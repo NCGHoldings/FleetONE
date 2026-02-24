@@ -1,87 +1,46 @@
 
 
-# Fix: Yutong Proforma Invoice Without Engine/Chassis + Vehicle Data Linking
+# Fix: Yutong Invoice Professional Layout
 
-## Problems Identified
+## Issues Found
 
-### 1. Proforma Invoice Requires Engine Number and Chassis Number
-Currently, when clicking "Proforma Invoice" from the Generate Invoice dropdown, the system requires all vehicle details (engine number, chassis number, etc.) to be complete before allowing any invoice generation (line 160-164 in `YutongOrderInvoiceGenerator.tsx`). However, at the proforma stage, these details are often not yet available -- the bus hasn't arrived yet.
+### 1. Orange Proforma Badge is Unprofessional
+The proforma invoice shows an orange gradient badge ("Proforma Invoice") floating over the header area at `position: absolute; top: 120px; right: 40px`. This looks jarring and unprofessional on a formal document.
 
-### 2. Vehicle Matching Modal Shows "Failed to load orders"
-The `YutongVehicleMatchingModal.tsx` queries `yutong_quotations(customer_name, model_name)` but the `yutong_quotations` table has NO `model_name` column -- the correct column is `bus_model`. This causes the entire query to fail with a Supabase error, showing "No matching orders found" and "Failed to load orders".
+**Fix:** Remove the orange badge entirely. The document is already identified as a proforma by the "PROFORMA NO" label in the metadata section and the "PROFORMA INVOICE NOTICE" box at the bottom. No extra badge is needed.
 
-### 3. No Integration Between Vehicle Data Page and Order Invoice Flow
-When a vehicle is matched to an order via the Vehicle Data page, the engine number, chassis number, and other details from the vehicle record are not automatically populated into the order's vehicle details. Users have to manually re-enter them.
+### 2. Product Table Column Widths are Badly Proportioned
+The PRODUCT header spans 55% (`colspan="2"`), but inside the body:
+- Label column (MAKE, BUS MODEL, etc.): `width: 45%`
+- Value column (YUTONG, C12 Pro, etc.): gets only ~10% (the leftover)
 
-## Solution
+This squeezes the Yutong model name "Yutong C12 Pro ZK6128H" into a tiny space, causing line wrapping and a cramped look.
 
-### File 1: `src/components/yutong/YutongOrderInvoiceGenerator.tsx`
+**Fix:** Redistribute the PRODUCT columns to 25% label / 30% value (matching the Yutong Tax Invoice standard from memory). This gives proper space for both the field names and the vehicle data values.
 
-**Allow Proforma Invoice without engine/chassis details:**
+### 3. Proforma Notice Box Styling
+The orange-bordered proforma notice at the bottom uses an emoji warning icon and orange theme. This will be refined to use the blue corporate theme for consistency while keeping it clearly marked as informational.
 
-- Modify `handleGenerateInvoice` (line 155-176): When the invoice type is `proforma_invoice`, skip the `vehicleDetailsComplete` check. Only require vehicle details for `direct_invoice` and `tax_invoice`.
-- Update the UI (line 361-398): Show the "Generate Invoice" dropdown even when vehicle details are incomplete, but only include "Proforma Invoice" as an option. The "Customer Invoice" and "Tax Invoice" options remain disabled/hidden until vehicle details are complete.
-- Update the invoice data preparation (line 206-251): For proforma invoices, use fallback values like "TBA" for engine_number and chassis_number when they are not yet available.
+## Changes
 
-### File 2: `src/components/yutong/YutongVehicleMatchingModal.tsx`
+### File: `src/lib/yutong-order-invoice-generator.ts`
 
-**Fix the broken query:**
+**Change 1 -- Remove proforma badge (lines 131-167)**
+- Remove the `.proforma-badge` CSS class and the `.proforma-amount-display` class
+- Keep `.proforma-info` but restyle it to use the blue corporate theme instead of orange
 
-- Line 53: Change `model_name` to `bus_model` in the Supabase select query:
-  ```
-  quotation:yutong_quotations(customer_name, bus_model)
-  ```
-- Line 65, 88: Update all references from `order.quotation?.model_name` to `order.quotation?.bus_model`
+**Change 2 -- Remove badge HTML (line 678)**
+- Remove `${isProforma ? '<div class="proforma-badge">Proforma Invoice</div>' : ''}`
 
-### File 3: `src/components/yutong/YutongVehicleMatchingModal.tsx` (continued)
+**Change 3 -- Fix table column widths (lines 711-719)**
+- Change PRODUCT columns from 55% to keep at 55% but split as:
+  - Label td: `width: 25%` (was 45%)
+  - Value td: `width: 30%` (was ~10%)
+- This matches the corporate standard for Tax Invoices
 
-**After matching, auto-populate vehicle details to the order:**
-
-- Extend the `handleMatch` function: After `matchVehicleToOrder` succeeds, also update the `yutong_orders` table with the vehicle record's engine_no, chassis_no, year_of_manufacture, country_of_origin, fuel_type, engine_capacity, and color fields.
-
-### File 4: `src/components/yutong/YutongInvoiceDataModal.tsx`
-
-**Make engine/chassis optional for proforma context:**
-
-- Add an optional `isProforma` prop to the component
-- When `isProforma` is true, remove the `required` attribute from engine_number and chassis_number fields
-- Update the validation on line 66: Only require engine_number and chassis_number when `isProforma` is false
-
-### File 5: `src/hooks/useYutongVehicleDataManagement.ts`
-
-**Enhance `matchVehicleToOrder` to sync vehicle details to the order:**
-
-- After updating the vehicle record's match status, also update the corresponding `yutong_orders` row with:
-  - `engine_number` from vehicle's `engine_no`
-  - `chassis_number` from vehicle's `chassis_no`
-  - `year_of_manufacture` from vehicle record
-  - `country_of_origin` from vehicle record
-  - `fuel_type` from vehicle record
-  - `engine_capacity` from vehicle record
-  - `color_scheme` from vehicle's `color`
-
-This creates a seamless flow: Upload vehicle data -> Match to order -> Vehicle details auto-populate -> All invoice types become available.
-
-## Technical Summary
-
-| Change | File | Impact |
-|--------|------|--------|
-| Skip vehicle check for proforma | YutongOrderInvoiceGenerator.tsx | Proforma invoices work without engine/chassis |
-| Fix `model_name` to `bus_model` | YutongVehicleMatchingModal.tsx | Vehicle matching modal loads orders correctly |
-| Auto-sync vehicle data to order | useYutongVehicleDataManagement.ts | Matching a vehicle auto-fills order details |
-| Optional engine/chassis fields | YutongInvoiceDataModal.tsx | Modal adapts based on invoice context |
-| Show proforma option always | YutongOrderInvoiceGenerator.tsx | Users can generate proforma even with incomplete vehicle data |
-
-## Expected User Flow
-
-```text
-1. Create Order (no vehicle details yet)
-2. Click "Generate Invoice" -> choose "Proforma Invoice"
-   -> Works immediately with "TBA" for engine/chassis
-3. Later, go to Vehicle Data page -> upload data sheet
-4. Match vehicle record to order
-   -> Engine, chassis, etc. auto-populate into the order
-5. Now "Customer Invoice" and "Tax Invoice" become available
-   -> Full details appear on the invoice
-```
+**Change 4 -- Restyle proforma notice (lines 146-162, 786-793)**
+- Change proforma-info background from orange (`#fff7ed`) to light blue (`#e8f6ff`)
+- Change border from orange (`#f97316`) to corporate blue (`#0b2f66`)
+- Change text color from orange (`#ea580c`, `#9a3412`) to corporate blue
+- Replace emoji warning icon with text "PROFORMA INVOICE NOTICE"
 
