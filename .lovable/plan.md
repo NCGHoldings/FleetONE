@@ -1,46 +1,69 @@
 
 
-# Fix: Yutong Invoice Professional Layout
+# Fix: Invoice Download - Missing Cell Values and Vertical Centering
 
-## Issues Found
+## Problems
 
-### 1. Orange Proforma Badge is Unprofessional
-The proforma invoice shows an orange gradient badge ("Proforma Invoice") floating over the header area at `position: absolute; top: 120px; right: 40px`. This looks jarring and unprofessional on a formal document.
+Looking at the downloaded PDF vs the in-app preview:
 
-**Fix:** Remove the orange badge entirely. The document is already identified as a proforma by the "PROFORMA NO" label in the metadata section and the "PROFORMA INVOICE NOTICE" box at the bottom. No extra badge is needed.
+1. **QTY, UNIT PRICE, and TOTAL cells appear empty** in the downloaded PDF — the `rowspan="8"` merged cells with `vertical-align: middle` are not rendering correctly when `html2canvas` captures the page. The values exist but `html2canvas` has known issues with vertically centering content in rowspan cells.
 
-### 2. Product Table Column Widths are Badly Proportioned
-The PRODUCT header spans 55% (`colspan="2"`), but inside the body:
-- Label column (MAKE, BUS MODEL, etc.): `width: 45%`
-- Value column (YUTONG, C12 Pro, etc.): gets only ~10% (the leftover)
+2. **Content is not vertically centered** in the merged cells — even when values do show, they stick to the top rather than being centered between the 8 product rows.
 
-This squeezes the Yutong model name "Yutong C12 Pro ZK6128H" into a tiny space, causing line wrapping and a cramped look.
+## Root Cause
 
-**Fix:** Redistribute the PRODUCT columns to 25% label / 30% value (matching the Yutong Tax Invoice standard from memory). This gives proper space for both the field names and the vehicle data values.
+`html2canvas` does not reliably support `vertical-align: middle` on `rowspan` cells. The CSS property is ignored during rasterization, causing content to either disappear or render at the top of the cell.
 
-### 3. Proforma Notice Box Styling
-The orange-bordered proforma notice at the bottom uses an emoji warning icon and orange theme. This will be refined to use the blue corporate theme for consistency while keeping it clearly marked as informational.
-
-## Changes
+## Solution
 
 ### File: `src/lib/yutong-order-invoice-generator.ts`
 
-**Change 1 -- Remove proforma badge (lines 131-167)**
-- Remove the `.proforma-badge` CSS class and the `.proforma-amount-display` class
-- Keep `.proforma-info` but restyle it to use the blue corporate theme instead of orange
+**Replace rowspan approach with a nested layout using flexbox:**
 
-**Change 2 -- Remove badge HTML (line 678)**
-- Remove `${isProforma ? '<div class="proforma-badge">Proforma Invoice</div>' : ''}`
+Instead of using `rowspan="8"` on the QTY, UNIT PRICE, and TOTAL cells (which breaks in html2canvas), restructure the table so that:
 
-**Change 3 -- Fix table column widths (lines 711-719)**
-- Change PRODUCT columns from 55% to keep at 55% but split as:
-  - Label td: `width: 25%` (was 45%)
-  - Value td: `width: 30%` (was ~10%)
-- This matches the corporate standard for Tax Invoices
+1. Only the first product row (`MAKE`) contains the QTY/PRICE/TOTAL cells
+2. These cells use `rowspan="8"` but with an inner wrapper div that uses `display: flex; align-items: center; justify-content: center; height: 100%` to force centering
+3. Add explicit `height` to the merged cells so html2canvas can compute the layout
 
-**Change 4 -- Restyle proforma notice (lines 146-162, 786-793)**
-- Change proforma-info background from orange (`#fff7ed`) to light blue (`#e8f6ff`)
-- Change border from orange (`#f97316`) to corporate blue (`#0b2f66`)
-- Change text color from orange (`#ea580c`, `#9a3412`) to corporate blue
-- Replace emoji warning icon with text "PROFORMA INVOICE NOTICE"
+**CSS Changes (around line 198):**
+- Update `.merged-cell` to include:
+  - `position: relative`
+  - Add a child `.merged-cell-content` wrapper with `display: flex; align-items: center; justify-content: center; height: 100%; position: absolute; top: 0; left: 0; right: 0; bottom: 0`
+
+**HTML Changes (lines 703-705):**
+- Wrap the content of each merged cell in a `<div class="merged-cell-content">` div
+- Example: `<td rowspan="8" class="qty merged-cell"><div class="merged-cell-content">1.00</div></td>`
+
+**Specific edits:**
+
+1. **CSS addition** (after line 201): Add `.merged-cell-content` style:
+   ```
+   .merged-cell {
+     vertical-align: middle !important;
+     text-align: center;
+     position: relative;
+   }
+   .merged-cell-content {
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     height: 100%;
+     width: 100%;
+     position: absolute;
+     top: 0;
+     left: 0;
+     right: 0;
+     bottom: 0;
+     padding: 8px;
+     box-sizing: border-box;
+     font-weight: 700;
+   }
+   ```
+
+2. **HTML wrapping** (lines 703-705): Wrap each merged cell value in a content div:
+   - `<td rowspan="8" class="qty merged-cell"><div class="merged-cell-content">${data.quantity}.00</div></td>`
+   - Same for UNIT PRICE and TOTAL cells
+
+This ensures `html2canvas` can correctly render and center the values in the downloaded PDF, matching the in-app preview.
 
