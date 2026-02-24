@@ -38,7 +38,8 @@ const defaultSettings: CoreGLSettingsData = {
 };
 
 export function CoreGLSettings() {
-  const { selectedCompanyId, companyName } = useCompany();
+  const { selectedCompanyId, selectedCompany } = useCompany();
+  const companyName = selectedCompany?.name || 'Unknown';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [accounts, setAccounts] = useState<GLAccount[]>([]);
@@ -65,7 +66,7 @@ export function CoreGLSettings() {
       setAccounts(accountsData || []);
 
       // Load existing settings
-      const { data: settingsData, error: settingsError } = await supabase
+      const { data: settingsData, error: settingsError } = await (supabase as any)
         .from('gl_settings')
         .select('*')
         .eq('company_id', companyId)
@@ -102,7 +103,7 @@ export function CoreGLSettings() {
         company_id: selectedCompanyId,
       };
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('gl_settings')
         .upsert(saveData, { onConflict: 'company_id' });
 

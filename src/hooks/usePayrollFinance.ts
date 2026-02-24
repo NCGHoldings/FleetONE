@@ -109,7 +109,7 @@ export function usePayrollFinanceSettings() {
       }
 
       if (data?.settings) {
-        return data.settings as PayrollFinanceSettings;
+        return data.settings as unknown as PayrollFinanceSettings;
       }
 
       // Return defaults
@@ -137,12 +137,12 @@ export function useSavePayrollFinanceSettings() {
 
   return useMutation({
     mutationFn: async (settings: PayrollFinanceSettings) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("module_finance_settings")
         .upsert({
           company_id: effectiveCompanyId,
           module_name: "payroll",
-          settings: settings,
+          settings: settings as any,
           updated_at: new Date().toISOString(),
         }, {
           onConflict: "company_id,module_name",

@@ -425,7 +425,7 @@ export default function SystemIssueTracker() {
                       <span className="text-xs text-muted-foreground font-mono">#{issue.issue_number}</span>
                       <h4 className="font-medium truncate">{issue.title}</h4>
                       {issue.is_auto_diagnosed && (
-                        <Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" title="Auto-diagnosed" />
+                        <Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" />
                       )}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">

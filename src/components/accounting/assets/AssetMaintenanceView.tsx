@@ -10,8 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, MoreHorizontal, Wrench, Calendar, AlertTriangle, CheckCircle, Clock, Play, BookOpen, Loader2 } from "lucide-react";
-import { useAssetMaintenanceLogs, useUpcomingMaintenance, useStartMaintenance, useCompleteMaintenance, useCancelMaintenance } from "@/hooks/useAssetMaintenance";
+import { useAssetMaintenanceLogs, useUpcomingMaintenance, useStartMaintenance, useCompleteMaintenance, useCancelMaintenance, useCreateMaintenanceLog } from "@/hooks/useAssetMaintenance";
 import { useMaintenanceFinanceSettings, usePostMaintenanceCostToGL } from "@/hooks/useMaintenanceFinance";
+import { useFixedAssets } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -21,6 +22,9 @@ export const AssetMaintenanceView = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<any>(null);
+  const [completionCost, setCompletionCost] = useState("");
+  const [completionNotes, setCompletionNotes] = useState("");
   const [scheduleForm, setScheduleForm] = useState({
     asset_id: "",
     maintenance_type: "preventive" as "preventive" | "corrective" | "predictive" | "emergency",

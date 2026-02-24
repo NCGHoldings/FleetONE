@@ -176,9 +176,10 @@ export const BudgetAnalytics = () => {
       const cat = item.subcategory || item.category || "Other";
       if (!bySub[cat]) bySub[cat] = { budget: 0, actual: 0, count: 0 };
       bySub[cat].budget += item.budget_amount || 0;
-      // Use GL-derived actual if account_id is linked, otherwise fallback to manual actual_amount
-      const glActual = item.account_id ? (glAccountSpending[item.account_id] || 0) : 0;
-      const effectiveActual = item.account_id && glActual > 0 ? glActual : (item.actual_amount || 0);
+      // Use GL-derived actual if chart_of_accounts_id is linked, otherwise fallback to manual actual_amount
+      const accountId = (item as any).chart_of_accounts_id;
+      const glActual = accountId ? (glAccountSpending[accountId] || 0) : 0;
+      const effectiveActual = accountId && glActual > 0 ? glActual : (item.actual_amount || 0);
       bySub[cat].actual += effectiveActual;
       bySub[cat].count++;
     });
@@ -201,9 +202,10 @@ export const BudgetAnalytics = () => {
     return [...lineItems]
       .filter(item => item.budget_amount > 0)
       .map(item => {
-        // Use GL-derived actual if account_id is linked
-        const glActual = item.account_id ? (glAccountSpending[item.account_id] || 0) : 0;
-        const effectiveActual = item.account_id && glActual > 0 ? glActual : (item.actual_amount || 0);
+        // Use GL-derived actual if chart_of_accounts_id is linked
+        const accountId = (item as any).chart_of_accounts_id;
+        const glActual = accountId ? (glAccountSpending[accountId] || 0) : 0;
+        const effectiveActual = accountId && glActual > 0 ? glActual : (item.actual_amount || 0);
         return {
           ...item,
           actual_amount: effectiveActual,

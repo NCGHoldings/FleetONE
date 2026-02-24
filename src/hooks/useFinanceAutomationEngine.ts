@@ -301,7 +301,7 @@ export const useModuleAutomationHealth = () => {
         .eq("company_id", selectedCompanyId);
 
       // Fetch GL settings
-      const { data: glSettings } = await supabase
+      const { data: glSettings } = await (supabase as any)
         .from("gl_settings")
         .select("*")
         .eq("company_id", selectedCompanyId)

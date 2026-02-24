@@ -550,7 +550,7 @@ export function useGLIntegrityScanner() {
     mutationFn: async (): Promise<ScanResult> => {
       if (!effectiveCompanyId) throw new Error("No company selected");
 
-      const { data: glSettings } = await supabase
+      const { data: glSettings } = await (supabase as any)
         .from("gl_settings")
         .select("*")
         .eq("company_id", effectiveCompanyId)

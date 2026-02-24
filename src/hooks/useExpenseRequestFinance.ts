@@ -91,8 +91,8 @@ export function useExpenseGLMappings() {
         console.error("Error fetching expense GL mappings:", error);
       }
 
-      if (data?.settings?.mappings) {
-        return data.settings.mappings as ExpenseGLMapping[];
+      if ((data?.settings as any)?.mappings) {
+        return (data.settings as any).mappings as ExpenseGLMapping[];
       }
 
       return [];

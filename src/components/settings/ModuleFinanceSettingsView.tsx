@@ -297,7 +297,7 @@ export function ModuleFinanceSettingsView() {
         settings.mappings = expenseMappings;
       }
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("module_finance_settings")
         .upsert(
           {
