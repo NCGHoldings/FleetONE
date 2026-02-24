@@ -1,0 +1,309 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* NCG Transport Management System - Enterprise Design System */
+
+@layer base {
+  :root {
+    /* Enterprise Color Palette */
+    --background: 215 28% 97%;
+    --foreground: 215 25% 15%; 
+    
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+    
+    /* Professional Blue Primary */
+    --primary: 215 88% 52%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 215 88% 47%;
+    --primary-glow: 215 88% 72%;
+    
+    /* Enterprise Secondary */
+    --secondary: 215 15% 95%;
+    --secondary-foreground: 215 25% 35%;
+    
+    /* Muted Backgrounds */
+    --muted: 215 15% 96%;
+    --muted-foreground: 215 10% 50%;
+    
+    /* Accent Colors */
+    --accent: 160 75% 45%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 160 75% 40%;
+    
+    /* Status Colors */
+    --success: 145 65% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Borders & Inputs */
+    --border: 215 15% 88%;
+    --input: 215 15% 92%;
+    --ring: 215 88% 52%;
+    
+    /* Professional Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--muted)));
+    --gradient-hero: linear-gradient(135deg, hsl(215 88% 52%), hsl(215 88% 42%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100% / 0.8), hsl(0 0% 100% / 0.4));
+    
+    /* Shadows */
+    --shadow-card: 0 4px 6px -1px hsl(215 25% 15% / 0.1), 0 2px 4px -1px hsl(215 25% 15% / 0.06);
+    --shadow-elevated: 0 10px 15px -3px hsl(215 25% 15% / 0.1), 0 4px 6px -2px hsl(215 25% 15% / 0.05);
+    --shadow-primary: 0 8px 25px -5px hsl(var(--primary) / 0.3);
+    
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark Enterprise Colors */
+    --background: 215 25% 8%;
+    --foreground: 215 15% 92%;
+    
+    --card: 215 25% 10%;
+    --card-foreground: 215 15% 92%;
+    
+    --popover: 215 25% 10%;
+    --popover-foreground: 215 15% 92%;
+    
+    /* Dark Primary */
+    --primary: 215 88% 62%;
+    --primary-foreground: 215 25% 8%;
+    --primary-hover: 215 88% 57%;
+    --primary-glow: 215 88% 72%;
+    
+    /* Dark Secondary */
+    --secondary: 215 15% 15%;
+    --secondary-foreground: 215 15% 85%;
+    
+    /* Dark Muted */
+    --muted: 215 15% 12%;
+    --muted-foreground: 215 10% 65%;
+    
+    /* Dark Accent */
+    --accent: 160 75% 55%;
+    --accent-foreground: 215 25% 8%;
+    --accent-hover: 160 75% 50%;
+    
+    /* Dark Status Colors */
+    --success: 145 65% 52%;
+    --success-foreground: 215 25% 8%;
+    --warning: 38 92% 60%;
+    --warning-foreground: 215 25% 8%;
+    --destructive: 0 75% 65%;
+    --destructive-foreground: 215 25% 8%;
+    
+    /* Dark Borders */
+    --border: 215 15% 18%;
+    --input: 215 15% 15%;
+    --ring: 215 88% 62%;
+    
+    /* Dark Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--muted)));
+    --gradient-hero: linear-gradient(135deg, hsl(215 88% 62%), hsl(215 88% 52%));
+    --gradient-card: linear-gradient(145deg, hsl(215 25% 10% / 0.8), hsl(215 25% 10% / 0.4));
+    
+    /* Dark Shadows */
+    --shadow-card: 0 4px 6px -1px hsl(215 25% 5% / 0.3), 0 2px 4px -1px hsl(215 25% 5% / 0.2);
+    --shadow-elevated: 0 10px 15px -3px hsl(215 25% 5% / 0.4), 0 4px 6px -2px hsl(215 25% 5% / 0.2);
+    --shadow-primary: 0 8px 25px -5px hsl(var(--primary) / 0.4);
+    
+    /* Sidebar Dark */
+    --sidebar-background: 215 25% 6%;
+    --sidebar-foreground: 215 15% 88%;
+    --sidebar-primary: 215 88% 62%;
+    --sidebar-primary-foreground: 215 25% 8%;
+    --sidebar-accent: 215 15% 12%;
+    --sidebar-accent-foreground: 215 15% 88%;
+    --sidebar-border: 215 15% 15%;
+    --sidebar-ring: 215 88% 62%;
+  }
+}
+
+/* Enterprise Utility Classes */
+@layer components {
+  .card-elevated {
+    @apply bg-card border border-border/50 shadow-[var(--shadow-elevated)] backdrop-blur-sm;
+  }
+  
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+  
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+  
+  .shadow-primary {
+    box-shadow: var(--shadow-primary);
+  }
+  
+  .table-row-hover {
+    @apply hover:bg-muted/50 transition-smooth cursor-pointer;
+  }
+  
+  .kpi-card {
+    @apply bg-card border border-border/50 rounded-lg p-6 shadow-[var(--shadow-card)] transition-smooth hover:shadow-[var(--shadow-elevated)];
+  }
+  
+  .status-success {
+    @apply bg-success text-success-foreground;
+  }
+  
+  .status-warning {
+    @apply bg-warning text-warning-foreground;
+  }
+  
+  .status-error {
+    @apply bg-destructive text-destructive-foreground;
+  }
+  
+  /* Enhanced Interactive Elements */
+  .nav-item {
+    @apply relative overflow-hidden;
+  }
+  
+  .nav-item::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-primary/10 to-accent/10 opacity-0 transition-opacity duration-300;
+  }
+  
+  .nav-item:hover::before {
+    @apply opacity-100;
+  }
+  
+  /* Smooth Page Transitions */
+  .page-transition {
+    @apply animate-fade-in;
+  }
+  
+  /* Enhanced Cards */
+  .professional-card {
+    @apply bg-gradient-to-br from-card via-card to-card/80 border border-border/50 rounded-xl shadow-[var(--shadow-card)] backdrop-blur-sm hover:shadow-[var(--shadow-elevated)] transition-all duration-300 hover:scale-[1.02];
+  }
+  
+  /* Loading States */
+  .skeleton-pulse {
+    @apply animate-pulse bg-gradient-to-r from-muted via-muted/70 to-muted;
+  }
+
+  /* System Health Dashboard - Cyber Theme */
+  .cyber-card {
+    @apply bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900;
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.08);
+  }
+
+  .cyber-console {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  }
+
+  /* Pulsing status indicators */
+  .status-pulse-green {
+    @apply relative;
+  }
+  .status-pulse-green::before {
+    content: '';
+    @apply absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-30;
+  }
+
+  .status-pulse-yellow {
+    @apply relative;
+  }
+  .status-pulse-yellow::before {
+    content: '';
+    @apply absolute inset-0 rounded-full bg-amber-500 animate-ping opacity-30;
+  }
+
+  .status-pulse-red {
+    @apply relative;
+  }
+  .status-pulse-red::before {
+    content: '';
+    @apply absolute inset-0 rounded-full bg-red-500 animate-ping opacity-30;
+  }
+
+  /* Cyber grid overlay */
+  .cyber-grid {
+    background-image: 
+      linear-gradient(rgba(6, 182, 212, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(6, 182, 212, 0.1) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Glow effects */
+  .glow-cyan {
+    box-shadow: 0 0 30px rgba(6, 182, 212, 0.2);
+  }
+
+  .glow-emerald {
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.2);
+  }
+
+  .glow-red {
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.2);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-foreground;
+  }
+}
+
+/* Custom scrollbar for calendar cells */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}

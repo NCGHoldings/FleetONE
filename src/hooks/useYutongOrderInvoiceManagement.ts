@@ -1,0 +1,599 @@
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { 
+  generateYutongOrderInvoiceHTML, 
+  generateYutongOrderInvoicePDF,
+  YutongOrderInvoiceData 
+} from '@/lib/yutong-order-invoice-generator';
+import {
+  fetchVehicleFinanceSettings,
+  createVehicleARInvoice,
+  postVehicleInvoiceToGL,
+  applyAdvanceToReceivable,
+  updateOrderFinanceLinks,
+  NCG_HOLDING_ID,
+} from '@/hooks/useVehicleSalesFinance';
+
+interface YutongStoredInvoice {
+  id: string;
+  invoice_no: string;
+  order_id: string;
+  quotation_id: string;
+  invoice_date: string;
+  invoice_amount: number;
+  status: string;
+  invoice_type: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  generated_by: string | null;
+  generated_at: string;
+  created_at: string;
+  updated_at: string;
+  notes: string | null;
+}
+
+interface YutongStoredDocument {
+  id: string;
+  invoice_record_id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number;
+  document_status: string;
+  invoice_data: any;
+  generated_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export function useYutongOrderInvoiceManagement() {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const generateAndStoreDraftInvoice = async (
+    invoiceData: YutongOrderInvoiceData,
+    orderId: string,
+    quotationId: string
+  ): Promise<{ success: boolean; invoice?: any; document?: any; error?: any }> => {
+    console.log('🚀 Starting invoice generation process...');
+    console.log('📋 Invoice Data:', invoiceData);
+    console.log('🔑 Order ID:', orderId, 'Quotation ID:', quotationId);
+    
+    setIsLoading(true);
+    
+    try {
+      // Fetch verified payments for this order
+      const { data: verifiedPayments, error: paymentsError } = await supabase
+        .from('yutong_customer_payments')
+        .select('*')
+        .eq('order_id', orderId)
+        .eq('status', 'verified')
+        .order('payment_date', { ascending: true });
+
+      if (paymentsError) throw paymentsError;
+
+      // Calculate payment totals
+      const totalPaid = verifiedPayments?.reduce((sum, p) => sum + p.payment_amount, 0) || 0;
+      const balanceDue = invoiceData.total - totalPaid;
+
+      // Enrich invoice data with payment information
+      invoiceData = {
+        ...invoiceData,
+        paymentsReceived: verifiedPayments?.map(p => ({
+          payment_date: p.payment_date,
+          amount: p.payment_amount,
+          reference_no: p.payment_reference,
+          payment_method: p.payment_method,
+          verified_by: p.verified_by,
+          verified_at: p.verified_at
+        })) || [],
+        totalPaid,
+        balanceDue,
+        lastPaymentDate: verifiedPayments?.[verifiedPayments.length - 1]?.payment_date
+      };
+      
+      // Generate invoice number
+      console.log('📝 Step 1: Generating invoice number...');
+      const { data: invoiceNoData, error: invoiceNoError } = await supabase
+        .rpc('generate_yutong_invoice_no');
+      
+      if (invoiceNoError) {
+        console.error('❌ Failed to generate invoice number:', invoiceNoError);
+        throw new Error(`Invoice number generation failed: ${invoiceNoError.message}`);
+      }
+      
+      const invoiceNo = invoiceNoData as string;
+      console.log('✅ Invoice number generated:', invoiceNo);
+      
+      // For draft invoices, signatures will be added later via signature manager
+      console.log('📝 Step 1.5: Invoice signatures will be managed separately');
+      const signatureData = {};
+      
+      // Update invoice data with generated number and signatures
+      const fullInvoiceData = {
+        ...invoiceData,
+        ...signatureData,
+        invoice_no: invoiceNo,
+        invoice_status: 'draft' as const
+      };
+      
+      // Generate PDF
+      console.log('📄 Step 2: Generating PDF...');
+      const pdfBlob = await generateYutongOrderInvoicePDF(fullInvoiceData);
+      console.log('✅ PDF generated successfully. Size:', pdfBlob.size, 'bytes');
+      
+      // Upload to storage - use yutong-invoices bucket
+      console.log('☁️ Step 3: Uploading to storage...');
+      const fileName = `${invoiceNo}_draft.pdf`;
+      const filePath = `${orderId}/${fileName}`;
+      console.log('📁 Upload path:', filePath);
+      console.log('📦 File size:', pdfBlob.size, 'bytes (', (pdfBlob.size / 1024 / 1024).toFixed(2), 'MB)');
+      
+      // Add timeout to storage upload - use yutong-invoices bucket
+      const uploadPromise = supabase.storage
+        .from('yutong-invoices')
+        .upload(filePath, pdfBlob, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Storage upload timeout after 30 seconds')), 30000)
+      );
+      
+      const uploadResult = await Promise.race([uploadPromise, timeoutPromise]) as any;
+      
+      console.log('📤 Upload completed, checking result...');
+      
+      if (uploadResult.error) {
+        console.error('❌ Storage upload failed:', uploadResult.error);
+        throw new Error(`Failed to upload PDF to storage: ${uploadResult.error.message}`);
+      }
+      console.log('✅ PDF uploaded successfully to:', uploadResult.data?.path || filePath);
+      
+      // Create invoice record with proforma fields
+      console.log('💾 Step 4: Creating invoice record...');
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('yutong_invoice_records')
+        .insert({
+          invoice_no: invoiceNo,
+          order_id: orderId,
+          quotation_id: quotationId,
+          invoice_date: fullInvoiceData.invoice_date,
+          invoice_amount: fullInvoiceData.invoice_category === 'proforma_invoice' 
+            ? fullInvoiceData.proforma_amount || fullInvoiceData.total 
+            : fullInvoiceData.total,
+          status: 'draft',
+          // Proforma invoice fields
+          invoice_category: fullInvoiceData.invoice_category || 'direct_invoice',
+          proforma_amount_percentage: fullInvoiceData.proforma_amount_percentage,
+          proforma_amount: fullInvoiceData.proforma_amount,
+          finance_company_name: fullInvoiceData.finance_company_name,
+          finance_company_address: fullInvoiceData.finance_company_address,
+          proforma_purpose: fullInvoiceData.proforma_purpose
+        })
+        .select()
+        .single();
+      
+      if (invoiceError) {
+        console.error('❌ Failed to create invoice record:', invoiceError);
+        throw new Error(`Failed to create invoice record: ${invoiceError.message}`);
+      }
+      console.log('✅ Invoice record created:', invoice.id);
+      
+      // Create document record
+      console.log('📑 Step 5: Creating document record...');
+      const { data: document, error: docError } = await supabase
+        .from('yutong_invoice_documents')
+        .insert({
+          invoice_record_id: invoice.id,
+          file_name: fileName,
+          file_path: filePath,
+          file_size: pdfBlob.size,
+          document_status: 'draft',
+          invoice_data: fullInvoiceData
+        })
+        .select()
+        .single();
+      
+      if (docError) {
+        console.error('❌ Failed to create document record:', docError);
+        throw new Error(`Failed to create document record: ${docError.message}`);
+      }
+      console.log('✅ Document record created:', document.id);
+      
+      console.log('🎉 Invoice generation completed successfully!');
+      toast.success('Draft invoice generated successfully');
+      
+      return { success: true, invoice, document };
+    } catch (error: any) {
+      console.error('❌ INVOICE GENERATION FAILED:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        stack: error.stack
+      });
+      
+      const errorMessage = error.message || 'Unknown error occurred';
+      toast.error('Failed to generate invoice: ' + errorMessage);
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * PROPER ACCOUNTING FLOW:
+   * When invoice is APPROVED:
+   * 1. Create AR Invoice in Finance module
+   * 2. Post Revenue Recognition GL: DR Trade Receivable | CR Sales Revenue
+   * 3. Apply advances against receivable: DR Customer Advance | CR Trade Receivable
+   */
+  const approveInvoice = async (
+    invoiceId: string,
+    documentId: string
+  ): Promise<{ success: boolean; error?: any }> => {
+    setIsLoading(true);
+    
+    try {
+      // Get document with invoice data
+      const { data: document, error: docError } = await supabase
+        .from('yutong_invoice_documents')
+        .select('*')
+        .eq('id', documentId)
+        .single();
+      
+      if (docError) throw docError;
+      
+      // Get invoice record with order details
+      const { data: invoice, error: invError } = await supabase
+        .from('yutong_invoice_records')
+        .select('*')
+        .eq('id', invoiceId)
+        .single();
+      
+      if (invError) throw invError;
+
+      // Get order details for finance integration
+      const { data: orderDetails, error: orderError } = await supabase
+        .from('yutong_orders')
+        .select('*, yutong_quotations(customer_name)')
+        .eq('id', invoice.order_id)
+        .single();
+
+      if (orderError) throw orderError;
+      
+      // Regenerate PDF without draft watermark
+      const invoiceData: YutongOrderInvoiceData = document.invoice_data as unknown as YutongOrderInvoiceData;
+      invoiceData.invoice_status = 'approved' as const;
+      
+      const pdfBlob = await generateYutongOrderInvoicePDF(invoiceData);
+      
+      // Upload approved version - use yutong-invoices bucket
+      const fileName = `${invoice.invoice_no}_approved.pdf`;
+      const filePath = `${invoice.order_id}/${fileName}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('yutong-invoices')
+        .upload(filePath, pdfBlob, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Update invoice record
+      const { error: updateInvError } = await supabase
+        .from('yutong_invoice_records')
+        .update({
+          status: 'approved',
+          approved_by: user?.id,
+          approved_at: new Date().toISOString()
+        })
+        .eq('id', invoiceId);
+      
+      if (updateInvError) throw updateInvError;
+      
+      // Update document record
+      const { error: updateDocError } = await supabase
+        .from('yutong_invoice_documents')
+        .update({
+          file_name: fileName,
+          file_path: filePath,
+          file_size: pdfBlob.size,
+          document_status: 'approved',
+          invoice_data: invoiceData as any
+        })
+        .eq('id', documentId);
+      
+      if (updateDocError) throw updateDocError;
+
+      // ==========================================
+      // FINANCE INTEGRATION - PROPER ACCOUNTING
+      // ==========================================
+      const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
+      
+      if (settings && orderDetails?.finance_customer_id) {
+        const customerName = orderDetails?.yutong_quotations?.customer_name || 'Unknown';
+        const orderNo = orderDetails?.order_no;
+        const invoiceAmount = invoice.invoice_amount;
+        const totalPaid = orderDetails?.total_paid || 0;
+
+        // Check if AR Invoice already exists
+        let arInvoiceId = orderDetails?.ar_invoice_id;
+        
+        if (!arInvoiceId && settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
+          // 1. Create AR Invoice in Finance module (at invoice approval)
+          const arResult = await createVehicleARInvoice({
+            module: 'yutong',
+            orderId: invoice.order_id,
+            orderNo,
+            customerId: orderDetails.finance_customer_id,
+            totalAmount: invoiceAmount,
+            advanceAmount: totalPaid, // Apply already verified payments
+            companyId: NCG_HOLDING_ID,
+            settings,
+          });
+
+          if (arResult) {
+            arInvoiceId = arResult.invoiceId;
+            await updateOrderFinanceLinks({
+              module: 'yutong',
+              orderId: invoice.order_id,
+              arInvoiceId: arResult.invoiceId,
+            });
+            toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
+          }
+
+          // 2. Post Revenue Recognition GL: DR Trade Receivable | CR Sales Revenue
+          const revenueGLResult = await postVehicleInvoiceToGL({
+            module: 'yutong',
+            orderNo,
+            customerName,
+            invoiceAmount,
+            settings,
+            effectiveCompanyId: NCG_HOLDING_ID,
+          });
+
+          if (revenueGLResult) {
+            console.log(`[Yutong] Revenue GL posted: ${revenueGLResult.entryNumber}`);
+          }
+
+          // 3. Apply advances against receivable: DR Customer Advance | CR Trade Receivable
+          if (totalPaid > 0 && settings.customer_advance_account_id) {
+            const advanceResult = await applyAdvanceToReceivable({
+              module: 'yutong',
+              orderNo,
+              customerName,
+              advanceAmount: totalPaid,
+              settings,
+              effectiveCompanyId: NCG_HOLDING_ID,
+            });
+
+            if (advanceResult) {
+              console.log(`[Yutong] Advance applied GL: ${advanceResult.entryNumber}`);
+            }
+          }
+        }
+      } else if (!settings) {
+        console.warn('[Yutong] Finance settings not configured - skipping AR/GL integration');
+      } else if (!orderDetails?.finance_customer_id) {
+        console.warn('[Yutong] No finance customer linked - skipping AR/GL integration');
+      }
+      
+      toast.success('Invoice approved successfully');
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error approving invoice:', error);
+      toast.error('Failed to approve invoice: ' + error.message);
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getInvoicesByOrder = async (
+    orderId: string
+  ): Promise<{ success: boolean; invoices?: YutongStoredInvoice[]; error?: any }> => {
+    try {
+      const { data, error } = await supabase
+        .from('yutong_invoice_records')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      return { success: true, invoices: data as YutongStoredInvoice[] };
+    } catch (error: any) {
+      console.error('Error fetching invoices:', error);
+      return { success: false, error };
+    }
+  };
+
+  const getInvoiceDocuments = async (
+    orderId: string
+  ): Promise<{ success: boolean; documents?: YutongStoredDocument[]; error?: any }> => {
+    try {
+      // First get invoice records for this specific order
+      const { data: invoiceRecords, error: recordsError } = await supabase
+        .from('yutong_invoice_records')
+        .select('id')
+        .eq('order_id', orderId);
+
+      if (recordsError) throw recordsError;
+
+      if (!invoiceRecords || invoiceRecords.length === 0) {
+        return { success: true, documents: [] };
+      }
+
+      // Then get documents for those specific invoice records
+      const recordIds = invoiceRecords.map(r => r.id);
+      const { data, error } = await supabase
+        .from('yutong_invoice_documents')
+        .select(`
+          *,
+          yutong_invoice_records!invoice_record_id (
+            order_id,
+            quotation_id,
+            invoice_no,
+            status
+          )
+        `)
+        .in('invoice_record_id', recordIds)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return { success: true, documents: data as any };
+    } catch (error: any) {
+      console.error('Error fetching invoice documents:', error);
+      return { success: false, error };
+    }
+  };
+
+  const regenerateInvoice = async (
+    documentId: string
+  ): Promise<{ success: boolean; error?: any }> => {
+    setIsLoading(true);
+    
+    try {
+      // Get document with invoice data
+      const { data: document, error: docError } = await supabase
+        .from('yutong_invoice_documents')
+        .select(`
+          *,
+          yutong_invoice_records (
+            order_id
+          )
+        `)
+        .eq('id', documentId)
+        .single();
+      
+      if (docError) throw docError;
+      
+      // Fetch latest signatures from yutong_invoice_signatures table
+      let signatureData = {};
+      if (document.invoice_record_id) {
+        const { data: signatures } = await supabase
+          .from('yutong_invoice_signatures')
+          .select('*')
+          .eq('invoice_record_id', document.invoice_record_id)
+          .order('created_at', { ascending: true });
+        
+        if (signatures && signatures.length > 0) {
+          const prepared = signatures.find((s: any) => s.signature_role === 'prepared_by');
+          const approved = signatures.find((s: any) => s.signature_role === 'approved_by');
+          const customer = signatures.find((s: any) => s.signature_role === 'received_by');
+          
+          signatureData = {
+            preparedBy: prepared ? {
+              approver_name: prepared.signer_name,
+              signature_data: prepared.signature_data,
+              approval_date: prepared.signed_at
+            } : undefined,
+            approvedBy: approved ? {
+              approver_name: approved.signer_name,
+              signature_data: approved.signature_data,
+              approval_date: approved.signed_at
+            } : undefined,
+            receivedBy: customer ? {
+              approver_name: customer.signer_name,
+              signature_data: customer.signature_data,
+              approval_date: customer.signed_at
+            } : undefined
+          };
+        }
+      }
+
+      // Fetch latest verified payments
+      const orderId = (document.yutong_invoice_records as any)?.order_id;
+      let paymentData = {};
+      
+      if (orderId) {
+        const { data: verifiedPayments, error: paymentsError } = await supabase
+          .from('yutong_customer_payments')
+          .select('*')
+          .eq('order_id', orderId)
+          .eq('status', 'verified')
+          .order('payment_date', { ascending: true });
+
+        if (!paymentsError && verifiedPayments) {
+          const invoiceTotal = (document.invoice_data as any)?.total || 0;
+          const totalPaid = verifiedPayments.reduce((sum, p) => sum + p.payment_amount, 0);
+          const balanceDue = invoiceTotal - totalPaid;
+
+          paymentData = {
+            paymentsReceived: verifiedPayments.map(p => ({
+              payment_date: p.payment_date,
+              amount: p.payment_amount,
+              reference_no: p.payment_reference,
+              payment_method: p.payment_method,
+              verified_by: p.verified_by,
+              verified_at: p.verified_at
+            })),
+            totalPaid,
+            balanceDue,
+            lastPaymentDate: verifiedPayments[verifiedPayments.length - 1]?.payment_date
+          };
+        }
+      }
+      
+      // Merge invoice data with latest signatures and payments
+      const updatedInvoiceData = {
+        ...(document.invoice_data as unknown as YutongOrderInvoiceData),
+        ...signatureData,
+        ...paymentData
+      };
+      
+      // Regenerate PDF with updated data
+      const pdfBlob = await generateYutongOrderInvoicePDF(updatedInvoiceData);
+      
+      // Re-upload with same path - use yutong-invoices bucket
+      const { error: uploadError } = await supabase.storage
+        .from('yutong-invoices')
+        .upload(document.file_path, pdfBlob, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      // Update document record with new data and file size
+      const { error: updateError } = await supabase
+        .from('yutong_invoice_documents')
+        .update({
+          file_size: pdfBlob.size,
+          invoice_data: updatedInvoiceData as any,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', documentId);
+      
+      if (updateError) throw updateError;
+      
+      toast.success('Invoice regenerated successfully');
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error regenerating invoice:', error);
+      toast.error('Failed to regenerate invoice: ' + error.message);
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return {
+    isLoading,
+    generateAndStoreDraftInvoice,
+    approveInvoice,
+    getInvoicesByOrder,
+    getInvoiceDocuments,
+    regenerateInvoice
+  };
+}
