@@ -14,8 +14,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
 
       - name: Push to FleetONE
         run: |
-          git remote add fleetone https://${{ secrets.GH_PAT }}@github.com/NCGHoldings/FleetONE.git
+          git remote add fleetone https://x-access-token:${{ secrets.GH_PAT }}@github.com/NCGHoldings/FleetONE.git
           git push fleetone main --force
