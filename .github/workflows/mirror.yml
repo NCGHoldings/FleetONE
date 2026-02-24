@@ -15,9 +15,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Push to FleetONE
+      - name: Mirror via API
         env:
-          GH_PAT: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          git remote add fleetone "https://${GH_PAT}@github.com/NCGHoldings/FleetONE.git"
+          # Get source commit SHA
+          SOURCE_SHA=$(git rev-parse HEAD)
+          echo "Source SHA: $SOURCE_SHA"
+
+          # Push all objects to FleetONE using git
+          git remote add fleetone https://x-access-token:${GH_TOKEN}@github.com/NCGHoldings/FleetONE.git
+
+          # Push only the source code (exclude .github/workflows to avoid workflow scope issue)
+          git filter-branch --force --index-filter \
+            'git rm -r --cached --ignore-unmatch .github/workflows/' \
+            --prune-empty HEAD
+
           git push fleetone main --force
