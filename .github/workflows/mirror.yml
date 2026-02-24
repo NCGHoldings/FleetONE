@@ -18,5 +18,8 @@ jobs:
 
       - name: Push to FleetONE
         run: |
+          # Remove workflow files that require workflow scope to push
+          git rm -r --cached .github/workflows/ 2>/dev/null || true
+          git commit -m "temp: exclude workflows for mirror" --allow-empty
           git remote add fleetone https://x-access-token:${{ secrets.GH_PAT }}@github.com/NCGHoldings/FleetONE.git
           git push fleetone main --force
