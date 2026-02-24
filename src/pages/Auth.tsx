@@ -4,11 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Truck, Eye, EyeOff, Loader2, Bus, BarChart3, MapPin, Shield } from "lucide-react";
+import { Bus, Eye, EyeOff, Loader2, Shield, Mail, Lock, Quote } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import luxuryBusHero from "@/assets/luxury-bus-hero.jpg";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
@@ -55,7 +53,7 @@ export default function Auth() {
 
       toast({
         title: "Welcome back!",
-        description: "Successfully signed in to NCG Speed Transport System.",
+        description: "Successfully signed in to FleetONE.",
       });
 
       // Navigate to dashboard
@@ -69,184 +67,152 @@ export default function Auth() {
     }
   };
 
-  const features = [
-    { icon: Bus, label: "Fleet Management", description: "Track your entire fleet" },
-    { icon: MapPin, label: "Real-time Tracking", description: "GPS-enabled monitoring" },
-    { icon: BarChart3, label: "Analytics Dashboard", description: "Data-driven insights" },
-    { icon: Shield, label: "Secure & Reliable", description: "Enterprise-grade security" },
+  const featureCards = [
+    { icon: Bus, title: "Transit Operations", desc: "Real-time fleet tracking & scheduling" },
+    { icon: Shield, title: "Smart Diagnostics", desc: "AI-powered checks & quality control" },
   ];
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row">
-      {/* Left Side - Image Section */}
-      <div className="relative lg:w-1/2 h-64 lg:h-auto overflow-hidden">
-        {/* Background Image */}
-        <img
-          src={luxuryBusHero}
-          alt="Luxury Bus Fleet"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/90 via-primary/70 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-white/10 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse delay-1000" />
-        </div>
+    <div className="min-h-screen flex flex-col lg:flex-row bg-[#16222b] text-white selection:bg-[#dba816] selection:text-[#16222b] font-sans">
 
-        {/* Content Overlay */}
-        <div className="relative z-10 h-full flex flex-col justify-between p-6 lg:p-12 text-white">
-          {/* Logo & Tagline */}
-          <div className="animate-fade-in">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
-                <Truck className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">NCG Speed</h1>
-                <p className="text-white/80 text-sm">Transport Management System</p>
+      {/* Left Side - Login Section */}
+      <div className="flex-1 lg:w-1/2 flex flex-col justify-center p-8 lg:p-16 2xl:p-32 relative overflow-hidden">
+
+        <div className="w-full max-w-[420px] mx-auto relative z-10 flex flex-col items-start">
+
+          {/* Logo Handle */}
+          <div className="flex items-center gap-3 mb-10 animate-fade-in hover:scale-105 transition-transform cursor-pointer group">
+            <div className="relative">
+              <div className="w-10 h-10 bg-[#dba816] rounded-xl flex items-center justify-center relative z-10">
+                {/* Custom SVG Logo matching sister platforms */}
+                <svg className="w-6 h-6 text-[#16222b]" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </div>
             </div>
+            <span className="text-2xl font-black tracking-tighter text-[#dba816]">FleetONE</span>
           </div>
 
-          {/* Features Grid - Hidden on mobile, visible on lg */}
-          <div className="hidden lg:block space-y-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            <h2 className="text-xl font-semibold mb-6">Your Journey, Our Priority</h2>
-            <div className="grid grid-cols-2 gap-4">
-              {features.map((feature, index) => (
-                <div 
-                  key={feature.label}
-                  className="group bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:bg-white/20 transition-all duration-300"
-                  style={{ animationDelay: `${0.3 + index * 0.1}s` }}
-                >
-                  <feature.icon className="w-6 h-6 mb-2 text-white/90 group-hover:scale-110 transition-transform" />
-                  <h3 className="font-medium text-sm">{feature.label}</h3>
-                  <p className="text-xs text-white/70">{feature.description}</p>
-                </div>
-              ))}
-            </div>
+          <div className="mb-8 animate-fade-in w-full" style={{ animationDelay: '0.1s' }}>
+            <h1 className="text-3xl font-bold mb-2 text-white text-left">Welcome back</h1>
+            <p className="text-[#8095A8] text-sm text-left">Enter your credentials to access the workspace</p>
           </div>
 
-          {/* Bottom Stats */}
-          <div className="hidden lg:flex items-center gap-8 animate-fade-in" style={{ animationDelay: '0.5s' }}>
-            <div>
-              <p className="text-3xl font-bold">100+</p>
-              <p className="text-sm text-white/70">Active Buses</p>
-            </div>
-            <div className="w-px h-10 bg-white/30" />
-            <div>
-              <p className="text-3xl font-bold">50+</p>
-              <p className="text-sm text-white/70">Routes</p>
-            </div>
-            <div className="w-px h-10 bg-white/30" />
-            <div>
-              <p className="text-3xl font-bold">24/7</p>
-              <p className="text-sm text-white/70">Operations</p>
-            </div>
-          </div>
-        </div>
-      </div>
+          <form onSubmit={handleSignIn} className="w-full animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            {/* Form Container to match StoresOne/GarageOne style */}
+            <div className="bg-[#1c2834] border border-[#2c3d4f] rounded-xl p-6 shadow-sm space-y-6">
 
-      {/* Right Side - Login Section */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-background">
-        <div className="w-full max-w-md animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <Card className="border-0 shadow-2xl">
-            <CardHeader className="text-center pb-2">
-              <div className="mx-auto w-14 h-14 bg-gradient-to-br from-primary to-primary/80 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-primary/30">
-                <Truck className="w-7 h-7 text-primary-foreground" />
-              </div>
-              <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Sign in to access your dashboard
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="pt-6">
-              <form onSubmit={handleSignIn} className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="signin-email" className="text-sm font-medium">Email Address</Label>
+              {/* Email Input */}
+              <div className="space-y-2">
+                <Label htmlFor="signin-email" className="text-[13px] text-[#A0B0C0] font-medium block text-left">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8095A8]" />
                   <Input
                     id="signin-email"
                     type="email"
-                    placeholder="Enter your email"
+                    placeholder="name@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={loading}
-                    className="h-11 bg-muted/50 border-muted-foreground/20 focus:border-primary transition-colors"
+                    className="h-11 pl-10 pr-4 bg-[#16222b] border-[#2c3d4f] text-white font-medium rounded-lg placeholder:text-[#506578] focus-visible:ring-1 focus-visible:ring-[#dba816] focus-visible:border-[#dba816] focus-visible:outline-none transition-all"
                   />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="signin-password" className="text-sm font-medium">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="signin-password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={loading}
-                      className="h-11 bg-muted/50 border-muted-foreground/20 focus:border-primary transition-colors pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground hover:text-foreground"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={loading}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                {error && (
-                  <Alert variant="destructive" className="animate-fade-in">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <Button 
-                  type="submit" 
-                  className="w-full h-11 text-base font-medium shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300" 
-                  disabled={loading}
-                >
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Sign In
-                </Button>
-              </form>
-
-              <div className="mt-8 p-4 bg-muted/30 rounded-xl border border-border/50">
-                <p className="text-sm text-muted-foreground text-center leading-relaxed">
-                  New account registration is restricted to administrators only. 
-                  Contact your system administrator to create a new account.
-                </p>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Mobile Features - Show only on mobile */}
-          <div className="lg:hidden mt-6 grid grid-cols-2 gap-3">
-            {features.map((feature) => (
-              <div 
-                key={feature.label}
-                className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border border-border/50"
+              {/* Password Input */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="signin-password" className="text-[13px] text-[#A0B0C0] font-medium">Password</Label>
+                  <a href="#" className="text-[12px] text-[#dba816] hover:text-[#dba816]/80 transition-colors font-medium">Forgot password?</a>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8095A8]" />
+                  <Input
+                    id="signin-password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={loading}
+                    className="h-11 pl-10 pr-10 bg-[#16222b] border-[#2c3d4f] text-white font-medium rounded-lg placeholder:text-[#506578] focus-visible:ring-1 focus-visible:ring-[#dba816] focus-visible:border-[#dba816] focus-visible:outline-none transition-all tracking-[0.1em]"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-transparent text-[#8095A8] hover:text-[#dba816]"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              {error && (
+                <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-500 rounded-lg">
+                  <AlertDescription className="text-sm">{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full h-11 bg-[#dba816] hover:bg-[#c99912] text-[#16222b] font-semibold text-sm rounded-lg transition-all"
+                disabled={loading}
               >
-                <feature.icon className="w-4 h-4 text-primary shrink-0" />
-                <span className="text-xs font-medium text-muted-foreground">{feature.label}</span>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin text-[#16222b]" />}
+                Sign In
+              </Button>
+            </div>
+          </form>
+
+          {/* Bottom Features Cards to match the ecosystem look */}
+          <div className="mt-8 grid grid-cols-2 gap-4 animate-fade-in w-full" style={{ animationDelay: '0.4s' }}>
+            {featureCards.map((card, i) => (
+              <div key={i} className="bg-[#1c2834] border border-[#2c3d4f] p-4 rounded-xl hover:border-[#dba816]/30 transition-colors cursor-default">
+                <card.icon className="w-5 h-5 text-[#dba816] mb-3" />
+                <h3 className="text-[13px] font-semibold text-white mb-1">{card.title}</h3>
+                <p className="text-[11px] text-[#A0B0C0] leading-relaxed font-medium">{card.desc}</p>
               </div>
             ))}
           </div>
+
+        </div>
+      </div>
+
+      {/* Right Side - Brand / Quote Section */}
+      <div className="hidden lg:flex w-1/2 relative bg-[#dba816] overflow-hidden items-center justify-center p-16">
+
+        {/* Abstract background shapes matching the concentric circles/curves concept */}
+        <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none opacity-20">
+          {/* Using a concentric circle pattern similar to StoresOne */}
+          <div className="w-[800px] h-[800px] border border-[#b2870e] rounded-full absolute" />
+          <div className="w-[600px] h-[600px] border border-[#b2870e] rounded-full absolute" />
+          <div className="w-[400px] h-[400px] border border-[#b2870e] rounded-full absolute" />
+          <div className="w-[1000px] h-[1000px] border border-[#b2870e] rounded-full absolute" />
+        </div>
+
+        <div className="relative z-10 max-w-[500px] text-center flex flex-col items-center">
+          <Quote className="w-12 h-12 text-[#16222b] mb-6 opacity-30 fill-current rotate-180" />
+
+          <h2 className="text-3xl xl:text-[34px] font-semibold text-[#16222b] leading-[1.3] mb-8 tracking-tight">
+            "Elevating passenger experience with intelligent fleet management, seamless scheduling, and optimized transit operations."
+          </h2>
+
+          <div className="flex gap-2 mb-2 items-center justify-center">
+            <div className="w-2 h-2 rounded-full bg-[#16222b]/40"></div>
+            <div className="w-6 h-2 rounded-full bg-[#16222b]"></div>
+            <div className="w-2 h-2 rounded-full bg-[#16222b]/40"></div>
+            <div className="w-2 h-2 rounded-full bg-[#16222b]/40"></div>
+          </div>
+        </div>
+
+        {/* Footer info */}
+        <div className="absolute bottom-6 right-8 flex items-center gap-1.5 text-[#16222b]/60 text-xs font-medium">
+          Built with <span className="text-[#16222b] opacity-80">♥</span> by NCG Tech
+          <span className="opacity-60 ml-1">Build v3.36.0</span>
         </div>
       </div>
     </div>
