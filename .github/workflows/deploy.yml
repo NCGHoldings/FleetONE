@@ -33,10 +33,13 @@ jobs:
             echo "📦 Navigating to app directory..."
             cd "$APP_DIR"
 
+            # Fix git ownership check
+            git config --global --add safe.directory "$APP_DIR"
+
             # Initialize git if not already a repo
             if [ ! -d ".git" ]; then
               echo "🔧 Initializing git repo..."
-              git init
+              git init -b main
               git remote add origin https://github.com/NCGHoldings/FleetONE.git
             fi
 
