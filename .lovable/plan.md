@@ -1,145 +1,71 @@
 
+# Upload and Replace Chart of Accounts for NCG Holding
 
-# Fix: Special Hire KPIs Not Updating Beyond 2000 Records
+## Current Behavior
 
-## Problem
+The "Upload COA" button **already has replace functionality** built in. When you upload a new COA file, it:
+1. Deletes ALL existing accounts for the selected company
+2. Inserts the new accounts from the uploaded file
 
-The Special Hire Management KPI cards are stuck showing **2000 Total Quotations** when the database actually has **2033**. This happens because:
+## Problem: Data Integrity Risk
 
-1. **Supabase row limit**: The `loadStats()` function fetches all rows using `.select('status, gross_revenue, approval_status, created_at')` which is capped by Supabase's default PostgREST row limit (~2000). It then counts rows client-side with `.length`, so the count is never accurate beyond the limit.
+There are **700 journal entry lines** and **113 budget line items** that reference existing COA account IDs. If the old accounts are deleted and new ones inserted, those references become **orphaned** (pointing to non-existent accounts), which would break:
+- Journal Entry views and General Ledger reports
+- Budget analytics
+- Any historical financial data
 
-2. **Missing `is_active_version` filter**: The KPI query counts ALL quotations (including old versions), while the quotation list correctly filters by `is_active_version = true` (showing 1743). The KPIs should match the list.
+## Proposed Solution: Safe Replace with Confirmation
 
-3. **Comparison period logic is flawed**: The "comparison" query uses `.lte('created_at', comparisonDate)` which fetches all records *before* the comparison date -- this gives the cumulative total at that point, not just the records in the comparison window. Change percentages are therefore meaningless for older data.
+### Changes to `src/components/accounting/ChartOfAccountsUpload.tsx`
 
-## Actual vs Displayed Numbers
+1. **Add a confirmation step** before uploading that warns the user about the replacement
+2. **Show existing account count and linked transaction count** so the user understands the impact
+3. **Add a "Replace Mode" toggle** with two options:
+   - **Replace All (Clean Slate)**: Deletes existing COA and uploads new one. Shows a warning if there are linked journal entries/budget items that will lose their account references
+   - **Merge/Update**: Matches accounts by GL code -- updates existing accounts and adds new ones without deleting (preserves transaction links)
 
-| Metric | Database (Real) | KPI Shows | Issue |
-|--------|-----------------|-----------|-------|
-| Total Quotations | 2033 (all) / 1743 (active) | 2000 | Row limit cap |
-| Confirmed Trips | 97 | 97 | Happens to be under limit |
-| Revenue | LKR 7,250,960.50 | LKR 7,250,960.5 | Correct (payments table is small) |
-| Pending Approval | 163 | ~152 | Row limit excludes some |
+4. **Pre-upload validation**: Before confirming, query the database for:
+   - Count of existing accounts for this company
+   - Count of journal entry lines referencing these accounts
+   - Count of budget line items referencing these accounts
 
-## Solution
+5. **Clear warning dialog** when linked data exists:
+   > "Warning: There are 700 journal entries and 113 budget items linked to the current COA. Replacing will orphan these references. Consider using Merge mode instead."
 
-### File: `src/pages/SpecialHire.tsx` -- Rewrite `loadStats()` function (lines 142-225)
+### Technical Details
 
-Replace the client-side counting approach with **server-side counting using Supabase `count` and `head` options**, and add the `is_active_version` filter.
+**New state variables:**
+- `replaceMode: 'replace' | 'merge'` (default: 'replace')
+- `existingStats: { accounts: number, journalLines: number, budgetLines: number } | null`
 
-**New approach for each metric:**
-
-```typescript
-const loadStats = async () => {
-  try {
-    const selectedPeriod = comparisonPeriods.find(p => p.value === comparisonPeriod);
-    const daysBack = selectedPeriod?.days || 7;
-    const currentDate = new Date();
-    const comparisonStartDate = new Date();
-    comparisonStartDate.setDate(currentDate.getDate() - daysBack);
-    const previousStartDate = new Date();
-    previousStartDate.setDate(currentDate.getDate() - (daysBack * 2));
-
-    // Use count queries instead of fetching all rows
-    const [
-      { count: totalQuotations },
-      { count: pendingQuotations },
-      { count: confirmedTrips },
-      { count: pendingApprovals },
-      { data: revenueData },
-      { count: pendingFinanceApprovals },
-      // Comparison period counts (records created in previous period)
-      { count: compTotalQuotations },
-      { count: compConfirmedTrips },
-    ] = await Promise.all([
-      // Total active quotations
-      supabase.from('special_hire_quotations')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active_version', true),
-      // Pending
-      supabase.from('special_hire_quotations')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active_version', true)
-        .eq('status', 'pending'),
-      // Confirmed
-      supabase.from('special_hire_quotations')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active_version', true)
-        .eq('status', 'confirmed'),
-      // Pending approval
-      supabase.from('special_hire_quotations')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active_version', true)
-        .eq('approval_status', 'pending'),
-      // Revenue (small table, safe to fetch)
-      supabase.from('special_hire_payments')
-        .select('status, amount'),
-      // Finance pending
-      supabase.from('special_hire_payments')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending_finance'),
-      // Comparison: quotations created in previous period
-      supabase.from('special_hire_quotations')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active_version', true)
-        .gte('created_at', previousStartDate.toISOString())
-        .lt('created_at', comparisonStartDate.toISOString()),
-      // Comparison: confirmed in previous period
-      supabase.from('special_hire_quotations')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active_version', true)
-        .eq('status', 'confirmed')
-        .gte('created_at', previousStartDate.toISOString())
-        .lt('created_at', comparisonStartDate.toISOString()),
-    ]);
-
-    // Current period new quotations for comparison
-    const { count: currentPeriodNew } = await supabase
-      .from('special_hire_quotations')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_active_version', true)
-      .gte('created_at', comparisonStartDate.toISOString());
-
-    const totalRevenue = revenueData
-      ?.filter(p => p.status === 'approved')
-      .reduce((sum, p) => sum + p.amount, 0) || 0;
-
-    const calculateChange = (current: number, previous: number) => {
-      if (previous === 0) return current > 0 ? 100 : 0;
-      return ((current - previous) / previous) * 100;
-    };
-
-    setStats({
-      totalQuotations: totalQuotations || 0,
-      pendingQuotations: pendingQuotations || 0,
-      confirmedTrips: confirmedTrips || 0,
-      totalRevenue,
-      pendingApprovals: pendingApprovals || 0,
-      pendingFinanceApprovals: pendingFinanceApprovals || 0,
-      totalQuotationsChange: calculateChange(currentPeriodNew || 0, compTotalQuotations || 0),
-      confirmedTripsChange: calculateChange(confirmedTrips || 0, compConfirmedTrips || 0),
-      // ... other change calculations
-    });
-  } catch (error) {
-    console.error('Error loading stats:', error);
-  }
-};
+**Pre-upload check function** (runs when preview is shown):
+```text
+Query existing account count for company
+Query journal_entry_lines count where account_id in company's COA
+Query budget_line_items count where account_id in company's COA
+Display results in an Alert
 ```
 
-### Key Changes Summary
+**Merge mode logic:**
+- For each parsed row, check if an account with the same `gl_code` already exists for this company
+- If exists: update `account_name`, `level1-5`, `account_type`, `account_level` fields
+- If new: insert as a new account
+- Accounts in the old COA but NOT in the new file are left untouched (no deletion)
 
-1. **Use `{ count: 'exact', head: true }`** -- asks Supabase to count server-side without returning row data. Works for any table size.
-2. **Add `.eq('is_active_version', true)`** -- KPI totals now match the quotation list count (1743 active, not 2033 total).
-3. **Fix comparison logic** -- compare records created in the current period vs. the previous period of equal length, not cumulative totals.
-4. **Use `Promise.all()`** -- run all count queries in parallel for faster loading.
-5. **No row limit issues** -- `head: true` means no rows are fetched, only the count header.
+**Replace mode logic (existing, with added confirmation):**
+- Show a red warning alert with transaction counts
+- Require explicit confirmation ("I understand this will affect X transactions")
+- Then proceed with current delete-and-insert logic
 
-## Also Fix: Build Errors (Pre-existing)
+### Also Fix: Build Errors
 
-The build has many pre-existing TypeScript errors in other files. These are unrelated to this KPI fix but block deployment. The most critical ones will be addressed:
+The following pre-existing build errors will be fixed alongside this feature:
 
-- **`AssetMaintenanceView.tsx`**: Missing state variables (`selectedLog`, `completionCost`, `completionNotes`) -- add the missing `useState` declarations
-- **`ExpenseReviewView.tsx`**: Missing `toast` import and incorrect type access -- fix imports and type cast
-- **`BudgetAnalytics.tsx`**: `account_id` doesn't exist on `BudgetLineItem` -- use correct property name
-- **Other files**: Type casting fixes for `gl_settings` queries and `NCG_HOLDING_ID` exports
-
+- **`AssetMaintenanceView.tsx`**: Add missing `useState` declarations for `selectedLog`, `completionCost`, `completionNotes`, and `setSelectedLog`/`setCompletionNotes`/`setCompletionCost`. Fix references to non-existent hooks `useCreateMaintenanceLog` and `useFixedAssets`.
+- **`ExpenseReviewView.tsx`**: Add missing `toast` import from `sonner`. Fix `auto_post_on_approve` type access by casting the GL settings value.
+- **`BudgetAnalytics.tsx`**: Replace `account_id` with the correct property name from the `BudgetLineItem` type.
+- **`CoreGLSettings.tsx`**: Fix `companyName` property access and `gl_settings` type errors by using proper type casting for Supabase queries.
+- **`ModuleFinanceSettingsView.tsx`**: Fix upsert type error for `module_finance_settings`.
+- **`EnhancedTripStatusManagementModal.tsx` and `PostTripAdjustmentModal.tsx`**: Fix `NCG_HOLDING_ID` export reference.
+- **`useAccountingMutations.ts`**: Fix `gl_settings` query type errors and property access issues by adding proper type assertions.
+- **`useCommissionFinance.ts`**: Fix settings type cast.
