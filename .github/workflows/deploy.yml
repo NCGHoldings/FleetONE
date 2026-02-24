@@ -33,16 +33,20 @@ jobs:
             echo "📦 Navigating to app directory..."
             cd "$APP_DIR"
 
+            # Initialize git if not already a repo
+            if [ ! -d ".git" ]; then
+              echo "🔧 Initializing git repo..."
+              git init
+              git remote add origin https://github.com/NCGHoldings/FleetONE.git
+            fi
+
             echo "⬇️ Pulling latest changes..."
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
-            echo "📥 Installing dependencies..."
-            npm install --legacy-peer-deps
-
-            echo "🔨 Building application..."
-            npm run build
-
-            echo "🔄 Reloading Nginx..."
-            sudo systemctl reload nginx
+            echo "� Rebuilding Docker container..."
+            docker build -t fleetflow .
+            docker rm -f fleetflow || true
+            docker run -d --restart always -p 3000:3000 --name fleetflow fleetflow
 
             echo "✅ Deployment complete!"
