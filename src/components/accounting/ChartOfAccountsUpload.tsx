@@ -31,6 +31,7 @@ interface ExistingStats {
   accounts: number;
   journalLines: number;
   budgetLines: number;
+  otherLinks: number;
 }
 
 export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAccountsUploadProps) => {
@@ -44,7 +45,6 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
   const [replaceMode, setReplaceMode] = useState<'replace' | 'merge'>('merge');
   const [existingStats, setExistingStats] = useState<ExistingStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
-  const [confirmReplace, setConfirmReplace] = useState(false);
 
   const mapAccountType = (level1: string): "asset" | "liability" | "equity" | "revenue" | "expense" => {
     const normalized = level1.toLowerCase().trim();
@@ -65,18 +65,40 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
 
   // Auto-switch to merge if linked data is detected and replace is selected
   useEffect(() => {
-    if (existingStats && (existingStats.journalLines > 0 || existingStats.budgetLines > 0) && replaceMode === 'replace') {
+    if (hasLinkedData && replaceMode === 'replace') {
       setReplaceMode('merge');
-      setConfirmReplace(false);
       toast.info("Switched to Merge mode — Replace is not available when accounts have linked data.");
     }
   }, [existingStats]);
+
+  // Helper: count rows in a table matching account IDs in chunks
+  const countLinkedRowsChunked = async (
+    table: string,
+    column: string,
+    accountIds: string[],
+    useCompanyFilter = false
+  ): Promise<number> => {
+    const CHUNK_SIZE = 200;
+    let total = 0;
+    for (let i = 0; i < accountIds.length; i += CHUNK_SIZE) {
+      const chunk = accountIds.slice(i, i + CHUNK_SIZE);
+      let query = (supabase as any)
+        .from(table)
+        .select("id", { count: "exact", head: true })
+        .in(column, chunk);
+      if (useCompanyFilter && companyId) {
+        query = query.eq("company_id", companyId);
+      }
+      const { count } = await query;
+      total += count || 0;
+    }
+    return total;
+  };
 
   const loadExistingStats = async () => {
     if (!companyId) return;
     setLoadingStats(true);
     try {
-      // Get existing account IDs for this company
       const { data: existingAccounts, error: accErr } = await supabase
         .from("chart_of_accounts")
         .select("id")
@@ -87,48 +109,39 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
 
       let journalLines = 0;
       let budgetLines = 0;
+      let otherLinks = 0;
 
       if (accountIds.length > 0) {
-        // Count journal entry lines referencing these accounts
-        const { count: jelCount } = await (supabase as any)
-          .from("journal_entry_lines")
-          .select("id", { count: "exact", head: true })
-          .in("account_id", accountIds.slice(0, 100));
-        journalLines = jelCount || 0;
+        // Chunked counting across ALL account IDs
+        journalLines = await countLinkedRowsChunked("journal_entry_lines", "account_id", accountIds);
+        budgetLines = await countLinkedRowsChunked("budget_line_items", "account_id", accountIds);
 
-        // Count budget line items referencing these accounts
-        const { count: blCount } = await (supabase as any)
-          .from("budget_line_items")
-          .select("id", { count: "exact", head: true })
-          .in("account_id", accountIds.slice(0, 100));
-        budgetLines = blCount || 0;
-
-        // Count bank accounts linked to these COA accounts
+        // Bank accounts linked via gl_account_id
         const { count: bankCount } = await supabase
           .from("bank_accounts")
           .select("id", { count: "exact", head: true })
           .eq("company_id", companyId)
           .not("gl_account_id", "is", null);
-        
-        // Count AP/AR references
-        const { count: apCount } = await (supabase as any)
-          .from("accounts_payable")
-          .select("id", { count: "exact", head: true })
-          .in("account_id", accountIds.slice(0, 100));
-        const { count: arCount } = await (supabase as any)
-          .from("accounts_receivable")
-          .select("id", { count: "exact", head: true })
-          .in("account_id", accountIds.slice(0, 100));
 
-        const otherLinks = (bankCount || 0) + (apCount || 0) + (arCount || 0);
-        journalLines = (jelCount || 0) + otherLinks;
+        // AP/AR references – chunked
+        const apCount = await countLinkedRowsChunked("accounts_payable", "account_id", accountIds);
+        const arCount = await countLinkedRowsChunked("accounts_receivable", "account_id", accountIds);
+
+        // AP/AR invoice lines
+        const apLineCount = await countLinkedRowsChunked("ap_invoice_lines", "account_id", accountIds);
+        const arLineCount = await countLinkedRowsChunked("ar_invoice_lines", "account_id", accountIds);
+
+        // Asset categories referencing COA
+        const assetCatCount = await countLinkedRowsChunked("asset_categories", "asset_account_id", accountIds);
+
+        // Auto posting rules
+        const debitRuleCount = await countLinkedRowsChunked("auto_posting_rules", "debit_account_id", accountIds);
+        const creditRuleCount = await countLinkedRowsChunked("auto_posting_rules", "credit_account_id", accountIds);
+
+        otherLinks = (bankCount || 0) + apCount + arCount + apLineCount + arLineCount + assetCatCount + debitRuleCount + creditRuleCount;
       }
 
-      setExistingStats({
-        accounts: accountIds.length,
-        journalLines,
-        budgetLines,
-      });
+      setExistingStats({ accounts: accountIds.length, journalLines, budgetLines, otherLinks });
     } catch (error) {
       console.error("Error loading existing stats:", error);
     } finally {
@@ -144,7 +157,6 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
     setPreviewMode(false);
     setParsedData([]);
     setUploadStats(null);
-    setConfirmReplace(false);
 
     try {
       const data = await selectedFile.arrayBuffer();
@@ -261,7 +273,6 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
         const batch = parsedData.slice(i, i + batchSize);
         const records = batch.map(row => {
           const rec = buildRecord(row);
-          // Remove current_balance so upsert doesn't reset existing balances
           const { current_balance, ...upsertRec } = rec;
           return upsertRec;
         });
@@ -283,7 +294,6 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
         setUploadProgress(Math.round(((i + batch.length) / parsedData.length) * 100));
       }
 
-      // Log upload history
       await supabase.from("coa_upload_history").insert({
         uploaded_by: user?.id,
         total_records: parsedData.length,
@@ -312,23 +322,42 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
   const handleUploadReplace = async () => {
     if (parsedData.length === 0 || !companyId) return;
 
+    // ── DEFENSIVE GUARD: If linked data exists, abort immediately ──
+    if (hasLinkedData) {
+      toast.error(
+        "Replace is blocked: accounts have linked transactions/references. Use Merge/Update mode instead.",
+        { duration: 8000 }
+      );
+      setReplaceMode('merge');
+
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from("coa_upload_history").insert({
+        uploaded_by: user?.id,
+        total_records: parsedData.length,
+        status: "failed",
+        file_name: file?.name,
+        notes: "replace_blocked_linked_data — runtime guard triggered",
+      });
+      return;
+    }
+
     setIsUploading(true);
     setUploadProgress(0);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      const expectedCount = existingStats?.accounts || 0;
 
-      // Delete existing accounts for THIS COMPANY ONLY
-      const { error: deleteError } = await supabase
+      // ── VERIFIED DELETE: use count to confirm rows were actually removed ──
+      const { error: deleteError, count: deletedCount } = await supabase
         .from("chart_of_accounts")
-        .delete()
+        .delete({ count: 'exact' })
         .eq("company_id", companyId);
 
       if (deleteError) {
         console.error("Delete error:", deleteError);
-        // HARD STOP – do not proceed to inserts
         toast.error(
-          "Replace failed: existing accounts are linked to transactions, bank accounts, or other records. Please use Merge/Update mode instead.",
+          "Replace failed: could not delete existing accounts (likely linked to transactions). Please use Merge/Update mode instead.",
           { duration: 8000 }
         );
         setUploadStats({ total: parsedData.length, success: 0, errors: parsedData.length });
@@ -338,13 +367,35 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
           total_records: parsedData.length,
           status: "failed",
           file_name: file?.name,
-          notes: `Replace mode BLOCKED – delete failed due to linked records: ${deleteError.message}`,
+          notes: `replace_blocked_delete_error: ${deleteError.message}`,
         });
 
         setIsUploading(false);
         return;
       }
 
+      // ── VERIFIED DELETE CHECK: if accounts existed but 0 were deleted, stop ──
+      if (expectedCount > 0 && (deletedCount === null || deletedCount === 0)) {
+        console.error(`Delete was a no-op: expected ${expectedCount} deletions but got ${deletedCount}`);
+        toast.error(
+          "Replace failed: no accounts were actually deleted (possible RLS or FK constraint). Please use Merge/Update mode instead.",
+          { duration: 8000 }
+        );
+        setUploadStats({ total: parsedData.length, success: 0, errors: parsedData.length });
+
+        await supabase.from("coa_upload_history").insert({
+          uploaded_by: user?.id,
+          total_records: parsedData.length,
+          status: "failed",
+          file_name: file?.name,
+          notes: `replace_blocked_delete_no_rows: expected ${expectedCount}, deleted ${deletedCount}`,
+        });
+
+        setIsUploading(false);
+        return;
+      }
+
+      // ── DELETE VERIFIED — proceed with inserts ──
       let successCount = 0;
       let errorCount = 0;
       const batchSize = 50;
@@ -376,7 +427,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
         total_records: parsedData.length,
         status: errorCount === 0 ? "completed" : "partial",
         file_name: file?.name,
-        notes: `Replace mode: ${successCount} accounts, ${errorCount} errors`,
+        notes: `Replace mode: deleted ${deletedCount}, inserted ${successCount}, errors ${errorCount}`,
       });
 
       setUploadStats({ total: parsedData.length, success: successCount, errors: errorCount });
@@ -397,15 +448,16 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
   };
 
   const handleUpload = () => {
+    // ── HARD GUARD: Never allow replace when linked data exists ──
+    if (replaceMode === 'replace' && hasLinkedData) {
+      toast.error("Replace is not available for this company — accounts are linked to transactions. Switching to Merge/Update.");
+      setReplaceMode('merge');
+      return;
+    }
+
     if (replaceMode === 'merge') {
       handleUploadMerge();
     } else {
-      // For replace mode with linked data, require confirmation
-      const hasLinkedData = existingStats && (existingStats.journalLines > 0 || existingStats.budgetLines > 0);
-      if (hasLinkedData && !confirmReplace) {
-        toast.error("Please confirm that you understand the impact of replacing the COA");
-        return;
-      }
       handleUploadReplace();
     }
   };
@@ -418,10 +470,10 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
     setUploadStats(null);
     setReplaceMode('merge');
     setExistingStats(null);
-    setConfirmReplace(false);
   };
 
-  const hasLinkedData = existingStats && (existingStats.journalLines > 0 || existingStats.budgetLines > 0);
+  const totalLinkedCount = (existingStats?.journalLines || 0) + (existingStats?.budgetLines || 0) + (existingStats?.otherLinks || 0);
+  const hasLinkedData = existingStats && totalLinkedCount > 0;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetState(); }}>
@@ -503,13 +555,11 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
                       <>
                         <br />
                         <span className="text-destructive font-semibold">
-                          ⚠ {existingStats.journalLines} journal entry lines and {existingStats.budgetLines} budget items 
-                          are linked to these accounts.
+                          ⚠ {totalLinkedCount} linked references found ({existingStats.journalLines} journal lines, {existingStats.budgetLines} budget items, {existingStats.otherLinks} other refs).
                         </span>
                         <br />
                         <span className="text-sm">
-                          Using <strong>Replace</strong> mode will orphan these references. 
-                          <strong> Merge/Update</strong> mode is recommended to preserve data integrity.
+                          <strong>Replace mode is disabled.</strong> Use <strong>Merge/Update</strong> to safely update your COA without breaking linked data.
                         </span>
                       </>
                     )}
@@ -520,7 +570,16 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
               {/* Upload Mode Selection */}
               <div className="border rounded-lg p-4 space-y-3">
                 <Label className="text-sm font-semibold">Upload Mode</Label>
-                <RadioGroup value={replaceMode} onValueChange={(v) => { setReplaceMode(v as 'replace' | 'merge'); setConfirmReplace(false); }}>
+                <RadioGroup 
+                  value={replaceMode} 
+                  onValueChange={(v) => {
+                    if (v === 'replace' && hasLinkedData) {
+                      toast.warning("Replace is blocked — this company has linked transactions.");
+                      return; // reject selection
+                    }
+                    setReplaceMode(v as 'replace' | 'merge');
+                  }}
+                >
                   <div className="flex items-start gap-3 p-3 rounded-md border hover:bg-muted/50">
                     <RadioGroupItem value="merge" id="merge" className="mt-0.5" />
                     <div>
@@ -531,7 +590,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
                       </p>
                     </div>
                   </div>
-                  <div className={`flex items-start gap-3 p-3 rounded-md border ${hasLinkedData ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50'}`}>
+                  <div className={`flex items-start gap-3 p-3 rounded-md border ${hasLinkedData ? 'opacity-40 cursor-not-allowed bg-muted/30' : 'hover:bg-muted/50'}`}>
                     <RadioGroupItem value="replace" id="replace" className="mt-0.5" disabled={!!hasLinkedData} />
                     <div>
                       <Label htmlFor="replace" className={`font-medium ${hasLinkedData ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
@@ -540,7 +599,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
                       </Label>
                       <p className="text-xs text-muted-foreground mt-1">
                         {hasLinkedData 
-                          ? <>This company has <strong>{existingStats!.journalLines} transaction links</strong> and <strong>{existingStats!.budgetLines} budget items</strong> referencing existing accounts. Replace is not available — use Merge/Update to safely update your COA.</>
+                          ? <>This company has <strong>{totalLinkedCount} linked references</strong> to existing accounts. Replace is permanently blocked — use Merge/Update to safely update your COA.</>
                           : <>Deletes ALL existing accounts and uploads new ones. Only use for brand-new setups with no transactions or references.</>
                         }
                       </p>
@@ -548,22 +607,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
                   </div>
                 </RadioGroup>
 
-                {/* Confirmation for replace mode with linked data */}
-                {replaceMode === 'replace' && hasLinkedData && (
-                  <div className="mt-3 p-3 bg-destructive/10 rounded-md border border-destructive/30">
-                    <label className="flex items-start gap-2 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={confirmReplace} 
-                        onChange={(e) => setConfirmReplace(e.target.checked)}
-                        className="mt-1"
-                      />
-                      <span className="text-sm text-destructive">
-                        I understand that replacing the COA will orphan <strong>{existingStats!.journalLines} journal entries</strong> and <strong>{existingStats!.budgetLines} budget items</strong>. This action cannot be undone.
-                      </span>
-                    </label>
-                  </div>
-                )}
+                {/* No more bypass checkbox — replace is hard-blocked when linked data exists */}
               </div>
 
               {uploadStats && (
@@ -632,8 +676,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
                 </Button>
                 <Button 
                   onClick={handleUpload} 
-                  disabled={isUploading || (replaceMode === 'replace' && hasLinkedData && !confirmReplace)}
-                  variant={replaceMode === 'replace' && hasLinkedData ? "destructive" : "default"}
+                  disabled={isUploading || (replaceMode === 'replace' && !!hasLinkedData)}
                 >
                   {isUploading 
                     ? (replaceMode === 'merge' ? "Merging..." : "Replacing...") 
