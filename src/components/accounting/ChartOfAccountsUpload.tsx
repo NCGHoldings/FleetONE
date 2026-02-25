@@ -439,7 +439,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
     }
   };
 
-  // ── FORCE REPLACE: cascading delete + fresh insert ──
+  // ── FORCE REPLACE: uses DB function for transactional cascading delete + fresh insert ──
   const handleForceReplace = async () => {
     if (parsedData.length === 0 || !companyId) return;
     setIsUploading(true);
@@ -447,128 +447,45 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
     setShowForceConfirm(false);
     setConfirmText("");
 
-    let deletedLinkedTotal = 0;
-
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Step 0: Get all account IDs for this company
-      setForceReplaceStep("Fetching account IDs...");
-      const { data: existingAccounts } = await supabase
-        .from("chart_of_accounts")
-        .select("id")
-        .eq("company_id", companyId);
-      const accountIds = (existingAccounts || []).map(a => a.id);
-      setUploadProgress(5);
+      // Step 1: Call the database function to cascade-delete everything
+      setForceReplaceStep("Clearing all linked data and accounts (server-side transaction)...");
+      setUploadProgress(10);
 
-      if (accountIds.length > 0) {
-        // Step 1: Delete journal_entry_lines
-        setForceReplaceStep("Clearing journal entry lines...");
-        const jelCount = await deleteLinkedRowsChunked("journal_entry_lines", "account_id", accountIds);
-        deletedLinkedTotal += jelCount;
-        setUploadProgress(15);
+      const { data: rpcResult, error: rpcError } = await supabase.rpc("force_delete_coa_for_company", {
+        p_company_id: companyId,
+      });
 
-        // Step 2: Delete journal_entries by company_id
-        setForceReplaceStep("Clearing journal entries...");
-        const { count: jeCount } = await supabase
-          .from("journal_entries")
-          .delete({ count: 'exact' })
-          .eq("company_id", companyId);
-        deletedLinkedTotal += (jeCount || 0);
-        setUploadProgress(25);
-
-        // Step 3: Delete budget_line_items
-        setForceReplaceStep("Clearing budget items...");
-        const bliCount = await deleteLinkedRowsChunked("budget_line_items", "account_id", accountIds);
-        deletedLinkedTotal += bliCount;
-        setUploadProgress(32);
-
-        // Step 4: Delete ap_invoice_lines
-        setForceReplaceStep("Clearing AP invoice lines...");
-        const apilCount = await deleteLinkedRowsChunked("ap_invoice_lines", "account_id", accountIds);
-        deletedLinkedTotal += apilCount;
-        setUploadProgress(38);
-
-        // Step 5: Delete ar_invoice_lines
-        setForceReplaceStep("Clearing AR invoice lines...");
-        const arilCount = await deleteLinkedRowsChunked("ar_invoice_lines", "account_id", accountIds);
-        deletedLinkedTotal += arilCount;
-        setUploadProgress(44);
-
-        // Step 6: Nullify accounts_payable.account_id
-        setForceReplaceStep("Clearing AP account references...");
-        await nullifyLinkedRowsChunked("accounts_payable", "account_id", accountIds);
-        setUploadProgress(48);
-
-        // Step 7: Nullify accounts_receivable.account_id
-        setForceReplaceStep("Clearing AR account references...");
-        await nullifyLinkedRowsChunked("accounts_receivable", "account_id", accountIds);
-        setUploadProgress(52);
-
-        // Step 8: Delete auto_posting_rules by company_id
-        setForceReplaceStep("Clearing auto posting rules...");
-        await supabase
-          .from("auto_posting_rules")
-          .delete()
-          .eq("company_id", companyId);
-        setUploadProgress(56);
-
-        // Step 9: Nullify asset_categories account references
-        setForceReplaceStep("Clearing asset category references...");
-        for (const col of ["asset_account_id", "accumulated_dep_account_id", "depreciation_expense_account_id", "gain_loss_disposal_account_id", "revaluation_surplus_account_id", "bank_account_id"]) {
-          await nullifyLinkedRowsChunked("asset_categories", col, accountIds, true);
-        }
-        setUploadProgress(62);
-
-        // Step 10: Nullify bank_accounts.gl_account_id
-        setForceReplaceStep("Clearing bank account GL links...");
-        await supabase
-          .from("bank_accounts")
-          .update({ gl_account_id: null })
-          .eq("company_id", companyId)
-          .not("gl_account_id", "is", null);
-        setUploadProgress(66);
-
-        // Step 11: Nullify gl_settings account references
-        setForceReplaceStep("Clearing GL settings references...");
-        // gl_settings may have many account reference columns - nullify by company_id
-        try {
-          await (supabase as any)
-            .from("gl_settings")
-            .update({
-              default_cash_account_id: null,
-              default_bank_account_id: null,
-              retained_earnings_account_id: null,
-              suspense_account_id: null,
-              exchange_gain_loss_account_id: null,
-            })
-            .eq("company_id", companyId);
-        } catch {
-          // gl_settings may not exist or have different columns — continue silently
-        }
-        setUploadProgress(70);
-      }
-
-      // Step 12: Delete ALL chart_of_accounts for company
-      setForceReplaceStep("Deleting old accounts...");
-      const { error: deleteError, count: deletedAccounts } = await supabase
-        .from("chart_of_accounts")
-        .delete({ count: 'exact' })
-        .eq("company_id", companyId);
-
-      if (deleteError) {
-        toast.error(`Force replace failed at delete step: ${deleteError.message}`, { duration: 10000 });
+      if (rpcError) {
+        toast.error(`Force replace failed: ${rpcError.message}`, { duration: 10000 });
         await supabase.from("coa_upload_history").insert({
           uploaded_by: user?.id, total_records: parsedData.length, status: "failed", file_name: file?.name,
-          notes: `force_replace_failed_delete: ${deleteError.message}. Cleared ${deletedLinkedTotal} linked records before failure.`,
+          notes: `force_replace_rpc_error: ${rpcError.message}`,
         });
         setIsUploading(false);
         setForceReplaceStep("");
         return;
       }
-      setUploadProgress(80);
 
-      // Step 13: Insert new accounts
+      const result = rpcResult as any;
+      if (!result?.success) {
+        toast.error(`Force replace failed: ${result?.error || "Unknown database error"}`, { duration: 10000 });
+        await supabase.from("coa_upload_history").insert({
+          uploaded_by: user?.id, total_records: parsedData.length, status: "failed", file_name: file?.name,
+          notes: `force_replace_db_error: ${result?.error} (${result?.detail})`,
+        });
+        setIsUploading(false);
+        setForceReplaceStep("");
+        return;
+      }
+
+      const deletedAccounts = result.deleted_accounts || 0;
+      const deletedLinkedTotal = result.deleted_linked || 0;
+      setUploadProgress(60);
+
+      // Step 2: Insert new accounts
       setForceReplaceStep("Inserting new accounts...");
       let successCount = 0;
       let errorCount = 0;
@@ -587,22 +504,22 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
         } else {
           successCount += batchData.length;
         }
-        setUploadProgress(80 + Math.round(((batch + 1) / totalBatches) * 20));
+        setUploadProgress(60 + Math.round(((batch + 1) / totalBatches) * 40));
       }
 
-      // Step 14: Log to upload history
+      // Step 3: Log to upload history
       await supabase.from("coa_upload_history").insert({
         uploaded_by: user?.id,
         total_records: parsedData.length,
         status: errorCount === 0 ? "completed" : "partial",
         file_name: file?.name,
-        notes: `force_replace: deleted ${deletedAccounts || 0} old accounts + ${deletedLinkedTotal} linked records, inserted ${successCount} new accounts, ${errorCount} errors`,
+        notes: `force_replace: deleted ${deletedAccounts} old accounts + ${deletedLinkedTotal} linked records, inserted ${successCount} new accounts, ${errorCount} errors`,
       });
 
       setUploadStats({ total: parsedData.length, success: successCount, errors: errorCount });
 
       if (errorCount === 0) {
-        toast.success(`Force Replace complete: ${successCount} accounts inserted (${deletedLinkedTotal} linked records cleared)`);
+        toast.success(`Force Replace complete: ${successCount} accounts inserted (${deletedAccounts} old accounts + ${deletedLinkedTotal} linked records cleared)`);
         onUploadComplete();
         setTimeout(() => setOpen(false), 2000);
       } else {
