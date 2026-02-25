@@ -1,81 +1,69 @@
 
-Root cause is now clear from the live request trace:
+I cross-checked the current COA upload code, your screenshots, and recent DB upload history.  
+Do I know what the issue is? **Yes.**
 
-1) The failing requests are plain INSERTs to `chart_of_accounts` (409 duplicate key), not merge upserts.
-2) In the modal screenshot, **Replace All** is selected (red button: “Replace with 222 Accounts”).
-3) `handleUploadReplace` currently does:
-   - try delete existing COA
-   - if delete fails, it only logs the error
-   - still continues with insert batches
-   - insert then fails with duplicate unique key (`chart_of_accounts_company_account_code_key`)
-4) There are linked records for this company (at least `journal_entry_lines` and `bank_accounts`), so delete is expected to fail.
+### What is still going wrong
 
-I will fix this so the user never gets the “0 success, 222 errors” loop again.
+1. **Replace mode is still reachable in some paths**  
+   Even with UI warnings, the logic still allows the app to enter replace flow and attempt inserts.
 
-## Implementation plan
+2. **Replace flow only checks `deleteError`, not whether rows were actually deleted**  
+   If delete becomes a no-op (or partial visibility/RLS behavior), code continues to insert → duplicate key errors (`23505`) on `(company_id, account_code)`.
 
-### 1) Make Replace mode fail-safe (stop immediately on delete failure)
-File: `src/components/accounting/ChartOfAccountsUpload.tsx`
+3. **Linked-data detection is incomplete and under-counted**
+   - It currently checks limited tables and only first 100 account IDs (`slice(0, 100)`), so replace can be incorrectly allowed.
+   - Many FK references exist in finance tables; if any remain, delete will fail.
 
-- In `handleUploadReplace`, change delete handling to **hard-stop**:
-  - if `deleteError` exists, throw/return immediately
-  - do not continue to insert loop
-- Show a clear toast with actionable guidance:
-  - “Replace cannot run because existing accounts are linked to transactions/settings. Use Merge/Update mode.”
-- Populate `uploadStats` with a meaningful failure state instead of batch-level duplicate spam.
-
-Why: This removes the misleading 222 duplicate errors and surfaces the real problem directly.
+4. **Current UX still permits dangerous replace attempts**
+   Confirmation checkbox can still allow replacing logic to proceed instead of hard-blocking.
 
 ---
 
-### 2) Prevent unsafe Replace attempts in the UI
-File: `src/components/accounting/ChartOfAccountsUpload.tsx`
+### Implementation plan (target file: `src/components/accounting/ChartOfAccountsUpload.tsx`)
 
-- When linked data exists:
-  - disable or strongly gate Replace mode (cannot proceed destructively)
-  - auto-switch to merge if user tries to upload in replace with links
-- Keep Replace mode available only when no links are detected.
+1. **Make replace non-bypassable at runtime**
+   - In `handleUpload`, if replace is selected and linked data exists, immediately force merge and return (no replace call).
+   - Add same hard guard at top of `handleUploadReplace` as defensive fallback.
 
-Why: Users should not be able to trigger a known-failing destructive path for active companies.
+2. **Require verified delete before any insert**
+   - Change replace delete call to return deleted rows/count.
+   - Compare deleted count against expected existing account count.
+   - If mismatch (including 0 deleted while accounts exist), treat as failure and **stop**; do not run insert loop.
+
+3. **Remove confirmation override for linked data**
+   - Keep Replace disabled when linked data exists.
+   - Remove/disable the “I understand…” path that still lets replace proceed.
+   - Radio `onValueChange` should reject selecting `"replace"` when blocked and keep mode at `"merge"`.
+
+4. **Fix link detection accuracy**
+   - Replace `accountIds.slice(0, 100)` with chunked counting across all account IDs.
+   - Keep separate counters for journal/budget/other refs; compute a total linked count used for gating.
+
+5. **Improve failure messaging + audit logs**
+   - Log explicit reason in `coa_upload_history`:
+     - `replace_blocked_linked_data`
+     - `replace_blocked_delete_no_rows`
+     - `replace_blocked_delete_error`
+   - Show one clear toast instead of batch duplicate-noise.
+
+6. **Optional hardening (recommended)**
+   - If account count > 0 and this is a live company, default to merge and hide destructive replace unless explicitly unlocked by super-admin flow.
 
 ---
 
-### 3) Fix inaccurate link counting used in warning text
-File: `src/components/accounting/ChartOfAccountsUpload.tsx`
+### Validation checklist I will run after implementation
 
-- Correct budget relation query column:
-  - from `chart_of_accounts_id` (wrong) to `account_id` (actual FK)
-- Improve linked-data detection accuracy so warning text is trustworthy.
-- Keep message generic enough to include non-journal dependencies (bank accounts/settings/etc), since multiple FK tables can block delete.
+1. Reproduce your exact case (395 existing, 222 import, linked records present):
+   - Replace cannot proceed to inserts.
+   - No 222 duplicate-key batch spam.
+   - Clear “use Merge/Update” message shown.
 
-Why: Current warning underreports impact and can mislead users into attempting Replace.
+2. Test Merge with same file:
+   - Should complete successfully.
 
----
+3. Test clean company (no linked refs):
+   - Replace works only when delete is verified successful.
 
-### 4) Improve user guidance in modal copy
-File: `src/components/accounting/ChartOfAccountsUpload.tsx`
-
-- Update Replace help text:
-  - explain that active companies usually must use Merge
-  - Replace is for clean setups with no references
-- Keep “Merge / Update (Recommended)” as the safe primary path.
-
-Why: Reduces repeated operator mistakes and support churn.
-
-## Validation plan
-
-1) Reproduce current scenario (company with linked records, 222-file import):
-   - selecting Replace should no longer proceed to inserts after failed delete
-   - user should see one clear actionable error
-2) Run Merge mode with same file:
-   - should complete without unique constraint failures
-3) Test a company with no linked references:
-   - Replace should complete successfully
-4) Confirm no regression to COA history logging and progress UI.
-
-## Expected outcome
-
-- No more “Uploaded 0 accounts with 222 errors” for linked companies.
-- Clear explanation when Replace is blocked.
-- Users can complete updates reliably via Merge/Update.
-- Safer COA maintenance aligned with existing accounting data integrity.
+4. Confirm UI behavior:
+   - Replace selection cannot be forced when blocked.
+   - Upload history records the correct failure/success reason.
