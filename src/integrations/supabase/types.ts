@@ -20160,12 +20160,18 @@ export type Database = {
       staff_registry: {
         Row: {
           address: string | null
+          blood_group: string | null
           contact_number: string | null
           created_at: string
           daily_rate: number | null
+          date_of_birth: string | null
           emergency_contact: string | null
           id: string
           is_active: boolean | null
+          joined_date: string | null
+          license_expiry: string | null
+          license_number: string | null
+          license_type: string | null
           monthly_salary: number | null
           nic_number: string | null
           notes: string | null
@@ -20177,12 +20183,18 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          blood_group?: string | null
           contact_number?: string | null
           created_at?: string
           daily_rate?: number | null
+          date_of_birth?: string | null
           emergency_contact?: string | null
           id?: string
           is_active?: boolean | null
+          joined_date?: string | null
+          license_expiry?: string | null
+          license_number?: string | null
+          license_type?: string | null
           monthly_salary?: number | null
           nic_number?: string | null
           notes?: string | null
@@ -20194,12 +20206,18 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          blood_group?: string | null
           contact_number?: string | null
           created_at?: string
           daily_rate?: number | null
+          date_of_birth?: string | null
           emergency_contact?: string | null
           id?: string
           is_active?: boolean | null
+          joined_date?: string | null
+          license_expiry?: string | null
+          license_number?: string | null
+          license_type?: string | null
           monthly_salary?: number | null
           nic_number?: string | null
           notes?: string | null

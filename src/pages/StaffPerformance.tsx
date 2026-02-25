@@ -8,16 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useStaffPerformance, StaffMemberPerformance } from "@/hooks/useStaffPerformance";
-import { PerformanceInsightsPanel } from "@/components/staff/PerformanceInsightsPanel";
 import { StaffPerformanceCharts } from "@/components/staff/StaffPerformanceCharts";
 import { CommissionHistory } from "@/components/staff/CommissionHistory";
 import { AttendanceCalendar } from "@/components/staff/AttendanceCalendar";
+import { StaffExcelImport } from "@/components/staff/StaffExcelImport";
+import { DocumentUpload } from "@/components/documents/DocumentUpload";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   User, Phone, Bus, Star, Eye, Clock, Award, TrendingUp, 
   RefreshCw, Users, DollarSign, AlertTriangle, Filter,
-  Calendar, Fuel, Route, MapPin, PhoneCall, FileText
+  Calendar, Fuel, Route, MapPin, PhoneCall, FileText, IdCard
 } from "lucide-react";
 import { format } from "date-fns";
 import { ColumnDef } from "@tanstack/react-table";
@@ -33,7 +34,6 @@ export default function StaffPerformance() {
   const [openDialogId, setOpenDialogId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Fetch attendance when staff is selected
   const fetchStaffAttendance = async (staffId: string) => {
     setAttendanceLoading(true);
     try {
@@ -52,18 +52,11 @@ export default function StaffPerformance() {
     }
   };
 
-  // Filter staff based on filters
   const filteredStaff = useMemo(() => {
     return staffPerformance.filter(staff => {
-      // Type filter
       if (staffTypeFilter !== "all" && staff.staff_type !== staffTypeFilter) return false;
-      
-      // Tier filter
       if (tierFilter !== "all" && staff.performanceTier !== tierFilter) return false;
-      
-      // Search
       if (searchQuery && !staff.staff_name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      
       return true;
     });
   }, [staffPerformance, staffTypeFilter, tierFilter, searchQuery]);
@@ -172,6 +165,21 @@ export default function StaffPerformance() {
       ),
     },
     {
+      accessorKey: "phone",
+      header: "Phone",
+      cell: ({ row }) => <span className="text-sm">{row.original.phone || '-'}</span>,
+    },
+    {
+      accessorKey: "nic",
+      header: "NIC",
+      cell: ({ row }) => <span className="text-sm">{row.original.nic || '-'}</span>,
+    },
+    {
+      accessorKey: "license_number",
+      header: "License No.",
+      cell: ({ row }) => <span className="text-sm">{row.original.license_number || '-'}</span>,
+    },
+    {
       id: "performance",
       header: "Performance",
       cell: ({ row }) => (
@@ -206,21 +214,6 @@ export default function StaffPerformance() {
       ),
     },
     {
-      id: "efficiency",
-      header: "Fuel Efficiency",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Fuel className="h-4 w-4 text-muted-foreground" />
-          <span className={`font-medium ${
-            row.original.avgFuelEfficiency >= 8 ? 'text-green-600' :
-            row.original.avgFuelEfficiency >= 6 ? 'text-yellow-600' : 'text-red-600'
-          }`}>
-            {row.original.avgFuelEfficiency > 0 ? `${row.original.avgFuelEfficiency} km/L` : '-'}
-          </span>
-        </div>
-      ),
-    },
-    {
       id: "attendance",
       header: "Attendance",
       cell: ({ row }) => (
@@ -232,37 +225,6 @@ export default function StaffPerformance() {
           }`}>
             {row.original.attendanceRate}%
           </span>
-        </div>
-      ),
-    },
-    {
-      id: "commission",
-      header: "Commission",
-      cell: ({ row }) => (
-        <div className="text-sm">
-          {row.original.commissionEarned > 0 ? (
-            <span className="font-medium text-green-600">
-              LKR {row.original.commissionEarned.toLocaleString()}
-            </span>
-          ) : (
-            <span className="text-muted-foreground">-</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      id: "complaints",
-      header: "Complaints",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          {row.original.complaintsCount > 0 ? (
-            <>
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-              <span className="text-red-600 font-medium">{row.original.complaintsCount}</span>
-            </>
-          ) : (
-            <span className="text-green-600 text-sm">None</span>
-          )}
         </div>
       ),
     },
@@ -324,26 +286,29 @@ export default function StaffPerformance() {
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-              <TrendingUp className="w-10 h-10" />
+              <Users className="w-10 h-10" />
             </div>
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
-                Staff Performance
+                Driver & Conductor Profiles
               </h1>
               <p className="text-accent-foreground/80 text-lg">
-                Real-time performance metrics from all modules
+                Master profiles, performance metrics & document management
               </p>
             </div>
           </div>
-          <Button 
-            variant="secondary" 
-            onClick={refetch}
-            disabled={loading}
-            className="gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh Data
-          </Button>
+          <div className="flex items-center gap-2">
+            <StaffExcelImport onImportComplete={refetch} />
+            <Button 
+              variant="secondary" 
+              onClick={refetch}
+              disabled={loading}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/20 rounded-full blur-2xl" />
@@ -424,72 +389,58 @@ export default function StaffPerformance() {
         </Card>
       </div>
 
-      {/* Main Content */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Staff Table - 2 columns */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Filters */}
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex flex-wrap gap-4">
-                <div className="flex-1 min-w-[200px]">
-                  <Input
-                    placeholder="Search by name..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-                <Select value={staffTypeFilter} onValueChange={setStaffTypeFilter}>
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Staff Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="driver">Drivers</SelectItem>
-                    <SelectItem value="conductor">Conductors</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={tierFilter} onValueChange={setTierFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Performance Tier" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Tiers</SelectItem>
-                    <SelectItem value="excellent">Excellent (80%+)</SelectItem>
-                    <SelectItem value="good">Good (60-79%)</SelectItem>
-                    <SelectItem value="average">Average (40-59%)</SelectItem>
-                    <SelectItem value="needs_improvement">Needs Improvement</SelectItem>
-                  </SelectContent>
-                </Select>
+      {/* Full-Width Table */}
+      <div className="space-y-4">
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex flex-wrap gap-4">
+              <div className="flex-1 min-w-[200px]">
+                <Input
+                  placeholder="Search by name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full"
+                />
               </div>
-            </CardContent>
-          </Card>
+              <Select value={staffTypeFilter} onValueChange={setStaffTypeFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Staff Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="driver">Drivers</SelectItem>
+                  <SelectItem value="conductor">Conductors</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={tierFilter} onValueChange={setTierFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Performance Tier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Tiers</SelectItem>
+                  <SelectItem value="excellent">Excellent (80%+)</SelectItem>
+                  <SelectItem value="good">Good (60-79%)</SelectItem>
+                  <SelectItem value="average">Average (40-59%)</SelectItem>
+                  <SelectItem value="needs_improvement">Needs Improvement</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
 
-          <DataTable
-            columns={columns}
-            data={filteredStaff}
-            searchKey="staff_name"
-            title=""
-          />
-        </div>
-
-        {/* Insights Panel - 1 column */}
-        <div>
-          <PerformanceInsightsPanel 
-            insights={insights}
-            onInsightClick={(staffId) => {
-              const staff = staffPerformance.find(s => s.id === staffId);
-              if (staff) handleStaffClick(staff);
-            }}
-          />
-        </div>
+        <DataTable
+          columns={columns}
+          data={filteredStaff}
+          searchKey="staff_name"
+          title=""
+        />
       </div>
     </div>
   );
 }
 
-// Staff Detail Content Component
+// Staff Detail Content Component with Documents tab
 function StaffDetailContent({ 
   staff, 
   attendance,
@@ -501,11 +452,12 @@ function StaffDetailContent({
 }) {
   return (
     <Tabs defaultValue="overview" className="mt-4">
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="attendance">Attendance</TabsTrigger>
         <TabsTrigger value="performance">Performance</TabsTrigger>
         <TabsTrigger value="commissions">Commissions</TabsTrigger>
+        <TabsTrigger value="documents">Documents</TabsTrigger>
       </TabsList>
 
       <TabsContent value="overview" className="space-y-4 mt-4">
@@ -589,27 +541,53 @@ function StaffDetailContent({
                   <span className="font-medium">Emergency Contact:</span>
                   <span>{staff.emergency_contact || "Not provided"}</span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Date of Birth:</span>
+                  <span>{staff.date_of_birth ? format(new Date(staff.date_of_birth), 'MMM dd, yyyy') : "Not provided"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium ml-6">Blood Group:</span>
+                  <span>{staff.blood_group || "Not provided"}</span>
+                </div>
               </div>
               
-              {/* Salary & Financial */}
+              {/* License & Employment */}
               <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <IdCard className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">License No:</span>
+                  <span>{staff.license_number || "Not provided"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium ml-6">License Type:</span>
+                  <Badge variant="outline" className="capitalize">{staff.license_type || '-'}</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium ml-6">License Expiry:</span>
+                  <span>{staff.license_expiry ? format(new Date(staff.license_expiry), 'MMM dd, yyyy') : "Not provided"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Joined Date:</span>
+                  <span>{staff.joined_date ? format(new Date(staff.joined_date), 'MMM dd, yyyy') : "Not provided"}</span>
+                </div>
                 <div className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">Salary Type:</span>
                   <Badge variant="outline" className="capitalize">{staff.salary_type || '-'}</Badge>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">Daily Rate:</span>
+                  <span className="font-medium ml-6">Daily Rate:</span>
                   <span>{staff.daily_rate ? `LKR ${staff.daily_rate.toLocaleString()}` : '-'}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">Monthly Salary:</span>
+                  <span className="font-medium ml-6">Monthly Salary:</span>
                   <span>{staff.monthly_salary ? `LKR ${staff.monthly_salary.toLocaleString()}` : '-'}</span>
                 </div>
               </div>
             </div>
             
-            {/* Notes Section */}
             {staff.notes && (
               <div className="mt-4 pt-4 border-t">
                 <div className="flex items-start gap-2">
@@ -622,7 +600,6 @@ function StaffDetailContent({
               </div>
             )}
             
-            {/* Timestamps */}
             <div className="mt-4 pt-4 border-t flex flex-wrap gap-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
@@ -657,6 +634,14 @@ function StaffDetailContent({
 
       <TabsContent value="commissions" className="mt-4">
         <CommissionHistory staffId={staff.id} />
+      </TabsContent>
+
+      <TabsContent value="documents" className="mt-4">
+        <DocumentUpload 
+          linkedTable="staff_registry" 
+          linkedRowId={staff.id} 
+          title="Staff Documents (NIC, License, Certificates)" 
+        />
       </TabsContent>
     </Tabs>
   );
