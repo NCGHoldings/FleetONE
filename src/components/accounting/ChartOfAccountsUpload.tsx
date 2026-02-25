@@ -63,6 +63,15 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
     }
   }, [previewMode, companyId]);
 
+  // Auto-switch to merge if linked data is detected and replace is selected
+  useEffect(() => {
+    if (existingStats && (existingStats.journalLines > 0 || existingStats.budgetLines > 0) && replaceMode === 'replace') {
+      setReplaceMode('merge');
+      setConfirmReplace(false);
+      toast.info("Switched to Merge mode — Replace is not available when accounts have linked data.");
+    }
+  }, [existingStats]);
+
   const loadExistingStats = async () => {
     if (!companyId) return;
     setLoadingStats(true);
@@ -90,9 +99,29 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
         // Count budget line items referencing these accounts
         const { count: blCount } = await (supabase as any)
           .from("budget_line_items")
-          .select("*", { count: "exact", head: true })
-          .in("chart_of_accounts_id", accountIds);
+          .select("id", { count: "exact", head: true })
+          .in("account_id", accountIds.slice(0, 100));
         budgetLines = blCount || 0;
+
+        // Count bank accounts linked to these COA accounts
+        const { count: bankCount } = await supabase
+          .from("bank_accounts")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", companyId)
+          .not("gl_account_id", "is", null);
+        
+        // Count AP/AR references
+        const { count: apCount } = await (supabase as any)
+          .from("accounts_payable")
+          .select("id", { count: "exact", head: true })
+          .in("account_id", accountIds.slice(0, 100));
+        const { count: arCount } = await (supabase as any)
+          .from("accounts_receivable")
+          .select("id", { count: "exact", head: true })
+          .in("account_id", accountIds.slice(0, 100));
+
+        const otherLinks = (bankCount || 0) + (apCount || 0) + (arCount || 0);
+        journalLines = (jelCount || 0) + otherLinks;
       }
 
       setExistingStats({
@@ -297,6 +326,23 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
 
       if (deleteError) {
         console.error("Delete error:", deleteError);
+        // HARD STOP – do not proceed to inserts
+        toast.error(
+          "Replace failed: existing accounts are linked to transactions, bank accounts, or other records. Please use Merge/Update mode instead.",
+          { duration: 8000 }
+        );
+        setUploadStats({ total: parsedData.length, success: 0, errors: parsedData.length });
+
+        await supabase.from("coa_upload_history").insert({
+          uploaded_by: user?.id,
+          total_records: parsedData.length,
+          status: "failed",
+          file_name: file?.name,
+          notes: `Replace mode BLOCKED – delete failed due to linked records: ${deleteError.message}`,
+        });
+
+        setIsUploading(false);
+        return;
       }
 
       let successCount = 0;
@@ -485,13 +531,18 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3 p-3 rounded-md border hover:bg-muted/50">
-                    <RadioGroupItem value="replace" id="replace" className="mt-0.5" />
+                  <div className={`flex items-start gap-3 p-3 rounded-md border ${hasLinkedData ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50'}`}>
+                    <RadioGroupItem value="replace" id="replace" className="mt-0.5" disabled={!!hasLinkedData} />
                     <div>
-                      <Label htmlFor="replace" className="font-medium cursor-pointer">Replace All (Clean Slate)</Label>
+                      <Label htmlFor="replace" className={`font-medium ${hasLinkedData ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                        Replace All (Clean Slate)
+                        {hasLinkedData && <Badge variant="outline" className="ml-2 text-destructive border-destructive text-[10px]">Blocked</Badge>}
+                      </Label>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Deletes ALL existing accounts and uploads new ones. 
-                        {hasLinkedData && <span className="text-destructive font-semibold"> Will break {existingStats!.journalLines + existingStats!.budgetLines} linked records!</span>}
+                        {hasLinkedData 
+                          ? <>This company has <strong>{existingStats!.journalLines} transaction links</strong> and <strong>{existingStats!.budgetLines} budget items</strong> referencing existing accounts. Replace is not available — use Merge/Update to safely update your COA.</>
+                          : <>Deletes ALL existing accounts and uploads new ones. Only use for brand-new setups with no transactions or references.</>
+                        }
                       </p>
                     </div>
                   </div>
