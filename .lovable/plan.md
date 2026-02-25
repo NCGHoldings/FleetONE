@@ -1,97 +1,75 @@
 
 
-# Fix: COA Upload Merge Mode -- Use Upsert Instead of Manual Lookup
+# Fix: Special Hire Quotation Export - Single Date, Today Button, and Sri Lankan Time
 
-## Problem
+## Problems
 
-The merge upload fails with "0 success, 222 errors" because the existing account lookup query silently fails (no error check), leaving the lookup map empty. All 222 rows then go to the INSERT path and hit the unique constraint `(company_id, account_code)` since those accounts already exist in the database.
+1. **No single-date option** -- You can only pick a "from" and "to" date separately, but there's no way to export for just one specific date
+2. **No "Today" quick button** -- To export today's quotations you have to manually pick today's date twice
+3. **Time zone mismatch** -- Date comparisons use browser local time but don't properly handle Sri Lankan timezone (UTC+5:30), so quotations created today in Sri Lanka may not match
+4. **End-of-day not handled** -- When you pick a "to" date, it compares against midnight (start of day), so quotations created during that day are excluded
 
 ## Solution
 
-Replace the fragile select-then-update/insert pattern with Supabase's built-in `upsert` operation, which atomically handles "insert or update" in a single call using the existing unique constraint `chart_of_accounts_company_account_code_key` on `(company_id, account_code)`.
+### File: `src/components/special-hire/SpecialHireExportModal.tsx`
 
-### File: `src/components/accounting/ChartOfAccountsUpload.tsx`
+**1. Add quick-select date buttons: "Today", "This Week", "This Month", "All Time"**
 
-**Replace the entire `handleUploadMerge` function** with a simpler upsert-based approach:
+Add preset buttons above the date pickers so you can quickly select common ranges with one click. "Today" will set both from and to to today's date.
 
-```typescript
-const handleUploadMerge = async () => {
-  if (!companyId) return;
-  setIsUploading(true);
-  setUploadProgress(0);
+**2. Support single-date selection**
 
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
+Add a toggle or allow picking just one date. When only "from" is set (or both are the same date), the filter treats it as "that entire day."
 
-    let successCount = 0;
-    let errorCount = 0;
-    const batchSize = 50;
+**3. Fix date comparison to use end-of-day for the "to" date**
 
-    for (let i = 0; i < parsedData.length; i += batchSize) {
-      const batch = parsedData.slice(i, i + batchSize);
-      const records = batch.map(row => {
-        const rec = buildRecord(row);
-        // Remove current_balance so upsert doesn't reset existing balances
-        const { current_balance, ...upsertRec } = rec;
-        return upsertRec;
-      });
+Update `filterDataByDateRange` to:
+- Set the "to" date's time to 23:59:59.999 so all quotations created on that day are included
+- Convert comparison dates to Sri Lankan timezone (UTC+5:30) before comparing
+- When from === to (single date), filter for that full day
 
-      const { error } = await supabase
-        .from("chart_of_accounts")
-        .upsert(records, {
-          onConflict: "company_id,account_code",
-          ignoreDuplicates: false,
-        });
+**4. Add Sri Lankan timezone handling**
 
-      if (error) {
-        console.error(`COA upsert batch error:`, error.message);
-        errorCount += batch.length;
-      } else {
-        successCount += batch.length;
-      }
+Since `created_at` is stored in UTC in the database, convert it to Sri Lankan time (UTC+5:30) before comparing with the selected date range. This ensures a quotation created at 11 PM Sri Lankan time (which is 5:30 PM UTC) matches correctly.
 
-      setUploadProgress(Math.round(((i + batch.length) / parsedData.length) * 100));
-    }
+### Updated `filterDataByDateRange` logic
 
-    // Log upload history
-    await supabase.from("coa_upload_history").insert({
-      uploaded_by: user?.id,
-      total_records: parsedData.length,
-      status: errorCount === 0 ? "completed" : "partial",
-      file_name: file?.name,
-      notes: `Merge mode (upsert): ${successCount} success, ${errorCount} errors`,
-    });
-
-    setUploadStats({ total: parsedData.length, success: successCount, errors: errorCount });
-
-    if (errorCount === 0) {
-      toast.success(`Merged ${successCount} accounts successfully`);
-      onUploadComplete();
-      setTimeout(() => setOpen(false), 2000);
-    } else {
-      toast.warning(`Merged ${successCount} accounts with ${errorCount} errors`);
-    }
-  } catch (error) {
-    console.error("Merge error:", error);
-    toast.error("Failed to merge chart of accounts");
-  } finally {
-    setIsUploading(false);
-  }
-};
+```text
+function filterDataByDateRange(data):
+  if no dates selected: return all data
+  
+  // Sri Lankan offset: +5:30
+  SL_OFFSET_MS = 5.5 * 60 * 60 * 1000
+  
+  fromStart = from date at 00:00:00 Sri Lankan time (converted to UTC)
+  toEnd = to date at 23:59:59.999 Sri Lankan time (converted to UTC)
+  
+  // If only "from" set, treat as single day
+  if from but no to: toEnd = from date at 23:59:59.999 SL time
+  if to but no from: fromStart = to date at 00:00:00 SL time
+  
+  filter each quotation where compareDate >= fromStart AND compareDate <= toEnd
 ```
 
-### Why This Works
+### Quick-select buttons
 
-- `upsert` with `onConflict: "company_id,account_code"` tells Postgres: if a row with the same `(company_id, account_code)` exists, UPDATE it; otherwise INSERT it
-- No separate SELECT query needed, so no silent failure risk
-- `current_balance` is excluded from the upsert record so existing balances are preserved (Postgres only updates the columns provided)
-- Batch processing in groups of 50 for performance
-- All existing foreign key references (journal entries, budgets, GL settings) remain intact since account IDs are preserved
+```text
+[Today] [This Week] [This Month] [All Time]
+```
 
-### Impact
+- **Today**: Sets from = to = today
+- **This Week**: from = Monday, to = today
+- **This Month**: from = 1st of month, to = today  
+- **All Time**: Clears both dates
 
-- All 222 accounts will be correctly merged (existing ones updated, new ones inserted)
-- Existing balances preserved
-- No orphaned references
-- Simpler, more reliable code
+### UI Changes
+
+- Add a row of quick-select preset buttons between the "Filter By Date" radio and the date pickers
+- When a preset is clicked, both from and to are auto-filled
+- Keep the manual date pickers for custom ranges
+- Update the export summary text to show "Single date: Feb 25, 2025" when from === to
+
+## Files to Change
+
+- `src/components/special-hire/SpecialHireExportModal.tsx` -- Add presets, fix date filtering logic with SL timezone, handle single-date and end-of-day
 
