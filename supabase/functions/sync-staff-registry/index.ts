@@ -200,29 +200,7 @@ serve(async (req) => {
       }
     }
 
-    // 3. Extract from profiles - use first_name + last_name
-    console.log('Fetching profiles...');
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('first_name, last_name');
-
-    if (profilesError) {
-      console.error('Error fetching profiles:', profilesError);
-    } else {
-      console.log(`Found ${profiles?.length || 0} profiles`);
-      
-      for (const profile of profiles || []) {
-        const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
-        if (fullName && fullName.length > 1) {
-          // Add as driver by default (can be changed later)
-          candidates.push({ 
-            name: fullName, 
-            type: 'driver', 
-            source: 'profiles' 
-          });
-        }
-      }
-    }
+    // 3. Profiles extraction removed - system users should not be auto-added as drivers
 
     // 4. Get existing staff registry
     const { data: existingStaff, error: staffError } = await supabase
