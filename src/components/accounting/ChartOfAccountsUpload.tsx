@@ -227,12 +227,13 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
       // Fetch existing accounts by gl_code for this company
       const { data: existingAccounts } = await supabase
         .from("chart_of_accounts")
-        .select("id, gl_code")
+        .select("id, account_code, gl_code")
         .eq("company_id", companyId);
 
-      const existingByGlCode = new Map<string, string>();
+      const existingByCode = new Map<string, string>();
       (existingAccounts || []).forEach(a => {
-        if (a.gl_code) existingByGlCode.set(a.gl_code, a.id);
+        if (a.account_code) existingByCode.set(a.account_code, a.id);
+        if (a.gl_code && a.gl_code !== a.account_code) existingByCode.set(a.gl_code, a.id);
       });
 
       let successCount = 0;
@@ -245,7 +246,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
         const batch = parsedData.slice(i, i + batchSize);
         
         for (const row of batch) {
-          const existingId = existingByGlCode.get(row.glCode);
+          const existingId = existingByCode.get(row.glCode);
           const record = buildRecord(row);
 
           if (existingId) {
@@ -267,6 +268,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
               .eq("id", existingId);
 
             if (error) {
+              console.error(`COA merge update failed for ${row.glCode}:`, error.message);
               errorCount++;
             } else {
               updatedCount++;
@@ -279,6 +281,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
               .insert(record);
 
             if (error) {
+              console.error(`COA merge insert failed for ${row.glCode}:`, error.message);
               errorCount++;
             } else {
               insertedCount++;
