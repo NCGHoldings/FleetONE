@@ -1,69 +1,68 @@
 
-I cross-checked the current COA upload code, your screenshots, and recent DB upload history.  
-Do I know what the issue is? **Yes.**
 
-### What is still going wrong
+# Fix: Add Force Replace Option for COA Upload
 
-1. **Replace mode is still reachable in some paths**  
-   Even with UI warnings, the logic still allows the app to enter replace flow and attempt inserts.
+## Problem
+You accidentally used Merge mode, resulting in 456 accounts instead of the desired 222. Replace mode is blocked because 88 journal entry lines and other references are linked to existing accounts. You need a way to clean everything and start fresh with only 222 accounts.
 
-2. **Replace flow only checks `deleteError`, not whether rows were actually deleted**  
-   If delete becomes a no-op (or partial visibility/RLS behavior), code continues to insert → duplicate key errors (`23505`) on `(company_id, account_code)`.
+## Solution
+Add a **"Force Replace"** capability that first deletes all linked financial data (journal entries, budget items, bank account links, etc.) for the selected company, then deletes all COA accounts, then inserts the new 222 accounts. This requires an explicit confirmation step with a typed confirmation to prevent accidental data loss.
 
-3. **Linked-data detection is incomplete and under-counted**
-   - It currently checks limited tables and only first 100 account IDs (`slice(0, 100)`), so replace can be incorrectly allowed.
-   - Many FK references exist in finance tables; if any remain, delete will fail.
+## Changes to: `src/components/accounting/ChartOfAccountsUpload.tsx`
 
-4. **Current UX still permits dangerous replace attempts**
-   Confirmation checkbox can still allow replacing logic to proceed instead of hard-blocking.
+### 1. Add a "Force Replace" button when Replace is blocked
+When linked data is detected and Replace is blocked, show an additional option:
+- **"Force Replace (Clear All Linked Data)"** button with a red destructive style
+- Clicking it opens a confirmation dialog requiring the user to type "CONFIRM" to proceed
+- Clear warning text listing exactly what will be deleted (88 journal lines, 0 budget items, etc.)
 
----
+### 2. Implement `handleForceReplace` function
+This new function will:
+1. Delete all `journal_entry_lines` linked to the company's COA accounts (chunked by account IDs)
+2. Delete the parent `journal_entries` for those lines
+3. Delete `budget_line_items` linked to COA accounts
+4. Clear `gl_account_id` on `bank_accounts` for the company (set to null, not delete the bank accounts)
+5. Delete `ap_invoice_lines` and `ar_invoice_lines` linked to COA accounts
+6. Clear COA references in `accounts_payable`, `accounts_receivable`
+7. Clear COA references in `asset_categories` and `auto_posting_rules`
+8. Delete all `chart_of_accounts` for the company
+9. Insert the 222 new accounts
+10. Log to `coa_upload_history` with notes like `force_replace: deleted X linked records, inserted 222 accounts`
 
-### Implementation plan (target file: `src/components/accounting/ChartOfAccountsUpload.tsx`)
+### 3. Confirmation UI
+- Add state: `showForceConfirm` (boolean), `confirmText` (string)
+- When "Force Replace" is clicked, show an inline confirmation area:
+  - Red warning: "This will permanently delete ALL journal entries, budget items, and other financial data linked to this company's chart of accounts. This cannot be undone."
+  - Text input: "Type CONFIRM to proceed"
+  - "Force Replace" button (destructive, enabled only when text matches "CONFIRM")
+  - "Cancel" button
 
-1. **Make replace non-bypassable at runtime**
-   - In `handleUpload`, if replace is selected and linked data exists, immediately force merge and return (no replace call).
-   - Add same hard guard at top of `handleUploadReplace` as defensive fallback.
+### 4. Deletion order (respecting FK constraints)
+```text
+1. journal_entry_lines (child of journal_entries, references account_id)
+2. journal_entries (parent, by company_id)
+3. budget_line_items (references account_id)
+4. ap_invoice_lines (references account_id)
+5. ar_invoice_lines (references account_id)
+6. auto_posting_rules (references debit/credit_account_id) - by company_id
+7. asset_categories (references asset/depreciation/expense_account_id) - set nulls
+8. bank_accounts - SET gl_account_id = null (don't delete bank accounts)
+9. gl_settings - clear account references (set nulls)
+10. chart_of_accounts - DELETE all for company_id
+11. INSERT new 222 accounts
+```
 
-2. **Require verified delete before any insert**
-   - Change replace delete call to return deleted rows/count.
-   - Compare deleted count against expected existing account count.
-   - If mismatch (including 0 deleted while accounts exist), treat as failure and **stop**; do not run insert loop.
+### 5. Progress tracking
+Show a multi-step progress indicator during force replace:
+- "Clearing journal entries..." 
+- "Clearing budget items..."
+- "Clearing other references..."
+- "Deleting old accounts..."
+- "Inserting new accounts..."
 
-3. **Remove confirmation override for linked data**
-   - Keep Replace disabled when linked data exists.
-   - Remove/disable the “I understand…” path that still lets replace proceed.
-   - Radio `onValueChange` should reject selecting `"replace"` when blocked and keep mode at `"merge"`.
+## Expected Result
+- User clicks "Force Replace", types "CONFIRM", and the system cleanly removes all 456 accounts and their 88 linked journal lines
+- 222 new accounts are inserted fresh
+- Audit log records the force replace action
+- No more duplicate key errors
 
-4. **Fix link detection accuracy**
-   - Replace `accountIds.slice(0, 100)` with chunked counting across all account IDs.
-   - Keep separate counters for journal/budget/other refs; compute a total linked count used for gating.
-
-5. **Improve failure messaging + audit logs**
-   - Log explicit reason in `coa_upload_history`:
-     - `replace_blocked_linked_data`
-     - `replace_blocked_delete_no_rows`
-     - `replace_blocked_delete_error`
-   - Show one clear toast instead of batch duplicate-noise.
-
-6. **Optional hardening (recommended)**
-   - If account count > 0 and this is a live company, default to merge and hide destructive replace unless explicitly unlocked by super-admin flow.
-
----
-
-### Validation checklist I will run after implementation
-
-1. Reproduce your exact case (395 existing, 222 import, linked records present):
-   - Replace cannot proceed to inserts.
-   - No 222 duplicate-key batch spam.
-   - Clear “use Merge/Update” message shown.
-
-2. Test Merge with same file:
-   - Should complete successfully.
-
-3. Test clean company (no linked refs):
-   - Replace works only when delete is verified successful.
-
-4. Confirm UI behavior:
-   - Replace selection cannot be forced when blocked.
-   - Upload history records the correct failure/success reason.
