@@ -450,8 +450,8 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Step 1: Call the database function to cascade-delete everything
-      setForceReplaceStep("Clearing all linked data and accounts (server-side transaction)...");
+      // Step 1: Call the schema-driven database function to cascade-delete everything
+      setForceReplaceStep("Phase 1: Clearing all linked data via server-side transaction...");
       setUploadProgress(10);
 
       const { data: rpcResult, error: rpcError } = await supabase.rpc("force_delete_coa_for_company", {
@@ -459,10 +459,12 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
       });
 
       if (rpcError) {
-        toast.error(`Force replace failed: ${rpcError.message}`, { duration: 10000 });
+        const errMsg = `Force replace RPC error: ${rpcError.message}`;
+        console.error(errMsg, rpcError);
+        toast.error(errMsg, { duration: 10000 });
         await supabase.from("coa_upload_history").insert({
           uploaded_by: user?.id, total_records: parsedData.length, status: "failed", file_name: file?.name,
-          notes: `force_replace_rpc_error: ${rpcError.message}`,
+          notes: `force_replace_rpc_error: ${rpcError.message} | code: ${rpcError.code} | details: ${rpcError.details}`,
         });
         setIsUploading(false);
         setForceReplaceStep("");
@@ -471,10 +473,14 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
 
       const result = rpcResult as any;
       if (!result?.success) {
-        toast.error(`Force replace failed: ${result?.error || "Unknown database error"}`, { duration: 10000 });
+        const phase = result?.phase || 'unknown';
+        const detail = result?.detail || '';
+        const errMsg = result?.error || "Unknown database error";
+        console.error("Force replace DB failure:", { phase, errMsg, detail });
+        toast.error(`Force replace failed at phase "${phase}": ${errMsg}`, { duration: 12000 });
         await supabase.from("coa_upload_history").insert({
           uploaded_by: user?.id, total_records: parsedData.length, status: "failed", file_name: file?.name,
-          notes: `force_replace_db_error: ${result?.error} (${result?.detail})`,
+          notes: `force_replace_failed | phase: ${phase} | error: ${errMsg} | detail: ${detail}`,
         });
         setIsUploading(false);
         setForceReplaceStep("");
@@ -486,7 +492,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
       setUploadProgress(60);
 
       // Step 2: Insert new accounts
-      setForceReplaceStep("Inserting new accounts...");
+      setForceReplaceStep(`Phase 2: Inserting ${parsedData.length} new accounts (cleared ${deletedAccounts} old + ${deletedLinkedTotal} linked)...`);
       let successCount = 0;
       let errorCount = 0;
       const batchSize = 50;
