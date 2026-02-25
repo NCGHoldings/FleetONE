@@ -224,70 +224,31 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Fetch existing accounts by gl_code for this company
-      const { data: existingAccounts } = await supabase
-        .from("chart_of_accounts")
-        .select("id, account_code, gl_code")
-        .eq("company_id", companyId);
-
-      const existingByCode = new Map<string, string>();
-      (existingAccounts || []).forEach(a => {
-        if (a.account_code) existingByCode.set(a.account_code, a.id);
-        if (a.gl_code && a.gl_code !== a.account_code) existingByCode.set(a.gl_code, a.id);
-      });
-
       let successCount = 0;
       let errorCount = 0;
-      let updatedCount = 0;
-      let insertedCount = 0;
       const batchSize = 50;
 
       for (let i = 0; i < parsedData.length; i += batchSize) {
         const batch = parsedData.slice(i, i + batchSize);
-        
-        for (const row of batch) {
-          const existingId = existingByCode.get(row.glCode);
-          const record = buildRecord(row);
+        const records = batch.map(row => {
+          const rec = buildRecord(row);
+          // Remove current_balance so upsert doesn't reset existing balances
+          const { current_balance, ...upsertRec } = rec;
+          return upsertRec;
+        });
 
-          if (existingId) {
-            // Update existing — preserve current_balance and id
-            const { error } = await supabase
-              .from("chart_of_accounts")
-              .update({
-                account_name: record.account_name,
-                account_type: record.account_type,
-                level1: record.level1,
-                level2: record.level2,
-                level3: record.level3,
-                level4: record.level4,
-                level5: record.level5,
-                account_level: record.account_level,
-                is_header: record.is_header,
-                is_active: true,
-              })
-              .eq("id", existingId);
+        const { error } = await supabase
+          .from("chart_of_accounts")
+          .upsert(records, {
+            onConflict: "company_id,account_code",
+            ignoreDuplicates: false,
+          });
 
-            if (error) {
-              console.error(`COA merge update failed for ${row.glCode}:`, error.message);
-              errorCount++;
-            } else {
-              updatedCount++;
-              successCount++;
-            }
-          } else {
-            // Insert new
-            const { error } = await supabase
-              .from("chart_of_accounts")
-              .insert(record);
-
-            if (error) {
-              console.error(`COA merge insert failed for ${row.glCode}:`, error.message);
-              errorCount++;
-            } else {
-              insertedCount++;
-              successCount++;
-            }
-          }
+        if (error) {
+          console.error(`COA upsert batch error:`, error.message);
+          errorCount += batch.length;
+        } else {
+          successCount += batch.length;
         }
 
         setUploadProgress(Math.round(((i + batch.length) / parsedData.length) * 100));
@@ -299,13 +260,13 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
         total_records: parsedData.length,
         status: errorCount === 0 ? "completed" : "partial",
         file_name: file?.name,
-        notes: `Merge mode: ${updatedCount} updated, ${insertedCount} new, ${errorCount} errors`,
+        notes: `Merge mode (upsert): ${successCount} success, ${errorCount} errors`,
       });
 
       setUploadStats({ total: parsedData.length, success: successCount, errors: errorCount });
 
       if (errorCount === 0) {
-        toast.success(`Merged successfully: ${updatedCount} updated, ${insertedCount} new accounts`);
+        toast.success(`Merged ${successCount} accounts successfully`);
         onUploadComplete();
         setTimeout(() => setOpen(false), 2000);
       } else {
