@@ -1,51 +1,97 @@
 
-# Fix: Remove System Users from Driver & Conductor Profiles
 
-## Root Cause
+# Fix: COA Upload Merge Mode -- Use Upsert Instead of Manual Lookup
 
-The `sync-staff-registry` edge function pulls **ALL profiles** (including system users) and inserts them into `staff_registry` as `type: 'driver'` by default (line 217). This is why "Abi Money", "Admin User", "gm_nex", "hrm_nex", and other non-driver system users appear on the Driver & Conductor Profiles page.
+## Problem
 
-Currently there are **55 drivers** and **22 conductors** in the table, but many of these "drivers" are actually system users.
+The merge upload fails with "0 success, 222 errors" because the existing account lookup query silently fails (no error check), leaving the lookup map empty. All 222 rows then go to the INSERT path and hit the unique constraint `(company_id, account_code)` since those accounts already exist in the database.
 
 ## Solution
 
-### Step 1: Fix the sync function to stop importing profiles
+Replace the fragile select-then-update/insert pattern with Supabase's built-in `upsert` operation, which atomically handles "insert or update" in a single call using the existing unique constraint `chart_of_accounts_company_account_code_key` on `(company_id, account_code)`.
 
-**File: `supabase/functions/sync-staff-registry/index.ts`**
+### File: `src/components/accounting/ChartOfAccountsUpload.tsx`
 
-Remove the entire "Extract from profiles" section (lines 203-225). The sync function should only extract staff names from:
-- `daily_trips` notes (where actual driver/conductor names are recorded)
-- `driver_allocations` notes
+**Replace the entire `handleUploadMerge` function** with a simpler upsert-based approach:
 
-System users from the `profiles` table should never be auto-added as drivers.
+```typescript
+const handleUploadMerge = async () => {
+  if (!companyId) return;
+  setIsUploading(true);
+  setUploadProgress(0);
 
-### Step 2: Clean up incorrect data from the database
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
 
-Run a SQL migration to remove staff_registry entries that were incorrectly synced from profiles. These can be identified by:
-- `notes` containing `'Auto-synced from profiles'`
-- No attendance, trip, or commission records linked to them
+    let successCount = 0;
+    let errorCount = 0;
+    const batchSize = 50;
 
-```sql
-DELETE FROM staff_registry
-WHERE notes LIKE '%Auto-synced from profiles%'
-  AND id NOT IN (SELECT DISTINCT staff_registry_id FROM staff_attendance WHERE staff_registry_id IS NOT NULL)
-  AND id NOT IN (SELECT DISTINCT staff_id FROM staff_commissions WHERE staff_id IS NOT NULL)
-  AND id NOT IN (
-    SELECT DISTINCT sa.id FROM staff_registry sa
-    JOIN daily_trips dt ON dt.notes::jsonb->>'driver' ILIKE sa.staff_name
-       OR dt.notes::jsonb->>'conductor' ILIKE sa.staff_name
-  );
+    for (let i = 0; i < parsedData.length; i += batchSize) {
+      const batch = parsedData.slice(i, i + batchSize);
+      const records = batch.map(row => {
+        const rec = buildRecord(row);
+        // Remove current_balance so upsert doesn't reset existing balances
+        const { current_balance, ...upsertRec } = rec;
+        return upsertRec;
+      });
+
+      const { error } = await supabase
+        .from("chart_of_accounts")
+        .upsert(records, {
+          onConflict: "company_id,account_code",
+          ignoreDuplicates: false,
+        });
+
+      if (error) {
+        console.error(`COA upsert batch error:`, error.message);
+        errorCount += batch.length;
+      } else {
+        successCount += batch.length;
+      }
+
+      setUploadProgress(Math.round(((i + batch.length) / parsedData.length) * 100));
+    }
+
+    // Log upload history
+    await supabase.from("coa_upload_history").insert({
+      uploaded_by: user?.id,
+      total_records: parsedData.length,
+      status: errorCount === 0 ? "completed" : "partial",
+      file_name: file?.name,
+      notes: `Merge mode (upsert): ${successCount} success, ${errorCount} errors`,
+    });
+
+    setUploadStats({ total: parsedData.length, success: successCount, errors: errorCount });
+
+    if (errorCount === 0) {
+      toast.success(`Merged ${successCount} accounts successfully`);
+      onUploadComplete();
+      setTimeout(() => setOpen(false), 2000);
+    } else {
+      toast.warning(`Merged ${successCount} accounts with ${errorCount} errors`);
+    }
+  } catch (error) {
+    console.error("Merge error:", error);
+    toast.error("Failed to merge chart of accounts");
+  } finally {
+    setIsUploading(false);
+  }
+};
 ```
 
-Before deleting, we will first check how many records would be affected and ensure no legitimate driver/conductor data is lost.
+### Why This Works
 
-### Step 3: Verify remaining data
+- `upsert` with `onConflict: "company_id,account_code"` tells Postgres: if a row with the same `(company_id, account_code)` exists, UPDATE it; otherwise INSERT it
+- No separate SELECT query needed, so no silent failure risk
+- `current_balance` is excluded from the upsert record so existing balances are preserved (Postgres only updates the columns provided)
+- Batch processing in groups of 50 for performance
+- All existing foreign key references (journal entries, budgets, GL settings) remain intact since account IDs are preserved
 
-After cleanup, verify only real drivers and conductors remain. The page should then show accurate data.
+### Impact
 
-## Impact
+- All 222 accounts will be correctly merged (existing ones updated, new ones inserted)
+- Existing balances preserved
+- No orphaned references
+- Simpler, more reliable code
 
-- System users like "Abi Money", "Admin User", "gm_nex", "hrm_nex" will be removed from the Driver & Conductor Profiles page
-- Future syncs will no longer pull system users into the staff registry
-- Real drivers and conductors (from trip records) remain unaffected
-- No mapping or foreign key issues since these fake entries have no linked transactions
