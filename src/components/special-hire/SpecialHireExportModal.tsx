@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarIcon, Download } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfWeek, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx-js-style';
@@ -135,23 +135,54 @@ export function SpecialHireExportModal({ isOpen, onClose, data }: SpecialHireExp
     setColumns(prev => prev.map(col => ({ ...col, selected: false })));
   };
 
+  // Sri Lankan timezone offset: UTC+5:30
+  const SL_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+  const toSLDate = (utcDate: Date): Date => {
+    return new Date(utcDate.getTime() + SL_OFFSET_MS);
+  };
+
+  const getSLToday = (): Date => {
+    const now = toSLDate(new Date());
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  };
+
+  const setPreset = (preset: 'today' | 'this_week' | 'this_month' | 'all') => {
+    const today = getSLToday();
+    switch (preset) {
+      case 'today':
+        setDateRange({ from: today, to: today });
+        break;
+      case 'this_week':
+        setDateRange({ from: startOfWeek(today, { weekStartsOn: 1 }), to: today });
+        break;
+      case 'this_month':
+        setDateRange({ from: startOfMonth(today), to: today });
+        break;
+      case 'all':
+        setDateRange({});
+        break;
+    }
+  };
+
   const filterDataByDateRange = (data: Quotation[]) => {
     if (!dateRange.from && !dateRange.to) return data;
     
     return data.filter(quotation => {
-      const compareDate = dateFilterType === 'created' 
+      const rawDate = dateFilterType === 'created' 
         ? new Date(quotation.created_at)
         : new Date(quotation.pickup_datetime);
-      
-      if (dateRange.from && dateRange.to) {
-        return compareDate >= dateRange.from && compareDate <= dateRange.to;
-      } else if (dateRange.from) {
-        return compareDate >= dateRange.from;
-      } else if (dateRange.to) {
-        return compareDate <= dateRange.to;
-      }
-      
-      return true;
+      // Convert UTC timestamp to Sri Lankan time for comparison
+      const compareDate = toSLDate(rawDate);
+
+      // Build start of day (00:00:00) and end of day (23:59:59.999) boundaries
+      const fromDate = dateRange.from || dateRange.to!;
+      const toDate = dateRange.to || dateRange.from!;
+
+      const fromStart = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate(), 0, 0, 0, 0);
+      const toEnd = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999);
+
+      return compareDate >= fromStart && compareDate <= toEnd;
     });
   };
 
@@ -393,6 +424,17 @@ export function SpecialHireExportModal({ isOpen, onClose, data }: SpecialHireExp
             </RadioGroup>
           </div>
 
+          {/* Quick Date Presets */}
+          <div>
+            <Label className="text-sm text-muted-foreground mb-2 block">Quick Select</Label>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPreset('today')}>Today</Button>
+              <Button variant="outline" size="sm" onClick={() => setPreset('this_week')}>This Week</Button>
+              <Button variant="outline" size="sm" onClick={() => setPreset('this_month')}>This Month</Button>
+              <Button variant="outline" size="sm" onClick={() => setPreset('all')}>All Time</Button>
+            </div>
+          </div>
+
           {/* Date Range Selection */}
           <div>
             <Label className="text-base font-medium mb-3 block">Date Range</Label>
@@ -578,7 +620,12 @@ export function SpecialHireExportModal({ isOpen, onClose, data }: SpecialHireExp
               <div>Records to export: <span className="font-semibold">{filteredCount}</span> of {data.length}</div>
               <div>Selected columns: <span className="font-semibold">{selectedCount}</span> of {columns.length}</div>
               {(dateRange.from || dateRange.to) && (
-                <div>Date range: {dateRange.from ? format(dateRange.from, 'PP') : 'Any'} to {dateRange.to ? format(dateRange.to, 'PP') : 'Any'}</div>
+                <div>
+                  {dateRange.from && dateRange.to && dateRange.from.getTime() === dateRange.to.getTime()
+                    ? `Single date: ${format(dateRange.from, 'PP')}`
+                    : `Date range: ${dateRange.from ? format(dateRange.from, 'PP') : 'Any'} to ${dateRange.to ? format(dateRange.to, 'PP') : 'Any'}`
+                  }
+                </div>
               )}
               {(statusFilter !== 'all' || hireTypeFilter !== 'all' || approvalFilter !== 'all' || creatorFilter !== 'all') && (
                 <div className="mt-1">
