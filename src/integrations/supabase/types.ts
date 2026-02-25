@@ -26526,6 +26526,10 @@ export type Database = {
         Returns: string
       }
       expire_temporary_accounts: { Args: never; Returns: number }
+      force_delete_coa_for_company: {
+        Args: { p_company_id: string }
+        Returns: Json
+      }
       generate_budget_code: { Args: { p_fiscal_year: number }; Returns: string }
       generate_customer_code: { Args: never; Returns: string }
       generate_employee_id: { Args: never; Returns: string }
