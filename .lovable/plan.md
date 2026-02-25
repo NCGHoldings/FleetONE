@@ -1,51 +1,67 @@
 
-# Fix: Professional Customer Details Layout in Yutong Invoice
+
+# Fix: COA Upload Merge Mode -- Account Code Lookup Bug
 
 ## Problem
 
-The customer information section (CUSTOMER, COMPANY, ADDRESS, CONTACT, DATE, etc.) looks unprofessional because:
+The "Merge/Update" upload mode matches existing accounts by `gl_code`, but the unique database constraint is on `(company_id, account_code)`. Both fields are set to the same GL code value, yet the lookup only checks `gl_code`. When existing accounts have `account_code` set but `gl_code` is null or different, the system tries to INSERT instead of UPDATE, hitting the unique constraint -- causing all 222 accounts to fail.
 
-1. **Labels and values are spread apart** — `justify-content: space-between` pushes labels to the left edge and values to the right edge, creating a wide gap that looks messy
-2. **ADDRESS wraps badly** — the long address text breaks to a new line and doesn't align with other values
-3. **No consistent column alignment** — each row's value starts at a different position depending on the label width
+## Will Replacing Damage Mappings?
+
+Yes. Multiple tables have foreign key references to `chart_of_accounts.id`:
+- `school_bus_finance_settings` (trade receivable, revenue, bank accounts)
+- `journal_entry_lines` (account_id)
+- `budget_line_items` (chart_of_accounts_id)
+- GL settings for Yutong, Sinotruck, Light Vehicle, Special Hire, NCG Express
+
+Replace mode cannot even delete the existing COA because the database blocks it with foreign key errors. The safe approach is to fix the merge mode.
 
 ## Solution
 
-### File: `src/lib/yutong-order-invoice-generator.ts`
+### File: `src/components/accounting/ChartOfAccountsUpload.tsx`
 
-**Restructure the meta rows to use a proper two-column layout with fixed label widths:**
+**Change 1 -- Fix merge lookup to use `account_code` (the field with the unique constraint)**
 
-**CSS Changes (lines 274-282):**
+In `handleUploadMerge()` (lines 228-236), change the lookup from `gl_code` to `account_code`:
 
-Replace the current `.meta-left .row` and `.meta-right .row` styles:
+```typescript
+// Before (broken):
+const { data: existingAccounts } = await supabase
+  .from("chart_of_accounts")
+  .select("id, gl_code")
+  .eq("company_id", companyId);
 
-```css
-.meta-left .row, .meta-right .row {
-  margin: 4px 0;
-  display: flex;
-  align-items: baseline;
-}
+const existingByGlCode = new Map<string, string>();
+(existingAccounts || []).forEach(a => {
+  if (a.gl_code) existingByGlCode.set(a.gl_code, a.id);
+});
 
-.meta-left .label, .meta-right .label {
-  font-weight: 700;
-  min-width: 140px;
-  flex-shrink: 0;
-}
+// After (fixed):
+const { data: existingAccounts } = await supabase
+  .from("chart_of_accounts")
+  .select("id, account_code, gl_code")
+  .eq("company_id", companyId);
 
-.meta-right .label {
-  min-width: 160px;
-}
+const existingByCode = new Map<string, string>();
+(existingAccounts || []).forEach(a => {
+  if (a.account_code) existingByCode.set(a.account_code, a.id);
+  if (a.gl_code && a.gl_code !== a.account_code) existingByCode.set(a.gl_code, a.id);
+});
 ```
 
-Key changes:
-- Remove `justify-content: space-between` so labels and values sit next to each other
-- Add `min-width: 140px` on left labels and `min-width: 160px` on right labels to create consistent column alignment
-- Add `flex-shrink: 0` so labels never compress
-- Use `align-items: baseline` so multi-line addresses align properly with their labels
-- Reduce margin from `6px` to `4px` for tighter, cleaner spacing
+Then update the lookup reference from `existingByGlCode.get(row.glCode)` to `existingByCode.get(row.glCode)`.
 
-This ensures:
-- CUSTOMER, COMPANY, ADDRESS, CONTACT, DATE labels all have the same width
-- Values start at the same horizontal position
-- Long addresses wrap neatly under themselves, not under the label
-- Right column (PROFORMA NO, QUOTATION NO, PURPOSE) also aligns consistently
+This ensures that accounts are matched by either `account_code` or `gl_code`, so the merge correctly updates existing accounts instead of trying to insert duplicates.
+
+**Change 2 -- Add error logging for debugging**
+
+In both the update and insert paths, log the actual error so users can see what went wrong in the console, making future debugging easier.
+
+## Impact
+
+- Merge mode will correctly match all 222 accounts to the existing 395 accounts by their GL code
+- Matching accounts will be updated in-place (name, levels, type) while preserving their `id` and `current_balance`
+- New accounts (codes not in the current COA) will be inserted
+- All GL settings, journal entries, and budget references remain intact
+- No data loss or orphaned records
+
