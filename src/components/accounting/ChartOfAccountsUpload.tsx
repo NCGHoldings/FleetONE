@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, AlertTriangle, RefreshCw, ShieldAlert, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 interface ParsedRow {
   level1: string;
@@ -45,6 +46,11 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
   const [replaceMode, setReplaceMode] = useState<'replace' | 'merge'>('merge');
   const [existingStats, setExistingStats] = useState<ExistingStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
+
+  // Force Replace states
+  const [showForceConfirm, setShowForceConfirm] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [forceReplaceStep, setForceReplaceStep] = useState("");
 
   const mapAccountType = (level1: string): "asset" | "liability" | "equity" | "revenue" | "expense" => {
     const normalized = level1.toLowerCase().trim();
@@ -95,6 +101,49 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
     return total;
   };
 
+  // Helper: delete rows in chunks
+  const deleteLinkedRowsChunked = async (
+    table: string,
+    column: string,
+    accountIds: string[]
+  ): Promise<number> => {
+    const CHUNK_SIZE = 200;
+    let total = 0;
+    for (let i = 0; i < accountIds.length; i += CHUNK_SIZE) {
+      const chunk = accountIds.slice(i, i + CHUNK_SIZE);
+      const { count } = await (supabase as any)
+        .from(table)
+        .delete({ count: 'exact' })
+        .in(column, chunk);
+      total += count || 0;
+    }
+    return total;
+  };
+
+  // Helper: nullify FK columns in chunks
+  const nullifyLinkedRowsChunked = async (
+    table: string,
+    column: string,
+    accountIds: string[],
+    useCompanyFilter = false
+  ): Promise<number> => {
+    const CHUNK_SIZE = 200;
+    let total = 0;
+    for (let i = 0; i < accountIds.length; i += CHUNK_SIZE) {
+      const chunk = accountIds.slice(i, i + CHUNK_SIZE);
+      let query = (supabase as any)
+        .from(table)
+        .update({ [column]: null }, { count: 'exact' })
+        .in(column, chunk);
+      if (useCompanyFilter && companyId) {
+        query = query.eq("company_id", companyId);
+      }
+      const { count } = await query;
+      total += count || 0;
+    }
+    return total;
+  };
+
   const loadExistingStats = async () => {
     if (!companyId) return;
     setLoadingStats(true);
@@ -112,29 +161,20 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
       let otherLinks = 0;
 
       if (accountIds.length > 0) {
-        // Chunked counting across ALL account IDs
         journalLines = await countLinkedRowsChunked("journal_entry_lines", "account_id", accountIds);
         budgetLines = await countLinkedRowsChunked("budget_line_items", "account_id", accountIds);
 
-        // Bank accounts linked via gl_account_id
         const { count: bankCount } = await supabase
           .from("bank_accounts")
           .select("id", { count: "exact", head: true })
           .eq("company_id", companyId)
           .not("gl_account_id", "is", null);
 
-        // AP/AR references – chunked
         const apCount = await countLinkedRowsChunked("accounts_payable", "account_id", accountIds);
         const arCount = await countLinkedRowsChunked("accounts_receivable", "account_id", accountIds);
-
-        // AP/AR invoice lines
         const apLineCount = await countLinkedRowsChunked("ap_invoice_lines", "account_id", accountIds);
         const arLineCount = await countLinkedRowsChunked("ar_invoice_lines", "account_id", accountIds);
-
-        // Asset categories referencing COA
         const assetCatCount = await countLinkedRowsChunked("asset_categories", "asset_account_id", accountIds);
-
-        // Auto posting rules
         const debitRuleCount = await countLinkedRowsChunked("auto_posting_rules", "debit_account_id", accountIds);
         const creditRuleCount = await countLinkedRowsChunked("auto_posting_rules", "credit_account_id", accountIds);
 
@@ -322,22 +362,9 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
   const handleUploadReplace = async () => {
     if (parsedData.length === 0 || !companyId) return;
 
-    // ── DEFENSIVE GUARD: If linked data exists, abort immediately ──
     if (hasLinkedData) {
-      toast.error(
-        "Replace is blocked: accounts have linked transactions/references. Use Merge/Update mode instead.",
-        { duration: 8000 }
-      );
+      toast.error("Replace is blocked: accounts have linked transactions. Use Merge/Update or Force Replace.");
       setReplaceMode('merge');
-
-      const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from("coa_upload_history").insert({
-        uploaded_by: user?.id,
-        total_records: parsedData.length,
-        status: "failed",
-        file_name: file?.name,
-        notes: "replace_blocked_linked_data — runtime guard triggered",
-      });
       return;
     }
 
@@ -348,54 +375,32 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
       const { data: { user } } = await supabase.auth.getUser();
       const expectedCount = existingStats?.accounts || 0;
 
-      // ── VERIFIED DELETE: use count to confirm rows were actually removed ──
       const { error: deleteError, count: deletedCount } = await supabase
         .from("chart_of_accounts")
         .delete({ count: 'exact' })
         .eq("company_id", companyId);
 
       if (deleteError) {
-        console.error("Delete error:", deleteError);
-        toast.error(
-          "Replace failed: could not delete existing accounts (likely linked to transactions). Please use Merge/Update mode instead.",
-          { duration: 8000 }
-        );
+        toast.error("Replace failed: could not delete existing accounts. Use Merge/Update instead.", { duration: 8000 });
         setUploadStats({ total: parsedData.length, success: 0, errors: parsedData.length });
-
         await supabase.from("coa_upload_history").insert({
-          uploaded_by: user?.id,
-          total_records: parsedData.length,
-          status: "failed",
-          file_name: file?.name,
+          uploaded_by: user?.id, total_records: parsedData.length, status: "failed", file_name: file?.name,
           notes: `replace_blocked_delete_error: ${deleteError.message}`,
         });
-
         setIsUploading(false);
         return;
       }
 
-      // ── VERIFIED DELETE CHECK: if accounts existed but 0 were deleted, stop ──
       if (expectedCount > 0 && (deletedCount === null || deletedCount === 0)) {
-        console.error(`Delete was a no-op: expected ${expectedCount} deletions but got ${deletedCount}`);
-        toast.error(
-          "Replace failed: no accounts were actually deleted (possible RLS or FK constraint). Please use Merge/Update mode instead.",
-          { duration: 8000 }
-        );
-        setUploadStats({ total: parsedData.length, success: 0, errors: parsedData.length });
-
+        toast.error("Replace failed: no accounts were deleted (FK constraint). Use Merge/Update instead.", { duration: 8000 });
         await supabase.from("coa_upload_history").insert({
-          uploaded_by: user?.id,
-          total_records: parsedData.length,
-          status: "failed",
-          file_name: file?.name,
+          uploaded_by: user?.id, total_records: parsedData.length, status: "failed", file_name: file?.name,
           notes: `replace_blocked_delete_no_rows: expected ${expectedCount}, deleted ${deletedCount}`,
         });
-
         setIsUploading(false);
         return;
       }
 
-      // ── DELETE VERIFIED — proceed with inserts ──
       let successCount = 0;
       let errorCount = 0;
       const batchSize = 50;
@@ -405,28 +410,15 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
         const start = batch * batchSize;
         const end = Math.min(start + batchSize, parsedData.length);
         const batchData = parsedData.slice(start, end);
-
         const records = batchData.map(buildRecord);
-
-        const { error: insertError } = await supabase
-          .from("chart_of_accounts")
-          .insert(records);
-
-        if (insertError) {
-          console.error("Insert error for batch:", batch, insertError);
-          errorCount += batchData.length;
-        } else {
-          successCount += batchData.length;
-        }
-
+        const { error: insertError } = await supabase.from("chart_of_accounts").insert(records);
+        if (insertError) { errorCount += batchData.length; } else { successCount += batchData.length; }
         setUploadProgress(Math.round(((batch + 1) / totalBatches) * 100));
       }
 
       await supabase.from("coa_upload_history").insert({
-        uploaded_by: user?.id,
-        total_records: parsedData.length,
-        status: errorCount === 0 ? "completed" : "partial",
-        file_name: file?.name,
+        uploaded_by: user?.id, total_records: parsedData.length,
+        status: errorCount === 0 ? "completed" : "partial", file_name: file?.name,
         notes: `Replace mode: deleted ${deletedCount}, inserted ${successCount}, errors ${errorCount}`,
       });
 
@@ -447,10 +439,187 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
     }
   };
 
+  // ── FORCE REPLACE: cascading delete + fresh insert ──
+  const handleForceReplace = async () => {
+    if (parsedData.length === 0 || !companyId) return;
+    setIsUploading(true);
+    setUploadProgress(0);
+    setShowForceConfirm(false);
+    setConfirmText("");
+
+    let deletedLinkedTotal = 0;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Step 0: Get all account IDs for this company
+      setForceReplaceStep("Fetching account IDs...");
+      const { data: existingAccounts } = await supabase
+        .from("chart_of_accounts")
+        .select("id")
+        .eq("company_id", companyId);
+      const accountIds = (existingAccounts || []).map(a => a.id);
+      setUploadProgress(5);
+
+      if (accountIds.length > 0) {
+        // Step 1: Delete journal_entry_lines
+        setForceReplaceStep("Clearing journal entry lines...");
+        const jelCount = await deleteLinkedRowsChunked("journal_entry_lines", "account_id", accountIds);
+        deletedLinkedTotal += jelCount;
+        setUploadProgress(15);
+
+        // Step 2: Delete journal_entries by company_id
+        setForceReplaceStep("Clearing journal entries...");
+        const { count: jeCount } = await supabase
+          .from("journal_entries")
+          .delete({ count: 'exact' })
+          .eq("company_id", companyId);
+        deletedLinkedTotal += (jeCount || 0);
+        setUploadProgress(25);
+
+        // Step 3: Delete budget_line_items
+        setForceReplaceStep("Clearing budget items...");
+        const bliCount = await deleteLinkedRowsChunked("budget_line_items", "account_id", accountIds);
+        deletedLinkedTotal += bliCount;
+        setUploadProgress(32);
+
+        // Step 4: Delete ap_invoice_lines
+        setForceReplaceStep("Clearing AP invoice lines...");
+        const apilCount = await deleteLinkedRowsChunked("ap_invoice_lines", "account_id", accountIds);
+        deletedLinkedTotal += apilCount;
+        setUploadProgress(38);
+
+        // Step 5: Delete ar_invoice_lines
+        setForceReplaceStep("Clearing AR invoice lines...");
+        const arilCount = await deleteLinkedRowsChunked("ar_invoice_lines", "account_id", accountIds);
+        deletedLinkedTotal += arilCount;
+        setUploadProgress(44);
+
+        // Step 6: Nullify accounts_payable.account_id
+        setForceReplaceStep("Clearing AP account references...");
+        await nullifyLinkedRowsChunked("accounts_payable", "account_id", accountIds);
+        setUploadProgress(48);
+
+        // Step 7: Nullify accounts_receivable.account_id
+        setForceReplaceStep("Clearing AR account references...");
+        await nullifyLinkedRowsChunked("accounts_receivable", "account_id", accountIds);
+        setUploadProgress(52);
+
+        // Step 8: Delete auto_posting_rules by company_id
+        setForceReplaceStep("Clearing auto posting rules...");
+        await supabase
+          .from("auto_posting_rules")
+          .delete()
+          .eq("company_id", companyId);
+        setUploadProgress(56);
+
+        // Step 9: Nullify asset_categories account references
+        setForceReplaceStep("Clearing asset category references...");
+        for (const col of ["asset_account_id", "accumulated_dep_account_id", "depreciation_expense_account_id", "gain_loss_disposal_account_id", "revaluation_surplus_account_id", "bank_account_id"]) {
+          await nullifyLinkedRowsChunked("asset_categories", col, accountIds, true);
+        }
+        setUploadProgress(62);
+
+        // Step 10: Nullify bank_accounts.gl_account_id
+        setForceReplaceStep("Clearing bank account GL links...");
+        await supabase
+          .from("bank_accounts")
+          .update({ gl_account_id: null })
+          .eq("company_id", companyId)
+          .not("gl_account_id", "is", null);
+        setUploadProgress(66);
+
+        // Step 11: Nullify gl_settings account references
+        setForceReplaceStep("Clearing GL settings references...");
+        // gl_settings may have many account reference columns - nullify by company_id
+        try {
+          await (supabase as any)
+            .from("gl_settings")
+            .update({
+              default_cash_account_id: null,
+              default_bank_account_id: null,
+              retained_earnings_account_id: null,
+              suspense_account_id: null,
+              exchange_gain_loss_account_id: null,
+            })
+            .eq("company_id", companyId);
+        } catch {
+          // gl_settings may not exist or have different columns — continue silently
+        }
+        setUploadProgress(70);
+      }
+
+      // Step 12: Delete ALL chart_of_accounts for company
+      setForceReplaceStep("Deleting old accounts...");
+      const { error: deleteError, count: deletedAccounts } = await supabase
+        .from("chart_of_accounts")
+        .delete({ count: 'exact' })
+        .eq("company_id", companyId);
+
+      if (deleteError) {
+        toast.error(`Force replace failed at delete step: ${deleteError.message}`, { duration: 10000 });
+        await supabase.from("coa_upload_history").insert({
+          uploaded_by: user?.id, total_records: parsedData.length, status: "failed", file_name: file?.name,
+          notes: `force_replace_failed_delete: ${deleteError.message}. Cleared ${deletedLinkedTotal} linked records before failure.`,
+        });
+        setIsUploading(false);
+        setForceReplaceStep("");
+        return;
+      }
+      setUploadProgress(80);
+
+      // Step 13: Insert new accounts
+      setForceReplaceStep("Inserting new accounts...");
+      let successCount = 0;
+      let errorCount = 0;
+      const batchSize = 50;
+      const totalBatches = Math.ceil(parsedData.length / batchSize);
+
+      for (let batch = 0; batch < totalBatches; batch++) {
+        const start = batch * batchSize;
+        const end = Math.min(start + batchSize, parsedData.length);
+        const batchData = parsedData.slice(start, end);
+        const records = batchData.map(buildRecord);
+        const { error: insertError } = await supabase.from("chart_of_accounts").insert(records);
+        if (insertError) {
+          console.error("Force replace insert error:", insertError);
+          errorCount += batchData.length;
+        } else {
+          successCount += batchData.length;
+        }
+        setUploadProgress(80 + Math.round(((batch + 1) / totalBatches) * 20));
+      }
+
+      // Step 14: Log to upload history
+      await supabase.from("coa_upload_history").insert({
+        uploaded_by: user?.id,
+        total_records: parsedData.length,
+        status: errorCount === 0 ? "completed" : "partial",
+        file_name: file?.name,
+        notes: `force_replace: deleted ${deletedAccounts || 0} old accounts + ${deletedLinkedTotal} linked records, inserted ${successCount} new accounts, ${errorCount} errors`,
+      });
+
+      setUploadStats({ total: parsedData.length, success: successCount, errors: errorCount });
+
+      if (errorCount === 0) {
+        toast.success(`Force Replace complete: ${successCount} accounts inserted (${deletedLinkedTotal} linked records cleared)`);
+        onUploadComplete();
+        setTimeout(() => setOpen(false), 2000);
+      } else {
+        toast.warning(`Force Replace: ${successCount} inserted, ${errorCount} errors`);
+      }
+    } catch (error) {
+      console.error("Force replace error:", error);
+      toast.error("Force replace failed unexpectedly. Check console for details.");
+    } finally {
+      setIsUploading(false);
+      setForceReplaceStep("");
+    }
+  };
+
   const handleUpload = () => {
-    // ── HARD GUARD: Never allow replace when linked data exists ──
     if (replaceMode === 'replace' && hasLinkedData) {
-      toast.error("Replace is not available for this company — accounts are linked to transactions. Switching to Merge/Update.");
+      toast.error("Replace is not available — use Merge/Update or Force Replace.");
       setReplaceMode('merge');
       return;
     }
@@ -470,6 +639,9 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
     setUploadStats(null);
     setReplaceMode('merge');
     setExistingStats(null);
+    setShowForceConfirm(false);
+    setConfirmText("");
+    setForceReplaceStep("");
   };
 
   const totalLinkedCount = (existingStats?.journalLines || 0) + (existingStats?.budgetLines || 0) + (existingStats?.otherLinks || 0);
@@ -559,7 +731,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
                         </span>
                         <br />
                         <span className="text-sm">
-                          <strong>Replace mode is disabled.</strong> Use <strong>Merge/Update</strong> to safely update your COA without breaking linked data.
+                          <strong>Replace mode is disabled.</strong> Use <strong>Merge/Update</strong> or <strong>Force Replace</strong> below.
                         </span>
                       </>
                     )}
@@ -575,7 +747,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
                   onValueChange={(v) => {
                     if (v === 'replace' && hasLinkedData) {
                       toast.warning("Replace is blocked — this company has linked transactions.");
-                      return; // reject selection
+                      return;
                     }
                     setReplaceMode(v as 'replace' | 'merge');
                   }}
@@ -599,16 +771,75 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
                       </Label>
                       <p className="text-xs text-muted-foreground mt-1">
                         {hasLinkedData 
-                          ? <>This company has <strong>{totalLinkedCount} linked references</strong> to existing accounts. Replace is permanently blocked — use Merge/Update to safely update your COA.</>
-                          : <>Deletes ALL existing accounts and uploads new ones. Only use for brand-new setups with no transactions or references.</>
+                          ? <>This company has <strong>{totalLinkedCount} linked references</strong>. Standard replace is blocked — use Force Replace below.</>
+                          : <>Deletes ALL existing accounts and uploads new ones. Only use for brand-new setups with no transactions.</>
                         }
                       </p>
                     </div>
                   </div>
                 </RadioGroup>
-
-                {/* No more bypass checkbox — replace is hard-blocked when linked data exists */}
               </div>
+
+              {/* Force Replace Section — only shown when linked data blocks normal replace */}
+              {hasLinkedData && parsedData.length > 0 && !isUploading && (
+                <div className="border border-destructive/50 rounded-lg p-4 space-y-3 bg-destructive/5">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="h-5 w-5 text-destructive" />
+                    <Label className="text-sm font-semibold text-destructive">Force Replace (Danger Zone)</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This will <strong>permanently delete ALL</strong> journal entries ({existingStats?.journalLines}), 
+                    budget items ({existingStats?.budgetLines}), and other linked financial data ({existingStats?.otherLinks} refs) 
+                    for this company's chart of accounts, then replace with {parsedData.length} new accounts.
+                  </p>
+
+                  {!showForceConfirm ? (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setShowForceConfirm(true)}
+                    >
+                      <ShieldAlert className="h-4 w-4 mr-2" />
+                      Force Replace (Clear All Linked Data)
+                    </Button>
+                  ) : (
+                    <div className="space-y-3 border border-destructive/30 rounded-md p-3 bg-destructive/10">
+                      <p className="text-sm font-semibold text-destructive">
+                        ⚠️ This will permanently delete ALL journal entries, budget items, and other financial data 
+                        linked to this company's chart of accounts. This cannot be undone.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="confirm-force" className="text-xs whitespace-nowrap">Type CONFIRM to proceed:</Label>
+                        <Input
+                          id="confirm-force"
+                          value={confirmText}
+                          onChange={(e) => setConfirmText(e.target.value)}
+                          placeholder="CONFIRM"
+                          className="max-w-[200px] h-8 text-sm"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={confirmText !== "CONFIRM"}
+                          onClick={handleForceReplace}
+                        >
+                          <ShieldAlert className="h-4 w-4 mr-2" />
+                          Force Replace Now
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setShowForceConfirm(false); setConfirmText(""); }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {uploadStats && (
                 <Alert variant={uploadStats.errors > 0 ? "destructive" : "default"}>
@@ -626,8 +857,9 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
               {isUploading && (
                 <div className="space-y-2">
                   <Progress value={uploadProgress} />
-                  <p className="text-sm text-center text-muted-foreground">
-                    {replaceMode === 'merge' ? 'Merging' : 'Uploading'}... {uploadProgress}%
+                  <p className="text-sm text-center text-muted-foreground flex items-center justify-center gap-2">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {forceReplaceStep || (replaceMode === 'merge' ? 'Merging' : 'Uploading')}... {uploadProgress}%
                   </p>
                 </div>
               )}
