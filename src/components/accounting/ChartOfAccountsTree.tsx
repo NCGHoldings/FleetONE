@@ -37,7 +37,48 @@ interface TreeNode {
   accounts: Account[];
   children: Map<string, TreeNode>;
   totalBalance: number;
+  representativeCode: string;
 }
+
+// Collect all descendant account codes from a tree node
+const collectAllCodes = (node: TreeNode): string[] => {
+  const codes: string[] = node.accounts.map(a => a.account_code);
+  node.children.forEach(child => {
+    codes.push(...collectAllCodes(child));
+  });
+  return codes;
+};
+
+// Compute longest common prefix of an array of strings
+const longestCommonPrefix = (strs: string[]): string => {
+  if (strs.length === 0) return "";
+  let prefix = strs[0];
+  for (let i = 1; i < strs.length; i++) {
+    while (strs[i].indexOf(prefix) !== 0) {
+      prefix = prefix.slice(0, -1);
+      if (!prefix) return "";
+    }
+  }
+  return prefix;
+};
+
+// Recursively compute representative codes for all tree nodes
+const computeRepresentativeCodes = (node: TreeNode, codeLength: number = 8): void => {
+  // Process children first (bottom-up)
+  node.children.forEach(child => computeRepresentativeCodes(child, codeLength));
+  
+  const allCodes = collectAllCodes(node);
+  if (allCodes.length === 0) {
+    node.representativeCode = "";
+    return;
+  }
+  const lcp = longestCommonPrefix(allCodes);
+  if (!lcp) {
+    node.representativeCode = "";
+    return;
+  }
+  node.representativeCode = lcp.padEnd(codeLength, "0");
+};
 
 const ACCOUNT_TYPE_MAP: Record<string, string> = {
   "Assets": "asset",
@@ -158,7 +199,7 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
 
       // Ensure level1 node exists
       if (!root.has(level1)) {
-        root.set(level1, { name: level1, accounts: [], children: new Map(), totalBalance: 0 });
+        root.set(level1, { name: level1, accounts: [], children: new Map(), totalBalance: 0, representativeCode: "" });
       }
       const l1Node = root.get(level1)!;
       l1Node.totalBalance += account.current_balance || 0;
@@ -170,7 +211,7 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
 
       // Ensure level2 node exists
       if (!l1Node.children.has(level2)) {
-        l1Node.children.set(level2, { name: level2, accounts: [], children: new Map(), totalBalance: 0 });
+        l1Node.children.set(level2, { name: level2, accounts: [], children: new Map(), totalBalance: 0, representativeCode: "" });
       }
       const l2Node = l1Node.children.get(level2)!;
       l2Node.totalBalance += account.current_balance || 0;
@@ -182,7 +223,7 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
 
       // Ensure level3 node exists
       if (!l2Node.children.has(level3)) {
-        l2Node.children.set(level3, { name: level3, accounts: [], children: new Map(), totalBalance: 0 });
+        l2Node.children.set(level3, { name: level3, accounts: [], children: new Map(), totalBalance: 0, representativeCode: "" });
       }
       const l3Node = l2Node.children.get(level3)!;
       l3Node.totalBalance += account.current_balance || 0;
@@ -194,12 +235,15 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
 
       // Ensure level4 node exists
       if (!l3Node.children.has(level4)) {
-        l3Node.children.set(level4, { name: level4, accounts: [], children: new Map(), totalBalance: 0 });
+        l3Node.children.set(level4, { name: level4, accounts: [], children: new Map(), totalBalance: 0, representativeCode: "" });
       }
       const l4Node = l3Node.children.get(level4)!;
       l4Node.totalBalance += account.current_balance || 0;
       l4Node.accounts.push(account);
     });
+
+    // Compute representative codes for all folder nodes
+    root.forEach(node => computeRepresentativeCodes(node));
 
     return root;
   }, [filteredAccounts]);
@@ -441,6 +485,11 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
             <span className="w-4" />
           )}
           <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
+          {node.representativeCode && (
+            <span className="font-mono text-xs text-muted-foreground w-20 shrink-0">
+              {node.representativeCode}
+            </span>
+          )}
           <span className="flex-1 truncate">{node.name}</span>
           <Button
             variant="ghost"
