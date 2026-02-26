@@ -1,11 +1,13 @@
 import { useState, useMemo, useCallback } from "react";
-import { ChevronRight, ChevronDown, Folder, FileText, Eye, Plus, Check, X } from "lucide-react";
+import { ChevronRight, ChevronDown, Folder, FileText, Eye, Plus, Check, X, Edit } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { DrillDownModal } from "./DrillDownModal";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AccountEditForm } from "./AccountEditForm";
 import { useCompanyCreateAccount } from "@/hooks/useCompanyMutations";
 
 interface Account {
@@ -161,6 +163,7 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
   const [drillDownAccountIds, setDrillDownAccountIds] = useState<string[]>([]);
   const [drillDownLabel, setDrillDownLabel] = useState<string>("");
   const [drillDownOpen, setDrillDownOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
 
   // Inline add state
   const [addingUnderPath, setAddingUnderPath] = useState<string | null>(null);
@@ -549,6 +552,15 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
                   variant="ghost"
                   size="sm"
                   className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => { e.stopPropagation(); setEditingAccount(account); }}
+                  title={`Edit ${account.account_code}`}
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={(e) => handleAddUnderAccount(account, path + "/" + account.account_code, e)}
                   title={`Add child under ${account.account_code}`}
                 >
@@ -584,6 +596,23 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
         accountIds={drillDownAccountIds}
         accountName={drillDownLabel || (selectedAccount ? `${selectedAccount.account_code} - ${selectedAccount.account_name}` : undefined)}
       />
+
+      <Dialog open={!!editingAccount} onOpenChange={(open) => { if (!open) setEditingAccount(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Account</DialogTitle>
+          </DialogHeader>
+          {editingAccount && (
+            <AccountEditForm
+              account={editingAccount}
+              onSuccess={() => {
+                setEditingAccount(null);
+                onAccountCreated?.();
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

@@ -620,3 +620,47 @@ export const useCompanyCreateAccount = () => {
     },
   });
 };
+
+// ============ Update Chart of Accounts ============
+export const useCompanyUpdateAccount = () => {
+  const queryClient = useQueryClient();
+  const companyContext = useCompanyOptional();
+  const companyId = companyContext?.selectedCompanyId;
+  
+  return useMutation({
+    mutationFn: async (account: {
+      id: string;
+      account_code?: string;
+      account_name?: string;
+      account_type?: string;
+      parent_account_id?: string | null;
+      is_header?: boolean;
+      is_active?: boolean;
+      description?: string;
+    }) => {
+      if (!companyId) {
+        throw new Error("No company selected");
+      }
+
+      const { id, ...updates } = account;
+      const { data, error } = await supabase
+        .from("chart_of_accounts")
+        .update(updates as any)
+        .eq("id", id)
+        .eq("company_id", companyId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts-all", companyId] });
+      toast.success("Account updated successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to update account: ${error.message}`);
+    },
+  });
+};
