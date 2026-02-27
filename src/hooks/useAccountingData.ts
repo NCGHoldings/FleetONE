@@ -534,6 +534,79 @@ export const useBankTransactions = (bankAccountId?: string) => {
   });
 };
 
+// Reconciliation-specific hook: fetches ALL unreconciled + date-filtered reconciled transactions
+export const useBankTransactionsForRecon = (
+  bankAccountId?: string,
+  fromDate?: string,
+  toDate?: string
+) => {
+  const { selectedCompanyId } = useCompany();
+
+  return useQuery({
+    queryKey: ["bank-transactions-recon", bankAccountId, selectedCompanyId, fromDate, toDate],
+    queryFn: async () => {
+      // Fetch all unreconciled transactions (no limit)
+      let unreconciledQuery = supabase
+        .from("bank_transactions")
+        .select("*")
+        .eq("is_reconciled", false)
+        .order("transaction_date", { ascending: false });
+
+      if (selectedCompanyId) {
+        unreconciledQuery = unreconciledQuery.eq("company_id", selectedCompanyId);
+      }
+      if (bankAccountId) {
+        unreconciledQuery = unreconciledQuery.eq("bank_account_id", bankAccountId);
+      }
+
+      const { data: unreconciled, error: err1 } = await unreconciledQuery;
+      if (err1) throw err1;
+
+      // Fetch reconciled transactions within date range (for display)
+      let reconciledData: typeof unreconciled = [];
+      if (fromDate || toDate) {
+        let reconciledQuery = supabase
+          .from("bank_transactions")
+          .select("*")
+          .eq("is_reconciled", true)
+          .order("transaction_date", { ascending: false })
+          .limit(500);
+
+        if (selectedCompanyId) {
+          reconciledQuery = reconciledQuery.eq("company_id", selectedCompanyId);
+        }
+        if (bankAccountId) {
+          reconciledQuery = reconciledQuery.eq("bank_account_id", bankAccountId);
+        }
+        if (fromDate) {
+          reconciledQuery = reconciledQuery.gte("transaction_date", fromDate);
+        }
+        if (toDate) {
+          reconciledQuery = reconciledQuery.lte("transaction_date", toDate);
+        }
+
+        const { data: reconciled, error: err2 } = await reconciledQuery;
+        if (err2) throw err2;
+        reconciledData = reconciled || [];
+      }
+
+      // Merge and deduplicate
+      const allTxns = [...(unreconciled || []), ...reconciledData];
+      const seen = new Set<string>();
+      const unique = allTxns.filter((t) => {
+        if (seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      });
+
+      return unique.sort((a, b) =>
+        new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
+      );
+    },
+    enabled: !!selectedCompanyId && !!bankAccountId,
+  });
+};
+
 export const useBankReconciliations = (bankAccountId?: string) => {
   const { selectedCompanyId } = useCompany();
 

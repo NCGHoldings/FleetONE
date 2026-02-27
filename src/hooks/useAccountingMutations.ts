@@ -618,6 +618,8 @@ export const useCreateARReceipt = () => {
           credit_amount: 0,
           reference: receipt.reference || receipt.receipt_number,
           company_id: selectedCompanyId,
+          source_type: "ar_receipt",
+          source_id: data.id,
         }]);
 
         // Update bank account balance (increase on receipt)
@@ -939,6 +941,8 @@ export const useCreateAPPayment = () => {
           reference: payment.reference || payment.payment_number,
           cheque_number: payment.cheque_number,
           company_id: selectedCompanyId,
+          source_type: "ap_payment",
+          source_id: data.id,
         }]);
 
         // Update bank account balance
