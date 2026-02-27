@@ -275,8 +275,7 @@ const buildFooter = (roles: string[]) => {
     <div class="bottom-bar">
       <div class="terms-column">
         <strong>Notes &amp; Terms:</strong><br>
-        1. All transactions are subject to audit and verification.<br>
-        2. This document is electronically generated and remains valid with the associated digital logs.
+        This document is electronically generated and remains valid with the associated digital logs.
       </div>
       <div class="verification">
         <div class="qr-placeholder">QR VERIFY</div>
@@ -529,8 +528,7 @@ export const generateAPInvoiceTemplate = (): string => `
     <div class="bottom-bar">
       <div class="terms-column">
         <strong>Notes &amp; Terms:</strong><br>
-        1. All transactions are subject to audit and verification.<br>
-        2. This document is electronically generated and remains valid with the associated digital logs.
+        This document is electronically generated and remains valid with the associated digital logs.
       </div>
       <div class="verification">
         <div class="qr-placeholder">QR VERIFY</div>
@@ -577,11 +575,21 @@ export const generateAPPaymentVoucherTemplate = (): string => `
           <div class="row"><span class="k">Cheque No</span><span class="v">{{cheque_number}}</span></div>
         </div>
       </div>
-      <div class="payment-summary" style="border-color: rgba(124,58,237,0.2); background: rgba(124,58,237,0.02);">
-        <div class="total-box" style="border-color: var(--accent);">
-          <span class="label">Total Paid</span>
-          <span class="value">{{amount}}</span>
+      <div class="card" style="border-color: rgba(124,58,237,0.3);">
+        <h3>Vendor Bank Details</h3>
+        <div class="kv">
+          <div class="row"><span class="k">Bank</span><span class="v">{{vendor_bank_name}}</span></div>
+          <div class="row"><span class="k">Branch</span><span class="v">{{vendor_bank_branch}}</span></div>
+          <div class="row"><span class="k">Account No</span><span class="v">{{vendor_account_number}}</span></div>
+          <div class="row"><span class="k">Account Holder</span><span class="v">{{vendor_account_holder}}</span></div>
         </div>
+      </div>
+    </div>
+
+    <div class="payment-summary" style="border-color: rgba(124,58,237,0.2); background: rgba(124,58,237,0.02);">
+      <div class="total-box" style="border-color: var(--accent);">
+        <span class="label">Total Paid</span>
+        <span class="value">{{amount}}</span>
       </div>
     </div>
 

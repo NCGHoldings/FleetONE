@@ -783,6 +783,7 @@ export type Database = {
           reference: string | null
           status: string | null
           updated_at: string | null
+          vendor_bank_account_id: string | null
           vendor_id: string | null
         }
         Insert: {
@@ -807,6 +808,7 @@ export type Database = {
           reference?: string | null
           status?: string | null
           updated_at?: string | null
+          vendor_bank_account_id?: string | null
           vendor_id?: string | null
         }
         Update: {
@@ -831,6 +833,7 @@ export type Database = {
           reference?: string | null
           status?: string | null
           updated_at?: string | null
+          vendor_bank_account_id?: string | null
           vendor_id?: string | null
         }
         Relationships: [
@@ -846,6 +849,13 @@ export type Database = {
             columns: ["journal_entry_id"]
             isOneToOne: false
             referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payments_vendor_bank_account_id_fkey"
+            columns: ["vendor_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_bank_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -22331,6 +22341,60 @@ export type Database = {
             columns: ["assigned_to"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_bank_accounts: {
+        Row: {
+          account_holder_name: string | null
+          account_label: string | null
+          account_number: string
+          bank_branch: string | null
+          bank_name: string
+          company_id: string | null
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          vendor_id: string
+        }
+        Insert: {
+          account_holder_name?: string | null
+          account_label?: string | null
+          account_number: string
+          bank_branch?: string | null
+          bank_name: string
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          vendor_id: string
+        }
+        Update: {
+          account_holder_name?: string | null
+          account_label?: string | null
+          account_number?: string
+          bank_branch?: string | null
+          bank_name?: string
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_bank_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_bank_accounts_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]

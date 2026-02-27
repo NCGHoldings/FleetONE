@@ -10,7 +10,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateVendor, useUpdateVendor } from "@/hooks/useAccountingMutations";
 import { useGenerateNumber } from "@/hooks/useNumbering";
-import { Loader2 } from "lucide-react";
+import { useVendorBankAccounts, useSaveVendorBankAccounts } from "@/hooks/useVendorBankAccounts";
+import { Loader2, Plus, Trash2, Star } from "lucide-react";
 
 const formSchema = z.object({
   vendor_code: z.string().min(1, "Vendor code is required"),
@@ -30,6 +31,15 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+interface BankAccountRow {
+  account_label: string;
+  bank_name: string;
+  bank_branch: string;
+  account_number: string;
+  account_holder_name: string;
+  is_default: boolean;
+}
+
 interface VendorFormProps {
   vendor?: any;
   onSuccess?: () => void;
@@ -39,8 +49,36 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
   const createVendor = useCreateVendor();
   const updateVendor = useUpdateVendor();
   const generateNumber = useGenerateNumber();
+  const saveBankAccounts = useSaveVendorBankAccounts();
+  const { data: existingBankAccounts } = useVendorBankAccounts(vendor?.id);
   const isEditing = !!vendor;
   const [isGenerating, setIsGenerating] = useState(!isEditing);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountRow[]>([]);
+
+  // Initialize bank accounts from existing data
+  useEffect(() => {
+    if (isEditing && existingBankAccounts && existingBankAccounts.length > 0) {
+      setBankAccounts(
+        existingBankAccounts.map((acc) => ({
+          account_label: acc.account_label || "Primary",
+          bank_name: acc.bank_name,
+          bank_branch: acc.bank_branch || "",
+          account_number: acc.account_number,
+          account_holder_name: acc.account_holder_name || "",
+          is_default: acc.is_default,
+        }))
+      );
+    } else if (isEditing && vendor?.bank_name) {
+      setBankAccounts([{
+        account_label: "Primary",
+        bank_name: vendor.bank_name || "",
+        bank_branch: vendor.bank_branch || "",
+        account_number: vendor.bank_account || "",
+        account_holder_name: "",
+        is_default: true,
+      }]);
+    }
+  }, [isEditing, existingBankAccounts, vendor]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -63,7 +101,6 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
 
   const whtApplicable = form.watch("wht_applicable");
 
-  // Auto-generate vendor code for new vendors
   useEffect(() => {
     if (!isEditing && isGenerating) {
       generateNumber("vendor").then((code) => {
@@ -73,7 +110,39 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
     }
   }, [isEditing, generateNumber, form, isGenerating]);
 
+  const addBankAccount = () => {
+    setBankAccounts([
+      ...bankAccounts,
+      {
+        account_label: bankAccounts.length === 0 ? "Primary" : "",
+        bank_name: "",
+        bank_branch: "",
+        account_number: "",
+        account_holder_name: "",
+        is_default: bankAccounts.length === 0,
+      },
+    ]);
+  };
+
+  const removeBankAccount = (index: number) => {
+    const updated = bankAccounts.filter((_, i) => i !== index);
+    if (updated.length > 0 && !updated.some((a) => a.is_default)) {
+      updated[0].is_default = true;
+    }
+    setBankAccounts(updated);
+  };
+
+  const updateBankAccount = (index: number, field: keyof BankAccountRow, value: string | boolean) => {
+    const updated = [...bankAccounts];
+    if (field === "is_default" && value === true) {
+      updated.forEach((a) => (a.is_default = false));
+    }
+    (updated[index] as any)[field] = value;
+    setBankAccounts(updated);
+  };
+
   const onSubmit = async (data: FormValues) => {
+    const defaultBank = bankAccounts.find((a) => a.is_default) || bankAccounts[0];
     const payload = {
       vendor_code: data.vendor_code,
       vendor_name: data.vendor_name,
@@ -85,15 +154,26 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
       wht_applicable: data.wht_applicable,
       wht_rate: data.wht_rate,
       is_active: data.is_active,
-      bank_name: data.bank_name || undefined,
-      bank_branch: data.bank_branch || undefined,
-      bank_account: data.bank_account || undefined,
+      bank_name: defaultBank?.bank_name || data.bank_name || undefined,
+      bank_branch: defaultBank?.bank_branch || data.bank_branch || undefined,
+      bank_account: defaultBank?.account_number || data.bank_account || undefined,
     };
+
+    let vendorId = vendor?.id;
     if (isEditing) {
       await updateVendor.mutateAsync({ id: vendor.id, ...payload });
     } else {
-      await createVendor.mutateAsync(payload);
+      const result = await createVendor.mutateAsync(payload);
+      vendorId = result?.id;
     }
+
+    if (vendorId && bankAccounts.length > 0) {
+      await saveBankAccounts.mutateAsync({
+        vendorId,
+        accounts: bankAccounts.filter((a) => a.bank_name && a.account_number),
+      });
+    }
+
     onSuccess?.();
   };
 
@@ -293,49 +373,101 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
           )}
         </div>
 
+        {/* Multiple Bank Accounts Section */}
         <div className="rounded-lg border p-4 space-y-4">
-          <h4 className="font-medium">Banking Details</h4>
-          <div className="grid grid-cols-3 gap-4">
-            <FormField
-              control={form.control}
-              name="bank_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Bank Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Commercial Bank" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="bank_branch"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Branch</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Main Branch" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="bank_account"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Account Number</FormLabel>
-                  <FormControl>
-                    <Input placeholder="1234567890" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium">Banking Details</h4>
+            <Button type="button" variant="outline" size="sm" onClick={addBankAccount}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Account
+            </Button>
           </div>
+
+          {bankAccounts.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No bank accounts added. Click &quot;Add Account&quot; to add vendor payment details.
+            </p>
+          )}
+
+          {bankAccounts.map((acc, idx) => (
+            <div key={idx} className="border rounded-lg p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={acc.account_label}
+                    onChange={(e) => updateBankAccount(idx, "account_label", e.target.value)}
+                    placeholder="Account Label (e.g., Primary, USD)"
+                    className="w-48 h-8 text-sm"
+                  />
+                  {acc.is_default && (
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Star className="h-3 w-3" /> Default
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {!acc.is_default && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => updateBankAccount(idx, "is_default", true)}
+                      title="Set as default"
+                    >
+                      <Star className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeBankAccount(idx)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground">Bank Name *</label>
+                  <Input
+                    value={acc.bank_name}
+                    onChange={(e) => updateBankAccount(idx, "bank_name", e.target.value)}
+                    placeholder="Commercial Bank"
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Branch</label>
+                  <Input
+                    value={acc.bank_branch}
+                    onChange={(e) => updateBankAccount(idx, "bank_branch", e.target.value)}
+                    placeholder="Main Branch"
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Account Number *</label>
+                  <Input
+                    value={acc.account_number}
+                    onChange={(e) => updateBankAccount(idx, "account_number", e.target.value)}
+                    placeholder="1234567890"
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Account Holder</label>
+                  <Input
+                    value={acc.account_holder_name}
+                    onChange={(e) => updateBankAccount(idx, "account_holder_name", e.target.value)}
+                    placeholder="Account holder name"
+                    className="h-8"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
         <FormField
@@ -362,9 +494,9 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
           </Button>
           <Button 
             type="submit" 
-            disabled={createVendor.isPending || updateVendor.isPending}
+            disabled={createVendor.isPending || updateVendor.isPending || saveBankAccounts.isPending}
           >
-            {createVendor.isPending || updateVendor.isPending 
+            {createVendor.isPending || updateVendor.isPending || saveBankAccounts.isPending
               ? "Saving..." 
               : isEditing ? "Update Vendor" : "Create Vendor"
             }

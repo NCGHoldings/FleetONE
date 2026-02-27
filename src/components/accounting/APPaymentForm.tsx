@@ -13,6 +13,8 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useVendors, useAPInvoices, useBankAccounts } from "@/hooks/useAccountingData";
 import { useCreateAPPayment, useApproveAPInvoice } from "@/hooks/useAccountingMutations";
+import { useVendorBankAccounts } from "@/hooks/useVendorBankAccounts";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
@@ -58,16 +60,20 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const { data: allInvoices } = useAPInvoices();
   const createPayment = useCreateAPPayment();
   const approveInvoice = useApproveAPInvoice();
+  const generateNumber = useGenerateNumber();
 
   const [allocations, setAllocations] = useState<InvoiceAllocation[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState(preselectedVendorId || "");
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState("");
   const [isAdvance, setIsAdvance] = useState(isAdvanceMode);
   const [advanceAmount, setAdvanceAmount] = useState(0);
+
+  const { data: vendorBankAccounts } = useVendorBankAccounts(selectedVendorId || undefined);
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
-      payment_number: `PAY-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      payment_number: `PAY-${format(new Date(), "yyyyMMdd")}`,
       vendor_id: preselectedVendorId || "",
       payment_date: format(new Date(), "yyyy-MM-dd"),
       payment_method: "bank_transfer",
@@ -79,14 +85,19 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
 
   const paymentMethod = form.watch("payment_method");
 
-  // Reset form when dialog opens
+  // Reset form and generate payment number when dialog opens
   useEffect(() => {
     if (open) {
       setIsAdvance(isAdvanceMode);
       form.setValue("is_advance", isAdvanceMode);
       setAdvanceAmount(0);
+      setSelectedBankAccountId("");
+      // Generate sequential payment number
+      generateNumber("payment").then((num) => {
+        form.setValue("payment_number", num);
+      });
     }
-  }, [open, isAdvanceMode, form]);
+  }, [open, isAdvanceMode, form, generateNumber]);
 
   // Get pending invoices for selected vendor
   const pendingInvoices = useMemo(() => {
@@ -123,6 +134,14 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     }
   }, [selectedVendorId, allInvoices, isAdvance]);
 
+  // Auto-select default bank account when vendor changes
+  useEffect(() => {
+    if (vendorBankAccounts && vendorBankAccounts.length > 0) {
+      const defaultAcc = vendorBankAccounts.find((a) => a.is_default) || vendorBankAccounts[0];
+      setSelectedBankAccountId(defaultAcc.id);
+    }
+  }, [vendorBankAccounts]);
+
   // Approve all pending invoices for selected vendor
   const handleApproveAllPending = async () => {
     for (const inv of pendingInvoices) {
@@ -132,6 +151,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
 
   const handleVendorChange = (vendorId: string) => {
     setSelectedVendorId(vendorId);
+    setSelectedBankAccountId("");
     form.setValue("vendor_id", vendorId);
   };
 
@@ -301,6 +321,27 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                   </FormItem>
                 )}
               />
+
+              {/* Vendor Bank Account Selector */}
+              {selectedVendorId && vendorBankAccounts && vendorBankAccounts.length > 0 && (
+                <FormItem>
+                  <FormLabel>Pay To Account</FormLabel>
+                  <Select onValueChange={setSelectedBankAccountId} value={selectedBankAccountId}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select vendor account" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {vendorBankAccounts.map((acc) => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          {acc.bank_name} - {acc.account_number} {acc.is_default ? "(Default)" : ""} {acc.account_label ? `[${acc.account_label}]` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )}
 
               <FormField
                 control={form.control}
