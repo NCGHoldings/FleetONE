@@ -857,6 +857,75 @@ export type Database = {
           },
         ]
       }
+      ap_reconciliation_items: {
+        Row: {
+          cleared: boolean
+          cleared_amount: number
+          cleared_at: string | null
+          cleared_by: string | null
+          company_id: string | null
+          created_at: string
+          credit_amount: number
+          debit_amount: number
+          doc_date: string | null
+          doc_number: string | null
+          id: string
+          reconciliation_id: string
+          remarks: string | null
+          source_id: string | null
+          source_type: string
+        }
+        Insert: {
+          cleared?: boolean
+          cleared_amount?: number
+          cleared_at?: string | null
+          cleared_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          credit_amount?: number
+          debit_amount?: number
+          doc_date?: string | null
+          doc_number?: string | null
+          id?: string
+          reconciliation_id: string
+          remarks?: string | null
+          source_id?: string | null
+          source_type: string
+        }
+        Update: {
+          cleared?: boolean
+          cleared_amount?: number
+          cleared_at?: string | null
+          cleared_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          credit_amount?: number
+          debit_amount?: number
+          doc_date?: string | null
+          doc_number?: string | null
+          id?: string
+          reconciliation_id?: string
+          remarks?: string | null
+          source_id?: string | null
+          source_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ap_reconciliation_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_reconciliation_items_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "ap_reconciliations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ap_reconciliations: {
         Row: {
           closing_balance: number | null
@@ -1667,6 +1736,75 @@ export type Database = {
             columns: ["journal_entry_id"]
             isOneToOne: false
             referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ar_reconciliation_items: {
+        Row: {
+          cleared: boolean
+          cleared_amount: number
+          cleared_at: string | null
+          cleared_by: string | null
+          company_id: string | null
+          created_at: string
+          credit_amount: number
+          debit_amount: number
+          doc_date: string | null
+          doc_number: string | null
+          id: string
+          reconciliation_id: string
+          remarks: string | null
+          source_id: string | null
+          source_type: string
+        }
+        Insert: {
+          cleared?: boolean
+          cleared_amount?: number
+          cleared_at?: string | null
+          cleared_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          credit_amount?: number
+          debit_amount?: number
+          doc_date?: string | null
+          doc_number?: string | null
+          id?: string
+          reconciliation_id: string
+          remarks?: string | null
+          source_id?: string | null
+          source_type: string
+        }
+        Update: {
+          cleared?: boolean
+          cleared_amount?: number
+          cleared_at?: string | null
+          cleared_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          credit_amount?: number
+          debit_amount?: number
+          doc_date?: string | null
+          doc_number?: string | null
+          id?: string
+          reconciliation_id?: string
+          remarks?: string | null
+          source_id?: string | null
+          source_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ar_reconciliation_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_reconciliation_items_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "ar_reconciliations"
             referencedColumns: ["id"]
           },
         ]
@@ -8799,6 +8937,82 @@ export type Database = {
           },
         ]
       }
+      intercompany_reconciliations: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          details: Json | null
+          difference: number | null
+          id: string
+          notes: string | null
+          reconciled_at: string | null
+          reconciled_by: string | null
+          reconciliation_date: string
+          status: string
+          unit_a_balance: number
+          unit_a_id: string
+          unit_b_balance: number
+          unit_b_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          details?: Json | null
+          difference?: number | null
+          id?: string
+          notes?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date: string
+          status?: string
+          unit_a_balance?: number
+          unit_a_id: string
+          unit_b_balance?: number
+          unit_b_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          details?: Json | null
+          difference?: number | null
+          id?: string
+          notes?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date?: string
+          status?: string
+          unit_a_balance?: number
+          unit_a_id?: string
+          unit_b_balance?: number
+          unit_b_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intercompany_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intercompany_reconciliations_unit_a_id_fkey"
+            columns: ["unit_a_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intercompany_reconciliations_unit_b_id_fkey"
+            columns: ["unit_b_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_ageing_config: {
         Row: {
           bucket_name: string
@@ -13655,6 +13869,127 @@ export type Database = {
             columns: ["gl_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      petty_cash_reconciliation_items: {
+        Row: {
+          amount: number
+          cleared: boolean
+          company_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          reconciliation_id: string
+          remarks: string | null
+          transaction_id: string | null
+        }
+        Insert: {
+          amount?: number
+          cleared?: boolean
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          reconciliation_id: string
+          remarks?: string | null
+          transaction_id?: string | null
+        }
+        Update: {
+          amount?: number
+          cleared?: boolean
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          reconciliation_id?: string
+          remarks?: string | null
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_reconciliation_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_reconciliation_items_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "petty_cash_reconciliations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_reconciliation_items_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "petty_cash_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      petty_cash_reconciliations: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          difference: number | null
+          fund_id: string
+          id: string
+          notes: string | null
+          physical_count: number
+          reconciled_at: string | null
+          reconciled_by: string | null
+          reconciliation_date: string
+          status: string
+          system_balance: number
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          difference?: number | null
+          fund_id: string
+          id?: string
+          notes?: string | null
+          physical_count?: number
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date: string
+          status?: string
+          system_balance?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          difference?: number | null
+          fund_id?: string
+          id?: string
+          notes?: string | null
+          physical_count?: number
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date?: string
+          status?: string
+          system_balance?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_reconciliations_fund_id_fkey"
+            columns: ["fund_id"]
+            isOneToOne: false
+            referencedRelation: "petty_cash_funds"
             referencedColumns: ["id"]
           },
         ]
@@ -20562,6 +20897,75 @@ export type Database = {
             columns: ["to_warehouse_id"]
             isOneToOne: false
             referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subledger_reconciliations: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          details: Json | null
+          difference: number | null
+          gl_account_id: string | null
+          gl_balance: number
+          id: string
+          notes: string | null
+          reconciled_at: string | null
+          reconciled_by: string | null
+          reconciliation_date: string
+          reconciliation_type: string
+          status: string
+          subledger_total: number
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          details?: Json | null
+          difference?: number | null
+          gl_account_id?: string | null
+          gl_balance?: number
+          id?: string
+          notes?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date: string
+          reconciliation_type: string
+          status?: string
+          subledger_total?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          details?: Json | null
+          difference?: number | null
+          gl_account_id?: string | null
+          gl_balance?: number
+          id?: string
+          notes?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date?: string
+          reconciliation_type?: string
+          status?: string
+          subledger_total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subledger_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subledger_reconciliations_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
         ]
