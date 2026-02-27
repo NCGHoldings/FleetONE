@@ -1,137 +1,169 @@
 
-# Build All Missing Development Items
+# Yutong CEO Executive Report Dashboard
 
-This plan covers the 2 incomplete requirements from the cross-check plus all missing reconciliation worksheet components from the approved reconciliation plan.
-
----
-
-## Part A: Requirement #1 -- Bank Account Edit Functionality
-
-Currently `BankAccountForm.tsx` only creates bank accounts. No edit capability exists.
-
-### Changes:
-1. **Modify `BankAccountForm.tsx`** to accept an optional `bankAccount` prop for editing
-   - Add `bankAccount?: any` to `BankAccountFormProps`
-   - Pre-populate form with existing data when editing
-   - Change dialog title to "Edit Bank Account" when editing
-   - Change submit button text to "Update Bank Account"
-
-2. **Create `useUpdateBankAccount` mutation** in `useAccountingMutations.ts`
-   - Uses `supabase.from("bank_accounts").update({...}).eq("id", id)`
-   - Invalidates `["bank-accounts"]` query key
-
-3. **Add Edit button to `BankingView.tsx`** bank accounts table
-   - Add a new column with a pencil icon edit action
-   - State for `editingBankAccount` 
-   - Pass selected bank account to `BankAccountForm`
+A comprehensive, CEO-presentation-grade analytics and reporting page for the entire Yutong Bus Sales division. This page will aggregate data from all 49 Yutong tables into a single, visually rich, auto-updating dashboard -- and it can be shared via a public link with an access code.
 
 ---
 
-## Part B: Requirement #4 -- Vendor Bank Details
+## What Gets Built
 
-The `vendors` table already has `bank_name`, `bank_branch`, `bank_account` columns but the `VendorForm.tsx` has no UI fields for them.
+### 1. Data Hook: `useYutongExecutiveReport`
 
-### Changes:
-1. **Modify `VendorForm.tsx`**:
-   - Add `bank_name`, `bank_branch`, `bank_account` fields to the Zod schema (all optional strings)
-   - Add a "Banking Details" section in the form UI (below WHT section) with 3 fields: Bank Name, Branch, Account Number
-   - Include these fields in the submit payload
-   - Map existing vendor data to defaults when editing
+A React Query hook that fetches and aggregates data from across all Yutong tables into a single analytics object:
 
----
+| Data Section | Source Tables | Metrics |
+|---|---|---|
+| **Pipeline Overview** | `yutong_quotations` | Total quotations, by status (draft/sent/confirmed/rejected), conversion rate, avg quotation value |
+| **Order Performance** | `yutong_orders` | Total orders, by phase, total order value, avg order value, cash vs lease split |
+| **Payment & Finance** | `yutong_payment_schedules`, `yutong_letter_of_credits` | Total collected, outstanding, overdue payments, LC status breakdown |
+| **Shipment Tracking** | `yutong_shipment_groups`, `yutong_shipments` | Shipments by status (planning/in_transit/delivered), avg transit time |
+| **Operations Pipeline** | `yutong_customs_declarations`, `yutong_vehicle_processing`, `yutong_rmv_registrations` | Units in customs, processing, RMV stages |
+| **Delivery & Handover** | `yutong_delivery_inspections`, `yutong_delivery_confirmations`, `yutong_customer_handovers` | Delivered count, pending inspections, handover completion rate |
+| **After Sales** | `yutong_warranties`, `yutong_service_reminders`, `yutong_support_tickets`, `yutong_customer_feedback` | Active warranties, open tickets, avg feedback rating |
+| **Monthly Trends** | All above | Monthly quotation/order/delivery counts for trend charts |
+| **Top Customers** | `yutong_orders` joined with `yutong_customers` | Top 10 by order value |
+| **Bus Model Performance** | `yutong_orders`, `yutong_quotations` | Orders/quotations by bus model |
 
-## Part C: AR Reconciliation Worksheet (SAP B1-Style Upgrade)
-
-Replace basic `ARReconciliationView.tsx` with a full SAP B1-style worksheet.
-
-### New file: `ARReconciliationWorksheet.tsx`
-- **Header bar**: Customer selector, period date range, customer statement balance input, display filter (All/Unmatched/Matched)
-- **Table**: List AR invoices and receipts chronologically with columns: #, Cleared checkbox, Type (INV/RCT/CN), Date, Doc No., Reference, Debit, Credit, Cleared Amount input, Remarks
-- **Summary footer**: Left side shows invoice/receipt counts and totals. Right side shows Book Balance, Customer Statement Balance, Difference (green checkmark when zero)
-- **Actions**: Cancel and Save Reconciliation
-- **Uses shared CSS** from `ReconciliationWorksheet.css`
-- Follows exact same architecture as `BankReconciliationWorksheet.tsx`
-
-### Wire in `Accounting.tsx`:
-- Replace `ARReconciliationView` import with `ARReconciliationWorksheet`
+The hook uses `refetchInterval: 60000` (1 min) for live auto-updates.
 
 ---
 
-## Part D: AP Reconciliation Worksheet (SAP B1-Style Upgrade)
+### 2. Report Page: `YutongExecutiveReport.tsx`
 
-Replace basic `APReconciliationView.tsx` with full SAP B1-style worksheet.
+A professional, print-ready dashboard page with the following sections:
 
-### New file: `APReconciliationWorksheet.tsx`
-- Same pattern as AR but for vendors
-- **Header**: Vendor selector, period range, vendor statement balance, display filter
-- **Table**: AP invoices (debits), AP payments (credits) with clearing checkboxes
-- **Summary footer**: Invoice/Payment totals on left, Book Balance vs Vendor Statement vs Difference on right
-- Follows same architecture as Bank Reconciliation Worksheet
+**Header Bar:**
+- NCG Holdings logo + "Yutong Bus Sales -- Executive Report"
+- Report generation timestamp (auto-updates)
+- "Share Report" button (generates link + access code)
+- "Export to Excel" button
 
-### Wire in `Accounting.tsx`:
-- Replace `APReconciliationView` import with `APReconciliationWorksheet`
+**Section A -- Executive Summary (KPI Cards Row)**
+- Total Quotations | Conversion Rate | Active Orders | Total Revenue
+- Total Collected | Outstanding Balance | Units Delivered | Customer Satisfaction
 
----
+**Section B -- Sales Pipeline Funnel**
+- Visual funnel chart: Quotations -> Confirmed -> Orders -> Shipped -> Delivered
+- Shows count and value at each stage with drop-off percentages
 
-## Part E: Petty Cash Reconciliation Worksheet
+**Section C -- Revenue & Payments**
+- Bar chart: Monthly revenue trend (last 12 months)
+- Pie chart: Payment status breakdown (Paid/Pending/Overdue)
+- Progress bar: Overall collection rate
+- Cash vs Lease payment mode split
 
-### New file: `PettyCashReconciliationWorksheet.tsx`
-- **Header**: Fund selector (from `petty_cash_funds`), reconciliation date, physical cash count input
-- **Table**: All petty cash transactions with clearing checkboxes, showing running balance
-- **Summary footer**: Total disbursements, total replenishments, system balance, physical count, difference
-- **Actions**: Save reconciliation (inserts into `petty_cash_reconciliations` table)
+**Section D -- Shipment & Operations Status**
+- Horizontal stacked bar: Units by current phase (ordering -> shipping -> customs -> processing -> RMV -> delivery)
+- Shipment group status cards (planning/in_transit/customs/delivered counts)
 
-### Wire in `Accounting.tsx`:
-- Add "Petty Cash Reconciliation" tab in the banking module tabs
+**Section E -- Order Phase Distribution**
+- Donut chart showing orders across all phases
+- Table: Top 10 orders by value with current phase and payment status
 
----
+**Section F -- Bus Model Performance**
+- Bar chart: Orders by bus model
+- Table: Model, Units Ordered, Total Value, Avg Price
 
-## Part F: Sub-Ledger to GL Reconciliation
+**Section G -- Top Customers**
+- Table: Customer Name, Company, Orders Count, Total Value, Payment Status
 
-### New file: `SubLedgerReconciliationView.tsx`
-- **Header**: Reconciliation type selector (AR Sub-Ledger / AP Sub-Ledger), as-of date
-- **Table**: Each customer/vendor with sub-ledger balance alongside GL control account balance
-- **Summary**: Total sub-ledger balance, GL control account balance, difference
-- Fetches AR invoice balances summed by customer and compares against Trade Receivable GL account balance
+**Section H -- After Sales Health**
+- Cards: Active Warranties, Open Support Tickets, Pending Service Reminders
+- Star rating display for average customer feedback
+- Upcoming service reminders list
 
-### Wire in `Accounting.tsx`:
-- Add in GL/Settings section
+**Section I -- Predictive Insights**
+- Projected monthly deliveries based on current pipeline
+- Estimated revenue from pending orders
+- Overdue payment risk summary
 
----
-
-## Part G: Intercompany Reconciliation
-
-### New file: `IntercompanyReconciliationView.tsx`
-- **Header**: Select two business units, reconciliation date
-- **Table**: Intercompany transactions between units with clearing checkboxes
-- **Summary**: Unit A balance, Unit B balance, net difference
-
-### Wire in `Accounting.tsx`:
-- Add in GL section
-
----
-
-## Part H: Shared Reconciliation CSS
-
-### New file: `ReconciliationWorksheet.css`
-- Extract and extend bank reconciliation CSS into shared stylesheet
-- Module-specific color accents: blue (bank), green (AR), orange (AP), purple (petty cash)
-- All new worksheet components import this shared CSS
+All charts use Recharts (already installed). Layout uses CSS grid for clean, print-friendly formatting.
 
 ---
 
-## Technical Summary
+### 3. Public Shareable Report: `PublicYutongReport.tsx`
 
-| File | Action |
-|------|--------|
-| `BankAccountForm.tsx` | Modified -- add edit mode |
-| `BankingView.tsx` | Modified -- add edit button to table |
-| `useAccountingMutations.ts` | Modified -- add `useUpdateBankAccount` |
-| `VendorForm.tsx` | Modified -- add banking details fields |
-| `ARReconciliationWorksheet.tsx` | New -- SAP B1-style AR worksheet |
-| `APReconciliationWorksheet.tsx` | New -- SAP B1-style AP worksheet |
-| `PettyCashReconciliationWorksheet.tsx` | New -- Petty cash worksheet |
-| `SubLedgerReconciliationView.tsx` | New -- Sub-ledger vs GL comparison |
-| `IntercompanyReconciliationView.tsx` | New -- Cross-unit reconciliation |
-| `ReconciliationWorksheet.css` | New -- Shared CSS for all worksheets |
-| `Accounting.tsx` | Modified -- wire new components, add new tabs |
+A public (unauthenticated) page at `/public/yutong-report` that:
+
+- Accepts an access code via URL query param (`?code=XXXX`)
+- Shows a code-entry form if no code or invalid code
+- On valid code, renders the same `YutongExecutiveReport` component in read-only mode
+- Access codes stored in `yutong_report_access` table (or `system_settings` JSONB)
+
+**Access Code System:**
+- When "Share Report" is clicked, a 6-character alphanumeric code is generated
+- Code is stored in `system_settings` with key `yutong_report_access_code`
+- Code can be regenerated anytime
+- The public page fetches data using Supabase anon key with RLS policies allowing SELECT for authenticated OR matching access code
+
+Since creating new RLS policies for public access is complex, the simpler approach: Create a Supabase Edge Function `yutong-executive-report` that:
+- Accepts the access code as a header
+- Validates it against `system_settings`
+- If valid, queries all Yutong tables using the service role key
+- Returns the aggregated analytics JSON
+
+The public page calls this edge function instead of querying Supabase directly.
+
+---
+
+### 4. Excel Export
+
+Reuse the existing `xlsx-js-style` pattern (from NSP reports) to generate a multi-sheet Excel workbook:
+
+| Sheet | Content |
+|---|---|
+| Executive Summary | KPI metrics, report date, period |
+| Sales Pipeline | Quotation/Order/Delivery funnel data |
+| Orders Detail | All orders with phase, amount, payment status |
+| Payments | Payment schedule with status |
+| Shipments | Shipment groups with status and dates |
+| Customers | Top customers ranked by value |
+| After Sales | Warranties, tickets, feedback |
+
+---
+
+### 5. Routing & Integration
+
+| File | Change |
+|---|---|
+| `App.tsx` | Add public route: `/public/yutong-report` -> `PublicYutongReport` |
+| `YutongQuotations.tsx` | Add "Reports" tab with BarChart3 icon wired to `YutongExecutiveReport` |
+
+---
+
+## Files to Create
+
+| File | Purpose |
+|---|---|
+| `src/hooks/useYutongExecutiveReport.ts` | Data aggregation hook (React Query) |
+| `src/components/yutong/report/YutongExecutiveReport.tsx` | Main report dashboard component |
+| `src/components/yutong/report/YutongReportKPICards.tsx` | Executive summary KPI row |
+| `src/components/yutong/report/YutongPipelineFunnel.tsx` | Sales funnel visualization |
+| `src/components/yutong/report/YutongRevenueCharts.tsx` | Revenue trend + payment charts |
+| `src/components/yutong/report/YutongShipmentStatus.tsx` | Shipment & operations pipeline |
+| `src/components/yutong/report/YutongModelPerformance.tsx` | Bus model analysis charts |
+| `src/components/yutong/report/YutongTopCustomers.tsx` | Top customers table |
+| `src/components/yutong/report/YutongAfterSalesHealth.tsx` | After-sales KPIs |
+| `src/components/yutong/report/YutongReportShareDialog.tsx` | Share link + code generator |
+| `src/components/yutong/report/YutongExcelExporter.ts` | Multi-sheet Excel export |
+| `src/pages/PublicYutongReport.tsx` | Public report page with code entry |
+| `supabase/functions/yutong-executive-report/index.ts` | Edge function for public data access |
+
+## Files to Modify
+
+| File | Change |
+|---|---|
+| `src/pages/YutongQuotations.tsx` | Add "Reports" tab trigger + content |
+| `src/App.tsx` | Add `/public/yutong-report` route |
+
+---
+
+## Technical Approach
+
+- All charts built with Recharts (AreaChart, BarChart, PieChart, FunnelChart via custom SVG)
+- LKR currency formatting throughout using `toLocaleString()`
+- Auto-refresh every 60 seconds for live dashboard feel
+- Print-optimized CSS with `@media print` rules
+- Edge function uses Supabase service role for public access (no RLS bypass needed)
+- Access code validated server-side in the edge function
+- The report page is designed to be presentation-ready for CEO meetings
