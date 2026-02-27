@@ -1,1030 +1,1013 @@
-// Document Template Seeder - Professional templates for all 12 document types
-// Each template follows a consistent structure: Header, Body, Footer with print-optimized CSS
+// Document Template Seeder - Professional CEO-grade templates for all 12 document types
+// Each template uses modern CSS custom properties, rounded cards, signature pads, and print-optimized layout
 
-// Common CSS that applies to all templates
+// Common CSS shared across all templates - professional layout with CSS custom properties
 const commonStyles = `
-  @page { size: A4 portrait; margin: 15mm; }
-  @media print {
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .no-print { display: none !important; }
+  :root {
+    --ink: #1e293b;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --bg: #ffffff;
+    --accent: #2563eb;
+    --accent-2: #1e40af;
+    --chip: #eff6ff;
+    --radius: 14px;
+    --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    font-size: 12px;
-    line-height: 1.5;
-    color: #333;
     margin: 0;
-    padding: 0;
-    background: white;
+    background: #f8fafc;
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 13px;
+    line-height: 1.5;
   }
-  .document-container {
-    max-width: 210mm;
-    margin: 0 auto;
-    padding: 20px;
-    min-height: 297mm;
-    display: flex;
-    flex-direction: column;
+  .page { max-width: 980px; margin: 28px auto; padding: 0 14px; }
+  .doc {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,.04);
   }
-  .document-header {
-    border-bottom: 2px solid #2563eb;
-    padding-bottom: 15px;
-    margin-bottom: 20px;
+  .header {
+    padding: 24px 28px;
+    display: grid;
+    grid-template-columns: 1.2fr .8fr;
+    gap: 18px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(37,99,235,0.04), rgba(255,255,255,0));
   }
-  .header-row {
-    display: flex;
+  .brand {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: 16px;
     align-items: center;
-    gap: 20px;
   }
-  .logo-area {
-    flex-shrink: 0;
+  .logo-container {
+    width: 64px; height: 64px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: #fff;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
   }
-  .logo-area img {
-    max-height: 200px;
-    max-width: 400px;
-    object-fit: contain;
+  .logo-container img {
+    width: 100%; height: 100%; object-fit: contain; display: block;
   }
-  .company-details {
-    flex: 1;
+  .company h1 {
+    margin: 0; font-size: 19px; line-height: 1.2;
+    letter-spacing: -0.01em; font-weight: 800;
   }
-  .company-details h1 {
-    margin: 0 0 5px 0;
-    font-size: 20px;
-    color: #1e40af;
+  .company p {
+    margin: 4px 0 0; color: var(--muted);
+    font-size: 12px; line-height: 1.5; white-space: pre-line;
   }
-  .company-details p {
-    margin: 2px 0;
-    font-size: 11px;
-    color: #666;
+  .meta {
+    display: grid; justify-items: end;
+    align-content: start; gap: 12px;
   }
-  .document-body {
-    flex: 1;
+  .title { text-align: right; }
+  .title .label {
+    font-size: 11px; color: var(--muted);
+    letter-spacing: 0.15em; text-transform: uppercase; font-weight: 700;
   }
-  .document-title {
-    text-align: center;
-    font-size: 18px;
-    font-weight: bold;
-    color: #1e40af;
-    margin: 0 0 20px 0;
-    padding: 10px;
-    background: #eff6ff;
-    border-radius: 4px;
+  .title .value {
+    font-size: 22px; font-weight: 900; margin-top: 2px; color: var(--ink);
   }
-  .info-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 15px;
-    margin-bottom: 20px;
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .chip {
+    font-size: 11px; padding: 6px 12px; border-radius: 999px;
+    background: var(--chip); border: 1px solid rgba(37,99,235,0.2);
+    color: var(--accent-2); font-weight: 700; white-space: nowrap;
   }
-  .info-section {
-    padding: 12px;
-    background: #f8fafc;
-    border-radius: 4px;
-    border: 1px solid #e2e8f0;
+  .chip.gray {
+    background: #f1f5f9; border-color: var(--line); color: var(--muted);
   }
-  .info-section h3 {
-    margin: 0 0 8px 0;
-    font-size: 12px;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+  .status {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-weight: 900; letter-spacing: .08em; text-transform: uppercase;
+    font-size: 10px; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--line); background: #fff;
   }
-  .info-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 4px 0;
-    border-bottom: 1px dotted #e2e8f0;
+  .dot {
+    width: 7px; height: 7px; border-radius: 999px; background: #10b981;
   }
-  .info-row:last-child { border-bottom: none; }
-  .info-row .label {
-    color: #64748b;
-    font-size: 11px;
+  .body { padding: 24px 28px 20px; display: grid; gap: 20px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card {
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px; background: #fff;
   }
-  .info-row .value {
-    font-weight: 600;
-    color: #1e293b;
+  .card h3 {
+    margin: 0 0 12px; font-size: 11px; letter-spacing: .15em;
+    text-transform: uppercase; color: var(--muted); font-weight: 700;
   }
-  .customer-section, .vendor-section {
-    margin-bottom: 20px;
-    padding: 12px;
-    background: #f0f9ff;
-    border-left: 4px solid #2563eb;
+  .kv { display: grid; gap: 9px; }
+  .row {
+    display: grid; grid-template-columns: 140px 1fr;
+    gap: 12px; align-items: baseline;
   }
-  .customer-section h3, .vendor-section h3 {
-    margin: 0 0 5px 0;
-    font-size: 11px;
-    color: #64748b;
-    text-transform: uppercase;
+  .k { color: var(--muted); font-size: 12px; }
+  .v { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .payment-summary {
+    border: 1px solid rgba(37,99,235,0.15);
+    background: rgba(37,99,235,0.02);
+    border-radius: var(--radius); padding: 16px; display: grid; gap: 8px;
   }
-  .customer-section p, .vendor-section p {
-    margin: 2px 0;
+  .summary-line {
+    display: flex; justify-content: space-between; align-items: baseline;
   }
-  table.items-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 15px 0;
+  .summary-line .left { color: var(--muted); font-size: 12px; }
+  .summary-line .right { font-weight: 700; font-size: 13px; }
+  .total-box {
+    margin-top: 8px; padding-top: 12px;
+    border-top: 2px solid var(--accent);
+    display: flex; justify-content: space-between; align-items: center;
   }
-  table.items-table th {
-    background: #1e40af;
-    color: white;
-    padding: 10px 8px;
-    text-align: left;
-    font-size: 11px;
-    text-transform: uppercase;
+  .total-box .label {
+    font-size: 12px; font-weight: 800; color: var(--accent-2);
+    text-transform: uppercase; letter-spacing: 0.05em;
   }
-  table.items-table th:last-child,
-  table.items-table td:last-child { text-align: right; }
-  table.items-table th:nth-child(3),
-  table.items-table th:nth-child(4),
-  table.items-table td:nth-child(3),
-  table.items-table td:nth-child(4) { text-align: right; }
-  table.items-table td {
-    padding: 10px 8px;
-    border-bottom: 1px solid #e2e8f0;
+  .total-box .value {
+    font-size: 22px; font-weight: 950; color: var(--accent-2);
   }
-  table.items-table tr:hover { background: #f8fafc; }
-  .totals-section {
-    margin-left: auto;
-    width: 280px;
-    margin-top: 15px;
+  table {
+    width: 100%; border-collapse: collapse;
+    border: 1px solid var(--line); border-radius: var(--radius);
+    overflow: hidden; background: #fff;
   }
-  .total-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 12px;
-    border-bottom: 1px solid #e2e8f0;
+  thead th {
+    background: #f8fafc; color: var(--muted); font-size: 11px;
+    letter-spacing: .1em; text-transform: uppercase;
+    text-align: left; padding: 14px;
+    border-bottom: 2px solid var(--line);
   }
-  .total-row.grand {
-    background: #1e40af;
-    color: white;
-    font-weight: bold;
-    font-size: 14px;
-    border-radius: 0 0 4px 4px;
+  tbody td {
+    padding: 14px; border-bottom: 1px solid var(--line);
+    font-size: 13px; vertical-align: top;
   }
+  tbody tr:last-child td { border-bottom: none; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .notes-section {
+    display: grid; gap: 8px; padding: 16px;
+    border: 1px solid var(--line); border-radius: var(--radius); background: #fff;
+  }
+  .notes-section .label {
+    font-size: 11px; letter-spacing: .15em;
+    text-transform: uppercase; color: var(--muted); font-weight: 800;
+  }
+  .notes-section p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ink); }
   .amount-words {
-    margin-top: 15px;
-    padding: 12px;
-    background: #fef3c7;
-    border-radius: 4px;
-    font-style: italic;
-    border-left: 4px solid #f59e0b;
+    padding: 12px 16px; background: #fffbeb;
+    border: 1px solid #fde68a; border-radius: var(--radius);
+    font-style: italic; font-size: 12px; color: #92400e;
   }
-  .document-footer {
-    margin-top: auto;
-    padding-top: 20px;
-    border-top: 1px solid #e2e8f0;
+  .footer {
+    padding: 20px 28px 24px; border-top: 1px solid var(--line);
+    background: #fff; display: grid; gap: 24px;
   }
-  .signature-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 30px;
-    margin-top: 40px;
+  .sig-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .signature-pad { display: flex; flex-direction: column; gap: 10px; }
+  .signature-area {
+    border: 1px solid var(--line); border-radius: 12px;
+    height: 80px; background: #fcfcfc;
+    display: grid; place-items: center; position: relative;
+    overflow: hidden;
   }
-  .sig-box {
-    text-align: center;
+  .signature-area img {
+    max-width: 90%; max-height: 70px; object-fit: contain;
   }
-  .sig-line {
-    border-top: 1px solid #333;
-    padding-top: 8px;
-    font-size: 11px;
-    color: #666;
+  .signature-area::after {
+    content: 'SIGN HERE'; font-size: 9px; color: #cbd5e1;
+    letter-spacing: 0.2em; position: absolute; bottom: 6px;
   }
-  .footer-notes {
-    margin-top: 20px;
-    padding: 10px;
-    background: #f8fafc;
-    border-radius: 4px;
-    font-size: 10px;
-    color: #64748b;
+  .sig-info { text-align: center; }
+  .sig-info .name { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+  .sig-info .role {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--muted); font-weight: 600;
   }
-  .amount-box {
-    text-align: center;
-    padding: 20px;
-    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-    color: white;
-    border-radius: 8px;
-    margin: 20px 0;
+  .bottom-bar {
+    display: flex; justify-content: space-between;
+    align-items: flex-end; padding-top: 10px;
   }
-  .amount-box .amount {
-    font-size: 28px;
-    font-weight: bold;
+  .terms-column {
+    max-width: 60%; font-size: 11px; color: var(--muted); line-height: 1.5;
   }
-  .amount-box .words {
-    font-size: 12px;
-    opacity: 0.9;
-    margin-top: 5px;
+  .verification { text-align: right; }
+  .qr-placeholder {
+    width: 80px; height: 80px; border: 1px solid var(--line);
+    border-radius: 8px; margin-left: auto; margin-bottom: 8px;
+    display: grid; place-items: center; background: #fff;
+    font-size: 9px; color: #cbd5e1; text-align: center;
   }
-  .payment-info {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin: 15px 0;
-    padding: 12px;
-    background: #f8fafc;
-    border-radius: 4px;
+  .verification .printed {
+    font-size: 10px; color: var(--muted); margin-top: 4px;
   }
-  .payment-info div {
-    padding: 5px 0;
+  @media print {
+    body { background: #fff; }
+    .page { margin: 0; padding: 0; max-width: 100%; }
+    .doc { box-shadow: none; border-radius: 0; border: none; }
+    .header { border-top: 1px solid var(--line); }
   }
-  .status-badge {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
+  @media (max-width: 840px) {
+    .header { grid-template-columns: 1fr; }
+    .meta { justify-items: start; }
+    .title { text-align: left; }
+    .chips { justify-content: flex-start; }
+    .grid { grid-template-columns: 1fr; }
+    .sig-row { grid-template-columns: 1fr 1fr; }
+    .bottom-bar { flex-direction: column; align-items: flex-start; gap: 20px; }
+    .terms-column { max-width: 100%; }
+    .verification { text-align: left; }
+    .qr-placeholder { margin-left: 0; }
   }
-  .status-paid { background: #dcfce7; color: #166534; }
-  .status-unpaid { background: #fef3c7; color: #92400e; }
-  .status-partial { background: #dbeafe; color: #1e40af; }
 `;
 
-// AR Invoice Template
+// Helper to build the header block
+const buildHeader = (docLabel: string, docNumberPlaceholder: string, docDatePlaceholder: string, chipLabel: string) => `
+  <div class="header">
+    <div class="brand">
+      <div class="logo-container">{{company_logo}}</div>
+      <div class="company">
+        <h1>{{company_name}}</h1>
+        <p>{{company_address}}
+Tel: {{company_phone}} | Email: {{company_email}}</p>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="title">
+        <div class="label">${docLabel}</div>
+        <div class="value">${docNumberPlaceholder}</div>
+      </div>
+      <div class="chips">
+        <span class="chip">${chipLabel}</span>
+        <span class="chip gray">Date: ${docDatePlaceholder}</span>
+      </div>
+      <div class="status">
+        <span class="dot"></span>
+        {{status}}
+      </div>
+    </div>
+  </div>
+`;
+
+// Helper to build the footer/signature block
+const buildFooter = (roles: string[]) => {
+  const pads = roles.map(role => `
+      <div class="signature-pad">
+        <div class="signature-area"></div>
+        <div class="sig-info">
+          <div class="name">&nbsp;</div>
+          <div class="role">${role}</div>
+        </div>
+      </div>`).join('');
+
+  return `
+  <div class="footer">
+    <div class="sig-row">${pads}
+    </div>
+    <div class="bottom-bar">
+      <div class="terms-column">
+        <strong>Notes &amp; Terms:</strong><br>
+        1. All transactions are subject to audit and verification.<br>
+        2. This document is electronically generated and remains valid with the associated digital logs.
+      </div>
+      <div class="verification">
+        <div class="qr-placeholder">QR VERIFY</div>
+        <div class="printed">Printed: {{print_date}}</div>
+      </div>
+    </div>
+  </div>`;
+};
+
+// ==================== AR Invoice ====================
 export const generateARInvoiceTemplate = (): string => `
 <style>${commonStyles}</style>
-<div class="document-container">
+<div class="page"><div class="doc">
   {{document_header}}
-  <div class="document-header">
-    <div class="header-row">
-      <div class="logo-area">{{company_logo}}</div>
-      <div class="company-details">
-        <h1>{{company_name}}</h1>
-        <p>{{company_address}}</p>
-        <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-        <p>TIN: {{company_tax_id}}</p>
-      </div>
-    </div>
-  </div>
+  ${buildHeader('Tax Invoice', '{{invoice_number}}', '{{invoice_date}}', 'Sales Invoice')}
 
-  <div class="document-body">
-    <h2 class="document-title">TAX INVOICE</h2>
-    
-    <div class="info-grid">
-      <div class="info-section">
+  <div class="body">
+    <div class="grid">
+      <div class="card">
         <h3>Invoice Details</h3>
-        <div class="info-row"><span class="label">Invoice No:</span><span class="value">{{invoice_number}}</span></div>
-        <div class="info-row"><span class="label">Date:</span><span class="value">{{invoice_date}}</span></div>
-        <div class="info-row"><span class="label">Due Date:</span><span class="value">{{due_date}}</span></div>
-        <div class="info-row"><span class="label">Reference:</span><span class="value">{{reference}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Invoice No</span><span class="v">{{invoice_number}}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">{{invoice_date}}</span></div>
+          <div class="row"><span class="k">Due Date</span><span class="v">{{due_date}}</span></div>
+          <div class="row"><span class="k">Reference</span><span class="v">{{reference}}</span></div>
+        </div>
       </div>
-      <div class="customer-section">
+      <div class="card">
         <h3>Bill To</h3>
-        <p><strong>{{customer_name}}</strong></p>
-        <p>{{customer_address}}</p>
-        <p>{{customer_phone}}</p>
-        <p>{{customer_email}}</p>
+        <div class="kv">
+          <div class="row"><span class="k">Customer</span><span class="v">{{customer_name}}</span></div>
+          <div class="row"><span class="k">Address</span><span class="v">{{customer_address}}</span></div>
+          <div class="row"><span class="k">Phone</span><span class="v">{{customer_phone}}</span></div>
+          <div class="row"><span class="k">Email</span><span class="v">{{customer_email}}</span></div>
+        </div>
       </div>
     </div>
 
     {{line_items}}
 
-    <div class="totals-section">
-      <div class="total-row"><span>Subtotal:</span><span>{{subtotal}}</span></div>
-      <div class="total-row"><span>Tax:</span><span>{{tax_amount}}</span></div>
-      <div class="total-row"><span>Discount:</span><span>{{discount_amount}}</span></div>
-      <div class="total-row grand"><span>Total Due:</span><span>{{total_amount}}</span></div>
+    <div class="payment-summary">
+      <div class="summary-line"><span class="left">Subtotal</span><span class="right">{{subtotal}}</span></div>
+      <div class="summary-line"><span class="left">Tax</span><span class="right">{{tax_amount}}</span></div>
+      <div class="summary-line"><span class="left">Discount</span><span class="right">{{discount_amount}}</span></div>
+      <div class="total-box">
+        <span class="label">Total Due</span>
+        <span class="value">{{total_amount}}</span>
+      </div>
     </div>
 
-    <div class="amount-words">
-      <strong>Amount in Words:</strong> {{amount_in_words}}
-    </div>
+    <div class="amount-words"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
 
-    <div class="footer-notes">
-      <strong>Notes:</strong> {{notes}}
+    <div class="notes-section">
+      <div class="label">Notes</div>
+      <p>{{notes}}</p>
     </div>
   </div>
 
-  <div class="document-footer">
-    <div class="signature-grid">
-      <div class="sig-box"><div class="sig-line">Prepared By</div></div>
-      <div class="sig-box"><div class="sig-line">Checked By</div></div>
-      <div class="sig-box"><div class="sig-line">Authorized Signature</div></div>
-    </div>
-  </div>
-</div>
+  ${buildFooter(['Prepared By', 'Checked By', 'Authorized By', 'Customer Acknowledgment'])}
+</div></div>
 `;
 
-// AR Receipt Template
+// ==================== AR Receipt ====================
 export const generateARReceiptTemplate = (): string => `
 <style>${commonStyles}</style>
-<div class="document-container">
-  <div class="document-header">
-    <div class="header-row">
-      <div class="logo-area">{{company_logo}}</div>
-      <div class="company-details">
-        <h1>{{company_name}}</h1>
-        <p>{{company_address}}</p>
-        <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-      </div>
-    </div>
-  </div>
+<div class="page"><div class="doc">
+  ${buildHeader('Official Receipt', '{{receipt_number}}', '{{receipt_date}}', 'AR Receipt')}
 
-  <div class="document-body">
-    <h2 class="document-title">OFFICIAL RECEIPT</h2>
-    
-    <div class="info-grid">
-      <div class="info-section">
+  <div class="body">
+    <div class="grid">
+      <div class="card">
         <h3>Receipt Details</h3>
-        <div class="info-row"><span class="label">Receipt No:</span><span class="value">{{receipt_number}}</span></div>
-        <div class="info-row"><span class="label">Date:</span><span class="value">{{receipt_date}}</span></div>
-        <div class="info-row"><span class="label">Reference:</span><span class="value">{{reference}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Receipt No</span><span class="v">{{receipt_number}}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">{{receipt_date}}</span></div>
+          <div class="row"><span class="k">Reference</span><span class="v">{{reference}}</span></div>
+        </div>
       </div>
-      <div class="customer-section">
+      <div class="card">
         <h3>Received From</h3>
-        <p><strong>{{customer_name}}</strong></p>
-        <p>{{customer_address}}</p>
+        <div class="kv">
+          <div class="row"><span class="k">Customer</span><span class="v">{{customer_name}}</span></div>
+          <div class="row"><span class="k">Address</span><span class="v">{{customer_address}}</span></div>
+        </div>
       </div>
     </div>
 
-    <div class="amount-box">
-      <div class="amount">{{amount}}</div>
-      <div class="words">{{amount_in_words}}</div>
+    <div class="grid">
+      <div class="card">
+        <h3>Payment Method</h3>
+        <div class="kv">
+          <div class="row"><span class="k">Method</span><span class="v">{{payment_method}}</span></div>
+          <div class="row"><span class="k">Cheque No</span><span class="v">{{cheque_number}}</span></div>
+        </div>
+      </div>
+      <div class="payment-summary">
+        <div class="total-box">
+          <span class="label">Total Received</span>
+          <span class="value">{{amount}}</span>
+        </div>
+      </div>
     </div>
 
-    <div class="payment-info">
-      <div><strong>Payment Method:</strong> {{payment_method}}</div>
-      <div><strong>Cheque No:</strong> {{cheque_number}}</div>
-    </div>
+    <div class="amount-words"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
 
-    <h3 style="margin-top: 20px; font-size: 13px; color: #1e40af;">Invoice Allocations</h3>
+    <div class="notes-section">
+      <div class="label">Invoice Allocations</div>
+    </div>
     {{allocations}}
 
-    <div class="footer-notes">
-      <strong>Notes:</strong> {{notes}}
+    <div class="notes-section">
+      <div class="label">Notes</div>
+      <p>{{notes}}</p>
     </div>
   </div>
 
-  <div class="document-footer">
-    <div class="signature-grid">
-      <div class="sig-box"><div class="sig-line">Received By</div></div>
-      <div class="sig-box"><div class="sig-line">Cashier</div></div>
-      <div class="sig-box"><div class="sig-line">Authorized Signature</div></div>
-    </div>
-  </div>
-</div>
+  ${buildFooter(['Received By', 'Cashier', 'Authorized By', 'Customer Signature'])}
+</div></div>
 `;
 
-// AR Credit Note Template
+// ==================== AR Credit Note ====================
 export const generateARCreditNoteTemplate = (): string => `
 <style>${commonStyles}
-.document-title { background: #fef2f2; color: #b91c1c; }
-.customer-section { background: #fef2f2; border-left-color: #dc2626; }
+  :root { --accent: #dc2626; --accent-2: #991b1b; --chip: #fef2f2; }
 </style>
-<div class="document-container">
-  <div class="document-header">
-    <div class="header-row">
-      <div class="logo-area">{{company_logo}}</div>
-      <div class="company-details">
-        <h1>{{company_name}}</h1>
-        <p>{{company_address}}</p>
-        <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-      </div>
-    </div>
-  </div>
+<div class="page"><div class="doc">
+  ${buildHeader('Credit Note', '{{credit_note_number}}', '{{credit_date}}', 'AR Credit Note')}
 
-  <div class="document-body">
-    <h2 class="document-title">CREDIT NOTE</h2>
-    
-    <div class="info-grid">
-      <div class="info-section">
+  <div class="body">
+    <div class="grid">
+      <div class="card">
         <h3>Credit Note Details</h3>
-        <div class="info-row"><span class="label">Credit Note No:</span><span class="value">{{credit_note_number}}</span></div>
-        <div class="info-row"><span class="label">Date:</span><span class="value">{{credit_date}}</span></div>
-        <div class="info-row"><span class="label">Original Invoice:</span><span class="value">{{original_invoice}}</span></div>
-        <div class="info-row"><span class="label">Status:</span><span class="value">{{status}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Credit Note No</span><span class="v">{{credit_note_number}}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">{{credit_date}}</span></div>
+          <div class="row"><span class="k">Original Invoice</span><span class="v">{{original_invoice}}</span></div>
+          <div class="row"><span class="k">Status</span><span class="v">{{status}}</span></div>
+        </div>
       </div>
-      <div class="customer-section">
+      <div class="card">
         <h3>Issued To</h3>
-        <p><strong>{{customer_name}}</strong></p>
-        <p>Customer Code: {{customer_code}}</p>
+        <div class="kv">
+          <div class="row"><span class="k">Customer</span><span class="v">{{customer_name}}</span></div>
+          <div class="row"><span class="k">Customer Code</span><span class="v">{{customer_code}}</span></div>
+        </div>
       </div>
     </div>
 
-    <div class="amount-box" style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);">
-      <div class="amount">{{amount}}</div>
-      <div class="words">{{amount_in_words}}</div>
+    <div class="payment-summary" style="border-color: rgba(220,38,38,0.2); background: rgba(220,38,38,0.02);">
+      <div class="total-box" style="border-color: var(--accent);">
+        <span class="label">Credit Amount</span>
+        <span class="value">{{amount}}</span>
+      </div>
     </div>
 
-    <div class="info-section" style="margin-top: 20px;">
-      <h3>Reason for Credit</h3>
-      <p style="margin: 10px 0;">{{reason}}</p>
+    <div class="amount-words"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
+
+    <div class="notes-section">
+      <div class="label">Reason for Credit</div>
+      <p>{{reason}}</p>
     </div>
   </div>
 
-  <div class="document-footer">
-    <div class="signature-grid">
-      <div class="sig-box"><div class="sig-line">Prepared By</div></div>
-      <div class="sig-box"><div class="sig-line">Approved By</div></div>
-      <div class="sig-box"><div class="sig-line">Customer Acknowledgment</div></div>
-    </div>
-  </div>
-</div>
+  ${buildFooter(['Prepared By', 'Approved By', 'Authorized By', 'Customer Acknowledgment'])}
+</div></div>
 `;
 
-// AP Invoice Template
+// ==================== AP Invoice ====================
 export const generateAPInvoiceTemplate = (): string => `
 <style>${commonStyles}
-.document-title { background: #fff7ed; color: #c2410c; }
-.vendor-section { background: #fff7ed; border-left-color: #ea580c; }
-table.items-table th { background: #ea580c; }
-.total-row.grand { background: #ea580c; }
+  :root { --accent: #ea580c; --accent-2: #c2410c; --chip: #fff7ed; }
 </style>
-<div class="document-container">
-  <div class="document-header">
-    <div class="header-row">
-      <div class="logo-area">{{company_logo}}</div>
-      <div class="company-details">
-        <h1>{{company_name}}</h1>
-        <p>{{company_address}}</p>
-        <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-        <p>TIN: {{company_tax_id}}</p>
-      </div>
-    </div>
-  </div>
+<div class="page"><div class="doc">
+  {{document_header}}
+  ${buildHeader('Purchase Invoice', '{{invoice_number}}', '{{invoice_date}}', 'AP Invoice')}
 
-  <div class="document-body">
-    <h2 class="document-title">PURCHASE INVOICE</h2>
-    
-    <div class="info-grid">
-      <div class="info-section">
+  <div class="body">
+    <div class="grid">
+      <div class="card">
         <h3>Invoice Details</h3>
-        <div class="info-row"><span class="label">Invoice No:</span><span class="value">{{invoice_number}}</span></div>
-        <div class="info-row"><span class="label">Date:</span><span class="value">{{invoice_date}}</span></div>
-        <div class="info-row"><span class="label">Due Date:</span><span class="value">{{due_date}}</span></div>
-        <div class="info-row"><span class="label">Reference:</span><span class="value">{{reference}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Invoice No</span><span class="v">{{invoice_number}}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">{{invoice_date}}</span></div>
+          <div class="row"><span class="k">Due Date</span><span class="v">{{due_date}}</span></div>
+          <div class="row"><span class="k">Reference</span><span class="v">{{reference}}</span></div>
+        </div>
       </div>
-      <div class="vendor-section">
+      <div class="card">
         <h3>Supplier / Vendor</h3>
-        <p><strong>{{vendor_name}}</strong></p>
-        <p>{{vendor_address}}</p>
-        <p>Vendor Code: {{vendor_code}}</p>
+        <div class="kv">
+          <div class="row"><span class="k">Vendor</span><span class="v">{{vendor_name}}</span></div>
+          <div class="row"><span class="k">Address</span><span class="v">{{vendor_address}}</span></div>
+          <div class="row"><span class="k">Vendor Code</span><span class="v">{{vendor_code}}</span></div>
+        </div>
       </div>
     </div>
 
     {{line_items}}
 
-    <div class="totals-section">
-      <div class="total-row"><span>Subtotal:</span><span>{{subtotal}}</span></div>
-      <div class="total-row"><span>Tax:</span><span>{{tax_amount}}</span></div>
-      <div class="total-row"><span>WHT:</span><span>{{wht_amount}}</span></div>
-      <div class="total-row grand"><span>Total Payable:</span><span>{{total_amount}}</span></div>
-      <div class="total-row"><span>Balance Due:</span><span>{{balance_due}}</span></div>
+    <div class="payment-summary" style="border-color: rgba(234,88,12,0.2); background: rgba(234,88,12,0.02);">
+      <div class="summary-line"><span class="left">Subtotal</span><span class="right">{{subtotal}}</span></div>
+      <div class="summary-line"><span class="left">Tax</span><span class="right">{{tax_amount}}</span></div>
+      <div class="summary-line"><span class="left">WHT</span><span class="right">{{wht_amount}}</span></div>
+      <div class="total-box" style="border-color: var(--accent);">
+        <span class="label">Total Payable</span>
+        <span class="value">{{total_amount}}</span>
+      </div>
+      <div class="summary-line" style="margin-top: 8px;"><span class="left">Balance Due</span><span class="right" style="font-size: 15px;">{{balance_due}}</span></div>
     </div>
 
-    <div class="amount-words">
-      <strong>Amount in Words:</strong> {{amount_in_words}}
-    </div>
+    <div class="amount-words"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
 
-    <div class="footer-notes">
-      <strong>Notes:</strong> {{notes}}
+    <div class="notes-section">
+      <div class="label">Notes</div>
+      <p>{{notes}}</p>
     </div>
   </div>
 
-  <div class="document-footer">
-    <div class="signature-grid">
-      <div class="sig-box">
-        <div style="min-height: 60px; display: flex; align-items: center; justify-content: center;">{{received_by_signature}}</div>
-        <div class="sig-line">{{received_by}}</div>
-        <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Received By</div>
+  <div class="footer">
+    <div class="sig-row">
+      <div class="signature-pad">
+        <div class="signature-area">{{received_by_signature}}</div>
+        <div class="sig-info">
+          <div class="name">{{received_by}}</div>
+          <div class="role">Received By</div>
+        </div>
       </div>
-      <div class="sig-box">
-        <div style="min-height: 60px; display: flex; align-items: center; justify-content: center;">{{verified_by_signature}}</div>
-        <div class="sig-line">{{verified_by}}</div>
-        <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Verified By</div>
+      <div class="signature-pad">
+        <div class="signature-area">{{verified_by_signature}}</div>
+        <div class="sig-info">
+          <div class="name">{{verified_by}}</div>
+          <div class="role">Verified By</div>
+        </div>
       </div>
-      <div class="sig-box">
-        <div style="min-height: 60px; display: flex; align-items: center; justify-content: center;">{{approved_by_signature}}</div>
-        <div class="sig-line">{{approved_by}}</div>
-        <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Approved By</div>
+      <div class="signature-pad">
+        <div class="signature-area">{{approved_by_signature}}</div>
+        <div class="sig-info">
+          <div class="name">{{approved_by}}</div>
+          <div class="role">Authorized By</div>
+        </div>
+      </div>
+      <div class="signature-pad">
+        <div class="signature-area"></div>
+        <div class="sig-info">
+          <div class="name">&nbsp;</div>
+          <div class="role">Vendor Acknowledgment</div>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-bar">
+      <div class="terms-column">
+        <strong>Notes &amp; Terms:</strong><br>
+        1. All transactions are subject to audit and verification.<br>
+        2. This document is electronically generated and remains valid with the associated digital logs.
+      </div>
+      <div class="verification">
+        <div class="qr-placeholder">QR VERIFY</div>
+        <div class="printed">Printed: {{print_date}}</div>
       </div>
     </div>
   </div>
-</div>
+</div></div>
 `;
 
-// AP Payment Voucher Template
+// ==================== AP Payment Voucher ====================
 export const generateAPPaymentVoucherTemplate = (): string => `
 <style>${commonStyles}
-.document-title { background: #faf5ff; color: #7c3aed; }
-.vendor-section { background: #faf5ff; border-left-color: #7c3aed; }
-.amount-box { background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%); }
+  :root { --accent: #7c3aed; --accent-2: #6d28d9; --chip: #faf5ff; }
 </style>
-<div class="document-container">
-  <div class="document-header">
-    <div class="header-row">
-      <div class="logo-area">{{company_logo}}</div>
-      <div class="company-details">
-        <h1>{{company_name}}</h1>
-        <p>{{company_address}}</p>
-        <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-      </div>
-    </div>
-  </div>
+<div class="page"><div class="doc">
+  ${buildHeader('Payment Voucher', '{{payment_number}}', '{{payment_date}}', 'AP Payment')}
 
-  <div class="document-body">
-    <h2 class="document-title">PAYMENT VOUCHER</h2>
-    
-    <div class="info-grid">
-      <div class="info-section">
+  <div class="body">
+    <div class="grid">
+      <div class="card">
         <h3>Payment Details</h3>
-        <div class="info-row"><span class="label">Voucher No:</span><span class="value">{{payment_number}}</span></div>
-        <div class="info-row"><span class="label">Date:</span><span class="value">{{payment_date}}</span></div>
-        <div class="info-row"><span class="label">Reference:</span><span class="value">{{reference}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Voucher No</span><span class="v">{{payment_number}}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">{{payment_date}}</span></div>
+          <div class="row"><span class="k">Reference</span><span class="v">{{reference}}</span></div>
+        </div>
       </div>
-      <div class="vendor-section">
+      <div class="card">
         <h3>Pay To</h3>
-        <p><strong>{{vendor_name}}</strong></p>
-        <p>{{vendor_address}}</p>
-        <p>Vendor Code: {{vendor_code}}</p>
+        <div class="kv">
+          <div class="row"><span class="k">Vendor</span><span class="v">{{vendor_name}}</span></div>
+          <div class="row"><span class="k">Address</span><span class="v">{{vendor_address}}</span></div>
+          <div class="row"><span class="k">Vendor Code</span><span class="v">{{vendor_code}}</span></div>
+        </div>
       </div>
     </div>
 
-    <div class="amount-box">
-      <div class="amount">{{amount}}</div>
-      <div class="words">{{amount_in_words}}</div>
+    <div class="grid">
+      <div class="card">
+        <h3>Payment Method</h3>
+        <div class="kv">
+          <div class="row"><span class="k">Method</span><span class="v">{{payment_method}}</span></div>
+          <div class="row"><span class="k">Cheque No</span><span class="v">{{cheque_number}}</span></div>
+        </div>
+      </div>
+      <div class="payment-summary" style="border-color: rgba(124,58,237,0.2); background: rgba(124,58,237,0.02);">
+        <div class="total-box" style="border-color: var(--accent);">
+          <span class="label">Total Paid</span>
+          <span class="value">{{amount}}</span>
+        </div>
+      </div>
     </div>
 
-    <div class="payment-info">
-      <div><strong>Payment Method:</strong> {{payment_method}}</div>
-      <div><strong>Cheque No:</strong> {{cheque_number}}</div>
-    </div>
+    <div class="amount-words"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
 
-    <h3 style="margin-top: 20px; font-size: 13px; color: #7c3aed;">Invoice Allocations</h3>
+    <div class="notes-section">
+      <div class="label">Invoice Allocations</div>
+    </div>
     {{allocations}}
 
-    <div class="footer-notes">
-      <strong>Notes:</strong> {{notes}}
+    <div class="notes-section">
+      <div class="label">Notes</div>
+      <p>{{notes}}</p>
     </div>
   </div>
 
-  <div class="document-footer">
-    <div class="signature-grid">
-      <div class="sig-box"><div class="sig-line">Prepared By</div></div>
-      <div class="sig-box"><div class="sig-line">Approved By</div></div>
-      <div class="sig-box"><div class="sig-line">Received By (Payee)</div></div>
-    </div>
-  </div>
-</div>
+  ${buildFooter(['Prepared By', 'Verified By', 'Authorized By', 'Received By (Payee)'])}
+</div></div>
 `;
 
-// AP Debit Note Template
+// ==================== AP Debit Note ====================
 export const generateAPDebitNoteTemplate = (): string => `
 <style>${commonStyles}
-.document-title { background: #fef2f2; color: #b91c1c; }
-.vendor-section { background: #fef2f2; border-left-color: #dc2626; }
+  :root { --accent: #dc2626; --accent-2: #b91c1c; --chip: #fef2f2; }
 </style>
-<div class="document-container">
-  <div class="document-header">
-    <div class="header-row">
-      <div class="logo-area">{{company_logo}}</div>
-      <div class="company-details">
-        <h1>{{company_name}}</h1>
-        <p>{{company_address}}</p>
-        <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-      </div>
-    </div>
-  </div>
+<div class="page"><div class="doc">
+  ${buildHeader('Debit Note', '{{debit_note_number}}', '{{debit_date}}', 'AP Debit Note')}
 
-  <div class="document-body">
-    <h2 class="document-title">DEBIT NOTE</h2>
-    
-    <div class="info-grid">
-      <div class="info-section">
+  <div class="body">
+    <div class="grid">
+      <div class="card">
         <h3>Debit Note Details</h3>
-        <div class="info-row"><span class="label">Debit Note No:</span><span class="value">{{debit_note_number}}</span></div>
-        <div class="info-row"><span class="label">Date:</span><span class="value">{{debit_date}}</span></div>
-        <div class="info-row"><span class="label">Original Invoice:</span><span class="value">{{original_invoice}}</span></div>
-        <div class="info-row"><span class="label">Status:</span><span class="value">{{status}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Debit Note No</span><span class="v">{{debit_note_number}}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">{{debit_date}}</span></div>
+          <div class="row"><span class="k">Original Invoice</span><span class="v">{{original_invoice}}</span></div>
+          <div class="row"><span class="k">Status</span><span class="v">{{status}}</span></div>
+        </div>
       </div>
-      <div class="vendor-section">
+      <div class="card">
         <h3>Issued To Vendor</h3>
-        <p><strong>{{vendor_name}}</strong></p>
-        <p>Vendor Code: {{vendor_code}}</p>
+        <div class="kv">
+          <div class="row"><span class="k">Vendor</span><span class="v">{{vendor_name}}</span></div>
+          <div class="row"><span class="k">Vendor Code</span><span class="v">{{vendor_code}}</span></div>
+        </div>
       </div>
     </div>
 
-    <div class="amount-box" style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);">
-      <div class="amount">{{amount}}</div>
-      <div class="words">{{amount_in_words}}</div>
+    <div class="payment-summary" style="border-color: rgba(220,38,38,0.2); background: rgba(220,38,38,0.02);">
+      <div class="total-box" style="border-color: var(--accent);">
+        <span class="label">Debit Amount</span>
+        <span class="value">{{amount}}</span>
+      </div>
     </div>
 
-    <div class="info-section" style="margin-top: 20px;">
-      <h3>Reason for Debit</h3>
-      <p style="margin: 10px 0;">{{reason}}</p>
+    <div class="amount-words"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
+
+    <div class="notes-section">
+      <div class="label">Reason for Debit</div>
+      <p>{{reason}}</p>
     </div>
   </div>
 
-  <div class="document-footer">
-    <div class="signature-grid">
-      <div class="sig-box"><div class="sig-line">Prepared By</div></div>
-      <div class="sig-box"><div class="sig-line">Approved By</div></div>
-      <div class="sig-box"><div class="sig-line">Vendor Acknowledgment</div></div>
-    </div>
-  </div>
-</div>
+  ${buildFooter(['Prepared By', 'Approved By', 'Authorized By', 'Vendor Acknowledgment'])}
+</div></div>
 `;
 
-// Advance Receipt Template
+// ==================== Advance Receipt ====================
 export const generateAdvanceReceiptTemplate = (): string => `
 <style>${commonStyles}
-.document-title { background: #ecfdf5; color: #047857; }
-.customer-section { background: #ecfdf5; border-left-color: #10b981; }
-.amount-box { background: linear-gradient(135deg, #047857 0%, #10b981 100%); }
+  :root { --accent: #047857; --accent-2: #065f46; --chip: #ecfdf5; }
 </style>
-<div class="document-container">
-  <div class="document-header">
-    <div class="header-row">
-      <div class="logo-area">{{company_logo}}</div>
-      <div class="company-details">
-        <h1>{{company_name}}</h1>
-        <p>{{company_address}}</p>
-        <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-      </div>
-    </div>
-  </div>
+<div class="page"><div class="doc">
+  ${buildHeader('Advance Payment Receipt', '{{receipt_number}}', '{{receipt_date}}', 'Advance Receipt')}
 
-  <div class="document-body">
-    <h2 class="document-title">ADVANCE PAYMENT RECEIPT</h2>
-    
-    <div class="info-grid">
-      <div class="info-section">
+  <div class="body">
+    <div class="grid">
+      <div class="card">
         <h3>Receipt Details</h3>
-        <div class="info-row"><span class="label">Receipt No:</span><span class="value">{{receipt_number}}</span></div>
-        <div class="info-row"><span class="label">Date:</span><span class="value">{{receipt_date}}</span></div>
-        <div class="info-row"><span class="label">Reference:</span><span class="value">{{reference}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Receipt No</span><span class="v">{{receipt_number}}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">{{receipt_date}}</span></div>
+          <div class="row"><span class="k">Reference</span><span class="v">{{reference}}</span></div>
+        </div>
       </div>
-      <div class="customer-section">
+      <div class="card">
         <h3>Received From</h3>
-        <p><strong>{{customer_name}}</strong></p>
-        <p>{{customer_address}}</p>
+        <div class="kv">
+          <div class="row"><span class="k">Customer</span><span class="v">{{customer_name}}</span></div>
+          <div class="row"><span class="k">Address</span><span class="v">{{customer_address}}</span></div>
+        </div>
       </div>
     </div>
 
-    <div class="amount-box">
-      <div class="amount">{{amount}}</div>
-      <div class="words">{{amount_in_words}}</div>
+    <div class="grid">
+      <div class="card">
+        <h3>Payment Method</h3>
+        <div class="kv">
+          <div class="row"><span class="k">Method</span><span class="v">{{payment_method}}</span></div>
+          <div class="row"><span class="k">Cheque No</span><span class="v">{{cheque_number}}</span></div>
+        </div>
+      </div>
+      <div class="payment-summary" style="border-color: rgba(4,120,87,0.2); background: rgba(4,120,87,0.02);">
+        <div class="total-box" style="border-color: var(--accent);">
+          <span class="label">Advance Amount</span>
+          <span class="value">{{amount}}</span>
+        </div>
+      </div>
     </div>
 
-    <div class="payment-info">
-      <div><strong>Payment Method:</strong> {{payment_method}}</div>
-      <div><strong>Cheque No:</strong> {{cheque_number}}</div>
-    </div>
+    <div class="amount-words"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
 
-    <div class="info-section" style="margin-top: 20px; background: #fef3c7; border-left-color: #f59e0b;">
+    <div class="card" style="background: #fffbeb; border-color: #fde68a;">
       <h3 style="color: #92400e;">Advance Payment Notice</h3>
-      <p style="margin: 10px 0; color: #92400e;">This receipt acknowledges advance payment. The amount will be adjusted against future invoices.</p>
+      <p style="margin: 0; font-size: 12px; color: #92400e;">This receipt acknowledges advance payment. The amount will be adjusted against future invoices.</p>
     </div>
 
-    <div class="footer-notes">
-      <strong>Notes:</strong> {{notes}}
+    <div class="notes-section">
+      <div class="label">Notes</div>
+      <p>{{notes}}</p>
     </div>
   </div>
 
-  <div class="document-footer">
-    <div class="signature-grid">
-      <div class="sig-box"><div class="sig-line">Received By</div></div>
-      <div class="sig-box"><div class="sig-line">Cashier</div></div>
-      <div class="sig-box"><div class="sig-line">Authorized Signature</div></div>
-    </div>
-  </div>
-</div>
+  ${buildFooter(['Received By', 'Cashier', 'Authorized By', 'Customer Signature'])}
+</div></div>
 `;
 
-// Advance Payment Voucher Template
+// ==================== Advance Payment Voucher ====================
 export const generateAdvancePaymentTemplate = (): string => `
 <style>${commonStyles}
-.document-title { background: #fefce8; color: #a16207; }
-.vendor-section { background: #fefce8; border-left-color: #eab308; }
-.amount-box { background: linear-gradient(135deg, #a16207 0%, #eab308 100%); }
+  :root { --accent: #a16207; --accent-2: #854d0e; --chip: #fefce8; }
 </style>
-<div class="document-container">
-  <div class="document-header">
-    <div class="header-row">
-      <div class="logo-area">{{company_logo}}</div>
-      <div class="company-details">
-        <h1>{{company_name}}</h1>
-        <p>{{company_address}}</p>
-        <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-      </div>
-    </div>
-  </div>
+<div class="page"><div class="doc">
+  ${buildHeader('Advance Payment Voucher', '{{payment_number}}', '{{payment_date}}', 'Advance Payment')}
 
-  <div class="document-body">
-    <h2 class="document-title">ADVANCE PAYMENT VOUCHER</h2>
-    
-    <div class="info-grid">
-      <div class="info-section">
+  <div class="body">
+    <div class="grid">
+      <div class="card">
         <h3>Voucher Details</h3>
-        <div class="info-row"><span class="label">Voucher No:</span><span class="value">{{payment_number}}</span></div>
-        <div class="info-row"><span class="label">Date:</span><span class="value">{{payment_date}}</span></div>
-        <div class="info-row"><span class="label">Reference:</span><span class="value">{{reference}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Voucher No</span><span class="v">{{payment_number}}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">{{payment_date}}</span></div>
+          <div class="row"><span class="k">Reference</span><span class="v">{{reference}}</span></div>
+        </div>
       </div>
-      <div class="vendor-section">
+      <div class="card">
         <h3>Pay To</h3>
-        <p><strong>{{vendor_name}}</strong></p>
-        <p>{{vendor_address}}</p>
+        <div class="kv">
+          <div class="row"><span class="k">Vendor</span><span class="v">{{vendor_name}}</span></div>
+          <div class="row"><span class="k">Address</span><span class="v">{{vendor_address}}</span></div>
+        </div>
       </div>
     </div>
 
-    <div class="amount-box">
-      <div class="amount">{{amount}}</div>
-      <div class="words">{{amount_in_words}}</div>
+    <div class="grid">
+      <div class="card">
+        <h3>Payment Method</h3>
+        <div class="kv">
+          <div class="row"><span class="k">Method</span><span class="v">{{payment_method}}</span></div>
+          <div class="row"><span class="k">Cheque No</span><span class="v">{{cheque_number}}</span></div>
+        </div>
+      </div>
+      <div class="payment-summary" style="border-color: rgba(161,98,7,0.2); background: rgba(161,98,7,0.02);">
+        <div class="total-box" style="border-color: var(--accent);">
+          <span class="label">Advance Amount</span>
+          <span class="value">{{amount}}</span>
+        </div>
+      </div>
     </div>
 
-    <div class="payment-info">
-      <div><strong>Payment Method:</strong> {{payment_method}}</div>
-      <div><strong>Cheque No:</strong> {{cheque_number}}</div>
-    </div>
+    <div class="amount-words"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
 
-    <div class="info-section" style="margin-top: 20px; background: #fef3c7; border-left-color: #f59e0b;">
+    <div class="card" style="background: #fffbeb; border-color: #fde68a;">
       <h3 style="color: #92400e;">Advance Payment Notice</h3>
-      <p style="margin: 10px 0; color: #92400e;">This voucher represents an advance payment. The amount will be adjusted against future invoices from this vendor.</p>
+      <p style="margin: 0; font-size: 12px; color: #92400e;">This voucher represents an advance payment. The amount will be adjusted against future invoices from this vendor.</p>
     </div>
 
-    <div class="footer-notes">
-      <strong>Notes:</strong> {{notes}}
+    <div class="notes-section">
+      <div class="label">Notes</div>
+      <p>{{notes}}</p>
     </div>
   </div>
 
-  <div class="document-footer">
-    <div class="signature-grid">
-      <div class="sig-box"><div class="sig-line">Prepared By</div></div>
-      <div class="sig-box"><div class="sig-line">Approved By</div></div>
-      <div class="sig-box"><div class="sig-line">Received By (Payee)</div></div>
-    </div>
-  </div>
-</div>
+  ${buildFooter(['Prepared By', 'Approved By', 'Authorized By', 'Received By (Payee)'])}
+</div></div>
 `;
 
-// Journal Voucher Template
+// ==================== Journal Voucher ====================
 export const generateJournalVoucherTemplate = (): string => `
 <style>${commonStyles}
-.document-title { background: #eff6ff; color: #1d4ed8; }
-table.journal-table th { background: #1d4ed8; }
+  :root { --accent: #1d4ed8; --accent-2: #1e40af; --chip: #eff6ff; }
 </style>
-<div class="document-container">
-  <div class="document-header">
-    <div class="header-row">
-      <div class="logo-area">{{company_logo}}</div>
-      <div class="company-details">
-        <h1>{{company_name}}</h1>
-        <p>{{company_address}}</p>
-        <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-      </div>
-    </div>
-  </div>
+<div class="page"><div class="doc">
+  ${buildHeader('Journal Voucher', '{{voucher_number}}', '{{voucher_date}}', 'Journal Entry')}
 
-  <div class="document-body">
-    <h2 class="document-title">JOURNAL VOUCHER</h2>
-    
-    <div class="info-grid">
-      <div class="info-section">
+  <div class="body">
+    <div class="grid">
+      <div class="card">
         <h3>Voucher Details</h3>
-        <div class="info-row"><span class="label">Voucher No:</span><span class="value">{{voucher_number}}</span></div>
-        <div class="info-row"><span class="label">Date:</span><span class="value">{{voucher_date}}</span></div>
-        <div class="info-row"><span class="label">Reference:</span><span class="value">{{reference}}</span></div>
-        <div class="info-row"><span class="label">Status:</span><span class="value">{{status}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Voucher No</span><span class="v">{{voucher_number}}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">{{voucher_date}}</span></div>
+          <div class="row"><span class="k">Reference</span><span class="v">{{reference}}</span></div>
+          <div class="row"><span class="k">Status</span><span class="v">{{status}}</span></div>
+        </div>
       </div>
-      <div class="info-section">
+      <div class="card">
         <h3>Description</h3>
-        <p style="margin: 10px 0;">{{description}}</p>
+        <p style="margin: 0; font-size: 13px; line-height: 1.6;">{{description}}</p>
       </div>
     </div>
 
     {{journal_lines}}
 
-    <div class="totals-section" style="width: 350px;">
-      <div class="total-row"><span>Total Debit:</span><span>{{total_debit}}</span></div>
-      <div class="total-row"><span>Total Credit:</span><span>{{total_credit}}</span></div>
-      <div class="total-row grand"><span>Difference:</span><span>{{difference}}</span></div>
+    <div class="payment-summary">
+      <div class="summary-line"><span class="left">Total Debit</span><span class="right">{{total_debit}}</span></div>
+      <div class="summary-line"><span class="left">Total Credit</span><span class="right">{{total_credit}}</span></div>
+      <div class="total-box">
+        <span class="label">Difference</span>
+        <span class="value">{{difference}}</span>
+      </div>
     </div>
 
-    <div class="footer-notes">
-      <strong>Notes:</strong> {{notes}}
+    <div class="notes-section">
+      <div class="label">Notes</div>
+      <p>{{notes}}</p>
     </div>
   </div>
 
-  <div class="document-footer">
-    <div class="signature-grid">
-      <div class="sig-box"><div class="sig-line">Prepared By</div></div>
-      <div class="sig-box"><div class="sig-line">Checked By</div></div>
-      <div class="sig-box"><div class="sig-line">Approved By</div></div>
-    </div>
-  </div>
-</div>
+  ${buildFooter(['Prepared By', 'Checked By', 'Approved By', 'Posted By'])}
+</div></div>
 `;
 
-// Cheque Voucher Template
+// ==================== Cheque Voucher ====================
 export const generateChequeVoucherTemplate = (): string => `
 <style>${commonStyles}
-.document-title { background: #f0fdf4; color: #166534; }
-.cheque-details { background: #f0fdf4; border: 2px dashed #22c55e; padding: 15px; border-radius: 8px; margin: 20px 0; }
-.amount-box { background: linear-gradient(135deg, #166534 0%, #22c55e 100%); }
+  :root { --accent: #166534; --accent-2: #14532d; --chip: #f0fdf4; }
+  .cheque-card {
+    border: 2px dashed #22c55e; background: #f0fdf4;
+    border-radius: var(--radius); padding: 16px;
+  }
+  .cheque-card h3 { margin: 0 0 12px; font-size: 11px; letter-spacing: .15em; text-transform: uppercase; color: #166534; font-weight: 700; }
 </style>
-<div class="document-container">
-  <div class="document-header">
-    <div class="header-row">
-      <div class="logo-area">{{company_logo}}</div>
-      <div class="company-details">
-        <h1>{{company_name}}</h1>
-        <p>{{company_address}}</p>
-        <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-      </div>
-    </div>
-  </div>
+<div class="page"><div class="doc">
+  ${buildHeader('Cheque Payment Voucher', '{{voucher_number}}', '{{voucher_date}}', 'Cheque Voucher')}
 
-  <div class="document-body">
-    <h2 class="document-title">CHEQUE PAYMENT VOUCHER</h2>
-    
-    <div class="info-grid">
-      <div class="info-section">
+  <div class="body">
+    <div class="grid">
+      <div class="card">
         <h3>Voucher Details</h3>
-        <div class="info-row"><span class="label">Voucher No:</span><span class="value">{{voucher_number}}</span></div>
-        <div class="info-row"><span class="label">Date:</span><span class="value">{{voucher_date}}</span></div>
-        <div class="info-row"><span class="label">Reference:</span><span class="value">{{reference}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Voucher No</span><span class="v">{{voucher_number}}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">{{voucher_date}}</span></div>
+          <div class="row"><span class="k">Reference</span><span class="v">{{reference}}</span></div>
+        </div>
       </div>
-      <div class="info-section">
+      <div class="card">
         <h3>Payee Details</h3>
-        <p><strong>{{payee_name}}</strong></p>
-        <p>{{payee_address}}</p>
+        <div class="kv">
+          <div class="row"><span class="k">Payee</span><span class="v">{{payee_name}}</span></div>
+          <div class="row"><span class="k">Address</span><span class="v">{{payee_address}}</span></div>
+        </div>
       </div>
     </div>
 
-    <div class="cheque-details">
-      <h3 style="margin: 0 0 10px 0; color: #166534;">Cheque Information</h3>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-        <div><strong>Cheque No:</strong> {{cheque_number}}</div>
-        <div><strong>Cheque Date:</strong> {{cheque_date}}</div>
-        <div><strong>Bank:</strong> {{bank_name}}</div>
-        <div><strong>Account:</strong> {{bank_account}}</div>
+    <div class="cheque-card">
+      <h3>Cheque Information</h3>
+      <div class="grid">
+        <div class="kv">
+          <div class="row"><span class="k">Cheque No</span><span class="v">{{cheque_number}}</span></div>
+          <div class="row"><span class="k">Bank</span><span class="v">{{bank_name}}</span></div>
+        </div>
+        <div class="kv">
+          <div class="row"><span class="k">Cheque Date</span><span class="v">{{cheque_date}}</span></div>
+          <div class="row"><span class="k">Account</span><span class="v">{{bank_account}}</span></div>
+        </div>
       </div>
     </div>
 
-    <div class="amount-box">
-      <div class="amount">{{amount}}</div>
-      <div class="words">{{amount_in_words}}</div>
+    <div class="payment-summary" style="border-color: rgba(22,101,52,0.2); background: rgba(22,101,52,0.02);">
+      <div class="total-box" style="border-color: var(--accent);">
+        <span class="label">Cheque Amount</span>
+        <span class="value">{{amount}}</span>
+      </div>
     </div>
 
-    <div class="footer-notes">
-      <strong>Notes:</strong> {{notes}}
+    <div class="amount-words"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
+
+    <div class="notes-section">
+      <div class="label">Notes</div>
+      <p>{{notes}}</p>
     </div>
   </div>
 
-  <div class="document-footer">
-    <div class="signature-grid">
-      <div class="sig-box"><div class="sig-line">Prepared By</div></div>
-      <div class="sig-box"><div class="sig-line">Approved By</div></div>
-      <div class="sig-box"><div class="sig-line">Received By (Payee)</div></div>
-    </div>
-  </div>
-</div>
+  ${buildFooter(['Prepared By', 'Approved By', 'Authorized By', 'Received By (Payee)'])}
+</div></div>
 `;
 
-// WHT Certificate Template
+// ==================== WHT Certificate ====================
 export const generateWHTCertificateTemplate = (): string => `
 <style>${commonStyles}
-.document-title { background: #fef2f2; color: #991b1b; }
-.wht-notice { background: #fef2f2; border: 2px solid #dc2626; padding: 15px; border-radius: 8px; margin: 20px 0; }
+  :root { --accent: #991b1b; --accent-2: #7f1d1d; --chip: #fef2f2; }
+  .wht-table { border: 2px solid #dc2626; border-radius: var(--radius); overflow: hidden; }
+  .wht-table thead th { background: #fee2e2; color: #991b1b; border-bottom: 2px solid #fecaca; }
+  .wht-table tbody td { border-bottom: 1px solid #fecaca; }
 </style>
-<div class="document-container">
-  <div class="document-header">
-    <div class="header-row">
-      <div class="logo-area">{{company_logo}}</div>
-      <div class="company-details">
-        <h1>{{company_name}}</h1>
-        <p>{{company_address}}</p>
-        <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-        <p>TIN: {{company_tax_id}}</p>
-      </div>
-    </div>
-  </div>
+<div class="page"><div class="doc">
+  ${buildHeader('WHT Certificate', '{{certificate_number}}', '{{certificate_date}}', 'Withholding Tax')}
 
-  <div class="document-body">
-    <h2 class="document-title">WITHHOLDING TAX CERTIFICATE</h2>
-    
-    <div class="info-grid">
-      <div class="info-section">
+  <div class="body">
+    <div class="grid">
+      <div class="card">
         <h3>Certificate Details</h3>
-        <div class="info-row"><span class="label">Certificate No:</span><span class="value">{{certificate_number}}</span></div>
-        <div class="info-row"><span class="label">Date:</span><span class="value">{{certificate_date}}</span></div>
-        <div class="info-row"><span class="label">Tax Period:</span><span class="value">{{tax_period}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Certificate No</span><span class="v">{{certificate_number}}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">{{certificate_date}}</span></div>
+          <div class="row"><span class="k">Tax Period</span><span class="v">{{tax_period}}</span></div>
+        </div>
       </div>
-      <div class="info-section">
+      <div class="card">
         <h3>Payee (Tax Withheld From)</h3>
-        <p><strong>{{vendor_name}}</strong></p>
-        <p>TIN: {{vendor_tax_id}}</p>
-        <p>{{vendor_address}}</p>
+        <div class="kv">
+          <div class="row"><span class="k">Vendor</span><span class="v">{{vendor_name}}</span></div>
+          <div class="row"><span class="k">TIN</span><span class="v">{{vendor_tax_id}}</span></div>
+          <div class="row"><span class="k">Address</span><span class="v">{{vendor_address}}</span></div>
+        </div>
       </div>
     </div>
 
-    <div class="wht-notice">
-      <h3 style="margin: 0 0 15px 0; color: #991b1b;">Withholding Tax Details</h3>
-      <table style="width: 100%; border-collapse: collapse;">
-        <tr style="background: #fee2e2;">
-          <th style="padding: 10px; text-align: left; border: 1px solid #fecaca;">Description</th>
-          <th style="padding: 10px; text-align: right; border: 1px solid #fecaca;">Gross Amount</th>
-          <th style="padding: 10px; text-align: center; border: 1px solid #fecaca;">WHT Rate</th>
-          <th style="padding: 10px; text-align: right; border: 1px solid #fecaca;">WHT Amount</th>
-        </tr>
+    <table class="wht-table">
+      <thead>
         <tr>
-          <td style="padding: 10px; border: 1px solid #fecaca;">{{payment_description}}</td>
-          <td style="padding: 10px; text-align: right; border: 1px solid #fecaca;">{{gross_amount}}</td>
-          <td style="padding: 10px; text-align: center; border: 1px solid #fecaca;">{{wht_rate}}</td>
-          <td style="padding: 10px; text-align: right; border: 1px solid #fecaca; font-weight: bold;">{{wht_amount}}</td>
+          <th>Description</th>
+          <th style="text-align:right;">Gross Amount</th>
+          <th style="text-align:center;">WHT Rate</th>
+          <th style="text-align:right;">WHT Amount</th>
         </tr>
-      </table>
-    </div>
+      </thead>
+      <tbody>
+        <tr>
+          <td>{{payment_description}}</td>
+          <td class="num">{{gross_amount}}</td>
+          <td style="text-align:center;">{{wht_rate}}</td>
+          <td class="num" style="font-weight:800;">{{wht_amount}}</td>
+        </tr>
+      </tbody>
+    </table>
 
-    <div class="amount-words">
-      <strong>WHT Amount in Words:</strong> {{amount_in_words}}
-    </div>
+    <div class="amount-words"><strong>WHT Amount in Words:</strong> {{amount_in_words}}</div>
 
-    <div class="info-section" style="margin-top: 20px;">
-      <h3>Related Invoice/Payment</h3>
-      <div class="info-row"><span class="label">Invoice No:</span><span class="value">{{invoice_number}}</span></div>
-      <div class="info-row"><span class="label">Payment Voucher:</span><span class="value">{{payment_voucher}}</span></div>
+    <div class="grid">
+      <div class="card">
+        <h3>Related Invoice / Payment</h3>
+        <div class="kv">
+          <div class="row"><span class="k">Invoice No</span><span class="v">{{invoice_number}}</span></div>
+          <div class="row"><span class="k">Payment Voucher</span><span class="v">{{payment_voucher}}</span></div>
+        </div>
+      </div>
+      <div class="card" style="background: #fef2f2; border-color: #fecaca;">
+        <h3 style="color: #991b1b;">Tax Authority Notice</h3>
+        <p style="margin: 0; font-size: 11px; color: #991b1b; line-height: 1.6;">This certificate is issued in accordance with the Inland Revenue Act. Please retain for tax filing purposes.</p>
+      </div>
     </div>
   </div>
 
-  <div class="document-footer">
-    <div class="signature-grid">
-      <div class="sig-box"><div class="sig-line">Prepared By</div></div>
-      <div class="sig-box"><div class="sig-line">Authorized Signatory</div></div>
-      <div class="sig-box"><div class="sig-line">Company Seal</div></div>
-    </div>
-    <p style="text-align: center; margin-top: 20px; font-size: 10px; color: #666;">
-      This certificate is issued in accordance with the Inland Revenue Act. Please retain for tax filing purposes.
-    </p>
-  </div>
-</div>
+  ${buildFooter(['Prepared By', 'Authorized Signatory', 'Company Seal', 'Payee Acknowledgment'])}
+</div></div>
 `;
 
-// GRN (Goods Receipt Note) Template
+// ==================== GRN ====================
 export const generateGRNTemplate = (): string => `
 <style>${commonStyles}
-.document-title { background: #ecfeff; color: #0e7490; }
-.vendor-section { background: #ecfeff; border-left-color: #06b6d4; }
-table.items-table th { background: #0891b2; }
+  :root { --accent: #0891b2; --accent-2: #0e7490; --chip: #ecfeff; }
 </style>
-<div class="document-container">
-  <div class="document-header">
-    <div class="header-row">
-      <div class="logo-area">{{company_logo}}</div>
-      <div class="company-details">
-        <h1>{{company_name}}</h1>
-        <p>{{company_address}}</p>
-        <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-      </div>
-    </div>
-  </div>
+<div class="page"><div class="doc">
+  ${buildHeader('Goods Receipt Note', '{{grn_number}}', '{{grn_date}}', 'GRN')}
 
-  <div class="document-body">
-    <h2 class="document-title">GOODS RECEIPT NOTE (GRN)</h2>
-    
-    <div class="info-grid">
-      <div class="info-section">
+  <div class="body">
+    <div class="grid">
+      <div class="card">
         <h3>GRN Details</h3>
-        <div class="info-row"><span class="label">GRN No:</span><span class="value">{{grn_number}}</span></div>
-        <div class="info-row"><span class="label">Date:</span><span class="value">{{grn_date}}</span></div>
-        <div class="info-row"><span class="label">PO Reference:</span><span class="value">{{po_number}}</span></div>
-        <div class="info-row"><span class="label">Delivery Note:</span><span class="value">{{delivery_note}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">GRN No</span><span class="v">{{grn_number}}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">{{grn_date}}</span></div>
+          <div class="row"><span class="k">PO Reference</span><span class="v">{{po_number}}</span></div>
+          <div class="row"><span class="k">Delivery Note</span><span class="v">{{delivery_note}}</span></div>
+        </div>
       </div>
-      <div class="vendor-section">
+      <div class="card">
         <h3>Supplier</h3>
-        <p><strong>{{supplier_name}}</strong></p>
-        <p>{{supplier_address}}</p>
-        <p>Supplier Code: {{supplier_code}}</p>
+        <div class="kv">
+          <div class="row"><span class="k">Supplier</span><span class="v">{{supplier_name}}</span></div>
+          <div class="row"><span class="k">Address</span><span class="v">{{supplier_address}}</span></div>
+          <div class="row"><span class="k">Supplier Code</span><span class="v">{{supplier_code}}</span></div>
+        </div>
       </div>
     </div>
 
     {{items}}
 
-    <div class="info-grid" style="margin-top: 20px;">
-      <div class="info-section">
+    <div class="grid">
+      <div class="card">
         <h3>Receiving Details</h3>
-        <div class="info-row"><span class="label">Received By:</span><span class="value">{{received_by}}</span></div>
-        <div class="info-row"><span class="label">Location:</span><span class="value">{{warehouse}}</span></div>
-        <div class="info-row"><span class="label">Condition:</span><span class="value">{{condition}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Received By</span><span class="v">{{received_by}}</span></div>
+          <div class="row"><span class="k">Location</span><span class="v">{{warehouse}}</span></div>
+          <div class="row"><span class="k">Condition</span><span class="v">{{condition}}</span></div>
+        </div>
       </div>
-      <div class="info-section">
+      <div class="card">
         <h3>Quality Check</h3>
-        <div class="info-row"><span class="label">Inspected By:</span><span class="value">{{inspected_by}}</span></div>
-        <div class="info-row"><span class="label">QC Status:</span><span class="value">{{qc_status}}</span></div>
+        <div class="kv">
+          <div class="row"><span class="k">Inspected By</span><span class="v">{{inspected_by}}</span></div>
+          <div class="row"><span class="k">QC Status</span><span class="v">{{qc_status}}</span></div>
+        </div>
       </div>
     </div>
 
-    <div class="footer-notes">
-      <strong>Remarks:</strong> {{notes}}
+    <div class="notes-section">
+      <div class="label">Remarks</div>
+      <p>{{notes}}</p>
     </div>
   </div>
 
-  <div class="document-footer">
-    <div class="signature-grid">
-      <div class="sig-box"><div class="sig-line">Received By</div></div>
-      <div class="sig-box"><div class="sig-line">Inspected By</div></div>
-      <div class="sig-box"><div class="sig-line">Store Manager</div></div>
-    </div>
-  </div>
-</div>
+  ${buildFooter(['Received By', 'Inspected By', 'Store Manager', 'Authorized By'])}
+</div></div>
 `;
 
 // Export all templates as a map
