@@ -23,6 +23,9 @@ const formSchema = z.object({
   wht_applicable: z.boolean(),
   wht_rate: z.number().min(0).max(100).optional(),
   is_active: z.boolean(),
+  bank_name: z.string().optional(),
+  bank_branch: z.string().optional(),
+  bank_account: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -52,6 +55,9 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
       wht_applicable: vendor?.wht_applicable ?? false,
       wht_rate: vendor?.wht_rate || 0,
       is_active: vendor?.is_active ?? true,
+      bank_name: vendor?.bank_name || "",
+      bank_branch: vendor?.bank_branch || "",
+      bank_account: vendor?.bank_account || "",
     },
   });
 
@@ -79,6 +85,9 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
       wht_applicable: data.wht_applicable,
       wht_rate: data.wht_rate,
       is_active: data.is_active,
+      bank_name: data.bank_name || undefined,
+      bank_branch: data.bank_branch || undefined,
+      bank_account: data.bank_account || undefined,
     };
     if (isEditing) {
       await updateVendor.mutateAsync({ id: vendor.id, ...payload });
@@ -282,6 +291,51 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
               )}
             />
           )}
+        </div>
+
+        <div className="rounded-lg border p-4 space-y-4">
+          <h4 className="font-medium">Banking Details</h4>
+          <div className="grid grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="bank_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Bank Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Commercial Bank" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="bank_branch"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Branch</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Main Branch" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="bank_account"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Account Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="1234567890" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
         <FormField
