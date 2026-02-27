@@ -196,7 +196,7 @@ export const ARReconciliationWorksheet = () => {
               </SelectTrigger>
               <SelectContent>
                 {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

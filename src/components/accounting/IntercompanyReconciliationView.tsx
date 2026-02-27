@@ -19,7 +19,7 @@ export const IntercompanyReconciliationView = () => {
   const { data: companies = [] } = useQuery({
     queryKey: ["companies"],
     queryFn: async () => {
-      const { data } = await supabase.from("companies").select("id, company_name, business_unit_code").order("company_name");
+      const { data } = await supabase.from("companies").select("id, name, short_code").order("name");
       return data || [];
     },
   });
@@ -77,7 +77,7 @@ export const IntercompanyReconciliationView = () => {
             <Select value={unitAId} onValueChange={setUnitAId}>
               <SelectTrigger className="w-[240px]"><SelectValue placeholder="Select Unit A" /></SelectTrigger>
               <SelectContent>
-                {companies.map((c) => (<SelectItem key={c.id} value={c.id}>{c.business_unit_code || c.company_name}</SelectItem>))}
+                {companies.map((c) => (<SelectItem key={c.id} value={c.id}>{c.short_code || c.name}</SelectItem>))}
               </SelectContent>
             </Select>
           </div>
@@ -90,7 +90,7 @@ export const IntercompanyReconciliationView = () => {
             <Select value={unitBId} onValueChange={setUnitBId}>
               <SelectTrigger className="w-[240px]"><SelectValue placeholder="Select Unit B" /></SelectTrigger>
               <SelectContent>
-                {companies.map((c) => (<SelectItem key={c.id} value={c.id}>{c.business_unit_code || c.company_name}</SelectItem>))}
+                {companies.map((c) => (<SelectItem key={c.id} value={c.id}>{c.short_code || c.name}</SelectItem>))}
               </SelectContent>
             </Select>
           </div>
@@ -121,11 +121,11 @@ export const IntercompanyReconciliationView = () => {
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="font-semibold">{unitA.business_unit_code || unitA.company_name}</td>
+                    <td className="font-semibold">{unitA.short_code || unitA.name}</td>
                     <td className="num-col">LKR {fmt(unitABal)}</td>
                   </tr>
                   <tr>
-                    <td className="font-semibold">{unitB.business_unit_code || unitB.company_name}</td>
+                    <td className="font-semibold">{unitB.short_code || unitB.name}</td>
                     <td className="num-col">LKR {fmt(unitBBal)}</td>
                   </tr>
                 </tbody>

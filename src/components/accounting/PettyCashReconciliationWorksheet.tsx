@@ -39,7 +39,7 @@ export const PettyCashReconciliationWorksheet = () => {
   const { data: transactions = [] } = useQuery({
     queryKey: ["petty-cash-transactions", selectedFundId],
     queryFn: async () => {
-      const { data } = await supabase.from("petty_cash_transactions").select("*").eq("fund_id", selectedFundId!).order("transaction_date", { ascending: true });
+      const { data } = await supabase.from("petty_cash_transactions").select("*").eq("petty_cash_fund_id", selectedFundId!).order("created_at", { ascending: true });
       return data || [];
     },
     enabled: !!selectedFundId,
@@ -164,9 +164,9 @@ export const PettyCashReconciliationWorksheet = () => {
                     <td>{idx + 1}</td>
                     <td><input type="checkbox" className="cleared-checkbox" checked={isCleared} onChange={() => toggleCleared(t.id, t.amount || 0)} /></td>
                     <td><span className={`type-badge ${isDisbursement ? "pc-disbursement" : "pc-replenishment"}`}>{isDisbursement ? "DIS" : "REP"}</span></td>
-                    <td>{t.transaction_date ? format(new Date(t.transaction_date), "dd/MM/yyyy") : "—"}</td>
+                    <td>{t.created_at ? format(new Date(t.created_at), "dd/MM/yyyy") : "—"}</td>
                     <td>{t.description || "—"}</td>
-                    <td className="font-mono text-xs">{t.reference_number || "—"}</td>
+                    <td className="font-mono text-xs">{t.receipt_number || "—"}</td>
                     <td className="num-col">{isDisbursement ? <span className="text-destructive">-LKR {fmt(t.amount || 0)}</span> : <span className="text-green-600">+LKR {fmt(t.amount || 0)}</span>}</td>
                   </tr>
                 );
