@@ -114,6 +114,7 @@ const generateAllocationsTable = (allocations: any[]): string => {
       <thead>
         <tr style="background-color: #f3f4f6;">
           <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left;">Invoice #</th>
+          <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left;">Description</th>
           <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">Allocated Amount</th>
         </tr>
       </thead>
@@ -121,6 +122,7 @@ const generateAllocationsTable = (allocations: any[]): string => {
         ${allocations.map((alloc) => `
           <tr>
             <td style="border: 1px solid #e5e7eb; padding: 8px;">${alloc.ar_invoices?.invoice_number || alloc.ap_invoices?.invoice_number || alloc.invoice_id}</td>
+            <td style="border: 1px solid #e5e7eb; padding: 8px;">${alloc.ap_invoices?.notes || alloc.ar_invoices?.notes || ''}</td>
             <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">${formatCurrency(alloc.allocated_amount)}</td>
           </tr>
         `).join('')}
@@ -396,6 +398,13 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{payee_account}}'] = documentData?.vendors?.bank_account || '';
       placeholders['{{payee_bank}}'] = documentData?.vendors?.bank_name || '';
       placeholders['{{payee_tax_id}}'] = documentData?.vendors?.tax_id || '';
+
+      // Vendor bank account details (from vendor_bank_accounts if available)
+      const vendorBankAccount = documentData?.vendor_bank_accounts;
+      placeholders['{{vendor_bank_name}}'] = vendorBankAccount?.bank_name || documentData?.vendors?.bank_name || '';
+      placeholders['{{vendor_bank_branch}}'] = vendorBankAccount?.bank_branch || documentData?.vendors?.bank_branch || '';
+      placeholders['{{vendor_account_number}}'] = vendorBankAccount?.account_number || documentData?.vendors?.bank_account || '';
+      placeholders['{{vendor_account_holder}}'] = vendorBankAccount?.account_holder_name || documentData?.vendors?.vendor_name || '';
       placeholders['{{vendor_email}}'] = documentData?.vendors?.email || '';
       placeholders['{{vendor_phone}}'] = documentData?.vendors?.phone || '';
       placeholders['{{vendor_contact}}'] = documentData?.vendors?.contact_person || '';
