@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.run-scheduled-tasks]
 verify_jwt = false
+
+[functions.yutong-executive-report]
+verify_jwt = false

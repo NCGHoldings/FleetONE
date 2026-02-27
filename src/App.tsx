@@ -83,6 +83,7 @@ import CustomerPortal from "./pages/CustomerPortal";
 import VendorPortal from "./pages/VendorPortal";
 import WhatsAppHub from "./pages/WhatsAppHub";
 import SystemIssueTracker from "./pages/SystemIssueTracker";
+import PublicYutongReport from "./pages/PublicYutongReport";
 
 const queryClient = new QueryClient();
 
@@ -106,6 +107,7 @@ const App = () => (
             <Route path="/public/conductor-upload" element={<PublicConductorUpload />} />
             <Route path="/customer-portal" element={<CustomerPortal />} />
             <Route path="/vendor-portal" element={<VendorPortal />} />
+            <Route path="/public/yutong-report" element={<PublicYutongReport />} />
             
             {/* Protected routes wrapped in AppLayout */}
             <Route 
