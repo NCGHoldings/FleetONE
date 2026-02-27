@@ -1,129 +1,197 @@
 
-# Comprehensive Reconciliation Module Upgrade
+# Comprehensive Reconciliation Database Migration
 
-Upgrade all existing reconciliation views to match the SAP B1-style Bank Reconciliation Worksheet, and add new reconciliation modules that are currently missing.
-
----
-
-## Current State
-
-| Module | Status | Quality |
-|--------|--------|---------|
-| Bank Reconciliation | Exists | SAP B1-style worksheet (gold standard) |
-| AR Reconciliation | Exists | Basic -- uses `prompt()` for balance, no clearing workflow |
-| AP Reconciliation | Exists | Basic -- same issues as AR |
-| Stock Reconciliation | Exists | Basic -- physical count entry only |
-| GL Balance Reconciliation | Exists | Admin tool only, no worksheet |
-| Petty Cash Reconciliation | Missing | No reconciliation view |
-| Intercompany Reconciliation | Missing | No module exists |
-| Sub-Ledger to GL Reconciliation | Missing | No module exists |
+This migration creates the missing reconciliation tables, adds clearing/line-item tables for the upgraded AR/AP worksheets, builds a centralized audit logging system, adds performance indexes, and ensures `updated_at` triggers on all new tables -- all following "Secure by Default" principles.
 
 ---
 
-## Phase 1: Upgrade AR Reconciliation to SAP B1-Style Worksheet
+## What Already Exists (No Changes Needed)
 
-**File:** `src/components/accounting/ARReconciliationWorksheet.tsx` (new, replaces ARReconciliationView)
-
-Build a worksheet matching the bank reconciliation pattern:
-- **Header bar:** Customer selector, period date range, customer statement balance input, display filter (All / Unmatched / Matched)
-- **Table:** List all AR invoices and receipts in chronological order with columns: #, Cleared checkbox, Type (INV/RCT/CN), Date, Doc No., Reference, Debit (invoices), Credit (receipts/credit notes), Cleared Amount input, Remarks
-- **Summary footer (SAP-style):** Left side shows Invoice count/total and Receipt count/total. Right side shows Book Balance, Customer Statement Balance, and Difference (with green checkmark when zero)
-- **Actions:** Cancel, Save Reconciliation (creates record in `ar_reconciliations` and marks matched items)
-- **CSS:** Reuse `BankReconciliationWorksheet.css` classes with minor color adjustments
-
-**Database:** Uses existing `ar_reconciliations` table -- no schema changes needed.
-
----
-
-## Phase 2: Upgrade AP Reconciliation to SAP B1-Style Worksheet
-
-**File:** `src/components/accounting/APReconciliationWorksheet.tsx` (new, replaces APReconciliationView)
-
-Same pattern as AR but for vendors:
-- **Header:** Vendor selector, period range, vendor statement balance, display filter
-- **Table:** AP invoices (debits), AP payments (credits), debit notes in chronological order with clearing checkboxes
-- **Summary footer:** Invoice/Payment totals on left, Book Balance vs Vendor Statement vs Difference on right
-- **Actions:** Save creates record in `ap_reconciliations`
-
-**Database:** Uses existing `ap_reconciliations` table -- no schema changes needed.
+| Table | Status |
+|-------|--------|
+| `bank_reconciliations` | Exists with RLS |
+| `bank_reconciliation_items` | Exists with RLS |
+| `ar_reconciliations` | Exists with RLS |
+| `ap_reconciliations` | Exists with RLS |
+| `accounting_audit_log` | Exists (basic audit) |
+| `petty_cash_funds` | Exists |
+| `petty_cash_transactions` | Exists |
 
 ---
 
-## Phase 3: Petty Cash Reconciliation Worksheet
+## New Tables to Create
 
-**File:** `src/components/accounting/PettyCashReconciliationWorksheet.tsx` (new)
+### 1. `ar_reconciliation_items` (clearing line items for SAP-style AR worksheet)
 
-SAP B1-style worksheet for reconciling physical petty cash count against system balance:
-- **Header:** Fund selector (from `petty_cash_funds`), reconciliation date, physical cash count input
-- **Table:** All petty cash transactions (disbursements/replenishments) with clearing checkboxes, showing running balance
-- **Summary footer:** Total disbursements, total replenishments, system balance, physical count, difference
-- **Actions:** Save reconciliation
+Tracks which AR invoices/receipts were cleared during a reconciliation session.
 
-**Database migration:** Create `petty_cash_reconciliations` table:
-- id, fund_id, reconciliation_date, system_balance, physical_count, difference, status, notes, reconciled_by, company_id, created_at
+- `id` UUID PK
+- `reconciliation_id` UUID FK -> `ar_reconciliations(id)` ON DELETE CASCADE
+- `source_type` TEXT (invoice, receipt, credit_note, debit_note)
+- `source_id` UUID (reference to `ar_invoices` or `ar_receipts`)
+- `doc_number` TEXT
+- `doc_date` DATE
+- `debit_amount` NUMERIC DEFAULT 0
+- `credit_amount` NUMERIC DEFAULT 0
+- `cleared` BOOLEAN DEFAULT false
+- `cleared_amount` NUMERIC DEFAULT 0
+- `remarks` TEXT
+- `cleared_at` TIMESTAMPTZ
+- `cleared_by` UUID
+- `company_id` UUID FK -> `companies(id)`
+- `created_at` TIMESTAMPTZ DEFAULT now()
+
+### 2. `ap_reconciliation_items` (clearing line items for SAP-style AP worksheet)
+
+Same pattern for vendor/AP clearing.
+
+- `id` UUID PK
+- `reconciliation_id` UUID FK -> `ap_reconciliations(id)` ON DELETE CASCADE
+- `source_type` TEXT (invoice, payment, debit_note, credit_note)
+- `source_id` UUID
+- `doc_number` TEXT
+- `doc_date` DATE
+- `debit_amount` NUMERIC DEFAULT 0
+- `credit_amount` NUMERIC DEFAULT 0
+- `cleared` BOOLEAN DEFAULT false
+- `cleared_amount` NUMERIC DEFAULT 0
+- `remarks` TEXT
+- `cleared_at` TIMESTAMPTZ
+- `cleared_by` UUID
+- `company_id` UUID FK -> `companies(id)`
+- `created_at` TIMESTAMPTZ DEFAULT now()
+
+### 3. `petty_cash_reconciliations`
+
+Physical cash count reconciliation against system balance.
+
+- `id` UUID PK
+- `fund_id` UUID FK -> `petty_cash_funds(id)` ON DELETE CASCADE
+- `reconciliation_date` DATE NOT NULL
+- `system_balance` NUMERIC NOT NULL DEFAULT 0
+- `physical_count` NUMERIC NOT NULL DEFAULT 0
+- `difference` NUMERIC GENERATED ALWAYS AS (physical_count - system_balance) STORED
+- `status` TEXT DEFAULT 'draft'
+- `notes` TEXT
+- `reconciled_by` UUID
+- `reconciled_at` TIMESTAMPTZ
+- `company_id` UUID FK -> `companies(id)`
+- `created_at` TIMESTAMPTZ DEFAULT now()
+- `updated_at` TIMESTAMPTZ DEFAULT now()
+
+### 4. `petty_cash_reconciliation_items`
+
+Line items for petty cash reconciliation (denomination breakdown, adjustments).
+
+- `id` UUID PK
+- `reconciliation_id` UUID FK -> `petty_cash_reconciliations(id)` ON DELETE CASCADE
+- `transaction_id` UUID FK -> `petty_cash_transactions(id)` ON DELETE SET NULL
+- `description` TEXT
+- `amount` NUMERIC DEFAULT 0
+- `cleared` BOOLEAN DEFAULT false
+- `remarks` TEXT
+- `company_id` UUID FK -> `companies(id)`
+- `created_at` TIMESTAMPTZ DEFAULT now()
+
+### 5. `subledger_reconciliations`
+
+AR/AP sub-ledger vs GL control account reconciliation.
+
+- `id` UUID PK
+- `reconciliation_type` TEXT NOT NULL (ar, ap)
+- `reconciliation_date` DATE NOT NULL
+- `subledger_total` NUMERIC NOT NULL DEFAULT 0
+- `gl_balance` NUMERIC NOT NULL DEFAULT 0
+- `difference` NUMERIC GENERATED ALWAYS AS (subledger_total - gl_balance) STORED
+- `gl_account_id` UUID FK -> `chart_of_accounts(id)`
+- `status` TEXT DEFAULT 'draft'
+- `notes` TEXT
+- `details` JSONB (per-customer/vendor breakdown)
+- `reconciled_by` UUID
+- `reconciled_at` TIMESTAMPTZ
+- `company_id` UUID FK -> `companies(id)`
+- `created_at` TIMESTAMPTZ DEFAULT now()
+- `updated_at` TIMESTAMPTZ DEFAULT now()
+
+### 6. `intercompany_reconciliations`
+
+Cross-company balance reconciliation between NCG sub-units.
+
+- `id` UUID PK
+- `unit_a_id` UUID FK -> `companies(id)`
+- `unit_b_id` UUID FK -> `companies(id)`
+- `reconciliation_date` DATE NOT NULL
+- `unit_a_balance` NUMERIC NOT NULL DEFAULT 0
+- `unit_b_balance` NUMERIC NOT NULL DEFAULT 0
+- `difference` NUMERIC GENERATED ALWAYS AS (unit_a_balance - unit_b_balance) STORED
+- `status` TEXT DEFAULT 'draft'
+- `notes` TEXT
+- `details` JSONB (transaction-level breakdown)
+- `reconciled_by` UUID
+- `reconciled_at` TIMESTAMPTZ
+- `company_id` UUID FK -> `companies(id)`
+- `created_at` TIMESTAMPTZ DEFAULT now()
+- `updated_at` TIMESTAMPTZ DEFAULT now()
 
 ---
 
-## Phase 4: Sub-Ledger to GL Reconciliation Worksheet
+## Security: RLS Policies
 
-**File:** `src/components/accounting/SubLedgerReconciliationView.tsx` (new)
+All 6 new tables get RLS enabled with role-based policies following the existing pattern:
 
-Reconciles AR/AP sub-ledger totals against their GL control accounts:
-- **Header:** Reconciliation type selector (AR Sub-Ledger, AP Sub-Ledger), as-of date
-- **Table:** Shows each customer/vendor with their sub-ledger balance alongside the GL control account balance
-- **Summary:** Total sub-ledger balance, GL control account balance, difference
-- Automatically fetches AR invoice balances summed by customer and compares against the Trade Receivable GL account balance (and similarly for AP/Trade Payable)
-
-**Database migration:** Create `subledger_reconciliations` table:
-- id, reconciliation_type (ar/ap), reconciliation_date, subledger_total, gl_balance, difference, status, notes, company_id, created_at
+- **SELECT**: All authenticated users can view (`auth.uid() IS NOT NULL`)
+- **INSERT/UPDATE/DELETE**: Restricted to `finance`, `admin`, `super_admin` roles using the existing `has_role()` security definer function
+- Uses `(SELECT auth.uid())` pattern for performance (avoids re-evaluation per row)
 
 ---
 
-## Phase 5: Intercompany Reconciliation Worksheet
+## Performance: Indexes
 
-**File:** `src/components/accounting/IntercompanyReconciliationView.tsx` (new)
+B-tree indexes on all FK columns and common WHERE clause columns:
 
-Reconciles balances between NCG Holding sub-units:
-- **Header:** Select two business units (e.g., YUT vs SBO), reconciliation date
-- **Table:** Shows intercompany transactions between the two units with clearing checkboxes
-- **Summary:** Unit A balance, Unit B balance, net difference
+| Table | Indexed Columns |
+|-------|----------------|
+| `ar_reconciliation_items` | reconciliation_id, source_id, company_id |
+| `ap_reconciliation_items` | reconciliation_id, source_id, company_id |
+| `petty_cash_reconciliations` | fund_id, company_id, reconciliation_date |
+| `petty_cash_reconciliation_items` | reconciliation_id, transaction_id |
+| `subledger_reconciliations` | company_id, reconciliation_type, gl_account_id |
+| `intercompany_reconciliations` | unit_a_id, unit_b_id, company_id |
 
-**Database migration:** Create `intercompany_reconciliations` table:
-- id, unit_a_code, unit_b_code, reconciliation_date, unit_a_balance, unit_b_balance, difference, status, notes, company_id, created_at
-
----
-
-## Phase 6: Wire Into Accounting Page
-
-**File:** `src/pages/Accounting.tsx`
-
-- Replace `ARReconciliationView` import with `ARReconciliationWorksheet`
-- Replace `APReconciliationView` import with `APReconciliationWorksheet`
-- Add "Petty Cash Reconciliation" tab under Banking section
-- Add "Sub-Ledger Reconciliation" tab under Settings or GL section
-- Add "Intercompany Reconciliation" tab under GL section
+GIN indexes on `details` JSONB columns in `subledger_reconciliations` and `intercompany_reconciliations`.
 
 ---
 
-## Phase 7: Shared Reconciliation CSS
+## Audit Logging
 
-**File:** `src/components/accounting/ReconciliationWorksheet.css` (new)
-
-Extract and extend the bank reconciliation CSS into a shared stylesheet that all worksheet components can import, with module-specific color accents (blue for bank, green for AR, orange for AP, purple for petty cash).
+Create a centralized audit trigger function `audit.log_changes()` in a private `audit` schema that:
+- Captures `INSERT`, `UPDATE`, `DELETE` operations
+- Stores `user_id` (from `auth.uid()`), `table_name`, `record_id`, `action`, `old_data`, `new_data`, `timestamp`
+- Attach this trigger to all 6 new reconciliation tables
+- Leverages the existing `accounting_audit_log` table structure (no new audit table needed -- we reuse it)
 
 ---
 
-## Technical Summary
+## Reliability: updated_at Triggers
 
-| File | Action |
-|------|--------|
-| `ARReconciliationWorksheet.tsx` | New -- SAP B1-style AR worksheet |
-| `APReconciliationWorksheet.tsx` | New -- SAP B1-style AP worksheet |
-| `PettyCashReconciliationWorksheet.tsx` | New -- Petty cash physical count worksheet |
-| `SubLedgerReconciliationView.tsx` | New -- Sub-ledger vs GL comparison |
-| `IntercompanyReconciliationView.tsx` | New -- Cross-unit balance reconciliation |
-| `ReconciliationWorksheet.css` | New -- Shared CSS for all worksheets |
-| `Accounting.tsx` | Modified -- Wire new components into tabs |
-| Database migration | New tables: `petty_cash_reconciliations`, `subledger_reconciliations`, `intercompany_reconciliations` |
+A shared `set_updated_at()` function (create if not exists) applied as BEFORE UPDATE triggers on:
+- `petty_cash_reconciliations`
+- `subledger_reconciliations`
+- `intercompany_reconciliations`
 
-All new components follow the exact same architecture pattern as `BankReconciliationWorksheet.tsx`: useState for cleared state, useMemo for summary calculations, useCallback for handlers, SAP-style header/table/footer layout with the shared CSS.
+(The item tables don't have `updated_at` columns since they are append-only clearing records.)
+
+---
+
+## Migration Execution Order
+
+1. Create `audit` schema (if not exists)
+2. Create shared helper functions (`set_updated_at`, `audit_reconciliation_changes`)
+3. Create all 6 tables with proper constraints and defaults
+4. Enable RLS on all tables
+5. Create role-based RLS policies
+6. Create all B-tree and GIN indexes
+7. Attach `updated_at` triggers
+8. Attach audit triggers to all 6 tables
+
+No existing tables are modified -- this is purely additive.
