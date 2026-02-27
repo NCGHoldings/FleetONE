@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -29,9 +30,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Building2, Store, Loader2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Building2, Store, Loader2, Star } from "lucide-react";
 import { toast } from "sonner";
 import { useGenerateNumber } from "@/hooks/useNumbering";
+import { useVendorBankAccounts, useSaveVendorBankAccounts } from "@/hooks/useVendorBankAccounts";
 
 interface Vendor {
   id: string;
@@ -49,20 +51,48 @@ interface Vendor {
   created_at: string | null;
 }
 
+interface BankAccountRow {
+  account_label: string;
+  bank_name: string;
+  bank_branch: string;
+  account_number: string;
+  account_holder_name: string;
+  is_default: boolean;
+}
+
 export function VendorMasterView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountRow[]>([]);
   const queryClient = useQueryClient();
   const { selectedCompanyId, selectedCompany, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
   const generateNumber = useGenerateNumber();
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const saveBankAccounts = useSaveVendorBankAccounts();
+  
+  // Fetch bank accounts when editing
+  const { data: existingBankAccounts } = useVendorBankAccounts(editingVendor?.id);
   
   // For consolidated GL: use parent company ID for storage, filter by business unit
   const effectiveCompanyId = getEffectiveCompanyId();
   const businessUnitCode = selectedCompanyId && isSubCompanyOfNCGHolding(selectedCompanyId) 
     ? getBusinessUnitCode() 
     : null;
+
+  // Load existing bank accounts when editing
+  useEffect(() => {
+    if (editingVendor && existingBankAccounts) {
+      setBankAccounts(existingBankAccounts.map(acc => ({
+        account_label: acc.account_label,
+        bank_name: acc.bank_name,
+        bank_branch: acc.bank_branch || "",
+        account_number: acc.account_number,
+        account_holder_name: acc.account_holder_name || "",
+        is_default: acc.is_default,
+      })));
+    }
+  }, [editingVendor, existingBankAccounts]);
 
   const [formData, setFormData] = useState({
     vendor_code: "",
@@ -76,6 +106,36 @@ export function VendorMasterView() {
     wht_applicable: "false",
     wht_rate: "",
   });
+
+  // Bank account helpers
+  const addBankAccount = () => {
+    setBankAccounts([...bankAccounts, {
+      account_label: bankAccounts.length === 0 ? "Primary" : "",
+      bank_name: "",
+      bank_branch: "",
+      account_number: "",
+      account_holder_name: "",
+      is_default: bankAccounts.length === 0,
+    }]);
+  };
+
+  const removeBankAccount = (index: number) => {
+    const updated = bankAccounts.filter((_, i) => i !== index);
+    // If removed the default, make first one default
+    if (updated.length > 0 && !updated.some(a => a.is_default)) {
+      updated[0].is_default = true;
+    }
+    setBankAccounts(updated);
+  };
+
+  const updateBankAccount = (index: number, field: keyof BankAccountRow, value: string | boolean) => {
+    const updated = [...bankAccounts];
+    if (field === "is_default" && value === true) {
+      updated.forEach(a => a.is_default = false);
+    }
+    (updated[index] as any)[field] = value;
+    setBankAccounts(updated);
+  };
 
   const { data: vendors, isLoading } = useQuery({
     queryKey: ["vendors", effectiveCompanyId, businessUnitCode],
@@ -104,7 +164,7 @@ export function VendorMasterView() {
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       if (!selectedCompanyId) throw new Error("Please select a company first");
-      const { error } = await supabase.from("vendors").insert([{
+      const { data: inserted, error } = await supabase.from("vendors").insert([{
         vendor_code: data.vendor_code,
         vendor_name: data.vendor_name,
         contact_person: data.contact_person || null,
@@ -116,12 +176,27 @@ export function VendorMasterView() {
         wht_applicable: data.wht_applicable === "true",
         wht_rate: data.wht_rate ? parseFloat(data.wht_rate) : null,
         is_active: true,
-        company_id: effectiveCompanyId, // Store under parent company for consolidated GL
-        business_unit_code: businessUnitCode, // Tag with business unit for filtering
-      }]);
+        company_id: effectiveCompanyId,
+        business_unit_code: businessUnitCode,
+      }]).select().single();
       if (error) throw error;
+      return inserted;
     },
-    onSuccess: () => {
+    onSuccess: async (inserted) => {
+      // Save bank accounts
+      if (bankAccounts.length > 0 && inserted?.id) {
+        await saveBankAccounts.mutateAsync({
+          vendorId: inserted.id,
+          accounts: bankAccounts.map(acc => ({
+            account_label: acc.account_label,
+            bank_name: acc.bank_name,
+            bank_branch: acc.bank_branch || null,
+            account_number: acc.account_number,
+            account_holder_name: acc.account_holder_name || null,
+            is_default: acc.is_default,
+          })),
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["vendors"] });
       toast.success("Vendor created successfully");
       resetForm();
@@ -150,8 +225,21 @@ export function VendorMasterView() {
         })
         .eq("id", id);
       if (error) throw error;
+      return id;
     },
-    onSuccess: () => {
+    onSuccess: async (vendorId) => {
+      // Save bank accounts
+      await saveBankAccounts.mutateAsync({
+        vendorId,
+        accounts: bankAccounts.map(acc => ({
+          account_label: acc.account_label,
+          bank_name: acc.bank_name,
+          bank_branch: acc.bank_branch || null,
+          account_number: acc.account_number,
+          account_holder_name: acc.account_holder_name || null,
+          is_default: acc.is_default,
+        })),
+      });
       queryClient.invalidateQueries({ queryKey: ["vendors"] });
       toast.success("Vendor updated successfully");
       resetForm();
@@ -190,6 +278,7 @@ export function VendorMasterView() {
       wht_applicable: "false",
       wht_rate: "",
     });
+    setBankAccounts([]);
   };
 
   const handleEdit = (vendor: Vendor) => {
@@ -264,7 +353,7 @@ export function VendorMasterView() {
                 Add Vendor
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {editingVendor ? "Edit Vendor" : "Add New Vendor"}
@@ -383,6 +472,94 @@ export function VendorMasterView() {
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   />
                 </div>
+
+                {/* Banking Details Section */}
+                <div className="space-y-3 border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">Banking Details</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addBankAccount}>
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Account
+                    </Button>
+                  </div>
+                  {bankAccounts.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No bank accounts added. Click "Add Account" to add payment details.</p>
+                  )}
+                  {bankAccounts.map((acc, idx) => (
+                    <div key={idx} className="border rounded-lg p-3 space-y-3 relative">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">Account {idx + 1}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <Star className={`h-3.5 w-3.5 ${acc.is_default ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`} />
+                            <Label htmlFor={`default-${idx}`} className="text-xs">Default</Label>
+                            <Switch
+                              id={`default-${idx}`}
+                              checked={acc.is_default}
+                              onCheckedChange={(checked) => updateBankAccount(idx, "is_default", checked)}
+                            />
+                          </div>
+                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeBankAccount(idx)}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Account Label *</Label>
+                          <Input
+                            value={acc.account_label}
+                            onChange={(e) => updateBankAccount(idx, "account_label", e.target.value)}
+                            placeholder="e.g., Primary, USD"
+                            className="h-8 text-sm"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Bank Name *</Label>
+                          <Input
+                            value={acc.bank_name}
+                            onChange={(e) => updateBankAccount(idx, "bank_name", e.target.value)}
+                            placeholder="Bank name"
+                            className="h-8 text-sm"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Branch</Label>
+                          <Input
+                            value={acc.bank_branch}
+                            onChange={(e) => updateBankAccount(idx, "bank_branch", e.target.value)}
+                            placeholder="Branch"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Account Number *</Label>
+                          <Input
+                            value={acc.account_number}
+                            onChange={(e) => updateBankAccount(idx, "account_number", e.target.value)}
+                            placeholder="Account number"
+                            className="h-8 text-sm"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Account Holder</Label>
+                          <Input
+                            value={acc.account_holder_name}
+                            onChange={(e) => updateBankAccount(idx, "account_holder_name", e.target.value)}
+                            placeholder="Holder name"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
