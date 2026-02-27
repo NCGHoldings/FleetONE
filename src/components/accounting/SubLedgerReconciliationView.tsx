@@ -43,7 +43,7 @@ export const SubLedgerReconciliationView = () => {
       arInvoices
         .filter((i) => i.status !== "cancelled" && new Date(i.invoice_date) <= new Date(asOfDate))
         .forEach((i) => {
-          const name = customers.find((c) => c.id === i.customer_id)?.name || "Unknown";
+          const name = customers.find((c) => c.id === i.customer_id)?.customer_name || "Unknown";
           const existing = customerMap.get(i.customer_id || "none") || { name, balance: 0 };
           existing.balance += i.balance || 0;
           customerMap.set(i.customer_id || "none", existing);
