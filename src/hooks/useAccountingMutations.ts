@@ -3125,6 +3125,45 @@ export const useCreateBankAccount = () => {
   });
 };
 
+export const useUpdateBankAccount = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (account: {
+      id: string;
+      account_code?: string;
+      account_name?: string;
+      bank_name?: string;
+      account_number?: string;
+      branch?: string;
+      account_type?: string;
+      currency?: string;
+      opening_balance?: number;
+      gl_account_id?: string;
+      is_active?: boolean;
+      is_default?: boolean;
+      notes?: string;
+    }) => {
+      const { id, ...updateData } = account;
+      const { data, error } = await supabase
+        .from("bank_accounts")
+        .update(updateData)
+        .eq("id", id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
+      toast.success("Bank account updated successfully");
+    },
+    onError: (error) => toast.error(`Failed to update bank account: ${error.message}`),
+  });
+};
+
 // ============ Asset Categories ============
 export const useCreateAssetCategory = () => {
   const queryClient = useQueryClient();
