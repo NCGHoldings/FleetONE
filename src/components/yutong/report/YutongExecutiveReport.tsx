@@ -1,5 +1,5 @@
-import React from 'react';
-import { useYutongExecutiveReport } from '@/hooks/useYutongExecutiveReport';
+import React, { useState } from 'react';
+import { useYutongExecutiveReport, YutongReportFilters as FilterType } from '@/hooks/useYutongExecutiveReport';
 import { YutongReportKPICards } from './YutongReportKPICards';
 import { YutongPipelineFunnel } from './YutongPipelineFunnel';
 import { YutongRevenueCharts } from './YutongRevenueCharts';
@@ -8,6 +8,12 @@ import { YutongModelPerformance } from './YutongModelPerformance';
 import { YutongTopCustomers } from './YutongTopCustomers';
 import { YutongAfterSalesHealth } from './YutongAfterSalesHealth';
 import { YutongReportShareDialog } from './YutongReportShareDialog';
+import { YutongReportFilters } from './YutongReportFilters';
+import { YutongExecutiveSummary } from './YutongExecutiveSummary';
+import { YutongPeriodComparison } from './YutongPeriodComparison';
+import { YutongRevenueForecasting } from './YutongRevenueForecasting';
+import { YutongSalesVelocity } from './YutongSalesVelocity';
+import { YutongCustomerAnalytics } from './YutongCustomerAnalytics';
 import { exportYutongReport } from './YutongExcelExporter';
 import { Button } from '@/components/ui/button';
 import { Download, RefreshCw, Printer, TrendingUp, AlertTriangle, Clock } from 'lucide-react';
@@ -16,12 +22,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { YutongReportData } from '@/hooks/useYutongExecutiveReport';
 
 interface Props {
-  data?: YutongReportData; // Allow external data (for public page)
+  data?: YutongReportData;
   isPublic?: boolean;
 }
 
 function PredictiveInsights({ data }: { data: YutongReportData }) {
-  // Pipeline-based projections
   const avgMonthlyDeliveries = data.monthlyTrends.slice(-3).reduce((s, m) => s + m.deliveries, 0) / 3;
   const pendingPipelineUnits = data.orders.totalUnits - data.delivery.totalDelivered;
   const estimatedRevenueFromPending = data.orders.totalBalance;
@@ -57,7 +62,6 @@ function PredictiveInsights({ data }: { data: YutongReportData }) {
           </div>
         </div>
 
-        {/* Trend chart */}
         <div className="mt-4">
           <p className="text-sm font-medium mb-2">Orders & Deliveries Trend</p>
           <ResponsiveContainer width="100%" height={180}>
@@ -77,7 +81,15 @@ function PredictiveInsights({ data }: { data: YutongReportData }) {
 }
 
 export function YutongExecutiveReport({ data: externalData, isPublic = false }: Props) {
-  const { data: hookData, isLoading, refetch } = useYutongExecutiveReport();
+  const [filters, setFilters] = useState<FilterType>({
+    startDate: null,
+    endDate: null,
+    compareWithPrevious: false,
+    busModels: [],
+    paymentMode: 'all',
+  });
+
+  const { data: hookData, isLoading, refetch } = useYutongExecutiveReport(externalData ? undefined : filters);
   const data = externalData || hookData;
 
   if (isLoading && !data) {
@@ -94,7 +106,7 @@ export function YutongExecutiveReport({ data: externalData, isPublic = false }: 
   }
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto print:max-w-none">
+    <div className="space-y-5 max-w-[1400px] mx-auto print:max-w-none">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:flex-row">
         <div>
@@ -106,24 +118,36 @@ export function YutongExecutiveReport({ data: externalData, isPublic = false }: 
         {!isPublic && (
           <div className="flex gap-2 print:hidden">
             <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Refresh
+              <RefreshCw className="h-4 w-4" /> Refresh
             </Button>
             <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2">
-              <Printer className="h-4 w-4" />
-              Print
+              <Printer className="h-4 w-4" /> Print
             </Button>
             <Button variant="outline" size="sm" onClick={() => exportYutongReport(data)} className="gap-2">
-              <Download className="h-4 w-4" />
-              Export Excel
+              <Download className="h-4 w-4" /> Export Excel
             </Button>
             <YutongReportShareDialog />
           </div>
         )}
       </div>
 
+      {/* Filters */}
+      {!isPublic && (
+        <YutongReportFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          availableBusModels={data.availableBusModels}
+        />
+      )}
+
+      {/* Executive Summary */}
+      <YutongExecutiveSummary data={data} />
+
       {/* KPI Cards */}
       <YutongReportKPICards data={data} />
+
+      {/* Period Comparison */}
+      <YutongPeriodComparison data={data} />
 
       {/* Pipeline + Revenue */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -135,10 +159,16 @@ export function YutongExecutiveReport({ data: externalData, isPublic = false }: 
         </div>
       </div>
 
+      {/* Sales Velocity & Conversion */}
+      <YutongSalesVelocity data={data} />
+
+      {/* Revenue Forecasting & Breakdown */}
+      <YutongRevenueForecasting data={data} />
+
       {/* Shipment & Operations */}
       <YutongShipmentStatus data={data} />
 
-      {/* Order Phase Distribution */}
+      {/* Order Phase Distribution + Quotation Trend */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-0 shadow-md">
           <CardHeader className="pb-2">
@@ -157,7 +187,6 @@ export function YutongExecutiveReport({ data: externalData, isPublic = false }: 
           </CardContent>
         </Card>
 
-        {/* Quotation Trend */}
         <Card className="border-0 shadow-md">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">Monthly Quotation Activity</CardTitle>
@@ -179,7 +208,10 @@ export function YutongExecutiveReport({ data: externalData, isPublic = false }: 
       {/* Bus Models */}
       <YutongModelPerformance data={data} />
 
-      {/* Top Customers */}
+      {/* Customer Analytics */}
+      <YutongCustomerAnalytics data={data} />
+
+      {/* Top Customers (full table) */}
       <YutongTopCustomers data={data} />
 
       {/* After Sales */}
