@@ -652,7 +652,21 @@ export default function StaffManagement() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={staff} />
+          <DataTable
+            columns={columns}
+            data={staff}
+            searchKeys={["name", "employee ID", "phone", "role"]}
+            customSearch={(data: Profile[], query: string) => {
+              const q = query.toLowerCase();
+              return data.filter(s =>
+                s.first_name?.toLowerCase().includes(q) ||
+                s.last_name?.toLowerCase().includes(q) ||
+                s.employee_id?.toLowerCase().includes(q) ||
+                s.phone?.toLowerCase().includes(q) ||
+                s.roles?.some(r => r.toLowerCase().includes(q))
+              );
+            }}
+          />
           {isSuperAdmin && (
             <>
               <PageAccessModal
