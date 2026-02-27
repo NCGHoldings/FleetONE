@@ -1,197 +1,137 @@
 
-# Comprehensive Reconciliation Database Migration
+# Build All Missing Development Items
 
-This migration creates the missing reconciliation tables, adds clearing/line-item tables for the upgraded AR/AP worksheets, builds a centralized audit logging system, adds performance indexes, and ensures `updated_at` triggers on all new tables -- all following "Secure by Default" principles.
-
----
-
-## What Already Exists (No Changes Needed)
-
-| Table | Status |
-|-------|--------|
-| `bank_reconciliations` | Exists with RLS |
-| `bank_reconciliation_items` | Exists with RLS |
-| `ar_reconciliations` | Exists with RLS |
-| `ap_reconciliations` | Exists with RLS |
-| `accounting_audit_log` | Exists (basic audit) |
-| `petty_cash_funds` | Exists |
-| `petty_cash_transactions` | Exists |
+This plan covers the 2 incomplete requirements from the cross-check plus all missing reconciliation worksheet components from the approved reconciliation plan.
 
 ---
 
-## New Tables to Create
+## Part A: Requirement #1 -- Bank Account Edit Functionality
 
-### 1. `ar_reconciliation_items` (clearing line items for SAP-style AR worksheet)
+Currently `BankAccountForm.tsx` only creates bank accounts. No edit capability exists.
 
-Tracks which AR invoices/receipts were cleared during a reconciliation session.
+### Changes:
+1. **Modify `BankAccountForm.tsx`** to accept an optional `bankAccount` prop for editing
+   - Add `bankAccount?: any` to `BankAccountFormProps`
+   - Pre-populate form with existing data when editing
+   - Change dialog title to "Edit Bank Account" when editing
+   - Change submit button text to "Update Bank Account"
 
-- `id` UUID PK
-- `reconciliation_id` UUID FK -> `ar_reconciliations(id)` ON DELETE CASCADE
-- `source_type` TEXT (invoice, receipt, credit_note, debit_note)
-- `source_id` UUID (reference to `ar_invoices` or `ar_receipts`)
-- `doc_number` TEXT
-- `doc_date` DATE
-- `debit_amount` NUMERIC DEFAULT 0
-- `credit_amount` NUMERIC DEFAULT 0
-- `cleared` BOOLEAN DEFAULT false
-- `cleared_amount` NUMERIC DEFAULT 0
-- `remarks` TEXT
-- `cleared_at` TIMESTAMPTZ
-- `cleared_by` UUID
-- `company_id` UUID FK -> `companies(id)`
-- `created_at` TIMESTAMPTZ DEFAULT now()
+2. **Create `useUpdateBankAccount` mutation** in `useAccountingMutations.ts`
+   - Uses `supabase.from("bank_accounts").update({...}).eq("id", id)`
+   - Invalidates `["bank-accounts"]` query key
 
-### 2. `ap_reconciliation_items` (clearing line items for SAP-style AP worksheet)
-
-Same pattern for vendor/AP clearing.
-
-- `id` UUID PK
-- `reconciliation_id` UUID FK -> `ap_reconciliations(id)` ON DELETE CASCADE
-- `source_type` TEXT (invoice, payment, debit_note, credit_note)
-- `source_id` UUID
-- `doc_number` TEXT
-- `doc_date` DATE
-- `debit_amount` NUMERIC DEFAULT 0
-- `credit_amount` NUMERIC DEFAULT 0
-- `cleared` BOOLEAN DEFAULT false
-- `cleared_amount` NUMERIC DEFAULT 0
-- `remarks` TEXT
-- `cleared_at` TIMESTAMPTZ
-- `cleared_by` UUID
-- `company_id` UUID FK -> `companies(id)`
-- `created_at` TIMESTAMPTZ DEFAULT now()
-
-### 3. `petty_cash_reconciliations`
-
-Physical cash count reconciliation against system balance.
-
-- `id` UUID PK
-- `fund_id` UUID FK -> `petty_cash_funds(id)` ON DELETE CASCADE
-- `reconciliation_date` DATE NOT NULL
-- `system_balance` NUMERIC NOT NULL DEFAULT 0
-- `physical_count` NUMERIC NOT NULL DEFAULT 0
-- `difference` NUMERIC GENERATED ALWAYS AS (physical_count - system_balance) STORED
-- `status` TEXT DEFAULT 'draft'
-- `notes` TEXT
-- `reconciled_by` UUID
-- `reconciled_at` TIMESTAMPTZ
-- `company_id` UUID FK -> `companies(id)`
-- `created_at` TIMESTAMPTZ DEFAULT now()
-- `updated_at` TIMESTAMPTZ DEFAULT now()
-
-### 4. `petty_cash_reconciliation_items`
-
-Line items for petty cash reconciliation (denomination breakdown, adjustments).
-
-- `id` UUID PK
-- `reconciliation_id` UUID FK -> `petty_cash_reconciliations(id)` ON DELETE CASCADE
-- `transaction_id` UUID FK -> `petty_cash_transactions(id)` ON DELETE SET NULL
-- `description` TEXT
-- `amount` NUMERIC DEFAULT 0
-- `cleared` BOOLEAN DEFAULT false
-- `remarks` TEXT
-- `company_id` UUID FK -> `companies(id)`
-- `created_at` TIMESTAMPTZ DEFAULT now()
-
-### 5. `subledger_reconciliations`
-
-AR/AP sub-ledger vs GL control account reconciliation.
-
-- `id` UUID PK
-- `reconciliation_type` TEXT NOT NULL (ar, ap)
-- `reconciliation_date` DATE NOT NULL
-- `subledger_total` NUMERIC NOT NULL DEFAULT 0
-- `gl_balance` NUMERIC NOT NULL DEFAULT 0
-- `difference` NUMERIC GENERATED ALWAYS AS (subledger_total - gl_balance) STORED
-- `gl_account_id` UUID FK -> `chart_of_accounts(id)`
-- `status` TEXT DEFAULT 'draft'
-- `notes` TEXT
-- `details` JSONB (per-customer/vendor breakdown)
-- `reconciled_by` UUID
-- `reconciled_at` TIMESTAMPTZ
-- `company_id` UUID FK -> `companies(id)`
-- `created_at` TIMESTAMPTZ DEFAULT now()
-- `updated_at` TIMESTAMPTZ DEFAULT now()
-
-### 6. `intercompany_reconciliations`
-
-Cross-company balance reconciliation between NCG sub-units.
-
-- `id` UUID PK
-- `unit_a_id` UUID FK -> `companies(id)`
-- `unit_b_id` UUID FK -> `companies(id)`
-- `reconciliation_date` DATE NOT NULL
-- `unit_a_balance` NUMERIC NOT NULL DEFAULT 0
-- `unit_b_balance` NUMERIC NOT NULL DEFAULT 0
-- `difference` NUMERIC GENERATED ALWAYS AS (unit_a_balance - unit_b_balance) STORED
-- `status` TEXT DEFAULT 'draft'
-- `notes` TEXT
-- `details` JSONB (transaction-level breakdown)
-- `reconciled_by` UUID
-- `reconciled_at` TIMESTAMPTZ
-- `company_id` UUID FK -> `companies(id)`
-- `created_at` TIMESTAMPTZ DEFAULT now()
-- `updated_at` TIMESTAMPTZ DEFAULT now()
+3. **Add Edit button to `BankingView.tsx`** bank accounts table
+   - Add a new column with a pencil icon edit action
+   - State for `editingBankAccount` 
+   - Pass selected bank account to `BankAccountForm`
 
 ---
 
-## Security: RLS Policies
+## Part B: Requirement #4 -- Vendor Bank Details
 
-All 6 new tables get RLS enabled with role-based policies following the existing pattern:
+The `vendors` table already has `bank_name`, `bank_branch`, `bank_account` columns but the `VendorForm.tsx` has no UI fields for them.
 
-- **SELECT**: All authenticated users can view (`auth.uid() IS NOT NULL`)
-- **INSERT/UPDATE/DELETE**: Restricted to `finance`, `admin`, `super_admin` roles using the existing `has_role()` security definer function
-- Uses `(SELECT auth.uid())` pattern for performance (avoids re-evaluation per row)
-
----
-
-## Performance: Indexes
-
-B-tree indexes on all FK columns and common WHERE clause columns:
-
-| Table | Indexed Columns |
-|-------|----------------|
-| `ar_reconciliation_items` | reconciliation_id, source_id, company_id |
-| `ap_reconciliation_items` | reconciliation_id, source_id, company_id |
-| `petty_cash_reconciliations` | fund_id, company_id, reconciliation_date |
-| `petty_cash_reconciliation_items` | reconciliation_id, transaction_id |
-| `subledger_reconciliations` | company_id, reconciliation_type, gl_account_id |
-| `intercompany_reconciliations` | unit_a_id, unit_b_id, company_id |
-
-GIN indexes on `details` JSONB columns in `subledger_reconciliations` and `intercompany_reconciliations`.
+### Changes:
+1. **Modify `VendorForm.tsx`**:
+   - Add `bank_name`, `bank_branch`, `bank_account` fields to the Zod schema (all optional strings)
+   - Add a "Banking Details" section in the form UI (below WHT section) with 3 fields: Bank Name, Branch, Account Number
+   - Include these fields in the submit payload
+   - Map existing vendor data to defaults when editing
 
 ---
 
-## Audit Logging
+## Part C: AR Reconciliation Worksheet (SAP B1-Style Upgrade)
 
-Create a centralized audit trigger function `audit.log_changes()` in a private `audit` schema that:
-- Captures `INSERT`, `UPDATE`, `DELETE` operations
-- Stores `user_id` (from `auth.uid()`), `table_name`, `record_id`, `action`, `old_data`, `new_data`, `timestamp`
-- Attach this trigger to all 6 new reconciliation tables
-- Leverages the existing `accounting_audit_log` table structure (no new audit table needed -- we reuse it)
+Replace basic `ARReconciliationView.tsx` with a full SAP B1-style worksheet.
 
----
+### New file: `ARReconciliationWorksheet.tsx`
+- **Header bar**: Customer selector, period date range, customer statement balance input, display filter (All/Unmatched/Matched)
+- **Table**: List AR invoices and receipts chronologically with columns: #, Cleared checkbox, Type (INV/RCT/CN), Date, Doc No., Reference, Debit, Credit, Cleared Amount input, Remarks
+- **Summary footer**: Left side shows invoice/receipt counts and totals. Right side shows Book Balance, Customer Statement Balance, Difference (green checkmark when zero)
+- **Actions**: Cancel and Save Reconciliation
+- **Uses shared CSS** from `ReconciliationWorksheet.css`
+- Follows exact same architecture as `BankReconciliationWorksheet.tsx`
 
-## Reliability: updated_at Triggers
-
-A shared `set_updated_at()` function (create if not exists) applied as BEFORE UPDATE triggers on:
-- `petty_cash_reconciliations`
-- `subledger_reconciliations`
-- `intercompany_reconciliations`
-
-(The item tables don't have `updated_at` columns since they are append-only clearing records.)
+### Wire in `Accounting.tsx`:
+- Replace `ARReconciliationView` import with `ARReconciliationWorksheet`
 
 ---
 
-## Migration Execution Order
+## Part D: AP Reconciliation Worksheet (SAP B1-Style Upgrade)
 
-1. Create `audit` schema (if not exists)
-2. Create shared helper functions (`set_updated_at`, `audit_reconciliation_changes`)
-3. Create all 6 tables with proper constraints and defaults
-4. Enable RLS on all tables
-5. Create role-based RLS policies
-6. Create all B-tree and GIN indexes
-7. Attach `updated_at` triggers
-8. Attach audit triggers to all 6 tables
+Replace basic `APReconciliationView.tsx` with full SAP B1-style worksheet.
 
-No existing tables are modified -- this is purely additive.
+### New file: `APReconciliationWorksheet.tsx`
+- Same pattern as AR but for vendors
+- **Header**: Vendor selector, period range, vendor statement balance, display filter
+- **Table**: AP invoices (debits), AP payments (credits) with clearing checkboxes
+- **Summary footer**: Invoice/Payment totals on left, Book Balance vs Vendor Statement vs Difference on right
+- Follows same architecture as Bank Reconciliation Worksheet
+
+### Wire in `Accounting.tsx`:
+- Replace `APReconciliationView` import with `APReconciliationWorksheet`
+
+---
+
+## Part E: Petty Cash Reconciliation Worksheet
+
+### New file: `PettyCashReconciliationWorksheet.tsx`
+- **Header**: Fund selector (from `petty_cash_funds`), reconciliation date, physical cash count input
+- **Table**: All petty cash transactions with clearing checkboxes, showing running balance
+- **Summary footer**: Total disbursements, total replenishments, system balance, physical count, difference
+- **Actions**: Save reconciliation (inserts into `petty_cash_reconciliations` table)
+
+### Wire in `Accounting.tsx`:
+- Add "Petty Cash Reconciliation" tab in the banking module tabs
+
+---
+
+## Part F: Sub-Ledger to GL Reconciliation
+
+### New file: `SubLedgerReconciliationView.tsx`
+- **Header**: Reconciliation type selector (AR Sub-Ledger / AP Sub-Ledger), as-of date
+- **Table**: Each customer/vendor with sub-ledger balance alongside GL control account balance
+- **Summary**: Total sub-ledger balance, GL control account balance, difference
+- Fetches AR invoice balances summed by customer and compares against Trade Receivable GL account balance
+
+### Wire in `Accounting.tsx`:
+- Add in GL/Settings section
+
+---
+
+## Part G: Intercompany Reconciliation
+
+### New file: `IntercompanyReconciliationView.tsx`
+- **Header**: Select two business units, reconciliation date
+- **Table**: Intercompany transactions between units with clearing checkboxes
+- **Summary**: Unit A balance, Unit B balance, net difference
+
+### Wire in `Accounting.tsx`:
+- Add in GL section
+
+---
+
+## Part H: Shared Reconciliation CSS
+
+### New file: `ReconciliationWorksheet.css`
+- Extract and extend bank reconciliation CSS into shared stylesheet
+- Module-specific color accents: blue (bank), green (AR), orange (AP), purple (petty cash)
+- All new worksheet components import this shared CSS
+
+---
+
+## Technical Summary
+
+| File | Action |
+|------|--------|
+| `BankAccountForm.tsx` | Modified -- add edit mode |
+| `BankingView.tsx` | Modified -- add edit button to table |
+| `useAccountingMutations.ts` | Modified -- add `useUpdateBankAccount` |
+| `VendorForm.tsx` | Modified -- add banking details fields |
+| `ARReconciliationWorksheet.tsx` | New -- SAP B1-style AR worksheet |
+| `APReconciliationWorksheet.tsx` | New -- SAP B1-style AP worksheet |
+| `PettyCashReconciliationWorksheet.tsx` | New -- Petty cash worksheet |
+| `SubLedgerReconciliationView.tsx` | New -- Sub-ledger vs GL comparison |
+| `IntercompanyReconciliationView.tsx` | New -- Cross-unit reconciliation |
+| `ReconciliationWorksheet.css` | New -- Shared CSS for all worksheets |
+| `Accounting.tsx` | Modified -- wire new components, add new tabs |
