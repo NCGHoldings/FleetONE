@@ -31,12 +31,12 @@ async function fetchReportData(): Promise<YutongReportData> {
     supabase.from('yutong_shipment_groups').select('id, status, shipment_name'),
     supabase.from('yutong_shipments').select('id, status'),
     supabase.from('yutong_customs_declarations').select('id, customs_status'),
-    supabase.from('yutong_vehicle_processing').select('id, status'),
+    supabase.from('yutong_vehicle_processing').select('id, current_stage'),
     supabase.from('yutong_rmv_registrations').select('id, registration_status'),
     supabase.from('yutong_delivery_inspections').select('id, status'),
     supabase.from('yutong_delivery_confirmations').select('id'),
     supabase.from('yutong_customer_handovers').select('id, status'),
-    supabase.from('yutong_warranties').select('id, warranty_status'),
+    supabase.from('yutong_warranties').select('id, status'),
     supabase.from('yutong_support_tickets').select('id, status, priority'),
     supabase.from('yutong_service_reminders').select('id, service_completed, due_date'),
     supabase.from('yutong_customer_feedback').select('id, overall_rating'),
@@ -95,18 +95,18 @@ async function fetchReportData(): Promise<YutongReportData> {
   // Operations - customs_status, not declaration_status
   const inCustoms = customs.filter(c => !['cleared', 'completed', 'released'].includes(c.customs_status || '')).length;
   const customsCleared = customs.filter(c => ['cleared', 'completed', 'released'].includes(c.customs_status || '')).length;
-  // vehicle_processing uses 'status' not 'processing_status'
-  const inProcessing = processing.filter(p => !['completed', 'delivered'].includes(p.status || '')).length;
-  const processingComplete = processing.filter(p => ['completed', 'delivered'].includes(p.status || '')).length;
+  // vehicle_processing uses 'current_stage' enum
+  const inProcessing = processing.filter(p => !['completed', 'delivered'].includes(p.current_stage || '')).length;
+  const processingComplete = processing.filter(p => ['completed', 'delivered'].includes(p.current_stage || '')).length;
   const inRMV = rmv.filter(r => !['registered', 'completed'].includes(r.registration_status || '')).length;
   const rmvRegistered = rmv.filter(r => ['registered', 'completed'].includes(r.registration_status || '')).length;
 
-  // Delivery - delivery_inspections uses 'status', handovers use 'status'
-  const pendingInspections = inspections.filter(i => i.status !== 'passed' && i.status !== 'approved').length;
+  // Delivery - delivery_inspections status enum: approved|completed|failed|in_progress|pending
+  const pendingInspections = inspections.filter(i => i.status !== 'completed' && i.status !== 'approved').length;
   const handoverComplete = handovers.filter(h => h.status === 'completed').length;
 
-  // After Sales
-  const activeWarranties = warranties.filter(w => w.warranty_status === 'active').length;
+  // After Sales - warranties uses 'status' column
+  const activeWarranties = warranties.filter(w => w.status === 'active').length;
   const openTickets = tickets.filter(t => t.status !== 'closed' && t.status !== 'resolved').length;
   // service_reminders has no 'status' column - use service_completed boolean
   const pendingReminders = reminders.filter(r => !r.service_completed).length;
