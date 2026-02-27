@@ -26,7 +26,9 @@ export function YutongTopCustomers({ data }: Props) {
                   <th className="text-left py-2 px-2">Company</th>
                   <th className="text-left py-2 px-2">Contact</th>
                   <th className="text-right py-2 px-2">Orders</th>
+                  <th className="text-right py-2 px-2">Avg Order</th>
                   <th className="text-right py-2 px-2">Total Value</th>
+                  <th className="text-right py-2 px-2">Last Order</th>
                 </tr>
               </thead>
               <tbody>
@@ -36,7 +38,11 @@ export function YutongTopCustomers({ data }: Props) {
                     <td className="py-2 px-2 font-medium">{c.company_name}</td>
                     <td className="py-2 px-2 text-muted-foreground">{c.contact_person || '-'}</td>
                     <td className="text-right py-2 px-2">{c.orderCount}</td>
+                    <td className="text-right py-2 px-2 text-muted-foreground">{formatLKR(c.avgOrderValue)}</td>
                     <td className="text-right py-2 px-2 font-semibold">{formatLKR(c.totalValue)}</td>
+                    <td className="text-right py-2 px-2 text-muted-foreground text-xs">
+                      {c.lastOrderDate ? new Date(c.lastOrderDate).toLocaleDateString() : '-'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
