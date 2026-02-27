@@ -1,102 +1,72 @@
 
 
-# Fix AP Payment Voucher & Vendor Bank Accounts
+# Add Sri Lankan Cheque Print to AP Payments
 
-## Problems Identified (from the printed voucher photo)
+## Overview
+When an AP payment is made via cheque, add a functional "Print Cheque" button that opens a real Sri Lankan-format cheque layout, with all details auto-positioned for direct printing onto a physical cheque leaf.
 
-1. **Company name** shows "NCG Holding" but should be "NCG Holding (Pvt) Ltd"
-2. **Payment number** has random hash suffix (e.g., PAY-20260227-FZKU) -- the `-FZKU` part should be removed
-3. **No vendor bank details** on the voucher -- need to show vendor's bank name, branch, and account number
-4. **Vendors only support one bank account** -- need support for multiple bank accounts per vendor
-5. **No AP invoice description** on the voucher -- the reason/description from the AP invoice should appear in allocations
-6. **Notes & Terms** footer line "All transactions are subject to audit and verification" should be removed
+## What Changes
 
----
+### 1. Rebuild ChequePrintPreview for Sri Lankan Format
+**File: `src/components/accounting/ChequePrintPreview.tsx`**
 
-## Changes
+Replace the current card-style preview with an actual cheque-sized layout (17.5cm x 7.5cm) using absolute CSS positioning:
 
-### 1. Update Company Name in Database
-- Update `companies` table: "NCG Holding" to "NCG Holding (Pvt) Ltd"
-- Single SQL migration
+- **Date**: Top-right, each digit (DD/MM/YYYY) in individual boxes, spaced to match printed cheque cells
+- **Payee line**: "Pay __________ or bearer" with the vendor name positioned on the line
+- **Amount in words**: Two lines below payee, with "Rupees" prefix and "Only" at the end, using `numberToWords()`
+- **Amount in figures**: Right-side box with Rs. prefix and formatted number (e.g., "Rs. 125,000.00")
+- **Account payee crossing**: Two parallel diagonal lines in top-left corner with "A/C PAYEE ONLY" text (auto-added for amounts over Rs. 500,000 or togglable)
+- **MICR line area**: Bottom strip left blank (bank's pre-printed zone)
 
-### 2. Fix Payment Number Format
-- **File:** `src/components/accounting/APPaymentForm.tsx` (line 70)
-- Change from: `PAY-${format(new Date(), "yyyyMMdd")}-${Math.random()...FZKU}`
-- Change to: `PAY-${format(new Date(), "yyyyMMdd")}-${sequential_number}` (use `useGenerateNumber('ap_payment')` hook, same pattern as vendor codes)
+CSS `@media print` styles will:
+- Hide all UI chrome (dialog header, buttons)
+- Set exact page size to cheque dimensions
+- Remove margins/padding for precise alignment
+- Use `position: absolute` with cm-based coordinates for each field
 
-### 3. Create `vendor_bank_accounts` Table
-- New migration to create a table supporting multiple bank accounts per vendor:
-  - `id`, `vendor_id` (FK), `account_label` (e.g., "Primary", "USD Account"), `bank_name`, `bank_branch`, `account_number`, `account_holder_name`, `is_default`, `created_at`
-- Keep existing single `bank_name/bank_branch/bank_account` fields on `vendors` table for backward compatibility
+### 2. Wire Print Button in AP Payments View
+**File: `src/components/accounting/APPaymentsView.tsx`**
 
-### 4. Update Vendor Form -- Multiple Bank Accounts
-- **File:** `src/components/accounting/VendorForm.tsx`
-- Replace the single "Banking Details" section with a dynamic list
-- Add/Remove bank account rows with fields: Label, Bank Name, Branch, Account Number
-- One account can be marked as default
-- Save to new `vendor_bank_accounts` table
+- Add state: `printCheque` and `showChequePrint`
+- The existing Print button (line 283) will:
+  - Only be enabled/shown when `payment_method === 'cheque'`
+  - On click, populate `printCheque` with: `cheque_number`, `cheque_date`, `payee` (vendor name), `amount`, `bank_account_name`, `reference`
+- Render `<ChequePrintPreview>` at the bottom of the component
+- For non-cheque payments, the print icon opens the existing voucher preview instead
 
-### 5. Update AP Payment Form -- Vendor Bank Account Selector
-- **File:** `src/components/accounting/APPaymentForm.tsx`
-- After vendor is selected, fetch that vendor's bank accounts from `vendor_bank_accounts`
-- Show a "Pay To Account" dropdown listing the vendor's accounts (bank name + account number)
-- Store selected `vendor_bank_account_id` on the payment record (new column on `ap_payments`)
+### 3. Cheque Position Calibration Controls
+**Added to `ChequePrintPreview.tsx`**
 
-### 6. Update Payment Voucher Template
-- **File:** `src/lib/document-template-seeder.ts` (AP Payment Voucher section)
-- Add a new "Vendor Bank Details" card showing:
-  - Bank Name, Branch, Account Number, Account Holder
-- These use new placeholders: `{{vendor_bank_name}}`, `{{vendor_bank_branch}}`, `{{vendor_account_number}}`
-
-### 7. Update Allocations Table -- Add Invoice Description
-- **File:** `src/lib/document-template-utils.ts` (`generateAllocationsTable`)
-- Add a "Description" column pulling from `ap_invoices.notes` (the invoice description/reason)
-- Update the data query to join and include invoice notes
-
-### 8. Update Document Footer -- Remove Audit Line
-- **File:** `src/lib/document-template-seeder.ts` (`buildFooter` function)
-- Remove line: "1. All transactions are subject to audit and verification."
-- Keep only: "This document is electronically generated and remains valid with the associated digital logs."
-
-### 9. Update Placeholder Mapping
-- **File:** `src/lib/document-template-utils.ts` (ap_payment_voucher case)
-- Add new placeholders for vendor bank details from the selected vendor bank account
-- Add invoice description/notes to allocation data
-
----
+A small settings gear icon (hidden during print) that reveals offset adjustments:
+- Vertical offset (mm) and Horizontal offset (mm) sliders
+- These allow users to fine-tune alignment for their specific printer/cheque book
+- Values stored in `localStorage` so they persist across sessions
 
 ## Technical Details
 
-### New Database Migration
+### Cheque Dimensions (Sri Lankan Standard)
 ```text
--- vendor_bank_accounts table
-CREATE TABLE vendor_bank_accounts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  vendor_id UUID NOT NULL REFERENCES vendors(id),
-  account_label TEXT DEFAULT 'Primary',
-  bank_name TEXT NOT NULL,
-  bank_branch TEXT,
-  account_number TEXT NOT NULL,
-  account_holder_name TEXT,
-  is_default BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+Width: 175mm (~17.5cm)
+Height: 75mm (~7.5cm)
 
--- Add vendor_bank_account_id to ap_payments
-ALTER TABLE ap_payments ADD COLUMN vendor_bank_account_id UUID REFERENCES vendor_bank_accounts(id);
-
--- Update company name
-UPDATE companies SET name = 'NCG Holding (Pvt) Ltd' WHERE name = 'NCG Holding';
+Field positions (from top-left, in mm):
+- Date digits:        top: 8mm,  left: 120mm  (8 boxes, 6mm apart)
+- Payee name:         top: 22mm, left: 15mm,  width: 145mm
+- Amount words line1: top: 32mm, left: 5mm,   width: 130mm
+- Amount words line2: top: 40mm, left: 5mm,   width: 130mm
+- Amount figures box: top: 30mm, left: 140mm, width: 30mm
+- A/C Payee crossing: top: 2mm,  left: 2mm    (diagonal lines)
 ```
 
-### Files to Create
-- `src/hooks/useVendorBankAccounts.ts` -- CRUD hook for vendor bank accounts
+### Files Modified (2)
+- `src/components/accounting/ChequePrintPreview.tsx` -- Complete rewrite with Sri Lankan cheque layout
+- `src/components/accounting/APPaymentsView.tsx` -- Wire print button + conditional cheque print logic
 
-### Files to Modify (7)
-- `src/components/accounting/VendorForm.tsx` -- Multi-bank account management UI
-- `src/components/accounting/APPaymentForm.tsx` -- Vendor bank account selector + fix payment number
-- `src/lib/document-template-seeder.ts` -- Update payment voucher template + footer
-- `src/lib/document-template-utils.ts` -- Add vendor bank placeholders + allocation description column
-- `src/integrations/supabase/types.ts` -- Add vendor_bank_accounts type
-- Migration file for schema changes
+### Print Flow
+1. User records AP payment with method "Cheque" and enters cheque number/date
+2. In the payments list, the printer icon appears highlighted for cheque payments
+3. Click opens `ChequePrintPreview` with auto-populated fields positioned correctly
+4. User clicks "Print" which triggers `window.print()` with cheque-specific CSS
+5. Only the cheque content prints at exact dimensions, fitting a physical cheque leaf
 
