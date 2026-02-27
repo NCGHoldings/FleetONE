@@ -7,15 +7,17 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useBankAccounts, useBankTransactions, useLastReconciliation } from "@/hooks/useAccountingData";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useBankAccounts, useBankTransactionsForRecon, useLastReconciliation } from "@/hooks/useAccountingData";
 import { useSaveBankReconciliation } from "@/hooks/useAccountingMutations";
-import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle } from "lucide-react";
+import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, BookOpen, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import "./BankReconciliationWorksheet.css";
 import { BankStatementImportModal } from "./BankStatementImportModal";
 
 // ---------- Types ----------
 type DisplayFilter = "all" | "not_cleared" | "cleared";
+type ReconMode = "statement" | "book";
 
 interface ClearedState {
   [transactionId: string]: {
@@ -48,12 +50,30 @@ const typeVariant = (t: string): string => {
   }
 };
 
+const sourceLabel = (sourceType: string | null | undefined): { text: string; className: string } => {
+  switch (sourceType) {
+    case "ap_payment": return { text: "AP", className: "source-badge source-ap" };
+    case "ar_receipt": return { text: "AR", className: "source-badge source-ar" };
+    case "bank_fee": return { text: "FEE", className: "source-badge source-fee" };
+    case "inter_bank_transfer": return { text: "IBT", className: "source-badge source-ibt" };
+    case "statement_import": return { text: "STMT", className: "source-badge source-stmt" };
+    default: return { text: "MAN", className: "source-badge source-man" };
+  }
+};
+
 // ================ COMPONENT ================
 const BankReconciliationWorksheet = () => {
   // --- Data hooks ---
   const { data: bankAccounts = [], isLoading: acctLoading } = useBankAccounts();
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
-  const { data: transactions = [], isLoading: txnLoading } = useBankTransactions(selectedAccountId || undefined);
+  const [reconMode, setReconMode] = useState<ReconMode>("statement");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const { data: transactions = [], isLoading: txnLoading } = useBankTransactionsForRecon(
+    selectedAccountId || undefined,
+    fromDate || undefined,
+    toDate || undefined
+  );
   const { data: lastRecon } = useLastReconciliation(selectedAccountId);
   const saveReconciliation = useSaveBankReconciliation();
 
@@ -79,12 +99,18 @@ const BankReconciliationWorksheet = () => {
 
   const lastStatementBalance = lastRecon?.statement_balance ?? selectedAccount?.opening_balance ?? 0;
 
+  // In book recon mode, use bank account current_balance as the target
+  const targetBalance = useMemo(() => {
+    if (reconMode === "book") {
+      return selectedAccount?.current_balance ?? 0;
+    }
+    return parseFloat(statementBalance) || 0;
+  }, [reconMode, selectedAccount, statementBalance]);
+
   // Only show unreconciled transactions (or all if user wants to see previously cleared)
   const filteredTransactions = useMemo(() => {
     const base = transactions.filter((t) => {
-      // Always include previously unreconciled
       if (!t.is_reconciled) return true;
-      // If filter is "all" or "cleared", also show already-reconciled
       return displayFilter === "all" || displayFilter === "cleared";
     });
 
@@ -112,7 +138,6 @@ const BankReconciliationWorksheet = () => {
 
       const cs = clearedState[t.id];
       if (cs?.cleared) {
-        // Use cleared amount (payment = outflow, deposit = inflow)
         if (payment > 0) clearedPaymentTotal += cs.clearedAmount;
         if (deposit > 0) clearedDepositTotal += cs.clearedAmount;
       }
@@ -120,7 +145,7 @@ const BankReconciliationWorksheet = () => {
 
     const bookBalance = lastStatementBalance + depositTotal - paymentTotal;
     const clearedBookBalance = lastStatementBalance + clearedDepositTotal - clearedPaymentTotal;
-    const stmtEndBal = parseFloat(statementBalance) || 0;
+    const stmtEndBal = targetBalance;
     const difference = clearedBookBalance - stmtEndBal;
 
     return {
@@ -132,7 +157,7 @@ const BankReconciliationWorksheet = () => {
       stmtEndBal,
       difference,
     };
-  }, [transactions, clearedState, lastStatementBalance, statementBalance]);
+  }, [transactions, clearedState, lastStatementBalance, targetBalance]);
 
   // --- Handlers ---
   const handleAccountChange = useCallback((accountId: string) => {
@@ -165,7 +190,6 @@ const BankReconciliationWorksheet = () => {
   const handleSelectAll = useCallback(() => {
     const allCleared = filteredTransactions.every((t) => clearedState[t.id]?.cleared || t.is_reconciled);
     if (allCleared) {
-      // Uncheck all
       const next: ClearedState = {};
       Object.keys(clearedState).forEach((id) => {
         if (!filteredTransactions.find((t) => t.id === id)) {
@@ -174,7 +198,6 @@ const BankReconciliationWorksheet = () => {
       });
       setClearedState(next);
     } else {
-      // Check all unreconciled
       const next = { ...clearedState };
       filteredTransactions.forEach((t) => {
         if (!t.is_reconciled && !next[t.id]) {
@@ -188,7 +211,7 @@ const BankReconciliationWorksheet = () => {
 
   const handleSave = useCallback(async () => {
     if (!selectedAccountId) return toast.error("Select a bank account");
-    if (!statementBalance) return toast.error("Enter statement ending balance");
+    if (reconMode === "statement" && !statementBalance) return toast.error("Enter statement ending balance");
     if (!statementDate) return toast.error("Enter statement date");
 
     const clearedIds = Object.entries(clearedState)
@@ -216,7 +239,7 @@ const BankReconciliationWorksheet = () => {
     setClearedState({});
     setStatementNo("");
     setStatementBalance("");
-  }, [selectedAccountId, statementDate, statementNo, statementBalance, clearedState, summary, saveReconciliation]);
+  }, [selectedAccountId, reconMode, statementDate, statementNo, statementBalance, clearedState, summary, saveReconciliation]);
 
   const handleCancel = useCallback(() => {
     setClearedState({});
@@ -235,6 +258,13 @@ const BankReconciliationWorksheet = () => {
     setAdjType("bank_charge");
   }, [adjAmount, adjDescription]);
 
+  const isSaveDisabled = useMemo(() => {
+    if (saveReconciliation.isPending) return true;
+    if (Object.keys(clearedState).length === 0) return true;
+    if (reconMode === "statement" && !statementBalance) return true;
+    return false;
+  }, [saveReconciliation.isPending, clearedState, reconMode, statementBalance]);
+
   // --- Loading ---
   if (acctLoading) {
     return (
@@ -252,8 +282,23 @@ const BankReconciliationWorksheet = () => {
       {/* ========================= HEADER ========================= */}
       <CardHeader className="p-0">
         <div className="bank-recon-header">
+          {/* Recon Mode Tabs */}
+          <div className="bank-recon-header-field" style={{ minWidth: 240 }}>
+            <label>Reconciliation Mode</label>
+            <Tabs value={reconMode} onValueChange={(v) => setReconMode(v as ReconMode)}>
+              <TabsList className="h-8">
+                <TabsTrigger value="statement" className="text-xs gap-1 px-2">
+                  <CreditCard className="w-3 h-3" /> Statement
+                </TabsTrigger>
+                <TabsTrigger value="book" className="text-xs gap-1 px-2">
+                  <BookOpen className="w-3 h-3" /> Book
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
           {/* Account Code */}
-          <div className="bank-recon-header-field" >
+          <div className="bank-recon-header-field">
             <label>Account Code</label>
             <Select value={selectedAccountId || ""} onValueChange={handleAccountChange}>
               <SelectTrigger className="w-[260px]">
@@ -269,20 +314,22 @@ const BankReconciliationWorksheet = () => {
             </Select>
           </div>
 
-          {/* Statement No. */}
-          <div className="bank-recon-header-field">
-            <label>Statement No.</label>
-            <Input
-              value={statementNo}
-              onChange={(e) => setStatementNo(e.target.value)}
-              placeholder="e.g. 202602"
-              className="w-[140px]"
-            />
-          </div>
+          {/* Statement No. (only in statement mode) */}
+          {reconMode === "statement" && (
+            <div className="bank-recon-header-field">
+              <label>Statement No.</label>
+              <Input
+                value={statementNo}
+                onChange={(e) => setStatementNo(e.target.value)}
+                placeholder="e.g. 202602"
+                className="w-[140px]"
+              />
+            </div>
+          )}
 
           {/* Statement Date */}
           <div className="bank-recon-header-field">
-            <label>Statement Date</label>
+            <label>{reconMode === "statement" ? "Statement Date" : "Recon Date"}</label>
             <Input
               type="date"
               value={statementDate}
@@ -291,23 +338,53 @@ const BankReconciliationWorksheet = () => {
             />
           </div>
 
-          {/* Statement Ending Balance */}
-          <div className="bank-recon-header-field">
-            <label>Statement Ending Balance</label>
-            <Input
-              type="number"
-              step="0.01"
-              value={statementBalance}
-              onChange={(e) => setStatementBalance(e.target.value)}
-              placeholder="0.00"
-              className="w-[160px]"
-            />
-          </div>
+          {/* Statement Ending Balance (only in statement mode) */}
+          {reconMode === "statement" && (
+            <div className="bank-recon-header-field">
+              <label>Statement Ending Balance</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={statementBalance}
+                onChange={(e) => setStatementBalance(e.target.value)}
+                placeholder="0.00"
+                className="w-[160px]"
+              />
+            </div>
+          )}
+
+          {/* Book mode: show bank account balance */}
+          {reconMode === "book" && selectedAccount && (
+            <div className="bank-recon-header-field">
+              <label>Bank Account Balance</label>
+              <span className="value">LKR {fmt(selectedAccount.current_balance || 0)}</span>
+            </div>
+          )}
 
           {/* Last Statement Balance */}
           <div className="bank-recon-header-field">
             <label>Last Statement Bal.</label>
             <span className="value">LKR {fmt(lastStatementBalance)}</span>
+          </div>
+
+          {/* Date Range Filters */}
+          <div className="bank-recon-header-field">
+            <label>From Date</label>
+            <Input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-[140px]"
+            />
+          </div>
+          <div className="bank-recon-header-field">
+            <label>To Date</label>
+            <Input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-[140px]"
+            />
           </div>
 
           {/* Display Filter */}
@@ -367,10 +444,10 @@ const BankReconciliationWorksheet = () => {
                   />
                 </th>
                 <th className="w-[60px]">Type</th>
+                <th className="w-[60px]">Source</th>
                 <th className="w-[100px]">Date</th>
                 <th>Trans. No.</th>
                 <th>Ref. 1</th>
-                <th>Ref. 2</th>
                 <th className="num-col">Payment</th>
                 <th className="num-col">Deposit</th>
                 <th className="num-col w-[120px]">Cleared Amt</th>
@@ -384,6 +461,7 @@ const BankReconciliationWorksheet = () => {
                 const cs = clearedState[t.id];
                 const isCleared = cs?.cleared || t.is_reconciled;
                 const isAlreadyReconciled = !!t.is_reconciled;
+                const source = sourceLabel(t.source_type);
 
                 const rowClass = [
                   isCleared ? "row-cleared" : "",
@@ -408,16 +486,18 @@ const BankReconciliationWorksheet = () => {
                         {typeLabel(t.transaction_type)}
                       </span>
                     </td>
+                    <td>
+                      <span className={source.className}>{source.text}</span>
+                    </td>
                     <td>{t.transaction_date ? format(new Date(t.transaction_date), "dd/MM/yyyy") : "—"}</td>
                     <td className="font-mono text-xs">{t.reference || t.id.substring(0, 8)}</td>
                     <td>{t.cheque_number || "—"}</td>
-                    <td>{t.source_type || "—"}</td>
                     <td className="num-col">{payment > 0 ? `LKR ${fmt(payment)}` : "—"}</td>
                     <td className="num-col">{deposit > 0 ? `LKR ${fmt(deposit)}` : "—"}</td>
                     <td className="num-col">
                       {isCleared ? (
                         isAlreadyReconciled ? (
-                          <span className="text-green-600 font-semibold">
+                          <span className="font-semibold" style={{ color: "hsl(142 76% 30%)" }}>
                             LKR {fmt(payment > 0 ? payment : deposit)}
                           </span>
                         ) : (
@@ -460,7 +540,7 @@ const BankReconciliationWorksheet = () => {
             </div>
           </div>
 
-          {/* RIGHT: Cleared Book Balance / Statement Ending / Difference */}
+          {/* RIGHT: Cleared Book Balance / Target Balance / Difference */}
           <div className="bank-recon-summary-right">
             <div className="bank-recon-balance-row">
               <span className="balance-label">Cleared Book Balance</span>
@@ -469,7 +549,9 @@ const BankReconciliationWorksheet = () => {
               </span>
             </div>
             <div className="bank-recon-balance-row">
-              <span className="balance-label">Statement Ending Balance</span>
+              <span className="balance-label">
+                {reconMode === "statement" ? "Statement Ending Balance" : "Bank Account Balance"}
+              </span>
               <span className="balance-value neutral">
                 LKR {fmt(summary.stmtEndBal)}
               </span>
@@ -491,10 +573,12 @@ const BankReconciliationWorksheet = () => {
       {/* ========================= ACTION BUTTONS ========================= */}
       {selectedAccountId && (
         <div className="bank-recon-actions">
-          <Button variant="outline" onClick={() => setShowImportModal(true)}>
-            <Upload className="w-4 h-4 mr-2" />
-            Import Statement
-          </Button>
+          {reconMode === "statement" && (
+            <Button variant="outline" onClick={() => setShowImportModal(true)}>
+              <Upload className="w-4 h-4 mr-2" />
+              Import Statement
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setShowAdjustments(true)}>
             <SlidersHorizontal className="w-4 h-4 mr-2" />
             Adjustments
@@ -503,10 +587,7 @@ const BankReconciliationWorksheet = () => {
             <X className="w-4 h-4 mr-2" />
             Cancel
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={saveReconciliation.isPending || !statementBalance || Object.keys(clearedState).length === 0}
-          >
+          <Button onClick={handleSave} disabled={isSaveDisabled}>
             <Save className="w-4 h-4 mr-2" />
             {saveReconciliation.isPending ? "Saving…" : "Save"}
           </Button>
@@ -568,7 +649,6 @@ const BankReconciliationWorksheet = () => {
         onOpenChange={setShowImportModal}
         bankAccountId={selectedAccountId}
         onImportComplete={() => {
-          // Refresh transactions after import
           setClearedState({});
         }}
       />
