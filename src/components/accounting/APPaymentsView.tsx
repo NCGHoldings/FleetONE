@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, DollarSign, TrendingDown, Wallet, Eye, Printer, ArrowRightLeft, Landmark } from "lucide-react";
+import { ChequePrintPreview } from "./ChequePrintPreview";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
 import { useAPPayments, useVendors } from "@/hooks/useAccountingData";
 import { useBankFees } from "@/hooks/useBankFees";
@@ -30,6 +31,8 @@ export const APPaymentsView = () => {
   const [bankFeeOpen, setBankFeeOpen] = useState(false);
   const [feePaymentId, setFeePaymentId] = useState<string | undefined>();
   const [feeBankAccountId, setFeeBankAccountId] = useState<string | undefined>();
+  const [chequePrintOpen, setChequePrintOpen] = useState(false);
+  const [printCheque, setPrintCheque] = useState<any>(null);
 
   // Get vendor name helper
   const getVendorName = (vendorId: string) => {
@@ -91,6 +94,23 @@ export const APPaymentsView = () => {
     setFeePaymentId(payment.id);
     setFeeBankAccountId(payment.bank_account_id);
     setBankFeeOpen(true);
+  };
+
+  const handlePrintCheque = (payment: any) => {
+    if (payment.payment_method === "cheque") {
+      setPrintCheque({
+        cheque_number: payment.cheque_number || "",
+        cheque_date: payment.cheque_date || payment.payment_date,
+        payee: getVendorName(payment.vendor_id),
+        amount: payment.amount,
+        bank_account_name: payment.bank_account_id || "",
+        reference: payment.reference,
+      });
+      setChequePrintOpen(true);
+    } else {
+      // For non-cheque payments, open the voucher preview
+      handleViewPayment(payment);
+    }
   };
 
   const getStatusBadge = (payment: any) => {
@@ -280,7 +300,13 @@ export const APPaymentsView = () => {
                       <Button variant="ghost" size="icon" onClick={() => handleAddBankFee(payment)} title="Add Bank Fee">
                         <Landmark className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handlePrintCheque(payment)}
+                        title={payment.payment_method === "cheque" ? "Print Cheque" : "Print Voucher"}
+                        className={payment.payment_method === "cheque" ? "text-primary" : ""}
+                      >
                         <Printer className="h-4 w-4" />
                       </Button>
                       {payment.is_advance && (
@@ -323,6 +349,13 @@ export const APPaymentsView = () => {
           businessUnitCode={selectedPayment?.business_unit_code}
         />
       )}
+
+      {/* Cheque Print Preview */}
+      <ChequePrintPreview
+        open={chequePrintOpen}
+        onOpenChange={setChequePrintOpen}
+        cheque={printCheque}
+      />
     </div>
   );
 };
