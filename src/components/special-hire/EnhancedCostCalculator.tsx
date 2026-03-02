@@ -54,6 +54,8 @@ interface QuotationData {
   discount_amount_lkr?: number;
   total_additional_charges?: number;
   additional_charges?: any; // JSONB field - can be array or string
+  parking_location_id?: string;
+  fuel_price_per_liter?: number;
   trip_days?: number;
   standard_hours?: number;
   available_hours?: number;
@@ -256,14 +258,25 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
 
     // Fetch fuel settings for correct fuel price
     // Order by created_at ASC to get the oldest default record (matches FuelSettingsAdmin logic)
-    const { data: fuelSettingsArray } = await supabase
-      .from('fuel_settings')
-      .select('diesel_price_lkr_per_l, maintenance_rate_lkr_per_km')
-      .eq('is_default', true)
-      .order('created_at', { ascending: true })
-      .limit(1);
-
-    const fuelSettings = fuelSettingsArray?.[0] || null;
+    // Fetch fuel settings by quotation's parking location first, fallback to default
+    let fuelSettings: { diesel_price_lkr_per_l: number; maintenance_rate_lkr_per_km: number } | null = null;
+    if (quotation.parking_location_id) {
+      const { data: fuelSettingsByParking } = await supabase
+        .from('fuel_settings')
+        .select('diesel_price_lkr_per_l, maintenance_rate_lkr_per_km')
+        .eq('id', quotation.parking_location_id)
+        .limit(1);
+      fuelSettings = fuelSettingsByParking?.[0] || null;
+    }
+    if (!fuelSettings) {
+      const { data: fuelSettingsDefault } = await supabase
+        .from('fuel_settings')
+        .select('diesel_price_lkr_per_l, maintenance_rate_lkr_per_km')
+        .eq('is_default', true)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      fuelSettings = fuelSettingsDefault?.[0] || null;
+    }
 
       // Fetch post-trip adjustment if exists
       const { data: adjustment } = await supabase
@@ -280,7 +293,7 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         safeParseJSON(quotation.additional_charges, []);
 
       // Calculate base rate from rate card (NOT from hire_charge)
-      const fixedRate = rateCard?.flat_fee_lkr || 30000;
+      const fixedRate = quotation.fixed_rate || rateCard?.flat_fee_lkr || 0;
 
       // Calculate exceeding distance correctly
       const exceedingKmThreshold = rateCard?.exceeding_km_threshold || 100;
@@ -288,7 +301,7 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
       const exceedingKm = Math.max(0, tripDistance - exceedingKmThreshold);
       const exceedingDistanceCharge = exceedingKm * (rateCard?.exceeding_km_rate_lkr || 175);
 
-      const fuelPricePerLiter = fuelSettings?.diesel_price_lkr_per_l || 350;
+      const fuelPricePerLiter = quotation.fuel_price_per_liter || fuelSettings?.diesel_price_lkr_per_l || 277;
       const maintenanceRatePerKm = fuelSettings?.maintenance_rate_lkr_per_km || 20;
 
       // Recalculate commission on full pre-commission total (includes additional charges)
