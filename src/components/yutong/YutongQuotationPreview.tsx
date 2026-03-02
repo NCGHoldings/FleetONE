@@ -100,12 +100,31 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch bus model details if bus_model_id is available
-        if (quotation.bus_model_id) {
+        // Fetch bus model details - try quotation's bus_model_id first, then walk parent chain
+        let busModelId = quotation.bus_model_id;
+        
+        if (!busModelId && (quotation as any).parent_quotation_id) {
+          // Walk the parent chain to find a valid bus_model_id
+          let parentId = (quotation as any).parent_quotation_id;
+          for (let i = 0; i < 10 && parentId && !busModelId; i++) {
+            const { data: parentData } = await supabase
+              .from("yutong_quotations")
+              .select("bus_model_id, parent_quotation_id")
+              .eq("id", parentId)
+              .maybeSingle();
+            if (parentData?.bus_model_id) {
+              busModelId = parentData.bus_model_id;
+            } else {
+              parentId = parentData?.parent_quotation_id;
+            }
+          }
+        }
+
+        if (busModelId) {
           const { data: busData, error: busError } = await supabase
             .from("yutong_bus_models")
             .select("model_name, capacity, engine, manufactured_year, condition")
-            .eq("id", quotation.bus_model_id)
+            .eq("id", busModelId)
             .maybeSingle();
 
           if (busError) {
