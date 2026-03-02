@@ -1,90 +1,49 @@
 
+# Fix: Yutong Quotation Versions Showing N/A for Bus Model Details
 
-# Fix Special Hire Fuel Price and Hardcoded Fallback Issues
+## Problem
+29 existing versioned quotations (v1.1, v1.3, etc.) have `bus_model_id` and `seating_capacity` as NULL because they were created before the versioning fix. The preview correctly shows "N/A" instead of wrong data, but the actual fix is to populate the missing data.
 
-## Problems Found
-
-1. **Fuel price not stored with quotation**: The `special_hire_quotations` table does not store `fuel_price_per_liter`. When viewing old quotations in EnhancedCostCalculator, it re-fetches the *current* fuel price from `fuel_settings`. If fuel price changes (e.g., from 283 to 277), all old quotation cost breakdowns show wrong fuel costs.
-
-2. **Hardcoded fallback values throughout the code**: Multiple files use wrong hardcoded fallbacks that don't match actual database values:
-   - `|| 350` for fuel price (actual: 277-283 LKR)
-   - `|| 30000` for flat fee rate (may not match actual rate cards)
-   - `|| 175` for exceeding km rate
-   - `|| 100` for exceeding km threshold
-   - These kick in when the fuel settings or rate card query returns null, causing wrong amounts silently.
-
-3. **EnhancedCostCalculator fetches wrong fuel settings**: It queries `fuel_settings` by `is_default = true` instead of by the quotation's `parking_location_id`, so it can get a different parking location's fuel price.
-
-4. **CostBreakdown fallback**: `fuelPricePerLiter: data.fuelPricePerLiter || data.fuelPrice || 350` silently uses 350 if the value isn't passed.
+Some parent records are also NULL (chained versions like v1.1 -> v1.5 -> v1.6), so a simple one-level parent lookup won't work -- we need to trace up the entire chain to the root (v1.0) which has the correct `bus_model_id`.
 
 ## Solution
 
-### 1. Database Migration: Add `fuel_price_per_liter` column to quotations table
+### 1. Database Migration: Backfill missing bus_model_id using recursive parent chain
 
-Add a new column `fuel_price_per_liter` to `special_hire_quotations` to store the fuel price at the time of quotation creation. This ensures historical accuracy.
+Run a recursive CTE migration that traces each NULL record up to its root ancestor (the v1.0 with a valid `bus_model_id`), then updates all descendants:
 
-### 2. Store fuel price when creating/saving quotations
-**File: `src/components/special-hire/SpecialHireForm.tsx`**
-
-In the `quotationData` object (around line 1717), add:
-```
-fuel_price_per_liter: fuelSettings.diesel_price_lkr_per_l
-```
-This requires passing `fuelSettings` from `calculateCosts` back, or storing it in component state. The fuel settings are already fetched by parking location ID in `calculateCosts` -- we'll store the price in a ref/state so the submit handler can access it.
-
-### 3. Use stored fuel price in EnhancedCostCalculator
-**File: `src/components/special-hire/EnhancedCostCalculator.tsx`**
-
-Change line 291 from:
-```typescript
-const fuelPricePerLiter = fuelSettings?.diesel_price_lkr_per_l || 350;
-```
-To:
-```typescript
-const fuelPricePerLiter = quotation.fuel_price_per_liter || fuelSettings?.diesel_price_lkr_per_l || 277;
-```
-Prioritize the stored quotation value, fall back to current settings, use a more realistic default last.
-
-### 4. Fix EnhancedCostCalculator to use quotation's parking location
-**File: `src/components/special-hire/EnhancedCostCalculator.tsx`**
-
-Change the fuel settings query (lines 259-264) to fetch by the quotation's `parking_location_id` instead of `is_default`:
-```typescript
-const { data: fuelSettingsArray } = await supabase
-  .from('fuel_settings')
-  .select('diesel_price_lkr_per_l, maintenance_rate_lkr_per_km')
-  .eq('id', quotation.parking_location_id)  // Use quotation's parking
-  .limit(1);
-```
-With a fallback to `is_default` if parking_location_id is missing.
-
-### 5. Remove/update hardcoded fallbacks in CostBreakdown
-**File: `src/components/special-hire/CostBreakdown.tsx`**
-
-Change line 151:
-```typescript
-fuelPricePerLiter: data.fuelPricePerLiter || data.fuelPrice || 350,
-```
-To use 0 as fallback (so it's obvious something is wrong rather than silently using a wrong value):
-```typescript
-fuelPricePerLiter: data.fuelPricePerLiter || data.fuelPrice || 0,
+```sql
+WITH RECURSIVE chain AS (
+  SELECT id, parent_quotation_id, bus_model_id, seating_capacity, customer_id
+  FROM yutong_quotations
+  WHERE bus_model_id IS NOT NULL
+  UNION ALL
+  SELECT child.id, child.parent_quotation_id, chain.bus_model_id, chain.seating_capacity, COALESCE(child.customer_id, chain.customer_id)
+  FROM yutong_quotations child
+  JOIN chain ON child.parent_quotation_id = chain.id
+  WHERE child.bus_model_id IS NULL
+)
+UPDATE yutong_quotations q
+SET bus_model_id = chain.bus_model_id,
+    seating_capacity = chain.seating_capacity,
+    customer_id = COALESCE(q.customer_id, chain.customer_id)
+FROM chain
+WHERE q.id = chain.id AND q.bus_model_id IS NULL;
 ```
 
-### 6. Update fallbacks in EnhancedCostCalculator to use stored quotation values first
-**File: `src/components/special-hire/EnhancedCostCalculator.tsx`**
+This fixes all 29 existing records in one pass.
 
-For rate card fallbacks, use the quotation's stored values before hardcoded defaults:
-- `fixedRate`: Use `quotation.fixed_rate || rateCard?.flat_fee_lkr || 0` (line 283)
-- `exceedingDistanceCharge`: Use `quotation.exceeding_distance_charge` first (already partially done at line 329)
-- Remove the recalculation of exceeding distance when quotation already has it stored
+### 2. Preview Component Fallback: Look up parent's bus_model_id
 
-## Technical Summary
+**File: `src/components/yutong/YutongQuotationPreview.tsx`**
 
-### Database Change
-- Add `fuel_price_per_liter NUMERIC` column to `special_hire_quotations` (nullable, no default)
+In the `fetchData` function (around line 100-116), add a fallback: if `bus_model_id` is null but `parent_quotation_id` exists on the quotation, query the parent's `bus_model_id` and use that to fetch bus model details. This acts as a safety net for any edge cases the migration doesn't cover.
 
-### Files Modified (3)
-- `src/components/special-hire/SpecialHireForm.tsx` -- Store fuel_price_per_liter on save, capture fuelSettings in state
-- `src/components/special-hire/EnhancedCostCalculator.tsx` -- Use stored fuel price, fix parking location query, fix hardcoded fallbacks
-- `src/components/special-hire/CostBreakdown.tsx` -- Fix fallback from 350 to 0
+This requires adding `parent_quotation_id` to the `YutongQuotation` interface and updating the fetch logic to:
+1. Try `quotation.bus_model_id` first (normal path)
+2. If null, query the parent chain to find a valid `bus_model_id`
+3. Fetch bus model details using whichever ID was found
 
+### Files Modified
+- **New migration SQL** -- Recursive backfill of bus_model_id, seating_capacity, customer_id
+- **`src/components/yutong/YutongQuotationPreview.tsx`** -- Add parent chain fallback for bus_model_id lookup
