@@ -1,34 +1,44 @@
 
-
-# Add Bank Details to Vendor Master Create/Edit Form
+# Fix: Quotation Versioning Loses Bus Model Data
 
 ## Problem
-The Vendor Master view (`VendorMasterView.tsx`) uses its own inline form for creating/editing vendors. This form does NOT include the bank account fields that were added to the separate `VendorForm.tsx` component. So when users create or edit vendors from the main Vendors tab, they cannot add bank payment details.
+When a Yutong quotation is edited (creating a new version like v1.1), critical fields are **not copied** from the original quotation to the new version:
+- `bus_model_id` (null in v1.1 -- this is the link to the bus model database)
+- `seating_capacity` (null in v1.1)
+- `customer_id` (not carried over)
 
-## Solution
-Add the multi-bank-account section directly into the `VendorMasterView.tsx` dialog form, matching the same functionality already in `VendorForm.tsx`. This ensures bank details are captured at vendor creation time and flow through to AP payments and payment voucher documents.
+Because `bus_model_id` is null, the Quotation Preview component cannot look up the actual bus model details and falls back to **hardcoded defaults**: capacity "37+1+1", engine "YUCHAI-YC6A270-50 (Euro V)", year "2025". These are wrong for models like the C12 Pro (which is 51+1+1, WEICHAI, 2026).
 
-## Changes
+## Root Cause
+In `src/components/yutong/YutongEditQuotationModal.tsx` (line 316-356), the version insert statement copies `bus_model` (text) but **omits** `bus_model_id`, `seating_capacity`, and `customer_id`.
 
-### File: `src/components/accounting/VendorMasterView.tsx`
+## Fix
 
-1. **Import hooks**: Add imports for `useVendorBankAccounts` and `useSaveVendorBankAccounts` from `useVendorBankAccounts.ts`, plus `Star` and `Trash2` icons (Trash2 already imported).
+### File: `src/components/yutong/YutongEditQuotationModal.tsx`
 
-2. **Add bank account state**: Add a `bankAccounts` state array (same `BankAccountRow` shape as VendorForm) and helper functions (`addBankAccount`, `removeBankAccount`, `updateBankAccount`).
+Add the missing fields to the new-version insert object (around line 326):
 
-3. **Load existing bank accounts on edit**: When `handleEdit` is called, fetch the vendor's bank accounts using `useVendorBankAccounts` and populate the state.
+```typescript
+bus_model: quotation.bus_model,
+bus_model_id: quotation.bus_model_id,        // ADD THIS
+seating_capacity: quotation.seating_capacity, // ADD THIS
+customer_id: quotation.customer_id,           // ADD THIS
+```
 
-4. **Add bank account UI section**: Insert a "Banking Details" section between the Address field and the Cancel/Create buttons, with:
-   - "Add Account" button
-   - Dynamic rows with: Account Label, Bank Name, Branch, Account Number, Account Holder, Default toggle, Remove button
-   - Same layout as `VendorForm.tsx` lines 376-471
+This is a 3-line addition. No other files need changes -- the preview already correctly reads from `bus_model_id` when it exists; it just wasn't being passed through during versioning.
 
-5. **Save bank accounts on submit**: After successful vendor create/update, call `saveBankAccounts.mutateAsync()` with the vendor ID and bank account rows (same logic as VendorForm lines 170-175).
+### Secondary Fix: Remove Hardcoded Fallbacks in Preview
 
-6. **Reset bank accounts**: Clear `bankAccounts` state in `resetForm()`.
+**File: `src/components/yutong/YutongQuotationPreview.tsx`** (lines 78-92)
 
-7. **Enlarge dialog**: Change `max-w-lg` to `max-w-2xl` and add `max-h-[85vh] overflow-y-auto` to accommodate the bank details section.
+The fallback values are misleading. Change them to show "N/A" or empty instead of specific wrong model data:
 
-### No other files need changes
-The AP Payment form already reads from `vendor_bank_accounts` and shows the "Pay To Account" selector. The payment voucher template already maps vendor bank placeholders. This change just ensures bank details can be entered at vendor creation time through the primary vendor form.
+- Change `"37+1+1"` fallback to `quotation.seating_capacity || "N/A"`
+- Change `"YUCHAI-YC6A270-50 (Euro V)"` fallback to `"N/A"`
+- Change `"2025"` fallback to `"N/A"`
 
+This prevents any future quotation from showing wrong specs if the model link is missing for any reason.
+
+### Files Modified (2)
+- `src/components/yutong/YutongEditQuotationModal.tsx` -- Add 3 missing fields to version insert
+- `src/components/yutong/YutongQuotationPreview.tsx` -- Replace misleading hardcoded fallbacks with "N/A"
