@@ -1,44 +1,90 @@
 
-# Fix: Quotation Versioning Loses Bus Model Data
 
-## Problem
-When a Yutong quotation is edited (creating a new version like v1.1), critical fields are **not copied** from the original quotation to the new version:
-- `bus_model_id` (null in v1.1 -- this is the link to the bus model database)
-- `seating_capacity` (null in v1.1)
-- `customer_id` (not carried over)
+# Fix Special Hire Fuel Price and Hardcoded Fallback Issues
 
-Because `bus_model_id` is null, the Quotation Preview component cannot look up the actual bus model details and falls back to **hardcoded defaults**: capacity "37+1+1", engine "YUCHAI-YC6A270-50 (Euro V)", year "2025". These are wrong for models like the C12 Pro (which is 51+1+1, WEICHAI, 2026).
+## Problems Found
 
-## Root Cause
-In `src/components/yutong/YutongEditQuotationModal.tsx` (line 316-356), the version insert statement copies `bus_model` (text) but **omits** `bus_model_id`, `seating_capacity`, and `customer_id`.
+1. **Fuel price not stored with quotation**: The `special_hire_quotations` table does not store `fuel_price_per_liter`. When viewing old quotations in EnhancedCostCalculator, it re-fetches the *current* fuel price from `fuel_settings`. If fuel price changes (e.g., from 283 to 277), all old quotation cost breakdowns show wrong fuel costs.
 
-## Fix
+2. **Hardcoded fallback values throughout the code**: Multiple files use wrong hardcoded fallbacks that don't match actual database values:
+   - `|| 350` for fuel price (actual: 277-283 LKR)
+   - `|| 30000` for flat fee rate (may not match actual rate cards)
+   - `|| 175` for exceeding km rate
+   - `|| 100` for exceeding km threshold
+   - These kick in when the fuel settings or rate card query returns null, causing wrong amounts silently.
 
-### File: `src/components/yutong/YutongEditQuotationModal.tsx`
+3. **EnhancedCostCalculator fetches wrong fuel settings**: It queries `fuel_settings` by `is_default = true` instead of by the quotation's `parking_location_id`, so it can get a different parking location's fuel price.
 
-Add the missing fields to the new-version insert object (around line 326):
+4. **CostBreakdown fallback**: `fuelPricePerLiter: data.fuelPricePerLiter || data.fuelPrice || 350` silently uses 350 if the value isn't passed.
 
+## Solution
+
+### 1. Database Migration: Add `fuel_price_per_liter` column to quotations table
+
+Add a new column `fuel_price_per_liter` to `special_hire_quotations` to store the fuel price at the time of quotation creation. This ensures historical accuracy.
+
+### 2. Store fuel price when creating/saving quotations
+**File: `src/components/special-hire/SpecialHireForm.tsx`**
+
+In the `quotationData` object (around line 1717), add:
+```
+fuel_price_per_liter: fuelSettings.diesel_price_lkr_per_l
+```
+This requires passing `fuelSettings` from `calculateCosts` back, or storing it in component state. The fuel settings are already fetched by parking location ID in `calculateCosts` -- we'll store the price in a ref/state so the submit handler can access it.
+
+### 3. Use stored fuel price in EnhancedCostCalculator
+**File: `src/components/special-hire/EnhancedCostCalculator.tsx`**
+
+Change line 291 from:
 ```typescript
-bus_model: quotation.bus_model,
-bus_model_id: quotation.bus_model_id,        // ADD THIS
-seating_capacity: quotation.seating_capacity, // ADD THIS
-customer_id: quotation.customer_id,           // ADD THIS
+const fuelPricePerLiter = fuelSettings?.diesel_price_lkr_per_l || 350;
+```
+To:
+```typescript
+const fuelPricePerLiter = quotation.fuel_price_per_liter || fuelSettings?.diesel_price_lkr_per_l || 277;
+```
+Prioritize the stored quotation value, fall back to current settings, use a more realistic default last.
+
+### 4. Fix EnhancedCostCalculator to use quotation's parking location
+**File: `src/components/special-hire/EnhancedCostCalculator.tsx`**
+
+Change the fuel settings query (lines 259-264) to fetch by the quotation's `parking_location_id` instead of `is_default`:
+```typescript
+const { data: fuelSettingsArray } = await supabase
+  .from('fuel_settings')
+  .select('diesel_price_lkr_per_l, maintenance_rate_lkr_per_km')
+  .eq('id', quotation.parking_location_id)  // Use quotation's parking
+  .limit(1);
+```
+With a fallback to `is_default` if parking_location_id is missing.
+
+### 5. Remove/update hardcoded fallbacks in CostBreakdown
+**File: `src/components/special-hire/CostBreakdown.tsx`**
+
+Change line 151:
+```typescript
+fuelPricePerLiter: data.fuelPricePerLiter || data.fuelPrice || 350,
+```
+To use 0 as fallback (so it's obvious something is wrong rather than silently using a wrong value):
+```typescript
+fuelPricePerLiter: data.fuelPricePerLiter || data.fuelPrice || 0,
 ```
 
-This is a 3-line addition. No other files need changes -- the preview already correctly reads from `bus_model_id` when it exists; it just wasn't being passed through during versioning.
+### 6. Update fallbacks in EnhancedCostCalculator to use stored quotation values first
+**File: `src/components/special-hire/EnhancedCostCalculator.tsx`**
 
-### Secondary Fix: Remove Hardcoded Fallbacks in Preview
+For rate card fallbacks, use the quotation's stored values before hardcoded defaults:
+- `fixedRate`: Use `quotation.fixed_rate || rateCard?.flat_fee_lkr || 0` (line 283)
+- `exceedingDistanceCharge`: Use `quotation.exceeding_distance_charge` first (already partially done at line 329)
+- Remove the recalculation of exceeding distance when quotation already has it stored
 
-**File: `src/components/yutong/YutongQuotationPreview.tsx`** (lines 78-92)
+## Technical Summary
 
-The fallback values are misleading. Change them to show "N/A" or empty instead of specific wrong model data:
+### Database Change
+- Add `fuel_price_per_liter NUMERIC` column to `special_hire_quotations` (nullable, no default)
 
-- Change `"37+1+1"` fallback to `quotation.seating_capacity || "N/A"`
-- Change `"YUCHAI-YC6A270-50 (Euro V)"` fallback to `"N/A"`
-- Change `"2025"` fallback to `"N/A"`
+### Files Modified (3)
+- `src/components/special-hire/SpecialHireForm.tsx` -- Store fuel_price_per_liter on save, capture fuelSettings in state
+- `src/components/special-hire/EnhancedCostCalculator.tsx` -- Use stored fuel price, fix parking location query, fix hardcoded fallbacks
+- `src/components/special-hire/CostBreakdown.tsx` -- Fix fallback from 350 to 0
 
-This prevents any future quotation from showing wrong specs if the model link is missing for any reason.
-
-### Files Modified (2)
-- `src/components/yutong/YutongEditQuotationModal.tsx` -- Add 3 missing fields to version insert
-- `src/components/yutong/YutongQuotationPreview.tsx` -- Replace misleading hardcoded fallbacks with "N/A"
