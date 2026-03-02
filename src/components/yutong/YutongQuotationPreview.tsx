@@ -14,6 +14,7 @@ interface YutongQuotation {
   contact_person?: string;
   bus_model: string;
   bus_model_id?: string;
+  seating_capacity?: string;
   quantity: number;
   unit_price: number;
   total_price: number;
@@ -75,19 +76,19 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
     if (busModelDetails) {
       return {
         model: busModelDetails.model_name || quotation.bus_model,
-        seating: busModelDetails.capacity ? `${busModelDetails.capacity}` : "37+1+1",
-        engine: busModelDetails.engine || "YUCHAI-YC6A270-50 (Euro V)",
-        year: busModelDetails.manufactured_year?.toString() || "2025",
+        seating: busModelDetails.capacity ? `${busModelDetails.capacity}` : (quotation.seating_capacity || "N/A"),
+        engine: busModelDetails.engine || "N/A",
+        year: busModelDetails.manufactured_year?.toString() || "N/A",
         condition: busModelDetails.condition || "BRAND NEW",
       };
     }
 
     // Fallback values when bus model details are not available
     return {
-      model: quotation.bus_model || "ZK6907H",
-      seating: "37+1+1",
-      engine: "YUCHAI-YC6A270-50 (Euro V)",
-      year: "2025",
+      model: quotation.bus_model || "N/A",
+      seating: quotation.seating_capacity || "N/A",
+      engine: "N/A",
+      year: "N/A",
       condition: "BRAND NEW",
     };
   };
