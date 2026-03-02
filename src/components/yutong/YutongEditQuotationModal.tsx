@@ -62,6 +62,9 @@ interface YutongQuotation {
   representative_name?: string;
   designation?: string;
   bus_model: string;
+  bus_model_id?: string;
+  seating_capacity?: string;
+  customer_id?: string;
   quantity: number;
   unit_price: number;
   discount_amount?: number;
@@ -324,6 +327,9 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
           edit_reason: editConfig.editReason,
           is_active_version: true,
           bus_model: quotation.bus_model,
+          bus_model_id: quotation.bus_model_id,
+          seating_capacity: quotation.seating_capacity,
+          customer_id: quotation.customer_id,
           customer_name: data.customer_name,
           customer_phone: data.customer_phone,
           customer_email: data.customer_email || null,
