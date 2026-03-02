@@ -19712,6 +19712,7 @@ export type Database = {
           finance_customer_id: string | null
           fixed_rate: number | null
           fuel_cost_fuel_only: number | null
+          fuel_price_per_liter: number | null
           gross_revenue: number | null
           hire_charge: number | null
           hire_type: string
@@ -19811,6 +19812,7 @@ export type Database = {
           finance_customer_id?: string | null
           fixed_rate?: number | null
           fuel_cost_fuel_only?: number | null
+          fuel_price_per_liter?: number | null
           gross_revenue?: number | null
           hire_charge?: number | null
           hire_type: string
@@ -19910,6 +19912,7 @@ export type Database = {
           finance_customer_id?: string | null
           fixed_rate?: number | null
           fuel_cost_fuel_only?: number | null
+          fuel_price_per_liter?: number | null
           gross_revenue?: number | null
           hire_charge?: number | null
           hire_type?: string

@@ -1768,6 +1768,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         total_additional_charges: costs.total_additional_charges,
         total_expenses: costs.total_expenses,
         net_profit: costs.net_profit,
+        fuel_price_per_liter: costData?.fuelPricePerLiter || null,
         customer_total_with_fuel: costs.customerTotalWithFuel ?? costData?.customerTotalWithFuel,
         bus_fleet_details: isMultiBusMode && costs.bus_fleet_details
           ? JSON.stringify(
