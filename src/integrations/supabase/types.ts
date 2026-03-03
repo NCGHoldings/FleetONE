@@ -5402,6 +5402,77 @@ export type Database = {
           },
         ]
       }
+      customer_categories: {
+        Row: {
+          advance_account_id: string | null
+          ar_account_id: string | null
+          category_code: string
+          category_name: string
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          revenue_account_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          advance_account_id?: string | null
+          ar_account_id?: string | null
+          category_code: string
+          category_name: string
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          revenue_account_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          advance_account_id?: string | null
+          ar_account_id?: string | null
+          category_code?: string
+          category_name?: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          revenue_account_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_categories_advance_account_id_fkey"
+            columns: ["advance_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_categories_ar_account_id_fkey"
+            columns: ["ar_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_categories_revenue_account_id_fkey"
+            columns: ["revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_portal_access: {
         Row: {
           created_at: string | null
@@ -5628,6 +5699,7 @@ export type Database = {
           credit_limit: number | null
           credit_used: number | null
           currency: string | null
+          customer_category_id: string | null
           customer_code: string
           customer_name: string
           customer_type: string | null
@@ -5652,6 +5724,7 @@ export type Database = {
           credit_limit?: number | null
           credit_used?: number | null
           currency?: string | null
+          customer_category_id?: string | null
           customer_code: string
           customer_name: string
           customer_type?: string | null
@@ -5676,6 +5749,7 @@ export type Database = {
           credit_limit?: number | null
           credit_used?: number | null
           currency?: string | null
+          customer_category_id?: string | null
           customer_code?: string
           customer_name?: string
           customer_type?: string | null
@@ -5702,6 +5776,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_customer_category_id_fkey"
+            columns: ["customer_category_id"]
+            isOneToOne: false
+            referencedRelation: "customer_categories"
             referencedColumns: ["id"]
           },
         ]

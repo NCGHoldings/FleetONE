@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateCustomer, useUpdateCustomer } from "@/hooks/useAccountingMutations";
 import { useGenerateNumber } from "@/hooks/useNumbering";
+import { useActiveCustomerCategories } from "@/hooks/useCustomerCategories";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
@@ -22,6 +23,7 @@ const formSchema = z.object({
   payment_terms: z.number().optional(),
   tax_id: z.string().optional(),
   is_active: z.boolean(),
+  customer_category_id: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -35,6 +37,7 @@ export const CustomerForm = ({ customer, onSuccess }: CustomerFormProps) => {
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
   const generateNumber = useGenerateNumber();
+  const { data: categories } = useActiveCustomerCategories();
   const isEditing = !!customer;
   const [isGenerating, setIsGenerating] = useState(!isEditing);
 
@@ -50,6 +53,7 @@ export const CustomerForm = ({ customer, onSuccess }: CustomerFormProps) => {
       payment_terms: customer?.payment_terms || "net_30",
       tax_id: customer?.tax_id || "",
       is_active: customer?.is_active ?? true,
+      customer_category_id: customer?.customer_category_id || "",
     },
   });
 
@@ -74,6 +78,7 @@ export const CustomerForm = ({ customer, onSuccess }: CustomerFormProps) => {
       payment_terms: data.payment_terms,
       tax_id: data.tax_id,
       is_active: data.is_active,
+      customer_category_id: data.customer_category_id || null,
     };
     if (isEditing) {
       await updateCustomer.mutateAsync({ id: customer.id, ...payload });
@@ -175,6 +180,35 @@ export const CustomerForm = ({ customer, onSuccess }: CustomerFormProps) => {
               <FormControl>
                 <Textarea placeholder="Street, City, Country" {...field} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="customer_category_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Customer Category</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || ""}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category (optional)" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="">No Category (use global defaults)</SelectItem>
+                  {categories?.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.category_code} - {cat.category_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                Determines which GL accounts are used for this customer's AR postings
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
