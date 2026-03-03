@@ -32,6 +32,7 @@ import { NCGExpressFinanceSettings } from "@/components/settings/NCGExpressFinan
 import { LeasingFinanceSettings } from "@/components/settings/LeasingFinanceSettings";
 import { ModuleFinanceSettingsView } from "@/components/settings/ModuleFinanceSettingsView";
 import { CoreGLSettings } from "@/components/settings/CoreGLSettings";
+import { CustomerCategoryManagement } from "@/components/accounting/CustomerCategoryManagement";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -167,6 +168,10 @@ export default function Settings() {
           <TabsTrigger value="core-gl-settings" className="flex items-center gap-1">
             <Settings2 className="h-3 w-3" />
             Core GL Settings
+          </TabsTrigger>
+          <TabsTrigger value="customer-categories" className="flex items-center gap-1">
+            <Tag className="h-3 w-3" />
+            Customer Categories
           </TabsTrigger>
           <TabsTrigger value="module-finance" className="flex items-center gap-1">
             <Wallet className="h-3 w-3" />
@@ -644,6 +649,10 @@ export default function Settings() {
 
         <TabsContent value="core-gl-settings" className="space-y-6 mt-6">
           <CoreGLSettings />
+        </TabsContent>
+
+        <TabsContent value="customer-categories" className="space-y-6 mt-6">
+          <CustomerCategoryManagement />
         </TabsContent>
 
         <TabsContent value="module-finance" className="space-y-6 mt-6">

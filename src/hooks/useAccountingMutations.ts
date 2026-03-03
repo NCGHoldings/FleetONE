@@ -384,20 +384,28 @@ export const useCreateARInvoice = () => {
 
       // ========== AUTO GL POSTING: DR Trade Receivable, CR Sales Revenue ==========
       try {
-        const { data: glSettings } = await (supabase as any)
-          .from("gl_settings")
-          .select("trade_receivable_account_id, sales_revenue_account_id")
-          .eq("company_id", effectiveCompanyId)
-          .maybeSingle();
+        const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
+        const resolved = await resolveCustomerARAccounts(invoice.customer_id, effectiveCompanyId);
 
-        if (glSettings?.trade_receivable_account_id && glSettings?.sales_revenue_account_id && invoice.total_amount > 0) {
+        // Fallback to global settings if resolution didn't find revenue account
+        let revenueAccountId = resolved.revenueAccountId;
+        if (!revenueAccountId) {
+          const { data: glSettings } = await (supabase as any)
+            .from("gl_settings")
+            .select("sales_revenue_account_id")
+            .eq("company_id", effectiveCompanyId)
+            .maybeSingle();
+          revenueAccountId = glSettings?.sales_revenue_account_id || null;
+        }
+
+        if (resolved.arAccountId && revenueAccountId && invoice.total_amount > 0) {
           const { postARInvoiceToGL } = await import("@/lib/gl-posting-utils");
           const glResult = await postARInvoiceToGL({
             invoiceNumber: invoice.invoice_number,
             invoiceDate: invoice.invoice_date,
             totalAmount: invoice.total_amount,
-            tradeReceivableId: glSettings.trade_receivable_account_id,
-            salesRevenueId: glSettings.sales_revenue_account_id,
+            tradeReceivableId: resolved.arAccountId,
+            salesRevenueId: revenueAccountId,
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
           });
@@ -517,17 +525,10 @@ export const useCreateARReceipt = () => {
         bankGLAccountId = bankAccount?.gl_account_id || null;
       }
 
-      // Find Trade Receivable account from COA
-      const { data: receivableAccounts } = await supabase
-        .from("chart_of_accounts")
-        .select("id, account_name")
-        .eq("company_id", effectiveCompanyId)
-        .eq("account_type", "asset")
-        .eq("is_active", true)
-        .ilike("account_name", "%trade receivable%")
-        .limit(1);
-
-      const tradeReceivableId = receivableAccounts?.[0]?.id || null;
+      // Find Trade Receivable and Advance accounts via customer category resolution
+      const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
+      const resolved = await resolveCustomerARAccounts(receipt.customer_id, effectiveCompanyId);
+      const tradeReceivableId = resolved.arAccountId;
 
       // Get customer name for GL posting description
       let customerName = "";
@@ -549,17 +550,19 @@ export const useCreateARReceipt = () => {
         let glResult: { success: boolean; journalEntryId?: string; error?: string };
 
         if (receipt.is_advance) {
-          // Find Customer Advance (Liability) account
-          const { data: advanceAccounts } = await supabase
-            .from("chart_of_accounts")
-            .select("id")
-            .eq("company_id", effectiveCompanyId)
-            .eq("account_type", "liability")
-            .eq("is_active", true)
-            .ilike("account_name", "%customer advance%")
-            .limit(1);
-
-          const customerAdvanceId = advanceAccounts?.[0]?.id;
+          // Use resolved advance account or fallback to COA search
+          let customerAdvanceId = resolved.advanceAccountId;
+          if (!customerAdvanceId) {
+            const { data: advanceAccounts } = await supabase
+              .from("chart_of_accounts")
+              .select("id")
+              .eq("company_id", effectiveCompanyId)
+              .eq("account_type", "liability")
+              .eq("is_active", true)
+              .ilike("account_name", "%customer advance%")
+              .limit(1);
+            customerAdvanceId = advanceAccounts?.[0]?.id || null;
+          }
 
           if (customerAdvanceId) {
             glResult = await postAdvanceReceiptToGL({
