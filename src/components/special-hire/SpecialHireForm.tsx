@@ -1437,7 +1437,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         total_additional_charges: Math.round(totalAdditionalCharges),
         total_expenses: Math.round(totalExpenses),
         net_profit: Math.round(netProfit),
-        customerTotalWithFuel: Math.round(finalCustomerTotal)
+        customerTotalWithFuel: Math.round(finalCustomerTotal),
+        fuel_price_per_liter: fuelSettings.diesel_price_lkr_per_l,
       };
 
       // Also set display data for UI
@@ -1674,6 +1675,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           overtime_charge: initialData.overtime_charge ?? 0,
           overnight_charge: initialData.overnight_charge ?? 0,
           exceeding_distance_charge: initialData.exceeding_distance_charge ?? 0,
+          fuel_price_per_liter: initialData.fuel_price_per_liter,
         };
 
         distanceData = {
@@ -1768,7 +1770,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         total_additional_charges: costs.total_additional_charges,
         total_expenses: costs.total_expenses,
         net_profit: costs.net_profit,
-        fuel_price_per_liter: costData?.fuelPricePerLiter || null,
+        fuel_price_per_liter: costs.fuel_price_per_liter || costData?.fuelPricePerLiter || null,
         customer_total_with_fuel: costs.customerTotalWithFuel ?? costData?.customerTotalWithFuel,
         bus_fleet_details: isMultiBusMode && costs.bus_fleet_details
           ? JSON.stringify(

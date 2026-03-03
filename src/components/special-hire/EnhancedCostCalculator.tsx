@@ -56,6 +56,7 @@ interface QuotationData {
   additional_charges?: any; // JSONB field - can be array or string
   parking_location_id?: string;
   fuel_price_per_liter?: number;
+  customer_total_with_fuel?: number;
   trip_days?: number;
   standard_hours?: number;
   available_hours?: number;
@@ -293,13 +294,13 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         safeParseJSON(quotation.additional_charges, []);
 
       // Calculate base rate from rate card (NOT from hire_charge)
-      const fixedRate = quotation.fixed_rate || rateCard?.flat_fee_lkr || 0;
+      const fixedRate = quotation.fixed_rate ?? rateCard?.flat_fee_lkr ?? 0;
 
       // Calculate exceeding distance correctly
       const exceedingKmThreshold = rateCard?.exceeding_km_threshold || 100;
       const tripDistance = quotation.km_trip || 0;
       const exceedingKm = Math.max(0, tripDistance - exceedingKmThreshold);
-      const exceedingDistanceCharge = exceedingKm * (rateCard?.exceeding_km_rate_lkr || 175);
+      const exceedingDistanceCharge = exceedingKm * (rateCard?.exceeding_km_rate_lkr ?? 0);
 
       const fuelPricePerLiter = quotation.fuel_price_per_liter || fuelSettings?.diesel_price_lkr_per_l || 277;
       const maintenanceRatePerKm = fuelSettings?.maintenance_rate_lkr_per_km || 20;
@@ -336,10 +337,10 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
       
       // Prepare the cost breakdown data from the quotation to match CostBreakdown props
       // Use stored values first, then recalculate as fallback for historical data
-      const storedFixedRate = quotation.fixed_rate || fixedRate;
-      let storedOvertimeCharge = quotation.overtime_charge || 0;
-      let storedOvernightCharge = quotation.overnight_charge || 0;
-      const storedExceedingDistanceCharge = quotation.exceeding_distance_charge || exceedingDistanceCharge;
+      const storedFixedRate = quotation.fixed_rate ?? fixedRate;
+      let storedOvertimeCharge = quotation.overtime_charge ?? 0;
+      let storedOvernightCharge = quotation.overnight_charge ?? 0;
+      const storedExceedingDistanceCharge = quotation.exceeding_distance_charge ?? exceedingDistanceCharge;
       
       // Recalculate overtime/overnight if stored values are 0 (historical data)
       if (storedOvertimeCharge === 0 && 
@@ -459,7 +460,7 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
           };
         })(),
         grossRevenue: quotation.gross_revenue || 0,
-        customerTotalWithFuel: (quotation.gross_revenue || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0) + (quotation.total_additional_charges || 0) - (quotation.discount_amount_lkr || 0),
+        customerTotalWithFuel: quotation.customer_total_with_fuel ?? ((quotation.gross_revenue || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0) + (quotation.total_additional_charges || 0) - (quotation.discount_amount_lkr || 0)),
         driverCharge: 0,
         otherExpenses: [],
         commissionPct: commissionPct,
