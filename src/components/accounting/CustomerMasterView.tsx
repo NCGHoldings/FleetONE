@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useActiveCustomerCategories } from "@/hooks/useCustomerCategories";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +48,7 @@ interface Customer {
   payment_terms: number | null;
   is_active: boolean | null;
   created_at: string | null;
+  customer_category_id: string | null;
 }
 
 export function CustomerMasterView() {
@@ -56,6 +59,7 @@ export function CustomerMasterView() {
   const { selectedCompanyId, selectedCompany, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
   const generateNumber = useGenerateNumber();
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const { data: categories } = useActiveCustomerCategories();
   
   // For consolidated GL: use parent company ID for storage, filter by business unit
   const effectiveCompanyId = getEffectiveCompanyId();
@@ -72,6 +76,7 @@ export function CustomerMasterView() {
     billing_address: "",
     credit_limit: "",
     payment_terms: "30",
+    customer_category_id: "",
   });
 
   const { data: customers, isLoading } = useQuery({
@@ -79,7 +84,7 @@ export function CustomerMasterView() {
     queryFn: async () => {
       let query = supabase
         .from("customers")
-        .select("*")
+        .select("*, customer_categories(category_code, category_name)")
         .order("customer_name");
       
       if (effectiveCompanyId) {
@@ -111,8 +116,9 @@ export function CustomerMasterView() {
         credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : null,
         payment_terms: parseInt(data.payment_terms) || 30,
         is_active: true,
-        company_id: effectiveCompanyId, // Store under parent company for consolidated GL
-        business_unit_code: businessUnitCode, // Tag with business unit for filtering
+        company_id: effectiveCompanyId,
+        business_unit_code: businessUnitCode,
+        customer_category_id: data.customer_category_id || null,
       }]);
       if (error) throw error;
     },
@@ -140,6 +146,7 @@ export function CustomerMasterView() {
           billing_address: data.billing_address || null,
           credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : null,
           payment_terms: parseInt(data.payment_terms) || 30,
+          customer_category_id: data.customer_category_id || null,
         })
         .eq("id", id);
       if (error) throw error;
@@ -180,6 +187,7 @@ export function CustomerMasterView() {
       billing_address: "",
       credit_limit: "",
       payment_terms: "30",
+      customer_category_id: "",
     });
   };
 
@@ -194,6 +202,7 @@ export function CustomerMasterView() {
       billing_address: customer.billing_address || "",
       credit_limit: customer.credit_limit?.toString() || "",
       payment_terms: customer.payment_terms?.toString() || "30",
+      customer_category_id: customer.customer_category_id || "",
     });
     setIsDialogOpen(true);
   };
@@ -343,6 +352,25 @@ export function CustomerMasterView() {
                     onChange={(e) => setFormData({ ...formData, billing_address: e.target.value })}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customer_category">Customer Category</Label>
+                  <Select
+                    value={formData.customer_category_id}
+                    onValueChange={(value) => setFormData({ ...formData, customer_category_id: value === "none" ? "" : value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="No Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Category</SelectItem>
+                      {categories?.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.category_code} - {cat.category_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
@@ -389,6 +417,7 @@ export function CustomerMasterView() {
                 <TableRow>
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead>Category</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead className="text-right">Credit Limit</TableHead>
@@ -402,6 +431,11 @@ export function CustomerMasterView() {
                   <TableRow key={customer.id}>
                     <TableCell className="font-mono text-sm">{customer.customer_code}</TableCell>
                     <TableCell className="font-medium">{customer.customer_name}</TableCell>
+                    <TableCell>
+                      {(customer as any).customer_categories?.category_code 
+                        ? <Badge variant="outline">{(customer as any).customer_categories.category_code}</Badge>
+                        : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
                     <TableCell>{customer.contact_person || "-"}</TableCell>
                     <TableCell>{customer.email || "-"}</TableCell>
                     <TableCell className="text-right">
