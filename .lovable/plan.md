@@ -1,68 +1,114 @@
 
 
-# Fix: 82 RLS "Policy Always True" Security Warnings
+# Add Customer Category-Based GL Account Mapping
 
-## What Are These Warnings?
+## The Problem
 
-The Supabase Security Advisor flags RLS policies that use `USING (true)` or `WITH CHECK (true)` on INSERT, UPDATE, DELETE, or ALL operations. This means **any user** matching the policy's role can modify **any row** -- there's no row-level filtering.
+Currently, ALL customers use the **same** Trade Receivable account from Core GL Settings. But your CoA has multiple receivable accounts (e.g., "Trade Receivable - External" and "Trade Receivable - Internal"), and different customers should post to different accounts.
 
-## Categories of Issues Found
+## The Solution: Customer Categories with GL Account Mappings
 
-### Category A: CRITICAL -- Policies using `{public}` role with `true` (should be restricted)
-These policies are named "Service role full access" but are actually assigned to the `{public}` role, meaning **anyone, even unauthenticated users**, can modify data:
+Instead of linking individual customers to accounts one-by-one, we create **Customer Categories** (e.g., "External Customer", "Internal/Intercompany", "Government", "School") and map each category to its own set of GL accounts. Then when creating a customer, you pick their category, and the system automatically uses the correct GL accounts.
 
-| Table | Policy | Current Role |
-|-------|--------|-------------|
-| ai_chat_messages | Service role full access | public |
-| ai_chat_sessions | Service role full access | public |
-| ai_chatbot_knowledge | Service role full access | public |
-| inter_bank_transfers | Users can update | public |
-| leasing_finance_settings | Users can update | public |
-| numbering_sequences | Users can update | public |
-| school_ar_invoice_batches | Users can manage | public |
-| school_ar_invoices | Users can manage | public |
-| school_bus_expense_gl_mappings | Users can update/delete | public |
-| school_bus_finance_settings | Users can manage | public |
-| school_student_ar_link | Users can manage | public |
-| special_hire_finance_settings | Users can update | public |
-| vendor_bank_accounts | Users can insert/update/delete | public |
+```text
+Customer Category Table
+========================
+| Category Name     | AR Account              | Revenue Account         | Advance Account         |
+|-------------------|-------------------------|-------------------------|-------------------------|
+| External          | 12201001 Trade Rec-Ext  | 41010001 Sales Rev-Ext  | (default)               |
+| Internal          | 12201002 Trade Rec-Int  | 41010002 Sales Rev-Int  | (default)               |
+| Government        | 12201003 Trade Rec-Gov  | 41010001 Sales Rev-Ext  | (default)               |
+| School            | 12201004 Trade Rec-Sch  | 41020001 School Rev     | (default)               |
 
-**Fix**: Drop these policies and recreate them for `authenticated` role with `(SELECT auth.uid()) IS NOT NULL`.
+Flow:
+Customer -> belongs to Category -> Category has GL Accounts
+AR Invoice created -> Check Customer's Category -> Use Category's AR Account (or fallback to GL Settings default)
+```
 
-### Category B: Authenticated policies with `true` (need proper check)
-These restrict to logged-in users but allow any authenticated user to modify any row. While less critical (users must be logged in), the linter still flags them:
+## What Changes
 
-~50 policies across: marketing_*, lightvehicle_*, sinotruck_*, yutong_*, expense_requests, document_versions, iou_records, payment_links, payment_reminder_rules, petty_cash_funds, recurring_invoices, scheduled_tasks, workflow_rules, etc.
+### 1. New Database Table: `customer_categories`
+- `id`, `company_id`, `category_name`, `category_code`, `description`
+- `ar_account_id` (FK to chart_of_accounts) -- Trade Receivable for this category
+- `revenue_account_id` (FK to chart_of_accounts) -- Revenue account override
+- `advance_account_id` (FK to chart_of_accounts) -- Advance receipt override
+- `is_active`, `created_at`, `updated_at`
 
-**Fix**: Replace `true` with `(SELECT auth.uid()) IS NOT NULL`. This is functionally equivalent for `authenticated` role but satisfies the linter and is best practice.
+### 2. Add `customer_category_id` to `customers` table
+- New FK column linking each customer to their category
+- The existing `ar_account_id` column will be kept as an **individual override** (customer-specific override takes priority over category)
 
-### Category C: Intentional public access (keep as-is, ~8 policies)
-These are for public-facing features where anonymous users must interact:
-- conductor_submissions INSERT (anon) -- public trip sheet upload
-- customer_portal_access UPDATE (anon) -- OTP verification flow
-- customer_portal_sessions INSERT (anon) -- portal login
-- customer_support_requests INSERT (anon) -- public support form
-- special_hire_submissions INSERT (public) -- public hire form
+### 3. New UI: Customer Categories Management
+- New section in Accounting Settings (alongside Core GL Settings)
+- Table listing categories with their mapped GL accounts
+- Add/Edit/Delete category forms with `SearchableFinanceAccountSelector` for each GL account
 
-These are **intentionally permissive** and will remain flagged (acceptable).
+### 4. Update Customer Form
+- Add a "Customer Category" dropdown when creating/editing customers
+- Optional -- if not selected, the global GL Settings default is used
 
-## Implementation Plan
+### 5. Update GL Posting Logic
+- When posting AR Invoice / AR Receipt / Advance Receipt:
+  - **Priority 1**: Customer's own `ar_account_id` (individual override)
+  - **Priority 2**: Customer's Category `ar_account_id`
+  - **Priority 3**: Global `gl_settings.trade_receivable_account_id` (current behavior, fallback)
 
-### Single Database Migration
+This ensures backwards compatibility -- existing customers without a category continue using the global default.
 
-One migration file that:
+## Technical Details
 
-1. **Drops and recreates ~15 Category A policies** -- changing role from `public` to `authenticated` and condition from `true` to `(SELECT auth.uid()) IS NOT NULL`
+### Database Migration
+```sql
+-- Customer Categories table
+CREATE TABLE public.customer_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id),
+  category_code TEXT NOT NULL,
+  category_name TEXT NOT NULL,
+  description TEXT,
+  ar_account_id UUID REFERENCES chart_of_accounts(id),
+  revenue_account_id UUID REFERENCES chart_of_accounts(id),
+  advance_account_id UUID REFERENCES chart_of_accounts(id),
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(company_id, category_code)
+);
 
-2. **Drops and recreates ~60 Category B policies** -- keeping `authenticated` role but changing condition from `true` to `(SELECT auth.uid()) IS NOT NULL`
+-- Add category FK to customers
+ALTER TABLE customers ADD COLUMN customer_category_id UUID REFERENCES customer_categories(id);
 
-3. **Leaves ~8 Category C policies untouched** -- they are intentional
+-- RLS + indexes
+```
 
-### Expected Result
-- Warnings reduced from **82 to ~8** (only the intentional public-facing policies remain)
-- No functionality changes for logged-in users (all internal app features work the same)
-- Critical security fix for Category A (public role policies that should never have been public)
+### Files to Create
+- `src/components/accounting/CustomerCategoryManagement.tsx` -- CRUD UI for categories
+- `src/hooks/useCustomerCategories.ts` -- React Query hooks for categories
 
-### No Code Changes Required
-All application code uses the Supabase client with authenticated sessions, so changing these policies from `true` to `auth.uid() IS NOT NULL` will not break any existing functionality.
+### Files to Modify
+- `src/components/accounting/CustomerForm.tsx` -- Add category dropdown
+- `src/hooks/useAccountingMutations.ts` -- Update AR Invoice/Receipt GL posting to resolve account via category hierarchy
+- `src/lib/gl-posting-utils.ts` -- Add helper `resolveReceivableAccount(customerId, companyId)` that checks customer -> category -> global fallback
+- `src/components/settings/CoreGLSettings.tsx` -- Add note that these are "default" accounts (overridden by category)
+- Accounting Settings page -- Add Customer Categories tab/section
+
+### Account Resolution Flow (in gl-posting-utils.ts)
+```typescript
+async function resolveARAccounts(customerId: string, companyId: string) {
+  // 1. Check customer's direct ar_account_id
+  const customer = await fetch customer with category join
+  if (customer.ar_account_id) return customer accounts
+  // 2. Check customer's category accounts
+  if (customer.customer_category?.ar_account_id) return category accounts
+  // 3. Fall back to global gl_settings
+  return gl_settings accounts
+}
+```
+
+## Summary
+- 1 new database table (`customer_categories`)
+- 1 new column on `customers` table
+- 2 new files (category UI + hooks)
+- 4-5 files modified (customer form, GL posting logic, settings page)
+- Full backwards compatibility -- existing data continues working with global defaults
 
