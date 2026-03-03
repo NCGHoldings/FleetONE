@@ -1,49 +1,53 @@
 
-# Fix: Yutong Quotation Versions Showing N/A for Bus Model Details
 
-## Problem
-29 existing versioned quotations (v1.1, v1.3, etc.) have `bus_model_id` and `seating_capacity` as NULL because they were created before the versioning fix. The preview correctly shows "N/A" instead of wrong data, but the actual fix is to populate the missing data.
+# Fix: Fuel Price Using Wrong Value in Special Hire Calculations
 
-Some parent records are also NULL (chained versions like v1.1 -> v1.5 -> v1.6), so a simple one-level parent lookup won't work -- we need to trace up the entire chain to the root (v1.0) which has the correct `bus_model_id`.
+## Problem Identified
 
-## Solution
+The `fuel_settings` table has **17 parking locations** with different diesel prices:
+- ncg bus yard: **277** LKR
+- Wathupitiwala/Papiliyana/Ridigama etc.: **283** LKR  
+- Lyceum Anuradhapura: **279** LKR
 
-### 1. Database Migration: Backfill missing bus_model_id using recursive parent chain
+When you set 277 manually and select "ncg bus yard", the initial calculation uses 277 correctly. But there are **two recalculation paths** that fetch fuel price incorrectly, causing it to silently switch to 283 or another wrong price:
 
-Run a recursive CTE migration that traces each NULL record up to its root ancestor (the v1.0 with a valid `bus_model_id`), then updates all descendants:
+### Bug 1: Manual Trip Distance Recalculation (Line 2322-2326)
+```typescript
+const { data: fuelSettings } = await supabase
+  .from('fuel_settings')
+  .select('*')
+  .single();  // <-- NO FILTER! Gets a random row from 17 records
+```
+This `.single()` call without any `.eq()` filter returns whichever row Supabase picks first. If it picks Wathupitiwala (283) instead of ncg bus yard (277), the recalculated cost uses 283.
 
-```sql
-WITH RECURSIVE chain AS (
-  SELECT id, parent_quotation_id, bus_model_id, seating_capacity, customer_id
-  FROM yutong_quotations
-  WHERE bus_model_id IS NOT NULL
-  UNION ALL
-  SELECT child.id, child.parent_quotation_id, chain.bus_model_id, chain.seating_capacity, COALESCE(child.customer_id, chain.customer_id)
-  FROM yutong_quotations child
-  JOIN chain ON child.parent_quotation_id = chain.id
-  WHERE child.bus_model_id IS NULL
-)
-UPDATE yutong_quotations q
-SET bus_model_id = chain.bus_model_id,
-    seating_capacity = chain.seating_capacity,
-    customer_id = COALESCE(q.customer_id, chain.customer_id)
-FROM chain
-WHERE q.id = chain.id AND q.bus_model_id IS NULL;
+### Bug 2: Hardcoded fallback `|| 350` (Lines 2203, 2349)
+Two places still use `|| 350` as a fallback for fuel price, which was supposed to be fixed but was missed in these inline recalculation sections.
+
+## Fix
+
+### File: `src/components/special-hire/SpecialHireForm.tsx`
+
+**Fix 1** (Line 2322-2326) -- Add parking location filter to Manual Trip Distance fuel settings query:
+```typescript
+const { data: fuelSettings } = await supabase
+  .from('fuel_settings')
+  .select('*')
+  .eq('id', formValues.parkingLocationId)
+  .single();
 ```
 
-This fixes all 29 existing records in one pass.
+**Fix 2** (Line 2203) -- Change fallback from 350 to 0:
+```typescript
+const fuelPrice = fuelSettings?.diesel_price_lkr_per_l || 0;
+```
 
-### 2. Preview Component Fallback: Look up parent's bus_model_id
+**Fix 3** (Line 2349) -- Change fallback from 350 to 0:
+```typescript
+const fuelPrice = fuelSettings?.diesel_price_lkr_per_l || 0;
+```
 
-**File: `src/components/yutong/YutongQuotationPreview.tsx`**
+### Summary
+- 1 critical bug: unfiltered `.single()` query returning a random parking location's fuel price
+- 2 minor bugs: leftover `|| 350` hardcoded fallbacks
+- All fixes in a single file: `src/components/special-hire/SpecialHireForm.tsx`
 
-In the `fetchData` function (around line 100-116), add a fallback: if `bus_model_id` is null but `parent_quotation_id` exists on the quotation, query the parent's `bus_model_id` and use that to fetch bus model details. This acts as a safety net for any edge cases the migration doesn't cover.
-
-This requires adding `parent_quotation_id` to the `YutongQuotation` interface and updating the fetch logic to:
-1. Try `quotation.bus_model_id` first (normal path)
-2. If null, query the parent chain to find a valid `bus_model_id`
-3. Fetch bus model details using whichever ID was found
-
-### Files Modified
-- **New migration SQL** -- Recursive backfill of bus_model_id, seating_capacity, customer_id
-- **`src/components/yutong/YutongQuotationPreview.tsx`** -- Add parent chain fallback for bus_model_id lookup
