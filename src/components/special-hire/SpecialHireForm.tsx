@@ -2200,7 +2200,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                       .single();
 
                                     const busEfficiency = busTypeData?.avg_km_per_l || 8;
-                                    const fuelPrice = fuelSettings?.diesel_price_lkr_per_l || 350;
+                                    const fuelPrice = fuelSettings?.diesel_price_lkr_per_l || 0;
                                     const numberOfBuses = form.getValues('numberOfBuses') || 1;
 
                                     // Calculate new fuel cost (empty run only - for customer billing)
@@ -2319,10 +2319,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                     const totalDistance = kmParkingToPickup + manualTripDistance + kmDropToParking;
                                     const numberOfBuses = formValues.numberOfBuses || 1;
 
-                                    // Get fuel settings
+                                    // Get fuel settings for selected parking location
                                     const { data: fuelSettings } = await supabase
                                       .from('fuel_settings')
                                       .select('*')
+                                      .eq('id', formValues.parkingLocationId)
                                       .single();
 
                                     const { data: busTypeData } = await supabase
@@ -2346,7 +2347,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                     }
 
                                     const busEfficiency = busTypeData?.avg_km_per_l || 8;
-                                    const fuelPrice = fuelSettings?.diesel_price_lkr_per_l || 350;
+                                    const fuelPrice = fuelSettings?.diesel_price_lkr_per_l || 0;
 
                                     // FULL RECALCULATION: Rate matching, exceeding KM, and overtime
                                     let rateCard = null;
