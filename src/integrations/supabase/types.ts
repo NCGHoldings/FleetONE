@@ -415,6 +415,134 @@ export type Database = {
           },
         ]
       }
+      ai_chat_messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          language: string | null
+          metadata: Json | null
+          role: string
+          session_id: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          language?: string | null
+          metadata?: Json | null
+          role: string
+          session_id?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          language?: string | null
+          metadata?: Json | null
+          role?: string
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_chat_sessions: {
+        Row: {
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          preferred_language: string | null
+          product_interest: string | null
+          session_token: string
+          status: string | null
+          updated_at: string | null
+          visitor_email: string | null
+          visitor_name: string | null
+          visitor_phone: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          preferred_language?: string | null
+          product_interest?: string | null
+          session_token: string
+          status?: string | null
+          updated_at?: string | null
+          visitor_email?: string | null
+          visitor_name?: string | null
+          visitor_phone?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          preferred_language?: string | null
+          product_interest?: string | null
+          session_token?: string
+          status?: string | null
+          updated_at?: string | null
+          visitor_email?: string | null
+          visitor_name?: string | null
+          visitor_phone?: string | null
+        }
+        Relationships: []
+      }
+      ai_chatbot_knowledge: {
+        Row: {
+          answer_en: string
+          answer_si: string | null
+          answer_ta: string | null
+          category: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          question_en: string | null
+          question_si: string | null
+          question_ta: string | null
+          sort_order: number | null
+          tags: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          answer_en: string
+          answer_si?: string | null
+          answer_ta?: string | null
+          category: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          question_en?: string | null
+          question_si?: string | null
+          question_ta?: string | null
+          sort_order?: number | null
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          answer_en?: string
+          answer_si?: string | null
+          answer_ta?: string | null
+          category?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          question_en?: string | null
+          question_si?: string | null
+          question_ta?: string | null
+          sort_order?: number | null
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       ap_ageing_buckets: {
         Row: {
           bucket_name: string
