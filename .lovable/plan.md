@@ -1,56 +1,68 @@
 
-# Fix: Special Hire Quotation Charges Showing Inconsistent/Wrong Figures
 
-## Problems Found
+# Fix: 82 RLS "Policy Always True" Security Warnings
 
-### Problem 1: `fuel_price_per_liter` NEVER actually saved (Critical)
-Line 1771 in SpecialHireForm.tsx uses `costData?.fuelPricePerLiter` but `costData` is React state updated via `setCostData()` inside `calculateCosts`. React state updates are **asynchronous** -- by the time `handleSubmit` reads `costData` on line 1771, it still has the **old** value (or null on first calculation). This is why **all 2,146 quotations** have `fuel_price_per_liter = NULL`.
+## What Are These Warnings?
 
-**Fix**: Add `fuel_price_per_liter` to the `costs` return object inside `calculateCosts()`, and read it from `costs.fuel_price_per_liter` in `handleSubmit` instead of stale React state.
+The Supabase Security Advisor flags RLS policies that use `USING (true)` or `WITH CHECK (true)` on INSERT, UPDATE, DELETE, or ALL operations. This means **any user** matching the policy's role can modify **any row** -- there's no row-level filtering.
 
-### Problem 2: `||` vs `??` in EnhancedCostCalculator causes zero values to be replaced
-When a quotation legitimately has `fixed_rate = 0`, `exceeding_distance_charge = 0`, or `overtime_charge = 0`, the `||` operator treats `0` as falsy and falls through to a recalculated or hardcoded value. This causes intermittent wrong figures.
+## Categories of Issues Found
 
-Affected lines:
-- Line 296: `quotation.fixed_rate || rateCard?.flat_fee_lkr || 0` -- if stored fixed_rate is 0, uses rate card value instead
-- Line 339: `quotation.fixed_rate || fixedRate` -- same issue
-- Line 342: `quotation.exceeding_distance_charge || exceedingDistanceCharge` -- if stored is 0, uses recalculated value
+### Category A: CRITICAL -- Policies using `{public}` role with `true` (should be restricted)
+These policies are named "Service role full access" but are actually assigned to the `{public}` role, meaning **anyone, even unauthenticated users**, can modify data:
 
-**Fix**: Change all `||` to `??` (nullish coalescing) for stored quotation values so that `0` is respected.
+| Table | Policy | Current Role |
+|-------|--------|-------------|
+| ai_chat_messages | Service role full access | public |
+| ai_chat_sessions | Service role full access | public |
+| ai_chatbot_knowledge | Service role full access | public |
+| inter_bank_transfers | Users can update | public |
+| leasing_finance_settings | Users can update | public |
+| numbering_sequences | Users can update | public |
+| school_ar_invoice_batches | Users can manage | public |
+| school_ar_invoices | Users can manage | public |
+| school_bus_expense_gl_mappings | Users can update/delete | public |
+| school_bus_finance_settings | Users can manage | public |
+| school_student_ar_link | Users can manage | public |
+| special_hire_finance_settings | Users can update | public |
+| vendor_bank_accounts | Users can insert/update/delete | public |
 
-### Problem 3: Hardcoded `|| 175` fallback for exceeding km rate
-Line 302: `rateCard?.exceeding_km_rate_lkr || 175` silently uses 175 if rate card lookup fails.
+**Fix**: Drop these policies and recreate them for `authenticated` role with `(SELECT auth.uid()) IS NOT NULL`.
 
-**Fix**: Change to `?? 0`.
+### Category B: Authenticated policies with `true` (need proper check)
+These restrict to logged-in users but allow any authenticated user to modify any row. While less critical (users must be logged in), the linter still flags them:
 
-### Problem 4: EnhancedCostCalculator recalculates `customerTotalWithFuel` instead of using stored value
-Line 462 manually adds up `gross_revenue + fuel + additional - discount`, but this can differ from the actual stored `customer_total_with_fuel` (due to rounding, commission, etc.). This causes the displayed total to differ from what was quoted.
+~50 policies across: marketing_*, lightvehicle_*, sinotruck_*, yutong_*, expense_requests, document_versions, iou_records, payment_links, payment_reminder_rules, petty_cash_funds, recurring_invoices, scheduled_tasks, workflow_rules, etc.
 
-**Fix**: Use the stored `quotation.customer_total_with_fuel` value first, fall back to calculation only if null. Changed from recalculated to: `quotation.customer_total_with_fuel ?? (calculated fallback)`.
+**Fix**: Replace `true` with `(SELECT auth.uid()) IS NOT NULL`. This is functionally equivalent for `authenticated` role but satisfies the linter and is best practice.
 
-### Problem 5: `costs` object missing `fuel_price_per_liter` field
-The `costs` object returned from `calculateCosts()` (line 1404-1441) doesn't include `fuel_price_per_liter`, so it can't be reliably used in submission.
+### Category C: Intentional public access (keep as-is, ~8 policies)
+These are for public-facing features where anonymous users must interact:
+- conductor_submissions INSERT (anon) -- public trip sheet upload
+- customer_portal_access UPDATE (anon) -- OTP verification flow
+- customer_portal_sessions INSERT (anon) -- portal login
+- customer_support_requests INSERT (anon) -- public support form
+- special_hire_submissions INSERT (public) -- public hire form
 
-**Fix**: Add `fuel_price_per_liter: fuelSettings.diesel_price_lkr_per_l` to the `costs` object.
+These are **intentionally permissive** and will remain flagged (acceptable).
 
-## Technical Changes
+## Implementation Plan
 
-### File 1: `src/components/special-hire/SpecialHireForm.tsx`
-- Add `fuel_price_per_liter: fuelSettings.diesel_price_lkr_per_l` to the `costs` object (around line 1440)
-- Change line 1771 from `costData?.fuelPricePerLiter || null` to `costs.fuel_price_per_liter || costData?.fuelPricePerLiter || null`
-- Also update the preserved-calculations path (line 1638 block) to include fuel_price_per_liter from initialData
+### Single Database Migration
 
-### File 2: `src/components/special-hire/EnhancedCostCalculator.tsx`
-- Line 296: Change `quotation.fixed_rate || rateCard?.flat_fee_lkr || 0` to `quotation.fixed_rate ?? rateCard?.flat_fee_lkr ?? 0`
-- Line 302: Change `rateCard?.exceeding_km_rate_lkr || 175` to `rateCard?.exceeding_km_rate_lkr ?? 0`
-- Line 339: Change `quotation.fixed_rate || fixedRate` to `quotation.fixed_rate ?? fixedRate`
-- Line 342: Change `quotation.exceeding_distance_charge || exceedingDistanceCharge` to `quotation.exceeding_distance_charge ?? exceedingDistanceCharge`
-- Line 462: Use stored `customer_total_with_fuel` first, with recalculation as fallback
+One migration file that:
 
-### File 3: Database Migration
-- Backfill `fuel_price_per_liter` for existing quotations by joining with `fuel_settings` on `parking_location_id`
+1. **Drops and recreates ~15 Category A policies** -- changing role from `public` to `authenticated` and condition from `true` to `(SELECT auth.uid()) IS NOT NULL`
 
-## Summary
-- 3 files modified
-- 1 database migration for backfill
-- Root cause: React state timing issue (fuel price never saved) + `||` treating legitimate `0` values as falsy (charges flip-flopping)
+2. **Drops and recreates ~60 Category B policies** -- keeping `authenticated` role but changing condition from `true` to `(SELECT auth.uid()) IS NOT NULL`
+
+3. **Leaves ~8 Category C policies untouched** -- they are intentional
+
+### Expected Result
+- Warnings reduced from **82 to ~8** (only the intentional public-facing policies remain)
+- No functionality changes for logged-in users (all internal app features work the same)
+- Critical security fix for Category A (public role policies that should never have been public)
+
+### No Code Changes Required
+All application code uses the Supabase client with authenticated sessions, so changing these policies from `true` to `auth.uid() IS NOT NULL` will not break any existing functionality.
+
