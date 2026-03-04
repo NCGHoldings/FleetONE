@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus, FileText, Calculator, Truck, ShoppingCart, DollarSign, Package, Shield, Cog, FileCheck, MapPin, Wrench, Users, Bus, BarChart3, UserPlus, FileSpreadsheet, History, Upload } from 'lucide-react';
+import { Plus, FileText, Calculator, Truck, ShoppingCart, DollarSign, Package, Shield, Cog, FileCheck, MapPin, Wrench, Users, Bus, BarChart3, UserPlus, FileSpreadsheet, History, Upload, Table2 } from 'lucide-react';
 import { YutongQuotationsList } from "@/components/yutong/YutongQuotationsList";
 import { YutongQuotationForm } from "@/components/yutong/YutongQuotationFormUpdated";
 import { YutongBusModelsAdmin } from "@/components/yutong/YutongBusModelsAdmin";
@@ -25,6 +25,7 @@ import { YutongVehicleDataManagement } from '@/components/yutong/YutongVehicleDa
 import { YutongOldSalesImport } from '@/components/yutong/YutongOldSalesImport';
 import { YutongOldSalesList } from '@/components/yutong/YutongOldSalesList';
 import { YutongExecutiveReport } from '@/components/yutong/report/YutongExecutiveReport';
+import { YutongOrderSpreadsheet } from '@/components/yutong/spreadsheet/YutongOrderSpreadsheet';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -194,7 +195,7 @@ export default function YutongQuotations() {
 
       {/* Main Content - Simplified to Core Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 lg:grid-cols-11">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 lg:grid-cols-12">
           <TabsTrigger value="quotations" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Quotations</span>
@@ -234,6 +235,10 @@ export default function YutongQuotations() {
           <TabsTrigger value="reports" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Reports</span>
+          </TabsTrigger>
+          <TabsTrigger value="spreadsheet" className="flex items-center gap-2">
+            <Table2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Spreadsheet</span>
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Cog className="h-4 w-4" />
@@ -302,6 +307,11 @@ export default function YutongQuotations() {
         <TabsContent value="reports" className="space-y-4">
           <YutongExecutiveReport />
         </TabsContent>
+
+        <TabsContent value="spreadsheet" className="space-y-4">
+          <YutongOrderSpreadsheet />
+        </TabsContent>
+
 
         <TabsContent value="settings" className="space-y-4">
           <YutongResponsiblePersonsAdmin />

@@ -80,3 +80,6 @@ verify_jwt = false
 
 [functions.yutong-executive-report]
 verify_jwt = false
+
+[functions.yutong-spreadsheet-data]
+verify_jwt = false
