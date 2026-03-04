@@ -51,7 +51,12 @@ export const TemplateInitializerButton = ({
     setResults([]);
 
     const allResults: InitResult[] = [];
-    const totalOperations = companies.length * templateTypes.length;
+
+    // Filter to only template types that have a generator in the seeder
+    const supportedTypes = templateTypes.filter(
+      (tt) => defaultTemplates[tt.type_code]
+    );
+    const totalOperations = companies.length * supportedTypes.length;
     let completedOperations = 0;
 
     try {
@@ -66,23 +71,12 @@ export const TemplateInitializerButton = ({
       });
 
       for (const company of companies) {
-        for (const templateType of templateTypes) {
+        for (const templateType of supportedTypes) {
           const key = `${company.id}-${templateType.id}`;
           const existingId = existingMap.get(key);
 
-          // Get template generator
+          // Get template generator (guaranteed to exist after filtering)
           const templateGenerator = defaultTemplates[templateType.type_code];
-          if (!templateGenerator) {
-            allResults.push({
-              company: company.name,
-              templateType: templateType.type_name,
-              status: "error",
-              error: "No template generator found",
-            });
-            completedOperations++;
-            setProgress((completedOperations / totalOperations) * 100);
-            continue;
-          }
 
           const htmlContent = templateGenerator();
           const templateName = `${templateDisplayNames[templateType.type_code] || templateType.type_name}`;
