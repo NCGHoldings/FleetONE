@@ -811,6 +811,20 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
               <p style={{ marginBottom: "6px" }}>
                 <b>11. Additional Clauses:</b> The seller retains the right to use photographs or descriptions of the vehicle for advertising or promotional purposes unless otherwise agreed in writing by both parties. The buyer may not assign, transfer, or sub-contract their rights or obligations under this agreement without the prior written consent of the seller.
               </p>
+
+              <p style={{ marginBottom: "6px", padding: "8px", border: "2px solid #1e40af", borderRadius: "4px", background: "#e8f0fe" }}>
+                <b>12. Quotation Validity:</b> This quotation is valid for {(() => {
+                  try {
+                    if (quotation.valid_until) {
+                      const created = new Date(quotation.created_at);
+                      const validUntil = new Date(quotation.valid_until);
+                      const diffDays = Math.round((validUntil.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+                      return `${diffDays > 0 ? diffDays : 30} days`;
+                    }
+                    return "30 days";
+                  } catch { return "30 days"; }
+                })()} from the date of issue{quotation.valid_until ? ` (valid until ${format(new Date(quotation.valid_until), "dd/MM/yyyy")})` : ""}. After this period, prices and availability are subject to change.
+              </p>
             </div>
 
             {/* Additional Terms Section - Warranty, Delivery, Payment */}
