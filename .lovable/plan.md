@@ -1,30 +1,33 @@
 
 
-# Add Validity Period to All Quotation T&C and Previews
+# Fix AP Payment Bank Account Issues
 
-## Problem
-None of the three quotation previews (Yutong, Sinotruck, Light Vehicle) show a **quotation validity period** in their Terms & Conditions section. The `valid_until` / `valid_days` / `validity_period` data exists in the database and forms, but is never rendered in the T&C on the document preview/PDF.
+## Problems Identified
 
-## What Changes
+1. **Vendor Pay-To account not saved**: The form has a "Pay To Account" selector (`selectedBankAccountId`) but never passes it to the mutation. The `ap_payments` table has a `vendor_bank_account_id` column (with FK to `vendor_bank_accounts`) that is never populated.
 
-### 1. Yutong Preview — `YutongQuotationPreview.tsx`
-- Add a new **clause 11** to the T&C: *"Quotation Validity: This quotation is valid for {valid_days} days from the date of issue (valid until {valid_until}). After this period, prices and availability are subject to change."*
-- Uses existing `quotation.valid_until` (already in the interface) and computes days from `created_at`
+2. **Source bank account not joined in query**: `useAPPayments` fetches `ap_payments` with only `vendors(...)` joined. It does NOT join `bank_accounts` (source) or `vendor_bank_accounts` (pay-to), so the Payment Voucher preview cannot display bank details.
 
-### 2. Light Vehicle Preview — `LightVehicleQuotationPreview.tsx`
-- Add a new **clause 12** to the T&C: *"Quotation Validity: This quotation is valid for {validity_period} from the date of issue. After this period, prices and availability are subject to change."*
-- Uses existing `quotation.validity_period` (already passed as prop)
+3. **Payment Voucher document shows empty bank fields**: `mapDocumentToPlaceholders` references `documentData?.bank_accounts?.account_name` and `documentData?.vendor_bank_accounts?.bank_name` but these are always empty because the data is never fetched.
 
-### 3. Sinotruck Preview — `SinotruckQuotationPreview.tsx`
-- Add a validity clause to the T&C section (or add one if none exists)
-- Uses existing `quotation.valid_until` to display: *"This quotation is valid until {formatted valid_until date}."*
-- The Sinotruck form already has `DEFAULT_TERMS_AND_CONDITIONS[0]` with "valid for 30 days" but this is a generic array — I'll ensure it dynamically uses the actual `valid_until` date
+## Changes
 
-### 4. All Three Previews — Add Validity Banner
-- Add a prominent styled box near the top of Page 1 (below quotation details) or at the start of T&C showing: **"This quotation is valid until: [date]"** so it's clearly visible
+### 1. `src/components/accounting/APPaymentForm.tsx`
+- Pass `vendor_bank_account_id: selectedBankAccountId` in the `createPayment.mutateAsync()` call
 
-## Files to Modify
-1. `src/components/yutong/YutongQuotationPreview.tsx` — add clause 11 + validity display
-2. `src/components/lightvehicle/LightVehicleQuotationPreview.tsx` — add clause 12 + validity display
-3. `src/components/sinotruck/SinotruckQuotationPreview.tsx` — add dynamic validity clause
+### 2. `src/hooks/useAccountingMutations.ts` (useCreateAPPayment)
+- Accept `vendor_bank_account_id` in the mutation input
+- Save it to the `ap_payments` insert: `vendor_bank_account_id: payment.vendor_bank_account_id`
+
+### 3. `src/hooks/useAccountingData.ts` (useAPPayments)
+- Join `bank_accounts(id, account_name, bank_name, account_number)` via `bank_account_id`
+- Join `vendor_bank_accounts(id, bank_name, bank_branch, account_number, account_holder_name, account_label)` via `vendor_bank_account_id`
+
+### 4. `src/lib/document-template-utils.ts`
+- Already has placeholders for `{{source_account}}`, `{{source_bank}}`, `{{vendor_bank_name}}` etc. — these will now populate correctly once the joins are in place. No changes needed here.
+
+## Result
+- Vendor pay-to bank account selection is persisted in `ap_payments.vendor_bank_account_id`
+- Payment Voucher preview shows source bank name/number and vendor pay-to bank details
+- All existing placeholders like `{{source_account}}`, `{{vendor_bank_name}}`, `{{vendor_account_number}}` render correctly
 
