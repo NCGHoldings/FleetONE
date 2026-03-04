@@ -1,53 +1,80 @@
 
 
-# AP Flow Audit: GL, COA, and Payment Interconnection Verification
+# Replace Tax Invoice Format with Sri Lankan Government Standard
 
-## Flow Traced End-to-End
+## Context
+The Sri Lankan government mandates a specific Tax Invoice format (shown in the uploaded screenshot) that all companies must follow. Currently, each module (Yutong, Sinotruck, Light Vehicle) has its own custom tax invoice layout that does not match the government format.
 
-### 1. AP Invoice Creation (`useCreateAPInvoice`)
-- **Saves**: `ap_invoices` header + `ap_invoice_lines` with `account_id` per line — **CORRECT**
-- **Status**: Created as `unpaid` — **CORRECT**
-- **No GL posting at creation** — this is by design (GL posts only on approval)
+## Sri Lankan Tax Invoice Format (from screenshot)
+The government format requires these specific fields and layout:
+- **Header**: "Tax Invoice" title (centered)
+- **Top Row**: Date of Invoice | Tax Invoice No.
+- **Supplier Block**: Supplier's TIN, Name, Address, Telephone No.
+- **Purchaser Block**: Purchaser's TIN, Name, Address, Telephone No.
+- **Middle Row**: Date of Delivery | Place of Supply
+- **Additional Information** field
+- **Line Items Table**: Reference | Description of Goods or Services | Quantity | Unit Price | Amount Excluding VAT (Rs.)
+- **Totals**: Total Value of Supply | VAT Amount (Total Value of Supply @ 18%) | Total Amount including VAT
+- **Bottom**: Total Amount in words | Mode of Payment
+- **Footer Reference**: EOG format number
 
-### 2. AP Invoice Approval (`useApproveAPInvoice`)
-- **GL Posting**: DR Expense / CR Trade Payable via `postAPInvoiceToGL()` — **CORRECT double-entry**
-- **COA Balance Update**: `createAndPostJournalEntry` → `updateAccountBalance()` adjusts `chart_of_accounts.current_balance` using debit/credit normal rules — **CORRECT**
-- **Journal Entry**: Created with `status: "posted"`, linked via `journal_entry_id` — **CORRECT**
+## Changes Required
 
-### 3. AP Payment (`useCreateAPPayment`)
-- **Saves**: `ap_payments` with `vendor_bank_account_id` — **CORRECT** (recently fixed)
-- **Invoice Allocation**: Updates `paid_amount`, `balance`, and `status` (paid/partial/unpaid) — **CORRECT**
-- **GL Posting**: DR Trade Payable / CR Bank via `postAPPaymentToGL()` — **CORRECT double-entry**
-- **WHT Handling**: Extra line DR Trade Payable / CR WHT Payable when WHT > 0 — **CORRECT**
-- **Bank Transaction**: Creates `bank_transactions` record and updates `bank_accounts.current_balance` — **CORRECT**
-- **Cheque Register**: Auto-creates entry for cheque payments — **CORRECT**
-- **Journal Link**: Links `journal_entry_id` back to payment record — **CORRECT**
+### 1. Create Shared Tax Invoice HTML Generator
+**New file: `src/lib/sri-lanka-tax-invoice-generator.ts`**
+- Create a `generateSriLankaTaxInvoiceHTML(data)` function that produces the exact government-mandated layout
+- Accept a unified data interface covering all modules:
+  - Supplier TIN, name, address, phone (from company/system settings)
+  - Purchaser TIN, name, address, phone (from customer)
+  - Invoice date, tax invoice number, date of delivery, place of supply
+  - Line items array: reference, description, quantity, unit price, amount excl. VAT
+  - VAT rate (default 18%), totals calculation
+  - Amount in words, mode of payment
+  - Additional information field
+- Clean, minimal black-and-white styling matching the government form (no colored themes)
+- Signatures section (Prepared By / Approved By / Customer) appended below the form
 
-### 4. COA Balance Updates (`updateAccountBalance`)
-- Assets/Expenses: debit increases, credit decreases — **CORRECT**
-- Liabilities/Revenue/Equity: credit increases, debit decreases — **CORRECT**
-- Applied after every GL posting — **CORRECT**
+### 2. Update Yutong Tax Invoice Generation
+**File: `src/lib/yutong-order-invoice-generator.ts`**
+- When `isTaxInvoice === true`, call the new shared `generateSriLankaTaxInvoiceHTML()` instead of the current custom layout
+- Map Yutong vehicle data into the standardized line items format (description = vehicle make/model/details)
+- Pass company TIN from settings, customer VAT number from invoice data
 
-### 5. Debit = Credit Validation
-- `createAndPostJournalEntry` validates `totalDebit === totalCredit` before posting — **CORRECT**
+### 3. Update Sinotruck to Support Tax Invoice
+**File: `src/lib/sinotruck-order-invoice-generator.ts`**
+- Add `tax_invoice` to `invoice_category` type
+- Add tax invoice fields (`is_tax_invoice`, `customer_vat_number`, `tax_rate`, etc.)
+- When tax invoice, use the shared Sri Lankan format generator
 
----
+**File: `src/components/sinotruck/SinotruckInvoiceTypeModal.tsx`**
+- Add "Tax Invoice" radio option (currently only has direct and proforma)
+- Add customer VAT number input field when tax invoice selected
 
-## One Issue Found: Per-Line GL Account Not Used During Approval
+### 4. Update Light Vehicle to Support Tax Invoice
+**File: `src/lib/lightvehicle-order-invoice-generator.ts`**
+- When `invoiceCategory === 'tax_invoice'`, use the shared Sri Lankan format
+- Map light vehicle data into standardized line items
 
-You just added `account_id` per AP invoice line, but **`useApproveAPInvoice` ignores the per-line accounts**. It posts the entire invoice total to a single `default_expense_account_id` from `gl_settings`. This means if a user assigns "Water & Electricity" to one line and "Repairs" to another, both still hit the same default expense account in the GL.
+**File: `src/components/lightvehicle/LightVehicleInvoiceTypeModal.tsx`**
+- Add "Tax Invoice" radio option
+- Add customer VAT number and tax fields
 
-### Fix Required
-Update `useApproveAPInvoice` to:
-1. Fetch `ap_invoice_lines` with their `account_id`
-2. For lines with an `account_id`, post to that specific account
-3. For lines without, fall back to `default_expense_account_id`
-4. Create multi-line journal entries (one debit line per distinct account, one credit to Trade Payable)
+### 5. Update Invoice Type Modals (All Modules)
+Add new fields to the tax invoice form across all three modals:
+- **Supplier TIN** (pre-filled from company settings, editable)
+- **Purchaser TIN** (required for tax invoices)
+- **Place of Supply** (text input)
+- **Date of Delivery** (date picker)
+- **Mode of Payment** (dropdown: Cash/Cheque/Bank Transfer/Credit)
+- **Additional Information** (textarea, optional)
 
-### Files to Modify
-1. `src/hooks/useAccountingMutations.ts` — `useApproveAPInvoice` mutation (lines ~1480-1542)
-2. `src/lib/gl-posting-utils.ts` — update `postAPInvoiceToGL` to accept multiple expense lines instead of a single `expenseAccountId`
+### 6. Update PDF Generation
+- Ensure `generateYutongOrderInvoicePDF` uses the new HTML when tax invoice
+- Add similar PDF support for Sinotruck and Light Vehicle tax invoices
 
-### Summary
-Everything else in the AP → GL → COA → Bank flow is properly interconnected and working correctly. The only gap is that per-line GL accounts added to AP invoice lines are not yet used during GL posting on approval.
+## Result
+- All three vehicle sales modules produce the exact Sri Lankan government-mandated Tax Invoice format
+- One shared generator ensures consistency and compliance across all companies
+- Regular invoices (direct/proforma) remain unchanged with their existing branded layouts
+- Tax invoice form collects all required government fields (TIN, place of supply, delivery date, etc.)
 
