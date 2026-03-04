@@ -342,20 +342,55 @@ export async function postAdvanceApplicationToGL(params: {
 // ============ AP Transaction GL Posting ============
 
 /**
- * Posts GL entry for AP Invoice creation
- * DR Expense/Inventory Account
- * CR Trade Payable
+ * Posts GL entry for AP Invoice approval
+ * DR Expense/Inventory Account(s) — one debit line per distinct GL account from invoice lines
+ * CR Trade Payable — single credit for the total amount
  */
 export async function postAPInvoiceToGL(params: {
   invoiceNumber: string;
   invoiceDate: string;
   totalAmount: number;
-  expenseAccountId: string;
+  expenseAccountId: string; // fallback default
   tradePayableId: string;
   companyId: string;
   businessUnitCode?: string;
   vendorName?: string;
+  expenseLines?: Array<{ accountId: string; amount: number; description?: string }>;
 }): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
+  const debitLines: JournalEntryLine[] = [];
+
+  if (params.expenseLines && params.expenseLines.length > 0) {
+    // Group by accountId and sum amounts for multi-line posting
+    const grouped = new Map<string, { amount: number; description: string }>();
+    for (const line of params.expenseLines) {
+      const existing = grouped.get(line.accountId);
+      if (existing) {
+        existing.amount += line.amount;
+      } else {
+        grouped.set(line.accountId, {
+          amount: line.amount,
+          description: line.description || `Expense/Purchase - ${params.invoiceNumber}`,
+        });
+      }
+    }
+    for (const [accountId, data] of grouped) {
+      debitLines.push({
+        account_id: accountId,
+        description: data.description,
+        debit: data.amount,
+        credit: 0,
+      });
+    }
+  } else {
+    // Fallback: single debit to default expense account
+    debitLines.push({
+      account_id: params.expenseAccountId,
+      description: `Expense/Purchase - ${params.invoiceNumber}`,
+      debit: params.totalAmount,
+      credit: 0,
+    });
+  }
+
   return createAndPostJournalEntry({
     entry_date: params.invoiceDate,
     description: `AP Invoice: ${params.invoiceNumber}${params.vendorName ? ` - ${params.vendorName}` : ""}`,
@@ -363,12 +398,7 @@ export async function postAPInvoiceToGL(params: {
     company_id: params.companyId,
     business_unit_code: params.businessUnitCode,
     lines: [
-      {
-        account_id: params.expenseAccountId,
-        description: `Expense/Purchase - ${params.invoiceNumber}`,
-        debit: params.totalAmount,
-        credit: 0,
-      },
+      ...debitLines,
       {
         account_id: params.tradePayableId,
         description: `Trade Payable - ${params.invoiceNumber}`,
