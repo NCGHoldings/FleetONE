@@ -2,6 +2,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { convertNumberToWords } from './number-to-words';
 import { generateSriLankaTaxInvoiceHTML } from './sri-lanka-tax-invoice-generator';
+import { resolveTaxInvoiceHTML } from './tax-invoice-template-resolver';
 
 export interface SinotruckOrderInvoiceData {
   invoice_no: string;
@@ -559,15 +560,49 @@ export function generateSinotruckOrderInvoiceHTML(data: SinotruckOrderInvoiceDat
 }
 
 export async function generateSinotruckOrderInvoicePDF(data: SinotruckOrderInvoiceData): Promise<Blob> {
+  const isTaxInvoice = data.invoice_category === 'tax_invoice' || data.is_tax_invoice;
+
+  let html: string;
+  if (isTaxInvoice) {
+    const taxRate = data.tax_rate || 18;
+    const baseAmount = data.total / (1 + taxRate / 100);
+    const vehicleDescription = [
+      data.make, data.truck_model, `${data.year_of_manufacture}`,
+      data.vehicle_condition, data.fuel_type,
+      `Engine: ${data.engine_number}`, `Chassis: ${data.chassis_number}`,
+    ].filter(Boolean).join(' | ');
+
+    html = await resolveTaxInvoiceHTML({
+      invoiceDate: data.invoice_date,
+      taxInvoiceNo: data.invoice_no,
+      supplierTin: data.supplier_tin || '',
+      supplierName: data.supplier_name || 'NCG Holdings (Pvt) Ltd',
+      supplierAddress: data.supplier_address || '157 Y, Kabellawita, Weniweikola, Polgasowita',
+      supplierPhone: data.supplier_phone || '0770455981',
+      purchaserTin: data.purchaser_tin || data.customer_vat_number || '',
+      purchaserName: data.customer_name,
+      purchaserAddress: data.address,
+      purchaserPhone: data.purchaser_phone || data.contact || '',
+      dateOfDelivery: data.date_of_delivery,
+      placeOfSupply: data.place_of_supply,
+      additionalInformation: data.additional_information,
+      lineItems: [{ reference: '1', description: vehicleDescription, quantity: data.quantity, unitPrice: baseAmount / data.quantity, amountExclVat: baseAmount }],
+      vatRate: taxRate,
+      modeOfPayment: data.mode_of_payment,
+      preparedBy: data.preparedBy ? { name: data.preparedBy.approver_name, signature: data.preparedBy.signature_data, date: data.preparedBy.approval_date } : undefined,
+      approvedBy: data.approvedBy ? { name: data.approvedBy.approver_name, signature: data.approvedBy.signature_data, date: data.approvedBy.approval_date } : undefined,
+      customerSignature: data.receivedBy ? { name: data.receivedBy.approver_name, signature: data.receivedBy.signature_data, date: data.receivedBy.approval_date } : undefined,
+    });
+  } else {
+    html = generateSinotruckOrderInvoiceHTML(data);
+  }
+
   // Create a hidden container for rendering
   const container = document.createElement('div');
   container.style.position = 'absolute';
   container.style.left = '-9999px';
   container.style.width = '900px';
   document.body.appendChild(container);
-
-  // Generate HTML and insert into container
-  const html = generateSinotruckOrderInvoiceHTML(data);
   container.innerHTML = html;
 
   // Wait for images to load
