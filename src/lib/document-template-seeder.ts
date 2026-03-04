@@ -1018,6 +1018,142 @@ export const generateGRNTemplate = (): string => `
 </div></div>
 `;
 
+// ==================== Tax Invoice (Sri Lanka Government Format) ====================
+export const generateTaxInvoiceTemplate = (): string => `
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Times New Roman", "Calibri", serif;
+    font-size: 13px;
+    color: #000;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+  }
+  .tax-invoice-container { width: 800px; margin: 0 auto; padding: 20px; }
+  .tax-invoice-page { width: 100%; border: 2px solid #000; padding: 0; background: #fff; }
+  .ti-title { text-align: center; font-size: 22px; font-weight: bold; padding: 15px 0 10px; text-decoration: underline; letter-spacing: 2px; }
+  .ti-row { display: flex; border-top: 1px solid #000; }
+  .ti-row .ti-cell { flex: 1; padding: 8px 12px; border-right: 1px solid #000; font-size: 13px; }
+  .ti-row .ti-cell:last-child { border-right: none; }
+  .ti-two-blocks { display: flex; border-top: 1px solid #000; }
+  .ti-two-blocks .ti-block-half { flex: 1; padding: 10px 12px; }
+  .ti-two-blocks .ti-block-half:first-child { border-right: 1px solid #000; }
+  .ti-block { border-top: 1px solid #000; padding: 10px 12px; }
+  .ti-block-row { display: flex; margin: 3px 0; }
+  .ti-block-label { font-weight: bold; min-width: 160px; flex-shrink: 0; }
+  .ti-block-value { flex: 1; }
+  table.ti-items { width: 100%; border-collapse: collapse; border-top: 1px solid #000; }
+  table.ti-items th { background: #f0f0f0; font-weight: bold; text-align: center; padding: 10px 6px; border: 1px solid #000; font-size: 12px; }
+  table.ti-items td { font-size: 13px; padding: 8px 6px; border: 1px solid #000; }
+  .ti-totals { border-top: 2px solid #000; }
+  .ti-totals-row { display: flex; border-bottom: 1px solid #000; }
+  .ti-totals-row:last-child { border-bottom: none; }
+  .ti-totals-label { flex: 1; padding: 8px 12px; font-weight: bold; border-right: 1px solid #000; }
+  .ti-totals-value { width: 200px; text-align: right; padding: 8px 12px; font-weight: bold; }
+  .ti-words-row { border-top: 1px solid #000; padding: 10px 12px; }
+  .ti-words-label { font-weight: bold; margin-bottom: 4px; }
+  .ti-words-value { text-transform: uppercase; font-weight: bold; font-size: 12px; }
+  .ti-payment-row { border-top: 1px solid #000; padding: 8px 12px; display: flex; }
+  .ti-footer-ref { border-top: 1px solid #000; padding: 6px 12px; font-size: 10px; color: #666; text-align: right; }
+  .ti-signatures { border-top: 2px solid #000; display: flex; padding: 20px 12px 30px; justify-content: space-between; }
+  .ti-sig-box { flex: 1; text-align: center; padding: 0 10px; }
+  .ti-sig-line { border-bottom: 1px solid #000; height: 60px; margin: 0 15px 8px; }
+  .ti-sig-label { font-weight: bold; font-size: 12px; }
+  @media print { body { margin: 0; } .tax-invoice-container { width: 100%; padding: 0; } }
+</style>
+<div class="tax-invoice-container">
+  <div class="tax-invoice-page">
+    <div class="ti-title">Tax Invoice</div>
+
+    <div class="ti-row">
+      <div class="ti-cell"><strong>Date of Invoice :</strong> {{invoice_date}}</div>
+      <div class="ti-cell"><strong>Tax Invoice No. :</strong> {{tax_invoice_no}}</div>
+    </div>
+
+    <div class="ti-two-blocks">
+      <div class="ti-block-half">
+        <div class="ti-block-row"><span class="ti-block-label">Supplier's TIN :</span><span class="ti-block-value">{{supplier_tin}}</span></div>
+        <div class="ti-block-row"><span class="ti-block-label">Name :</span><span class="ti-block-value">{{supplier_name}}</span></div>
+        <div class="ti-block-row"><span class="ti-block-label">Address :</span><span class="ti-block-value">{{supplier_address}}</span></div>
+        <div class="ti-block-row"><span class="ti-block-label">Telephone No. :</span><span class="ti-block-value">{{supplier_phone}}</span></div>
+      </div>
+      <div class="ti-block-half">
+        <div class="ti-block-row"><span class="ti-block-label">Purchaser's TIN :</span><span class="ti-block-value">{{purchaser_tin}}</span></div>
+        <div class="ti-block-row"><span class="ti-block-label">Name :</span><span class="ti-block-value">{{purchaser_name}}</span></div>
+        <div class="ti-block-row"><span class="ti-block-label">Address :</span><span class="ti-block-value">{{purchaser_address}}</span></div>
+        <div class="ti-block-row"><span class="ti-block-label">Telephone No. :</span><span class="ti-block-value">{{purchaser_phone}}</span></div>
+      </div>
+    </div>
+
+    <div class="ti-row">
+      <div class="ti-cell"><strong>Date of Delivery :</strong> {{date_of_delivery}}</div>
+      <div class="ti-cell"><strong>Place of Supply :</strong> {{place_of_supply}}</div>
+    </div>
+
+    <div class="ti-block" style="min-height:40px;">
+      <div class="ti-block-row"><span class="ti-block-label">Additional Information :</span><span class="ti-block-value">{{additional_information}}</span></div>
+    </div>
+
+    <table class="ti-items">
+      <thead>
+        <tr>
+          <th style="width:10%">Reference</th>
+          <th style="width:40%">Description of Goods or Services</th>
+          <th style="width:10%">Quantity</th>
+          <th style="width:18%">Unit Price</th>
+          <th style="width:22%">Amount Excluding<br/>VAT (Rs.)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{line_items}}
+      </tbody>
+    </table>
+
+    <div class="ti-totals">
+      <div class="ti-totals-row">
+        <div class="ti-totals-label">Total Value of Supply</div>
+        <div class="ti-totals-value">{{total_value_of_supply}}</div>
+      </div>
+      <div class="ti-totals-row">
+        <div class="ti-totals-label">VAT Amount (Total Value of Supply @ {{vat_rate}}%)</div>
+        <div class="ti-totals-value">{{vat_amount}}</div>
+      </div>
+      <div class="ti-totals-row" style="background:#f0f0f0; font-size:15px;">
+        <div class="ti-totals-label">Total Amount including VAT</div>
+        <div class="ti-totals-value">{{total_including_vat}}</div>
+      </div>
+    </div>
+
+    <div class="ti-words-row">
+      <div class="ti-words-label">Total Amount in words :</div>
+      <div class="ti-words-value">{{total_in_words}}</div>
+    </div>
+
+    <div class="ti-payment-row">
+      <span class="ti-block-label">Mode of Payment :</span>
+      <span class="ti-block-value">{{mode_of_payment}}</span>
+    </div>
+
+    <div class="ti-footer-ref">EOG 02/04/05</div>
+
+    <div class="ti-signatures">
+      <div class="ti-sig-box">
+        <div class="ti-sig-line"></div>
+        <div class="ti-sig-label">Prepared By</div>
+      </div>
+      <div class="ti-sig-box">
+        <div class="ti-sig-line"></div>
+        <div class="ti-sig-label">Approved By</div>
+      </div>
+      <div class="ti-sig-box">
+        <div class="ti-sig-line"></div>
+        <div class="ti-sig-label">Customer</div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
 // Export all templates as a map
 export const defaultTemplates: Record<string, () => string> = {
   ar_invoice: generateARInvoiceTemplate,
@@ -1032,6 +1168,7 @@ export const defaultTemplates: Record<string, () => string> = {
   cheque_voucher: generateChequeVoucherTemplate,
   wht_certificate: generateWHTCertificateTemplate,
   grn: generateGRNTemplate,
+  tax_invoice: generateTaxInvoiceTemplate,
 };
 
 // Template display names
@@ -1048,4 +1185,5 @@ export const templateDisplayNames: Record<string, string> = {
   cheque_voucher: "Cheque Payment Voucher",
   wht_certificate: "WHT Certificate",
   grn: "Goods Receipt Note (GRN)",
+  tax_invoice: "Sri Lanka Tax Invoice",
 };

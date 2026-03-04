@@ -1,6 +1,7 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { generateSriLankaTaxInvoiceHTML } from './sri-lanka-tax-invoice-generator';
+import { resolveTaxInvoiceHTML } from './tax-invoice-template-resolver';
 
 export interface LightVehicleOrderInvoiceData {
   invoiceNo?: string;
@@ -791,7 +792,43 @@ export function generateLightVehicleOrderInvoiceHTML(data: LightVehicleOrderInvo
 }
 
 export async function generateLightVehicleOrderInvoicePDF(data: LightVehicleOrderInvoiceData): Promise<Blob> {
-  const html = generateLightVehicleOrderInvoiceHTML(data);
+  const isTaxInvoice = data.invoiceCategory === 'tax_invoice';
+
+  let html: string;
+  if (isTaxInvoice) {
+    const taxRate = data.taxRate || 18;
+    const baseAmount = data.totalAmount / (1 + taxRate / 100);
+    const vehicleDescription = [
+      data.vehicleMake, data.vehicleModel, data.vehicleYear,
+      data.vehicleCondition, data.fuelType,
+      data.engineNumber ? `Engine: ${data.engineNumber}` : null,
+      data.chassisNumber ? `Chassis: ${data.chassisNumber}` : null,
+    ].filter(Boolean).join(' | ');
+
+    html = await resolveTaxInvoiceHTML({
+      invoiceDate: data.invoiceDate || new Date().toISOString(),
+      taxInvoiceNo: data.invoiceNo || data.orderNo,
+      supplierTin: data.supplierTin || '',
+      supplierName: data.supplierName || data.companyName || 'NCG Holdings (Pvt) Ltd',
+      supplierAddress: data.supplierAddress || data.companyAddress || '',
+      supplierPhone: data.supplierPhone || data.companyPhone || '',
+      purchaserTin: data.purchaserTin || '',
+      purchaserName: data.customerName,
+      purchaserAddress: data.customerAddress || '',
+      purchaserPhone: data.purchaserPhone || data.customerPhone || '',
+      dateOfDelivery: data.dateOfDelivery,
+      placeOfSupply: data.placeOfSupply,
+      additionalInformation: data.additionalInformation,
+      lineItems: [{ reference: '1', description: vehicleDescription, quantity: data.quantity, unitPrice: baseAmount / data.quantity, amountExclVat: baseAmount }],
+      vatRate: taxRate,
+      modeOfPayment: data.modeOfPayment,
+      preparedBy: data.signatures?.preparedBy ? { name: data.signatures.preparedBy.name, signature: data.signatures.preparedBy.signature, date: data.signatures.preparedBy.date } : undefined,
+      approvedBy: data.signatures?.approvedBy ? { name: data.signatures.approvedBy.name, signature: data.signatures.approvedBy.signature, date: data.signatures.approvedBy.date } : undefined,
+      customerSignature: data.signatures?.receivedBy ? { name: data.signatures.receivedBy.name, signature: data.signatures.receivedBy.signature, date: data.signatures.receivedBy.date } : undefined,
+    });
+  } else {
+    html = generateLightVehicleOrderInvoiceHTML(data);
+  }
   
   // Create a temporary container
   const container = document.createElement('div');
