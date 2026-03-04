@@ -25,6 +25,18 @@ export interface SpreadsheetOrder {
   notes: string | null;
 }
 
+export interface NewOrderData {
+  customer_name: string;
+  company_name: string;
+  bus_model: string;
+  quantity: number;
+  unit_price: number;
+  total_amount: number;
+  payment_mode: string;
+  expected_delivery_date?: string;
+  notes?: string;
+}
+
 export function useYutongSpreadsheetData() {
   const [orders, setOrders] = useState<SpreadsheetOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +45,6 @@ export function useYutongSpreadsheetData() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch orders with quotation info
       const { data: rawOrders, error: ordersError } = await supabase
         .from('yutong_orders')
         .select(`
@@ -46,23 +57,19 @@ export function useYutongSpreadsheetData() {
 
       if (ordersError) throw ordersError;
 
-      // Fetch delivery orders
       const { data: deliveryOrders } = await supabase
         .from('yutong_delivery_orders')
         .select('order_id, do_no, status');
 
-      // Fetch cash receipts  
       const { data: cashReceipts } = await supabase
         .from('yutong_cash_receipts')
         .select('order_id, amount');
 
-      // Fetch customer payments
       const { data: payments } = await supabase
         .from('yutong_customer_payments')
         .select('order_id, payment_amount, payment_method, status')
         .in('status', ['received', 'verified']);
 
-      // Build lookup maps
       const doMap = new Map<string, string>();
       (deliveryOrders || []).forEach((d: any) => {
         const existing = doMap.get(d.order_id) || '';
@@ -118,7 +125,6 @@ export function useYutongSpreadsheetData() {
 
   const updateOrderField = useCallback(async (orderId: string, field: string, value: any) => {
     try {
-      // Optimistic update
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, [field]: value } : o));
 
       const { error } = await supabase
@@ -130,15 +136,58 @@ export function useYutongSpreadsheetData() {
     } catch (err: any) {
       console.error('Error updating order:', err);
       toast({ title: 'Update Failed', description: err.message, variant: 'destructive' });
-      fetchData(); // Revert on error
+      fetchData();
     }
   }, [toast, fetchData]);
+
+  const addOrder = useCallback(async (data: NewOrderData) => {
+    try {
+      const orderNo = `YTO-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
+      const { error } = await supabase
+        .from('yutong_orders')
+        .insert({
+          order_no: orderNo,
+          bus_model: data.bus_model,
+          quantity: data.quantity,
+          unit_price: data.unit_price,
+          total_amount: data.total_amount,
+          balance_due: data.total_amount,
+          payment_mode: data.payment_mode as any,
+          expected_delivery_date: data.expected_delivery_date || null,
+          notes: data.notes || null,
+          status: 'pending',
+          order_date: new Date().toISOString().slice(0, 10),
+        });
+
+      if (error) throw error;
+      toast({ title: 'Order Added', description: 'New order row created successfully' });
+      await fetchData();
+    } catch (err: any) {
+      console.error('Error adding order:', err);
+      toast({ title: 'Add Failed', description: err.message, variant: 'destructive' });
+    }
+  }, [toast, fetchData]);
+
+  const deleteOrder = useCallback(async (orderId: string) => {
+    try {
+      const { error } = await supabase
+        .from('yutong_orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) throw error;
+      toast({ title: 'Order Deleted', description: 'Order removed successfully' });
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+    } catch (err: any) {
+      console.error('Error deleting order:', err);
+      toast({ title: 'Delete Failed', description: err.message, variant: 'destructive' });
+    }
+  }, [toast]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Real-time subscription
   useEffect(() => {
     const channel = supabase
       .channel('yutong-orders-spreadsheet')
@@ -150,5 +199,5 @@ export function useYutongSpreadsheetData() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
-  return { orders, loading, refetch: fetchData, updateOrderField };
+  return { orders, loading, refetch: fetchData, updateOrderField, addOrder, deleteOrder };
 }

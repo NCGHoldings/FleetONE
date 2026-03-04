@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Share2, ExternalLink } from 'lucide-react';
 
 export function YutongOrderSpreadsheet() {
-  const { orders, loading, refetch, updateOrderField } = useYutongSpreadsheetData();
+  const { orders, loading, refetch, updateOrderField, addOrder, deleteOrder } = useYutongSpreadsheetData();
   const [showShare, setShowShare] = useState(false);
 
   return (
@@ -31,6 +31,8 @@ export function YutongOrderSpreadsheet() {
         loading={loading}
         onUpdate={updateOrderField}
         onRefresh={refetch}
+        onAddOrder={addOrder}
+        onDeleteOrder={deleteOrder}
       />
 
       <YutongSpreadsheetShareDialog open={showShare} onOpenChange={setShowShare} />

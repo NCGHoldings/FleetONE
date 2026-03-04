@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json()
-    const { access_code, action, order_id, field, value } = body
+    const { access_code, action, order_id, field, value, order_data } = body
 
     if (!access_code || typeof access_code !== 'string') {
       return new Response(JSON.stringify({ error: 'Access code is required' }), {
@@ -41,6 +41,56 @@ Deno.serve(async (req) => {
     if (storedCode !== access_code) {
       return new Response(JSON.stringify({ error: 'Invalid access code' }), {
         status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Handle delete action
+    if (action === 'delete' && order_id) {
+      const { error } = await supabase
+        .from('yutong_orders')
+        .delete()
+        .eq('id', order_id)
+
+      if (error) {
+        console.error('Delete error:', error)
+        return new Response(JSON.stringify({ error: 'Failed to delete order' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Handle add action
+    if (action === 'add' && order_data) {
+      const orderNo = `YTO-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+      const { error } = await supabase
+        .from('yutong_orders')
+        .insert({
+          order_no: orderNo,
+          bus_model: order_data.bus_model,
+          quantity: order_data.quantity || 1,
+          unit_price: order_data.unit_price || 0,
+          total_amount: order_data.total_amount || 0,
+          balance_due: order_data.total_amount || 0,
+          payment_mode: order_data.payment_mode || 'cash',
+          expected_delivery_date: order_data.expected_delivery_date || null,
+          notes: order_data.notes || null,
+          status: 'pending',
+          order_date: new Date().toISOString().slice(0, 10),
+        })
+
+      if (error) {
+        console.error('Add error:', error)
+        return new Response(JSON.stringify({ error: 'Failed to add order' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

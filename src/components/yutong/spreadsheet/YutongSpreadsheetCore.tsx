@@ -4,8 +4,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Download, RefreshCw, TrendingUp, DollarSign, ShoppingCart, Percent } from 'lucide-react';
-import { SpreadsheetOrder } from '@/hooks/useYutongSpreadsheetData';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
+import { Search, Download, RefreshCw, TrendingUp, DollarSign, ShoppingCart, Percent, Plus, Pencil, Trash2 } from 'lucide-react';
+import { SpreadsheetOrder, NewOrderData } from '@/hooks/useYutongSpreadsheetData';
 import * as XLSX from 'xlsx';
 
 interface YutongSpreadsheetCoreProps {
@@ -13,6 +16,8 @@ interface YutongSpreadsheetCoreProps {
   loading: boolean;
   onUpdate: (orderId: string, field: string, value: any) => void;
   onRefresh: () => void;
+  onAddOrder?: (data: NewOrderData) => Promise<void>;
+  onDeleteOrder?: (orderId: string) => Promise<void>;
   isPublic?: boolean;
 }
 
@@ -22,10 +27,26 @@ const PAYMENT_MODE_OPTIONS = ['cash', 'lease', 'bank_transfer', 'cheque', 'mixed
 
 const formatCurrency = (val: number) => val ? `LKR ${val.toLocaleString()}` : '-';
 
-export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, isPublic }: YutongSpreadsheetCoreProps) {
+const emptyForm: NewOrderData = {
+  customer_name: '',
+  company_name: '',
+  bus_model: '',
+  quantity: 1,
+  unit_price: 0,
+  total_amount: 0,
+  payment_mode: 'cash',
+  expected_delivery_date: '',
+  notes: '',
+};
+
+export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, onAddOrder, onDeleteOrder, isPublic }: YutongSpreadsheetCoreProps) {
   const [search, setSearch] = useState('');
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [addForm, setAddForm] = useState<NewOrderData>({ ...emptyForm });
+  const [addLoading, setAddLoading] = useState(false);
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return orders;
@@ -68,6 +89,27 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, is
     onUpdate(id, field, value);
   }, [onUpdate]);
 
+  const handleAddSubmit = async () => {
+    if (!onAddOrder) return;
+    setAddLoading(true);
+    try {
+      await onAddOrder({
+        ...addForm,
+        total_amount: addForm.total_amount || addForm.unit_price * addForm.quantity,
+      });
+      setShowAddDialog(false);
+      setAddForm({ ...emptyForm });
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteOrderId || !onDeleteOrder) return;
+    await onDeleteOrder(deleteOrderId);
+    setDeleteOrderId(null);
+  };
+
   const exportToExcel = useCallback(() => {
     const data = filtered.map((o, i) => ({
       '#': i + 1,
@@ -96,16 +138,6 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, is
     XLSX.utils.book_append_sheet(wb, ws, 'Yutong Orders');
     XLSX.writeFile(wb, `Yutong_Orders_${new Date().toISOString().slice(0, 10)}.xlsx`);
   }, [filtered]);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': case 'delivered': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400';
-      case 'in_progress': case 'shipped': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'pending': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
-      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-      default: return 'bg-muted text-muted-foreground';
-    }
-  };
 
   const getBalanceColor = (balance: number, total: number) => {
     if (balance <= 0) return 'text-emerald-600 dark:text-emerald-400';
@@ -169,6 +201,9 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, is
     return <span className="text-xs px-1">{value ?? '-'}</span>;
   };
 
+  const hasActions = !!onAddOrder || !!onDeleteOrder;
+  const colCount = hasActions ? 21 : 20;
+
   return (
     <div className="space-y-4">
       {/* KPI Summary */}
@@ -230,6 +265,11 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, is
             className="pl-9 h-9"
           />
         </div>
+        {onAddOrder && (
+          <Button size="sm" onClick={() => setShowAddDialog(true)} className="gap-1">
+            <Plus className="h-3.5 w-3.5" /> Add Order
+          </Button>
+        )}
         <Button variant="outline" size="sm" onClick={onRefresh} className="gap-1">
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
         </Button>
@@ -247,7 +287,7 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, is
           <table className="w-full text-xs border-collapse">
             <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
               <tr>
-                {['#', 'Order No', 'Customer', 'Company', 'Bus Model', 'Qty', 'Total Amount', 'Status', 'Phase', 'DO', 'CR', 'Cheque', 'Cash', 'Total Paid', 'Balance Due', 'Pay Mode', 'Progress', 'Order Date', 'Exp. Delivery', 'Remark'].map((h, i) => (
+                {['#', 'Order No', 'Customer', 'Company', 'Bus Model', 'Qty', 'Total Amount', 'Status', 'Phase', 'DO', 'CR', 'Cheque', 'Cash', 'Total Paid', 'Balance Due', 'Pay Mode', 'Progress', 'Order Date', 'Exp. Delivery', 'Remark', ...(hasActions ? ['Actions'] : [])].map((h) => (
                   <th key={h} className="px-2 py-2 text-left font-semibold text-muted-foreground border-b border-r last:border-r-0 whitespace-nowrap select-none">
                     {h}
                   </th>
@@ -288,13 +328,30 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, is
                   <td className="px-2 py-1 border-r">
                     {renderCell(order, 'expected_delivery_date', true, 'date')}
                   </td>
-                  <td className="px-2 py-1 min-w-[150px]">
+                  <td className="px-2 py-1 border-r min-w-[150px]">
                     {renderCell(order, 'notes', true, 'text')}
                   </td>
+                  {hasActions && (
+                    <td className="px-2 py-1 whitespace-nowrap">
+                      <div className="flex gap-1">
+                        {onDeleteOrder && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteOrderId(order.id)}
+                            title="Delete order"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={20} className="text-center py-8 text-muted-foreground">No orders found</td></tr>
+                <tr><td colSpan={colCount} className="text-center py-8 text-muted-foreground">No orders found</td></tr>
               )}
             </tbody>
             {filtered.length > 0 && (
@@ -309,13 +366,95 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, is
                   <td className="px-2 py-2 border-t border-r text-right">{formatCurrency(filtered.reduce((s, o) => s + o.cash_total, 0))}</td>
                   <td className="px-2 py-2 border-t border-r text-right">{formatCurrency(filtered.reduce((s, o) => s + o.total_paid, 0))}</td>
                   <td className="px-2 py-2 border-t border-r text-right">{formatCurrency(filtered.reduce((s, o) => s + o.balance_due, 0))}</td>
-                  <td colSpan={5} className="px-2 py-2 border-t" />
+                  <td colSpan={hasActions ? 6 : 5} className="px-2 py-2 border-t" />
                 </tr>
               </tfoot>
             )}
           </table>
         )}
       </div>
+
+      {/* Add Order Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add New Order</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Customer Name</Label>
+                <Input value={addForm.customer_name} onChange={(e) => setAddForm(p => ({ ...p, customer_name: e.target.value }))} placeholder="Customer name" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Company Name</Label>
+                <Input value={addForm.company_name} onChange={(e) => setAddForm(p => ({ ...p, company_name: e.target.value }))} placeholder="Company name" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Bus Model *</Label>
+              <Input value={addForm.bus_model} onChange={(e) => setAddForm(p => ({ ...p, bus_model: e.target.value }))} placeholder="e.g. ZK6122H" />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Quantity</Label>
+                <Input type="number" min={1} value={addForm.quantity} onChange={(e) => setAddForm(p => ({ ...p, quantity: Number(e.target.value) || 1 }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Unit Price</Label>
+                <Input type="number" min={0} value={addForm.unit_price} onChange={(e) => setAddForm(p => ({ ...p, unit_price: Number(e.target.value) || 0, total_amount: (Number(e.target.value) || 0) * p.quantity }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Total Amount</Label>
+                <Input type="number" min={0} value={addForm.total_amount} onChange={(e) => setAddForm(p => ({ ...p, total_amount: Number(e.target.value) || 0 }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Payment Mode</Label>
+                <Select value={addForm.payment_mode} onValueChange={(v) => setAddForm(p => ({ ...p, payment_mode: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_MODE_OPTIONS.map(o => <SelectItem key={o} value={o}>{o.replace(/_/g, ' ')}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Expected Delivery</Label>
+                <Input type="date" value={addForm.expected_delivery_date} onChange={(e) => setAddForm(p => ({ ...p, expected_delivery_date: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Notes</Label>
+              <Input value={addForm.notes} onChange={(e) => setAddForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
+            <Button onClick={handleAddSubmit} disabled={!addForm.bus_model || addLoading}>
+              {addLoading ? 'Adding...' : 'Add Order'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteOrderId} onOpenChange={(open) => !open && setDeleteOrderId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this order? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
