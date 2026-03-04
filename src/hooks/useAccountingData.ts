@@ -460,6 +460,20 @@ export const useAPPayments = () => {
             email,
             phone,
             contact_person
+          ),
+          bank_accounts (
+            id,
+            account_name,
+            bank_name,
+            account_number
+          ),
+          vendor_bank_accounts (
+            id,
+            bank_name,
+            bank_branch,
+            account_number,
+            account_holder_name,
+            account_label
           )
         `)
         .order("payment_date", { ascending: false });

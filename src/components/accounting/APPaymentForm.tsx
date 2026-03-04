@@ -226,6 +226,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
         reference: data.reference,
         notes: data.notes,
         is_advance: isAdvance,
+        vendor_bank_account_id: selectedBankAccountId || undefined,
         allocations: selectedAllocations.map((a) => ({
           invoice_id: a.invoice_id,
           allocated_amount: a.allocated_amount,
