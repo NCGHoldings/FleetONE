@@ -1,33 +1,26 @@
 
 
-# Fix AP Payment Bank Account Issues
+# Add GL Account Selector to AP Invoice Lines
 
-## Problems Identified
-
-1. **Vendor Pay-To account not saved**: The form has a "Pay To Account" selector (`selectedBankAccountId`) but never passes it to the mutation. The `ap_payments` table has a `vendor_bank_account_id` column (with FK to `vendor_bank_accounts`) that is never populated.
-
-2. **Source bank account not joined in query**: `useAPPayments` fetches `ap_payments` with only `vendors(...)` joined. It does NOT join `bank_accounts` (source) or `vendor_bank_accounts` (pay-to), so the Payment Voucher preview cannot display bank details.
-
-3. **Payment Voucher document shows empty bank fields**: `mapDocumentToPlaceholders` references `documentData?.bank_accounts?.account_name` and `documentData?.vendor_bank_accounts?.bank_name` but these are always empty because the data is never fetched.
+## Problem
+AP Invoice lines have no way to specify which GL expense account each line should hit. For miscellaneous expenses (water bills, utilities, etc.), users need to manually link a COA account per line. Currently the `account_id` column exists in `ap_invoice_lines` but is never populated from the form.
 
 ## Changes
 
-### 1. `src/components/accounting/APPaymentForm.tsx`
-- Pass `vendor_bank_account_id: selectedBankAccountId` in the `createPayment.mutateAsync()` call
+### 1. `src/components/accounting/APInvoiceForm.tsx`
+- Add `account_id` field to the `InvoiceLine` interface
+- Add a new **"GL Account"** column in the invoice lines table with a searchable COA account selector (using the existing `SearchableAccountSelector` component)
+- If the user does not select an account, it defaults to the `default_expense_account_id` from `gl_settings` (fetched once when the form opens)
+- Import `useChartOfAccounts` or fetch COA for the selector
+- Pass `account_id` through to the `onSubmit` lines data
 
-### 2. `src/hooks/useAccountingMutations.ts` (useCreateAPPayment)
-- Accept `vendor_bank_account_id` in the mutation input
-- Save it to the `ap_payments` insert: `vendor_bank_account_id: payment.vendor_bank_account_id`
+### 2. `src/hooks/useAccountingMutations.ts` (`useCreateAPInvoice`)
+- Add `account_id?: string` to the line type in the mutation input
+- Include `account_id` in the `lineData` insert map so it persists to `ap_invoice_lines.account_id`
 
-### 3. `src/hooks/useAccountingData.ts` (useAPPayments)
-- Join `bank_accounts(id, account_name, bank_name, account_number)` via `bank_account_id`
-- Join `vendor_bank_accounts(id, bank_name, bank_branch, account_number, account_holder_name, account_label)` via `vendor_bank_account_id`
-
-### 4. `src/lib/document-template-utils.ts`
-- Already has placeholders for `{{source_account}}`, `{{source_bank}}`, `{{vendor_bank_name}}` etc. — these will now populate correctly once the joins are in place. No changes needed here.
-
-## Result
-- Vendor pay-to bank account selection is persisted in `ap_payments.vendor_bank_account_id`
-- Payment Voucher preview shows source bank name/number and vendor pay-to bank details
-- All existing placeholders like `{{source_account}}`, `{{vendor_bank_name}}`, `{{vendor_account_number}}` render correctly
+### Result
+- Each AP invoice line gets an optional searchable GL account selector
+- Users can manually assign expense accounts (e.g., Water & Electricity, Repairs, etc.)
+- If left blank, the system can fall back to the default expense account from GL settings
+- The `account_id` is saved to the database for accurate GL posting
 
