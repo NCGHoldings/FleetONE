@@ -75,7 +75,7 @@ export function useLightVehicleOrderInvoiceManagement() {
 
   const generateInvoice = async (
     invoiceData: LightVehicleOrderInvoiceData,
-    invoiceCategory: 'direct_invoice' | 'proforma_invoice',
+    invoiceCategory: 'direct_invoice' | 'proforma_invoice' | 'tax_invoice',
     proformaConfig?: {
       amountPercentage?: number;
       financeCompanyName?: string;

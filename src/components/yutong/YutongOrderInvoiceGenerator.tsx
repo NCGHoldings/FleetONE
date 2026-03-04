@@ -248,7 +248,14 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
        tax_rate: config.taxRate,
        company_vat_number: '101116190 - 7000',
        base_amount: config.isTaxInvoice ? order.total_amount / (1 + (config.taxRate || 18) / 100) : undefined,
-       vat_amount: config.isTaxInvoice ? order.total_amount - (order.total_amount / (1 + (config.taxRate || 18) / 100)) : undefined
+       vat_amount: config.isTaxInvoice ? order.total_amount - (order.total_amount / (1 + (config.taxRate || 18) / 100)) : undefined,
+       // Sri Lanka government format fields
+       supplier_tin: config.supplierTin || '101116190 - 7000',
+       purchaser_tin: config.purchaserTin || config.customerVatNumber,
+       place_of_supply: config.placeOfSupply,
+       date_of_delivery: config.dateOfDelivery,
+       mode_of_payment: config.modeOfPayment,
+       additional_information: config.additionalInformation
     };
     
     console.log('📋 Final invoice data prepared:', invoiceData);

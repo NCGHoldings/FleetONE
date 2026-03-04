@@ -1,5 +1,6 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { generateSriLankaTaxInvoiceHTML } from './sri-lanka-tax-invoice-generator';
 
 export interface LightVehicleOrderInvoiceData {
   invoiceNo?: string;
@@ -72,14 +73,71 @@ export interface LightVehicleOrderInvoiceData {
   
   // Template customization
   customHeaderImageUrl?: string;
+  
+  // Tax Invoice fields (Sri Lanka Government Format)
+  supplierTin?: string;
+  supplierName?: string;
+  supplierAddress?: string;
+  supplierPhone?: string;
+  purchaserTin?: string;
+  purchaserPhone?: string;
+  dateOfDelivery?: string;
+  placeOfSupply?: string;
+  modeOfPayment?: string;
+  additionalInformation?: string;
+  taxRate?: number;
 }
 
 export function generateLightVehicleOrderInvoiceHTML(data: LightVehicleOrderInvoiceData): string {
   const isProforma = data.invoiceCategory === 'proforma_invoice';
+  const isTaxInvoice = data.invoiceCategory === 'tax_invoice';
   const displayAmount = isProforma && data.proformaAmount ? data.proformaAmount : data.totalAmount;
   const invoiceTitle = isProforma ? 'PROFORMA INVOICE' : 'TAX INVOICE';
   const footerPhone = data.responsiblePersonPhone || '+94 77 123 4567';
   const footerEmail = data.responsiblePersonEmail || 'info@ncgholdings.lk';
+
+  // For tax invoices, use the Sri Lankan government-mandated format
+  if (isTaxInvoice) {
+    const taxRate = data.taxRate || 18;
+    const baseAmount = data.totalAmount / (1 + taxRate / 100);
+    const vehicleDescription = [
+      data.vehicleMake,
+      data.vehicleModel,
+      data.vehicleYear,
+      data.vehicleCondition,
+      data.fuelType,
+      data.engineNumber ? `Engine: ${data.engineNumber}` : null,
+      data.chassisNumber ? `Chassis: ${data.chassisNumber}` : null,
+    ].filter(Boolean).join(' | ');
+
+    return generateSriLankaTaxInvoiceHTML({
+      invoiceDate: data.invoiceDate || new Date().toISOString(),
+      taxInvoiceNo: data.invoiceNo || data.orderNo,
+      supplierTin: data.supplierTin || '',
+      supplierName: data.supplierName || data.companyName || 'NCG Holdings (Pvt) Ltd',
+      supplierAddress: data.supplierAddress || data.companyAddress || '',
+      supplierPhone: data.supplierPhone || data.companyPhone || '',
+      purchaserTin: data.purchaserTin || '',
+      purchaserName: data.customerName,
+      purchaserAddress: data.customerAddress || '',
+      purchaserPhone: data.purchaserPhone || data.customerPhone || '',
+      dateOfDelivery: data.dateOfDelivery,
+      placeOfSupply: data.placeOfSupply,
+      additionalInformation: data.additionalInformation,
+      lineItems: [{
+        reference: '1',
+        description: vehicleDescription,
+        quantity: data.quantity,
+        unitPrice: baseAmount / data.quantity,
+        amountExclVat: baseAmount,
+      }],
+      vatRate: taxRate,
+      modeOfPayment: data.modeOfPayment,
+      preparedBy: data.signatures?.preparedBy ? { name: data.signatures.preparedBy.name, signature: data.signatures.preparedBy.signature, date: data.signatures.preparedBy.date } : undefined,
+      approvedBy: data.signatures?.approvedBy ? { name: data.signatures.approvedBy.name, signature: data.signatures.approvedBy.signature, date: data.signatures.approvedBy.date } : undefined,
+      customerSignature: data.signatures?.receivedBy ? { name: data.signatures.receivedBy.name, signature: data.signatures.receivedBy.signature, date: data.signatures.receivedBy.date } : undefined,
+    });
+  }
   
   const formatCurrency = (amount: number) => {
     return `LKR ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

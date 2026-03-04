@@ -51,8 +51,9 @@ export function LightVehicleOrderInvoiceGenerator({ order, onRefresh }: LightVeh
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<LightVehicleInvoiceRecord | null>(null);
   const [pendingInvoiceType, setPendingInvoiceType] = useState<{
-    type: 'direct_invoice' | 'proforma_invoice';
+    type: 'direct_invoice' | 'proforma_invoice' | 'tax_invoice';
     config?: any;
+    taxConfig?: any;
   } | null>(null);
 
   const loadInvoices = async () => {
@@ -75,34 +76,35 @@ export function LightVehicleOrderInvoiceGenerator({ order, onRefresh }: LightVeh
   };
 
   const handleTypeSelected = (
-    type: 'direct_invoice' | 'proforma_invoice',
-    proformaConfig?: any
+    type: 'direct_invoice' | 'proforma_invoice' | 'tax_invoice',
+    proformaConfig?: any,
+    taxConfig?: any
   ) => {
     if (!vehicleDetailsComplete) {
-      setPendingInvoiceType({ type, config: proformaConfig });
+      setPendingInvoiceType({ type, config: proformaConfig, taxConfig });
       setDataModalOpen(true);
     } else {
-      generateInvoiceNow(type, proformaConfig);
+      generateInvoiceNow(type, proformaConfig, undefined, taxConfig);
     }
   };
 
   const handleVehicleDataComplete = async (data: any) => {
-    // Update order with vehicle details (in real app, save to DB)
-    // For now, merge with order data and generate invoice
     if (pendingInvoiceType) {
       await generateInvoiceNow(
         pendingInvoiceType.type,
         pendingInvoiceType.config,
-        data
+        data,
+        pendingInvoiceType.taxConfig
       );
       setPendingInvoiceType(null);
     }
   };
 
   const generateInvoiceNow = async (
-    type: 'direct_invoice' | 'proforma_invoice',
+    type: 'direct_invoice' | 'proforma_invoice' | 'tax_invoice',
     proformaConfig?: any,
-    vehicleOverrides?: any
+    vehicleOverrides?: any,
+    taxConfig?: any
   ) => {
     const invoiceData: LightVehicleOrderInvoiceData = {
       orderId: order.id,
@@ -126,7 +128,18 @@ export function LightVehicleOrderInvoiceGenerator({ order, onRefresh }: LightVeh
       unitPrice: order.unit_price,
       quantity: order.quantity,
       totalAmount: order.total_price,
-      amountPaid: order.total_paid
+      amountPaid: order.total_paid,
+      invoiceCategory: type,
+      // Tax invoice fields
+      ...(taxConfig && {
+        supplierTin: taxConfig.supplierTin,
+        purchaserTin: taxConfig.purchaserTin,
+        placeOfSupply: taxConfig.placeOfSupply,
+        dateOfDelivery: taxConfig.dateOfDelivery,
+        modeOfPayment: taxConfig.modeOfPayment,
+        additionalInformation: taxConfig.additionalInformation,
+        taxRate: taxConfig.taxRate,
+      })
     };
 
     const invoiceId = await generateInvoice(invoiceData, type, proformaConfig);

@@ -1,6 +1,7 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { convertNumberToWords } from './number-to-words';
+import { generateSriLankaTaxInvoiceHTML } from './sri-lanka-tax-invoice-generator';
 
 export interface YutongOrderInvoiceData {
   invoice_no: string;
@@ -41,6 +42,17 @@ export interface YutongOrderInvoiceData {
   tax_rate?: number;
   base_amount?: number;
   vat_amount?: number;
+  // Sri Lanka Tax Invoice additional fields
+  supplier_tin?: string;
+  supplier_name?: string;
+  supplier_address?: string;
+  supplier_phone?: string;
+  purchaser_tin?: string;
+  purchaser_phone?: string;
+  date_of_delivery?: string;
+  place_of_supply?: string;
+  mode_of_payment?: string;
+  additional_information?: string;
   // Payment tracking
   paymentsReceived?: Array<{
     payment_date: string;
@@ -87,11 +99,51 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
    const baseAmount = isTaxInvoice ? (data.base_amount || data.total / (1 + taxRate / 100)) : data.subtotal;
    const vatAmount = isTaxInvoice ? (data.vat_amount || data.total - baseAmount) : 0;
    const taxAmountInWords = isTaxInvoice ? convertNumberToWords(baseAmount) : amountInWords;
+
+   // For tax invoices, use the Sri Lankan government-mandated format
+   if (isTaxInvoice) {
+     const vehicleDescription = [
+       data.make,
+       data.bus_model,
+       `${data.seating_capacity} Seater`,
+       `${data.year_of_manufacture}`,
+       data.vehicle_condition,
+       data.fuel_type,
+       `Engine: ${data.engine_number}`,
+       `Chassis: ${data.chassis_number}`,
+     ].filter(Boolean).join(' | ');
+
+     return generateSriLankaTaxInvoiceHTML({
+       invoiceDate: data.invoice_date,
+       taxInvoiceNo: data.invoice_no,
+       supplierTin: data.supplier_tin || data.company_vat_number || '',
+       supplierName: data.supplier_name || 'NCG Holdings (Pvt) Ltd',
+       supplierAddress: data.supplier_address || '157 Y, Kabellawita, Weniweikola, Polgasowita',
+       supplierPhone: data.supplier_phone || '0770455981',
+       purchaserTin: data.purchaser_tin || data.customer_vat_number || '',
+       purchaserName: data.customer_name,
+       purchaserAddress: data.address,
+       purchaserPhone: data.purchaser_phone || data.contact || '',
+       dateOfDelivery: data.date_of_delivery,
+       placeOfSupply: data.place_of_supply,
+       additionalInformation: data.additional_information,
+       lineItems: [{
+         reference: '1',
+         description: vehicleDescription,
+         quantity: data.quantity,
+         unitPrice: baseAmount / data.quantity,
+         amountExclVat: baseAmount,
+       }],
+       vatRate: taxRate,
+       modeOfPayment: data.mode_of_payment,
+       preparedBy: data.preparedBy ? { name: data.preparedBy.approver_name, signature: data.preparedBy.signature_data, date: data.preparedBy.approval_date } : undefined,
+       approvedBy: data.approvedBy ? { name: data.approvedBy.approver_name, signature: data.approvedBy.signature_data, date: data.approvedBy.approval_date } : undefined,
+       customerSignature: data.receivedBy ? { name: data.receivedBy.approver_name, signature: data.receivedBy.signature_data, date: data.receivedBy.approval_date } : undefined,
+     });
+   }
    
    // Header image based on invoice type - prioritize custom header from template
-   const defaultHeaderImage = isTaxInvoice 
-     ? '/lovable-uploads/yutong-tax-invoice-header.png' 
-     : '/lovable-uploads/yutong-invoice-header.png';
+   const defaultHeaderImage = '/lovable-uploads/yutong-invoice-header.png';
    const headerImage = data.customHeaderImageUrl || defaultHeaderImage;
 
   return `<!doctype html>
@@ -989,14 +1041,54 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
   console.log('📄 Starting PDF generation for invoice:', data.invoice_no);
   
    const isTaxInvoice = data.invoice_category === 'tax_invoice' || data.is_tax_invoice;
-   const headerImagePath = isTaxInvoice 
-     ? '/lovable-uploads/yutong-tax-invoice-header.png' 
-     : '/lovable-uploads/yutong-invoice-header.png';
-   
+
+   // For tax invoices, no header image needed (uses government format)
+   if (isTaxInvoice) {
+     const htmlContent = generateYutongOrderInvoiceHTML(data);
+     const container = document.createElement('div');
+     container.innerHTML = htmlContent;
+     container.style.position = 'absolute';
+     container.style.left = '-9999px';
+     document.body.appendChild(container);
+
+     try {
+       const page = container.querySelector('.tax-invoice-page') as HTMLElement;
+       if (!page) throw new Error('Tax invoice page not found');
+
+       const pdf = new jsPDF('p', 'mm', 'a4');
+       const pdfWidth = pdf.internal.pageSize.getWidth();
+       const pdfHeight = pdf.internal.pageSize.getHeight();
+
+       const canvas = await html2canvas(page, {
+         scale: 2.5,
+         useCORS: true,
+         allowTaint: true,
+         backgroundColor: '#ffffff',
+         logging: false,
+         width: 800,
+         windowWidth: 800
+       });
+
+       const imgData = canvas.toDataURL('image/jpeg', 0.95);
+       const ratio = Math.min(pdfWidth / canvas.width, pdfHeight / canvas.height);
+       const scaledWidth = canvas.width * ratio;
+       const scaledHeight = canvas.height * ratio;
+       const imgX = (pdfWidth - scaledWidth) / 2;
+
+       pdf.addImage(imgData, 'JPEG', imgX, 0, scaledWidth, scaledHeight);
+       const blob = pdf.output('blob');
+       return blob;
+     } finally {
+       document.body.removeChild(container);
+     }
+   }
+
+   const headerImagePath = '/lovable-uploads/yutong-invoice-header.png';
+  
   // Pre-load header image as base64
   console.log('🖼️ Loading header image...');
-   const headerImageBase64 = await loadImageAsBase64(headerImagePath);
-  
+  const headerImageBase64 = await loadImageAsBase64(headerImagePath);
+   
    if (!headerImageBase64) {
     console.warn('⚠️ Header image failed to load, proceeding anyway...');
   }

@@ -21,6 +21,13 @@ export interface ProformaInvoiceConfig {
    isTaxInvoice?: boolean;
    customerVatNumber?: string;
    taxRate?: number;
+   // Sri Lanka government format fields
+   supplierTin?: string;
+   purchaserTin?: string;
+   placeOfSupply?: string;
+   dateOfDelivery?: string;
+   modeOfPayment?: string;
+   additionalInformation?: string;
 }
 
 interface YutongInvoiceTypeModalProps {
@@ -55,15 +62,20 @@ export function YutongInvoiceTypeModal({
   const [financeCompanyAddress, setFinanceCompanyAddress] = useState('');
   const [proformaPurpose, setProformaPurpose] = useState('bank_leasing');
    const [customerVatNumber, setCustomerVatNumber] = useState('');
+   // New Sri Lanka tax invoice fields
+   const [supplierTin, setSupplierTin] = useState('');
+   const [purchaserTin, setPurchaserTin] = useState('');
+   const [placeOfSupply, setPlaceOfSupply] = useState('');
+   const [dateOfDelivery, setDateOfDelivery] = useState('');
+   const [modeOfPayment, setModeOfPayment] = useState('');
+   const [additionalInformation, setAdditionalInformation] = useState('');
 
-  // Update invoice category when defaultInvoiceType changes
   useEffect(() => {
     setInvoiceCategory(defaultInvoiceType);
   }, [defaultInvoiceType, isOpen]);
 
   const proformaAmount = Math.round((totalAmount * proformaPercentage) / 100);
    
-   // Tax calculation (18% VAT rate)
    const taxRate = 18;
    const baseAmount = totalAmount / (1 + taxRate / 100);
    const vatAmount = totalAmount - baseAmount;
@@ -81,26 +93,37 @@ export function YutongInvoiceTypeModal({
        ...(invoiceCategory === 'tax_invoice' && {
          isTaxInvoice: true,
          customerVatNumber: customerVatNumber || undefined,
-         taxRate
+         taxRate,
+         supplierTin: supplierTin || undefined,
+         purchaserTin: purchaserTin || customerVatNumber || undefined,
+         placeOfSupply: placeOfSupply || undefined,
+         dateOfDelivery: dateOfDelivery || undefined,
+         modeOfPayment: modeOfPayment || undefined,
+         additionalInformation: additionalInformation || undefined,
        })
     };
     onConfirm(config);
   };
 
   const handleClose = () => {
-    // Reset state on close
     setInvoiceCategory('direct_invoice');
     setProformaPercentage(70);
     setFinanceCompanyName('');
     setFinanceCompanyAddress('');
     setProformaPurpose('bank_leasing');
      setCustomerVatNumber('');
+     setSupplierTin('');
+     setPurchaserTin('');
+     setPlaceOfSupply('');
+     setDateOfDelivery('');
+     setModeOfPayment('');
+     setAdditionalInformation('');
     onClose();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -109,7 +132,6 @@ export function YutongInvoiceTypeModal({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Invoice Type Selection */}
           <RadioGroup
             value={invoiceCategory}
              onValueChange={(value) => setInvoiceCategory(value as 'direct_invoice' | 'proforma_invoice' | 'tax_invoice')}
@@ -146,44 +168,98 @@ export function YutongInvoiceTypeModal({
                <RadioGroupItem value="tax_invoice" id="tax" className="mt-1" />
                <div className="flex-1">
                  <Label htmlFor="tax" className="font-semibold text-base cursor-pointer">
-                   Tax Invoice
+                   Tax Invoice (Sri Lanka Government Format)
                  </Label>
                  <p className="text-sm text-muted-foreground mt-1">
-                   Invoice with VAT breakdown for registered businesses
+                   Government-mandated format with VAT breakdown
                  </p>
                  <p className="text-sm font-medium mt-2">
-                   Amount: LKR {totalAmount.toLocaleString()} (incl. 18% VAT)
+                   Amount: LKR {totalAmount.toLocaleString()} (incl. {taxRate}% VAT)
                  </p>
                </div>
              </div>
           </RadioGroup>
 
-           {/* Tax Invoice Options */}
+           {/* Tax Invoice Options - Sri Lanka Government Format */}
            {invoiceCategory === 'tax_invoice' && (
              <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
                <Alert>
                  <Receipt className="h-4 w-4" />
                  <AlertDescription>
-                   Tax invoice will show VAT breakdown calculated from total amount.
+                   This generates the Sri Lankan government-mandated Tax Invoice format (EOG 02/04/05).
                  </AlertDescription>
                </Alert>
                
-               <div className="space-y-3">
-                 <Label>Customer VAT Number (Optional)</Label>
-                 <Input
-                   placeholder="e.g., 790701950 - 7000"
-                   value={customerVatNumber}
-                   onChange={(e) => setCustomerVatNumber(e.target.value)}
+               <div className="grid grid-cols-2 gap-3">
+                 <div className="space-y-2">
+                   <Label>Supplier's TIN</Label>
+                   <Input
+                     placeholder="Supplier TIN"
+                     value={supplierTin}
+                     onChange={(e) => setSupplierTin(e.target.value)}
+                   />
+                 </div>
+                 <div className="space-y-2">
+                   <Label>Purchaser's TIN *</Label>
+                   <Input
+                     placeholder="Purchaser TIN"
+                     value={purchaserTin}
+                     onChange={(e) => setPurchaserTin(e.target.value)}
+                   />
+                 </div>
+               </div>
+
+               <div className="grid grid-cols-2 gap-3">
+                 <div className="space-y-2">
+                   <Label>Date of Delivery</Label>
+                   <Input
+                     type="date"
+                     value={dateOfDelivery}
+                     onChange={(e) => setDateOfDelivery(e.target.value)}
+                   />
+                 </div>
+                 <div className="space-y-2">
+                   <Label>Place of Supply</Label>
+                   <Input
+                     placeholder="e.g., Colombo"
+                     value={placeOfSupply}
+                     onChange={(e) => setPlaceOfSupply(e.target.value)}
+                   />
+                 </div>
+               </div>
+
+               <div className="space-y-2">
+                 <Label>Mode of Payment</Label>
+                 <Select value={modeOfPayment} onValueChange={setModeOfPayment}>
+                   <SelectTrigger>
+                     <SelectValue placeholder="Select payment mode" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="Cash">Cash</SelectItem>
+                     <SelectItem value="Cheque">Cheque</SelectItem>
+                     <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                     <SelectItem value="Credit">Credit</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+
+               <div className="space-y-2">
+                 <Label>Additional Information</Label>
+                 <Textarea
+                   placeholder="Optional additional notes"
+                   value={additionalInformation}
+                   onChange={(e) => setAdditionalInformation(e.target.value)}
+                   rows={2}
                  />
                </div>
                
                <div className="grid grid-cols-3 gap-4 p-3 bg-background rounded border">
                  <div>
-                   <p className="text-xs text-muted-foreground">Sub Total</p>
+                   <p className="text-xs text-muted-foreground">Excl. VAT</p>
                    <p className="font-medium">LKR {baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                  </div>
                  <div>
-                   <p className="text-xs text-muted-foreground">VAT (18%)</p>
+                   <p className="text-xs text-muted-foreground">VAT ({taxRate}%)</p>
                    <p className="font-medium text-destructive">LKR {vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                  </div>
                  <div>
@@ -204,7 +280,6 @@ export function YutongInvoiceTypeModal({
                 </AlertDescription>
               </Alert>
 
-              {/* Amount Percentage */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label className="flex items-center gap-2">
@@ -223,7 +298,6 @@ export function YutongInvoiceTypeModal({
                   className="w-full"
                 />
                 
-                {/* Quick percentage buttons */}
                 <div className="flex gap-2 flex-wrap">
                   {COMMON_PERCENTAGES.map((pct) => (
                     <Button
@@ -250,7 +324,6 @@ export function YutongInvoiceTypeModal({
                 </div>
               </div>
 
-              {/* Finance Company Details */}
               <div className="space-y-3">
                 <Label className="flex items-center gap-2">
                   <Building className="h-4 w-4" />
