@@ -1500,6 +1500,12 @@ export const useApproveAPInvoice = () => {
           .eq("id", id)
           .single();
 
+        // Fetch invoice lines with per-line account_id
+        const { data: invoiceLines } = await (supabase as any)
+          .from("ap_invoice_lines")
+          .select("account_id, line_total, description")
+          .eq("invoice_id", id);
+
         // Fetch GL settings
         const { data: glSettings } = await (supabase as any)
           .from("gl_settings")
@@ -1507,21 +1513,30 @@ export const useApproveAPInvoice = () => {
           .eq("company_id", effectiveCompanyId)
           .maybeSingle();
 
-        const expenseAccountId = glSettings?.default_expense_account_id;
+        const defaultExpenseAccountId = glSettings?.default_expense_account_id;
         const tradePayableId = glSettings?.trade_payable_account_id;
 
-        if (invoice && expenseAccountId && tradePayableId && invoice.total_amount > 0) {
+        if (invoice && defaultExpenseAccountId && tradePayableId && invoice.total_amount > 0) {
           const { postAPInvoiceToGL } = await import("@/lib/gl-posting-utils");
           const vendorData = invoice.vendors as any;
+
+          // Build per-line expense entries, falling back to default account
+          const expenseLines = (invoiceLines || []).map((line: any) => ({
+            accountId: line.account_id || defaultExpenseAccountId,
+            amount: line.line_total || 0,
+            description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
+          }));
+
           const glResult = await postAPInvoiceToGL({
             invoiceNumber: invoice.invoice_number,
             invoiceDate: invoice.invoice_date,
             totalAmount: invoice.total_amount,
-            expenseAccountId,
+            expenseAccountId: defaultExpenseAccountId,
             tradePayableId,
             companyId: effectiveCompanyId,
             businessUnitCode,
             vendorName: vendorData?.vendor_name,
+            expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
           });
           if (!glResult.success) {
             console.warn("AP Invoice GL posting failed:", glResult.error);
