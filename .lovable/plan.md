@@ -1,57 +1,102 @@
 
 
-# Add Row CRUD Operations to Yutong Live Spreadsheet
+# Spreadsheet Full Automation: DO, Payments, and System Integration
 
-## Problem
-The spreadsheet currently only supports inline cell editing. It lacks the ability to **add new order rows**, **edit full order details**, or **delete orders** directly from the spreadsheet view.
+## What You're Getting
 
-## Solution
-Add Add/Edit/Delete row functionality to both the internal and public spreadsheet views.
+The spreadsheet currently shows DO, CR, Cheque, Cash columns as **read-only summaries**. This plan makes them **interactive** -- you can click on any of those cells to open quick-action panels directly from the spreadsheet that let you:
+
+1. **DO Column** -- Click to see existing DOs, update DO status, or create a new DO for that order
+2. **CR Column** -- Click to record a new cash receipt or view existing receipts
+3. **Payment Columns (Cheque/Cash)** -- Click to record a new payment (cheque or cash method), view existing payments, or verify pending payments
+4. **All changes auto-update**: `total_paid`, `balance_due`, invoices, vouchers, and GL entries -- using the **existing** finance hooks (`useYutongFinanceManagement`, `YutongPaymentTracking` verify logic, `useYutongCashReceipts`)
+
+## Architecture
+
+```text
+Spreadsheet Cell Click (DO / CR / Payment)
+        |
+        v
+  Popover/Sheet Panel (inline, no page navigation)
+        |
+        +-- View existing records (list)
+        +-- Quick Add (form)
+        +-- Update Status (dropdown)
+        |
+        v
+  Existing Hooks (reused, not duplicated)
+  - useYutongFinanceManagement.createDeliveryOrder()
+  - useYutongFinanceManagement.updateDOStatus()
+  - YutongPaymentTracking payment recording logic
+  - useYutongCashReceipts.createCashReceipt()
+  - postVehiclePaymentToGL() (GL automation)
+        |
+        v
+  Auto-refresh spreadsheet row (realtime subscription already active)
+```
 
 ## Changes
 
-### 1. `YutongSpreadsheetCore.tsx` — Add row action buttons & dialogs
-- Add **"+ Add Order"** button to the toolbar
-- Add an **actions column** (last column) with Edit and Delete icon buttons per row
-- Add a **New/Edit Order dialog** with fields: customer name, company, bus model, quantity, total amount, payment mode, expected delivery, notes
-- Add a **Delete confirmation dialog** (AlertDialog)
-- New props: `onAddOrder`, `onDeleteOrder` callbacks (optional — only shown when provided)
+### 1. New Component: `SpreadsheetQuickActions.tsx`
+A set of popover-based panels triggered from spreadsheet cells:
 
-### 2. `useYutongSpreadsheetData.ts` — Add create & delete mutations
-- Add `addOrder(data)`: inserts into `yutong_orders` (requires a quotation_id or direct insert with manual fields)
-- Add `deleteOrder(orderId)`: deletes from `yutong_orders` by id
-- Both trigger refetch after completion
+**DO Quick Panel** (`SpreadsheetDOPanel`):
+- Shows list of existing DOs for the order (do_no, status, amount)
+- Status update dropdown (pending → released → collected)
+- "Create DO" mini-form (do_no, issuing_bank, do_amount, vehicle_count)
+- Uses `useYutongFinanceManagement` hooks
 
-### 3. `YutongOrderSpreadsheet.tsx` — Wire up new callbacks
-- Pass `addOrder` and `deleteOrder` from the hook to `YutongSpreadsheetCore`
+**Payment Quick Panel** (`SpreadsheetPaymentPanel`):
+- Shows list of existing payments with status badges
+- "Record Payment" mini-form (amount, method [cash/cheque/bank_transfer], date, reference)
+- "Verify" button for pending payments (triggers GL posting via existing `postVehiclePaymentToGL`)
+- Auto-generates cash receipt via `useYutongCashReceipts`
+- Updates `total_paid` and `balance_due` on `yutong_orders`
 
-### 4. `supabase/functions/yutong-spreadsheet-data/index.ts` — Support delete action for public view
-- Add `action === 'delete'` handler that deletes an order by id
-- Add `action === 'add'` handler that inserts a new order row with provided fields
+**CR Quick Panel** (`SpreadsheetCRPanel`):
+- Shows list of cash receipts with receipt_no, amount, status
+- Link to view/download receipt PDF
+- "Generate Receipt" for unlinked payments
 
-### 5. `PublicYutongSpreadsheet.tsx` — Wire up add/delete for public view
-- Add `handleAdd` and `handleDelete` that call the edge function with the appropriate action
+### 2. Update `YutongSpreadsheetCore.tsx`
+- Replace static DO/CR/Cheque/Cash cells with clickable Popover triggers
+- Each cell shows the summary value but opens the quick panel on click
+- Visual indicator (small icon) showing the cell is interactive
 
-### 6. Migration — Add NOTIFY for schema cache
-- Include `NOTIFY pgrst, 'reload schema'` to ensure the `vehicle_year` column from the previous migration is recognized by PostgREST
+### 3. Update `useYutongSpreadsheetData.ts`
+- Add `order_id` to `SpreadsheetOrder` (already exists as `id`)
+- Fetch additional detail: DO statuses, payment statuses (not just amounts but also pending count)
+- Add helper counts: `pending_payments_count`, `do_count`
 
-## Key Details
+### 4. New Hook: `useSpreadsheetQuickActions.ts`
+Thin wrapper that coordinates:
+- `recordPayment(orderId, amount, method, date, reference)` -- inserts into `yutong_customer_payments`, auto-creates cash receipt, updates order totals
+- `verifyPayment(paymentId)` -- calls existing GL posting logic
+- `createDO(orderId, doData)` -- calls existing `createDeliveryOrder`
+- `updateDOStatus(doId, status)` -- calls existing `updateDOStatus`
+- Each action triggers spreadsheet refetch
 
-**Add Order Dialog fields:**
-- Customer Name, Company Name, Bus Model, Quantity, Unit Price/Total Amount, Payment Mode, Expected Delivery Date, Notes
-- Inserts directly into `yutong_orders` (without requiring a quotation)
-
-**Delete:** Soft confirmation via AlertDialog, then hard delete from `yutong_orders`.
-
-**Actions column:** Small icon buttons (Pencil, Trash2) in the last column of each row.
-
-## Files to Modify
-1. `src/components/yutong/spreadsheet/YutongSpreadsheetCore.tsx`
-2. `src/hooks/useYutongSpreadsheetData.ts`
-3. `src/components/yutong/spreadsheet/YutongOrderSpreadsheet.tsx`
-4. `supabase/functions/yutong-spreadsheet-data/index.ts`
-5. `src/pages/PublicYutongSpreadsheet.tsx`
+### 5. Update Edge Function for Public Access
+- Add `action: 'record_payment'` and `action: 'create_do'` handlers in `yutong-spreadsheet-data` so public users can also use quick actions (with access code validation)
 
 ## Files to Create
-1. Migration file for `NOTIFY pgrst, 'reload schema'`
+1. `src/components/yutong/spreadsheet/SpreadsheetQuickActions.tsx` -- DO, Payment, CR popover panels
+2. `src/hooks/useSpreadsheetQuickActions.ts` -- coordinating hook
+
+## Files to Modify
+1. `src/components/yutong/spreadsheet/YutongSpreadsheetCore.tsx` -- make DO/CR/Cheque/Cash cells interactive
+2. `src/hooks/useYutongSpreadsheetData.ts` -- enrich data with payment/DO details
+3. `supabase/functions/yutong-spreadsheet-data/index.ts` -- add payment/DO actions
+4. `src/components/yutong/spreadsheet/YutongOrderSpreadsheet.tsx` -- pass quick action handlers
+5. `src/pages/PublicYutongSpreadsheet.tsx` -- wire public quick actions
+
+## Key Detail: Automation Chain
+
+When a user records a payment from the spreadsheet:
+1. Payment inserted into `yutong_customer_payments` (status: pending)
+2. User clicks "Verify" → GL posted (DR Bank / CR Customer Advance)
+3. Cash receipt auto-generated in `yutong_cash_receipts`
+4. `yutong_orders.total_paid` and `balance_due` recalculated
+5. Spreadsheet row auto-refreshes via realtime subscription
+6. Reports tab reflects updated data immediately
 
