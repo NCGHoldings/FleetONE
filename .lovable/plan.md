@@ -1,21 +1,22 @@
 
 
-# Fix: Ensure Tax Invoice Template Appears in Document Templates List
+# Add Tax Invoice Template to AR Invoice Preview Dropdown
 
 ## Problem
-The `tax_invoice` template type migration may have failed silently because it lacks an `ON CONFLICT` clause — if the row already exists, the INSERT fails. Additionally, even if the type exists, the actual template records for each company only get created when you click "Initialize All Templates" or "Replace All Templates".
+The AR Invoice preview modal (`FinanceDocumentPreviewModal.tsx`) only shows templates matching the exact `documentType` (e.g., `ar_invoice`). The new `tax_invoice` template does not appear in the dropdown because it has a different `type_code`.
 
-## Changes
+## Solution
+Modify the template filtering in `FinanceDocumentPreviewModal.tsx` to also include `tax_invoice` templates when viewing an `ar_invoice` document. This way the user can switch between the standard AR Invoice layout and the Sri Lankan Tax Invoice layout from the same dropdown.
 
-### 1. Fix the migration to be idempotent
-**File: `supabase/migrations/20260304182304_f0fc2dcd-8319-48c7-ba5e-beebeb4ea1d0.sql`**
-- Add `ON CONFLICT (type_code) DO UPDATE SET ...` so the migration works whether or not the row already exists
+### Changes
 
-### 2. After the migration runs successfully
-- Go to **Settings → Document Templates**
-- Change the "Filter by Document Type" dropdown from "AR Invoice / Sales Invoice" to either **"All Document Types"** or **"Sri Lanka Tax Invoice"**
-- Click **"Initialize All Templates"** to create the tax invoice template for all companies
-- The tax invoice template will then appear in the grid
+**File: `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx`**
 
-Only the tax invoice template type registration is being changed. No other templates are affected.
+1. **Fetch both template types** — When `documentType` is `ar_invoice`, also fetch the `tax_invoice` template type ID so we can include those templates in the dropdown.
+
+2. **Expand the `availableTemplates` filter** (around line 118-126) — Instead of filtering only by the single `templateType.id`, also include templates whose `template_type_id` matches the `tax_invoice` type when viewing AR invoices.
+
+3. **Update the `documentTitle` map** (line 350) — Add `tax_invoice: "Tax Invoice"` entry.
+
+This is a small, surgical change — only the template dropdown filter logic is modified. No other templates or modules are affected.
 
