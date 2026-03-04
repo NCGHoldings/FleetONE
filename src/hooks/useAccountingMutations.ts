@@ -701,6 +701,7 @@ export const useCreateAPInvoice = () => {
         tax_amount?: number;
         tax_code?: string;
         line_total: number;
+        account_id?: string;
       }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
@@ -735,6 +736,7 @@ export const useCreateAPInvoice = () => {
           tax_amount: line.tax_amount || 0,
           tax_code: line.tax_code,
           line_total: line.line_total,
+          account_id: line.account_id || null,
           company_id: effectiveCompanyId,
         }));
         
