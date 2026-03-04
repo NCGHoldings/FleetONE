@@ -16,6 +16,7 @@ import { format, addDays } from "date-fns";
 import { Plus, Trash2 } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 
 const invoiceSchema = z.object({
   invoice_number: z.string().min(1, "Invoice number is required"),
@@ -37,6 +38,7 @@ interface InvoiceLine {
   tax_code?: string;
   tax_rate: number;
   line_total: number;
+  account_id?: string;
 }
 
 interface APInvoiceFormProps {
@@ -199,6 +201,7 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
             tax_amount: (l.quantity * l.unit_price * l.tax_rate) / 100,
             tax_code: l.tax_code,
             line_total: l.line_total,
+            account_id: l.account_id,
           })),
       });
       onOpenChange(false);
@@ -303,6 +306,7 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
                   <thead className="bg-muted">
                     <tr>
                       <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium w-48">GL Account</th>
                       <th className="px-3 py-2 text-center text-sm font-medium w-20">Qty</th>
                       <th className="px-3 py-2 text-right text-sm font-medium w-28">Unit Price</th>
                       <th className="px-3 py-2 text-center text-sm font-medium w-28">Tax Code</th>
@@ -319,6 +323,15 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
                             onChange={(e) => updateLine(line.id, "description", e.target.value)}
                             placeholder="Item/service description"
                             className="h-8"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <SearchableAccountSelector
+                            value={line.account_id || ""}
+                            onValueChange={(val) => updateLine(line.id, "account_id", val)}
+                            placeholder="Select GL account"
+                            accountTypes={["expense", "asset"]}
+                            className="h-8 text-xs"
                           />
                         </td>
                         <td className="px-3 py-2">
