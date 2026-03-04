@@ -25241,7 +25241,7 @@ export type Database = {
           payment_structure: Json | null
           progress_percentage: number | null
           quantity: number
-          quotation_id: string
+          quotation_id: string | null
           seating_capacity: number | null
           special_features: Json | null
           status: string
@@ -25279,13 +25279,13 @@ export type Database = {
           payment_structure?: Json | null
           progress_percentage?: number | null
           quantity?: number
-          quotation_id: string
+          quotation_id?: string | null
           seating_capacity?: number | null
           special_features?: Json | null
           status?: string
           total_amount: number
           total_paid?: number | null
-          unit_price: number
+          unit_price?: number
           updated_at?: string
           vehicle_condition?: string | null
           year_of_manufacture?: number | null
@@ -25317,7 +25317,7 @@ export type Database = {
           payment_structure?: Json | null
           progress_percentage?: number | null
           quantity?: number
-          quotation_id?: string
+          quotation_id?: string | null
           seating_capacity?: number | null
           special_features?: Json | null
           status?: string

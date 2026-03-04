@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Lock, Loader2, Table2 } from 'lucide-react';
 import { YutongSpreadsheetCore } from '@/components/yutong/spreadsheet/YutongSpreadsheetCore';
-import { SpreadsheetOrder } from '@/hooks/useYutongSpreadsheetData';
+import { SpreadsheetOrder, NewOrderData } from '@/hooks/useYutongSpreadsheetData';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -50,9 +50,7 @@ export default function PublicYutongSpreadsheet() {
   };
 
   const handleUpdate = useCallback(async (orderId: string, field: string, value: any) => {
-    // Optimistic update
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, [field]: value } : o));
-
     try {
       const { data, error } = await supabase.functions.invoke('yutong-spreadsheet-data', {
         body: { access_code: accessCode, action: 'update', order_id: orderId, field, value },
@@ -66,6 +64,38 @@ export default function PublicYutongSpreadsheet() {
       fetchData(accessCode);
     }
   }, [accessCode, toast, fetchData]);
+
+  const handleAddOrder = useCallback(async (orderData: NewOrderData) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('yutong-spreadsheet-data', {
+        body: { access_code: accessCode, action: 'add', order_data: orderData },
+      });
+      if (error || data?.error) {
+        toast({ title: 'Add Failed', description: data?.error || 'Failed to add order', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Order Added', description: 'New order created successfully' });
+      await fetchData(accessCode);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  }, [accessCode, toast, fetchData]);
+
+  const handleDeleteOrder = useCallback(async (orderId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('yutong-spreadsheet-data', {
+        body: { access_code: accessCode, action: 'delete', order_id: orderId },
+      });
+      if (error || data?.error) {
+        toast({ title: 'Delete Failed', description: data?.error || 'Failed to delete', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Order Deleted', description: 'Order removed successfully' });
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  }, [accessCode, toast]);
 
   // Auto-verify if code came from URL
   React.useEffect(() => {
@@ -90,6 +120,8 @@ export default function PublicYutongSpreadsheet() {
           loading={loading}
           onUpdate={handleUpdate}
           onRefresh={() => fetchData(accessCode)}
+          onAddOrder={handleAddOrder}
+          onDeleteOrder={handleDeleteOrder}
           isPublic
         />
       </div>
