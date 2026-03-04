@@ -945,6 +945,19 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             <p style={{ marginBottom: "6px" }}>
               <b>10. Indemnity, Marketing & Assignment:</b> The buyer agrees to indemnify the seller against any claims arising from use or resale of the vehicle. The seller may use vehicle images for promotional purposes. The buyer may not assign or transfer this agreement without written consent.
             </p>
+
+            <p style={{ marginBottom: "6px", padding: "8px", border: "2px solid #003366", borderRadius: "4px", background: "#e8f0fe" }}>
+              <b>11. Quotation Validity:</b> This quotation is valid for {(() => {
+                try {
+                  const created = new Date(quotation.created_at);
+                  const validUntil = new Date(quotation.valid_until);
+                  const diffDays = Math.round((validUntil.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+                  return diffDays > 0 ? diffDays : 30;
+                } catch { return 30; }
+              })()} days from the date of issue (valid until {(() => {
+                try { return format(new Date(quotation.valid_until), "dd/MM/yyyy"); } catch { return "N/A"; }
+              })()}). After this period, prices and availability are subject to change.
+            </p>
           </div>
 
           {/* Additional Terms Section - Warranty, Delivery, Payment */}
