@@ -113,7 +113,7 @@ export default function PublicYutongSpreadsheet() {
       <div className="min-h-screen bg-background p-4 md:p-6">
         <div className="mb-4">
           <h1 className="text-2xl font-bold">Yutong Orders — Live Spreadsheet</h1>
-          <p className="text-sm text-muted-foreground">Edit cells inline • Changes save instantly</p>
+          <p className="text-sm text-muted-foreground">Edit cells inline • Click DO/CR/Payment columns to manage • Changes save instantly</p>
         </div>
         <YutongSpreadsheetCore
           orders={orders}

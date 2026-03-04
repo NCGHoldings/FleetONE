@@ -95,6 +95,147 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Handle record payment action
+    if (action === 'record_payment' && order_id) {
+      const { amount, method, date, reference, notes: payNotes } = body
+      if (!amount || !method || !date) {
+        return new Response(JSON.stringify({ error: 'Missing payment fields' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const { error } = await supabase
+        .from('yutong_customer_payments')
+        .insert({
+          order_id,
+          payment_amount: amount,
+          payment_date: date,
+          payment_method: method,
+          payment_reference: reference || null,
+          notes: payNotes || null,
+          status: 'pending',
+        })
+      if (error) {
+        console.error('Record payment error:', error)
+        return new Response(JSON.stringify({ error: 'Failed to record payment' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Handle create DO action
+    if (action === 'create_do' && order_id) {
+      const { issuing_bank, do_amount, vehicle_count, notes: doNotes } = body
+      if (!issuing_bank) {
+        return new Response(JSON.stringify({ error: 'Missing issuing_bank' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const { error } = await supabase
+        .from('yutong_delivery_orders')
+        .insert({
+          order_id,
+          issuing_bank,
+          do_amount: do_amount || 0,
+          vehicle_count: vehicle_count || 1,
+          currency: 'USD',
+          chassis_numbers: [],
+          engine_numbers: [],
+          notes: doNotes || null,
+        })
+      if (error) {
+        console.error('Create DO error:', error)
+        return new Response(JSON.stringify({ error: 'Failed to create DO' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Handle update DO status
+    if (action === 'update_do_status' && body.do_id) {
+      const { do_id, new_status } = body
+      const updates: any = { status: new_status }
+      if (new_status === 'released') updates.release_date = new Date().toISOString().slice(0, 10)
+      if (new_status === 'collected') updates.collection_date = new Date().toISOString().slice(0, 10)
+      const { error } = await supabase
+        .from('yutong_delivery_orders')
+        .update(updates)
+        .eq('id', do_id)
+      if (error) {
+        console.error('Update DO status error:', error)
+        return new Response(JSON.stringify({ error: 'Failed to update DO status' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Handle fetch payments for order
+    if (action === 'fetch_payments' && order_id) {
+      const { data, error } = await supabase
+        .from('yutong_customer_payments')
+        .select('id, payment_amount, payment_method, payment_date, payment_reference, status, notes')
+        .eq('order_id', order_id)
+        .order('payment_date', { ascending: false })
+      if (error) {
+        return new Response(JSON.stringify({ error: 'Failed to fetch payments' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ payments: data }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Handle fetch DOs for order
+    if (action === 'fetch_dos' && order_id) {
+      const { data, error } = await supabase
+        .from('yutong_delivery_orders')
+        .select('id, do_no, status, do_amount, vehicle_count, issuing_bank')
+        .eq('order_id', order_id)
+        .order('created_at', { ascending: false })
+      if (error) {
+        return new Response(JSON.stringify({ error: 'Failed to fetch DOs' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ dos: data }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Handle fetch CRs for order
+    if (action === 'fetch_crs' && order_id) {
+      const { data, error } = await supabase
+        .from('yutong_cash_receipts')
+        .select('id, receipt_no, amount, status, receipt_date, payment_id')
+        .eq('order_id', order_id)
+        .order('receipt_date', { ascending: false })
+      if (error) {
+        return new Response(JSON.stringify({ error: 'Failed to fetch CRs' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ crs: data }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // Handle update action
     if (action === 'update' && order_id && field) {
       const allowedFields = ['status', 'current_phase', 'payment_mode', 'progress_percentage', 'expected_delivery_date', 'notes']
