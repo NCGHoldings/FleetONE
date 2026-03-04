@@ -25794,6 +25794,7 @@ export type Database = {
           updated_at: string
           valid_days: number
           valid_until: string
+          vehicle_year: number | null
           version_number: string | null
           warranty_terms: string | null
         }
@@ -25846,6 +25847,7 @@ export type Database = {
           updated_at?: string
           valid_days?: number
           valid_until: string
+          vehicle_year?: number | null
           version_number?: string | null
           warranty_terms?: string | null
         }
@@ -25898,6 +25900,7 @@ export type Database = {
           updated_at?: string
           valid_days?: number
           valid_until?: string
+          vehicle_year?: number | null
           version_number?: string | null
           warranty_terms?: string | null
         }

@@ -78,7 +78,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
         model: busModelDetails.model_name || quotation.bus_model,
         seating: busModelDetails.capacity ? `${busModelDetails.capacity}` : (quotation.seating_capacity || "N/A"),
         engine: busModelDetails.engine || "N/A",
-        year: busModelDetails.manufactured_year?.toString() || "N/A",
+        year: (quotation as any).vehicle_year?.toString() || busModelDetails.manufactured_year?.toString() || "N/A",
         condition: busModelDetails.condition || "BRAND NEW",
       };
     }
@@ -88,7 +88,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
       model: quotation.bus_model || "N/A",
       seating: quotation.seating_capacity || "N/A",
       engine: "N/A",
-      year: "N/A",
+      year: (quotation as any).vehicle_year?.toString() || "N/A",
       condition: "BRAND NEW",
     };
   };
