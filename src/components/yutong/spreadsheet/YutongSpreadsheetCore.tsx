@@ -9,6 +9,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Search, Download, RefreshCw, TrendingUp, DollarSign, ShoppingCart, Percent, Plus, Pencil, Trash2 } from 'lucide-react';
 import { SpreadsheetOrder, NewOrderData } from '@/hooks/useYutongSpreadsheetData';
+import { SpreadsheetDOPanel, SpreadsheetPaymentPanel, SpreadsheetCRPanel } from './SpreadsheetQuickActions';
+import { useSpreadsheetQuickActions } from '@/hooks/useSpreadsheetQuickActions';
 import * as XLSX from 'xlsx';
 
 interface YutongSpreadsheetCoreProps {
@@ -47,6 +49,8 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
   const [addForm, setAddForm] = useState<NewOrderData>({ ...emptyForm });
   const [addLoading, setAddLoading] = useState(false);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
+
+  const quickActions = useSpreadsheetQuickActions(onRefresh);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return orders;
@@ -310,10 +314,46 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
                   <td className="px-2 py-1 border-r">
                     {renderCell(order, 'current_phase', true, 'dropdown', PHASE_OPTIONS)}
                   </td>
-                  <td className="px-2 py-1 border-r text-muted-foreground">{order.do_summary}</td>
-                  <td className="px-2 py-1 border-r text-right">{order.cr_total ? formatCurrency(order.cr_total) : '-'}</td>
-                  <td className="px-2 py-1 border-r text-right">{order.cheque_total ? formatCurrency(order.cheque_total) : '-'}</td>
-                  <td className="px-2 py-1 border-r text-right">{order.cash_total ? formatCurrency(order.cash_total) : '-'}</td>
+                  <td className="px-2 py-1 border-r">
+                    <SpreadsheetDOPanel
+                      orderId={order.id}
+                      displayValue={order.do_summary}
+                      fetchDOs={quickActions.fetchDOs}
+                      createDO={quickActions.createDO}
+                      updateDOStatus={quickActions.updateDOStatus}
+                      loading={quickActions.loading}
+                    />
+                  </td>
+                  <td className="px-2 py-1 border-r">
+                    <SpreadsheetCRPanel
+                      orderId={order.id}
+                      displayValue={order.cr_total ? formatCurrency(order.cr_total) : '-'}
+                      fetchCRs={quickActions.fetchCRs}
+                      loading={quickActions.loading}
+                    />
+                  </td>
+                  <td className="px-2 py-1 border-r">
+                    <SpreadsheetPaymentPanel
+                      orderId={order.id}
+                      displayValue={order.cheque_total ? formatCurrency(order.cheque_total) : '-'}
+                      paymentMethod="cheque"
+                      fetchPayments={quickActions.fetchPayments}
+                      recordPayment={quickActions.recordPayment}
+                      verifyPayment={quickActions.verifyPayment}
+                      loading={quickActions.loading}
+                    />
+                  </td>
+                  <td className="px-2 py-1 border-r">
+                    <SpreadsheetPaymentPanel
+                      orderId={order.id}
+                      displayValue={order.cash_total ? formatCurrency(order.cash_total) : '-'}
+                      paymentMethod="cash"
+                      fetchPayments={quickActions.fetchPayments}
+                      recordPayment={quickActions.recordPayment}
+                      verifyPayment={quickActions.verifyPayment}
+                      loading={quickActions.loading}
+                    />
+                  </td>
                   <td className="px-2 py-1 border-r text-right font-medium">{formatCurrency(order.total_paid)}</td>
                   <td className={`px-2 py-1 border-r text-right font-semibold ${getBalanceColor(order.balance_due, order.total_amount)}`}>
                     {formatCurrency(order.balance_due)}
