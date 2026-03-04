@@ -776,6 +776,7 @@ export const useCreateAPPayment = () => {
       reference?: string;
       notes?: string;
       is_advance?: boolean;
+      vendor_bank_account_id?: string;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
@@ -810,6 +811,7 @@ export const useCreateAPPayment = () => {
           reference: payment.reference,
           notes: payment.notes,
           is_advance: payment.is_advance || false,
+          vendor_bank_account_id: payment.vendor_bank_account_id || null,
           status: "posted",
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,
