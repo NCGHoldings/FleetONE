@@ -1,32 +1,57 @@
 
 
-# Add Editable "Year" Field to Yutong Quotation Form
+# Add Row CRUD Operations to Yutong Live Spreadsheet
 
 ## Problem
-Currently, the **YEAR** shown on the quotation PDF/preview is pulled from the bus model's `manufactured_year` field. But sometimes you need to sell 2025 or 2024 stock, not just the current year. The year should be set per-quotation, not per-bus-model.
+The spreadsheet currently only supports inline cell editing. It lacks the ability to **add new order rows**, **edit full order details**, or **delete orders** directly from the spreadsheet view.
 
 ## Solution
-Add a `vehicle_year` column to `yutong_quotations` table, add a Year input field to the quotation creation form (defaulting to current year 2026), and update the preview to use this quotation-level year instead of the bus model's year.
+Add Add/Edit/Delete row functionality to both the internal and public spreadsheet views.
 
 ## Changes
 
-### 1. Database Migration
-- Add `vehicle_year INTEGER DEFAULT 2026` to `yutong_quotations`
+### 1. `YutongSpreadsheetCore.tsx` — Add row action buttons & dialogs
+- Add **"+ Add Order"** button to the toolbar
+- Add an **actions column** (last column) with Edit and Delete icon buttons per row
+- Add a **New/Edit Order dialog** with fields: customer name, company, bus model, quantity, total amount, payment mode, expected delivery, notes
+- Add a **Delete confirmation dialog** (AlertDialog)
+- New props: `onAddOrder`, `onDeleteOrder` callbacks (optional — only shown when provided)
 
-### 2. Quotation Form (`YutongQuotationFormUpdated.tsx`)
-- Add `vehicle_year` to the Zod schema (number, default current year)
-- Add a Year input field in the "Product Details" section near the bus model selector
-- Include `vehicle_year` in the insert payload
-- Default to `new Date().getFullYear()` (auto-suggests current year)
-- User can change to 2025, 2024, etc.
+### 2. `useYutongSpreadsheetData.ts` — Add create & delete mutations
+- Add `addOrder(data)`: inserts into `yutong_orders` (requires a quotation_id or direct insert with manual fields)
+- Add `deleteOrder(orderId)`: deletes from `yutong_orders` by id
+- Both trigger refetch after completion
 
-### 3. Quotation Preview (`YutongQuotationPreview.tsx`)
-- Change year resolution: use `quotation.vehicle_year` first, then fall back to `busModelDetails.manufactured_year`, then "N/A"
+### 3. `YutongOrderSpreadsheet.tsx` — Wire up new callbacks
+- Pass `addOrder` and `deleteOrder` from the hook to `YutongSpreadsheetCore`
 
-### 4. Types Update (`types.ts`)
-- Add `vehicle_year` to the `yutong_quotations` type
+### 4. `supabase/functions/yutong-spreadsheet-data/index.ts` — Support delete action for public view
+- Add `action === 'delete'` handler that deletes an order by id
+- Add `action === 'add'` handler that inserts a new order row with provided fields
 
-### Files
-- **Create**: 1 migration file
-- **Modify**: `YutongQuotationFormUpdated.tsx`, `YutongQuotationPreview.tsx`, `types.ts`
+### 5. `PublicYutongSpreadsheet.tsx` — Wire up add/delete for public view
+- Add `handleAdd` and `handleDelete` that call the edge function with the appropriate action
+
+### 6. Migration — Add NOTIFY for schema cache
+- Include `NOTIFY pgrst, 'reload schema'` to ensure the `vehicle_year` column from the previous migration is recognized by PostgREST
+
+## Key Details
+
+**Add Order Dialog fields:**
+- Customer Name, Company Name, Bus Model, Quantity, Unit Price/Total Amount, Payment Mode, Expected Delivery Date, Notes
+- Inserts directly into `yutong_orders` (without requiring a quotation)
+
+**Delete:** Soft confirmation via AlertDialog, then hard delete from `yutong_orders`.
+
+**Actions column:** Small icon buttons (Pencil, Trash2) in the last column of each row.
+
+## Files to Modify
+1. `src/components/yutong/spreadsheet/YutongSpreadsheetCore.tsx`
+2. `src/hooks/useYutongSpreadsheetData.ts`
+3. `src/components/yutong/spreadsheet/YutongOrderSpreadsheet.tsx`
+4. `supabase/functions/yutong-spreadsheet-data/index.ts`
+5. `src/pages/PublicYutongSpreadsheet.tsx`
+
+## Files to Create
+1. Migration file for `NOTIFY pgrst, 'reload schema'`
 
