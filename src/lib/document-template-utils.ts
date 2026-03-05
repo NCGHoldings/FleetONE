@@ -122,7 +122,7 @@ const generateAllocationsTable = (allocations: any[]): string => {
         ${allocations.map((alloc) => `
           <tr>
             <td style="border: 1px solid #e5e7eb; padding: 8px;">${alloc.ar_invoices?.invoice_number || alloc.ap_invoices?.invoice_number || alloc.invoice_id}</td>
-            <td style="border: 1px solid #e5e7eb; padding: 8px;">${alloc.ap_invoices?.notes || alloc.ar_invoices?.notes || ''}</td>
+            <td style="border: 1px solid #e5e7eb; padding: 8px;">${alloc.ap_invoices?.ap_invoice_lines?.map((l: any) => l.description).filter(Boolean).join(', ') || alloc.ap_invoices?.notes || alloc.ar_invoices?.notes || ''}</td>
             <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">${formatCurrency(alloc.allocated_amount)}</td>
           </tr>
         `).join('')}
