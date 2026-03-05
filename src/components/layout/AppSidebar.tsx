@@ -1,4 +1,4 @@
-import { BarChart3, Bus, Calendar, Settings, Users, Wrench, Shield, MessageSquare, FileText, MapPin, UserCheck, DollarSign, Lightbulb, Star, ChevronDown, Truck, TrendingUp, AlertTriangle, Package, Settings2, GraduationCap, ShoppingCart, FileSpreadsheet, Home, Sparkles, BookOpen, Upload, Clock, Activity, Monitor, Car, Megaphone, CheckSquare, FolderKanban, Share2 } from "lucide-react";
+import { BarChart3, Bus, Calendar, Settings, Users, Wrench, Shield, MessageSquare, FileText, MapPin, UserCheck, DollarSign, Lightbulb, Star, ChevronDown, Truck, TrendingUp, AlertTriangle, Package, Settings2, GraduationCap, ShoppingCart, FileSpreadsheet, Home, Sparkles, BookOpen, Upload, Clock, Activity, Monitor, Car, Megaphone, CheckSquare, FolderKanban, Share2, Store, ExternalLink } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarTrigger, useSidebar, SidebarHeader } from "@/components/ui/sidebar";
@@ -356,6 +356,38 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="py-4">
+        {/* External Systems Quick Access */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <a
+                    href="https://storesone.lgh.lk"
+                    target="_self"
+                    className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-medium shadow-md hover:from-emerald-700 hover:to-emerald-600 hover:shadow-lg transition-all duration-300 rounded-lg"
+                  >
+                    <Store className="w-5 h-5 transition-all duration-300" />
+                    {!collapsed && <span className="font-medium transition-all duration-300">Stores One</span>}
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <a
+                    href="https://docs.lgh.lk"
+                    target="_self"
+                    className="bg-gradient-to-r from-blue-600 to-blue-500 text-white font-medium shadow-md hover:from-blue-700 hover:to-blue-600 hover:shadow-lg transition-all duration-300 rounded-lg"
+                  >
+                    <BookOpen className="w-5 h-5 transition-all duration-300" />
+                    {!collapsed && <span className="font-medium transition-all duration-300">Document ERP</span>}
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         {/* Always visible Home link */}
         <SidebarGroup>
           <SidebarGroupContent>
