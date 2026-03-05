@@ -3513,3 +3513,122 @@ export const useProcessRecurringEntry = () => {
     onError: (error: any) => toast.error(`Failed to process: ${error.message}`),
   });
 };
+
+// ============ DELETE & UPDATE MUTATIONS FOR EDIT/DELETE FEATURE ============
+
+export const useDeleteARInvoice = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // First delete related lines
+      await supabase.from("ar_invoice_lines").delete().eq("invoice_id", id);
+      const { error } = await supabase.from("ar_invoices").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices", selectedCompanyId] });
+      toast.success("AR Invoice deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+export const useDeleteAPInvoice = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from("ap_invoice_lines").delete().eq("invoice_id", id);
+      const { error } = await supabase.from("ap_invoices").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
+      toast.success("AP Invoice deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+export const useDeleteItem = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("items").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items", selectedCompanyId] });
+      toast.success("Item deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+export const useDeleteSalesOrder = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from("sales_order_lines").delete().eq("sales_order_id", id);
+      const { error } = await supabase.from("sales_orders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      toast.success("Sales order deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+export const useDeletePurchaseOrder = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from("purchase_order_lines").delete().eq("purchase_order_id", id);
+      const { error } = await supabase.from("purchase_orders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders", selectedCompanyId] });
+      toast.success("Purchase order deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+export const useDeleteARCreditNote = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ar_credit_notes").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ar-credit-notes", selectedCompanyId] });
+      toast.success("Credit note deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+export const useDeleteAPDebitNote = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ap_debit_notes").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ap-debit-notes", selectedCompanyId] });
+      toast.success("Debit note deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};

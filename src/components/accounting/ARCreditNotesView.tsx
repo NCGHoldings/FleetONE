@@ -6,8 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, FileText, Search, Printer } from "lucide-react";
+import { Plus, FileText, Search, Printer, Pencil, Trash2 } from "lucide-react";
 import { useARCreditNotes, useCustomers, useARInvoices } from "@/hooks/useAccountingData";
+import { useDeleteARCreditNote } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
 import { StatusBadge } from "./shared/StatusBadge";
@@ -15,6 +16,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const ARCreditNotesView = () => {
   const { data: creditNotes, isLoading, refetch } = useARCreditNotes();
@@ -24,6 +35,9 @@ export const ARCreditNotesView = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [printDocumentOpen, setPrintDocumentOpen] = useState(false);
   const [printDocumentData, setPrintDocumentData] = useState<any>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [editingNote, setEditingNote] = useState<any>(null);
+  const deleteCreditNote = useDeleteARCreditNote();
   const [formData, setFormData] = useState({
     customer_id: "",
     original_invoice_id: "",
@@ -47,19 +61,31 @@ export const ARCreditNotesView = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from("ar_credit_notes").insert({
-        credit_note_number: generateCreditNoteNumber(),
-        customer_id: formData.customer_id,
-        original_invoice_id: formData.original_invoice_id || null,
-        credit_date: formData.credit_date,
-        amount: parseFloat(formData.amount),
-        reason: formData.reason,
-        status: "draft",
-      });
-
-      if (error) throw error;
-      toast.success("Credit note created successfully");
+      if (editingNote) {
+        const { error } = await supabase.from("ar_credit_notes").update({
+          customer_id: formData.customer_id,
+          original_invoice_id: formData.original_invoice_id || null,
+          credit_date: formData.credit_date,
+          amount: parseFloat(formData.amount),
+          reason: formData.reason,
+        }).eq("id", editingNote.id);
+        if (error) throw error;
+        toast.success("Credit note updated successfully");
+      } else {
+        const { error } = await supabase.from("ar_credit_notes").insert({
+          credit_note_number: generateCreditNoteNumber(),
+          customer_id: formData.customer_id,
+          original_invoice_id: formData.original_invoice_id || null,
+          credit_date: formData.credit_date,
+          amount: parseFloat(formData.amount),
+          reason: formData.reason,
+          status: "draft",
+        });
+        if (error) throw error;
+        toast.success("Credit note created successfully");
+      }
       setIsDialogOpen(false);
+      setEditingNote(null);
       setFormData({
         customer_id: "",
         original_invoice_id: "",
@@ -69,7 +95,26 @@ export const ARCreditNotesView = () => {
       });
       refetch();
     } catch (error: any) {
-      toast.error(error.message || "Failed to create credit note");
+      toast.error(error.message || "Failed to save credit note");
+    }
+  };
+
+  const handleEdit = (cn: any) => {
+    setEditingNote(cn);
+    setFormData({
+      customer_id: cn.customer_id || "",
+      original_invoice_id: cn.original_invoice_id || "",
+      credit_date: cn.credit_date,
+      amount: cn.amount?.toString() || "",
+      reason: cn.reason || "",
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = () => {
+    if (deleteConfirmId) {
+      deleteCreditNote.mutate(deleteConfirmId);
+      setDeleteConfirmId(null);
     }
   };
 
@@ -86,13 +131,15 @@ export const ARCreditNotesView = () => {
           <h2 className="text-2xl font-bold">AR Credit Notes</h2>
           <p className="text-sm text-muted-foreground">Manage customer credit notes and adjustments</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingNote(null); }}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />New Credit Note</Button>
+            <Button onClick={() => { setEditingNote(null); setFormData({ customer_id: "", original_invoice_id: "", credit_date: format(new Date(), "yyyy-MM-dd"), amount: "", reason: "" }); }}>
+              <Plus className="h-4 w-4 mr-2" />New Credit Note
+            </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>Create Credit Note</DialogTitle>
+              <DialogTitle>{editingNote ? "Edit Credit Note" : "Create Credit Note"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -133,7 +180,7 @@ export const ARCreditNotesView = () => {
               </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                <Button type="submit">Create Credit Note</Button>
+                <Button type="submit">{editingNote ? "Update" : "Create"} Credit Note</Button>
               </div>
             </form>
           </DialogContent>
@@ -174,16 +221,37 @@ export const ARCreditNotesView = () => {
                     <td className="py-3 px-2 text-right font-semibold text-destructive"><CurrencyDisplay amount={cn.amount} /></td>
                     <td className="py-3 px-2"><StatusBadge status={cn.status || "draft"} /></td>
                     <td className="py-3 px-2">
-                      <Button 
-                        size="sm" 
-                        variant="ghost"
-                        onClick={() => {
-                          setPrintDocumentData(cn);
-                          setPrintDocumentOpen(true);
-                        }}
-                      >
-                        <Printer className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          title="Edit"
+                          onClick={() => handleEdit(cn)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        {(cn.status === "draft") && (
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            title="Delete"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteConfirmId(cn.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => {
+                            setPrintDocumentData(cn);
+                            setPrintDocumentOpen(true);
+                          }}
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -192,6 +260,24 @@ export const ARCreditNotesView = () => {
           </table>
         </div>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Credit Note?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this credit note.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Document Print Preview Modal */}
       <FinanceDocumentPreviewModal
