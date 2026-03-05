@@ -1,54 +1,49 @@
 
 
-# Auto-Numbering Cheques from Bank Cheque Books
+# Add Bank Fee to AP Payment Form with Breakdown Display
 
 ## Problem
-When recording an AP payment by cheque, the user must manually type the cheque number. There is no cheque book management — so no way to auto-assign the next cheque number for a given bank account.
-
-## Solution
-Create a **cheque_books** table to track cheque book ranges per bank account, then auto-populate the cheque number field when the user selects a bank account and cheque payment method.
+Currently, bank fees can only be added **after** a payment is recorded (via a separate button). The user wants to add the bank fee **at the time of recording the payment**, and see a clear breakdown: **Payment Amount + Bank Fee = Total Deducted from Bank**. This breakdown should also appear in the payments table, bank transactions, and reconciliation views.
 
 ## Database Changes
 
-### New table: `cheque_books`
+### Add columns to `ap_payments`
 ```sql
-CREATE TABLE public.cheque_books (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  bank_account_id UUID NOT NULL REFERENCES bank_accounts(id) ON DELETE CASCADE,
-  company_id UUID,
-  prefix TEXT DEFAULT '',
-  start_number INTEGER NOT NULL,
-  end_number INTEGER NOT NULL,
-  next_number INTEGER NOT NULL,
-  is_active BOOLEAN DEFAULT true,
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
+ALTER TABLE ap_payments ADD COLUMN bank_fee_amount NUMERIC DEFAULT 0;
+ALTER TABLE ap_payments ADD COLUMN bank_fee_type TEXT;
+ALTER TABLE ap_payments ADD COLUMN total_with_fees NUMERIC GENERATED ALWAYS AS (amount + COALESCE(bank_fee_amount, 0)) STORED;
 ```
-- Each bank account can have one or more cheque books (only one active at a time).
-- `next_number` tracks the next available cheque leaf.
-- When `next_number > end_number`, the book is exhausted.
-
-### New RPC: `get_next_cheque_number`
-A database function that, given a `bank_account_id`, finds the active cheque book and returns the next cheque number (with prefix formatting), then increments `next_number`.
+- `bank_fee_amount`: the fee charged by the bank for this payment
+- `bank_fee_type`: type of fee (bank_charge, swift_fee, stamp_duty, etc.)
+- `total_with_fees`: computed column showing the full amount deducted from the bank
 
 ## Code Changes
 
-### 1. New hook: `src/hooks/useChequeBooks.ts`
-- `useChequeBooks(bankAccountId)` — fetch cheque books for a bank account
-- `useNextChequeNumber()` — mutation calling the RPC to get and consume the next number
-- `useCreateChequeBook()` / `useUpdateChequeBook()` — CRUD for cheque book management
+### 1. `src/components/accounting/APPaymentForm.tsx`
+Add a **Bank Fee section** below the payment method fields:
+- Toggle: "Include Bank Fee" switch
+- When enabled, show: Fee Amount input, Fee Type dropdown
+- Update the **Totals section** to show a 3-line breakdown:
+  - Payment Amount: LKR X
+  - Bank Fee: LKR Y
+  - **Total (Bank Deduction): LKR X+Y**
+- On submit, pass `bank_fee_amount` and `bank_fee_type` to the mutation
 
-### 2. Modify: `src/components/accounting/APPaymentForm.tsx`
-- When payment method is "cheque" **and** a bank account is selected, auto-fetch the next cheque number via the hook and populate the `cheque_number` field.
-- Show a small indicator if the cheque book is running low or exhausted.
-- Still allow manual override if needed.
+### 2. `src/hooks/useAccountingMutations.ts` — `useCreateAPPayment`
+- Save `bank_fee_amount` and `bank_fee_type` to the `ap_payments` record
+- When `bank_fee_amount > 0`: automatically create a `bank_fee_charges` record linked to this payment (reusing existing bank fee logic)
+- The bank transaction should record the **total_with_fees** as the actual bank deduction amount
+- GL posting: add a separate debit line for bank charges expense
 
-### 3. New UI: Cheque Book Management (in Banking settings)
-- A simple table to add/view cheque books per bank account (prefix, start, end, next, status).
-- This lets the user register new cheque books when they receive them from the bank.
+### 3. `src/components/accounting/APPaymentsView.tsx` — Table
+- Add a "Bank Fee" column between Amount and Status
+- Show `total_with_fees` as the main Amount column, with a tooltip/subtitle showing the breakdown
+- Or show two columns: "Amount" and "Fee" side by side
 
-### 4. Apply same logic to `ChequeIssueForm.tsx`
-- Auto-populate cheque number from the active cheque book when bank account is selected.
+### 4. Bank Transaction & Reconciliation
+- The bank transaction amount will reflect `total_with_fees` (payment + fee) so reconciliation matches the actual bank statement deduction
+- Transaction description includes the fee breakdown
+
+## Result
+When recording a payment, the user can optionally add a bank fee inline. The system stores the fee, creates the GL entries, and shows a clear breakdown everywhere: payment tables, voucher preview, bank transactions, and reconciliation.
 
