@@ -362,13 +362,18 @@ export function AppSidebar() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <a
-                    href="https://storesone.lgh.lk"
-                    target="_self"
+                   <a
+                    href="https://storesone.lovable.app"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-medium shadow-md hover:from-emerald-700 hover:to-emerald-600 hover:shadow-lg transition-all duration-300 rounded-lg"
                   >
                     <Store className="w-5 h-5 transition-all duration-300" />
-                    {!collapsed && <span className="font-medium transition-all duration-300">Stores One</span>}
+                    {!collapsed && (
+                      <span className="font-medium transition-all duration-300 flex items-center gap-2">
+                        Stores One <ExternalLink className="w-3 h-3 opacity-60" />
+                      </span>
+                    )}
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -376,11 +381,16 @@ export function AppSidebar() {
                 <SidebarMenuButton asChild>
                   <a
                     href="https://docs.lgh.lk"
-                    target="_self"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="bg-gradient-to-r from-blue-600 to-blue-500 text-white font-medium shadow-md hover:from-blue-700 hover:to-blue-600 hover:shadow-lg transition-all duration-300 rounded-lg"
                   >
                     <BookOpen className="w-5 h-5 transition-all duration-300" />
-                    {!collapsed && <span className="font-medium transition-all duration-300">Document ERP</span>}
+                    {!collapsed && (
+                      <span className="font-medium transition-all duration-300 flex items-center gap-2">
+                        Document ERP <ExternalLink className="w-3 h-3 opacity-60" />
+                      </span>
+                    )}
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
