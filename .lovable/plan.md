@@ -1,61 +1,51 @@
 
 
-# Cross-Check and Fix All Automation Modules
+# Full System Cross-Check: Guard, Monitor, and Protect
 
-## Findings from Console Logs and Database Inspection
+## Critical Finding: `gl_settings` table does not exist
 
-The GL Integrity Scanner (`useGLIntegrityScanner.ts`) references 7 incorrect table/column names, causing scan errors on every load. The Automation Engine dashboard and sub-modules (Recurring Invoices, Payment Reminders, Workflow Rules, Scheduled Tasks) have CRUD UIs that work but some underlying scanner targets are broken.
+The most critical issue: the `gl_settings` table referenced by 5+ files across the system **does not exist in the database**. Every query to it silently fails, causing:
+- GL Integrity Scanner audit score to always report 0% Configuration
+- Core GL Settings page to never load/save settings
+- AR/AP posting logic to skip GL account lookups
+- Automation Engine module health to always show "warning" for Core GL
 
-### Errors Found (from console logs)
+## All Issues Found
 
-| Error | Wrong Reference | Actual Table/Column |
-|---|---|---|
-| `maintenance_logs` not found | `tableName: "maintenance_logs"` | `maintenance_records` |
-| `insurance_records.company_id` missing | `.eq("company_id", ...)` | No `company_id` column; use `bus_id` join or remove filter |
-| `special_hire_payments.company_id` missing | `.eq("company_id", ...)` | No `company_id` column; join via `quotation_id` |
-| `school_bus_payments` not found | `tableName: "school_bus_payments"` | `school_payments` |
-| `loan_payments` not found | `tableName: "loan_payments"` | `bus_loan_payments` |
-| `ncg_express_daily_trips` not found | `tableName: "ncg_express_daily_trips"` | Table does not exist — remove target |
-| `ncg_express_daily_expenses` not found | `tableName: "ncg_express_daily_expenses"` | Table does not exist — remove target |
+### 1. Missing `gl_settings` table (CRITICAL)
+**Files affected**: `useGLIntegrityScanner.ts`, `useFinanceAutomationEngine.ts`, `CoreGLSettings.tsx`, `useAccountingMutations.ts`, `useCustomerCategories.ts`
 
-Additional column mismatches:
-- `maintenance_records` has no `maintenance_date` (use `scheduled_date`), no `cost` (use `actual_cost`), no `company_id`, no `gl_posted`
-- `school_payments` has no `receipt_number`, no `journal_entry_id`, no `company_id`
-- `insurance_records` has no `company_id`, no `journal_entry_id`, no `last_amortization_month`
+**Fix**: Create the `gl_settings` table via SQL migration with columns: `id`, `company_id` (unique), `trade_receivable_account_id`, `trade_payable_account_id`, `sales_revenue_account_id`, `default_expense_account_id`, `customer_advance_account_id`, `wht_payable_account_id`, `bank_account_id`, `expense_account_id`, `created_at`, `updated_at` — all FK references to `chart_of_accounts`.
 
-## Plan
+### 2. `light_vehicle_finance_settings` table name wrong
+**File**: `useFinanceAutomationEngine.ts` line 496
+**Wrong**: `light_vehicle_finance_settings`
+**Correct**: `lightvehicle_finance_settings`
 
-### 1. Fix `useGLIntegrityScanner.ts` — SCAN_TARGETS array (lines 106-277)
+### 3. `maintenance_records.vehicle_id` column doesn't exist
+**File**: `useCrossModuleChecks.ts` line 141
+**Wrong**: `.is('vehicle_id', null)`
+**Correct**: `.is('bus_id', null)`
 
-Fix all 12 scan targets:
+### 4. `bus_loan_payments` refColumn should use `payment_number`
+**File**: `useGLIntegrityScanner.ts` line 218
+**Current**: `refColumn: "id"` — shows raw UUIDs in gap reports
+**Better**: `refColumn: "payment_number"` — shows human-readable references
 
-- **maintenance**: Change `tableName` from `"maintenance_logs"` to `"maintenance_records"`, `dateColumn` from `"maintenance_date"` to `"scheduled_date"`, `amountColumn` from `"cost"` to `"actual_cost"`. Since no `company_id` or `gl_posted`, change `glCheckType` to `"journal_entry_id"` (if column exists) or remove the target entirely.
-- **insurance**: Change `glCheckType` approach since no `company_id` or `journal_entry_id`. Remove company filter for this target.
-- **special_hire**: Remove direct `company_id` filter; the scanner must skip the company filter for this table.
-- **school_bus**: Change `tableName` from `"school_bus_payments"` to `"school_payments"`, `refColumn` from `"receipt_number"` to `"reference_no"`, remove `company_id` dependency. Since no `journal_entry_id`, change `glCheckType` to `"gl_posted"` or remove target.
-- **leasing**: Change `tableName` from `"loan_payments"` to `"bus_loan_payments"`.
-- **ncge_trips** and **ncge_expenses**: Remove both targets entirely since the tables don't exist.
+### 5. Post-gap update logic missing `gl_posted` for `bus_loan_payments`
+**File**: `useGLIntegrityScanner.ts` lines 705-710 and 768-773
+The post-gap logic only sets `gl_posted = true` for `asset_maintenance_logs` and `expense_requests`. But `bus_loan_payments` also has a `gl_posted` column that should be updated.
 
-### 2. Fix `useGLIntegrityScanner.ts` — Scanner query logic (lines 578-600)
+**Fix**: Add `bus_loan_payments` to the condition that sets `gl_posted = true`.
 
-The scanner blindly applies `.eq("company_id", effectiveCompanyId)` to all targets. Add a `hasCompanyId` flag to each `ScanTarget` so tables without `company_id` skip that filter.
+## Plan Summary
 
-### 3. Fix `useFinanceAutomationEngine.ts` — Pending Amortizations (lines 592-697)
-
-The `usePendingAmortizations` hook queries `insurance_records.company_id` and `insurance_records.last_amortization_month`, neither of which exist. Fix by removing `company_id` filter and `last_amortization_month` reference (or skipping insurance amortization entirely until columns are added).
-
-Similarly for `route_permits` — verify the `last_amortization_month` column exists.
-
-### 4. Verify remaining automation sub-modules work
-
-The CRUD views (RecurringInvoicesView, PaymentReminderRulesView, WorkflowRulesView, ScheduledTasksView) all query real tables (`recurring_invoices`, `payment_reminder_rules`, `workflow_rules`, `scheduled_tasks`) and appear structurally correct. The edge functions (`process-recurring-invoices`, `process-payment-reminders`, `execute-workflow-rules`, `run-scheduled-tasks`) are deployed. No code changes needed for these — they work.
-
-### Summary of Changes
-
-| File | What |
+| File | Change |
 |---|---|
-| `src/hooks/useGLIntegrityScanner.ts` | Fix 7 table names, 5 column names, add `hasCompanyId` flag, remove 2 non-existent targets |
-| `src/hooks/useFinanceAutomationEngine.ts` | Fix `usePendingAmortizations` to handle missing columns |
+| SQL Migration | Create `gl_settings` table with RLS |
+| `useFinanceAutomationEngine.ts` | Fix `light_vehicle_finance_settings` → `lightvehicle_finance_settings` |
+| `useCrossModuleChecks.ts` | Fix `vehicle_id` → `bus_id` |
+| `useGLIntegrityScanner.ts` | Fix `bus_loan_payments` refColumn to `payment_number`; add `bus_loan_payments` to `gl_posted` update logic |
 
-This will eliminate all 7 console errors and make the Automation Engine dashboard fully functional with accurate module health reporting, GL integrity scanning, and pending amortization tracking.
+These 5 fixes will eliminate all remaining silent failures and ensure the full guard/monitor system works correctly across all modules.
 
