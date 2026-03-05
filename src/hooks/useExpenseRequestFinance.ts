@@ -216,8 +216,22 @@ export function usePostExpenseRequestToGL() {
         }
       }
 
+      // Final fallback: use default_expense_account_id from core GL settings
       if (!expenseAccountId) {
-        throw new Error(`No GL account mapped for expense category: ${expense.expenseCategory}. Please configure expense GL mappings.`);
+        const { data: glSettings } = await supabase
+          .from("gl_settings" as any)
+          .select("default_expense_account_id")
+          .eq("company_id", effectiveCompanyId)
+          .maybeSingle();
+
+        if ((glSettings as any)?.default_expense_account_id) {
+          expenseAccountId = (glSettings as any).default_expense_account_id;
+          console.warn(`Expense category "${expense.expenseCategory}" has no explicit mapping. Using core GL default expense account as fallback.`);
+        }
+      }
+
+      if (!expenseAccountId) {
+        throw new Error(`No GL account mapped for expense category: ${expense.expenseCategory}. Please configure expense GL mappings in Settings → Module GL Mappings → Expense Requests, or set a Default Expense Account in Core GL Settings.`);
       }
 
       // 2. Determine credit account based on payment method
@@ -424,6 +438,19 @@ export async function bulkPostExpenseRequestsToGL(
           .limit(1)
           .maybeSingle();
         expenseAccountId = fallback?.id || null;
+      }
+
+      // Final fallback: use default_expense_account_id from core GL settings
+      if (!expenseAccountId) {
+        const { data: glSettings } = await supabase
+          .from("gl_settings" as any)
+          .select("default_expense_account_id")
+          .eq("company_id", effectiveCompanyId)
+          .maybeSingle();
+
+        if ((glSettings as any)?.default_expense_account_id) {
+          expenseAccountId = (glSettings as any).default_expense_account_id;
+        }
       }
 
       if (!expenseAccountId) {

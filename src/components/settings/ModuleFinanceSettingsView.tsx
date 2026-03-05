@@ -6,7 +6,8 @@
  * Reads/writes to the `module_finance_settings` table via module-specific hooks.
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { EXPENSE_CATEGORIES } from "@/hooks/useExpenseRequests";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -238,10 +239,26 @@ export function ModuleFinanceSettingsView() {
           configured.add(row.module_name);
 
           // Load expense mappings
-          if (row.module_name === "expense_requests" && (row.settings as Record<string, unknown>)?.mappings) {
-            setExpenseMappings(
-              ((row.settings as Record<string, unknown>).mappings as ExpenseMapping[]) || []
-            );
+          if (row.module_name === "expense_requests") {
+            const existingMappings = ((row.settings as Record<string, unknown>)?.mappings as ExpenseMapping[]) || [];
+            if (existingMappings.length === 0) {
+              // Auto-populate all expense categories as empty mappings
+              const autoPopulated = EXPENSE_CATEGORIES.map(cat => ({
+                expense_category: cat.value,
+                gl_account_id: "",
+              }));
+              setExpenseMappings(autoPopulated);
+            } else {
+              // Merge: add any missing categories that aren't already mapped
+              const existingCats = new Set(existingMappings.map(m => m.expense_category));
+              const merged = [...existingMappings];
+              for (const cat of EXPENSE_CATEGORIES) {
+                if (!existingCats.has(cat.value)) {
+                  merged.push({ expense_category: cat.value, gl_account_id: "" });
+                }
+              }
+              setExpenseMappings(merged);
+            }
           }
         }
       }
@@ -259,6 +276,14 @@ export function ModuleFinanceSettingsView() {
           defaults[config.prefixField] = config.defaultPrefix;
           settingsMap[config.moduleName] = defaults;
         }
+      }
+
+      // Auto-populate expense categories if expense_requests module has no settings yet
+      if (!configured.has("expense_requests") && expenseMappings.length === 0) {
+        setExpenseMappings(EXPENSE_CATEGORIES.map(cat => ({
+          expense_category: cat.value,
+          gl_account_id: "",
+        })));
       }
 
       setModuleSettings(settingsMap);
@@ -463,7 +488,7 @@ export function ModuleFinanceSettingsView() {
                               {expenseMappings.map((mapping, index) => (
                                 <div key={index} className="flex items-end gap-3">
                                   <div className="w-48">
-                                    <Label className="text-xs">{mapping.expense_category}</Label>
+                                    <Label className="text-xs">{EXPENSE_CATEGORIES.find(c => c.value === mapping.expense_category)?.label || mapping.expense_category}</Label>
                                   </div>
                                   <div className="flex-1">
                                     <SearchableFinanceAccountSelector
