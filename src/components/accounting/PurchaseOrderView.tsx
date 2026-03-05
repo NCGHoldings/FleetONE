@@ -2,15 +2,26 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, FileText, CheckCircle, Package, ArrowRight } from "lucide-react";
+import { Plus, Eye, FileText, CheckCircle, Package, ArrowRight, Pencil, Trash2 } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePurchaseOrders, useGoodsReceiptNotes } from "@/hooks/useAccountingData";
+import { useDeletePurchaseOrder } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { PurchaseOrderForm } from "./PurchaseOrderForm";
 import { GoodsReceiptForm } from "./GoodsReceiptForm";
 import { InvoiceMatchingView } from "./InvoiceMatchingView";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const PurchaseOrderView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
@@ -20,6 +31,8 @@ export const PurchaseOrderView = () => {
   const [showPOForm, setShowPOForm] = useState(false);
   const [showGRNForm, setShowGRNForm] = useState(false);
   const [selectedPO, setSelectedPO] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const deletePO = useDeletePurchaseOrder();
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -31,6 +44,13 @@ export const PurchaseOrderView = () => {
       cancelled: "destructive",
     };
     return <Badge variant={variants[status] || "default"}>{status?.replace("_", " ").toUpperCase()}</Badge>;
+  };
+
+  const handleDelete = () => {
+    if (deleteConfirmId) {
+      deletePO.mutate(deleteConfirmId);
+      setDeleteConfirmId(null);
+    }
   };
 
   const poColumns = [
@@ -90,26 +110,40 @@ export const PurchaseOrderView = () => {
     {
       id: "actions",
       header: "Actions",
-      cell: ({ row }: any) => (
-        <div className="flex gap-2">
-          <Button size="sm" variant="ghost">
-            <Eye className="h-4 w-4" />
-          </Button>
-          {(row.original.status === "approved" || row.original.status === "partially_received") && (
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => {
-                setSelectedPO(row.original.id);
-                setShowGRNForm(true);
-              }}
-            >
-              <Package className="h-4 w-4 mr-1" />
-              Receive
+      cell: ({ row }: any) => {
+        const status = row.original.status || "draft";
+        return (
+          <div className="flex gap-1">
+            <Button size="sm" variant="ghost">
+              <Eye className="h-4 w-4" />
             </Button>
-          )}
-        </div>
-      ),
+            {status === "draft" && (
+              <Button 
+                size="sm" 
+                variant="ghost"
+                title="Delete PO"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setDeleteConfirmId(row.original.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+            {(status === "approved" || status === "partially_received") && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => {
+                  setSelectedPO(row.original.id);
+                  setShowGRNForm(true);
+                }}
+              >
+                <Package className="h-4 w-4 mr-1" />
+                Receive
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -252,6 +286,24 @@ export const PurchaseOrderView = () => {
         onOpenChange={setShowGRNForm}
         purchaseOrderId={selectedPO}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Purchase Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. Only draft purchase orders can be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
