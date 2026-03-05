@@ -1,57 +1,67 @@
 
 
-# Fix Route Permit Document Upload + Add Change History
+# School Bus Branch Reports — Excel-Style P&L with Charts
 
-## What's Missing
+## Current State
+The `SchoolBranchReports.tsx` page is a minimal placeholder showing only 4 KPI cards (total students, revenue, payment rate, pending revenue) and a basic payment summary. No charts, no bus-by-bus breakdown, no expense tracking, no profit calculations — nothing like the Excel spreadsheet the user shared.
 
-1. **Document Upload button** shows "coming soon" toast instead of actually uploading files
-2. **No change history** — when a permit is edited, there's no record of what changed
+## What the Excel Shows (Reference: Wattala Branch, January 2026)
+A bus-by-bus P&L table with columns per bus (identified by route name + bus reg no):
+- **School bus income** (total income per bus)
+- **Expense breakdown**: Fuel expenses, Maintenance expenses, Driver salary, Caretaker salary, Parking fee, Other expenses
+- **Total direct expenses**
+- **Total direct profit** (Income - Expenses)
+- **Lease Installment**
+- **Total Net profit** (Direct Profit - Lease)
+- **Totals column** summing all buses
+
+## Data Sources Available
+- `school_students` — students with `bus_reg_no`, `route`, `payment_amount`, `payment_status`, `branch_id`
+- `school_routes` — route records with `bus_reg_no`, `total_income`, `total_expenses`, `net_profit`
+- `route_expenses` — individual expense records with `expense_type`, `expense_category`, `amount`, `route_id`, `branch_id`
+- `route_staff_costs` — driver/caretaker salaries with `staff_type`, `monthly_salary`, `route_id`, `branch_id`
+- `school_payments` — payment transactions
 
 ## Plan
 
-### 1. Create `route_permit_change_history` table (SQL Migration)
+### 1. Rewrite `SchoolBranchReports.tsx` — Full Branch P&L Report
 
-New table to track every permit change:
-- `id`, `permit_id` (FK to route_permits), `changed_by` (FK to auth.users), `changed_at`
-- `change_type` (text: 'created', 'updated', 'renewed', 'status_change', 'document_uploaded')
-- `changes` (jsonb: `{ field: "expiry_date", old: "2024-01-01", new: "2025-01-01" }`)
-- `description` (text summary)
-- RLS: authenticated can read, insert
+Replace the current minimal page with a comprehensive report:
 
-### 2. Implement Document Upload for Route Permits
+**Data Fetching**: Query all buses for the branch by grouping `school_students` by `bus_reg_no`, then fetch `route_expenses` and `route_staff_costs` for each route. Build a per-bus financial model:
+- Income: sum of `payment_amount` for paid students per bus
+- Fuel: sum of `route_expenses` where `expense_type = 'fuel'`
+- Maintenance: sum where `expense_type = 'maintenance'`
+- Driver salary: sum of `route_staff_costs` where `staff_type = 'driver'`
+- Caretaker salary: sum where `staff_type = 'caretaker'`
+- Parking: sum where `expense_type = 'parking'`
+- Other: remaining expenses
+- Direct profit = Income - Total expenses
 
-**In `src/pages/RoutePermits.tsx`**:
-- Replace the "coming soon" toast (lines 509-518) with a file input dialog
-- Upload file to Supabase Storage bucket `documents` under path `route-permits/{permitId}/{filename}`
-- Insert row into `documents` table with `linked_table: 'route_permits'`, `linked_row_id: permit.id`, `tag: 'permit_document'`
-- Log upload to `route_permit_change_history`
+**Excel-Style Spreadsheet Table**: Render a horizontally scrollable table matching the Excel layout — rows for each financial line item, columns for each bus (showing route name + reg no in header), plus a Totals column. Color-code profit rows: green for positive, red (pink) for negative — exactly like the Excel.
 
-Add new state + dialog component inline:
-- `showUploadDialog` boolean + `uploadPermitId` string
-- File dropzone accepting image/*, application/pdf (max 10MB)
-- On submit: upload to storage, insert to documents, record history, toast success
+### 2. Add Charts Section
 
-### 3. Record Change History on Every Permit Edit
+Below the spreadsheet table, add 4 charts using Recharts:
 
-**In `src/pages/RoutePermits.tsx` `handleSubmit()`**:
-- Before updating, fetch the current permit data
-- Diff old vs new values, build a `changes` jsonb array of `{ field, old_value, new_value }`
-- Insert into `route_permit_change_history` with `change_type: 'updated'` (or `'created'` for new permits)
+1. **Income vs Expenses Bar Chart** — grouped bars per bus showing income (green) and total expenses (red)
+2. **Expense Breakdown Stacked Bar Chart** — per bus, stacked by category (fuel, maintenance, driver salary, caretaker salary, parking, other)
+3. **Profit/Loss Bar Chart** — per bus net profit bars, green for positive, red for negative
+4. **Expense Category Pie Chart** — aggregate expense distribution across all buses
 
-### 4. Display History + Documents in Details Modal
+### 3. Fix Export Functions
 
-**In `src/components/route-permits/RoutePermitDetailsModal.tsx`**:
-- Add two new cards at the bottom:
+Replace the placeholder `exportReport` with real CSV and PDF export using `xlsx-js-style` and `jspdf`/`jspdf-autotable` (already installed), generating the same spreadsheet-style layout.
 
-**Documents Card**: Query `documents` where `linked_table = 'route_permits' AND linked_row_id = permit.id`. Show file name, upload date, download button (signed URL).
+### 4. Add Month Selector
 
-**Change History Card**: Query `route_permit_change_history` where `permit_id = permit.id` ordered by `changed_at DESC`. Show timeline with change type badge, description, timestamp, and expandable field-level diffs.
+The Excel shows "For the month of January 2026". Add a month/year picker alongside the date range so users can quickly select a reporting month, which filters expenses and payments to that period.
 
 ### Files to Change
 
 | File | What |
 |---|---|
-| SQL Migration | Create `route_permit_change_history` table with RLS |
-| `src/pages/RoutePermits.tsx` | Add document upload dialog, record change history on create/edit |
-| `src/components/route-permits/RoutePermitDetailsModal.tsx` | Add Documents and Change History sections |
+| `src/pages/SchoolBranchReports.tsx` | Complete rewrite with bus-by-bus P&L table, charts, and real exports |
+
+This is a single-file change that transforms the placeholder into a production-grade Excel-equivalent report with visual charts.
 
