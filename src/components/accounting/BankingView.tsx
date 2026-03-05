@@ -17,6 +17,7 @@ import { InterBankTransferForm } from "./InterBankTransferForm";
 import { InterBankTransferList } from "./InterBankTransferList";
 import { BankFeeForm } from "./BankFeeForm";
 import { BankFeesList } from "./BankFeesList";
+import { ChequeBookManagement } from "./ChequeBookManagement";
 
 export const BankingView = () => {
   const [selectedBankId, setSelectedBankId] = useState<string | undefined>();
@@ -229,6 +230,7 @@ export const BankingView = () => {
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="transfers">Fund Transfers</TabsTrigger>
           <TabsTrigger value="bank_fees">Bank Fees</TabsTrigger>
+          <TabsTrigger value="cheque_books">Cheque Books</TabsTrigger>
           <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
         </TabsList>
 
@@ -321,6 +323,10 @@ export const BankingView = () => {
             </div>
             <BankFeesList />
           </Card>
+        </TabsContent>
+
+        <TabsContent value="cheque_books">
+          <ChequeBookManagement />
         </TabsContent>
 
         <TabsContent value="reconciliation">

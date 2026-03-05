@@ -4753,6 +4753,63 @@ export type Database = {
           },
         ]
       }
+      cheque_books: {
+        Row: {
+          bank_account_id: string
+          company_id: string | null
+          created_at: string | null
+          end_number: number
+          id: string
+          is_active: boolean | null
+          next_number: number
+          notes: string | null
+          prefix: string | null
+          start_number: number
+          updated_at: string | null
+        }
+        Insert: {
+          bank_account_id: string
+          company_id?: string | null
+          created_at?: string | null
+          end_number: number
+          id?: string
+          is_active?: boolean | null
+          next_number: number
+          notes?: string | null
+          prefix?: string | null
+          start_number: number
+          updated_at?: string | null
+        }
+        Update: {
+          bank_account_id?: string
+          company_id?: string | null
+          created_at?: string | null
+          end_number?: number
+          id?: string
+          is_active?: boolean | null
+          next_number?: number
+          notes?: string | null
+          prefix?: string | null
+          start_number?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cheque_books_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cheque_books_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cheque_register: {
         Row: {
           amount: number
@@ -27289,6 +27346,10 @@ export type Database = {
       get_liability_account_setting: {
         Args: { p_setting_id: string }
         Returns: string
+      }
+      get_next_cheque_number: {
+        Args: { p_bank_account_id: string }
+        Returns: Json
       }
       get_user_page_permissions: {
         Args: { _user_id: string }
