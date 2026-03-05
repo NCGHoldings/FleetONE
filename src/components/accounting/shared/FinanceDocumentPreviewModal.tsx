@@ -171,7 +171,7 @@ export const FinanceDocumentPreviewModal = ({
       if (documentType === "ar_receipt") {
         const { data, error } = await supabase
           .from("ar_receipt_allocations")
-          .select("*, ar_invoices(invoice_number)")
+          .select("*, ar_invoices(invoice_number, notes)")
           .eq("receipt_id", documentData.id);
         if (error) throw error;
         return data;
@@ -180,7 +180,7 @@ export const FinanceDocumentPreviewModal = ({
       if (documentType === "ap_payment_voucher") {
         const { data, error } = await supabase
           .from("ap_payment_allocations")
-          .select("*, ap_invoices(invoice_number)")
+          .select("*, ap_invoices(invoice_number, notes, ap_invoice_lines(description))")
           .eq("payment_id", documentData.id);
         if (error) throw error;
         return data;
