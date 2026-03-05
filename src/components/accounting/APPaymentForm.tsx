@@ -15,10 +15,11 @@ import { useVendors, useAPInvoices, useBankAccounts } from "@/hooks/useAccountin
 import { useCreateAPPayment, useApproveAPInvoice } from "@/hooks/useAccountingMutations";
 import { useVendorBankAccounts } from "@/hooks/useVendorBankAccounts";
 import { useGenerateNumber } from "@/hooks/useNumbering";
+import { useNextChequeNumber, useActiveChequeBook } from "@/hooks/useChequeBooks";
 import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, CheckCircle, AlertCircle } from "lucide-react";
+import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen } from "lucide-react";
 
 const paymentSchema = z.object({
   payment_number: z.string().min(1, "Payment number is required"),
@@ -84,6 +85,27 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   });
 
   const paymentMethod = form.watch("payment_method");
+  const watchedBankAccountId = form.watch("bank_account_id");
+  const nextChequeNumber = useNextChequeNumber();
+  const { data: activeChequeBook } = useActiveChequeBook(
+    paymentMethod === "cheque" ? watchedBankAccountId : undefined
+  );
+
+  // Auto-fetch cheque number when payment method is cheque and bank is selected
+  useEffect(() => {
+    if (paymentMethod === "cheque" && watchedBankAccountId && open) {
+      const currentCheque = form.getValues("cheque_number");
+      if (!currentCheque) {
+        nextChequeNumber.mutate(watchedBankAccountId, {
+          onSuccess: (result) => {
+            if (result.cheque_number) {
+              form.setValue("cheque_number", result.cheque_number);
+            }
+          },
+        });
+      }
+    }
+  }, [paymentMethod, watchedBankAccountId, open]);
 
   // Reset form and generate payment number when dialog opens
   useEffect(() => {
@@ -416,10 +438,38 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                     name="cheque_number"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Cheque Number</FormLabel>
+                        <FormLabel className="flex items-center gap-1">
+                          Cheque Number
+                          {activeChequeBook && (
+                            <Badge variant="outline" className="ml-1 text-xs">
+                              <BookOpen className="h-3 w-3 mr-1" />
+                              Auto
+                            </Badge>
+                          )}
+                        </FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ''} placeholder="Cheque #" />
+                          <Input {...field} value={field.value || ''} placeholder={activeChequeBook ? "Auto-assigned" : "Cheque #"} />
                         </FormControl>
+                        {activeChequeBook && (() => {
+                          const remaining = activeChequeBook.end_number - activeChequeBook.next_number + 1;
+                          if (remaining <= 10 && remaining > 0) {
+                            return (
+                              <p className="text-xs text-orange-600 flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                {remaining} cheque leaves remaining
+                              </p>
+                            );
+                          }
+                          if (remaining <= 0) {
+                            return (
+                              <p className="text-xs text-destructive flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                Cheque book exhausted
+                              </p>
+                            );
+                          }
+                          return null;
+                        })()}
                         <FormMessage />
                       </FormItem>
                     )}

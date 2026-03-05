@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -9,9 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useCreateCheque } from "@/hooks/useAccountingMutations";
 import { useBankAccounts, useVendors, useCustomers } from "@/hooks/useAccountingData";
-import { Loader2 } from "lucide-react";
+import { useNextChequeNumber, useActiveChequeBook } from "@/hooks/useChequeBooks";
+import { Loader2, BookOpen, AlertTriangle, AlertCircle } from "lucide-react";
 
 const chequeSchema = z.object({
   cheque_number: z.string().min(1, "Cheque number is required"),
@@ -57,6 +60,27 @@ export const ChequeIssueForm = ({ open, onOpenChange }: ChequeIssueFormProps) =>
 
   const isPostDated = form.watch("is_post_dated");
   const chequeType = form.watch("cheque_type");
+  const watchedBankAccountId = form.watch("bank_account_id");
+  const nextChequeNumber = useNextChequeNumber();
+  const { data: activeChequeBook } = useActiveChequeBook(
+    chequeType === "outgoing" ? watchedBankAccountId : undefined
+  );
+
+  // Auto-fetch cheque number when bank account changes for outgoing cheques
+  useEffect(() => {
+    if (chequeType === "outgoing" && watchedBankAccountId && open) {
+      const currentCheque = form.getValues("cheque_number");
+      if (!currentCheque) {
+        nextChequeNumber.mutate(watchedBankAccountId, {
+          onSuccess: (result) => {
+            if (result.cheque_number) {
+              form.setValue("cheque_number", result.cheque_number);
+            }
+          },
+        });
+      }
+    }
+  }, [chequeType, watchedBankAccountId, open]);
 
   const handleVendorSelect = (vendorId: string) => {
     form.setValue("vendor_id", vendorId);
@@ -129,12 +153,40 @@ export const ChequeIssueForm = ({ open, onOpenChange }: ChequeIssueFormProps) =>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="cheque_number">Cheque Number *</Label>
+              <Label htmlFor="cheque_number" className="flex items-center gap-1">
+                Cheque Number *
+                {chequeType === "outgoing" && activeChequeBook && (
+                  <Badge variant="outline" className="ml-1 text-xs">
+                    <BookOpen className="h-3 w-3 mr-1" />
+                    Auto
+                  </Badge>
+                )}
+              </Label>
               <Input 
                 id="cheque_number" 
                 {...form.register("cheque_number")} 
-                placeholder="000001"
+                placeholder={chequeType === "outgoing" && activeChequeBook ? "Auto-assigned" : "000001"}
               />
+              {chequeType === "outgoing" && activeChequeBook && (() => {
+                const remaining = activeChequeBook.end_number - activeChequeBook.next_number + 1;
+                if (remaining <= 10 && remaining > 0) {
+                  return (
+                    <p className="text-xs text-orange-600 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      {remaining} cheque leaves remaining
+                    </p>
+                  );
+                }
+                if (remaining <= 0) {
+                  return (
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      Cheque book exhausted
+                    </p>
+                  );
+                }
+                return null;
+              })()}
               {form.formState.errors.cheque_number && (
                 <p className="text-xs text-destructive">{form.formState.errors.cheque_number.message}</p>
               )}
