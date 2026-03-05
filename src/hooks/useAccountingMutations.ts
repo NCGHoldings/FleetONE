@@ -3632,3 +3632,146 @@ export const useDeleteAPDebitNote = () => {
     onError: (error) => toast.error(`Failed to delete: ${error.message}`),
   });
 };
+
+// ============ UPDATE MUTATIONS FOR AP/AR INVOICES ============
+
+export const useUpdateAPInvoice = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async ({ id, data, lines }: {
+      id: string;
+      data: {
+        vendor_id: string;
+        invoice_number: string;
+        invoice_date: string;
+        due_date: string;
+        subtotal?: number;
+        total_amount: number;
+        tax_amount?: number;
+        wht_amount?: number;
+        notes?: string;
+      };
+      lines: Array<{
+        description: string;
+        quantity: number;
+        unit_price: number;
+        tax_amount?: number;
+        tax_code?: string;
+        line_total: number;
+        account_id?: string;
+      }>;
+    }) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      
+      const { error: headerError } = await supabase
+        .from("ap_invoices")
+        .update({
+          vendor_id: data.vendor_id,
+          invoice_number: data.invoice_number,
+          invoice_date: data.invoice_date,
+          due_date: data.due_date,
+          subtotal: data.subtotal,
+          total_amount: data.total_amount,
+          tax_amount: data.tax_amount,
+          wht_amount: data.wht_amount,
+          balance: data.total_amount - (data.wht_amount || 0),
+          notes: data.notes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+      if (headerError) throw headerError;
+
+      // Delete old lines, insert new
+      await supabase.from("ap_invoice_lines").delete().eq("invoice_id", id);
+      if (lines.length > 0) {
+        const lineData = lines.map(l => ({
+          invoice_id: id,
+          description: l.description,
+          quantity: l.quantity,
+          unit_price: l.unit_price,
+          tax_amount: l.tax_amount,
+          tax_code: l.tax_code,
+          line_total: l.line_total,
+          account_id: l.account_id,
+          company_id: effectiveCompanyId,
+        }));
+        const { error: linesError } = await supabase.from("ap_invoice_lines").insert(lineData);
+        if (linesError) throw linesError;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      toast.success("AP Invoice updated successfully");
+    },
+    onError: (error) => toast.error(`Failed to update AP Invoice: ${error.message}`),
+  });
+};
+
+export const useUpdateARInvoice = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async ({ id, data, lines }: {
+      id: string;
+      data: {
+        customer_id: string;
+        invoice_number: string;
+        invoice_date: string;
+        due_date: string;
+        total_amount: number;
+        tax_amount?: number;
+        notes?: string;
+      };
+      lines: Array<{
+        description: string;
+        quantity: number;
+        unit_price: number;
+        line_total: number;
+        tax_code?: string;
+        account_id?: string;
+      }>;
+    }) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      
+      const { error: headerError } = await supabase
+        .from("ar_invoices")
+        .update({
+          customer_id: data.customer_id,
+          invoice_number: data.invoice_number,
+          invoice_date: data.invoice_date,
+          due_date: data.due_date,
+          total_amount: data.total_amount,
+          tax_amount: data.tax_amount,
+          balance: data.total_amount,
+          notes: data.notes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+      if (headerError) throw headerError;
+
+      await supabase.from("ar_invoice_lines").delete().eq("invoice_id", id);
+      if (lines.length > 0) {
+        const lineData = lines.map(l => ({
+          invoice_id: id,
+          description: l.description,
+          quantity: l.quantity,
+          unit_price: l.unit_price,
+          line_total: l.line_total,
+          tax_code: l.tax_code,
+          account_id: l.account_id,
+          company_id: effectiveCompanyId,
+        }));
+        const { error: linesError } = await supabase.from("ar_invoice_lines").insert(lineData);
+        if (linesError) throw linesError;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      toast.success("AR Invoice updated successfully");
+    },
+    onError: (error) => toast.error(`Failed to update AR Invoice: ${error.message}`),
+  });
+};
