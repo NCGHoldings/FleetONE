@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
 import { createAndPostJournalEntry, generateEntryNumber } from "@/lib/gl-posting-utils";
+import { EXPENSE_CATEGORIES } from "@/hooks/useExpenseRequests";
 
 // ============ Types ============
 
@@ -326,6 +327,57 @@ async function runAuditRules(
     learnMore: "Auto-posting eliminates manual work — when a transaction is created/approved, the GL entry is created automatically. This ensures no transaction is ever missed.",
   });
 
+  // ---- EXPENSE CATEGORY MAPPING COMPLETENESS ----
+
+  // Rule: Expense Category GL Mappings
+  const expenseSettings = moduleSettingsMap.get("expense_requests");
+  const expenseMappings: Array<{ expense_category: string; gl_account_id: string }> = expenseSettings?.mappings || [];
+  const allCategoryValues = EXPENSE_CATEGORIES.map(c => c.value);
+  const mappedCategories = expenseMappings.filter(m => m.gl_account_id && m.gl_account_id.length > 0).map(m => m.expense_category);
+  const unmappedCategories = allCategoryValues.filter(c => !mappedCategories.includes(c));
+  const unmappedLabels = unmappedCategories.map(v => EXPENSE_CATEGORIES.find(c => c.value === v)?.label || v);
+  
+  // Check if fallback accounts exist for unmapped categories
+  let fallbacksAvailable = 0;
+  if (unmappedCategories.length > 0) {
+    try {
+      // Check for "general expense" fallback
+      const { data: generalExpense } = await supabase
+        .from("chart_of_accounts")
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("account_type", "expense")
+        .ilike("account_name", "%general expense%")
+        .limit(1)
+        .maybeSingle();
+      
+      if (generalExpense) fallbacksAvailable++;
+      
+      // Check if default_expense_account_id is set in gl_settings
+      if (glSettings?.default_expense_account_id) fallbacksAvailable++;
+    } catch { /* ignore */ }
+  }
+
+  const mappingPercentage = allCategoryValues.length > 0 ? Math.round((mappedCategories.length / allCategoryValues.length) * 100) : 100;
+  const hasCriticalGap = unmappedCategories.length > allCategoryValues.length * 0.5 && fallbacksAvailable === 0;
+
+  rules.push({
+    id: "config_expense_category_mappings",
+    name: "Expense Category GL Mappings",
+    category: "configuration",
+    description: "All expense categories have explicit GL account mappings",
+    status: unmappedCategories.length === 0 ? "pass" : hasCriticalGap ? "fail" : "warning",
+    score: mappingPercentage,
+    weight: 15,
+    details: unmappedCategories.length === 0
+      ? `All ${allCategoryValues.length} expense categories are mapped to GL accounts`
+      : `${mappedCategories.length}/${allCategoryValues.length} mapped. Unmapped: ${unmappedLabels.slice(0, 5).join(", ")}${unmappedLabels.length > 5 ? ` (+${unmappedLabels.length - 5} more)` : ""}${fallbacksAvailable > 0 ? " (fallbacks available)" : " (NO fallbacks!)"}`,
+    recommendation: unmappedCategories.length > 0
+      ? "Go to Settings → Module GL Mappings → Expense Requests to map missing categories. Categories without mappings will fail GL posting."
+      : undefined,
+    learnMore: "Each expense category (Food, Fuel, Repairs, etc.) needs a GL account mapping so the system knows which expense account to debit when posting. Without mappings, expense approval will fail with 'No GL account mapped' errors.",
+  });
+
   // ---- COMPLETENESS RULES ----
 
   // Rule 4: No unposted transactions
@@ -529,7 +581,7 @@ export function useGLIntegrityScanner() {
         try {
           let query = (supabase as any)
             .from(target.tableName)
-            .select(`id, ${target.refColumn}, ${target.dateColumn}, ${target.amountColumn}`);
+            .select(`id, ${target.refColumn}, ${target.dateColumn}, ${target.amountColumn}${target.module === "expense_requests" ? ", expense_category" : ""}`);
 
           // Only filter by company_id if the table has it
           if (target.hasCompanyId !== false) {
@@ -590,6 +642,23 @@ export function useGLIntegrityScanner() {
             const amount = record[target.amountColumn];
             if (!amount || amount <= 0) continue;
 
+            // For expense_requests, check if the category has a mapping
+            let isMissingMapping = false;
+            let effectiveCanAutoPost = canAutoPost;
+            let effectiveDescription = `${target.moduleLabel}: ${record[target.refColumn] || "N/A"} - LKR ${amount.toLocaleString()}`;
+            
+            if (target.module === "expense_requests" && record.expense_category) {
+              const expSettings = moduleSettingsMap.get("expense_requests");
+              const expMappings: Array<{ expense_category: string; gl_account_id: string }> = expSettings?.mappings || [];
+              const catMapping = expMappings.find((m: any) => m.expense_category === record.expense_category && m.gl_account_id);
+              if (!catMapping) {
+                isMissingMapping = true;
+                const catLabel = EXPENSE_CATEGORIES.find(c => c.value === record.expense_category)?.label || record.expense_category;
+                effectiveDescription = `⚠️ UNPOSTABLE - ${target.moduleLabel}: ${record[target.refColumn] || "N/A"} - Category "${catLabel}" has no GL mapping - LKR ${amount.toLocaleString()}`;
+                effectiveCanAutoPost = false; // Can't auto-post without mapping
+              }
+            }
+
             allGaps.push({
               id: `${target.module}-${record.id}`,
               module: target.module,
@@ -599,12 +668,12 @@ export function useGLIntegrityScanner() {
               recordRef: record[target.refColumn] || record.id.substring(0, 8),
               recordDate: record[target.dateColumn] || new Date().toISOString(),
               amount,
-              description: `${target.moduleLabel}: ${record[target.refColumn] || "N/A"} - LKR ${amount.toLocaleString()}`,
-              severity: target.severity,
+              description: effectiveDescription,
+              severity: isMissingMapping ? "critical" : target.severity,
               suggestedDebit: debitLabel,
               suggestedCredit: creditLabel,
-              canAutoPost,
-              postingData: canAutoPost
+              canAutoPost: effectiveCanAutoPost,
+              postingData: effectiveCanAutoPost
                 ? { debitAccountId: debitAccountId!, creditAccountId: creditAccountId!, debitLabel, creditLabel }
                 : undefined,
             });
