@@ -233,7 +233,7 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{system_uuid}}'] = documentData?.id || '';
       placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
       const arInvLogo = companyData?.logo_url || headerImageUrl || '';
-      if (arInvLogo) placeholders['{{company_logo}}'] = arInvLogo;
+      if (arInvLogo) placeholders['{{company_logo}}'] = `<img src="${arInvLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
       break;
     }
 
@@ -261,7 +261,7 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{system_uuid}}'] = documentData?.id || '';
       placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
       const arRcptLogo = companyData?.logo_url || headerImageUrl || '';
-      if (arRcptLogo) placeholders['{{company_logo}}'] = arRcptLogo;
+      if (arRcptLogo) placeholders['{{company_logo}}'] = `<img src="${arRcptLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
       break;
     }
 
@@ -283,7 +283,7 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{system_uuid}}'] = documentData?.id || '';
       placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
       const arCnLogo = companyData?.logo_url || headerImageUrl || '';
-      if (arCnLogo) placeholders['{{company_logo}}'] = arCnLogo;
+      if (arCnLogo) placeholders['{{company_logo}}'] = `<img src="${arCnLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
       break;
     }
 
@@ -366,7 +366,7 @@ export const mapDocumentToPlaceholders = (
       // Company logo URL for custom templates
       const invLogoUrl = companyData?.logo_url || headerImageUrl || '';
       if (invLogoUrl) {
-        placeholders['{{company_logo}}'] = invLogoUrl;
+        placeholders['{{company_logo}}'] = `<img src="${invLogoUrl}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
       }
       break;
     }
@@ -457,7 +457,7 @@ export const mapDocumentToPlaceholders = (
       // Override the <img> tag version with the raw URL for custom templates
       const logoUrl = companyData?.logo_url || headerImageUrl || '';
       if (logoUrl) {
-        placeholders['{{company_logo}}'] = logoUrl;
+        placeholders['{{company_logo}}'] = `<img src="${logoUrl}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
       }
       break;
     }
@@ -483,7 +483,7 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{system_uuid}}'] = documentData?.id || '';
       placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
       const dnLogo = companyData?.logo_url || headerImageUrl || '';
-      if (dnLogo) placeholders['{{company_logo}}'] = dnLogo;
+      if (dnLogo) placeholders['{{company_logo}}'] = `<img src="${dnLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
       break;
     }
   }
