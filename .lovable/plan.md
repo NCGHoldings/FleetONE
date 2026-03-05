@@ -1,26 +1,18 @@
 
 
-# Fix: AP Payment Voucher Missing Invoice Description
+# Add Alternating Row Colors (Zebra Striping) to All Tables
 
 ## Problem
-The Payment Voucher preview shows a blank "Description" column because the queries only fetch `invoice_number` from related invoices — never the `notes` or line-item descriptions.
+All tables currently have the same white background for every row, making it hard to visually track rows across wide tables. The user wants alternating row colors like the StoresONE reference screenshot.
 
-## Changes
+## Fix
+A single change to `src/components/ui/table.tsx` — add `even:bg-muted/30` (or `odd:bg-muted/30`) to the `TableBody` component so every other row gets a subtle background. This automatically applies to **all tables** project-wide since every table uses this shared component.
 
-### 1. `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx`
-- **Line 183**: Change AP allocation query to:
-  `.select("*, ap_invoices(invoice_number, notes, ap_invoice_lines(description))")`
-- **Line 174**: Change AR allocation query to:
-  `.select("*, ar_invoices(invoice_number, notes)")`
+### `src/components/ui/table.tsx` — TableBody (line 33)
+Change the class to:
+```
+"[&_tr:last-child]:border-0 [&_tr:nth-child(even)]:bg-muted/30"
+```
 
-### 2. `src/lib/document-template-utils.ts`
-- **Line 125**: Build description from line-item descriptions first, fall back to invoice notes:
-  ```typescript
-  const desc = alloc.ap_invoices?.ap_invoice_lines?.map(l => l.description).filter(Boolean).join(', ')
-    || alloc.ap_invoices?.notes
-    || alloc.ar_invoices?.notes
-    || '';
-  ```
-
-Two files, three line changes. The Payment Voucher and AR Receipt previews will then display invoice descriptions automatically.
+This adds a light alternating background on even rows across every table in the application — AP payments, journal entries, school payments, fleet tables, etc.
 
