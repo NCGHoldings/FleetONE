@@ -895,6 +895,8 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           bank_account_id: string | null
+          bank_fee_amount: number | null
+          bank_fee_type: string | null
           business_unit_code: string | null
           cheque_date: string | null
           cheque_number: string | null
@@ -910,6 +912,7 @@ export type Database = {
           payment_number: string
           reference: string | null
           status: string | null
+          total_with_fees: number | null
           updated_at: string | null
           vendor_bank_account_id: string | null
           vendor_id: string | null
@@ -920,6 +923,8 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bank_account_id?: string | null
+          bank_fee_amount?: number | null
+          bank_fee_type?: string | null
           business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
@@ -935,6 +940,7 @@ export type Database = {
           payment_number: string
           reference?: string | null
           status?: string | null
+          total_with_fees?: number | null
           updated_at?: string | null
           vendor_bank_account_id?: string | null
           vendor_id?: string | null
@@ -945,6 +951,8 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bank_account_id?: string | null
+          bank_fee_amount?: number | null
+          bank_fee_type?: string | null
           business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
@@ -960,6 +968,7 @@ export type Database = {
           payment_number?: string
           reference?: string | null
           status?: string | null
+          total_with_fees?: number | null
           updated_at?: string | null
           vendor_bank_account_id?: string | null
           vendor_id?: string | null
