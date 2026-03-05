@@ -214,7 +214,7 @@ const SCAN_TARGETS: ScanTarget[] = [
     module: "leasing",
     moduleLabel: "Leasing Payments",
     tableName: "bus_loan_payments",
-    refColumn: "id",
+    refColumn: "payment_number",
     dateColumn: "payment_date",
     amountColumn: "total_installment",
     glCheckType: "journal_entry_id",
@@ -702,7 +702,7 @@ export function usePostGapToGL() {
       if (!result.success) throw new Error(result.error || "Failed to create journal entry");
 
       const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
-      if (gap.tableName === "asset_maintenance_logs" || gap.tableName === "expense_requests") {
+      if (gap.tableName === "asset_maintenance_logs" || gap.tableName === "expense_requests" || gap.tableName === "bus_loan_payments") {
         updateData.gl_posted = true;
         updateData.journal_entry_id = result.journalEntryId;
       } else {
@@ -765,7 +765,7 @@ export function useBulkPostGapsToGL() {
           if (!result.success) { failed++; continue; }
 
           const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
-          if (gap.tableName === "asset_maintenance_logs" || gap.tableName === "expense_requests") {
+          if (gap.tableName === "asset_maintenance_logs" || gap.tableName === "expense_requests" || gap.tableName === "bus_loan_payments") {
             updateData.gl_posted = true;
             updateData.journal_entry_id = result.journalEntryId;
           } else {
