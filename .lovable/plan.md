@@ -1,67 +1,48 @@
 
 
-# School Bus Branch Reports — Excel-Style P&L with Charts
+# Fix GL Guardian "Config" Button + AP Invoice GL Linking
 
-## Current State
-The `SchoolBranchReports.tsx` page is a minimal placeholder showing only 4 KPI cards (total students, revenue, payment rate, pending revenue) and a basic payment summary. No charts, no bus-by-bus breakdown, no expense tracking, no profit calculations — nothing like the Excel spreadsheet the user shared.
+## Problems Found
 
-## What the Excel Shows (Reference: Wattala Branch, January 2026)
-A bus-by-bus P&L table with columns per bus (identified by route name + bus reg no):
-- **School bus income** (total income per bus)
-- **Expense breakdown**: Fuel expenses, Maintenance expenses, Driver salary, Caretaker salary, Parking fee, Other expenses
-- **Total direct expenses**
-- **Total direct profit** (Income - Expenses)
-- **Lease Installment**
-- **Total Net profit** (Direct Profit - Lease)
-- **Totals column** summing all buses
+### 1. "Config" button is disabled and does nothing
+In `GLIntegrityGuardian.tsx` line 635, the Config button has `disabled` prop and no `onClick` handler. When gaps show "Needs Config", users have no way to navigate to the Core GL Settings page to configure the required accounts.
 
-## Data Sources Available
-- `school_students` — students with `bus_reg_no`, `route`, `payment_amount`, `payment_status`, `branch_id`
-- `school_routes` — route records with `bus_reg_no`, `total_income`, `total_expenses`, `net_profit`
-- `route_expenses` — individual expense records with `expense_type`, `expense_category`, `amount`, `route_id`, `branch_id`
-- `route_staff_costs` — driver/caretaker salaries with `staff_type`, `monthly_salary`, `route_id`, `branch_id`
-- `school_payments` — payment transactions
+### 2. AP Invoice GL posting does NOT link `journal_entry_id` back
+In `useAccountingMutations.ts` lines 1540-1568, `useApproveAPInvoice` calls `postAPInvoiceToGL` and gets back a `journalEntryId`, but never writes it back to the `ap_invoices` row. This means:
+- The GL Guardian always detects AP invoices as "gaps" (it checks `journal_entry_id IS NULL`)
+- Even approved+posted invoices show as "Needs Config" or unposted
+
+### 3. "Settings config" link text is not clickable
+The "⚠ X gaps need Settings config" text at line 392 is plain text, not a link to settings.
 
 ## Plan
 
-### 1. Rewrite `SchoolBranchReports.tsx` — Full Branch P&L Report
+### File 1: `src/components/accounting/GLIntegrityGuardian.tsx`
 
-Replace the current minimal page with a comprehensive report:
+**A. Make Config button navigate to Settings → Core GL Settings**
+- Remove `disabled` from the Config button (line 635)
+- Add `onClick` handler using `useNavigate` to go to `/settings` with the `core-gl-settings` tab
+- Make the "gaps need Settings config" text a clickable link to the same destination
 
-**Data Fetching**: Query all buses for the branch by grouping `school_students` by `bus_reg_no`, then fetch `route_expenses` and `route_staff_costs` for each route. Build a per-bus financial model:
-- Income: sum of `payment_amount` for paid students per bus
-- Fuel: sum of `route_expenses` where `expense_type = 'fuel'`
-- Maintenance: sum where `expense_type = 'maintenance'`
-- Driver salary: sum of `route_staff_costs` where `staff_type = 'driver'`
-- Caretaker salary: sum where `staff_type = 'caretaker'`
-- Parking: sum where `expense_type = 'parking'`
-- Other: remaining expenses
-- Direct profit = Income - Total expenses
+### File 2: `src/hooks/useAccountingMutations.ts`
 
-**Excel-Style Spreadsheet Table**: Render a horizontally scrollable table matching the Excel layout — rows for each financial line item, columns for each bus (showing route name + reg no in header), plus a Totals column. Color-code profit rows: green for positive, red (pink) for negative — exactly like the Excel.
+**A. Fix `useApproveAPInvoice` — link journal_entry_id back to ap_invoices**
+After the `postAPInvoiceToGL` call succeeds (line 1551), add:
+```typescript
+if (glResult.success && glResult.journalEntryId) {
+  await supabase.from("ap_invoices")
+    .update({ journal_entry_id: glResult.journalEntryId })
+    .eq("id", id);
+}
+```
+This ensures the GL Guardian sees the invoice as posted and stops flagging it.
 
-### 2. Add Charts Section
+## Summary
 
-Below the spreadsheet table, add 4 charts using Recharts:
-
-1. **Income vs Expenses Bar Chart** — grouped bars per bus showing income (green) and total expenses (red)
-2. **Expense Breakdown Stacked Bar Chart** — per bus, stacked by category (fuel, maintenance, driver salary, caretaker salary, parking, other)
-3. **Profit/Loss Bar Chart** — per bus net profit bars, green for positive, red for negative
-4. **Expense Category Pie Chart** — aggregate expense distribution across all buses
-
-### 3. Fix Export Functions
-
-Replace the placeholder `exportReport` with real CSV and PDF export using `xlsx-js-style` and `jspdf`/`jspdf-autotable` (already installed), generating the same spreadsheet-style layout.
-
-### 4. Add Month Selector
-
-The Excel shows "For the month of January 2026". Add a month/year picker alongside the date range so users can quickly select a reporting month, which filters expenses and payments to that period.
-
-### Files to Change
-
-| File | What |
+| File | Change |
 |---|---|
-| `src/pages/SchoolBranchReports.tsx` | Complete rewrite with bus-by-bus P&L table, charts, and real exports |
+| `GLIntegrityGuardian.tsx` | Enable Config button → navigates to Settings Core GL tab; make "needs config" text clickable |
+| `useAccountingMutations.ts` | Link `journal_entry_id` back to `ap_invoices` after GL posting on approval |
 
-This is a single-file change that transforms the placeholder into a production-grade Excel-equivalent report with visual charts.
+These two fixes will: (1) let users actually configure GL accounts when gaps say "Needs Config", and (2) stop AP invoices from being perpetually flagged as unposted gaps after approval.
 
