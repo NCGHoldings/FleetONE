@@ -779,6 +779,8 @@ export const useCreateAPPayment = () => {
       notes?: string;
       is_advance?: boolean;
       vendor_bank_account_id?: string;
+      bank_fee_amount?: number;
+      bank_fee_type?: string;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
@@ -814,10 +816,12 @@ export const useCreateAPPayment = () => {
           notes: payment.notes,
           is_advance: payment.is_advance || false,
           vendor_bank_account_id: payment.vendor_bank_account_id || null,
+          bank_fee_amount: payment.bank_fee_amount || 0,
+          bank_fee_type: payment.bank_fee_type || null,
           status: "posted",
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,
-        }])
+        } as any])
         .select()
         .single();
       
@@ -937,13 +941,17 @@ export const useCreateAPPayment = () => {
 
       // ========== BANK TRANSACTION ==========
       // Create bank transaction record if bank account is selected (use selectedCompanyId to match bank account)
+      const totalWithFees = payment.amount + (payment.bank_fee_amount || 0);
       if (payment.bank_account_id && payment.amount > 0) {
+        const feeBreakdown = payment.bank_fee_amount && payment.bank_fee_amount > 0
+          ? ` (Payment: ${payment.amount.toLocaleString()}, Bank Fee: ${payment.bank_fee_amount.toLocaleString()})`
+          : '';
         await supabase.from("bank_transactions").insert([{
           bank_account_id: payment.bank_account_id,
           transaction_date: payment.payment_date,
           transaction_type: "payment",
-          description: `AP Payment to ${vendorName} - ${payment.payment_number}`,
-          credit_amount: payment.amount,
+          description: `AP Payment to ${vendorName} - ${payment.payment_number}${feeBreakdown}`,
+          credit_amount: totalWithFees,
           debit_amount: 0,
           reference: payment.reference || payment.payment_number,
           cheque_number: payment.cheque_number,
@@ -952,7 +960,7 @@ export const useCreateAPPayment = () => {
           source_id: data.id,
         }]);
 
-        // Update bank account balance
+        // Update bank account balance with total including fees
         const { data: bankAccount } = await supabase
           .from("bank_accounts")
           .select("current_balance")
@@ -960,11 +968,24 @@ export const useCreateAPPayment = () => {
           .single();
 
         if (bankAccount) {
-          const newBalance = (bankAccount.current_balance || 0) - payment.amount;
+          const newBalance = (bankAccount.current_balance || 0) - totalWithFees;
           await supabase
             .from("bank_accounts")
             .update({ current_balance: newBalance })
             .eq("id", payment.bank_account_id);
+        }
+
+        // Auto-create bank_fee_charges record if bank fee is included
+        if (payment.bank_fee_amount && payment.bank_fee_amount > 0) {
+          await supabase.from("bank_fee_charges").insert([{
+            bank_account_id: payment.bank_account_id,
+            fee_date: payment.payment_date,
+            amount: payment.bank_fee_amount,
+            fee_type: payment.bank_fee_type || "bank_charge",
+            description: `Bank fee for AP Payment ${payment.payment_number} to ${vendorName}`,
+            ap_payment_id: data.id,
+            company_id: selectedCompanyId,
+          } as any]);
         }
       }
 

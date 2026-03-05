@@ -19,7 +19,8 @@ import { useNextChequeNumber, useActiveChequeBook } from "@/hooks/useChequeBooks
 import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen, Landmark } from "lucide-react";
 
 const paymentSchema = z.object({
   payment_number: z.string().min(1, "Payment number is required"),
@@ -68,6 +69,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const [selectedBankAccountId, setSelectedBankAccountId] = useState("");
   const [isAdvance, setIsAdvance] = useState(isAdvanceMode);
   const [advanceAmount, setAdvanceAmount] = useState(0);
+  const [includeBankFee, setIncludeBankFee] = useState(false);
+  const [bankFeeAmount, setBankFeeAmount] = useState(0);
+  const [bankFeeType, setBankFeeType] = useState("bank_charge");
 
   const { data: vendorBankAccounts } = useVendorBankAccounts(selectedVendorId || undefined);
 
@@ -114,6 +118,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       form.setValue("is_advance", isAdvanceMode);
       setAdvanceAmount(0);
       setSelectedBankAccountId("");
+      setIncludeBankFee(false);
+      setBankFeeAmount(0);
+      setBankFeeType("bank_charge");
       // Generate sequential payment number
       generateNumber("payment").then((num) => {
         form.setValue("payment_number", num);
@@ -229,6 +236,8 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
 
   const totalPayment = isAdvance ? advanceAmount : allocations.reduce((sum, a) => sum + a.allocated_amount, 0);
   const totalWhtDeducted = allocations.reduce((sum, a) => sum + a.wht_deducted, 0);
+  const effectiveBankFee = includeBankFee ? bankFeeAmount : 0;
+  const totalWithFees = totalPayment + effectiveBankFee;
 
   const onSubmit = async (data: PaymentFormData) => {
     const selectedAllocations = isAdvance 
@@ -249,6 +258,8 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
         notes: data.notes,
         is_advance: isAdvance,
         vendor_bank_account_id: selectedBankAccountId || undefined,
+        bank_fee_amount: effectiveBankFee > 0 ? effectiveBankFee : undefined,
+        bank_fee_type: effectiveBankFee > 0 ? bankFeeType : undefined,
         allocations: selectedAllocations.map((a) => ({
           invoice_id: a.invoice_id,
           allocated_amount: a.allocated_amount,
@@ -260,6 +271,8 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       setAllocations([]);
       setIsAdvance(false);
       setAdvanceAmount(0);
+      setIncludeBankFee(false);
+      setBankFeeAmount(0);
     } catch (error) {
       // Error handled by mutation
     }
@@ -505,6 +518,55 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
               />
             </div>
 
+            {/* Bank Fee Section */}
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
+              <div className="flex items-center gap-3">
+                <Landmark className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium">Include Bank Fee</p>
+                  <p className="text-sm text-muted-foreground">
+                    Add bank charges to this payment
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={includeBankFee}
+                onCheckedChange={setIncludeBankFee}
+              />
+            </div>
+
+            {includeBankFee && (
+              <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
+                <div>
+                  <Label className="text-sm font-medium">Fee Amount</Label>
+                  <Input
+                    type="number"
+                    value={bankFeeAmount}
+                    onChange={(e) => setBankFeeAmount(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    min={0}
+                    step="0.01"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Fee Type</Label>
+                  <Select value={bankFeeType} onValueChange={setBankFeeType}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bank_charge">Bank Charge</SelectItem>
+                      <SelectItem value="swift_fee">SWIFT Fee</SelectItem>
+                      <SelectItem value="stamp_duty">Stamp Duty</SelectItem>
+                      <SelectItem value="commission">Commission</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
             {/* Advance Mode: Direct Amount Input */}
             {isAdvance && (
               <div className="p-4 border rounded-lg bg-orange-50 dark:bg-orange-950/20">
@@ -644,11 +706,25 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                       </span>
                     </div>
                   </div>
-                  <div className="bg-muted p-4 rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <span className="font-semibold">Total Payment:</span>
-                      <span className="text-2xl font-bold text-primary">
+                  <div className="bg-muted p-4 rounded-lg space-y-1">
+                    <div className="flex items-center justify-between gap-8">
+                      <span className="text-sm text-muted-foreground">Payment Amount:</span>
+                      <span className="font-semibold">
                         <CurrencyDisplay amount={totalPayment} />
+                      </span>
+                    </div>
+                    {includeBankFee && bankFeeAmount > 0 && (
+                      <div className="flex items-center justify-between gap-8">
+                        <span className="text-sm text-muted-foreground">Bank Fee:</span>
+                        <span className="font-semibold text-orange-600">
+                          <CurrencyDisplay amount={bankFeeAmount} />
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-8 border-t pt-1">
+                      <span className="font-semibold">Total (Bank Deduction):</span>
+                      <span className="text-2xl font-bold text-primary">
+                        <CurrencyDisplay amount={totalWithFees} />
                       </span>
                     </div>
                   </div>

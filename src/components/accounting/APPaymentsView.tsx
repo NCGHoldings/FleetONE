@@ -255,6 +255,8 @@ export const APPaymentsView = () => {
               <TableHead>Cheque #</TableHead>
               <TableHead>Reference</TableHead>
               <TableHead className="text-right">Amount</TableHead>
+              <TableHead className="text-right">Bank Fee</TableHead>
+              <TableHead className="text-right">Total</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -262,13 +264,13 @@ export const APPaymentsView = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
-                  Loading payments...
+                 <TableCell colSpan={11} className="text-center py-8">
+                   Loading payments...
                 </TableCell>
               </TableRow>
             ) : filteredPayments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                   No payments found
                 </TableCell>
               </TableRow>
@@ -290,6 +292,14 @@ export const APPaymentsView = () => {
                   <TableCell className="text-muted-foreground">{payment.reference || "-"}</TableCell>
                   <TableCell className="text-right font-semibold">
                     <CurrencyDisplay amount={payment.amount} />
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {(payment as any).bank_fee_amount > 0 ? (
+                      <CurrencyDisplay amount={(payment as any).bank_fee_amount} />
+                    ) : "-"}
+                  </TableCell>
+                  <TableCell className="text-right font-semibold">
+                    <CurrencyDisplay amount={(payment as any).total_with_fees || payment.amount} />
                   </TableCell>
                   <TableCell>{getStatusBadge(payment)}</TableCell>
                   <TableCell className="text-right">
