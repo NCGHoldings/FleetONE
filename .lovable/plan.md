@@ -1,52 +1,69 @@
 
 
-# Fix AP Invoice Edit Pre-fill + Reorder Line Columns
+# Add "Direct Payment" Mode to AP Payments
 
-## Problems
+## What the User Wants
 
-1. **Edit doesn't pre-fill data**: `AccountsPayableView` sets `editingInvoice` state when Edit is clicked, but `APInvoiceForm` has no prop to receive it. The form always opens with blank defaults — no previous data loaded.
+A "Direct Payment" (Direct Invoice) option in AP — pay a vendor **without creating an AP invoice first**. The user selects a vendor, then adds line items with GL account, description, quantity, price, tax, etc. — all payment details entered directly, no invoice selection needed.
 
-2. **Line column order wrong**: Currently the table columns are: Description → GL Account → Qty → Price → Tax → Total. User wants: GL Account → Description → Qty → Price → Tax → Total (GL Account first).
+## Current State
 
-3. **Same issue exists on AR side**: `AccountsReceivableView` sets `editingInvoice` but `ARInvoiceForm` doesn't accept it either.
+- `APPaymentForm` has two modes: **Normal** (allocate to invoices) and **Advance** (lump sum, no allocation)
+- No `ap_payment_lines` table exists — payments are single-amount records
+- Direct payments need line-item detail for proper GL posting (each line to a different expense account)
 
 ## Plan
 
-### File 1: `src/components/accounting/APInvoiceForm.tsx`
+### 1. Database Migration — Create `ap_payment_lines` table
 
-- Add `editingInvoice?: any` prop to `APInvoiceFormProps`
-- Add `useEffect` that runs when `editingInvoice` changes: pre-fills `form.reset()` with invoice header data (vendor_id, invoice_number, invoice_date, due_date, notes, apply_wht, wht_rate)
-- Fetch existing invoice lines from `ap_invoice_lines` table when editing, populate `setLines()` with description, quantity, unit_price, tax_code, tax_rate, account_id, line_total
-- Change dialog title to "Edit AP Invoice" when editing
-- Change submit button to "Update Invoice" when editing
-- Add an `useUpdateAPInvoice` mutation call path for updates (update header + delete old lines + insert new lines)
-- **Reorder table columns**: Move GL Account column before Description
+```sql
+CREATE TABLE public.ap_payment_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  payment_id UUID REFERENCES public.ap_payments(id) ON DELETE CASCADE NOT NULL,
+  account_id UUID REFERENCES public.chart_of_accounts(id),
+  description TEXT,
+  quantity NUMERIC DEFAULT 1,
+  unit_price NUMERIC DEFAULT 0,
+  tax_rate NUMERIC DEFAULT 0,
+  tax_amount NUMERIC DEFAULT 0,
+  line_total NUMERIC DEFAULT 0,
+  company_id UUID REFERENCES public.companies(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.ap_payment_lines ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage ap_payment_lines" ON public.ap_payment_lines FOR ALL TO authenticated USING (true) WITH CHECK (true);
+```
 
-### File 2: `src/components/accounting/AccountsPayableView.tsx`
+Also add `is_direct_payment BOOLEAN DEFAULT false` column to `ap_payments`.
 
-- Pass `editingInvoice={editingInvoice}` prop to `<APInvoiceForm>`
+### 2. Update `APPaymentForm.tsx` — Add "Direct Payment" mode
 
-### File 3: `src/components/accounting/ARInvoiceForm.tsx`
+Add a **third mode** via the existing toggle pattern:
+- **Normal** — allocate to invoices (existing)
+- **Advance** — lump sum (existing)
+- **Direct Payment** — new: shows line-item table with GL Account, Description, Qty, Unit Price, Tax, Total
 
-- Same pattern: add `editingInvoice` prop, pre-fill form + lines on edit, fetch `ar_invoice_lines`, update path
-- Reorder columns: GL Account before Description
+When "Direct Payment" is toggled ON:
+- Hide invoice allocation section
+- Show a line-items table (same pattern as AP Invoice form) with columns: GL Account (SearchableAccountSelector) | Description | Qty | Unit Price | Tax Rate | Total
+- Add/remove line buttons
+- Auto-calculate line totals and grand total
+- Submit creates the payment with `is_direct_payment: true` and inserts lines into `ap_payment_lines`
 
-### File 4: `src/components/accounting/AccountsReceivableView.tsx`
+### 3. Update `useCreateAPPayment` in `useAccountingMutations.ts`
 
-- Pass `editingInvoice={editingInvoice}` prop to `<ARInvoiceForm>`
+- Accept optional `direct_lines` array in the mutation input
+- Accept `is_direct_payment` boolean
+- After inserting the payment, if `is_direct_payment`, insert all lines into `ap_payment_lines`
+- For GL posting: instead of debiting Trade Payable, debit each line's GL account directly (expense accounts) and credit the bank account — similar to how AP Invoice GL posting works with line-level accounts
 
-### File 5: `src/hooks/useAccountingMutations.ts`
+### 4. Update `types.ts` (auto-updated by migration)
 
-- Add `useUpdateAPInvoice` mutation: updates `ap_invoices` header, deletes old `ap_invoice_lines`, inserts new lines
-- Add `useUpdateARInvoice` mutation: same pattern for AR
-
-## Summary
+## Files to Change
 
 | File | Change |
 |---|---|
-| `APInvoiceForm.tsx` | Accept `editingInvoice` prop, pre-fill form+lines, reorder GL Account before Description |
-| `AccountsPayableView.tsx` | Pass `editingInvoice` to form |
-| `ARInvoiceForm.tsx` | Same edit pre-fill + column reorder |
-| `AccountsReceivableView.tsx` | Pass `editingInvoice` to form |
-| `useAccountingMutations.ts` | Add `useUpdateAPInvoice` and `useUpdateARInvoice` mutations |
+| Migration SQL | Create `ap_payment_lines` table, add `is_direct_payment` to `ap_payments` |
+| `src/components/accounting/APPaymentForm.tsx` | Add Direct Payment toggle + line-items table with GL Account, Description, Qty, Price, Tax columns |
+| `src/hooks/useAccountingMutations.ts` | Update `useCreateAPPayment` to handle direct payment lines + GL posting per line account |
 
