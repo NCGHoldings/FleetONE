@@ -1,48 +1,75 @@
 
 
-# Fix GL Guardian "Config" Button + AP Invoice GL Linking
+# Add Edit & Delete to All Major Accounting Views
 
-## Problems Found
-
-### 1. "Config" button is disabled and does nothing
-In `GLIntegrityGuardian.tsx` line 635, the Config button has `disabled` prop and no `onClick` handler. When gaps show "Needs Config", users have no way to navigate to the Core GL Settings page to configure the required accounts.
-
-### 2. AP Invoice GL posting does NOT link `journal_entry_id` back
-In `useAccountingMutations.ts` lines 1540-1568, `useApproveAPInvoice` calls `postAPInvoiceToGL` and gets back a `journalEntryId`, but never writes it back to the `ap_invoices` row. This means:
-- The GL Guardian always detects AP invoices as "gaps" (it checks `journal_entry_id IS NULL`)
-- Even approved+posted invoices show as "Needs Config" or unposted
-
-### 3. "Settings config" link text is not clickable
-The "⚠ X gaps need Settings config" text at line 392 is plain text, not a link to settings.
+## Current State
+- **CustomerMasterView** and **VendorMasterView** already have Edit buttons
+- **AR Invoices, AP Invoices, Inventory Items, Sales Orders, Delivery Notes, Purchase Orders, Credit Notes, Debit Notes** — only have View/Approve/Pay actions, NO edit or delete
+- No `useDeleteARInvoice`, `useDeleteAPInvoice`, `useUpdateARInvoice`, `useUpdateAPInvoice`, `useDeleteItem`, `useUpdateItem` mutation hooks exist
 
 ## Plan
 
-### File 1: `src/components/accounting/GLIntegrityGuardian.tsx`
+### 1. Add Missing Mutation Hooks (`src/hooks/useAccountingMutations.ts`)
 
-**A. Make Config button navigate to Settings → Core GL Settings**
-- Remove `disabled` from the Config button (line 635)
-- Add `onClick` handler using `useNavigate` to go to `/settings` with the `core-gl-settings` tab
-- Make the "gaps need Settings config" text a clickable link to the same destination
+Add update and delete mutations for each entity. Delete will only work on `draft` or `cancelled` records (safety rule — posted/paid records cannot be deleted, only cancelled):
 
-### File 2: `src/hooks/useAccountingMutations.ts`
+- `useUpdateARInvoice` — updates `ar_invoices` by id
+- `useDeleteARInvoice` — deletes from `ar_invoices` where status is `draft`/`cancelled`
+- `useUpdateAPInvoice` — updates `ap_invoices` by id
+- `useDeleteAPInvoice` — deletes from `ap_invoices` where status is `draft`/`cancelled`
+- `useUpdateItem` — updates `items` by id
+- `useDeleteItem` — deletes from `items` by id
+- `useDeleteSalesOrder` — deletes from `sales_orders` where status is `draft`
+- `useDeletePurchaseOrder` — deletes from `purchase_orders` where status is `draft`
+- `useDeleteARCreditNote` — deletes from `ar_credit_notes`
+- `useDeleteAPDebitNote` — deletes from `ap_debit_notes`
 
-**A. Fix `useApproveAPInvoice` — link journal_entry_id back to ap_invoices**
-After the `postAPInvoiceToGL` call succeeds (line 1551), add:
-```typescript
-if (glResult.success && glResult.journalEntryId) {
-  await supabase.from("ap_invoices")
-    .update({ journal_entry_id: glResult.journalEntryId })
-    .eq("id", id);
-}
-```
-This ensures the GL Guardian sees the invoice as posted and stops flagging it.
+### 2. Add Edit & Delete to AR Invoices (`AccountsReceivableView.tsx`)
 
-## Summary
+- Add state: `editingInvoice`, `deleteConfirmId`
+- In actions column: add Edit (pencil icon) and Delete (trash icon) buttons
+- Edit opens `ARInvoiceForm` pre-filled with invoice data
+- Delete shows confirmation dialog, only enabled for `draft`/`cancelled` invoices
+- Add `AlertDialog` for delete confirmation
 
-| File | Change |
+### 3. Add Edit & Delete to AP Invoices (`AccountsPayableView.tsx`)
+
+Same pattern as AR — Edit opens `APInvoiceForm` pre-filled, Delete with confirmation for draft/cancelled only.
+
+### 4. Add Edit & Delete to Inventory (`InventoryView.tsx`)
+
+- Edit opens `ItemForm` pre-filled with item data
+- Delete with confirmation
+
+### 5. Add Edit & Delete to Sales Orders (`SalesOrderView.tsx`)
+
+- Edit opens `SalesOrderForm` pre-filled
+- Delete for draft orders only
+
+### 6. Add Edit & Delete to Credit/Debit Notes (`ARCreditNotesView.tsx`, `APDebitNotesView.tsx`)
+
+- Add Edit and Delete action buttons to existing action columns
+
+### 7. Add Edit & Delete to Purchase Orders (`PurchaseOrderView.tsx`)
+
+- Add Edit and Delete for draft POs
+
+## Safety Rules
+- **Delete** only available for `draft` or `cancelled` status records
+- **Edit** disabled for `paid` or `posted` records (read-only after posting)
+- All deletes require confirmation dialog
+- Toast notifications for success/error
+
+## Files to Change
+
+| File | What |
 |---|---|
-| `GLIntegrityGuardian.tsx` | Enable Config button → navigates to Settings Core GL tab; make "needs config" text clickable |
-| `useAccountingMutations.ts` | Link `journal_entry_id` back to `ap_invoices` after GL posting on approval |
-
-These two fixes will: (1) let users actually configure GL accounts when gaps say "Needs Config", and (2) stop AP invoices from being perpetually flagged as unposted gaps after approval.
+| `src/hooks/useAccountingMutations.ts` | Add ~10 new update/delete mutation hooks |
+| `src/components/accounting/AccountsReceivableView.tsx` | Add Edit + Delete buttons with confirmation |
+| `src/components/accounting/AccountsPayableView.tsx` | Add Edit + Delete buttons with confirmation |
+| `src/components/accounting/InventoryView.tsx` | Add Edit + Delete buttons with confirmation |
+| `src/components/accounting/SalesOrderView.tsx` | Add Edit + Delete buttons with confirmation |
+| `src/components/accounting/PurchaseOrderView.tsx` | Add Edit + Delete buttons with confirmation |
+| `src/components/accounting/ARCreditNotesView.tsx` | Add Edit + Delete buttons |
+| `src/components/accounting/APDebitNotesView.tsx` | Add Edit + Delete buttons |
 
