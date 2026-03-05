@@ -488,7 +488,34 @@ export const useAPPayments = () => {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        // Fallback: if join fails (e.g. missing FK), retry without bank_accounts join
+        console.warn('AP Payments query failed, retrying without bank_accounts join:', error.message);
+        let fallbackQuery = supabase
+          .from("ap_payments")
+          .select(`
+            *,
+            vendors (
+              vendor_code, vendor_name, address, bank_account, bank_name, bank_branch,
+              tax_id, currency, email, phone, contact_person
+            ),
+            vendor_bank_accounts (
+              id, bank_name, bank_branch, account_number, account_holder_name, account_label
+            )
+          `)
+          .order("payment_date", { ascending: false });
+
+        if (effectiveCompanyId) {
+          fallbackQuery = fallbackQuery.eq("company_id", effectiveCompanyId);
+        }
+        if (autoBusinessUnitCode) {
+          fallbackQuery = fallbackQuery.eq("business_unit_code", autoBusinessUnitCode);
+        }
+
+        const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+        if (fallbackError) throw fallbackError;
+        return fallbackData;
+      }
       return data;
     },
     enabled: !!selectedCompanyId,
