@@ -8180,6 +8180,115 @@ export type Database = {
           },
         ]
       }
+      gl_settings: {
+        Row: {
+          bank_account_id: string | null
+          company_id: string
+          created_at: string
+          customer_advance_account_id: string | null
+          default_expense_account_id: string | null
+          expense_account_id: string | null
+          id: string
+          sales_revenue_account_id: string | null
+          trade_payable_account_id: string | null
+          trade_receivable_account_id: string | null
+          updated_at: string
+          wht_payable_account_id: string | null
+        }
+        Insert: {
+          bank_account_id?: string | null
+          company_id: string
+          created_at?: string
+          customer_advance_account_id?: string | null
+          default_expense_account_id?: string | null
+          expense_account_id?: string | null
+          id?: string
+          sales_revenue_account_id?: string | null
+          trade_payable_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string
+          wht_payable_account_id?: string | null
+        }
+        Update: {
+          bank_account_id?: string | null
+          company_id?: string
+          created_at?: string
+          customer_advance_account_id?: string | null
+          default_expense_account_id?: string | null
+          expense_account_id?: string | null
+          id?: string
+          sales_revenue_account_id?: string | null
+          trade_payable_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string
+          wht_payable_account_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gl_settings_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_customer_advance_account_id_fkey"
+            columns: ["customer_advance_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_default_expense_account_id_fkey"
+            columns: ["default_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_expense_account_id_fkey"
+            columns: ["expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_sales_revenue_account_id_fkey"
+            columns: ["sales_revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_trade_payable_account_id_fkey"
+            columns: ["trade_payable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_trade_receivable_account_id_fkey"
+            columns: ["trade_receivable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_wht_payable_account_id_fkey"
+            columns: ["wht_payable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goods_receipt_lines: {
         Row: {
           company_id: string | null

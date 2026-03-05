@@ -138,7 +138,7 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
       const { count: orphanMaintenance } = await supabase
         .from('maintenance_records')
         .select('*', { count: 'exact', head: true })
-        .is('vehicle_id', null);
+        .is('bus_id', null);
       
       newResults.push({
         id: 'orphan-maintenance',

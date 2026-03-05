@@ -493,7 +493,7 @@ export const useModuleAutomationHealth = () => {
       const vehicleModules = [
         { key: "yutong", label: "Yutong Sales", table: "yutong_finance_settings" },
         { key: "sinotruck", label: "Sinotruck Sales", table: "sinotruck_finance_settings" },
-        { key: "lightvehicle", label: "Light Vehicle Sales", table: "light_vehicle_finance_settings" },
+        { key: "lightvehicle", label: "Light Vehicle Sales", table: "lightvehicle_finance_settings" },
       ];
       for (const vm of vehicleModules) {
         let vStatus: AutomationHealthStatus = {
