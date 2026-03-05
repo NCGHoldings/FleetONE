@@ -1,22 +1,29 @@
 
 
-# Add Tax Invoice Template to AR Invoice Preview Dropdown
+# Redesign AP Invoice Template for Professional Look
 
 ## Problem
-The AR Invoice preview modal (`FinanceDocumentPreviewModal.tsx`) only shows templates matching the exact `documentType` (e.g., `ar_invoice`). The new `tax_invoice` template does not appear in the dropdown because it has a different `type_code`.
+The current AP Invoice template uses an orange accent color (`#ea580c`) throughout — for card borders, total box, summary section, and the amount-in-words highlight. This creates a harsh, unprofessional appearance with too many orange elements competing for attention.
 
 ## Solution
-Modify the template filtering in `FinanceDocumentPreviewModal.tsx` to also include `tax_invoice` templates when viewing an `ar_invoice` document. This way the user can switch between the standard AR Invoice layout and the Sri Lankan Tax Invoice layout from the same dropdown.
+Redesign the AP Invoice template in `src/lib/document-template-seeder.ts` with a refined, corporate color scheme:
 
-### Changes
+### Color Changes
+- **Accent**: Change from orange (`#ea580c`) to a sophisticated slate-blue (`#334155`) or corporate navy (`#1e3a5f`)
+- **Payment summary**: Use subtle gray background instead of orange-tinted background
+- **Total box**: Use a clean dark border with professional typography instead of orange
+- **Amount-in-words**: Change from yellow/amber background to a subtle light blue/gray professional highlight
+- **Cards (Invoice Details, Supplier)**: Add subtle left-border accent in muted blue instead of default gray
 
-**File: `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx`**
+### Specific Changes in `generateAPInvoiceTemplate()`
+1. Update CSS variables: `--accent` and `--accent-2` to professional navy/dark slate tones
+2. Update `--chip` to a cooler tone matching the new accent
+3. Remove inline orange `style` overrides on `.payment-summary` and `.total-box`
+4. Restyle the `.amount-words` section — use a cooler, more professional background (light slate instead of amber)
+5. Add subtle left-border accents on `.card` elements for visual hierarchy
 
-1. **Fetch both template types** — When `documentType` is `ar_invoice`, also fetch the `tax_invoice` template type ID so we can include those templates in the dropdown.
+### File to modify
+- `src/lib/document-template-seeder.ts` — only the `generateAPInvoiceTemplate()` function (lines 447-540)
 
-2. **Expand the `availableTemplates` filter** (around line 118-126) — Instead of filtering only by the single `templateType.id`, also include templates whose `template_type_id` matches the `tax_invoice` type when viewing AR invoices.
-
-3. **Update the `documentTitle` map** (line 350) — Add `tax_invoice: "Tax Invoice"` entry.
-
-This is a small, surgical change — only the template dropdown filter logic is modified. No other templates or modules are affected.
+No other templates are affected. The common styles remain unchanged.
 
