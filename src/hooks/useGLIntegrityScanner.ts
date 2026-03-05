@@ -92,6 +92,7 @@ interface ScanTarget {
   dateColumn: string;
   amountColumn: string;
   glCheckType: "journal_entry_id" | "gl_posted";
+  hasCompanyId?: boolean; // defaults to true; set false for tables without company_id
   extraFilters?: Record<string, any>;
   suggestedDebit: string;
   suggestedCredit: string;
@@ -179,11 +180,12 @@ const SCAN_TARGETS: ScanTarget[] = [
   {
     module: "maintenance",
     moduleLabel: "Maintenance Logs",
-    tableName: "maintenance_logs",
-    refColumn: "id",
+    tableName: "asset_maintenance_logs",
+    refColumn: "maintenance_number",
     dateColumn: "maintenance_date",
     amountColumn: "cost",
     glCheckType: "gl_posted",
+    hasCompanyId: true,
     extraFilters: { status: "completed" },
     suggestedDebit: "Maintenance Expense",
     suggestedCredit: "Bank / Cash",
@@ -193,28 +195,14 @@ const SCAN_TARGETS: ScanTarget[] = [
     moduleCreditKey: "bank_account_id",
   },
   {
-    module: "insurance",
-    moduleLabel: "Insurance Premiums",
-    tableName: "insurance_records",
-    refColumn: "policy_number",
-    dateColumn: "issue_date",
-    amountColumn: "premium_amount",
-    glCheckType: "journal_entry_id",
-    suggestedDebit: "Prepaid Insurance",
-    suggestedCredit: "Bank / Cash",
-    severity: "warning",
-    moduleSettingsName: "insurance",
-    moduleDebitKey: "prepaid_insurance_account_id",
-    moduleCreditKey: "bank_account_id",
-  },
-  {
     module: "special_hire",
     moduleLabel: "Special Hire Payments",
     tableName: "special_hire_payments",
-    refColumn: "id",
+    refColumn: "reference_no",
     dateColumn: "created_at",
     amountColumn: "amount",
     glCheckType: "journal_entry_id",
+    hasCompanyId: false,
     extraFilters: { status: "approved" },
     suggestedDebit: "Bank / Cash",
     suggestedCredit: "Revenue / Receivables",
@@ -223,56 +211,18 @@ const SCAN_TARGETS: ScanTarget[] = [
     glSettingsCreditKey: "trade_receivable_account_id",
   },
   {
-    module: "school_bus",
-    moduleLabel: "School Bus Payments",
-    tableName: "school_bus_payments",
-    refColumn: "receipt_number",
-    dateColumn: "payment_date",
-    amountColumn: "amount",
-    glCheckType: "journal_entry_id",
-    suggestedDebit: "Bank / Cash",
-    suggestedCredit: "Transport Revenue",
-    severity: "warning",
-    moduleSettingsName: "school_bus",
-    moduleDebitKey: "bank_account_id",
-    moduleCreditKey: "revenue_account_id",
-  },
-  {
     module: "leasing",
     moduleLabel: "Leasing Payments",
-    tableName: "loan_payments",
+    tableName: "bus_loan_payments",
     refColumn: "id",
     dateColumn: "payment_date",
     amountColumn: "total_installment",
     glCheckType: "journal_entry_id",
+    hasCompanyId: false,
     extraFilters: { payment_status: "paid" },
     suggestedDebit: "Leasing Liability + Interest",
     suggestedCredit: "Bank / Cash",
     severity: "warning",
-  },
-  {
-    module: "ncge_trips",
-    moduleLabel: "NCG Express Trips",
-    tableName: "ncg_express_daily_trips",
-    refColumn: "trip_no",
-    dateColumn: "trip_date",
-    amountColumn: "income",
-    glCheckType: "journal_entry_id",
-    suggestedDebit: "Cash / Bank",
-    suggestedCredit: "Ticket Revenue",
-    severity: "warning",
-  },
-  {
-    module: "ncge_expenses",
-    moduleLabel: "NCG Express Expenses",
-    tableName: "ncg_express_daily_expenses",
-    refColumn: "id",
-    dateColumn: "expense_date",
-    amountColumn: "fuel_cost",
-    glCheckType: "journal_entry_id",
-    suggestedDebit: "Fuel Expense",
-    suggestedCredit: "Cash / Bank",
-    severity: "info",
   },
 ];
 
@@ -579,8 +529,12 @@ export function useGLIntegrityScanner() {
         try {
           let query = (supabase as any)
             .from(target.tableName)
-            .select(`id, ${target.refColumn}, ${target.dateColumn}, ${target.amountColumn}`)
-            .eq("company_id", effectiveCompanyId);
+            .select(`id, ${target.refColumn}, ${target.dateColumn}, ${target.amountColumn}`);
+
+          // Only filter by company_id if the table has it
+          if (target.hasCompanyId !== false) {
+            query = query.eq("company_id", effectiveCompanyId);
+          }
 
           if (target.glCheckType === "journal_entry_id") {
             query = query.is("journal_entry_id", null);
@@ -748,7 +702,7 @@ export function usePostGapToGL() {
       if (!result.success) throw new Error(result.error || "Failed to create journal entry");
 
       const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
-      if (gap.tableName === "maintenance_logs" || gap.tableName === "expense_requests") {
+      if (gap.tableName === "asset_maintenance_logs" || gap.tableName === "expense_requests") {
         updateData.gl_posted = true;
         updateData.journal_entry_id = result.journalEntryId;
       } else {
@@ -811,7 +765,7 @@ export function useBulkPostGapsToGL() {
           if (!result.success) { failed++; continue; }
 
           const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
-          if (gap.tableName === "maintenance_logs" || gap.tableName === "expense_requests") {
+          if (gap.tableName === "asset_maintenance_logs" || gap.tableName === "expense_requests") {
             updateData.gl_posted = true;
             updateData.journal_entry_id = result.journalEntryId;
           } else {
