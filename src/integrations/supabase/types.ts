@@ -14273,51 +14273,76 @@ export type Database = {
       }
       petty_cash_funds: {
         Row: {
+          approval_required_above: number | null
+          branch_id: string | null
           business_unit_code: string
           company_id: string | null
           created_at: string | null
           current_balance: number
           custodian_id: string | null
           fund_code: string | null
+          fund_limit: number | null
           fund_name: string
+          fund_type: string | null
           gl_account_id: string | null
           id: string
           is_active: boolean | null
           last_replenished_at: string | null
+          low_balance_threshold: number | null
+          notes: string | null
           opening_balance: number
           updated_at: string | null
         }
         Insert: {
+          approval_required_above?: number | null
+          branch_id?: string | null
           business_unit_code: string
           company_id?: string | null
           created_at?: string | null
           current_balance?: number
           custodian_id?: string | null
           fund_code?: string | null
+          fund_limit?: number | null
           fund_name: string
+          fund_type?: string | null
           gl_account_id?: string | null
           id?: string
           is_active?: boolean | null
           last_replenished_at?: string | null
+          low_balance_threshold?: number | null
+          notes?: string | null
           opening_balance?: number
           updated_at?: string | null
         }
         Update: {
+          approval_required_above?: number | null
+          branch_id?: string | null
           business_unit_code?: string
           company_id?: string | null
           created_at?: string | null
           current_balance?: number
           custodian_id?: string | null
           fund_code?: string | null
+          fund_limit?: number | null
           fund_name?: string
+          fund_type?: string | null
           gl_account_id?: string | null
           id?: string
           is_active?: boolean | null
           last_replenished_at?: string | null
+          low_balance_threshold?: number | null
+          notes?: string | null
           opening_balance?: number
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "petty_cash_funds_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "petty_cash_funds_company_id_fkey"
             columns: ["company_id"]
@@ -14465,49 +14490,103 @@ export type Database = {
       petty_cash_transactions: {
         Row: {
           amount: number
+          approved_by: string | null
+          attachment_url: string | null
           balance_after: number
+          branch_id: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           description: string | null
+          expense_category: string | null
           expense_request_id: string | null
+          gl_account_id: string | null
           id: string
           journal_entry_id: string | null
+          payee_name: string | null
+          payment_method: string | null
           petty_cash_fund_id: string
           receipt_number: string | null
+          reference_number: string | null
+          status: string | null
           transaction_type: string
+          voucher_number: string | null
         }
         Insert: {
           amount: number
+          approved_by?: string | null
+          attachment_url?: string | null
           balance_after: number
+          branch_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          expense_category?: string | null
           expense_request_id?: string | null
+          gl_account_id?: string | null
           id?: string
           journal_entry_id?: string | null
+          payee_name?: string | null
+          payment_method?: string | null
           petty_cash_fund_id: string
           receipt_number?: string | null
+          reference_number?: string | null
+          status?: string | null
           transaction_type: string
+          voucher_number?: string | null
         }
         Update: {
           amount?: number
+          approved_by?: string | null
+          attachment_url?: string | null
           balance_after?: number
+          branch_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          expense_category?: string | null
           expense_request_id?: string | null
+          gl_account_id?: string | null
           id?: string
           journal_entry_id?: string | null
+          payee_name?: string | null
+          payment_method?: string | null
           petty_cash_fund_id?: string
           receipt_number?: string | null
+          reference_number?: string | null
+          status?: string | null
           transaction_type?: string
+          voucher_number?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "petty_cash_transactions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "petty_cash_transactions_expense_request_id_fkey"
             columns: ["expense_request_id"]
             isOneToOne: false
             referencedRelation: "expense_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_transactions_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -27607,6 +27686,7 @@ export type Database = {
         Args: { p_parent_id: string }
         Returns: string
       }
+      generate_petty_cash_voucher_number: { Args: never; Returns: string }
       generate_sbs_batch_number: { Args: never; Returns: string }
       generate_sbs_invoice_number: {
         Args: { p_prefix?: string }
