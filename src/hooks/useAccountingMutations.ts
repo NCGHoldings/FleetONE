@@ -1559,7 +1559,13 @@ export const useApproveAPInvoice = () => {
             vendorName: vendorData?.vendor_name,
             expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
           });
-          if (!glResult.success) {
+          if (glResult.success && glResult.journalEntryId) {
+            // Link journal_entry_id back to ap_invoices so GL Guardian sees it as posted
+            await (supabase as any)
+              .from("ap_invoices")
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq("id", id);
+          } else if (!glResult.success) {
             console.warn("AP Invoice GL posting failed:", glResult.error);
           }
         }
