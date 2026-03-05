@@ -1,42 +1,22 @@
 
 
-# Add External System Quick-Access Buttons to Sidebar
+# Fix External System Buttons — URL Update and Back-to-NCG Navigation
 
-## What the User Wants
+## Problem
 
-Like the "Stores One" screenshot showing an "Open POS" button at the top of the sidebar, the user wants two quick-access buttons in their NCG Speed sidebar:
+1. **Wrong Stores One URL**: Currently points to `https://storesone.lgh.lk`, should be `https://storesone.lovable.app`
+2. **No way to return to NCG from Document ERP**: The StoresOne POS has a closable "POS Terminal" bar at the top that lets users quickly return. The Document ERP system at `https://docs.lgh.lk` has no equivalent "back to NCG" option. Since these links use `target="_self"`, the user navigates away from NCG entirely.
 
-1. **Document ERP** button — links to `https://docs.lgh.lk` (Document ERP system)
-2. **Stores One** button — links to the POS/Stores system (external URL)
+## Solution
 
-These should:
-- Open in the **same browser tab** (not a new window/popup)
-- Match the current sidebar styling exactly
-- Be placed prominently near the top (after logo, before Home)
-- Show icons when collapsed, full text when expanded
+### 1. Fix Stores One URL
+Change `https://storesone.lgh.lk` → `https://storesone.lovable.app` in `AppSidebar.tsx`.
 
-## Plan
+### 2. Open external systems in a new tab instead of same tab
+Since the external systems are completely separate apps (different Lovable projects), using `target="_self"` replaces NCG entirely and there is no built-in way to add a "back to NCG" button inside those external apps. The practical fix is to open them in a **new tab** (`target="_blank"`) so NCG remains open and accessible. This mirrors how integrated systems typically work — the user can switch between browser tabs instantly.
 
-### Edit `src/components/layout/AppSidebar.tsx`
-
-Add an "External Systems" section between the logo header and the Home link:
-
-- **Two styled buttons** using `<a href="..." >` tags (not NavLink since they're external URLs):
-  - **Stores One** — with `ShoppingCart` or `Store` icon, links to the Stores/POS system URL, styled as a prominent gradient button (similar to the green "Open POS" button in the reference screenshot)
-  - **Document ERP** — with `FileText` or `BookOpen` icon, links to `https://docs.lgh.lk`, same button style
-
-- Both buttons use `target="_self"` to navigate in the same tab (not popup)
-- Styled to match sidebar width, with gradient backgrounds matching the existing design system
-- When sidebar is collapsed, show only the icon
-- Wrapped in a `SidebarGroup` for consistency
-
-### Placement Order (top to bottom):
-1. Logo header (existing)
-2. **Stores One** button (new) 
-3. **Document ERP** button (new)
-4. Home link (existing)
-5. All other groups (unchanged)
-
-### No Other Files Changed
-This is a sidebar-only UI change. No routing, no new pages — just external links styled as sidebar buttons.
+### File Change: `src/components/layout/AppSidebar.tsx` (lines 360-389)
+- Update Stores One `href` to `https://storesone.lovable.app`
+- Change both links from `target="_self"` to `target="_blank"` with `rel="noopener noreferrer"`
+- Add an `ExternalLink` icon indicator (already imported) when sidebar is expanded, so users know it opens externally
 
