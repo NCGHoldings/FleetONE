@@ -1,69 +1,52 @@
 
 
-# Add "Direct Payment" Mode to AP Payments
+# Fix Expense GL Posting Failure + Enhance GL Integrity Guardian
 
-## What the User Wants
+## Root Cause
 
-A "Direct Payment" (Direct Invoice) option in AP — pay a vendor **without creating an AP invoice first**. The user selects a vendor, then adds line items with GL account, description, quantity, price, tax, etc. — all payment details entered directly, no invoice selection needed.
+The error "No GL account mapped for expense category: food" occurs because:
+1. No explicit mapping exists in `module_finance_settings` for the "food" (Food/Meals) expense category
+2. The fallback logic tries to find a COA account with "food" in the name — none exists
+3. The final fallback looks for "general expense" — also not found
 
-## Current State
+The GL Integrity Guardian doesn't detect this because it only checks:
+- Whether unposted transactions exist (gap scan)
+- Whether core GL settings are configured (AR/AP/Revenue/Bank)
+- Whether modules have settings at all
 
-- `APPaymentForm` has two modes: **Normal** (allocate to invoices) and **Advance** (lump sum, no allocation)
-- No `ap_payment_lines` table exists — payments are single-amount records
-- Direct payments need line-item detail for proper GL posting (each line to a different expense account)
+It does **NOT** check whether all expense categories have GL account mappings.
 
 ## Plan
 
-### 1. Database Migration — Create `ap_payment_lines` table
+### 1. Add Expense Category Mapping Audit Rule to GL Guardian (`src/hooks/useGLIntegrityScanner.ts`)
 
-```sql
-CREATE TABLE public.ap_payment_lines (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  payment_id UUID REFERENCES public.ap_payments(id) ON DELETE CASCADE NOT NULL,
-  account_id UUID REFERENCES public.chart_of_accounts(id),
-  description TEXT,
-  quantity NUMERIC DEFAULT 1,
-  unit_price NUMERIC DEFAULT 0,
-  tax_rate NUMERIC DEFAULT 0,
-  tax_amount NUMERIC DEFAULT 0,
-  line_total NUMERIC DEFAULT 0,
-  company_id UUID REFERENCES public.companies(id),
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-ALTER TABLE public.ap_payment_lines ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage ap_payment_lines" ON public.ap_payment_lines FOR ALL TO authenticated USING (true) WITH CHECK (true);
-```
+Add a new audit rule in `runAuditRules()` that:
+- Fetches the expense_requests module settings and its `mappings` array
+- Compares against the full `EXPENSE_CATEGORIES` list (21 categories)
+- Reports which categories are **unmapped** (no explicit GL account)
+- Checks if fallback accounts exist in COA (accounts matching category names or "general expense")
+- Status: `fail` if >50% unmapped with no fallbacks, `warning` if some unmapped, `pass` if all mapped
+- Recommendation: "Go to Settings → Module GL Mappings → Expense Requests to map missing categories"
 
-Also add `is_direct_payment BOOLEAN DEFAULT false` column to `ap_payments`.
+### 2. Add a "Missing Mappings" Detection in the Gap Scanner (`src/hooks/useGLIntegrityScanner.ts`)
 
-### 2. Update `APPaymentForm.tsx` — Add "Direct Payment" mode
+In the expense_requests scan target processing, also check for approved expenses where the category has no mapping. Surface these as a distinct warning in the scan results — not just "unposted" but specifically "unpostable due to missing mapping."
 
-Add a **third mode** via the existing toggle pattern:
-- **Normal** — allocate to invoices (existing)
-- **Advance** — lump sum (existing)
-- **Direct Payment** — new: shows line-item table with GL Account, Description, Qty, Unit Price, Tax, Total
+### 3. Improve Expense GL Posting Fallback (`src/hooks/useExpenseRequestFinance.ts`)
 
-When "Direct Payment" is toggled ON:
-- Hide invoice allocation section
-- Show a line-items table (same pattern as AP Invoice form) with columns: GL Account (SearchableAccountSelector) | Description | Qty | Unit Price | Tax Rate | Total
-- Add/remove line buttons
-- Auto-calculate line totals and grand total
-- Submit creates the payment with `is_direct_payment: true` and inserts lines into `ap_payment_lines`
+Make the posting more resilient:
+- If no explicit mapping and no name-match, fall back to `gl_settings.default_expense_account_id` (the core GL default expense account) before throwing
+- This ensures posting works as long as core GL settings have a default expense account configured
 
-### 3. Update `useCreateAPPayment` in `useAccountingMutations.ts`
+### 4. Auto-populate Expense Category Mappings in Settings (`src/components/settings/ModuleFinanceSettingsView.tsx`)
 
-- Accept optional `direct_lines` array in the mutation input
-- Accept `is_direct_payment` boolean
-- After inserting the payment, if `is_direct_payment`, insert all lines into `ap_payment_lines`
-- For GL posting: instead of debiting Trade Payable, debit each line's GL account directly (expense accounts) and credit the bank account — similar to how AP Invoice GL posting works with line-level accounts
-
-### 4. Update `types.ts` (auto-updated by migration)
+When the expense_requests module settings are opened and no mappings exist yet, auto-populate all 21 categories from `EXPENSE_CATEGORIES` as empty mappings so the user can see exactly what needs to be configured — instead of having to manually type each category name.
 
 ## Files to Change
 
 | File | Change |
 |---|---|
-| Migration SQL | Create `ap_payment_lines` table, add `is_direct_payment` to `ap_payments` |
-| `src/components/accounting/APPaymentForm.tsx` | Add Direct Payment toggle + line-items table with GL Account, Description, Qty, Price, Tax columns |
-| `src/hooks/useAccountingMutations.ts` | Update `useCreateAPPayment` to handle direct payment lines + GL posting per line account |
+| `src/hooks/useGLIntegrityScanner.ts` | Add audit rule checking expense category GL mappings completeness |
+| `src/hooks/useExpenseRequestFinance.ts` | Add fallback to `gl_settings.default_expense_account_id` before throwing error |
+| `src/components/settings/ModuleFinanceSettingsView.tsx` | Auto-populate all expense categories when no mappings exist |
 
