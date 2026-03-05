@@ -1,36 +1,28 @@
 
 
-# Fix AP Invoice Logo and Header Display
+# Fix AP Payments Not Showing in Table
 
-## Problem
-The AP Invoice preview shows no logo and the company name looks unprofessional because:
+## Root Cause
+The `useAPPayments()` query in `src/hooks/useAccountingData.ts` joins `bank_accounts (...)` via PostgREST, but the `ap_payments.bank_account_id` column has **no foreign key constraint** to the `bank_accounts` table. PostgREST cannot resolve this join, causing the entire query to fail silently. React Query keeps retrying, leaving the table stuck on "Loading payments..." forever.
 
-1. **Logo broken**: The AP invoice case in `document-template-utils.ts` (line 366-370) overwrites `{{company_logo}}` with a **raw URL** instead of an `<img>` tag. The template expects `<div class="logo-container">{{company_logo}}</div>` — so a raw URL renders as text, not an image.
+The data is fine — there are 8 payments in the database. The query itself is broken.
 
-2. **Same issue exists for other document types** (AR Invoice at line 236, AR Receipt at line 264, etc.) — they all override the correctly formatted `<img>` tag with a raw URL.
+## Fix
 
-## Changes
-
-### File: `src/lib/document-template-utils.ts`
-
-**Fix the AP Invoice logo override** (lines 366-370): Wrap the raw URL in an `<img>` tag so it renders correctly inside `logo-container`:
-
-```typescript
-// Before (broken):
-placeholders['{{company_logo}}'] = invLogoUrl;
-
-// After (fixed):
-placeholders['{{company_logo}}'] = `<img src="${invLogoUrl}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
+### 1. Add the missing FK constraint (Database)
+Run SQL to add the foreign key:
+```sql
+ALTER TABLE ap_payments 
+ADD CONSTRAINT ap_payments_bank_account_id_fkey 
+FOREIGN KEY (bank_account_id) REFERENCES bank_accounts(id);
 ```
 
-**Apply the same fix to all other document type cases** that have the same raw-URL override pattern:
-- AR Invoice (line ~236)
-- AR Receipt (line ~264)  
-- AR Credit Note (line ~286)
-- AP Payment Voucher (line ~458-461)
-- Debit Note (line ~486)
+### 2. Defensive fallback in code
+In `src/hooks/useAccountingData.ts`, wrap the `useAPPayments` query with error handling so if the join fails it falls back to fetching without the join. Alternatively, keep the join but add a `.catch` that retries without the joined fields.
 
-Each of these sets `{{company_logo}}` to a raw URL — all need wrapping in an `<img>` tag.
+**Recommended approach**: Add the FK constraint (step 1) since `bank_account_id` values already reference valid `bank_accounts` rows. This is the correct fix and also improves database integrity. The code change is optional as a safety net.
 
-This ensures the logo renders properly in the `logo-container` div and the company header section looks professional with both logo and company name displayed correctly.
+### File Changes
+- **Database migration**: Add FK constraint `ap_payments_bank_account_id_fkey`
+- **`src/hooks/useAccountingData.ts`** (optional safety): No code change needed if FK is added
 
