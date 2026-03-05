@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useVendors, useTaxCodes } from "@/hooks/useAccountingData";
-import { useCreateAPInvoice } from "@/hooks/useAccountingMutations";
+import { useCreateAPInvoice, useUpdateAPInvoice } from "@/hooks/useAccountingMutations";
 import { useCompany } from "@/contexts/CompanyContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays } from "date-fns";
@@ -44,13 +44,17 @@ interface InvoiceLine {
 interface APInvoiceFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editingInvoice?: any;
 }
 
-export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
+export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceFormProps) => {
   const { data: vendors } = useVendors();
   const { data: taxCodes } = useTaxCodes();
   const createInvoice = useCreateAPInvoice();
+  const updateInvoice = useUpdateAPInvoice();
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+
+  const isEditing = !!editingInvoice;
 
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 },
@@ -68,16 +72,57 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
     },
   });
 
-  // Auto-generate AP Invoice number when dialog opens
+  // Pre-fill form when editing
   useEffect(() => {
     if (!open) return;
+    if (editingInvoice) {
+      form.reset({
+        invoice_number: editingInvoice.invoice_number || "",
+        vendor_id: editingInvoice.vendor_id || "",
+        invoice_date: editingInvoice.invoice_date || format(new Date(), "yyyy-MM-dd"),
+        due_date: editingInvoice.due_date || format(addDays(new Date(), 30), "yyyy-MM-dd"),
+        apply_wht: (editingInvoice.wht_amount || 0) > 0,
+        wht_rate: editingInvoice.wht_amount && editingInvoice.subtotal
+          ? Math.round((editingInvoice.wht_amount / editingInvoice.subtotal) * 100 * 100) / 100
+          : 5,
+        notes: editingInvoice.notes || "",
+      });
+
+      // Fetch existing lines
+      const fetchLines = async () => {
+        const { data: existingLines } = await supabase
+          .from("ap_invoice_lines")
+          .select("*")
+          .eq("invoice_id", editingInvoice.id);
+        if (existingLines && existingLines.length > 0) {
+          setLines(existingLines.map((l: any) => ({
+            id: l.id,
+            description: l.description || "",
+            quantity: l.quantity || 1,
+            unit_price: l.unit_price || 0,
+            tax_code: l.tax_code || undefined,
+            tax_rate: l.tax_rate || 0,
+            line_total: l.line_total || 0,
+            account_id: l.account_id || undefined,
+          })));
+        }
+      };
+      fetchLines();
+    } else {
+      // New invoice - reset
+      setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
+    }
+  }, [open, editingInvoice]);
+
+  // Auto-generate AP Invoice number when dialog opens (only for new invoices)
+  useEffect(() => {
+    if (!open || isEditing) return;
     
     const generateInvoiceNumber = async () => {
       try {
         const year = new Date().getFullYear();
         const prefix = `AP-INV-${year}-`;
         
-        // Build query — optionally filter by company if available
         let query = supabase
           .from("ap_invoices")
           .select("invoice_number")
@@ -85,19 +130,12 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
           .order("invoice_number", { ascending: false })
           .limit(1);
 
-        // Only filter by company if we have one
         const effectiveCompanyId = getEffectiveCompanyId();
         if (effectiveCompanyId) {
           query = query.eq("company_id", effectiveCompanyId);
         }
-        console.log("[AP Auto-Number] Querying with prefix:", prefix, "companyId:", effectiveCompanyId);
 
-        const { data: latestInvoice, error } = await query.maybeSingle();
-        
-        if (error) {
-          console.warn("[AP Auto-Number] Query error:", error.message);
-        }
-        console.log("[AP Auto-Number] Latest invoice found:", latestInvoice);
+        const { data: latestInvoice } = await query.maybeSingle();
 
         let nextSeq = 1;
         if (latestInvoice?.invoice_number) {
@@ -108,21 +146,16 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
         }
         
         const autoNumber = `${prefix}${String(nextSeq).padStart(4, "0")}`;
-        console.log("[AP Auto-Number] Generated:", autoNumber);
         form.setValue("invoice_number", autoNumber);
       } catch (err) {
-        console.error("[AP Auto-Number] Failed:", err);
-        // Fallback: always generate a usable number
         const year = new Date().getFullYear();
         const ts = Date.now().toString().slice(-6);
-        const fallback = `AP-INV-${year}-${ts}`;
-        console.log("[AP Auto-Number] Using fallback:", fallback);
-        form.setValue("invoice_number", fallback);
+        form.setValue("invoice_number", `AP-INV-${year}-${ts}`);
       }
     };
 
     generateInvoiceNumber();
-  }, [open, selectedCompanyId]);
+  }, [open, selectedCompanyId, isEditing]);
 
   const applyWht = form.watch("apply_wht");
   const whtRate = form.watch("wht_rate") || 5;
@@ -165,7 +198,6 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
     }
   };
 
-  // Get vendor WHT rate when vendor changes
   const handleVendorChange = (vendorId: string) => {
     form.setValue("vendor_id", vendorId);
     const vendor = vendors?.find((v) => v.id === vendorId);
@@ -181,29 +213,49 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
   const netPayable = grossTotal - whtAmount;
 
   const onSubmit = async (data: InvoiceFormData) => {
+    const lineData = lines
+      .filter(l => l.description.trim() || l.unit_price > 0)
+      .map(l => ({
+        description: l.description,
+        quantity: l.quantity,
+        unit_price: l.unit_price,
+        tax_amount: (l.quantity * l.unit_price * l.tax_rate) / 100,
+        tax_code: l.tax_code,
+        line_total: l.line_total,
+        account_id: l.account_id,
+      }));
+
     try {
-      await createInvoice.mutateAsync({
-        invoice_number: data.invoice_number,
-        vendor_id: data.vendor_id,
-        invoice_date: data.invoice_date,
-        due_date: data.due_date,
-        subtotal: subtotal,
-        total_amount: grossTotal,
-        tax_amount: totalTax,
-        wht_amount: whtAmount,
-        notes: data.notes,
-        lines: lines
-          .filter(l => l.description.trim() || l.unit_price > 0)
-          .map(l => ({
-            description: l.description,
-            quantity: l.quantity,
-            unit_price: l.unit_price,
-            tax_amount: (l.quantity * l.unit_price * l.tax_rate) / 100,
-            tax_code: l.tax_code,
-            line_total: l.line_total,
-            account_id: l.account_id,
-          })),
-      });
+      if (isEditing) {
+        await updateInvoice.mutateAsync({
+          id: editingInvoice.id,
+          data: {
+            invoice_number: data.invoice_number,
+            vendor_id: data.vendor_id,
+            invoice_date: data.invoice_date,
+            due_date: data.due_date,
+            subtotal,
+            total_amount: grossTotal,
+            tax_amount: totalTax,
+            wht_amount: whtAmount,
+            notes: data.notes,
+          },
+          lines: lineData,
+        });
+      } else {
+        await createInvoice.mutateAsync({
+          invoice_number: data.invoice_number,
+          vendor_id: data.vendor_id,
+          invoice_date: data.invoice_date,
+          due_date: data.due_date,
+          subtotal,
+          total_amount: grossTotal,
+          tax_amount: totalTax,
+          wht_amount: whtAmount,
+          notes: data.notes,
+          lines: lineData,
+        });
+      }
       onOpenChange(false);
       form.reset();
       setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
@@ -212,11 +264,13 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
     }
   };
 
+  const isPending = isEditing ? updateInvoice.isPending : createInvoice.isPending;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Record AP Invoice (Vendor Bill)</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit AP Invoice" : "Record AP Invoice (Vendor Bill)"}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -305,8 +359,8 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
                 <table className="w-full">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
                       <th className="px-3 py-2 text-left text-sm font-medium w-48">GL Account</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
                       <th className="px-3 py-2 text-center text-sm font-medium w-20">Qty</th>
                       <th className="px-3 py-2 text-right text-sm font-medium w-28">Unit Price</th>
                       <th className="px-3 py-2 text-center text-sm font-medium w-28">Tax Code</th>
@@ -318,20 +372,20 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
                     {lines.map((line) => (
                       <tr key={line.id} className="border-t">
                         <td className="px-3 py-2">
-                          <Input
-                            value={line.description}
-                            onChange={(e) => updateLine(line.id, "description", e.target.value)}
-                            placeholder="Item/service description"
-                            className="h-8"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
                           <SearchableAccountSelector
                             value={line.account_id || ""}
                             onValueChange={(val) => updateLine(line.id, "account_id", val)}
                             placeholder="Select GL account"
                             accountTypes={["expense", "asset"]}
                             className="h-8 text-xs"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            value={line.description}
+                            onChange={(e) => updateLine(line.id, "description", e.target.value)}
+                            placeholder="Item/service description"
+                            className="h-8"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -477,8 +531,8 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={createInvoice.isPending}>
-                {createInvoice.isPending ? "Recording..." : "Record Invoice"}
+              <Button type="submit" disabled={isPending}>
+                {isPending ? (isEditing ? "Updating..." : "Recording...") : (isEditing ? "Update Invoice" : "Record Invoice")}
               </Button>
             </div>
           </form>

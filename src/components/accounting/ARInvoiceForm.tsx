@@ -10,10 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCustomers, useTaxCodes } from "@/hooks/useAccountingData";
-import { useCreateARInvoice } from "@/hooks/useAccountingMutations";
+import { useCreateARInvoice, useUpdateARInvoice } from "@/hooks/useAccountingMutations";
 import { useGenerateNumber } from "@/hooks/useNumbering";
+import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 
 const invoiceSchema = z.object({
   invoice_number: z.string().min(1, "Invoice number is required"),
@@ -33,19 +35,24 @@ interface InvoiceLine {
   tax_code?: string;
   tax_rate: number;
   line_total: number;
+  account_id?: string;
 }
 
 interface ARInvoiceFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editingInvoice?: any;
 }
 
-export const ARInvoiceForm = ({ open, onOpenChange }: ARInvoiceFormProps) => {
+export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceFormProps) => {
   const { data: customers } = useCustomers();
   const { data: taxCodes } = useTaxCodes();
   const createInvoice = useCreateARInvoice();
+  const updateInvoice = useUpdateARInvoice();
   const generateNumber = useGenerateNumber();
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const isEditing = !!editingInvoice;
 
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 },
@@ -61,16 +68,53 @@ export const ARInvoiceForm = ({ open, onOpenChange }: ARInvoiceFormProps) => {
     },
   });
 
-  // Auto-generate invoice number when dialog opens
+  // Pre-fill form when editing
   useEffect(() => {
-    if (open && !form.getValues("invoice_number")) {
+    if (!open) return;
+    if (editingInvoice) {
+      form.reset({
+        invoice_number: editingInvoice.invoice_number || "",
+        customer_id: editingInvoice.customer_id || "",
+        invoice_date: editingInvoice.invoice_date || format(new Date(), "yyyy-MM-dd"),
+        due_date: editingInvoice.due_date || format(addDays(new Date(), 30), "yyyy-MM-dd"),
+        notes: editingInvoice.notes || "",
+      });
+
+      // Fetch existing lines
+      const fetchLines = async () => {
+        const { data: existingLines } = await supabase
+          .from("ar_invoice_lines")
+          .select("*")
+          .eq("invoice_id", editingInvoice.id);
+        if (existingLines && existingLines.length > 0) {
+          setLines(existingLines.map((l: any) => ({
+            id: l.id,
+            description: l.description || "",
+            quantity: l.quantity || 1,
+            unit_price: l.unit_price || 0,
+            tax_code: l.tax_code || undefined,
+            tax_rate: l.tax_rate || 0,
+            line_total: l.line_total || 0,
+            account_id: l.account_id || undefined,
+          })));
+        }
+      };
+      fetchLines();
+    } else {
+      setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
+    }
+  }, [open, editingInvoice]);
+
+  // Auto-generate invoice number when dialog opens (only for new)
+  useEffect(() => {
+    if (open && !isEditing && !form.getValues("invoice_number")) {
       setIsGenerating(true);
       generateNumber("ar_invoice").then((num) => {
         form.setValue("invoice_number", num);
         setIsGenerating(false);
       });
     }
-  }, [open, generateNumber, form]);
+  }, [open, generateNumber, form, isEditing]);
 
   const addLine = () => {
     setLines([
@@ -90,7 +134,6 @@ export const ARInvoiceForm = ({ open, onOpenChange }: ARInvoiceFormProps) => {
       lines.map((line) => {
         if (line.id === id) {
           const updated = { ...line, [field]: value };
-          // Recalculate line total
           if (field === "quantity" || field === "unit_price" || field === "tax_rate") {
             const subtotal = updated.quantity * updated.unit_price;
             const tax = subtotal * (updated.tax_rate / 100);
@@ -116,23 +159,42 @@ export const ARInvoiceForm = ({ open, onOpenChange }: ARInvoiceFormProps) => {
   const grandTotal = subtotal + totalTax;
 
   const onSubmit = async (data: InvoiceFormData) => {
+    const lineData = lines.map((line) => ({
+      description: line.description,
+      quantity: line.quantity,
+      unit_price: line.unit_price,
+      line_total: line.line_total,
+      tax_code: line.tax_code,
+      account_id: line.account_id,
+    }));
+
     try {
-      await createInvoice.mutateAsync({
-        invoice_number: data.invoice_number,
-        customer_id: data.customer_id,
-        invoice_date: data.invoice_date,
-        due_date: data.due_date,
-        total_amount: grandTotal,
-        tax_amount: totalTax,
-        notes: data.notes,
-        lines: lines.map((line) => ({
-          description: line.description,
-          quantity: line.quantity,
-          unit_price: line.unit_price,
-          line_total: line.line_total,
-          tax_code: line.tax_code,
-        })),
-      });
+      if (isEditing) {
+        await updateInvoice.mutateAsync({
+          id: editingInvoice.id,
+          data: {
+            invoice_number: data.invoice_number,
+            customer_id: data.customer_id,
+            invoice_date: data.invoice_date,
+            due_date: data.due_date,
+            total_amount: grandTotal,
+            tax_amount: totalTax,
+            notes: data.notes,
+          },
+          lines: lineData,
+        });
+      } else {
+        await createInvoice.mutateAsync({
+          invoice_number: data.invoice_number,
+          customer_id: data.customer_id,
+          invoice_date: data.invoice_date,
+          due_date: data.due_date,
+          total_amount: grandTotal,
+          tax_amount: totalTax,
+          notes: data.notes,
+          lines: lineData,
+        });
+      }
       onOpenChange(false);
       form.reset();
       setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
@@ -141,11 +203,13 @@ export const ARInvoiceForm = ({ open, onOpenChange }: ARInvoiceFormProps) => {
     }
   };
 
+  const isPending = isEditing ? updateInvoice.isPending : createInvoice.isPending;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create AR Invoice</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit AR Invoice" : "Create AR Invoice"}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -245,6 +309,7 @@ export const ARInvoiceForm = ({ open, onOpenChange }: ARInvoiceFormProps) => {
                 <table className="w-full">
                   <thead className="bg-muted">
                     <tr>
+                      <th className="px-3 py-2 text-left text-sm font-medium w-48">GL Account</th>
                       <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
                       <th className="px-3 py-2 text-center text-sm font-medium w-20">Qty</th>
                       <th className="px-3 py-2 text-right text-sm font-medium w-28">Unit Price</th>
@@ -256,6 +321,15 @@ export const ARInvoiceForm = ({ open, onOpenChange }: ARInvoiceFormProps) => {
                   <tbody>
                     {lines.map((line) => (
                       <tr key={line.id} className="border-t">
+                        <td className="px-3 py-2">
+                          <SearchableAccountSelector
+                            value={line.account_id || ""}
+                            onValueChange={(val) => updateLine(line.id, "account_id", val)}
+                            placeholder="Select GL account"
+                            accountTypes={["revenue", "income"]}
+                            className="h-8 text-xs"
+                          />
+                        </td>
                         <td className="px-3 py-2">
                           <Input
                             value={line.description}
@@ -358,8 +432,8 @@ export const ARInvoiceForm = ({ open, onOpenChange }: ARInvoiceFormProps) => {
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={createInvoice.isPending}>
-                {createInvoice.isPending ? "Creating..." : "Create Invoice"}
+              <Button type="submit" disabled={isPending}>
+                {isPending ? (isEditing ? "Updating..." : "Creating...") : (isEditing ? "Update Invoice" : "Create Invoice")}
               </Button>
             </div>
           </form>

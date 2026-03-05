@@ -345,7 +345,7 @@ export const AccountsPayableView = () => {
       </Card>
 
       {/* AP Invoice Form Dialog */}
-      <APInvoiceForm open={invoiceFormOpen} onOpenChange={(open) => { setInvoiceFormOpen(open); if (!open) setEditingInvoice(null); }} />
+      <APInvoiceForm open={invoiceFormOpen} onOpenChange={(open) => { setInvoiceFormOpen(open); if (!open) setEditingInvoice(null); }} editingInvoice={editingInvoice} />
 
       {/* AP Payment Form Dialog */}
       <APPaymentForm 

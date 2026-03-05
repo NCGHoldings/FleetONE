@@ -312,7 +312,7 @@ export const AccountsReceivableView = () => {
       </Card>
 
       {/* AR Invoice Form Dialog */}
-      <ARInvoiceForm open={invoiceFormOpen} onOpenChange={(open) => { setInvoiceFormOpen(open); if (!open) setEditingInvoice(null); }} />
+      <ARInvoiceForm open={invoiceFormOpen} onOpenChange={(open) => { setInvoiceFormOpen(open); if (!open) setEditingInvoice(null); }} editingInvoice={editingInvoice} />
 
       {/* AR Receipt Form Dialog */}
       <ARReceiptForm 
