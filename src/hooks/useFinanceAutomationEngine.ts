@@ -593,8 +593,7 @@ export const usePendingAmortizations = () => {
       try {
         const { data: policies } = await (supabase as any)
           .from("insurance_records")
-          .select("id, policy_number, premium_amount, issue_date, expiry_date, last_amortization_month")
-          .eq("company_id", selectedCompanyId)
+          .select("id, policy_number, premium_amount, issue_date, expiry_date, status")
           .eq("status", "active");
 
         for (const policy of policies || []) {
@@ -607,7 +606,7 @@ export const usePendingAmortizations = () => {
               (expiryDate.getMonth() - issueDate.getMonth())
           );
           const monthlyAmount = Math.round(policy.premium_amount / totalMonths);
-          const lastPosted = policy.last_amortization_month || null;
+          const lastPosted = null; // insurance_records has no last_amortization_month column
 
           // Count pending months
           let pendingMonths = 0;
@@ -644,12 +643,11 @@ export const usePendingAmortizations = () => {
       try {
         const { data: permits } = await (supabase as any)
           .from("route_permits")
-          .select("id, permit_number, renewal_cost, issue_date, expiry_date, last_amortization_month")
-          .eq("company_id", selectedCompanyId)
-          .eq("status", "active");
+          .select("id, permit_no, annual_fee, issue_date, expiry_date, permit_status")
+          .eq("permit_status", "active");
 
         for (const permit of permits || []) {
-          if (!permit.renewal_cost || permit.renewal_cost <= 0) continue;
+          if (!permit.annual_fee || permit.annual_fee <= 0) continue;
           const issueDate = new Date(permit.issue_date);
           const expiryDate = new Date(permit.expiry_date);
           const totalMonths = Math.max(
@@ -657,8 +655,8 @@ export const usePendingAmortizations = () => {
             (expiryDate.getFullYear() - issueDate.getFullYear()) * 12 +
               (expiryDate.getMonth() - issueDate.getMonth())
           );
-          const monthlyAmount = Math.round(permit.renewal_cost / totalMonths);
-          const lastPosted = permit.last_amortization_month || null;
+          const monthlyAmount = Math.round(permit.annual_fee / totalMonths);
+          const lastPosted = null; // route_permits has no last_amortization_month column
 
           let pendingMonths = 0;
           if (!lastPosted) {
@@ -680,7 +678,7 @@ export const usePendingAmortizations = () => {
               id: permit.id,
               type: "route_permit",
               label: "Route Permit Amortization",
-              policyOrPermit: permit.permit_number || permit.id.substring(0, 8),
+              policyOrPermit: permit.permit_no || permit.id.substring(0, 8),
               monthlyAmount,
               lastPostedMonth: lastPosted,
               pendingMonths,
