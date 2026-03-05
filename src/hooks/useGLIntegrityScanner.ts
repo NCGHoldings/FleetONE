@@ -505,6 +505,216 @@ async function runAuditRules(
     learnMore: "Double-entry bookkeeping requires every transaction to have equal debits and credits. If DR ≠ CR, the accounting equation (Assets = Liabilities + Equity) is broken.",
   });
 
+  // ---- CONFIGURATION RULES (continued) ----
+
+  // Rule 8: Vendor Category GL Mappings
+  let totalVendorCategories = 0;
+  let vendorCatsWithGL = 0;
+  try {
+    const { data: vendorCats } = await supabase
+      .from("vendor_categories")
+      .select("id, ap_account_id, expense_account_id")
+      .eq("company_id", companyId)
+      .eq("is_active", true);
+
+    totalVendorCategories = (vendorCats || []).length;
+    vendorCatsWithGL = (vendorCats || []).filter(
+      (c: any) => c.ap_account_id || c.expense_account_id
+    ).length;
+  } catch { /* ignore */ }
+
+  if (totalVendorCategories > 0) {
+    const vendorCatPct = Math.round((vendorCatsWithGL / totalVendorCategories) * 100);
+    rules.push({
+      id: "config_vendor_category_gl",
+      name: "Vendor Category GL Mappings",
+      category: "configuration",
+      description: "All vendor categories have AP/Expense GL accounts mapped",
+      status: vendorCatsWithGL === totalVendorCategories ? "pass" : vendorCatsWithGL > 0 ? "warning" : "fail",
+      score: vendorCatPct,
+      weight: 8,
+      details: vendorCatsWithGL === totalVendorCategories
+        ? `All ${totalVendorCategories} vendor categories have GL mappings`
+        : `${vendorCatsWithGL}/${totalVendorCategories} vendor categories have GL account mappings`,
+      recommendation: vendorCatsWithGL < totalVendorCategories
+        ? "Go to Settings → Vendor Categories and assign AP/Expense GL accounts to each category for accurate vendor-level tracking"
+        : undefined,
+      learnMore: "Vendor categories allow different GL account mappings per vendor type (e.g., Spare Parts vs Utilities). Without mappings, all vendors fall back to the global Trade Payable account, losing granular expense tracking.",
+    });
+  } else {
+    rules.push({
+      id: "config_vendor_category_gl",
+      name: "Vendor Category GL Mappings",
+      category: "configuration",
+      description: "All vendor categories have AP/Expense GL accounts mapped",
+      status: "not_applicable",
+      score: 100,
+      weight: 8,
+      details: "No vendor categories defined — using global GL defaults",
+      learnMore: "Vendor categories allow different GL account mappings per vendor type. Create categories in Settings → Vendor Categories for granular tracking.",
+    });
+  }
+
+  // Rule 9: Customer Category GL Mappings
+  let totalCustomerCategories = 0;
+  let customerCatsWithGL = 0;
+  try {
+    const { data: customerCats } = await supabase
+      .from("customer_categories")
+      .select("id, ar_account_id, revenue_account_id")
+      .eq("company_id", companyId)
+      .eq("is_active", true);
+
+    totalCustomerCategories = (customerCats || []).length;
+    customerCatsWithGL = (customerCats || []).filter(
+      (c: any) => c.ar_account_id || c.revenue_account_id
+    ).length;
+  } catch { /* ignore */ }
+
+  if (totalCustomerCategories > 0) {
+    const customerCatPct = Math.round((customerCatsWithGL / totalCustomerCategories) * 100);
+    rules.push({
+      id: "config_customer_category_gl",
+      name: "Customer Category GL Mappings",
+      category: "configuration",
+      description: "All customer categories have AR/Revenue GL accounts mapped",
+      status: customerCatsWithGL === totalCustomerCategories ? "pass" : customerCatsWithGL > 0 ? "warning" : "fail",
+      score: customerCatPct,
+      weight: 8,
+      details: customerCatsWithGL === totalCustomerCategories
+        ? `All ${totalCustomerCategories} customer categories have GL mappings`
+        : `${customerCatsWithGL}/${totalCustomerCategories} customer categories have GL account mappings`,
+      recommendation: customerCatsWithGL < totalCustomerCategories
+        ? "Go to Settings → Customer Categories and assign AR/Revenue GL accounts to each category for segmented revenue tracking"
+        : undefined,
+      learnMore: "Customer categories enable distinct AR and Revenue account mappings per customer type (e.g., External, Government, Intercompany). Without mappings, all customers use global GL defaults.",
+    });
+  } else {
+    rules.push({
+      id: "config_customer_category_gl",
+      name: "Customer Category GL Mappings",
+      category: "configuration",
+      description: "All customer categories have AR/Revenue GL accounts mapped",
+      status: "not_applicable",
+      score: 100,
+      weight: 8,
+      details: "No customer categories defined — using global GL defaults",
+      learnMore: "Customer categories enable segmented revenue tracking. Create categories in Settings → Customer Categories.",
+    });
+  }
+
+  // ---- TIMELINESS RULES (continued) ----
+
+  // Rule 10: Financial Period Status
+  let openPeriodCount = 0;
+  let oldOpenPeriods = 0;
+  let currentPeriodOpen = false;
+  try {
+    const { data: periods } = await (supabase as any)
+      .from("financial_periods")
+      .select("id, period_name, start_date, end_date, status")
+      .eq("company_id", companyId)
+      .eq("status", "open");
+
+    openPeriodCount = (periods || []).length;
+    const now = new Date();
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+    for (const period of periods || []) {
+      const endDate = new Date((period as any).end_date);
+      if (endDate < threeMonthsAgo) {
+        oldOpenPeriods++;
+      }
+      if (new Date((period as any).start_date) <= now && endDate >= now) {
+        currentPeriodOpen = true;
+      }
+    }
+  } catch { /* ignore */ }
+
+  rules.push({
+    id: "timeliness_period_status",
+    name: "Financial Period Management",
+    category: "timeliness",
+    description: "Current period is open and old periods are properly closed",
+    status: currentPeriodOpen && oldOpenPeriods === 0 ? "pass" : oldOpenPeriods > 0 ? "warning" : !currentPeriodOpen && openPeriodCount === 0 ? "fail" : "warning",
+    score: currentPeriodOpen && oldOpenPeriods === 0 ? 100 : oldOpenPeriods > 0 ? Math.max(30, 100 - oldOpenPeriods * 25) : openPeriodCount > 0 ? 60 : 20,
+    weight: 10,
+    details: currentPeriodOpen
+      ? oldOpenPeriods > 0
+        ? `Current period is open but ${oldOpenPeriods} old period(s) are still open and should be closed`
+        : `${openPeriodCount} period(s) open — current period is active`
+      : openPeriodCount > 0
+        ? `${openPeriodCount} period(s) open but none covers the current date`
+        : "No financial periods are open — transactions cannot be posted",
+    recommendation: oldOpenPeriods > 0
+      ? "Close old financial periods via Settings → Financial Periods → Period Closing Checklist to prevent backdated postings"
+      : !currentPeriodOpen
+        ? "Open a financial period for the current month in Settings → Financial Periods"
+        : undefined,
+    learnMore: "Financial periods control which dates accept GL postings. Old open periods allow unauthorized backdated entries. The current period must be open for normal operations. Always close periods after month-end reconciliation.",
+  });
+
+  // Rule 11: Bank Reconciliation Timeliness
+  let recentReconCount = 0;
+  let totalBankAccounts = 0;
+  try {
+    const { count: bankCount } = await supabase
+      .from("bank_accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", companyId)
+      .eq("is_active", true);
+
+    totalBankAccounts = bankCount || 0;
+
+    if (totalBankAccounts > 0) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const { count: reconCount } = await supabase
+        .from("bank_reconciliations")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", companyId)
+        .gte("reconciliation_date", thirtyDaysAgo.toISOString().split("T")[0]);
+
+      recentReconCount = reconCount || 0;
+    }
+  } catch { /* ignore */ }
+
+  if (totalBankAccounts > 0) {
+    const reconPct = Math.min(100, Math.round((recentReconCount / totalBankAccounts) * 100));
+    rules.push({
+      id: "timeliness_bank_recon",
+      name: "Bank Reconciliation Timeliness",
+      category: "timeliness",
+      description: "Bank accounts have been reconciled within the last 30 days",
+      status: recentReconCount >= totalBankAccounts ? "pass" : recentReconCount > 0 ? "warning" : "fail",
+      score: reconPct,
+      weight: 10,
+      details: recentReconCount >= totalBankAccounts
+        ? `All ${totalBankAccounts} bank accounts reconciled in the last 30 days`
+        : recentReconCount > 0
+          ? `${recentReconCount}/${totalBankAccounts} bank accounts reconciled recently`
+          : `No bank reconciliations in the last 30 days (${totalBankAccounts} active accounts)`,
+      recommendation: recentReconCount < totalBankAccounts
+        ? "Go to Banking → Reconciliation to reconcile outstanding bank accounts. Monthly reconciliation is an accounting best practice."
+        : undefined,
+      learnMore: "Bank reconciliation verifies that your books match the actual bank statement. Unreconciled accounts may hide errors, fraud, or unrecorded transactions. Best practice: reconcile monthly.",
+    });
+  } else {
+    rules.push({
+      id: "timeliness_bank_recon",
+      name: "Bank Reconciliation Timeliness",
+      category: "timeliness",
+      description: "Bank accounts have been reconciled within the last 30 days",
+      status: "not_applicable",
+      score: 100,
+      weight: 10,
+      details: "No active bank accounts configured",
+      learnMore: "Set up bank accounts in Banking to enable reconciliation tracking.",
+    });
+  }
+
   // ---- CALCULATE OVERALL SCORE ----
   const totalWeight = rules.reduce((sum, r) => sum + r.weight, 0);
   const weightedScore = rules.reduce((sum, r) => sum + (r.score * r.weight) / totalWeight, 0);
