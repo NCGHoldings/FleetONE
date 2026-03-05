@@ -1,10 +1,14 @@
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   FileText, MapPin, User, Calendar, DollarSign, 
-  Truck, Route, Shield, AlertTriangle, CheckCircle, Bus
+  Truck, Route, Shield, AlertTriangle, CheckCircle, Bus,
+  Download, History, File, Clock
 } from "lucide-react";
 import { format, parseISO, differenceInDays } from "date-fns";
 
@@ -49,6 +53,47 @@ interface RoutePermitDetailsModalProps {
 }
 
 export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePermitDetailsModalProps) {
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [changeHistory, setChangeHistory] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (permit && open) {
+      fetchDocuments(permit.id);
+      fetchChangeHistory(permit.id);
+    }
+  }, [permit, open]);
+
+  const fetchDocuments = async (permitId: string) => {
+    const { data } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('linked_table', 'route_permits')
+      .eq('linked_row_id', permitId)
+      .order('uploaded_at', { ascending: false });
+    setDocuments(data || []);
+  };
+
+  const fetchChangeHistory = async (permitId: string) => {
+    const { data } = await (supabase as any)
+      .from('route_permit_change_history')
+      .select('*')
+      .eq('permit_id', permitId)
+      .order('changed_at', { ascending: false });
+    setChangeHistory(data || []);
+  };
+
+  const handleDownload = async (doc: any) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(doc.storage_path, 3600);
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank');
+    } catch {
+      window.open(doc.file_url, '_blank');
+    }
+  };
+
   if (!permit) return null;
 
   const getExpiryStatus = (expiryDate: string) => {
@@ -97,6 +142,17 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
     );
   };
 
+  const getChangeTypeBadge = (type: string) => {
+    const variants: Record<string, string> = {
+      created: 'default',
+      updated: 'secondary',
+      renewed: 'default',
+      status_change: 'outline',
+      document_uploaded: 'outline',
+    };
+    return <Badge variant={(variants[type] || 'secondary') as any}>{type.replace('_', ' ')}</Badge>;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -138,9 +194,7 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
               <div className="space-y-3">
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">Route Numbers</span>
-                  <p className="text-sm">
-                    {permit.route_numbers?.join(', ') || '-'}
-                  </p>
+                  <p className="text-sm">{permit.route_numbers?.join(', ') || '-'}</p>
                 </div>
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">NTC Approved Service Type</span>
@@ -151,9 +205,7 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
                   <p className="text-sm font-mono">
                     {permit.allocated_bus_number || permit.buses?.bus_no || '-'}
                     {permit.buses?.registration_number && (
-                      <span className="text-muted-foreground ml-2">
-                        ({permit.buses.registration_number})
-                      </span>
+                      <span className="text-muted-foreground ml-2">({permit.buses.registration_number})</span>
                     )}
                   </p>
                 </div>
@@ -278,9 +330,9 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
                       const status = getExpiryStatus(permit.expiry_date);
                       return (
                         <>
-                          {status === 'expired' && <AlertTriangle className="h-4 w-4 text-red-500" />}
-                          {status === 'expiring-soon' && <Calendar className="h-4 w-4 text-yellow-500" />}
-                          {status === 'valid' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                          {status === 'expired' && <AlertTriangle className="h-4 w-4 text-destructive" />}
+                          {status === 'expiring-soon' && <Calendar className="h-4 w-4 text-accent-foreground" />}
+                          {status === 'valid' && <CheckCircle className="h-4 w-4 text-primary" />}
                         </>
                       );
                     })()}
@@ -295,8 +347,8 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
                       (() => {
                         const days = differenceInDays(parseISO(permit.expiry_date), new Date());
                         return days < 0 ? 
-                          <span className="text-red-600 font-medium">Expired {Math.abs(days)} days ago</span> :
-                          <span className={days <= 30 ? "text-yellow-600 font-medium" : "text-green-600"}>{days} days remaining</span>;
+                          <span className="text-destructive font-medium">Expired {Math.abs(days)} days ago</span> :
+                          <span className={days <= 30 ? "text-accent-foreground font-medium" : "text-primary"}>{days} days remaining</span>;
                       })()
                     ) : '-'}
                   </p>
@@ -342,6 +394,89 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
               </CardContent>
             </Card>
           )}
+
+          {/* Documents */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <File className="h-4 w-4" />
+                Permit Documents
+              </CardTitle>
+              <CardDescription>
+                {documents.length} document{documents.length !== 1 ? 's' : ''} attached
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {documents.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No documents uploaded yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {documents.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{doc.file_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {doc.uploaded_at ? format(parseISO(doc.uploaded_at), 'MMM dd, yyyy HH:mm') : '-'}
+                            {doc.file_size && ` · ${(doc.file_size / 1024).toFixed(1)} KB`}
+                          </p>
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => handleDownload(doc)}>
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Change History */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-4 w-4" />
+                Change History
+              </CardTitle>
+              <CardDescription>
+                Audit trail of all permit changes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {changeHistory.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No change history recorded</p>
+              ) : (
+                <div className="space-y-4">
+                  {changeHistory.map((entry) => (
+                    <div key={entry.id} className="relative pl-6 pb-4 border-l-2 border-muted last:pb-0">
+                      <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-primary" />
+                      <div className="flex items-center gap-2 mb-1">
+                        {getChangeTypeBadge(entry.change_type)}
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {entry.changed_at ? format(parseISO(entry.changed_at), 'MMM dd, yyyy HH:mm') : '-'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-foreground">{entry.description}</p>
+                      {entry.changes && Array.isArray(entry.changes) && entry.changes.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {entry.changes.map((change: any, idx: number) => (
+                            <div key={idx} className="text-xs font-mono bg-muted/50 rounded px-2 py-1">
+                              <span className="text-muted-foreground">{change.field}:</span>{' '}
+                              <span className="text-destructive line-through">{change.old_value || '(empty)'}</span>{' → '}
+                              <span className="text-primary">{change.new_value || '(empty)'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </DialogContent>
     </Dialog>
