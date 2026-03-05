@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import { format, parseISO, differenceInDays } from "date-fns";
 import { RoutePermitImport } from "@/components/route-permits/RoutePermitImport";
 import { RoutePermitDetailsModal } from "@/components/route-permits/RoutePermitDetailsModal";
 import { useRoutePermitFinanceSettings, usePostPermitCostToGL } from "@/hooks/useRoutePermitFinance";
+import { useDropzone } from "react-dropzone";
 
 interface RoutePermit {
   id: string;
@@ -69,6 +70,10 @@ export default function RoutePermits() {
   const [selectedPermit, setSelectedPermit] = useState<RoutePermit | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadPermitId, setUploadPermitId] = useState<string>('');
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
 
   // Finance integration
   const { data: permitFinanceSettings } = useRoutePermitFinanceSettings();
@@ -206,6 +211,83 @@ export default function RoutePermits() {
     return `${permitPrefix}${year}${String(lastNumber).padStart(3, '0')}`;
   };
 
+  const recordChangeHistory = async (permitId: string, changeType: string, changes: any[], description: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await (supabase as any)
+        .from('route_permit_change_history')
+        .insert({
+          permit_id: permitId,
+          changed_by: user?.id || null,
+          change_type: changeType,
+          changes: changes,
+          description: description,
+        });
+    } catch (err) {
+      console.error('Failed to record change history:', err);
+    }
+  };
+
+  const handleDocumentUpload = async () => {
+    if (!uploadFile || !uploadPermitId) return;
+    
+    if (uploadFile.size > 10 * 1024 * 1024) {
+      toast.error('File size must be less than 10MB');
+      return;
+    }
+
+    setUploadingFile(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const filePath = `route-permits/${uploadPermitId}/${Date.now()}_${uploadFile.name}`;
+      
+      const { error: storageError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, uploadFile);
+
+      if (storageError) throw storageError;
+
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+
+      await supabase.from('documents').insert({
+        file_name: uploadFile.name,
+        file_type: uploadFile.type,
+        file_size: uploadFile.size,
+        file_url: urlData.publicUrl,
+        storage_path: filePath,
+        linked_table: 'route_permits',
+        linked_row_id: uploadPermitId,
+        tag: 'permit_document',
+        uploaded_by: user?.id || null,
+      });
+
+      await recordChangeHistory(uploadPermitId, 'document_uploaded', [], `Document uploaded: ${uploadFile.name}`);
+
+      toast.success('Document uploaded successfully');
+      setShowUploadDialog(false);
+      setUploadFile(null);
+      setUploadPermitId('');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(error.message || 'Failed to upload document');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      setUploadFile(acceptedFiles[0]);
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'image/*': [], 'application/pdf': [] },
+    maxFiles: 1,
+    maxSize: 10 * 1024 * 1024,
+  });
+
   const handleSubmit = async () => {
     if (!isAdmin) {
       toast.error('Access denied');
@@ -230,19 +312,44 @@ export default function RoutePermits() {
       };
 
       if (editingPermit) {
+        // Build change diff
+        const changesArr: any[] = [];
+        const fieldsToTrack = ['route_name', 'temporary_route_name', 'via', 'owner_name', 'owner_address', 'owner_nic', 'service_type', 'seats', 'max_fare', 'issue_date', 'expiry_date', 'annual_fee', 'permit_status', 'operation_status', 'bus_id', 'route_id', 'ntc_number'];
+        
+        for (const field of fieldsToTrack) {
+          const oldVal = String(editingPermit[field as keyof RoutePermit] ?? '');
+          const newVal = String(permitData[field as keyof typeof permitData] ?? '');
+          if (oldVal !== newVal) {
+            changesArr.push({ field, old_value: oldVal, new_value: newVal });
+          }
+        }
+
         const { error } = await supabase
           .from('route_permits')
           .update(permitData)
           .eq('id', editingPermit.id);
 
         if (error) throw error;
+
+        if (changesArr.length > 0) {
+          const desc = changesArr.map(c => `${c.field}: "${c.old_value}" → "${c.new_value}"`).join('; ');
+          await recordChangeHistory(editingPermit.id, 'updated', changesArr, `Permit updated: ${desc}`);
+        }
+
         toast.success('Route permit updated successfully');
       } else {
-        const { error } = await supabase
+        const { data: newPermit, error } = await supabase
           .from('route_permits')
-          .insert(permitData);
+          .insert(permitData)
+          .select('id')
+          .single();
 
         if (error) throw error;
+
+        if (newPermit) {
+          await recordChangeHistory(newPermit.id, 'created', [], `Permit ${permitNo} created for route ${formData.route_name}`);
+        }
+
         toast.success('Route permit created successfully');
       }
 
@@ -510,8 +617,9 @@ export default function RoutePermits() {
             size="sm" 
             variant="outline"
             onClick={() => {
-              // TODO: Implement document upload for permit
-              toast.info('Document upload functionality coming soon');
+              setUploadPermitId(row.original.id);
+              setUploadFile(null);
+              setShowUploadDialog(true);
             }}
           >
             <Upload className="h-4 w-4" />
@@ -900,6 +1008,51 @@ export default function RoutePermits() {
         open={showDetailsModal}
         onOpenChange={setShowDetailsModal}
       />
+
+      {/* Document Upload Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Upload Permit Document
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div
+              {...getRootProps()}
+              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'
+              }`}
+            >
+              <input {...getInputProps()} />
+              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              {uploadFile ? (
+                <div>
+                  <p className="text-sm font-medium">{uploadFile.name}</p>
+                  <p className="text-xs text-muted-foreground">{(uploadFile.size / 1024).toFixed(1)} KB</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm font-medium">Drop file here or click to browse</p>
+                  <p className="text-xs text-muted-foreground">PDF or images, max 10MB</p>
+                </div>
+              )}
+            </div>
+            <Button 
+              onClick={handleDocumentUpload} 
+              disabled={!uploadFile || uploadingFile}
+              className="w-full"
+            >
+              {uploadingFile ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading...</>
+              ) : (
+                <><Upload className="h-4 w-4 mr-2" /> Upload Document</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

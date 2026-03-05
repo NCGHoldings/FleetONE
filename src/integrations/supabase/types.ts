@@ -16316,6 +16316,44 @@ export type Database = {
           },
         ]
       }
+      route_permit_change_history: {
+        Row: {
+          change_type: string
+          changed_at: string
+          changed_by: string | null
+          changes: Json | null
+          description: string | null
+          id: string
+          permit_id: string
+        }
+        Insert: {
+          change_type?: string
+          changed_at?: string
+          changed_by?: string | null
+          changes?: Json | null
+          description?: string | null
+          id?: string
+          permit_id: string
+        }
+        Update: {
+          change_type?: string
+          changed_at?: string
+          changed_by?: string | null
+          changes?: Json | null
+          description?: string | null
+          id?: string
+          permit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_permit_change_history_permit_id_fkey"
+            columns: ["permit_id"]
+            isOneToOne: false
+            referencedRelation: "route_permits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       route_permits: {
         Row: {
           allocated_bus_number: string | null
