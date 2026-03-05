@@ -33,6 +33,7 @@ import { LeasingFinanceSettings } from "@/components/settings/LeasingFinanceSett
 import { ModuleFinanceSettingsView } from "@/components/settings/ModuleFinanceSettingsView";
 import { CoreGLSettings } from "@/components/settings/CoreGLSettings";
 import { CustomerCategoryManagement } from "@/components/accounting/CustomerCategoryManagement";
+import { VendorCategoryManagement } from "@/components/accounting/VendorCategoryManagement";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -172,6 +173,10 @@ export default function Settings() {
           <TabsTrigger value="customer-categories" className="flex items-center gap-1">
             <Tag className="h-3 w-3" />
             Customer Categories
+          </TabsTrigger>
+          <TabsTrigger value="vendor-categories" className="flex items-center gap-1">
+            <Tag className="h-3 w-3" />
+            Vendor Categories
           </TabsTrigger>
           <TabsTrigger value="module-finance" className="flex items-center gap-1">
             <Wallet className="h-3 w-3" />
@@ -653,6 +658,10 @@ export default function Settings() {
 
         <TabsContent value="customer-categories" className="space-y-6 mt-6">
           <CustomerCategoryManagement />
+        </TabsContent>
+
+        <TabsContent value="vendor-categories" className="space-y-6 mt-6">
+          <VendorCategoryManagement />
         </TabsContent>
 
         <TabsContent value="module-finance" className="space-y-6 mt-6">

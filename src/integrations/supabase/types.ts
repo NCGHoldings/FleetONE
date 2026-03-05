@@ -22831,6 +22831,77 @@ export type Database = {
           },
         ]
       }
+      vendor_categories: {
+        Row: {
+          advance_account_id: string | null
+          ap_account_id: string | null
+          category_code: string
+          category_name: string
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          expense_account_id: string | null
+          id: string
+          is_active: boolean
+          updated_at: string | null
+        }
+        Insert: {
+          advance_account_id?: string | null
+          ap_account_id?: string | null
+          category_code: string
+          category_name: string
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          expense_account_id?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string | null
+        }
+        Update: {
+          advance_account_id?: string | null
+          ap_account_id?: string | null
+          category_code?: string
+          category_name?: string
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          expense_account_id?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_categories_advance_account_id_fkey"
+            columns: ["advance_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_categories_ap_account_id_fkey"
+            columns: ["ap_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_categories_expense_account_id_fkey"
+            columns: ["expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_performance: {
         Row: {
           calculated_at: string | null
@@ -23122,6 +23193,7 @@ export type Database = {
           phone: string | null
           tax_id: string | null
           updated_at: string | null
+          vendor_category_id: string | null
           vendor_code: string
           vendor_name: string
           vendor_type: string | null
@@ -23148,6 +23220,7 @@ export type Database = {
           phone?: string | null
           tax_id?: string | null
           updated_at?: string | null
+          vendor_category_id?: string | null
           vendor_code: string
           vendor_name: string
           vendor_type?: string | null
@@ -23174,6 +23247,7 @@ export type Database = {
           phone?: string | null
           tax_id?: string | null
           updated_at?: string | null
+          vendor_category_id?: string | null
           vendor_code?: string
           vendor_name?: string
           vendor_type?: string | null
@@ -23193,6 +23267,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendors_vendor_category_id_fkey"
+            columns: ["vendor_category_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_categories"
             referencedColumns: ["id"]
           },
         ]
