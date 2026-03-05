@@ -34,6 +34,7 @@ import { Plus, Search, Edit, Trash2, Building2, Store, Loader2, Star } from "luc
 import { toast } from "sonner";
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { useVendorBankAccounts, useSaveVendorBankAccounts } from "@/hooks/useVendorBankAccounts";
+import { useActiveVendorCategories } from "@/hooks/useVendorCategories";
 
 interface Vendor {
   id: string;
@@ -48,6 +49,7 @@ interface Vendor {
   wht_applicable: boolean | null;
   wht_rate: number | null;
   is_active: boolean | null;
+  vendor_category_id: string | null;
   created_at: string | null;
 }
 
@@ -70,6 +72,7 @@ export function VendorMasterView() {
   const generateNumber = useGenerateNumber();
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const saveBankAccounts = useSaveVendorBankAccounts();
+  const { data: vendorCategories } = useActiveVendorCategories();
   
   // Fetch bank accounts when editing
   const { data: existingBankAccounts } = useVendorBankAccounts(editingVendor?.id);
@@ -105,6 +108,7 @@ export function VendorMasterView() {
     payment_terms: "30",
     wht_applicable: "false",
     wht_rate: "",
+    vendor_category_id: "",
   });
 
   // Bank account helpers
@@ -142,7 +146,7 @@ export function VendorMasterView() {
     queryFn: async () => {
       let query = supabase
         .from("vendors")
-        .select("*")
+        .select("*, vendor_categories(category_code, category_name)")
         .order("vendor_name");
       
       if (effectiveCompanyId) {
@@ -175,6 +179,7 @@ export function VendorMasterView() {
         payment_terms: parseInt(data.payment_terms) || 30,
         wht_applicable: data.wht_applicable === "true",
         wht_rate: data.wht_rate ? parseFloat(data.wht_rate) : null,
+        vendor_category_id: data.vendor_category_id || null,
         is_active: true,
         company_id: effectiveCompanyId,
         business_unit_code: businessUnitCode,
@@ -222,6 +227,7 @@ export function VendorMasterView() {
           payment_terms: parseInt(data.payment_terms) || 30,
           wht_applicable: data.wht_applicable === "true",
           wht_rate: data.wht_rate ? parseFloat(data.wht_rate) : null,
+          vendor_category_id: data.vendor_category_id || null,
         })
         .eq("id", id);
       if (error) throw error;
@@ -277,6 +283,7 @@ export function VendorMasterView() {
       payment_terms: "30",
       wht_applicable: "false",
       wht_rate: "",
+      vendor_category_id: "",
     });
     setBankAccounts([]);
   };
@@ -294,6 +301,7 @@ export function VendorMasterView() {
       payment_terms: vendor.payment_terms?.toString() || "30",
       wht_applicable: vendor.wht_applicable ? "true" : "false",
       wht_rate: vendor.wht_rate?.toString() || "",
+      vendor_category_id: vendor.vendor_category_id || "",
     });
     setIsDialogOpen(true);
   };
@@ -386,6 +394,27 @@ export function VendorMasterView() {
                       onChange={(e) => setFormData({ ...formData, vendor_name: e.target.value })}
                       required
                     />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Vendor Category</Label>
+                    <Select
+                      value={formData.vendor_category_id || "_none"}
+                      onValueChange={(value) => setFormData({ ...formData, vendor_category_id: value === "_none" ? "" : value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none">No Category</SelectItem>
+                        {vendorCategories?.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.category_code} - {cat.category_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -606,6 +635,7 @@ export function VendorMasterView() {
                 <TableRow>
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead>Category</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Tax ID</TableHead>
@@ -620,6 +650,11 @@ export function VendorMasterView() {
                   <TableRow key={vendor.id}>
                     <TableCell className="font-mono text-sm">{vendor.vendor_code}</TableCell>
                     <TableCell className="font-medium">{vendor.vendor_name}</TableCell>
+                    <TableCell>
+                      {(vendor as any).vendor_categories?.category_code 
+                        ? <Badge variant="outline">{(vendor as any).vendor_categories.category_code}</Badge>
+                        : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
                     <TableCell>{vendor.contact_person || "-"}</TableCell>
                     <TableCell>{vendor.email || "-"}</TableCell>
                     <TableCell>{vendor.tax_id || "-"}</TableCell>
