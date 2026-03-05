@@ -966,6 +966,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "ap_payments_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ap_payments_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
