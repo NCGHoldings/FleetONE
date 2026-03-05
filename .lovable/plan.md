@@ -1,28 +1,54 @@
 
 
-# Fix AP Payments Not Showing in Table
+# Auto-Numbering Cheques from Bank Cheque Books
 
-## Root Cause
-The `useAPPayments()` query in `src/hooks/useAccountingData.ts` joins `bank_accounts (...)` via PostgREST, but the `ap_payments.bank_account_id` column has **no foreign key constraint** to the `bank_accounts` table. PostgREST cannot resolve this join, causing the entire query to fail silently. React Query keeps retrying, leaving the table stuck on "Loading payments..." forever.
+## Problem
+When recording an AP payment by cheque, the user must manually type the cheque number. There is no cheque book management — so no way to auto-assign the next cheque number for a given bank account.
 
-The data is fine — there are 8 payments in the database. The query itself is broken.
+## Solution
+Create a **cheque_books** table to track cheque book ranges per bank account, then auto-populate the cheque number field when the user selects a bank account and cheque payment method.
 
-## Fix
+## Database Changes
 
-### 1. Add the missing FK constraint (Database)
-Run SQL to add the foreign key:
+### New table: `cheque_books`
 ```sql
-ALTER TABLE ap_payments 
-ADD CONSTRAINT ap_payments_bank_account_id_fkey 
-FOREIGN KEY (bank_account_id) REFERENCES bank_accounts(id);
+CREATE TABLE public.cheque_books (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bank_account_id UUID NOT NULL REFERENCES bank_accounts(id) ON DELETE CASCADE,
+  company_id UUID,
+  prefix TEXT DEFAULT '',
+  start_number INTEGER NOT NULL,
+  end_number INTEGER NOT NULL,
+  next_number INTEGER NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
 ```
+- Each bank account can have one or more cheque books (only one active at a time).
+- `next_number` tracks the next available cheque leaf.
+- When `next_number > end_number`, the book is exhausted.
 
-### 2. Defensive fallback in code
-In `src/hooks/useAccountingData.ts`, wrap the `useAPPayments` query with error handling so if the join fails it falls back to fetching without the join. Alternatively, keep the join but add a `.catch` that retries without the joined fields.
+### New RPC: `get_next_cheque_number`
+A database function that, given a `bank_account_id`, finds the active cheque book and returns the next cheque number (with prefix formatting), then increments `next_number`.
 
-**Recommended approach**: Add the FK constraint (step 1) since `bank_account_id` values already reference valid `bank_accounts` rows. This is the correct fix and also improves database integrity. The code change is optional as a safety net.
+## Code Changes
 
-### File Changes
-- **Database migration**: Add FK constraint `ap_payments_bank_account_id_fkey`
-- **`src/hooks/useAccountingData.ts`** (optional safety): No code change needed if FK is added
+### 1. New hook: `src/hooks/useChequeBooks.ts`
+- `useChequeBooks(bankAccountId)` — fetch cheque books for a bank account
+- `useNextChequeNumber()` — mutation calling the RPC to get and consume the next number
+- `useCreateChequeBook()` / `useUpdateChequeBook()` — CRUD for cheque book management
+
+### 2. Modify: `src/components/accounting/APPaymentForm.tsx`
+- When payment method is "cheque" **and** a bank account is selected, auto-fetch the next cheque number via the hook and populate the `cheque_number` field.
+- Show a small indicator if the cheque book is running low or exhausted.
+- Still allow manual override if needed.
+
+### 3. New UI: Cheque Book Management (in Banking settings)
+- A simple table to add/view cheque books per bank account (prefix, start, end, next, status).
+- This lets the user register new cheque books when they receive them from the bank.
+
+### 4. Apply same logic to `ChequeIssueForm.tsx`
+- Auto-populate cheque number from the active cheque book when bank account is selected.
 
