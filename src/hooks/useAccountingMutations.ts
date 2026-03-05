@@ -778,6 +778,7 @@ export const useCreateAPPayment = () => {
       reference?: string;
       notes?: string;
       is_advance?: boolean;
+      is_direct_payment?: boolean;
       vendor_bank_account_id?: string;
       bank_fee_amount?: number;
       bank_fee_type?: string;
@@ -785,6 +786,15 @@ export const useCreateAPPayment = () => {
         invoice_id: string;
         allocated_amount: number;
         wht_deducted?: number;
+      }>;
+      direct_lines?: Array<{
+        account_id: string;
+        description: string;
+        quantity: number;
+        unit_price: number;
+        tax_rate: number;
+        tax_amount: number;
+        line_total: number;
       }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
@@ -815,7 +825,7 @@ export const useCreateAPPayment = () => {
           reference: payment.reference,
           notes: payment.notes,
           is_advance: payment.is_advance || false,
-          vendor_bank_account_id: payment.vendor_bank_account_id || null,
+          is_direct_payment: payment.is_direct_payment || false,
           bank_fee_amount: payment.bank_fee_amount || 0,
           bank_fee_type: payment.bank_fee_type || null,
           status: "posted",
@@ -864,6 +874,27 @@ export const useCreateAPPayment = () => {
         }
       }
 
+      // ========== DIRECT PAYMENT LINES ==========
+      if (payment.is_direct_payment && payment.direct_lines?.length) {
+        const linesToInsert = payment.direct_lines.map((line) => ({
+          payment_id: data.id,
+          account_id: line.account_id,
+          description: line.description,
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          tax_rate: line.tax_rate,
+          tax_amount: line.tax_amount,
+          line_total: line.line_total,
+          company_id: effectiveCompanyId,
+        }));
+        const { error: linesError } = await supabase
+          .from("ap_payment_lines" as any)
+          .insert(linesToInsert);
+        if (linesError) {
+          console.error("[AP Direct Payment] Failed to insert lines:", linesError);
+        }
+      }
+
       // ========== GL POSTING ==========
       // Get the bank account's linked GL account if a bank account is selected
       let bankGLAccountId: string | null = null;
@@ -876,66 +907,140 @@ export const useCreateAPPayment = () => {
         bankGLAccountId = bankAccount?.gl_account_id || null;
       }
 
-      // Find Trade Payable account from COA (look for liability accounts with "payable" in name)
-      const { data: payableAccounts } = await supabase
-        .from("chart_of_accounts")
-        .select("id, account_name")
-        .eq("company_id", effectiveCompanyId)
-        .eq("account_type", "liability")
-        .eq("is_active", true)
-        .ilike("account_name", "%trade payable%")
-        .limit(1);
-      
-      const tradePayableId = payableAccounts?.[0]?.id || null;
+      // For direct payments: GL post per line (debit each line's account, credit bank)
+      if (payment.is_direct_payment && payment.direct_lines?.length && bankGLAccountId && payment.amount > 0) {
+        // Build journal entry lines: debit each expense account, credit bank
+        const jeLines: Array<{ account_id: string; description: string; debit_amount: number; credit_amount: number }> = [];
+        
+        for (const line of payment.direct_lines) {
+          if (line.account_id && line.line_total > 0) {
+            jeLines.push({
+              account_id: line.account_id,
+              description: line.description || `Direct payment line`,
+              debit_amount: line.line_total,
+              credit_amount: 0,
+            });
+          }
+        }
+        // Credit bank for total
+        jeLines.push({
+          account_id: bankGLAccountId,
+          description: `Direct Payment ${payment.payment_number} to ${vendorName}`,
+          debit_amount: 0,
+          credit_amount: payment.amount,
+        });
 
-      // Find WHT Payable account if needed
-      let whtPayableId: string | null = null;
-      if (totalWhtDeducted > 0) {
-        const { data: whtAccounts } = await supabase
+        const totalDebit = jeLines.reduce((s, l) => s + l.debit_amount, 0);
+        const totalCredit = jeLines.reduce((s, l) => s + l.credit_amount, 0);
+
+        // Create journal entry
+        const { data: je, error: jeError } = await supabase
+          .from("journal_entries")
+          .insert([{
+            entry_number: `JE-DP-${payment.payment_number}`,
+            entry_date: payment.payment_date,
+            description: `Direct Payment ${payment.payment_number} to ${vendorName}`,
+            reference: payment.reference || payment.payment_number,
+            total_debit: totalDebit,
+            total_credit: totalCredit,
+            status: "posted",
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode,
+          }])
+          .select()
+          .single();
+
+        if (!jeError && je) {
+          const jelLines = jeLines.map((l) => ({
+            journal_entry_id: je.id,
+            account_id: l.account_id,
+            description: l.description,
+            debit: l.debit_amount,
+            credit: l.credit_amount,
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode,
+          }));
+          await supabase.from("journal_entry_lines").insert(jelLines);
+
+          // Update COA balances
+          for (const l of jelLines) {
+            if (l.debit > 0) {
+              const { data: acc } = await supabase.from("chart_of_accounts").select("current_balance").eq("id", l.account_id).single();
+              if (acc) {
+                await supabase.from("chart_of_accounts").update({ current_balance: (acc.current_balance || 0) + l.debit }).eq("id", l.account_id);
+              }
+            }
+            if (l.credit > 0) {
+              const { data: acc } = await supabase.from("chart_of_accounts").select("current_balance").eq("id", l.account_id).single();
+              if (acc) {
+                await supabase.from("chart_of_accounts").update({ current_balance: (acc.current_balance || 0) - l.credit }).eq("id", l.account_id);
+              }
+            }
+          }
+
+          // Link journal entry to payment
+          await supabase.from("ap_payments").update({ journal_entry_id: je.id }).eq("id", data.id);
+        }
+      } else if (!payment.is_direct_payment) {
+        // Normal / Advance payment GL posting (existing logic)
+        // Find Trade Payable account from COA
+        const { data: payableAccounts } = await supabase
           .from("chart_of_accounts")
-          .select("id")
+          .select("id, account_name")
           .eq("company_id", effectiveCompanyId)
           .eq("account_type", "liability")
           .eq("is_active", true)
-          .ilike("account_name", "%wht%payable%")
+          .ilike("account_name", "%trade payable%")
           .limit(1);
-        whtPayableId = whtAccounts?.[0]?.id || null;
-      }
-
-      // Only post to GL if we have the required accounts
-      if (tradePayableId && bankGLAccountId && payment.amount > 0) {
-        // Import the GL posting utility dynamically to avoid circular dependencies
-        const { postAPPaymentToGL } = await import("@/lib/gl-posting-utils");
         
-        const glResult = await postAPPaymentToGL({
-          paymentNumber: payment.payment_number,
-          paymentDate: payment.payment_date,
-          amount: payment.amount,
-          whtAmount: totalWhtDeducted > 0 ? totalWhtDeducted : undefined,
-          bankAccountId: bankGLAccountId,
-          tradePayableId: tradePayableId,
-          whtPayableId: totalWhtDeducted > 0 ? whtPayableId || undefined : undefined,
-          companyId: effectiveCompanyId,
-          businessUnitCode: businessUnitCode || undefined,
-          vendorName: vendorName,
-        });
+        const tradePayableId = payableAccounts?.[0]?.id || null;
 
-        // Link journal entry to payment if GL posting succeeded
-        if (glResult.success && glResult.journalEntryId) {
-          await supabase
-            .from("ap_payments")
-            .update({ journal_entry_id: glResult.journalEntryId })
-            .eq("id", data.id);
+        // Find WHT Payable account if needed
+        let whtPayableId: string | null = null;
+        if (totalWhtDeducted > 0) {
+          const { data: whtAccounts } = await supabase
+            .from("chart_of_accounts")
+            .select("id")
+            .eq("company_id", effectiveCompanyId)
+            .eq("account_type", "liability")
+            .eq("is_active", true)
+            .ilike("account_name", "%wht%payable%")
+            .limit(1);
+          whtPayableId = whtAccounts?.[0]?.id || null;
         }
-      } else if (payment.amount > 0) {
-        // Warn user when GL posting is skipped
-        if (!bankGLAccountId) {
-          console.warn("[AP Payment GL] Bank account has no linked GL account, skipping GL posting");
-          toast.warning("GL posting skipped: Bank account has no linked GL account. Configure it in Banking → Edit Account → GL Account.");
-        }
-        if (!tradePayableId) {
-          console.warn("[AP Payment GL] Trade Payable account not found in COA");
-          toast.warning("GL posting skipped: 'Trade Payable' account not found in Chart of Accounts.");
+
+        // Only post to GL if we have the required accounts
+        if (tradePayableId && bankGLAccountId && payment.amount > 0) {
+          const { postAPPaymentToGL } = await import("@/lib/gl-posting-utils");
+          
+          const glResult = await postAPPaymentToGL({
+            paymentNumber: payment.payment_number,
+            paymentDate: payment.payment_date,
+            amount: payment.amount,
+            whtAmount: totalWhtDeducted > 0 ? totalWhtDeducted : undefined,
+            bankAccountId: bankGLAccountId,
+            tradePayableId: tradePayableId,
+            whtPayableId: totalWhtDeducted > 0 ? whtPayableId || undefined : undefined,
+            companyId: effectiveCompanyId,
+            businessUnitCode: businessUnitCode || undefined,
+            vendorName: vendorName,
+          });
+
+          if (glResult.success && glResult.journalEntryId) {
+            await supabase
+              .from("ap_payments")
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq("id", data.id);
+          }
+        } else if (payment.amount > 0) {
+          if (!bankGLAccountId) {
+            console.warn("[AP Payment GL] Bank account has no linked GL account, skipping GL posting");
+            toast.warning("GL posting skipped: Bank account has no linked GL account. Configure it in Banking → Edit Account → GL Account.");
+          }
+          if (!tradePayableId) {
+            console.warn("[AP Payment GL] Trade Payable account not found in COA");
+            toast.warning("GL posting skipped: 'Trade Payable' account not found in Chart of Accounts.");
+          }
         }
       }
 

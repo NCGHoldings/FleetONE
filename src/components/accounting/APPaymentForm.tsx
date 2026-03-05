@@ -20,7 +20,8 @@ import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen, Landmark } from "lucide-react";
+import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen, Landmark, FileText, Plus, Trash2 } from "lucide-react";
+import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 
 const paymentSchema = z.object({
   payment_number: z.string().min(1, "Payment number is required"),
@@ -49,6 +50,17 @@ interface InvoiceAllocation {
   selected: boolean;
 }
 
+interface DirectPaymentLine {
+  id: string;
+  account_id: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  tax_rate: number;
+  tax_amount: number;
+  line_total: number;
+}
+
 interface APPaymentFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -56,10 +68,22 @@ interface APPaymentFormProps {
   isAdvanceMode?: boolean;
 }
 
+const createEmptyLine = (): DirectPaymentLine => ({
+  id: crypto.randomUUID(),
+  account_id: "",
+  description: "",
+  quantity: 1,
+  unit_price: 0,
+  tax_rate: 0,
+  tax_amount: 0,
+  line_total: 0,
+});
+
 export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvanceMode = false }: APPaymentFormProps) => {
   const { data: vendors } = useVendors();
   const { data: bankAccounts } = useBankAccounts();
   const { data: allInvoices } = useAPInvoices();
+  
   const createPayment = useCreateAPPayment();
   const approveInvoice = useApproveAPInvoice();
   const generateNumber = useGenerateNumber();
@@ -68,6 +92,8 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const [selectedVendorId, setSelectedVendorId] = useState(preselectedVendorId || "");
   const [selectedBankAccountId, setSelectedBankAccountId] = useState("");
   const [isAdvance, setIsAdvance] = useState(isAdvanceMode);
+  const [isDirectPayment, setIsDirectPayment] = useState(false);
+  const [directLines, setDirectLines] = useState<DirectPaymentLine[]>([createEmptyLine()]);
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [includeBankFee, setIncludeBankFee] = useState(false);
   const [bankFeeAmount, setBankFeeAmount] = useState(0);
@@ -115,13 +141,14 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   useEffect(() => {
     if (open) {
       setIsAdvance(isAdvanceMode);
+      setIsDirectPayment(false);
+      setDirectLines([createEmptyLine()]);
       form.setValue("is_advance", isAdvanceMode);
       setAdvanceAmount(0);
       setSelectedBankAccountId("");
       setIncludeBankFee(false);
       setBankFeeAmount(0);
       setBankFeeType("bank_charge");
-      // Generate sequential payment number
       generateNumber("payment").then((num) => {
         form.setValue("payment_number", num);
       });
@@ -142,7 +169,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
 
   // Filter invoices for selected vendor
   useEffect(() => {
-    if (selectedVendorId && allInvoices && !isAdvance) {
+    if (selectedVendorId && allInvoices && !isAdvance && !isDirectPayment) {
       const vendorInvoices = allInvoices.filter(
         (inv) => inv.vendor_id === selectedVendorId && (inv.balance || 0) > 0 && inv.approval_status === "approved"
       );
@@ -161,7 +188,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     } else {
       setAllocations([]);
     }
-  }, [selectedVendorId, allInvoices, isAdvance]);
+  }, [selectedVendorId, allInvoices, isAdvance, isDirectPayment]);
 
   // Auto-select default bank account when vendor changes
   useEffect(() => {
@@ -228,19 +255,59 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
 
   const handleAdvanceToggle = (checked: boolean) => {
     setIsAdvance(checked);
+    setIsDirectPayment(false);
     form.setValue("is_advance", checked);
     if (checked) {
       setAllocations([]);
+      setDirectLines([createEmptyLine()]);
     }
   };
 
-  const totalPayment = isAdvance ? advanceAmount : allocations.reduce((sum, a) => sum + a.allocated_amount, 0);
+  const handleDirectPaymentToggle = (checked: boolean) => {
+    setIsDirectPayment(checked);
+    setIsAdvance(false);
+    form.setValue("is_advance", false);
+    if (checked) {
+      setAllocations([]);
+    } else {
+      setDirectLines([createEmptyLine()]);
+    }
+  };
+
+  // Direct payment line management
+  const addLine = () => setDirectLines([...directLines, createEmptyLine()]);
+  const removeLine = (id: string) => {
+    if (directLines.length <= 1) return;
+    setDirectLines(directLines.filter((l) => l.id !== id));
+  };
+
+  const updateLine = (id: string, field: keyof DirectPaymentLine, value: any) => {
+    setDirectLines(
+      directLines.map((line) => {
+        if (line.id !== id) return line;
+        const updated = { ...line, [field]: value };
+        // Recalculate
+        const subtotal = updated.quantity * updated.unit_price;
+        updated.tax_amount = subtotal * (updated.tax_rate / 100);
+        updated.line_total = subtotal + updated.tax_amount;
+        return updated;
+      })
+    );
+  };
+
+  const directLinesTotal = directLines.reduce((sum, l) => sum + l.line_total, 0);
+
+  const totalPayment = isDirectPayment
+    ? directLinesTotal
+    : isAdvance
+    ? advanceAmount
+    : allocations.reduce((sum, a) => sum + a.allocated_amount, 0);
   const totalWhtDeducted = allocations.reduce((sum, a) => sum + a.wht_deducted, 0);
   const effectiveBankFee = includeBankFee ? bankFeeAmount : 0;
   const totalWithFees = totalPayment + effectiveBankFee;
 
   const onSubmit = async (data: PaymentFormData) => {
-    const selectedAllocations = isAdvance 
+    const selectedAllocations = isAdvance || isDirectPayment
       ? [] 
       : allocations.filter((a) => a.selected && a.allocated_amount > 0);
     
@@ -257,6 +324,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
         reference: data.reference,
         notes: data.notes,
         is_advance: isAdvance,
+        is_direct_payment: isDirectPayment,
         vendor_bank_account_id: selectedBankAccountId || undefined,
         bank_fee_amount: effectiveBankFee > 0 ? effectiveBankFee : undefined,
         bank_fee_type: effectiveBankFee > 0 ? bankFeeType : undefined,
@@ -265,11 +333,24 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
           allocated_amount: a.allocated_amount,
           wht_deducted: a.wht_deducted,
         })),
+        direct_lines: isDirectPayment
+          ? directLines.filter((l) => l.account_id && l.line_total > 0).map((l) => ({
+              account_id: l.account_id,
+              description: l.description,
+              quantity: l.quantity,
+              unit_price: l.unit_price,
+              tax_rate: l.tax_rate,
+              tax_amount: l.tax_amount,
+              line_total: l.line_total,
+            }))
+          : undefined,
       });
       onOpenChange(false);
       form.reset();
       setAllocations([]);
       setIsAdvance(false);
+      setIsDirectPayment(false);
+      setDirectLines([createEmptyLine()]);
       setAdvanceAmount(0);
       setIncludeBankFee(false);
       setBankFeeAmount(0);
@@ -278,16 +359,23 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     }
   };
 
-  const canSubmit = isAdvance 
+  const canSubmit = isDirectPayment
+    ? directLinesTotal > 0 && selectedVendorId && directLines.some((l) => l.account_id)
+    : isAdvance 
     ? advanceAmount > 0 && selectedVendorId 
     : totalPayment > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {isAdvance ? (
+            {isDirectPayment ? (
+              <>
+                <FileText className="h-5 w-5 text-blue-600" />
+                Direct Payment (Without Invoice)
+              </>
+            ) : isAdvance ? (
               <>
                 <Wallet className="h-5 w-5 text-orange-600" />
                 Record Advance Payment
@@ -300,21 +388,39 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Advance Toggle */}
-            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <Wallet className="h-5 w-5 text-orange-600" />
-                <div>
-                  <p className="font-medium">Advance Payment</p>
-                  <p className="text-sm text-muted-foreground">
-                    Record payment without allocating to invoices
-                  </p>
+            {/* Mode Toggles */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Wallet className="h-5 w-5 text-orange-600" />
+                  <div>
+                    <p className="font-medium">Advance Payment</p>
+                    <p className="text-sm text-muted-foreground">
+                      Record payment without allocating to invoices
+                    </p>
+                  </div>
                 </div>
+                <Switch
+                  checked={isAdvance}
+                  onCheckedChange={handleAdvanceToggle}
+                />
               </div>
-              <Switch
-                checked={isAdvance}
-                onCheckedChange={handleAdvanceToggle}
-              />
+
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border-blue-200 dark:border-blue-800" style={{ borderWidth: isDirectPayment ? 2 : 1 }}>
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="font-medium">Direct Payment</p>
+                    <p className="text-sm text-muted-foreground">
+                      Pay directly with line items — no invoice needed
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={isDirectPayment}
+                  onCheckedChange={handleDirectPaymentToggle}
+                />
+              </div>
             </div>
 
             {/* Header Fields */}
@@ -588,8 +694,116 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
               </div>
             )}
 
-            {/* Invoice Allocation (only when not advance mode) */}
-            {!isAdvance && selectedVendorId && (
+            {/* Direct Payment: Line Items */}
+            {isDirectPayment && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-blue-600" />
+                    Payment Line Items
+                  </h3>
+                  <Button type="button" variant="outline" size="sm" onClick={addLine}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Line
+                  </Button>
+                </div>
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-sm font-medium w-48">GL Account</th>
+                        <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
+                        <th className="px-3 py-2 text-right text-sm font-medium w-20">Qty</th>
+                        <th className="px-3 py-2 text-right text-sm font-medium w-28">Unit Price</th>
+                        <th className="px-3 py-2 text-right text-sm font-medium w-20">Tax %</th>
+                        <th className="px-3 py-2 text-right text-sm font-medium w-28">Total</th>
+                        <th className="px-3 py-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {directLines.map((line) => (
+                        <tr key={line.id} className="border-t">
+                          <td className="px-2 py-2">
+                            <SearchableAccountSelector
+                              value={line.account_id}
+                              onValueChange={(val) => updateLine(line.id, "account_id", val)}
+                              placeholder="Select account"
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <Input
+                              value={line.description}
+                              onChange={(e) => updateLine(line.id, "description", e.target.value)}
+                              placeholder="Description"
+                              className="h-8"
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <Input
+                              type="number"
+                              value={line.quantity}
+                              onChange={(e) => updateLine(line.id, "quantity", parseFloat(e.target.value) || 0)}
+                              className="h-8 text-right"
+                              min={0}
+                              step="1"
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <Input
+                              type="number"
+                              value={line.unit_price}
+                              onChange={(e) => updateLine(line.id, "unit_price", parseFloat(e.target.value) || 0)}
+                              className="h-8 text-right"
+                              min={0}
+                              step="0.01"
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <Input
+                              type="number"
+                              value={line.tax_rate}
+                              onChange={(e) => updateLine(line.id, "tax_rate", parseFloat(e.target.value) || 0)}
+                              className="h-8 text-right"
+                              min={0}
+                              step="0.01"
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-right font-mono text-sm">
+                            <CurrencyDisplay amount={line.line_total} />
+                          </td>
+                          <td className="px-2 py-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => removeLine(line.id)}
+                              disabled={directLines.length <= 1}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Direct payment total */}
+                <div className="flex justify-end">
+                  <div className="bg-muted p-4 rounded-lg">
+                    <div className="flex items-center justify-between gap-8">
+                      <span className="font-semibold">Total:</span>
+                      <span className="text-2xl font-bold text-primary">
+                        <CurrencyDisplay amount={directLinesTotal} />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Invoice Allocation (only when not advance or direct payment mode) */}
+            {!isAdvance && !isDirectPayment && selectedVendorId && (
               <div className="space-y-3">
                 {/* Pending Invoices Alert */}
                 {pendingInvoices.length > 0 && (
@@ -751,7 +965,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                 Cancel
               </Button>
               <Button type="submit" disabled={createPayment.isPending || !canSubmit}>
-                {createPayment.isPending ? "Processing..." : isAdvance ? "Record Advance" : "Process Payment"}
+                {createPayment.isPending ? "Processing..." : isDirectPayment ? "Process Direct Payment" : isAdvance ? "Record Advance" : "Process Payment"}
               </Button>
             </div>
           </form>

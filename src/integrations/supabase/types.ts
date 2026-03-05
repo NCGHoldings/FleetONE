@@ -888,6 +888,70 @@ export type Database = {
           },
         ]
       }
+      ap_payment_lines: {
+        Row: {
+          account_id: string | null
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          line_total: number | null
+          payment_id: string
+          quantity: number | null
+          tax_amount: number | null
+          tax_rate: number | null
+          unit_price: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          line_total?: number | null
+          payment_id: string
+          quantity?: number | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          unit_price?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          line_total?: number | null
+          payment_id?: string
+          quantity?: number | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ap_payment_lines_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payment_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payment_lines_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "ap_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ap_payments: {
         Row: {
           amount: number
@@ -905,6 +969,7 @@ export type Database = {
           created_by: string | null
           id: string
           is_advance: boolean | null
+          is_direct_payment: boolean | null
           journal_entry_id: string | null
           notes: string | null
           payment_date: string
@@ -933,6 +998,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_advance?: boolean | null
+          is_direct_payment?: boolean | null
           journal_entry_id?: string | null
           notes?: string | null
           payment_date: string
@@ -961,6 +1027,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_advance?: boolean | null
+          is_direct_payment?: boolean | null
           journal_entry_id?: string | null
           notes?: string | null
           payment_date?: string
