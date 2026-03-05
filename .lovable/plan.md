@@ -1,29 +1,36 @@
 
 
-# Redesign AP Invoice Template for Professional Look
+# Fix AP Invoice Logo and Header Display
 
 ## Problem
-The current AP Invoice template uses an orange accent color (`#ea580c`) throughout — for card borders, total box, summary section, and the amount-in-words highlight. This creates a harsh, unprofessional appearance with too many orange elements competing for attention.
+The AP Invoice preview shows no logo and the company name looks unprofessional because:
 
-## Solution
-Redesign the AP Invoice template in `src/lib/document-template-seeder.ts` with a refined, corporate color scheme:
+1. **Logo broken**: The AP invoice case in `document-template-utils.ts` (line 366-370) overwrites `{{company_logo}}` with a **raw URL** instead of an `<img>` tag. The template expects `<div class="logo-container">{{company_logo}}</div>` — so a raw URL renders as text, not an image.
 
-### Color Changes
-- **Accent**: Change from orange (`#ea580c`) to a sophisticated slate-blue (`#334155`) or corporate navy (`#1e3a5f`)
-- **Payment summary**: Use subtle gray background instead of orange-tinted background
-- **Total box**: Use a clean dark border with professional typography instead of orange
-- **Amount-in-words**: Change from yellow/amber background to a subtle light blue/gray professional highlight
-- **Cards (Invoice Details, Supplier)**: Add subtle left-border accent in muted blue instead of default gray
+2. **Same issue exists for other document types** (AR Invoice at line 236, AR Receipt at line 264, etc.) — they all override the correctly formatted `<img>` tag with a raw URL.
 
-### Specific Changes in `generateAPInvoiceTemplate()`
-1. Update CSS variables: `--accent` and `--accent-2` to professional navy/dark slate tones
-2. Update `--chip` to a cooler tone matching the new accent
-3. Remove inline orange `style` overrides on `.payment-summary` and `.total-box`
-4. Restyle the `.amount-words` section — use a cooler, more professional background (light slate instead of amber)
-5. Add subtle left-border accents on `.card` elements for visual hierarchy
+## Changes
 
-### File to modify
-- `src/lib/document-template-seeder.ts` — only the `generateAPInvoiceTemplate()` function (lines 447-540)
+### File: `src/lib/document-template-utils.ts`
 
-No other templates are affected. The common styles remain unchanged.
+**Fix the AP Invoice logo override** (lines 366-370): Wrap the raw URL in an `<img>` tag so it renders correctly inside `logo-container`:
+
+```typescript
+// Before (broken):
+placeholders['{{company_logo}}'] = invLogoUrl;
+
+// After (fixed):
+placeholders['{{company_logo}}'] = `<img src="${invLogoUrl}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
+```
+
+**Apply the same fix to all other document type cases** that have the same raw-URL override pattern:
+- AR Invoice (line ~236)
+- AR Receipt (line ~264)  
+- AR Credit Note (line ~286)
+- AP Payment Voucher (line ~458-461)
+- Debit Note (line ~486)
+
+Each of these sets `{{company_logo}}` to a raw URL — all need wrapping in an `<img>` tag.
+
+This ensures the logo renders properly in the `logo-container` div and the company header section looks professional with both logo and company name displayed correctly.
 
