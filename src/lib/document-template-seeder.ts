@@ -446,7 +446,8 @@ export const generateARCreditNoteTemplate = (): string => `
 // ==================== AP Invoice ====================
 export const generateAPInvoiceTemplate = (): string => `
 <style>${commonStyles}
-  :root { --accent: #ea580c; --accent-2: #c2410c; --chip: #fff7ed; }
+  :root { --accent: #1e3a5f; --accent-2: #334155; --chip: #f0f4f8; }
+  .card { border-left: 3px solid #cbd5e1 !important; }
 </style>
 <div class="page"><div class="doc">
   {{document_header}}
@@ -475,18 +476,18 @@ export const generateAPInvoiceTemplate = (): string => `
 
     {{line_items}}
 
-    <div class="payment-summary" style="border-color: rgba(234,88,12,0.2); background: rgba(234,88,12,0.02);">
+    <div class="payment-summary" style="border-color: rgba(30,58,95,0.15); background: #f8fafc;">
       <div class="summary-line"><span class="left">Subtotal</span><span class="right">{{subtotal}}</span></div>
       <div class="summary-line"><span class="left">Tax</span><span class="right">{{tax_amount}}</span></div>
       <div class="summary-line"><span class="left">WHT</span><span class="right">{{wht_amount}}</span></div>
-      <div class="total-box" style="border-color: var(--accent);">
+      <div class="total-box" style="border-color: #1e3a5f; background: #f0f4f8;">
         <span class="label">Total Payable</span>
         <span class="value">{{total_amount}}</span>
       </div>
       <div class="summary-line" style="margin-top: 8px;"><span class="left">Balance Due</span><span class="right" style="font-size: 15px;">{{balance_due}}</span></div>
     </div>
 
-    <div class="amount-words"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
+    <div class="amount-words" style="background: #eef2f7; border-left: 3px solid #1e3a5f;"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
 
     <div class="notes-section">
       <div class="label">Notes</div>
