@@ -1,51 +1,57 @@
 
 
-# Full System Cross-Check: Guard, Monitor, and Protect
+# Fix Route Permit Document Upload + Add Change History
 
-## Critical Finding: `gl_settings` table does not exist
+## What's Missing
 
-The most critical issue: the `gl_settings` table referenced by 5+ files across the system **does not exist in the database**. Every query to it silently fails, causing:
-- GL Integrity Scanner audit score to always report 0% Configuration
-- Core GL Settings page to never load/save settings
-- AR/AP posting logic to skip GL account lookups
-- Automation Engine module health to always show "warning" for Core GL
+1. **Document Upload button** shows "coming soon" toast instead of actually uploading files
+2. **No change history** — when a permit is edited, there's no record of what changed
 
-## All Issues Found
+## Plan
 
-### 1. Missing `gl_settings` table (CRITICAL)
-**Files affected**: `useGLIntegrityScanner.ts`, `useFinanceAutomationEngine.ts`, `CoreGLSettings.tsx`, `useAccountingMutations.ts`, `useCustomerCategories.ts`
+### 1. Create `route_permit_change_history` table (SQL Migration)
 
-**Fix**: Create the `gl_settings` table via SQL migration with columns: `id`, `company_id` (unique), `trade_receivable_account_id`, `trade_payable_account_id`, `sales_revenue_account_id`, `default_expense_account_id`, `customer_advance_account_id`, `wht_payable_account_id`, `bank_account_id`, `expense_account_id`, `created_at`, `updated_at` — all FK references to `chart_of_accounts`.
+New table to track every permit change:
+- `id`, `permit_id` (FK to route_permits), `changed_by` (FK to auth.users), `changed_at`
+- `change_type` (text: 'created', 'updated', 'renewed', 'status_change', 'document_uploaded')
+- `changes` (jsonb: `{ field: "expiry_date", old: "2024-01-01", new: "2025-01-01" }`)
+- `description` (text summary)
+- RLS: authenticated can read, insert
 
-### 2. `light_vehicle_finance_settings` table name wrong
-**File**: `useFinanceAutomationEngine.ts` line 496
-**Wrong**: `light_vehicle_finance_settings`
-**Correct**: `lightvehicle_finance_settings`
+### 2. Implement Document Upload for Route Permits
 
-### 3. `maintenance_records.vehicle_id` column doesn't exist
-**File**: `useCrossModuleChecks.ts` line 141
-**Wrong**: `.is('vehicle_id', null)`
-**Correct**: `.is('bus_id', null)`
+**In `src/pages/RoutePermits.tsx`**:
+- Replace the "coming soon" toast (lines 509-518) with a file input dialog
+- Upload file to Supabase Storage bucket `documents` under path `route-permits/{permitId}/{filename}`
+- Insert row into `documents` table with `linked_table: 'route_permits'`, `linked_row_id: permit.id`, `tag: 'permit_document'`
+- Log upload to `route_permit_change_history`
 
-### 4. `bus_loan_payments` refColumn should use `payment_number`
-**File**: `useGLIntegrityScanner.ts` line 218
-**Current**: `refColumn: "id"` — shows raw UUIDs in gap reports
-**Better**: `refColumn: "payment_number"` — shows human-readable references
+Add new state + dialog component inline:
+- `showUploadDialog` boolean + `uploadPermitId` string
+- File dropzone accepting image/*, application/pdf (max 10MB)
+- On submit: upload to storage, insert to documents, record history, toast success
 
-### 5. Post-gap update logic missing `gl_posted` for `bus_loan_payments`
-**File**: `useGLIntegrityScanner.ts` lines 705-710 and 768-773
-The post-gap logic only sets `gl_posted = true` for `asset_maintenance_logs` and `expense_requests`. But `bus_loan_payments` also has a `gl_posted` column that should be updated.
+### 3. Record Change History on Every Permit Edit
 
-**Fix**: Add `bus_loan_payments` to the condition that sets `gl_posted = true`.
+**In `src/pages/RoutePermits.tsx` `handleSubmit()`**:
+- Before updating, fetch the current permit data
+- Diff old vs new values, build a `changes` jsonb array of `{ field, old_value, new_value }`
+- Insert into `route_permit_change_history` with `change_type: 'updated'` (or `'created'` for new permits)
 
-## Plan Summary
+### 4. Display History + Documents in Details Modal
 
-| File | Change |
+**In `src/components/route-permits/RoutePermitDetailsModal.tsx`**:
+- Add two new cards at the bottom:
+
+**Documents Card**: Query `documents` where `linked_table = 'route_permits' AND linked_row_id = permit.id`. Show file name, upload date, download button (signed URL).
+
+**Change History Card**: Query `route_permit_change_history` where `permit_id = permit.id` ordered by `changed_at DESC`. Show timeline with change type badge, description, timestamp, and expandable field-level diffs.
+
+### Files to Change
+
+| File | What |
 |---|---|
-| SQL Migration | Create `gl_settings` table with RLS |
-| `useFinanceAutomationEngine.ts` | Fix `light_vehicle_finance_settings` → `lightvehicle_finance_settings` |
-| `useCrossModuleChecks.ts` | Fix `vehicle_id` → `bus_id` |
-| `useGLIntegrityScanner.ts` | Fix `bus_loan_payments` refColumn to `payment_number`; add `bus_loan_payments` to `gl_posted` update logic |
-
-These 5 fixes will eliminate all remaining silent failures and ensure the full guard/monitor system works correctly across all modules.
+| SQL Migration | Create `route_permit_change_history` table with RLS |
+| `src/pages/RoutePermits.tsx` | Add document upload dialog, record change history on create/edit |
+| `src/components/route-permits/RoutePermitDetailsModal.tsx` | Add Documents and Change History sections |
 
