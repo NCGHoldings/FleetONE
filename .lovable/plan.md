@@ -1,75 +1,52 @@
 
 
-# Add Edit & Delete to All Major Accounting Views
+# Fix AP Invoice Edit Pre-fill + Reorder Line Columns
 
-## Current State
-- **CustomerMasterView** and **VendorMasterView** already have Edit buttons
-- **AR Invoices, AP Invoices, Inventory Items, Sales Orders, Delivery Notes, Purchase Orders, Credit Notes, Debit Notes** — only have View/Approve/Pay actions, NO edit or delete
-- No `useDeleteARInvoice`, `useDeleteAPInvoice`, `useUpdateARInvoice`, `useUpdateAPInvoice`, `useDeleteItem`, `useUpdateItem` mutation hooks exist
+## Problems
+
+1. **Edit doesn't pre-fill data**: `AccountsPayableView` sets `editingInvoice` state when Edit is clicked, but `APInvoiceForm` has no prop to receive it. The form always opens with blank defaults — no previous data loaded.
+
+2. **Line column order wrong**: Currently the table columns are: Description → GL Account → Qty → Price → Tax → Total. User wants: GL Account → Description → Qty → Price → Tax → Total (GL Account first).
+
+3. **Same issue exists on AR side**: `AccountsReceivableView` sets `editingInvoice` but `ARInvoiceForm` doesn't accept it either.
 
 ## Plan
 
-### 1. Add Missing Mutation Hooks (`src/hooks/useAccountingMutations.ts`)
+### File 1: `src/components/accounting/APInvoiceForm.tsx`
 
-Add update and delete mutations for each entity. Delete will only work on `draft` or `cancelled` records (safety rule — posted/paid records cannot be deleted, only cancelled):
+- Add `editingInvoice?: any` prop to `APInvoiceFormProps`
+- Add `useEffect` that runs when `editingInvoice` changes: pre-fills `form.reset()` with invoice header data (vendor_id, invoice_number, invoice_date, due_date, notes, apply_wht, wht_rate)
+- Fetch existing invoice lines from `ap_invoice_lines` table when editing, populate `setLines()` with description, quantity, unit_price, tax_code, tax_rate, account_id, line_total
+- Change dialog title to "Edit AP Invoice" when editing
+- Change submit button to "Update Invoice" when editing
+- Add an `useUpdateAPInvoice` mutation call path for updates (update header + delete old lines + insert new lines)
+- **Reorder table columns**: Move GL Account column before Description
 
-- `useUpdateARInvoice` — updates `ar_invoices` by id
-- `useDeleteARInvoice` — deletes from `ar_invoices` where status is `draft`/`cancelled`
-- `useUpdateAPInvoice` — updates `ap_invoices` by id
-- `useDeleteAPInvoice` — deletes from `ap_invoices` where status is `draft`/`cancelled`
-- `useUpdateItem` — updates `items` by id
-- `useDeleteItem` — deletes from `items` by id
-- `useDeleteSalesOrder` — deletes from `sales_orders` where status is `draft`
-- `useDeletePurchaseOrder` — deletes from `purchase_orders` where status is `draft`
-- `useDeleteARCreditNote` — deletes from `ar_credit_notes`
-- `useDeleteAPDebitNote` — deletes from `ap_debit_notes`
+### File 2: `src/components/accounting/AccountsPayableView.tsx`
 
-### 2. Add Edit & Delete to AR Invoices (`AccountsReceivableView.tsx`)
+- Pass `editingInvoice={editingInvoice}` prop to `<APInvoiceForm>`
 
-- Add state: `editingInvoice`, `deleteConfirmId`
-- In actions column: add Edit (pencil icon) and Delete (trash icon) buttons
-- Edit opens `ARInvoiceForm` pre-filled with invoice data
-- Delete shows confirmation dialog, only enabled for `draft`/`cancelled` invoices
-- Add `AlertDialog` for delete confirmation
+### File 3: `src/components/accounting/ARInvoiceForm.tsx`
 
-### 3. Add Edit & Delete to AP Invoices (`AccountsPayableView.tsx`)
+- Same pattern: add `editingInvoice` prop, pre-fill form + lines on edit, fetch `ar_invoice_lines`, update path
+- Reorder columns: GL Account before Description
 
-Same pattern as AR — Edit opens `APInvoiceForm` pre-filled, Delete with confirmation for draft/cancelled only.
+### File 4: `src/components/accounting/AccountsReceivableView.tsx`
 
-### 4. Add Edit & Delete to Inventory (`InventoryView.tsx`)
+- Pass `editingInvoice={editingInvoice}` prop to `<ARInvoiceForm>`
 
-- Edit opens `ItemForm` pre-filled with item data
-- Delete with confirmation
+### File 5: `src/hooks/useAccountingMutations.ts`
 
-### 5. Add Edit & Delete to Sales Orders (`SalesOrderView.tsx`)
+- Add `useUpdateAPInvoice` mutation: updates `ap_invoices` header, deletes old `ap_invoice_lines`, inserts new lines
+- Add `useUpdateARInvoice` mutation: same pattern for AR
 
-- Edit opens `SalesOrderForm` pre-filled
-- Delete for draft orders only
+## Summary
 
-### 6. Add Edit & Delete to Credit/Debit Notes (`ARCreditNotesView.tsx`, `APDebitNotesView.tsx`)
-
-- Add Edit and Delete action buttons to existing action columns
-
-### 7. Add Edit & Delete to Purchase Orders (`PurchaseOrderView.tsx`)
-
-- Add Edit and Delete for draft POs
-
-## Safety Rules
-- **Delete** only available for `draft` or `cancelled` status records
-- **Edit** disabled for `paid` or `posted` records (read-only after posting)
-- All deletes require confirmation dialog
-- Toast notifications for success/error
-
-## Files to Change
-
-| File | What |
+| File | Change |
 |---|---|
-| `src/hooks/useAccountingMutations.ts` | Add ~10 new update/delete mutation hooks |
-| `src/components/accounting/AccountsReceivableView.tsx` | Add Edit + Delete buttons with confirmation |
-| `src/components/accounting/AccountsPayableView.tsx` | Add Edit + Delete buttons with confirmation |
-| `src/components/accounting/InventoryView.tsx` | Add Edit + Delete buttons with confirmation |
-| `src/components/accounting/SalesOrderView.tsx` | Add Edit + Delete buttons with confirmation |
-| `src/components/accounting/PurchaseOrderView.tsx` | Add Edit + Delete buttons with confirmation |
-| `src/components/accounting/ARCreditNotesView.tsx` | Add Edit + Delete buttons |
-| `src/components/accounting/APDebitNotesView.tsx` | Add Edit + Delete buttons |
+| `APInvoiceForm.tsx` | Accept `editingInvoice` prop, pre-fill form+lines, reorder GL Account before Description |
+| `AccountsPayableView.tsx` | Pass `editingInvoice` to form |
+| `ARInvoiceForm.tsx` | Same edit pre-fill + column reorder |
+| `AccountsReceivableView.tsx` | Pass `editingInvoice` to form |
+| `useAccountingMutations.ts` | Add `useUpdateAPInvoice` and `useUpdateARInvoice` mutations |
 
