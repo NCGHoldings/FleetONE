@@ -1,52 +1,106 @@
 
 
-# Fix Expense GL Posting Failure + Enhance GL Integrity Guardian
+# Advanced Petty Cash Management System
 
-## Root Cause
+## Current State
 
-The error "No GL account mapped for expense category: food" occurs because:
-1. No explicit mapping exists in `module_finance_settings` for the "food" (Food/Meals) expense category
-2. The fallback logic tries to find a COA account with "food" in the name — none exists
-3. The final fallback looks for "general expense" — also not found
+The petty cash system is basic:
+- Simple fund cards with Disburse/Replenish buttons
+- Minimal create form (name, business unit, opening balance, custodian)
+- Basic transaction history table
+- No branch-wise or section-wise filtering
+- No expense category tracking on disbursements
+- No approval workflow
+- No receipt/voucher number generation
+- No fund limits/thresholds
+- No detailed disbursement form (payee, category, GL account, receipt attachment)
 
-The GL Integrity Guardian doesn't detect this because it only checks:
-- Whether unposted transactions exist (gap scan)
-- Whether core GL settings are configured (AR/AP/Revenue/Bank)
-- Whether modules have settings at all
+## What Needs to Change
 
-It does **NOT** check whether all expense categories have GL account mappings.
+### 1. Database Migration — Enhance petty_cash tables
 
-## Plan
+Add missing columns to `petty_cash_funds`:
+- `branch_id` (FK to `school_branches`) — for school bus branch-wise fund management
+- `fund_limit` — maximum balance allowed
+- `low_balance_threshold` — alert when below this
+- `fund_type` (main/branch/department) — categorize funds
+- `approval_required_above` — amount threshold requiring approval
+- `notes` — fund description/notes
 
-### 1. Add Expense Category Mapping Audit Rule to GL Guardian (`src/hooks/useGLIntegrityScanner.ts`)
+Add missing columns to `petty_cash_transactions`:
+- `payee_name` — who received the money
+- `expense_category` — expense type (fuel, food, etc.)
+- `payment_method` (cash/cheque)
+- `reference_number` — external reference
+- `approved_by` — approval tracking
+- `status` (pending/approved/rejected/void)
+- `voucher_number` — auto-generated PC voucher number
+- `attachment_url` — receipt image
+- `branch_id` — for branch filtering
+- `company_id` — for section filtering
 
-Add a new audit rule in `runAuditRules()` that:
-- Fetches the expense_requests module settings and its `mappings` array
-- Compares against the full `EXPENSE_CATEGORIES` list (21 categories)
-- Reports which categories are **unmapped** (no explicit GL account)
-- Checks if fallback accounts exist in COA (accounts matching category names or "general expense")
-- Status: `fail` if >50% unmapped with no fallbacks, `warning` if some unmapped, `pass` if all mapped
-- Recommendation: "Go to Settings → Module GL Mappings → Expense Requests to map missing categories"
+Create new table `petty_cash_voucher_seq` or use a Postgres sequence for auto-numbering vouchers.
 
-### 2. Add a "Missing Mappings" Detection in the Gap Scanner (`src/hooks/useGLIntegrityScanner.ts`)
+### 2. Rebuild `PettyCashView.tsx` — Full Management Interface
 
-In the expense_requests scan target processing, also check for approved expenses where the category has no mapping. Surface these as a distinct warning in the scan results — not just "unposted" but specifically "unpostable due to missing mapping."
+Replace the basic view with a tabbed, advanced interface:
 
-### 3. Improve Expense GL Posting Fallback (`src/hooks/useExpenseRequestFinance.ts`)
+**Tab 1: Dashboard**
+- Summary cards: Total balance, Total disbursed (month), Total replenished (month), Active funds count
+- Branch-wise and section-wise balance breakdown (grouped cards/table)
+- Low balance alerts
+- Recent transactions feed
 
-Make the posting more resilient:
-- If no explicit mapping and no name-match, fall back to `gl_settings.default_expense_account_id` (the core GL default expense account) before throwing
-- This ensures posting works as long as core GL settings have a default expense account configured
+**Tab 2: Funds Management**
+- Full CRUD table with all fund details
+- Filter by branch, section (business unit), custodian, status
+- Fund detail panel showing: opening balance, current balance, limit, threshold, custodian, GL account, branch
+- Edit fund, deactivate fund
+- Enhanced create form with all new fields
 
-### 4. Auto-populate Expense Category Mappings in Settings (`src/components/settings/ModuleFinanceSettingsView.tsx`)
+**Tab 3: Disbursements**
+- Advanced disbursement form:
+  - Select Fund (filtered by branch/section)
+  - Voucher number (auto-generated)
+  - Payee name
+  - Expense category (from EXPENSE_CATEGORIES)
+  - GL Account (SearchableAccountSelector)
+  - Amount with validation against fund balance and approval threshold
+  - Description, Reference number
+  - Receipt attachment upload
+  - Status workflow (pending → approved → posted)
+- Disbursement history table with filters
 
-When the expense_requests module settings are opened and no mappings exist yet, auto-populate all 21 categories from `EXPENSE_CATEGORIES` as empty mappings so the user can see exactly what needs to be configured — instead of having to manually type each category name.
+**Tab 4: Replenishments**
+- Replenishment form with bank account selection
+- Replenishment history
+- Pending replenishment requests
+
+**Tab 5: Reports**
+- Branch-wise summary
+- Section-wise summary  
+- Fund utilization report
+- Category-wise spending
+- Period-based filtering (date range)
+
+### 3. Update `usePettyCash.ts` — Enhanced hooks
+
+- Add `usePettyCashDashboard()` — aggregated stats
+- Update `useCreatePettyCashTransaction()` — include new fields (payee, category, voucher, status, branch)
+- Add `useUpdatePettyCashFund()` — edit fund details
+- Add `usePettyCashByBranch()` — branch-filtered data
+- Add `useDeactivatePettyCashFund()` — soft delete
+- Update queries to join `school_branches` and include branch info
+
+### 4. Update `useCreatePettyCashFund()` — Enhanced creation
+
+Accept all new fields: branch_id, fund_limit, low_balance_threshold, fund_type, approval_required_above, notes, GL account selection.
 
 ## Files to Change
 
 | File | Change |
 |---|---|
-| `src/hooks/useGLIntegrityScanner.ts` | Add audit rule checking expense category GL mappings completeness |
-| `src/hooks/useExpenseRequestFinance.ts` | Add fallback to `gl_settings.default_expense_account_id` before throwing error |
-| `src/components/settings/ModuleFinanceSettingsView.tsx` | Auto-populate all expense categories when no mappings exist |
+| Migration SQL | Add columns to `petty_cash_funds` and `petty_cash_transactions`, create voucher sequence |
+| `src/components/accounting/PettyCashView.tsx` | Complete rebuild with tabbed advanced interface |
+| `src/hooks/usePettyCash.ts` | Enhanced hooks with new fields, branch filtering, dashboard stats |
 
