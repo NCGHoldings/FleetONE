@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AdminApprovalInterface } from '../components/special-hire/AdminApprovalInterface';
-import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield, TrendingDown, Calendar, CalendarDays, ChevronDown, Users, Workflow } from 'lucide-react';
+import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield, TrendingDown, Calendar, CalendarDays, ChevronDown, Users, Workflow, Table2 } from 'lucide-react';
+import { SpecialHireSpreadsheet } from "@/components/special-hire/spreadsheet/SpecialHireSpreadsheet";
 import { SpecialHireFlowDiagram } from "@/components/special-hire/SpecialHireFlowDiagram";
 import { CostCalculator } from "@/components/special-hire/CostCalculator";
 import { EnhancedCostCalculator } from "@/components/special-hire/EnhancedCostCalculator";
@@ -464,6 +465,11 @@ export default function SpecialHire() {
               <span>Referrals</span>
             </TabsTrigger>
 
+            <TabsTrigger value="spreadsheet" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+              <Table2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Sheet</span>
+            </TabsTrigger>
+
             {isAdmin && (
               <TabsTrigger value="system-flow" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
                 <Workflow className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -542,6 +548,10 @@ export default function SpecialHire() {
         {/* Referral Agents content */}
         <TabsContent value="referral-agents" className="space-y-6">
           <ReferralAgentsManagement />
+        </TabsContent>
+
+        <TabsContent value="spreadsheet" className="space-y-6">
+          <SpecialHireSpreadsheet />
         </TabsContent>
 
         {/* System Flow Diagram - Admin only */}
