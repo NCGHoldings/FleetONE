@@ -1,64 +1,93 @@
 
 
-# Special Hire Spreadsheet — Full Operations Tracking View
+# NCG Express Fleet Master Spreadsheet — Daily Operations Tracker
 
 ## What You Want
-A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
 
-## Column Mapping (Your Columns → Database Fields)
+A **master spreadsheet** (like the Excel screenshots) that shows all 48 active buses with their routes, drivers, conductors, bus type, permit type, and daily financial data. Key features:
 
-The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
+1. **No of Trips column** — Jaffna route = 1 trip, Badulla = 2 trips, Moratuwa-Nittabuwa = 4. When set to 2, that bus row **expands into 2 sub-rows** (Trip 1, Trip 2), each linked to a `daily_trips` record
+2. **Two-way sync with Daily Trips** — editing driver/conductor here updates `daily_trips.notes`, and OCR-uploaded revenue/expenses flow back into this spreadsheet
+3. **Auto-create daily trips** — when you confirm tomorrow's roster in the master sheet, it auto-inserts `daily_trips` rows (bypassing driver allocation if you want)
+4. **Columns match your Excel**: No, Bus, Route, Trip, Bus Type, Permit Type, Route Start Date, Remark, Driver, Conductor, Turn 01/02 Times, Day Target, Passenger Income, Luggage, Total Expenses, Net
 
-| Group | Columns | Source |
-|---|---|---|
-| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
-| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
-| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
-| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
-| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
-| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
+## New Database Table
+
+A `fleet_master_roster` table stores the **template** data (which bus runs which route, how many trips, default driver/conductor). This is the "master" that persists day-to-day.
+
+```
+fleet_master_roster
+├── id (uuid PK)
+├── bus_id (uuid FK → buses)
+├── route_id (uuid FK → routes)
+├── route_label (text) — e.g. "Makumbura - Badulla"
+├── bus_type (text) — XL, Normal, Semi, A/C
+├── permit_type (text) — XL, A/C, Normal, Semi
+├── route_start_date (date)
+├── trips_per_day (int, default 1)
+├── default_driver (text)
+├── default_conductor (text)
+├── day_target (numeric)
+├── remark (text) — Running, Repair, Hire, etc.
+├── section (text) — OLD RUNNING ROUTES, NEWLY STARTED, EXTRA ROUTES
+├── sort_order (int)
+├── is_active (boolean)
+├── created_at, updated_at
+```
 
 ## Implementation Plan
 
-### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
-- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
-- Map to a flat `SpreadsheetHire` interface with all ~45 columns
-- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
-- Realtime subscription on `special_hire_quotations` for live updates
-- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
+### 1. Create `fleet_master_roster` table
+- SQL migration to create the table
+- Populate from existing 48 active buses
+- User can edit all fields inline
 
-### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
-- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
-- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
-- Inline click-to-edit cells for editable fields
-- Dropdown selects for status fields
-- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
-- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
-- Search, Refresh, Export Excel toolbar
+### 2. New Hook: `src/hooks/useFleetMasterSpreadsheet.ts`
+- Fetches `fleet_master_roster` joined with `buses`, `routes`
+- For a selected date, fetches matching `daily_trips` and `daily_bus_expenses` to overlay revenue/expense data
+- **Trip expansion**: if `trips_per_day = 2`, generates 2 display rows, each linked to the matching `daily_trips` record (matched by `bus_id + trip_date + trip sequence`)
+- `updateField()` — updates roster fields OR daily_trips fields depending on column
+- `confirmAndCreateTrips(date)` — takes current roster, creates `daily_trips` entries for that date (with driver/conductor in notes), skipping already-existing trips
 
-### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
-- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
+### 3. New Component: `src/components/fleet/FleetMasterSpreadsheet.tsx`
+- Color-coded column groups matching your Excel:
+  - **Bus Info** (blue header): No, Bus, Route, Trip, Bus Type, Permit Type, Route Start Date, Remark
+  - **Crew** (green): Driver, Conductor
+  - **Turns** (light blue): Turn 01 Start Time, Turn 02 Start Time
+  - **Income** (yellow): Day Target, Passenger, Luggage, Total Expenses, Net
+- **Section headers** ("OLD RUNNING ROUTES", "NEWLY STARTED ROUTES", "EXTRA ROUTES") as full-width blue bars
+- Trip expansion: when `trips_per_day > 1`, show sub-rows with trip sequence numbers
+- All cells editable inline (dropdowns for Bus Type, Permit Type, Remark status)
+- **Toolbar**: Date picker, "Create Trips for Date" button, Refresh, Export Excel, Search
+- KPI cards: Total Buses Running, Total Revenue, Total Expenses, Net Income
 
-### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
-- New tab trigger with `Table2` icon labeled "Sheet"
-- TabsContent rendering `<SpecialHireSpreadsheet />`
+### 4. Integration with Daily Trips Page
+- Add a "Fleet Sheet" tab to `DailyTrips.tsx` (alongside Daily Trips, Bus P&L, Route P&L)
+- When trips are created from this sheet, they appear in the existing Daily Trips view
+- OCR-uploaded data (income_details, expenses) flows back because we read from `daily_trips` for the selected date
 
-### User-Friendly Design Decisions
-- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
-- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
-- **Smart defaults**: empty expense fields show "0" and are click-to-edit
-- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
-- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
+### 5. Revenue/Expense Data Flow
+- Income columns (Passenger, Luggage) read from `daily_trips.income_details` JSONB
+- Total Expenses reads from `daily_bus_expenses` for that bus+date
+- Net = Passenger + Luggage - Total Expenses (auto-computed)
+- When OCR uploads update a trip's income, refreshing the master sheet shows it immediately
 
-### Files to Create/Edit
+## Files to Create/Edit
 
 | File | Action |
 |---|---|
-| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
-| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
+| SQL migration | Create `fleet_master_roster` table |
+| `src/hooks/useFleetMasterSpreadsheet.ts` | Data hook with trip expansion + two-way sync |
+| `src/components/fleet/FleetMasterSpreadsheetCore.tsx` | Main grid component |
+| `src/components/fleet/FleetMasterSpreadsheet.tsx` | Wrapper with toolbar |
+| `src/pages/DailyTrips.tsx` | Add "Fleet Sheet" tab |
 
-### DB Note
-The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
+## How It Works Day-to-Day
+
+1. Open **Fleet Sheet** tab → see all 48 buses with their default drivers/conductors
+2. Pick tomorrow's date → review/edit any driver/conductor changes
+3. Click **"Create Trips"** → auto-generates `daily_trips` rows for all active buses
+4. Throughout the day, OCR uploads and manual entries fill in Passenger/Luggage/Expenses
+5. Refresh the sheet → all financial columns update with live data
+6. Both this sheet AND the existing Daily Trips card view show the same data
 
