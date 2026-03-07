@@ -153,6 +153,7 @@ function parseExcelRows(sheet: XLSX.WorkSheet): ImportRow[] {
       turn01: getVal(r, 'turn01'),
       turn02: getVal(r, 'turn02'),
       dayTarget: parseDayTarget(getVal(r, 'dayTarget')),
+      trip: parseInt(getVal(r, 'trip')) || 1,
       section: currentSection,
       matched: false,
     });
