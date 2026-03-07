@@ -92,11 +92,15 @@ export default function DailyTrips() {
             </div>
 
             {/* Main Module Tabs */}
-            <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "trips" | "bus-pl" | "route-pl")}>
+            <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)}>
               <TabsList>
                 <TabsTrigger value="trips" className="gap-2">
                   <LayoutList className="h-4 w-4" />
                   Daily Trips
+                </TabsTrigger>
+                <TabsTrigger value="fleet-sheet" className="gap-2">
+                  <Table2 className="h-4 w-4" />
+                  Fleet Sheet
                 </TabsTrigger>
                 <TabsTrigger value="bus-pl" className="gap-2">
                   <TrendingUp className="h-4 w-4" />
