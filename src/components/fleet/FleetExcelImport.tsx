@@ -195,6 +195,7 @@ function parseExcelRowsLegacy(sheet: XLSX.WorkSheet): ImportRow[] {
       turn01: getCellVal(10),
       turn02: getCellVal(11),
       dayTarget: parseDayTarget(getCellVal(12)),
+      trip: parseInt(getCellVal(3)) || 1,
       section: currentSection,
       matched: false,
     });
