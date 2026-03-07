@@ -20,6 +20,7 @@ interface ImportRow {
   turn01: string;
   turn02: string;
   dayTarget: number;
+  trip: number;
   section: string;
   matched: boolean;
   busId?: string;
