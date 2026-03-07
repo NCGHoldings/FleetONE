@@ -23,7 +23,7 @@ export function FleetMasterSpreadsheet() {
   const [availableBuses, setAvailableBuses] = useState<any[]>([]);
   const [selectedBusId, setSelectedBusId] = useState('');
   const [creating, setCreating] = useState(false);
-
+  const [showImport, setShowImport] = useState(false);
   const loadAvailableBuses = async () => {
     const { data } = await supabase
       .from("buses")
