@@ -301,7 +301,7 @@ export function useSpecialHireSpreadsheetData() {
         }
       } else if (invoiceFields.includes(field)) {
         // Upsert into special_hire_invoices
-        const dbField = field === 'invoice_amount' ? 'total_amount' : field;
+        const dbField = field === 'invoice_amount' ? 'amount' : field === 'invoice_number' ? 'invoice_no' : field;
         const { data: existing } = await supabase
           .from('special_hire_invoices')
           .select('id')
