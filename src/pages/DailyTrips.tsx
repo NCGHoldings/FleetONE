@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users, BookOpen, TrendingUp, Route, Table2 } from "lucide-react";
+import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users, BookOpen, TrendingUp, Route, Table2, Table2 } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useDailyBusGroupedTrips } from "@/hooks/useDailyBusGroupedTrips";
@@ -33,7 +33,7 @@ export default function DailyTrips() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [dateMode, setDateMode] = useState<"single" | "range">("single");
   const [viewMode, setViewMode] = useState<"table" | "cards" | "crew">(isMobile ? "cards" : "table");
-  const [mainTab, setMainTab] = useState<"trips" | "bus-pl" | "route-pl">("trips");
+  const [mainTab, setMainTab] = useState<"trips" | "bus-pl" | "r | "fleet-sheet"oute-pl">("trips");
   const [showImportModal, setShowImportModal] = useState(false);
   const [showGLExportModal, setShowGLExportModal] = useState(false);
   const [showRouteGLAdmin, setShowRouteGLAdmin] = useState(false);
