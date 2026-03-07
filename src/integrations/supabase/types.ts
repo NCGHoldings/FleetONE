@@ -7934,6 +7934,87 @@ export type Database = {
           },
         ]
       }
+      fleet_master_roster: {
+        Row: {
+          bus_id: string | null
+          bus_type: string | null
+          created_at: string
+          day_target: number | null
+          default_conductor: string | null
+          default_driver: string | null
+          id: string
+          is_active: boolean
+          permit_type: string | null
+          remark: string | null
+          route_id: string | null
+          route_label: string | null
+          route_start_date: string | null
+          section: string | null
+          sort_order: number | null
+          trips_per_day: number
+          turn_01_time: string | null
+          turn_02_time: string | null
+          updated_at: string
+        }
+        Insert: {
+          bus_id?: string | null
+          bus_type?: string | null
+          created_at?: string
+          day_target?: number | null
+          default_conductor?: string | null
+          default_driver?: string | null
+          id?: string
+          is_active?: boolean
+          permit_type?: string | null
+          remark?: string | null
+          route_id?: string | null
+          route_label?: string | null
+          route_start_date?: string | null
+          section?: string | null
+          sort_order?: number | null
+          trips_per_day?: number
+          turn_01_time?: string | null
+          turn_02_time?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bus_id?: string | null
+          bus_type?: string | null
+          created_at?: string
+          day_target?: number | null
+          default_conductor?: string | null
+          default_driver?: string | null
+          id?: string
+          is_active?: boolean
+          permit_type?: string | null
+          remark?: string | null
+          route_id?: string | null
+          route_label?: string | null
+          route_start_date?: string | null
+          section?: string | null
+          sort_order?: number | null
+          trips_per_day?: number
+          turn_01_time?: string | null
+          turn_02_time?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_master_roster_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: true
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_master_roster_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       frequency_rules: {
         Row: {
           created_at: string
