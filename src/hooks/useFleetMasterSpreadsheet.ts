@@ -237,7 +237,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
               route_id: row.route_id,
               trip_date: dateStr,
               trip_no: tripNo,
-              notes: `Driver: ${row.default_driver || 'N/A'}, Conductor: ${row.default_conductor || 'N/A'}`,
+              notes: JSON.stringify({ driver: row.default_driver || null, conductor: row.default_conductor || null }),
               data_source: 'manual' as const,
             });
           }

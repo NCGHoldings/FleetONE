@@ -312,7 +312,7 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
           const { error } = await supabase.from('fleet_master_roster').insert({
             bus_id: row.busId!,
             ...payload,
-            trips_per_day: 1,
+            trips_per_day: row.trip || 1,
             sort_order: idx + 1,
           });
           if (error) {
