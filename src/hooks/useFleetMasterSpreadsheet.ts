@@ -279,6 +279,37 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
     }
   };
 
+  const bulkAddAllBuses = async () => {
+    try {
+      const { data: allBuses } = await supabase.from("buses").select("id, bus_no, route").order("bus_no");
+      if (!allBuses || allBuses.length === 0) {
+        toast({ title: "No buses", description: "No buses found in the system", variant: "destructive" });
+        return;
+      }
+      const existingBusIds = new Set(roster.map(r => r.bus_id));
+      const newBuses = allBuses.filter(b => !existingBusIds.has(b.id));
+      if (newBuses.length === 0) {
+        toast({ title: "All added", description: "All buses are already in the roster" });
+        return;
+      }
+      const entries = newBuses.map((bus, i) => ({
+        bus_id: bus.id,
+        route_label: bus.route || '',
+        trips_per_day: 1,
+        remark: 'Running',
+        is_active: true,
+        sort_order: roster.length + i + 1,
+      }));
+      const { error } = await supabase.from("fleet_master_roster").insert(entries);
+      if (error) throw error;
+      toast({ title: "Success", description: `Added ${newBuses.length} buses to roster` });
+      await fetchRoster();
+    } catch (error: any) {
+      console.error("Error bulk adding buses:", error);
+      toast({ title: "Error", description: error.message || "Failed to bulk add", variant: "destructive" });
+    }
+  };
+
   // Compute KPIs
   const kpis = {
     totalBuses: roster.filter(r => r.remark === 'Running').length,
