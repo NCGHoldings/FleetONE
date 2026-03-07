@@ -1,64 +1,32 @@
 
 
-# Special Hire Spreadsheet — Full Operations Tracking View
+# Fix Excel Import: Auto-Detect Columns and Handle All Buses
 
-## What You Want
-A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
+## Problems Identified
 
-## Column Mapping (Your Columns → Database Fields)
+1. **Day Target shows "193158"** — the column indices are hardcoded and may not match your actual Excel layout. The parser needs to auto-detect column positions from the header row instead of assuming fixed positions.
 
-The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
+2. **24 unmatched buses** — these bus numbers from your Excel don't exist in the `buses` table. For example, your Excel has "NI 8220" but the database has "NG 8220". The current behavior correctly skips these (as you requested).
 
-| Group | Columns | Source |
-|---|---|---|
-| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
-| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
-| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
-| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
-| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
-| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
+3. **500 Internal Server Errors** visible in your network panel — likely from other API calls, but need to ensure the import itself doesn't hit errors.
 
-## Implementation Plan
+## Plan
 
-### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
-- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
-- Map to a flat `SpreadsheetHire` interface with all ~45 columns
-- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
-- Realtime subscription on `special_hire_quotations` for live updates
-- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
+### 1. Smart Header Detection in `FleetExcelImport.tsx`
+Instead of hardcoded column indices (col 1 = Bus, col 8 = Driver, etc.), scan the first few rows to find the header row by matching known column names ("Bus", "Driver", "Conductor", "Day Target", etc.), then use those positions dynamically. This handles Excel files with different column orders or extra columns.
 
-### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
-- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
-- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
-- Inline click-to-edit cells for editable fields
-- Dropdown selects for status fields
-- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
-- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
-- Search, Refresh, Export Excel toolbar
+### 2. Auto-Create Missing Buses Option
+Add a checkbox: **"Create missing buses in system"** — when enabled, unmatched bus numbers get inserted into the `buses` table automatically before importing to roster. When disabled (default), unmatched buses are rejected as currently.
 
-### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
-- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
+### 3. Show Unmatched Bus Details
+In the preview table, show the exact bus numbers that don't match so you can decide whether to auto-create them or fix them in your Excel first.
 
-### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
-- New tab trigger with `Table2` icon labeled "Sheet"
-- TabsContent rendering `<SpecialHireSpreadsheet />`
+### 4. Better Day Target Parsing
+Handle Excel number formats — if a cell contains a date serial number instead of a target amount, detect and skip it. Also handle comma-formatted numbers.
 
-### User-Friendly Design Decisions
-- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
-- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
-- **Smart defaults**: empty expense fields show "0" and are click-to-edit
-- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
-- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
+## Files Changed
 
-### Files to Create/Edit
-
-| File | Action |
+| File | Change |
 |---|---|
-| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
-| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
-
-### DB Note
-The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
+| `src/components/fleet/FleetExcelImport.tsx` | Replace hardcoded column indices with header-row auto-detection; add "create missing buses" toggle; improve number parsing |
 
