@@ -93,7 +93,7 @@ export default function DailyTrips() {
 
             {/* Main Module Tabs */}
             <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)}>
-              <TabsList>
+              <TabsList className="flex-wrap h-auto">
                 <TabsTrigger value="trips" className="gap-2">
                   <LayoutList className="h-4 w-4" />
                   Daily Trips
