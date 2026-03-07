@@ -246,8 +246,13 @@ export function useSpecialHireSpreadsheetData() {
 
       const quotationDirectFields = [
         'assigned_bus_no', 'assigned_driver_name', 'assigned_conductor_name',
-        'special_request', 'company_name', 'status', 'trip_status'
+        'special_request', 'company_name', 'customer_name', 'customer_phone',
+        'status', 'trip_status', 'km_trip', 'pickup_location', 'drop_location',
+        'discount_amount_lkr'
       ];
+
+      const meterFields = ['check_in_meter', 'check_out_meter', 'actual_km', 'additional_distance_charge', 'additional_hours_charge'];
+      const invoiceFields = ['invoice_number', 'invoice_amount', 'invoiced_km'];
 
       if (expenseFields.includes(field)) {
         // Update via other_expenses JSONB
@@ -267,12 +272,62 @@ export function useSpecialHireSpreadsheetData() {
 
         if (error) throw error;
       } else if (quotationDirectFields.includes(field)) {
+        const dbField = field === 'discount' ? 'discount_amount_lkr' : field;
         const { error } = await supabase
           .from('special_hire_quotations')
-          .update({ [field]: value })
+          .update({ [dbField]: value })
           .eq('id', hireId);
 
         if (error) throw error;
+      } else if (meterFields.includes(field)) {
+        // Upsert into special_hire_trip_adjustments
+        const { data: existing } = await supabase
+          .from('special_hire_trip_adjustments')
+          .select('id')
+          .eq('quotation_id', hireId)
+          .maybeSingle();
+
+        if (existing) {
+          const { error } = await supabase
+            .from('special_hire_trip_adjustments')
+            .update({ [field]: value })
+            .eq('id', existing.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('special_hire_trip_adjustments')
+            .insert({ quotation_id: hireId, [field]: value });
+          if (error) throw error;
+        }
+      } else if (invoiceFields.includes(field)) {
+        // Upsert into special_hire_invoices
+        const dbField = field === 'invoice_amount' ? 'amount' : field === 'invoice_number' ? 'invoice_no' : field;
+        const { data: existing } = await supabase
+          .from('special_hire_invoices')
+          .select('id')
+          .eq('quotation_id', hireId)
+          .maybeSingle();
+
+        if (existing) {
+          const { error } = await supabase
+            .from('special_hire_invoices')
+            .update({ [dbField]: value })
+            .eq('id', existing.id);
+          if (error) throw error;
+        } else {
+          const insertData: any = { 
+            quotation_id: hireId, 
+            invoice_type: 'standard',
+            invoice_no: field === 'invoice_number' ? String(value) : `INV-${Date.now()}`,
+            amount: field === 'invoice_amount' ? Number(value) : 0,
+          };
+          if (field === 'invoice_number') insertData.invoice_no = String(value);
+          if (field === 'invoiced_km') insertData.amount = 0; // placeholder
+          const { error } = await supabase
+            .from('special_hire_invoices')
+            .insert(insertData);
+          if (error) throw error;
+        }
       }
     } catch (err: any) {
       console.error('Error updating field:', err);
