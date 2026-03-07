@@ -183,6 +183,13 @@ export function FleetMasterSpreadsheet() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Excel Import Dialog */}
+      <FleetExcelImport
+        open={showImport}
+        onOpenChange={setShowImport}
+        onImportComplete={refetch}
+      />
     </div>
   );
 }
