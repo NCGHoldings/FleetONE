@@ -365,22 +365,18 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
                     <>
                       <td className="px-1.5 py-1 border-r text-muted-foreground">{hire.row_num}</td>
                       <td className="px-1.5 py-1 border-r font-mono font-medium whitespace-nowrap">{hire.quotation_no}</td>
-                      <td className="px-1 py-1 border-r">
-                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${getStatusBadgeClass(hire.status)}`}>
-                          {hire.status}
-                        </span>
-                      </td>
-                      <td className="px-1.5 py-1 border-r max-w-[100px] truncate" title={hire.company_name}>{hire.company_name || '-'}</td>
-                      <td className="px-1.5 py-1 border-r max-w-[100px] truncate" title={hire.customer_name}>{hire.customer_name}</td>
-                      <td className="px-1.5 py-1 border-r whitespace-nowrap">{hire.customer_phone || '-'}</td>
+                      <td className="px-1 py-1 border-r min-w-[90px]">{renderDropdownCell(hire, 'status', STATUS_OPTIONS)}</td>
+                      <td className="px-1 py-1 border-r min-w-[100px]">{renderEditableCell(hire, 'company_name')}</td>
+                      <td className="px-1 py-1 border-r min-w-[100px]">{renderEditableCell(hire, 'customer_name')}</td>
+                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'customer_phone')}</td>
                       <td className="px-1.5 py-1 border-r max-w-[150px] truncate" title={hire.route}>{hire.route}</td>
                       <td className="px-1.5 py-1 border-r">{hire.bus_type_name || '-'}</td>
                       <td className="px-1.5 py-1 border-r text-center">{hire.number_of_buses}</td>
-                      <td className="px-1.5 py-1 border-r text-right">{hire.km_trip.toLocaleString()}</td>
+                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'km_trip', 'number')}</td>
                       <td className="px-1.5 py-1 border-r text-right font-medium">{formatCurrency(hire.gross_revenue)}</td>
                       <td className="px-1.5 py-1 border-r text-right">{formatCurrency(hire.total_paid)}</td>
                       <td className="px-1.5 py-1 border-r whitespace-nowrap">{formatDate(hire.pickup_datetime)}</td>
-                      <td className="px-1.5 py-1 border-r max-w-[100px] truncate" title={hire.special_request}>{hire.special_request || '-'}</td>
+                      <td className="px-1 py-1 border-r min-w-[80px]">{renderEditableCell(hire, 'special_request')}</td>
                       <td className="px-1.5 py-1 border-r text-center">{hire.number_of_days}</td>
                     </>
                   ) : <td className="px-1 py-1 border-r text-muted-foreground text-center">…</td>}
@@ -392,8 +388,8 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'assigned_bus_no')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'assigned_driver_name')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'assigned_conductor_name')}</td>
-                      <td className="px-1.5 py-1 border-r max-w-[100px] truncate">{hire.pickup_location}</td>
-                      <td className="px-1.5 py-1 border-r max-w-[100px] truncate">{hire.drop_location}</td>
+                      <td className="px-1 py-1 border-r min-w-[80px]">{renderEditableCell(hire, 'pickup_location')}</td>
+                      <td className="px-1 py-1 border-r min-w-[80px]">{renderEditableCell(hire, 'drop_location')}</td>
                       <td className="px-1.5 py-1 border-r whitespace-nowrap">{hire.pickup_time}</td>
                       <td className="px-1.5 py-1 border-r whitespace-nowrap">{hire.drop_time}</td>
                       <td className="px-1 py-1 border-r min-w-[80px]">{renderEditableCell(hire, 'operation_remark')}</td>
@@ -403,10 +399,10 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
                   {/* Invoice */}
                   {!collapsedGroups.has('Invoice') ? (
                     <>
-                      <td className="px-1.5 py-1 border-r whitespace-nowrap font-mono">{hire.invoice_number || '-'}</td>
-                      <td className="px-1.5 py-1 border-r text-right">{hire.invoiced_km.toLocaleString()}</td>
-                      <td className="px-1.5 py-1 border-r text-right">{formatCurrency(hire.invoice_amount)}</td>
-                      <td className="px-1.5 py-1 border-r text-right">{formatCurrency(hire.discount)}</td>
+                      <td className="px-1 py-1 border-r min-w-[80px]">{renderEditableCell(hire, 'invoice_number')}</td>
+                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'invoiced_km', 'number')}</td>
+                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'invoice_amount', 'number')}</td>
+                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'discount', 'number')}</td>
                       <td className="px-1.5 py-1 border-r text-right font-medium">{formatCurrency(hire.price_after_discount)}</td>
                     </>
                   ) : <td className="px-1 py-1 border-r text-center text-muted-foreground">…</td>}
@@ -414,11 +410,11 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
                   {/* Meter / KM */}
                   {!collapsedGroups.has('Meter / KM') ? (
                     <>
-                      <td className="px-1.5 py-1 border-r text-right">{hire.check_in_meter || '-'}</td>
-                      <td className="px-1.5 py-1 border-r text-right">{hire.check_out_meter || '-'}</td>
+                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'check_in_meter', 'number')}</td>
+                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'check_out_meter', 'number')}</td>
                       <td className="px-1.5 py-1 border-r text-right">{hire.actual_km || '-'}</td>
-                      <td className="px-1.5 py-1 border-r text-right">{formatCurrency(hire.additional_distance_charge)}</td>
-                      <td className="px-1.5 py-1 border-r text-right">{formatCurrency(hire.additional_hours_charge)}</td>
+                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'additional_distance_charge', 'number')}</td>
+                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'additional_hours_charge', 'number')}</td>
                     </>
                   ) : <td className="px-1 py-1 border-r text-center text-muted-foreground">…</td>}
 
