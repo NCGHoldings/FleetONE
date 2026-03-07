@@ -16,7 +16,8 @@ import * as XLSX from 'xlsx';
 
 export function FleetMasterSpreadsheet() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const { expandedRows, loading, kpis, updateField, confirmAndCreateTrips, addRosterEntry, refetch } = useFleetMasterSpreadsheet(selectedDate);
+  const { expandedRows, loading, kpis, updateField, confirmAndCreateTrips, addRosterEntry, bulkAddAllBuses, refetch } = useFleetMasterSpreadsheet(selectedDate);
+  const [bulkAdding, setBulkAdding] = useState(false);
   const [showAddBus, setShowAddBus] = useState(false);
   const [availableBuses, setAvailableBuses] = useState<any[]>([]);
   const [selectedBusId, setSelectedBusId] = useState('');
@@ -128,6 +129,14 @@ export function FleetMasterSpreadsheet() {
 
           <Button variant="outline" size="sm" onClick={loadAvailableBuses}>
             <Plus className="h-4 w-4 mr-1" /> Add Bus
+          </Button>
+
+          <Button variant="outline" size="sm" disabled={bulkAdding} onClick={async () => {
+            setBulkAdding(true);
+            await bulkAddAllBuses();
+            setBulkAdding(false);
+          }}>
+            <Bus className="h-4 w-4 mr-1" /> {bulkAdding ? 'Adding...' : 'Bulk Add All'}
           </Button>
 
           <Button size="sm" onClick={handleCreateTrips} disabled={creating} className="bg-green-600 hover:bg-green-700 text-white">
