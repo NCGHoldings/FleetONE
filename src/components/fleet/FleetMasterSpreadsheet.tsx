@@ -4,7 +4,7 @@ import { FleetMasterSpreadsheetCore } from './FleetMasterSpreadsheetCore';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, RefreshCw, Plus, FileSpreadsheet, Rocket, Bus } from 'lucide-react';
+import { CalendarIcon, RefreshCw, Plus, FileSpreadsheet, Rocket, Bus, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { formatLKR } from '@/lib/accounting-utils';
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import { FleetExcelImport } from './FleetExcelImport';
 
 export function FleetMasterSpreadsheet() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -22,7 +23,7 @@ export function FleetMasterSpreadsheet() {
   const [availableBuses, setAvailableBuses] = useState<any[]>([]);
   const [selectedBusId, setSelectedBusId] = useState('');
   const [creating, setCreating] = useState(false);
-
+  const [showImport, setShowImport] = useState(false);
   const loadAvailableBuses = async () => {
     const { data } = await supabase
       .from("buses")
@@ -123,6 +124,10 @@ export function FleetMasterSpreadsheet() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
+            <Upload className="h-4 w-4 mr-1" /> Import Excel
+          </Button>
+
           <Button variant="outline" size="sm" onClick={exportToExcel}>
             <FileSpreadsheet className="h-4 w-4 mr-1" /> Export
           </Button>
@@ -178,6 +183,13 @@ export function FleetMasterSpreadsheet() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Excel Import Dialog */}
+      <FleetExcelImport
+        open={showImport}
+        onOpenChange={setShowImport}
+        onImportComplete={refetch}
+      />
     </div>
   );
 }
