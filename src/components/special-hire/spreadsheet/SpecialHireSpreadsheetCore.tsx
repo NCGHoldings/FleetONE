@@ -69,13 +69,37 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
     const { id, field } = editingCell;
     const numericFields = [
       'fuel_cost_actual', 'driver_wages', 'assistant_wages', 'driver_meal_allowance',
-      'assistant_meal_allowance', 'wages_total', 'maintenance', 'other_permits_highway', 'buses_deployed'
+      'assistant_meal_allowance', 'wages_total', 'maintenance', 'other_permits_highway', 'buses_deployed',
+      'km_trip', 'check_in_meter', 'check_out_meter', 'actual_km',
+      'additional_distance_charge', 'additional_hours_charge',
+      'invoiced_km', 'invoice_amount', 'discount', 'discount_amount_lkr'
     ];
     let val: any = editValue;
     if (numericFields.includes(field)) val = Number(val) || 0;
-    onUpdate(id, field, val || null);
+
+    // Auto-compute actual_km when check_in or check_out changes
+    if (field === 'check_in_meter' || field === 'check_out_meter') {
+      const hire = hires.find(h => h.id === id);
+      if (hire) {
+        const checkIn = field === 'check_in_meter' ? Number(val) : hire.check_in_meter;
+        const checkOut = field === 'check_out_meter' ? Number(val) : hire.check_out_meter;
+        if (checkIn > 0 && checkOut > 0) {
+          const autoKm = Math.max(0, checkOut - checkIn);
+          onUpdate(id, 'actual_km', autoKm);
+        }
+      }
+    }
+
+    // Auto-compute price_after_discount when invoice_amount or discount changes
+    if (field === 'discount' || field === 'discount_amount_lkr') {
+      onUpdate(id, 'discount_amount_lkr', val);
+      setEditingCell(null);
+      return;
+    }
+
+    onUpdate(id, field, val === '' ? null : val);
     setEditingCell(null);
-  }, [editingCell, editValue, onUpdate]);
+  }, [editingCell, editValue, onUpdate, hires]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') commitEdit();
