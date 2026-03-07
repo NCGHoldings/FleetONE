@@ -252,7 +252,11 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
           const { data: newBus, error } = await supabase.from('buses').insert({
             bus_no: row.bus,
             route: row.route || null,
-            status: 'active',
+            status: 'active' as any,
+            capacity: 50,
+            model: 'Unknown',
+            type: row.busType || 'Standard',
+            year: new Date().getFullYear(),
           }).select('id').single();
 
           if (newBus && !error) {
