@@ -345,6 +345,10 @@ export default function DailyTrips() {
             )}
           </div>
         </div>
+      ) : mainTab === "fleet-sheet" ? (
+        <div className="container mx-auto p-4">
+          <FleetMasterSpreadsheet />
+        </div>
       ) : mainTab === "bus-pl" ? (
         <div className="container mx-auto p-4">
           <BusProfitabilityReport />
