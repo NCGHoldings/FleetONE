@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users, BookOpen, TrendingUp, Route } from "lucide-react";
+import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users, BookOpen, TrendingUp, Route, Table2 } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useDailyBusGroupedTrips } from "@/hooks/useDailyBusGroupedTrips";
@@ -22,6 +22,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { BulkGLPostingDialog } from "@/components/ncg-express/BulkGLPostingDialog";
 import { BusProfitabilityReport } from "@/components/ncg-express/BusProfitabilityReport";
 import { RouteProfitabilityReport } from "@/components/ncg-express/RouteProfitabilityReport";
+import { FleetMasterSpreadsheet } from "@/components/fleet/FleetMasterSpreadsheet";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 
@@ -32,7 +33,7 @@ export default function DailyTrips() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [dateMode, setDateMode] = useState<"single" | "range">("single");
   const [viewMode, setViewMode] = useState<"table" | "cards" | "crew">(isMobile ? "cards" : "table");
-  const [mainTab, setMainTab] = useState<"trips" | "bus-pl" | "route-pl">("trips");
+  const [mainTab, setMainTab] = useState<"trips" | "bus-pl" | "route-pl" | "fleet-sheet">("trips");
   const [showImportModal, setShowImportModal] = useState(false);
   const [showGLExportModal, setShowGLExportModal] = useState(false);
   const [showRouteGLAdmin, setShowRouteGLAdmin] = useState(false);
@@ -91,11 +92,15 @@ export default function DailyTrips() {
             </div>
 
             {/* Main Module Tabs */}
-            <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "trips" | "bus-pl" | "route-pl")}>
+            <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)}>
               <TabsList>
                 <TabsTrigger value="trips" className="gap-2">
                   <LayoutList className="h-4 w-4" />
                   Daily Trips
+                </TabsTrigger>
+                <TabsTrigger value="fleet-sheet" className="gap-2">
+                  <Table2 className="h-4 w-4" />
+                  Fleet Sheet
                 </TabsTrigger>
                 <TabsTrigger value="bus-pl" className="gap-2">
                   <TrendingUp className="h-4 w-4" />
@@ -339,6 +344,10 @@ export default function DailyTrips() {
               </>
             )}
           </div>
+        </div>
+      ) : mainTab === "fleet-sheet" ? (
+        <div className="container mx-auto p-4">
+          <FleetMasterSpreadsheet />
         </div>
       ) : mainTab === "bus-pl" ? (
         <div className="container mx-auto p-4">
