@@ -1,75 +1,64 @@
 
 
-# Fix Fleet Master Spreadsheet: Trip Count, Driver/Conductor, and Interconnection
+# Special Hire Spreadsheet — Full Operations Tracking View
 
-## Problems Found
+## What You Want
+A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
 
-### 1. Driver & Conductor names show "N/A" in Daily Trips
-**Root cause**: `confirmAndCreateTrips()` stores notes as a plain string:
-```
-"Driver: John, Conductor: Jane"
-```
-But **every other part of the system** (Daily Trips page, Crew Grouping, Analytics, Leaderboard) expects JSON:
-```json
-{"driver": "John", "conductor": "Jane"}
-```
-This is why the Daily Trips page shows "Driver: N/A • Conductor: N/A".
+## Column Mapping (Your Columns → Database Fields)
 
-### 2. Trip count (trips_per_day) editing
-The cell is technically editable, but when changed, the system correctly refetches and re-expands rows. If the user sets trips_per_day to 2, the bus should show 2 rows in the spreadsheet AND "Create Trips" should create 2 trip records for that bus. This part works in code but the `notes` format breaks the downstream display.
+The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
 
-### 3. Excel import doesn't set trips_per_day from the "Trip" column
-The Excel file has a "Trip" column (e.g., value `1`), but the import hardcodes `trips_per_day: 1` and ignores the Excel value.
+| Group | Columns | Source |
+|---|---|---|
+| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
+| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
+| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
+| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
+| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
+| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
 
-## Plan
+## Implementation Plan
 
-### File 1: `src/hooks/useFleetMasterSpreadsheet.ts`
-**Fix `confirmAndCreateTrips` — store notes as JSON object** (line 227):
-```typescript
-// BEFORE (broken)
-notes: `Driver: ${row.default_driver || 'N/A'}, Conductor: ${row.default_conductor || 'N/A'}`,
+### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
+- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
+- Map to a flat `SpreadsheetHire` interface with all ~45 columns
+- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
+- Realtime subscription on `special_hire_quotations` for live updates
+- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
 
-// AFTER (matches system-wide expectation)
-notes: JSON.stringify({
-  driver: row.default_driver || null,
-  conductor: row.default_conductor || null,
-}),
-```
+### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
+- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
+- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
+- Inline click-to-edit cells for editable fields
+- Dropdown selects for status fields
+- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
+- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
+- Search, Refresh, Export Excel toolbar
 
-### File 2: `src/components/fleet/FleetExcelImport.tsx`
-**Read "trip" column from Excel and set `trips_per_day`** in the roster insert (line 313):
-- Parse the `trip` value from the Excel row (already in `ImportRow` as `turn01` or we need to use the existing `trip` header detection)
-- Actually, looking at the header map, `trip` is already detected. We need to add it to `ImportRow` and use it when inserting:
+### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
+- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
 
-```typescript
-// In parseExcelRows, capture trip count
-trip: parseInt(getVal(r, 'trip')) || 1,
+### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
+- New tab trigger with `Table2` icon labeled "Sheet"
+- TabsContent rendering `<SpecialHireSpreadsheet />`
 
-// In handleImport, use it:
-trips_per_day: row.trip || 1,  // instead of hardcoded 1
-```
+### User-Friendly Design Decisions
+- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
+- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
+- **Smart defaults**: empty expense fields show "0" and are click-to-edit
+- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
+- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
 
-Wait — the `ImportRow` interface doesn't have a `trip` field. The header map has `trip: ['trip', 'trips', 'trip no']` but it's not being captured. Need to add it.
+### Files to Create/Edit
 
-### File 3: `src/hooks/useFleetMasterSpreadsheet.ts`  
-**Also read driver/conductor from trip notes JSON** when expanding rows, so the driver shows even after trips are created. Currently line 147 sets `driver_name: row.default_driver` — but if a trip already exists with JSON notes, use those:
-
-```typescript
-// Extract driver/conductor from existing trip notes
-const tripNotes = matchedTrip?.notes ? 
-  (typeof matchedTrip.notes === 'string' ? 
-    (() => { try { return JSON.parse(matchedTrip.notes); } catch { return {}; } })() 
-    : matchedTrip.notes) 
-  : {};
-
-driver_name: tripNotes.driver || row.default_driver,
-conductor_name: tripNotes.conductor || row.default_conductor,
-```
-
-## Summary of Changes
-
-| File | Change |
+| File | Action |
 |---|---|
-| `src/hooks/useFleetMasterSpreadsheet.ts` | Fix notes to JSON format; read driver/conductor from trip notes |
-| `src/components/fleet/FleetExcelImport.tsx` | Add `trip` field to ImportRow; use Excel trip count for `trips_per_day` |
+| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
+| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
+| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
+| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
+
+### DB Note
+The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
 

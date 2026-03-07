@@ -20,6 +20,7 @@ interface ImportRow {
   turn01: string;
   turn02: string;
   dayTarget: number;
+  trip: number;
   section: string;
   matched: boolean;
   busId?: string;
@@ -152,6 +153,7 @@ function parseExcelRows(sheet: XLSX.WorkSheet): ImportRow[] {
       turn01: getVal(r, 'turn01'),
       turn02: getVal(r, 'turn02'),
       dayTarget: parseDayTarget(getVal(r, 'dayTarget')),
+      trip: parseInt(getVal(r, 'trip')) || 1,
       section: currentSection,
       matched: false,
     });
@@ -193,6 +195,7 @@ function parseExcelRowsLegacy(sheet: XLSX.WorkSheet): ImportRow[] {
       turn01: getCellVal(10),
       turn02: getCellVal(11),
       dayTarget: parseDayTarget(getCellVal(12)),
+      trip: parseInt(getCellVal(3)) || 1,
       section: currentSection,
       matched: false,
     });
@@ -310,7 +313,7 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
           const { error } = await supabase.from('fleet_master_roster').insert({
             bus_id: row.busId!,
             ...payload,
-            trips_per_day: 1,
+            trips_per_day: row.trip || 1,
             sort_order: idx + 1,
           });
           if (error) {
