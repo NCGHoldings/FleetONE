@@ -244,6 +244,7 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
       let updated = 0;
       let inserted = 0;
       let busesCreated = 0;
+      let deleted = 0;
       let errors = 0;
 
       // If auto-create is enabled, first create missing buses
@@ -270,13 +271,16 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
         }
       }
 
-      // Re-fetch roster to get current state (includes entries from Bulk Add)
+      // Re-fetch roster to get current state
       const { data: currentRoster } = await supabase.from('fleet_master_roster').select('id, bus_id');
       const rosterMap = new Map((currentRoster || []).map(r => [r.bus_id, r.id]));
 
       const matchedRows = parsedRows.filter(r => r.matched && r.busId);
+      const importedBusIds = new Set(matchedRows.map(r => r.busId!));
 
-      for (const row of matchedRows) {
+      // Upsert all matched rows
+      for (let idx = 0; idx < matchedRows.length; idx++) {
+        const row = matchedRows[idx];
         const payload: Record<string, any> = {
           route_label: row.route || null,
           bus_type: row.busType || null,
@@ -295,7 +299,7 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
         const existingId = rosterMap.get(row.busId!);
 
         if (existingId) {
-          const { error } = await supabase.from('fleet_master_roster').update(payload).eq('id', existingId);
+          const { error } = await supabase.from('fleet_master_roster').update({ ...payload, sort_order: idx + 1 }).eq('id', existingId);
           if (error) {
             console.error('Update error for bus:', row.bus, error.message);
             errors++;
@@ -307,7 +311,7 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
             bus_id: row.busId!,
             ...payload,
             trips_per_day: 1,
-            sort_order: inserted + updated + 1,
+            sort_order: idx + 1,
           });
           if (error) {
             console.error('Insert error for bus:', row.bus, error.message);
@@ -318,16 +322,35 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
         }
       }
 
+      // DELETE roster entries that are NOT in the Excel file (full replace)
+      const rosterIdsToDelete = (currentRoster || [])
+        .filter(r => !importedBusIds.has(r.bus_id))
+        .map(r => r.id);
+
+      if (rosterIdsToDelete.length > 0) {
+        const { error } = await supabase
+          .from('fleet_master_roster')
+          .delete()
+          .in('id', rosterIdsToDelete);
+        if (error) {
+          console.error('Delete error:', error.message);
+          errors++;
+        } else {
+          deleted = rosterIdsToDelete.length;
+        }
+      }
+
       const unmatched = parsedRows.filter(r => !r.matched).length;
       const parts = [];
       if (busesCreated > 0) parts.push(`${busesCreated} new buses created`);
       if (updated > 0) parts.push(`${updated} updated`);
       if (inserted > 0) parts.push(`${inserted} inserted`);
+      if (deleted > 0) parts.push(`${deleted} old entries removed`);
       if (unmatched > 0) parts.push(`${unmatched} skipped`);
       if (errors > 0) parts.push(`${errors} errors`);
 
       toast({
-        title: errors > 0 ? 'Import Completed with Errors' : 'Import Complete',
+        title: errors > 0 ? 'Import Completed with Errors' : 'Import Complete — Full Replace',
         description: parts.join(', ') || 'No changes made',
         variant: errors > 0 ? 'destructive' : 'default',
       });
