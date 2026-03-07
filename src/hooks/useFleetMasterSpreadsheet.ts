@@ -327,6 +327,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
     confirmAndCreateTrips,
     addRosterEntry,
     deleteRosterEntry,
+    bulkAddAllBuses,
     refetch: fetchRoster,
   };
 }

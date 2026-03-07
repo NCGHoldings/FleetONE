@@ -131,6 +131,14 @@ export function FleetMasterSpreadsheet() {
             <Plus className="h-4 w-4 mr-1" /> Add Bus
           </Button>
 
+          <Button variant="outline" size="sm" disabled={bulkAdding} onClick={async () => {
+            setBulkAdding(true);
+            await bulkAddAllBuses();
+            setBulkAdding(false);
+          }}>
+            <Bus className="h-4 w-4 mr-1" /> {bulkAdding ? 'Adding...' : 'Bulk Add All'}
+          </Button>
+
           <Button size="sm" onClick={handleCreateTrips} disabled={creating} className="bg-green-600 hover:bg-green-700 text-white">
             <Rocket className="h-4 w-4 mr-1" />
             {creating ? 'Creating...' : 'Create Trips'}
