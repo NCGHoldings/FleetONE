@@ -124,6 +124,10 @@ export function FleetMasterSpreadsheet() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
+            <Upload className="h-4 w-4 mr-1" /> Import Excel
+          </Button>
+
           <Button variant="outline" size="sm" onClick={exportToExcel}>
             <FileSpreadsheet className="h-4 w-4 mr-1" /> Export
           </Button>
