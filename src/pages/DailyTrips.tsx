@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users, BookOpen, TrendingUp, Route } from "lucide-react";
+import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users, BookOpen, TrendingUp, Route, Table2 } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useDailyBusGroupedTrips } from "@/hooks/useDailyBusGroupedTrips";
