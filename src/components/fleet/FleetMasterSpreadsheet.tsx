@@ -16,7 +16,8 @@ import * as XLSX from 'xlsx';
 
 export function FleetMasterSpreadsheet() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const { expandedRows, loading, kpis, updateField, confirmAndCreateTrips, addRosterEntry, refetch } = useFleetMasterSpreadsheet(selectedDate);
+  const { expandedRows, loading, kpis, updateField, confirmAndCreateTrips, addRosterEntry, bulkAddAllBuses, refetch } = useFleetMasterSpreadsheet(selectedDate);
+  const [bulkAdding, setBulkAdding] = useState(false);
   const [showAddBus, setShowAddBus] = useState(false);
   const [availableBuses, setAvailableBuses] = useState<any[]>([]);
   const [selectedBusId, setSelectedBusId] = useState('');
