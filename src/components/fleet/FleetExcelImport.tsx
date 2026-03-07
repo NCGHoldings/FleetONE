@@ -244,6 +244,7 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
       let updated = 0;
       let inserted = 0;
       let busesCreated = 0;
+      let errors = 0;
 
       // If auto-create is enabled, first create missing buses
       if (autoCreateBuses) {
@@ -263,9 +264,15 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
             row.busId = newBus.id;
             row.matched = true;
             busesCreated++;
+          } else {
+            console.warn('Failed to create bus:', row.bus, error?.message);
           }
         }
       }
+
+      // Re-fetch roster to get current state (includes entries from Bulk Add)
+      const { data: currentRoster } = await supabase.from('fleet_master_roster').select('id, bus_id');
+      const rosterMap = new Map((currentRoster || []).map(r => [r.bus_id, r.id]));
 
       const matchedRows = parsedRows.filter(r => r.matched && r.busId);
 
@@ -285,17 +292,29 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
           is_active: true,
         };
 
-        if (row.existingRosterId) {
-          await supabase.from('fleet_master_roster').update(payload).eq('id', row.existingRosterId);
-          updated++;
+        const existingId = rosterMap.get(row.busId!);
+
+        if (existingId) {
+          const { error } = await supabase.from('fleet_master_roster').update(payload).eq('id', existingId);
+          if (error) {
+            console.error('Update error for bus:', row.bus, error.message);
+            errors++;
+          } else {
+            updated++;
+          }
         } else {
-          await supabase.from('fleet_master_roster').insert({
+          const { error } = await supabase.from('fleet_master_roster').insert({
             bus_id: row.busId!,
             ...payload,
             trips_per_day: 1,
             sort_order: inserted + updated + 1,
           });
-          inserted++;
+          if (error) {
+            console.error('Insert error for bus:', row.bus, error.message);
+            errors++;
+          } else {
+            inserted++;
+          }
         }
       }
 
@@ -305,10 +324,12 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
       if (updated > 0) parts.push(`${updated} updated`);
       if (inserted > 0) parts.push(`${inserted} inserted`);
       if (unmatched > 0) parts.push(`${unmatched} skipped`);
+      if (errors > 0) parts.push(`${errors} errors`);
 
       toast({
-        title: 'Import Complete',
+        title: errors > 0 ? 'Import Completed with Errors' : 'Import Complete',
         description: parts.join(', ') || 'No changes made',
+        variant: errors > 0 ? 'destructive' : 'default',
       });
 
       onImportComplete();
