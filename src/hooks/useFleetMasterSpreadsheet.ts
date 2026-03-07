@@ -135,6 +135,19 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
           // Split expenses evenly across trips for display
           const tripExpenses = row.trips_per_day > 1 ? totalExpenses / row.trips_per_day : totalExpenses;
 
+          // Extract driver/conductor from trip notes JSON if available
+          let tripDriver = row.default_driver;
+          let tripConductor = row.default_conductor;
+          if (matchedTrip?.notes) {
+            try {
+              const parsed = typeof matchedTrip.notes === 'string' ? JSON.parse(matchedTrip.notes) : matchedTrip.notes;
+              if (parsed.driver) tripDriver = parsed.driver;
+              if (parsed.conductor) tripConductor = parsed.conductor;
+            } catch {
+              // Legacy string format — ignore
+            }
+          }
+
           expanded.push({
             ...row,
             trip_sequence: seq,
@@ -144,8 +157,8 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
             luggage_income: luggageIncome,
             total_expenses: tripExpenses,
             net_income: passengerIncome + luggageIncome - tripExpenses,
-            driver_name: row.default_driver,
-            conductor_name: row.default_conductor,
+            driver_name: tripDriver,
+            conductor_name: tripConductor,
             _isExpanded: row.trips_per_day > 1,
           });
         }
