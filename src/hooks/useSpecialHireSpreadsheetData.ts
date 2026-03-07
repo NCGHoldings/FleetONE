@@ -315,14 +315,17 @@ export function useSpecialHireSpreadsheetData() {
             .eq('id', existing.id);
           if (error) throw error;
         } else {
+          const insertData: any = { 
+            quotation_id: hireId, 
+            invoice_type: 'standard',
+            invoice_no: field === 'invoice_number' ? String(value) : `INV-${Date.now()}`,
+            amount: field === 'invoice_amount' ? Number(value) : 0,
+          };
+          if (field === 'invoice_number') insertData.invoice_no = String(value);
+          if (field === 'invoiced_km') insertData.amount = 0; // placeholder
           const { error } = await supabase
             .from('special_hire_invoices')
-            .insert({ 
-              quotation_id: hireId, 
-              [dbField]: value,
-              invoice_type: 'standard',
-              invoice_no: field === 'invoice_number' ? value : `INV-${Date.now()}`
-            });
+            .insert(insertData);
           if (error) throw error;
         }
       }
