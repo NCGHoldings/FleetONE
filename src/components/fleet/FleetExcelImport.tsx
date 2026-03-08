@@ -374,7 +374,7 @@ export function FleetExcelImport({ open, onOpenChange, onImportComplete }: Fleet
   };
 
   const downloadTemplate = () => {
-    const headers = ['No', 'Bus', 'Route', 'Trip', 'Bus Type', 'Permit Type', 'Route Start Date', 'Remark', 'Driver', 'Conductor', 'Turn 01 Start Time', 'Turn 02 Start Time', 'Day Target'];
+    const headers = ['No', 'Bus', 'Route', 'Trip', 'Bus Type', 'Permit Type', 'Route Start Date', 'Remark', 'Driver', 'Conductor', 'Turn 01 Start Time', 'Turn 02 Start Time', 'Day Target', 'Start Meter', 'End Meter', 'Fuel Liters', 'Standard Rate'];
     const ws = XLSX.utils.aoa_to_sheet([headers]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
