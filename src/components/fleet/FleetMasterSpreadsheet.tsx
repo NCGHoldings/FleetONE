@@ -8,7 +8,7 @@ import { CalendarIcon, RefreshCw, Plus, FileSpreadsheet, Rocket, Bus, Upload } f
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { formatLKR } from '@/lib/accounting-utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -24,6 +24,7 @@ export function FleetMasterSpreadsheet() {
   const [selectedBusId, setSelectedBusId] = useState('');
   const [creating, setCreating] = useState(false);
   const [showImport, setShowImport] = useState(false);
+
   const loadAvailableBuses = async () => {
     const { data } = await supabase
       .from("buses")
@@ -60,6 +61,14 @@ export function FleetMasterSpreadsheet() {
       'Conductor': r.default_conductor || '',
       'Turn 01': r.turn_01_time || '',
       'Turn 02': r.turn_02_time || '',
+      'Model': r.bus_model || '',
+      'Start Meter': r.start_meter || '',
+      'End Meter': r.end_meter || '',
+      'Total Mileage': r.total_mileage || '',
+      'Fuel Liters': r.fuel_liters || '',
+      'KM/L': r.fuel_consumption || '',
+      'Std Rate': r.standard_rate || '',
+      'Performance': r.performance || '',
       'Day Target': r.day_target,
       'Passenger': r.passenger_income,
       'Luggage': r.luggage_income,
@@ -76,7 +85,7 @@ export function FleetMasterSpreadsheet() {
   return (
     <div className="space-y-4">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
           <p className="text-xs text-blue-600 dark:text-blue-400">Buses Running</p>
           <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{kpis.totalBuses}</p>
@@ -94,6 +103,14 @@ export function FleetMasterSpreadsheet() {
           <p className={`text-lg font-bold ${kpis.netIncome >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
             {formatLKR(kpis.netIncome)}
           </p>
+        </div>
+        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg p-3">
+          <p className="text-xs text-slate-600 dark:text-slate-400">Total Mileage</p>
+          <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{kpis.totalMileage.toLocaleString()} km</p>
+        </div>
+        <div className="bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
+          <p className="text-xs text-orange-600 dark:text-orange-400">Total Fuel</p>
+          <p className="text-lg font-bold text-orange-700 dark:text-orange-300">{kpis.totalFuelLiters.toLocaleString()} L</p>
         </div>
       </div>
 

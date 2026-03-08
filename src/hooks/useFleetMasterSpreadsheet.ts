@@ -7,6 +7,8 @@ export interface FleetRosterRow {
   id: string;
   bus_id: string | null;
   bus_no: string;
+  bus_model: string;
+  expected_km_per_liter: number;
   route_id: string | null;
   route_label: string | null;
   bus_type: string | null;
@@ -35,6 +37,14 @@ export interface ExpandedFleetRow extends FleetRosterRow {
   driver_name: string | null;
   conductor_name: string | null;
   _isExpanded: boolean;
+  // Meter & Fuel fields
+  start_meter: number;
+  end_meter: number;
+  total_mileage: number;
+  fuel_liters: number;
+  fuel_consumption: number;
+  standard_rate: number;
+  performance: number;
 }
 
 export function useFleetMasterSpreadsheet(selectedDate: Date) {
@@ -48,10 +58,10 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
     try {
       setLoading(true);
 
-      // Fetch roster with bus info
+      // Fetch roster with bus info including model and expected_km_per_liter
       const { data: rosterData, error: rosterError } = await supabase
         .from("fleet_master_roster")
-        .select(`*, buses!inner(bus_no)`)
+        .select(`*, buses!inner(bus_no, model, expected_km_per_liter)`)
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
 
@@ -61,6 +71,8 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
         id: r.id,
         bus_id: r.bus_id,
         bus_no: r.buses?.bus_no || '',
+        bus_model: r.buses?.model || '',
+        expected_km_per_liter: r.buses?.expected_km_per_liter || 0,
         route_id: r.route_id,
         route_label: r.route_label,
         bus_type: r.bus_type,
@@ -80,9 +92,10 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
 
       setRoster(rosterRows);
 
-      // Fetch daily trips for the selected date to overlay financial data
+      // Fetch daily trips for the selected date
       const busIds = rosterRows.map(r => r.bus_id).filter(Boolean) as string[];
       let tripsMap: Record<string, any[]> = {};
+      let fuelExpenseMap: Record<string, number> = {};
       
       if (busIds.length > 0) {
         const { data: tripsData } = await supabase
@@ -132,7 +145,6 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
             ? (Number(incomeDetails.bus_collection) || 0) + (Number(incomeDetails.call_booking) || 0) + (Number(incomeDetails.agent_booking) || 0)
             : 0;
           const luggageIncome = incomeDetails ? (Number(incomeDetails.luggage_income) || 0) : 0;
-          // Split expenses evenly across trips for display
           const tripExpenses = row.trips_per_day > 1 ? totalExpenses / row.trips_per_day : totalExpenses;
 
           // Extract driver/conductor from trip notes JSON if available
@@ -148,6 +160,15 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
             }
           }
 
+          // Meter & Fuel data from matched trip
+          const startMeter = matchedTrip?.odometer_start || 0;
+          const endMeter = matchedTrip?.odometer_end || 0;
+          const totalMileage = matchedTrip?.distance_km || (endMeter > startMeter ? endMeter - startMeter : 0);
+          const fuelLiters = matchedTrip?.fuel_liters || 0;
+          const fuelConsumption = fuelLiters > 0 && totalMileage > 0 ? totalMileage / fuelLiters : 0;
+          const standardRate = row.expected_km_per_liter;
+          const performance = fuelConsumption > 0 ? standardRate - fuelConsumption : 0;
+
           expanded.push({
             ...row,
             trip_sequence: seq,
@@ -160,6 +181,13 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
             driver_name: tripDriver,
             conductor_name: tripConductor,
             _isExpanded: row.trips_per_day > 1,
+            start_meter: startMeter,
+            end_meter: endMeter,
+            total_mileage: totalMileage,
+            fuel_liters: fuelLiters,
+            fuel_consumption: Math.round(fuelConsumption * 100) / 100,
+            standard_rate: standardRate,
+            performance: Math.round(performance * 100) / 100,
           });
         }
       });
@@ -177,8 +205,49 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
     fetchRoster();
   }, [fetchRoster]);
 
+  // Trip-level fields that should update daily_trips instead of fleet_master_roster
+  const TRIP_FIELDS = ['odometer_start', 'odometer_end', 'fuel_liters'];
+
   const updateField = async (rosterId: string, field: string, value: any) => {
     try {
+      if (TRIP_FIELDS.includes(field)) {
+        // Find the matching expanded row to get trip_id
+        const row = expandedRows.find(r => r.id === rosterId);
+        if (!row?.trip_id) {
+          toast({ title: "No trip", description: "Create trips first before editing meter/fuel data", variant: "destructive" });
+          return;
+        }
+
+        const numVal = Number(value) || 0;
+        const updatePayload: Record<string, any> = { [field]: numVal };
+
+        // Auto-recalculate distance_km and km_per_liter when meter changes
+        if (field === 'odometer_start' || field === 'odometer_end') {
+          const currentStart = field === 'odometer_start' ? numVal : row.start_meter;
+          const currentEnd = field === 'odometer_end' ? numVal : row.end_meter;
+          if (currentEnd > currentStart) {
+            const dist = currentEnd - currentStart;
+            updatePayload.distance_km = dist;
+            if (row.fuel_liters > 0) {
+              updatePayload.km_per_liter = Math.round((dist / row.fuel_liters) * 100) / 100;
+            }
+          }
+        }
+
+        if (field === 'fuel_liters' && numVal > 0 && row.total_mileage > 0) {
+          updatePayload.km_per_liter = Math.round((row.total_mileage / numVal) * 100) / 100;
+        }
+
+        const { error } = await supabase
+          .from("daily_trips")
+          .update(updatePayload)
+          .eq("id", row.trip_id);
+
+        if (error) throw error;
+        await fetchRoster();
+        return;
+      }
+
       const numericFields = ['trips_per_day', 'day_target', 'sort_order'];
       const finalValue = numericFields.includes(field) ? Number(value) || 0 : value;
 
@@ -189,17 +258,15 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
 
       if (error) throw error;
 
-      // Update local state
       setExpandedRows(prev => prev.map(r =>
         r.id === rosterId ? { ...r, [field]: finalValue } : r
       ));
 
-      // If trips_per_day changed, refetch to re-expand
       if (field === 'trips_per_day') {
         await fetchRoster();
       }
     } catch (error: any) {
-      console.error("Error updating roster field:", error);
+      console.error("Error updating field:", error);
       toast({ title: "Error", description: error.message || "Failed to update", variant: "destructive" });
     }
   };
@@ -212,7 +279,6 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
         return;
       }
 
-      // Check existing trips for this date
       const busIds = activeRoster.map(r => r.bus_id!);
       const { data: existingTrips } = await supabase
         .from("daily_trips")
@@ -222,7 +288,6 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
 
       const existingSet = new Set((existingTrips || []).map(t => `${t.bus_id}_${t.trip_no}`));
 
-      // Build trip inserts
       const tripsToInsert: any[] = [];
       let tripCounter = 1;
 
@@ -324,11 +389,15 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
   };
 
   // Compute KPIs
+  // Only count first trip_sequence for bus-level KPIs
+  const uniqueRows = expandedRows.filter(r => r.trip_sequence === 1);
   const kpis = {
     totalBuses: roster.filter(r => r.remark === 'Running').length,
     totalRevenue: expandedRows.reduce((s, r) => s + r.passenger_income + r.luggage_income, 0),
     totalExpenses: expandedRows.reduce((s, r) => s + r.total_expenses, 0),
     netIncome: expandedRows.reduce((s, r) => s + r.net_income, 0),
+    totalMileage: expandedRows.reduce((s, r) => s + r.total_mileage, 0),
+    totalFuelLiters: expandedRows.reduce((s, r) => s + r.fuel_liters, 0),
   };
 
   return {
