@@ -1,64 +1,72 @@
 
 
-# Special Hire Spreadsheet — Full Operations Tracking View
+# Add Fuel Consumption & Meter Columns to Fleet Master Spreadsheet
 
-## What You Want
-A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
+## What the User Wants
 
-## Column Mapping (Your Columns → Database Fields)
+The screenshot shows a "Passenger Bus Service Daily Operation Report - Fuel Consumption" with these columns that are **missing** from the current Fleet Master Spreadsheet:
 
-The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
-
-| Group | Columns | Source |
-|---|---|---|
-| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
-| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
-| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
-| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
-| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
-| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
-
-## Implementation Plan
-
-### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
-- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
-- Map to a flat `SpreadsheetHire` interface with all ~45 columns
-- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
-- Realtime subscription on `special_hire_quotations` for live updates
-- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
-
-### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
-- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
-- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
-- Inline click-to-edit cells for editable fields
-- Dropdown selects for status fields
-- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
-- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
-- Search, Refresh, Export Excel toolbar
-
-### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
-- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
-
-### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
-- New tab trigger with `Table2` icon labeled "Sheet"
-- TabsContent rendering `<SpecialHireSpreadsheet />`
-
-### User-Friendly Design Decisions
-- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
-- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
-- **Smart defaults**: empty expense fields show "0" and are click-to-edit
-- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
-- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
-
-### Files to Create/Edit
-
-| File | Action |
+| Column | Source |
 |---|---|
-| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
-| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
+| Bus Model | `buses.model` (already in DB) |
+| Start Meter | `daily_trips.odometer_start` |
+| End Meter | `daily_trips.odometer_end` |
+| Total Mileage | `daily_trips.distance_km` (or computed: end - start) |
+| Fuel Litter | `daily_trips.fuel_liters` OR `daily_bus_expenses.fuel_liters` |
+| Fuel Consumption | `daily_trips.km_per_liter` (or computed: mileage / liters) |
+| Standard Rate | `buses.expected_km_per_liter` |
+| Performance | Computed: `standard_rate - fuel_consumption` (positive = good) |
 
-### DB Note
-The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
+All data already exists in the database — no new tables or columns needed.
+
+## Changes
+
+### 1. `src/hooks/useFleetMasterSpreadsheet.ts` — Extend data model + fetching
+
+- Add to `FleetRosterRow`: `bus_model` (from buses join)
+- Add to `ExpandedFleetRow`: `start_meter`, `end_meter`, `total_mileage`, `fuel_liters`, `fuel_consumption`, `standard_rate`, `performance`
+- Extend the `buses!inner` select to include `model, expected_km_per_liter`
+- Map `odometer_start`, `odometer_end`, `distance_km`, `fuel_liters`, `km_per_liter` from matched daily trips
+- Also pull `fuel_liters` from `daily_bus_expenses` as fallback
+- Compute performance: `standard_rate - fuel_consumption`
+- Add `totalMileage` and `totalFuelLiters` to KPIs
+
+### 2. `src/components/fleet/FleetMasterSpreadsheetCore.tsx` — Add new column group
+
+- Add a new **"Fuel & Meter"** column group header (orange/slate colored, matching the screenshot style)
+- Add 7 new column headers: Bus Model, Start Meter, End Meter, Total Mileage, Fuel Liters, Consumption, Std Rate, Perform
+- `Start Meter` and `End Meter` are **editable** (they update `daily_trips` via a new update path)
+- `Total Mileage`, `Consumption`, `Performance` are **computed/read-only**
+- Performance cell is **color-coded**: green for positive (good), red for negative (bad), yellow for borderline — matching the screenshot's style
+- Update `colSpan` on section headers and empty state row
+
+### 3. `src/hooks/useFleetMasterSpreadsheet.ts` — Trip field updates
+
+- Extend `updateField` to handle trip-level fields (`odometer_start`, `odometer_end`, `fuel_liters`) by writing to `daily_trips` instead of `fleet_master_roster`
+- When start/end meter updates, auto-recalculate `distance_km` and `km_per_liter`
+
+### 4. `src/components/fleet/FleetMasterSpreadsheet.tsx` — KPI updates
+
+- Add "Total Mileage" and "Total Fuel" KPI cards to the existing grid
+
+### 5. `src/components/fleet/FleetExcelImport.tsx` — Map new columns from Excel
+
+- Add header synonyms: `startMeter: ['start meter', 'meter start']`, `endMeter: ['end meter', 'meter end']`, `fuelLiters: ['fuel litter', 'fuel liters', 'fuel']`, `standardRate: ['standard rate', 'std rate']`
+- These values write to `daily_trips` after "Create Trips" (not to roster)
+
+## Column Layout (updated spreadsheet)
+
+```text
+Bus Info | Route & Type | Config | Status | Crew | Turns | Meter/Fuel (NEW)        | Financials
+No, Bus  | Route,Trip,  | Trips/ | Remark | Dr,  | T01,  | Model, Start, End, KM,  | Target, Pass,
+         | Type, Permit | Day    |        | Cond | T02   | Fuel, Cons, Std, Perf   | Lugg, Exp, Net
+```
+
+Total columns: 17 existing + 8 new = 25 columns
+
+## Performance Cell Color Logic (matching screenshot)
+
+- Green background: performance >= 0 (consuming less than standard)
+- Yellow background: performance between -0.5 and 0
+- Red/pink background: performance < -0.5 (consuming more than standard)
 
