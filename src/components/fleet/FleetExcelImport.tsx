@@ -49,6 +49,10 @@ const HEADER_MAPS: Record<string, string[]> = {
   turn02: ['turn 02', 'turn 02 start time', 'turn2', 'turn 2', '2nd turn'],
   dayTarget: ['day target', 'target', 'daily target'],
   trip: ['trip', 'trips', 'trip no'],
+  startMeter: ['start meter', 'meter start', 'start km', 'odometer start'],
+  endMeter: ['end meter', 'meter end', 'end km', 'odometer end'],
+  fuelLiters: ['fuel litter', 'fuel liters', 'fuel litres', 'fuel', 'diesel'],
+  standardRate: ['standard rate', 'std rate', 'km per liter', 'km/l'],
 };
 
 function detectSection(cellValue: string | undefined): string | null {
