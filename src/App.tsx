@@ -828,9 +828,10 @@ const App = () => (
           </BrowserRouter>
         </SeasonalThemeProvider>
         </AuthProvider>
-      </TooltipProvider>
-    </CompanyProvider>
-  </QueryClientProvider>
+        </TooltipProvider>
+      </CompanyProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;
