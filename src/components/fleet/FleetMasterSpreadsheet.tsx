@@ -135,7 +135,7 @@ export function FleetMasterSpreadsheet() {
             </PopoverContent>
           </Popover>
 
-          <Button variant="outline" size="sm" onClick={refetch}>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-1" /> Refresh
           </Button>
         </div>
