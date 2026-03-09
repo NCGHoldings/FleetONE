@@ -414,7 +414,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
                     {shipments.map(s => (
                       <SelectItem key={s.id} value={s.id}>
                         <span className="flex items-center gap-2">
-                          <Ship className="h-3 w-3" /> {s.shipment_no{s.shipment_name}
+                          <Ship className="h-3 w-3" /> {s.shipment_nohipment_name}
                         </span>
                       </SelectItem>
                     ))}
@@ -423,7 +423,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
               )}
               {selectedShipment && !isCreatingShipment && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  ✓ Linked to {shipments.find(s => s.id === selectedShipment)?.shipment_numbeo              </p>
+                  ✓ Linked to {shipments.find(s => s.id === selectedShipment)?.shipment_numbeo   o      </p>
               )}
             </div>
           </div>
@@ -560,7 +560,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
             <Badge variant="outline" className="ml-2">
               <Ship className="h-3 w-3 mr-1" />
               {shipments.find(s => s.id === selectedShipment)?.shipment_number}
-            </Badge>
+ o      </Badge>
           )}
         </div>
         <div className="flex gap-3">
