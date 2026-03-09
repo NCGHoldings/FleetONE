@@ -55,7 +55,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
   const renderEditableCell = (row: ExpandedFleetRow, field: string, value: any, type: 'text' | 'number' = 'text') => {
     const cellKey = `${row.id}-${row.trip_sequence}-${field}`;
     if (row.trip_sequence > 1 && !['trip_no', 'odometer_start', 'odometer_end', 'fuel_liters'].includes(field)) {
-      return <span className="text-muted-foreground text-xs">↑</span>;
+      return <span className="text-muted-foreground text-sm">↑</span>;
     }
 
     if (editingCell === cellKey) {
