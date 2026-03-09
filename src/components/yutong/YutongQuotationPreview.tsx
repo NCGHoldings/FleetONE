@@ -497,20 +497,20 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             <tbody>
               {/* Main Bus Product */}
               <tr>
-                <td style={{ padding: "8px", fontSize: "14px", border: "1px solid #003366" }}>
-                  <b>BUS MODEL:</b> YUTONG - {busDetails.model}
+                <td style={{ padding: "8px", fontSize: "14px", border: "1px solid #003366", whiteSpace: "pre-wrap" }}>
+                  <b>BUS{'\u00A0'}MODEL{'\u00A0'}:{'\u00A0'}</b>YUTONG{'\u00A0'}-{'\u00A0'}{busDetails.model}
                   <br />
-                  <b>SEATING CAPACITY:</b> {busDetails.seating}
+                  <b>SEATING{'\u00A0'}CAPACITY{'\u00A0'}:{'\u00A0'}</b>{busDetails.seating}
                   <br />
-                  <b>ENGINE:</b> {busDetails.engine}
+                  <b>ENGINE{'\u00A0'}:{'\u00A0'}</b>{busDetails.engine}
                   <br />
-                  <b>YEAR:</b> {busDetails.year}
+                  <b>YEAR{'\u00A0'}:{'\u00A0'}</b>{busDetails.year}
                   <br />
-                  <b>CONDITION:</b> {busDetails.condition}
+                  <b>CONDITION{'\u00A0'}:{'\u00A0'}</b>{busDetails.condition}
                   {quotation.special_features && (
                     <>
                       <br />
-                      <b>SPECIAL FEATURES:</b> {quotation.special_features}
+                      <b>SPECIAL{'\u00A0'}FEATURES{'\u00A0'}:{'\u00A0'}</b>{quotation.special_features}
                     </>
                   )}
                 </td>
