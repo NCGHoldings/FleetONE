@@ -167,8 +167,8 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
     
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase
-        .from('yutong_shipment_groups')
+      const { data, error } = await (supabase
+        .from('yutong_shipment_groups') as any)
         .insert({
           shipment_name: newShipmentName.trim(),
           status: 'planning',
