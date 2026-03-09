@@ -85,7 +85,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
 
   const renderDropdownCell = (row: ExpandedFleetRow, field: string, value: string, options: string[]) => {
     if (row.trip_sequence > 1) {
-      return <span className="text-muted-foreground text-xs">↑</span>;
+      return <span className="text-muted-foreground text-sm">↑</span>;
     }
     return (
       <Select
