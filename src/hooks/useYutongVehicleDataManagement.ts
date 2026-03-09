@@ -63,14 +63,15 @@ export interface ColumnMapping {
 
 // Auto-detect column mappings based on common patterns
 const COLUMN_PATTERNS: Record<string, string[]> = {
-  vehicle_no: ['no', 'no.', 'number', 'sl', 's.no', 'sno', 'sr', 'serial', '#'],
+  vehicle_no: ['no', 'no.', 'number', 'sl', 's.no', 'sno', 'sr', 'serial', '#', 'item', 'item no', 'item number', 'item no.'],
   model: ['model', 'bus model', 'vehicle model', 'type'],
   engine_no: ['engine', 'engine no', 'engine number', 'engine_no', 'eng no', 'eng'],
-  chassis_no: ['chassis', 'chassis no', 'chassis number', 'chassis_no', 'chasis'],
+  chassis_no: ['chassis', 'chassis no', 'chassis number', 'chassis_no', 'chasis', 'vin', 'vin no', 'vin number', 'vin no.'],
   seat_config: ['seat', 'seats', 'seating', 'capacity', 'seat config', 'seater'],
   color: ['color', 'colour', 'paint', 'shade'],
   customer_name: ['customer', 'customer name', 'buyer', 'client', 'owner', 'name'],
   year_of_manufacture: ['year', 'year of manufacture', 'yom', 'mfg year'],
+  order_no: ['order', 'order no', 'order number', 'order no.', 'order_no'],
 };
 
 export function useYutongVehicleDataManagement() {

@@ -1,43 +1,64 @@
 
 
-# Enhanced Vehicle Data Upload with Auto-Shipment Creation
+# Special Hire Spreadsheet — Full Operations Tracking View
 
-## Problem
-The current upload flow requires a shipment to exist before linking vehicle data to it. The user needs to upload a new Excel sheet as "Shipment 7" (continuing from 6 existing shipments), but there's no way to create a shipment inline during upload. Also, the Excel has columns (ORDER NO, ITEM NO, VIN NO) that aren't in the current mapping options.
+## What You Want
+A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
 
-## Changes
+## Column Mapping (Your Columns → Database Fields)
 
-### 1. Add missing column mapping options — `YutongVehicleDataUpload.tsx`
-Add new field options to `FIELD_OPTIONS`:
-- `item_no` → maps to `vehicle_no` in DB (ITEM NO like 25E371X-0025)
-- `vin_no` → maps to `chassis_no` in DB (VIN NO like LZYTDT...)
-- `order_no` → stored in `raw_data` (reference only, like 454104)
+The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
 
-Update `COLUMN_PATTERNS` in the hook to auto-detect these new columns:
-- `item_no`: patterns `['item', 'item no', 'item number']`
-- `vin_no`: patterns `['vin', 'vin no', 'vin number']`
-- `order_no`: patterns `['order', 'order no', 'order number']`
+| Group | Columns | Source |
+|---|---|---|
+| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
+| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
+| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
+| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
+| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
+| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
 
-### 2. Add "Create New Shipment" option inline — `YutongVehicleDataUpload.tsx`
-In the shipment selector dropdown, add a "**+ Create New Shipment**" option at the top. When selected, show inline fields:
-- Shipment Name (text input, pre-filled from sheet name)
-- Expected dates (optional)
+## Implementation Plan
 
-On import, if "create new" is selected, auto-create the shipment group first via `useYutongShipmentGroupManagement.createShipmentGroup()`, then link the data sheet and vehicles to it.
+### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
+- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
+- Map to a flat `SpreadsheetHire` interface with all ~45 columns
+- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
+- Realtime subscription on `special_hire_quotations` for live updates
+- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
 
-### 3. Improve data preview — `YutongVehicleDataUpload.tsx`
-- Show all rows count with a summary by model type (parsed from the data)
-- Highlight section header rows (like "C9 Customers and Exstock...") in the preview and skip them during import (rows where most mapped fields are empty)
-- Show a badge with the shipment it will be linked to
+### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
+- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
+- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
+- Inline click-to-edit cells for editable fields
+- Dropdown selects for status fields
+- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
+- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
+- Search, Refresh, Export Excel toolbar
 
-### 4. Filter out section header rows during import — `YutongVehicleDataUpload.tsx`
-The Excel has group separator rows (e.g., "C9 Customers and Exstock - 37+1+1 = 9"). During import, skip rows where the engine_no/chassis_no/vin_no columns are empty AND the first column contains text that doesn't look like a number — these are section headers, not vehicle data.
+### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
+- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
 
-### 5. Hook updates — `useYutongVehicleDataManagement.ts`
-- Add `item_no` and `vin_no` to `COLUMN_PATTERNS` for auto-detection
-- In `insertVehicleRecords`, handle `item_no` → `vehicle_no` and `vin_no` → `chassis_no` field mapping
+### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
+- New tab trigger with `Table2` icon labeled "Sheet"
+- TabsContent rendering `<SpecialHireSpreadsheet />`
 
-### Files to Edit
-- `src/components/yutong/YutongVehicleDataUpload.tsx` — inline shipment creation, new field options, header row filtering, better preview
-- `src/hooks/useYutongVehicleDataManagement.ts` — new column patterns for auto-detection
+### User-Friendly Design Decisions
+- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
+- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
+- **Smart defaults**: empty expense fields show "0" and are click-to-edit
+- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
+- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
+
+### Files to Create/Edit
+
+| File | Action |
+|---|---|
+| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
+| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
+| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
+| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
+
+### DB Note
+The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
 
