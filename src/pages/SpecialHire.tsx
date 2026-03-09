@@ -148,54 +148,47 @@ export default function SpecialHire() {
       const currentDate = new Date();
       const comparisonDate = new Date();
       comparisonDate.setDate(currentDate.getDate() - daysBack);
+      const comparisonISO = comparisonDate.toISOString();
 
-      // Get current period quotation stats
-      const { data: quotations, error } = await supabase
-        .from('special_hire_quotations')
-        .select('status, gross_revenue, approval_status, created_at');
+      // Server-side counts for current period (bypasses 1000-row limit)
+      const [
+        totalRes, pendingRes, confirmedRes, pendingApprovalRes,
+        compTotalRes, compPendingRes, compConfirmedRes, compPendingApprovalRes,
+        pendingFinanceRes, compPendingFinanceRes,
+        revenueRes, compRevenueRes,
+      ] = await Promise.all([
+        // Current counts with is_active_version filter
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true),
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'pending'),
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'confirmed'),
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('approval_status', 'pending'),
+        // Comparison counts
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).lte('created_at', comparisonISO),
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'pending').lte('created_at', comparisonISO),
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'confirmed').lte('created_at', comparisonISO),
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('approval_status', 'pending').lte('created_at', comparisonISO),
+        // Payment counts
+        supabase.from('special_hire_payments').select('*', { count: 'exact', head: true }).eq('status', 'pending_finance'),
+        supabase.from('special_hire_payments').select('*', { count: 'exact', head: true }).eq('status', 'pending_finance').lte('created_at', comparisonISO),
+        // Revenue (need actual amounts)
+        supabase.from('special_hire_payments').select('amount').eq('status', 'approved'),
+        supabase.from('special_hire_payments').select('amount').eq('status', 'approved').lte('created_at', comparisonISO),
+      ]);
 
-      if (error) throw error;
+      const totalQuotations = totalRes.count ?? 0;
+      const pendingQuotations = pendingRes.count ?? 0;
+      const confirmedTrips = confirmedRes.count ?? 0;
+      const pendingApprovals = pendingApprovalRes.count ?? 0;
+      const pendingFinanceApprovals = pendingFinanceRes.count ?? 0;
+      const totalRevenue = revenueRes.data?.reduce((sum, p) => sum + (p.amount || 0), 0) ?? 0;
 
-      // Get comparison period quotation stats
-      const { data: comparisonQuotations, error: compError } = await supabase
-        .from('special_hire_quotations')
-        .select('status, gross_revenue, approval_status, created_at')
-        .lte('created_at', comparisonDate.toISOString());
+      const compTotalQuotations = compTotalRes.count ?? 0;
+      const compPendingQuotations = compPendingRes.count ?? 0;
+      const compConfirmedTrips = compConfirmedRes.count ?? 0;
+      const compPendingApprovals = compPendingApprovalRes.count ?? 0;
+      const compPendingFinanceApprovals = compPendingFinanceRes.count ?? 0;
+      const compTotalRevenue = compRevenueRes.data?.reduce((sum, p) => sum + (p.amount || 0), 0) ?? 0;
 
-      if (compError) throw compError;
-
-      // Get current payment stats  
-      const { data: payments, error: paymentsError } = await supabase
-        .from('special_hire_payments')
-        .select('status, amount, created_at');
-
-      if (paymentsError) throw paymentsError;
-
-      // Get comparison payment stats
-      const { data: comparisonPayments, error: compPaymentsError } = await supabase
-        .from('special_hire_payments')
-        .select('status, amount, created_at')
-        .lte('created_at', comparisonDate.toISOString());
-
-      if (compPaymentsError) throw compPaymentsError;
-
-      // Current stats
-      const totalQuotations = quotations?.length || 0;
-      const pendingQuotations = quotations?.filter(q => q.status === 'pending').length || 0;
-      const confirmedTrips = quotations?.filter(q => q.status === 'confirmed').length || 0;
-      const pendingApprovals = quotations?.filter(q => q.approval_status === 'pending').length || 0;
-      const pendingFinanceApprovals = payments?.filter(p => p.status === 'pending_finance').length || 0;
-      const totalRevenue = payments?.filter(p => p.status === 'approved').reduce((sum, p) => sum + p.amount, 0) || 0;
-
-      // Comparison stats
-      const compTotalQuotations = comparisonQuotations?.length || 0;
-      const compPendingQuotations = comparisonQuotations?.filter(q => q.status === 'pending').length || 0;
-      const compConfirmedTrips = comparisonQuotations?.filter(q => q.status === 'confirmed').length || 0;
-      const compPendingApprovals = comparisonQuotations?.filter(q => q.approval_status === 'pending').length || 0;
-      const compPendingFinanceApprovals = comparisonPayments?.filter(p => p.status === 'pending_finance').length || 0;
-      const compTotalRevenue = comparisonPayments?.filter(p => p.status === 'approved').reduce((sum, p) => sum + p.amount, 0) || 0;
-
-      // Calculate percentage changes
       const calculateChange = (current: number, previous: number) => {
         if (previous === 0) return current > 0 ? 100 : 0;
         return ((current - previous) / previous) * 100;
