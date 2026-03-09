@@ -387,7 +387,7 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <button
-                    onClick={() => openExternalSystem({ name: "Garage One", url: "https://garageone.ncg.lk" })}
+                    onClick={() => openExternalSystem({ name: "Garage One", url: "https://staging.garageone.ncg.lk/login" })}
                     className="bg-gradient-to-r from-orange-600 to-orange-500 text-white font-medium shadow-md hover:from-orange-700 hover:to-orange-600 hover:shadow-lg transition-all duration-300 rounded-lg w-full text-left"
                   >
                     <Wrench className="w-5 h-5 transition-all duration-300" />
