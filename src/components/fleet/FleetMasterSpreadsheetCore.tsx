@@ -67,7 +67,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={() => commitEdit(row.id, field)}
           onKeyDown={(e) => handleKeyDown(e, row.id, field)}
-          className="w-full h-7 px-1 text-xs border rounded bg-background focus:ring-1 focus:ring-primary"
+          className="w-full h-8 px-2 text-sm border rounded bg-background focus:ring-1 focus:ring-primary"
         />
       );
     }
