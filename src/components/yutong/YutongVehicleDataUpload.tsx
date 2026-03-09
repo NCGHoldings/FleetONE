@@ -173,7 +173,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
           shipment_name: newShipmentName.trim(),
           status: 'planning',
         })
-        .select('id, shipment_number, shipment_name')
+        .select('id, shipment_no, shipment_name')
         .single();
 
       if (error) throw error;
@@ -182,7 +182,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
       setSelectedShipment(data.id);
       setIsCreatingShipment(false);
       setNewShipmentName('');
-      toast.success(`Shipment ${data.shipment_number} created`);
+      toast.success(`Shipment ${data.shipment_no} created`);
     } catch (error: any) {
       console.error('Error creating shipment:', error);
       toast.error(error.message || 'Failed to create shipment');
