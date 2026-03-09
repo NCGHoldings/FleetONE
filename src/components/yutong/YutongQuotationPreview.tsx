@@ -388,51 +388,51 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             {quotation.customer_type === "company" ? (
               <>
                 {quotation.representative_name && (
-                  <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                    <b>CUSTOMER :</b> {quotation.representative_name}
+                  <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                    <b>CUSTOMER{'\u00A0'}:{'\u00A0'}</b>{quotation.representative_name}
                   </p>
                 )}
                 {quotation.designation && (
-                  <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                    <b>DESIGNATION :</b> {quotation.designation}
+                  <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                    <b>DESIGNATION{'\u00A0'}:{'\u00A0'}</b>{quotation.designation}
                   </p>
                 )}
-                <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                  <b>COMPANY :</b> {quotation.customer_name}
+                <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                  <b>COMPANY{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_name}
                 </p>
                 {quotation.business_registration_number && (
-                  <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                    <b>BUSINESS REG NO :</b> {quotation.business_registration_number}
+                  <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                    <b>BUSINESS{'\u00A0'}REG{'\u00A0'}NO{'\u00A0'}:{'\u00A0'}</b>{quotation.business_registration_number}
                   </p>
                 )}
                 {quotation.tax_registration_number && (
-                  <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                    <b>TAX REG NO :</b> {quotation.tax_registration_number}
+                  <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                    <b>TAX{'\u00A0'}REG{'\u00A0'}NO{'\u00A0'}:{'\u00A0'}</b>{quotation.tax_registration_number}
                   </p>
                 )}
-                <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                  <b>ADDRESS :</b> {quotation.customer_address || ""}
+                <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                  <b>ADDRESS{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_address || ""}
                 </p>
               </>
             ) : (
               <>
-                <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                  <b>CUSTOMER :</b> {quotation.customer_name}
+                <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                  <b>CUSTOMER{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_name}
                 </p>
-                <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                  <b>ADDRESS :</b> {quotation.customer_address || ""}
+                <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                  <b>ADDRESS{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_address || ""}
                 </p>
               </>
             )}
-            <p style={{ margin: "3px 0", fontSize: "13px" }}>
-              <b>CONTACT :</b> {quotation.customer_phone}{quotation.customer_email ? ` / ${quotation.customer_email}` : ''}
+            <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+              <b>CONTACT{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_phone}{quotation.customer_email ? ` / ${quotation.customer_email}` : ''}
             </p>
-            <p style={{ margin: "3px 0", fontSize: "13px" }}>
-              <b>DATE :</b> {formattedDate}
+            <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+              <b>DATE{'\u00A0'}:{'\u00A0'}</b>{formattedDate}
             </p>
             {quotation.finance_company && (
-              <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                <b>FINANCE COMPANY :</b> {quotation.finance_company}
+              <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                <b>FINANCE{'\u00A0'}COMPANY{'\u00A0'}:{'\u00A0'}</b>{quotation.finance_company}
               </p>
             )}
           </div>
@@ -497,20 +497,20 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             <tbody>
               {/* Main Bus Product */}
               <tr>
-                <td style={{ padding: "8px", fontSize: "14px", border: "1px solid #003366" }}>
-                  <b>BUS MODEL:</b> YUTONG - {busDetails.model}
+                <td style={{ padding: "8px", fontSize: "14px", border: "1px solid #003366", whiteSpace: "pre-wrap" }}>
+                  <b>BUS{'\u00A0'}MODEL{'\u00A0'}:{'\u00A0'}</b>YUTONG{'\u00A0'}-{'\u00A0'}{busDetails.model}
                   <br />
-                  <b>SEATING CAPACITY:</b> {busDetails.seating}
+                  <b>SEATING{'\u00A0'}CAPACITY{'\u00A0'}:{'\u00A0'}</b>{busDetails.seating}
                   <br />
-                  <b>ENGINE:</b> {busDetails.engine}
+                  <b>ENGINE{'\u00A0'}:{'\u00A0'}</b>{busDetails.engine}
                   <br />
-                  <b>YEAR:</b> {busDetails.year}
+                  <b>YEAR{'\u00A0'}:{'\u00A0'}</b>{busDetails.year}
                   <br />
-                  <b>CONDITION:</b> {busDetails.condition}
+                  <b>CONDITION{'\u00A0'}:{'\u00A0'}</b>{busDetails.condition}
                   {quotation.special_features && (
                     <>
                       <br />
-                      <b>SPECIAL FEATURES:</b> {quotation.special_features}
+                      <b>SPECIAL{'\u00A0'}FEATURES{'\u00A0'}:{'\u00A0'}</b>{quotation.special_features}
                     </>
                   )}
                 </td>
