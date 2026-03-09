@@ -92,12 +92,12 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
         value={value || ''}
         onValueChange={(v) => onUpdate(row.id, field, v)}
       >
-        <SelectTrigger className="h-7 text-xs border-0 bg-transparent p-0 focus:ring-0 shadow-none">
+        <SelectTrigger className="h-8 text-sm border-0 bg-transparent px-1 focus:ring-0 shadow-none">
           <SelectValue placeholder="-" />
         </SelectTrigger>
         <SelectContent>
           {options.map(opt => (
-            <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
+            <SelectItem key={opt} value={opt} className="text-sm">{opt}</SelectItem>
           ))}
         </SelectContent>
       </Select>
