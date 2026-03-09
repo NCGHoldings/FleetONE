@@ -10,6 +10,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { PageAccessGuard } from "./components/auth/PageAccessGuard";
 import { SeasonalThemeProvider } from "./components/seasonal/SeasonalThemeProvider";
 import { CompanyProvider } from "./contexts/CompanyContext";
+import { ThemeProvider } from "next-themes";
 
 // Pages
 import Auth from "./pages/Auth";
