@@ -131,49 +131,49 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
   let globalIndex = 0;
 
   return (
-    <div className="border rounded-lg overflow-auto max-h-[75vh]">
+    <div className="border rounded-lg overflow-auto max-h-[80vh]">
       <Table>
         <TableHeader className="sticky top-0 z-20">
           {/* Group headers */}
           <TableRow className="border-b-0">
-            <TableHead colSpan={2} className="bg-blue-600 text-white text-center text-xs font-bold border-r">Bus Info</TableHead>
-            <TableHead colSpan={3} className="bg-blue-500 text-white text-center text-xs font-bold border-r">Route & Type</TableHead>
-            <TableHead colSpan={2} className="bg-blue-400 text-white text-center text-xs font-bold border-r">Config</TableHead>
-            <TableHead colSpan={1} className="bg-emerald-600 text-white text-center text-xs font-bold border-r">Status</TableHead>
-            <TableHead colSpan={2} className="bg-green-600 text-white text-center text-xs font-bold border-r">Crew</TableHead>
-            <TableHead colSpan={2} className="bg-cyan-600 text-white text-center text-xs font-bold border-r">Turns</TableHead>
-            <TableHead colSpan={8} className="bg-slate-600 text-white text-center text-xs font-bold border-r">Meter / Fuel</TableHead>
-            <TableHead colSpan={5} className="bg-amber-500 text-white text-center text-xs font-bold">Financials</TableHead>
+            <TableHead colSpan={2} className="bg-blue-600 text-white text-center text-sm font-bold border-r">Bus Info</TableHead>
+            <TableHead colSpan={3} className="bg-blue-500 text-white text-center text-sm font-bold border-r">Route & Type</TableHead>
+            <TableHead colSpan={2} className="bg-blue-400 text-white text-center text-sm font-bold border-r">Config</TableHead>
+            <TableHead colSpan={1} className="bg-emerald-600 text-white text-center text-sm font-bold border-r">Status</TableHead>
+            <TableHead colSpan={2} className="bg-green-600 text-white text-center text-sm font-bold border-r">Crew</TableHead>
+            <TableHead colSpan={2} className="bg-cyan-600 text-white text-center text-sm font-bold border-r">Turns</TableHead>
+            <TableHead colSpan={8} className="bg-slate-600 text-white text-center text-sm font-bold border-r">Meter / Fuel</TableHead>
+            <TableHead colSpan={5} className="bg-amber-500 text-white text-center text-sm font-bold">Financials</TableHead>
           </TableRow>
           {/* Column headers */}
           <TableRow>
-            <TableHead className="bg-blue-100 dark:bg-blue-950 text-xs w-10 sticky left-0 z-30">No</TableHead>
-            <TableHead className="bg-blue-100 dark:bg-blue-950 text-xs min-w-[70px]">Bus</TableHead>
-            <TableHead className="bg-blue-50 dark:bg-blue-900 text-xs min-w-[140px]">Route</TableHead>
-            <TableHead className="bg-blue-50 dark:bg-blue-900 text-xs w-14">Trip</TableHead>
-            <TableHead className="bg-blue-50 dark:bg-blue-900 text-xs w-20">Bus Type</TableHead>
-            <TableHead className="bg-blue-50 dark:bg-blue-900 text-xs w-20">Permit</TableHead>
-            <TableHead className="bg-blue-50 dark:bg-blue-900 text-xs w-16">Trips/Day</TableHead>
-            <TableHead className="bg-emerald-50 dark:bg-emerald-950 text-xs w-20">Remark</TableHead>
-            <TableHead className="bg-green-50 dark:bg-green-950 text-xs min-w-[100px]">Driver</TableHead>
-            <TableHead className="bg-green-50 dark:bg-green-950 text-xs min-w-[100px]">Conductor</TableHead>
-            <TableHead className="bg-cyan-50 dark:bg-cyan-950 text-xs w-16">Turn 01</TableHead>
-            <TableHead className="bg-cyan-50 dark:bg-cyan-950 text-xs w-16">Turn 02</TableHead>
+            <TableHead className="bg-blue-100 dark:bg-blue-950 text-sm w-12 sticky left-0 z-30">No</TableHead>
+            <TableHead className="bg-blue-100 dark:bg-blue-950 text-sm min-w-[80px]">Bus</TableHead>
+            <TableHead className="bg-blue-50 dark:bg-blue-900 text-sm min-w-[160px]">Route</TableHead>
+            <TableHead className="bg-blue-50 dark:bg-blue-900 text-sm w-16">Trip</TableHead>
+            <TableHead className="bg-blue-50 dark:bg-blue-900 text-sm w-24">Bus Type</TableHead>
+            <TableHead className="bg-blue-50 dark:bg-blue-900 text-sm w-24">Permit</TableHead>
+            <TableHead className="bg-blue-50 dark:bg-blue-900 text-sm w-20">Trips/Day</TableHead>
+            <TableHead className="bg-emerald-50 dark:bg-emerald-950 text-sm w-24">Remark</TableHead>
+            <TableHead className="bg-green-50 dark:bg-green-950 text-sm min-w-[120px]">Driver</TableHead>
+            <TableHead className="bg-green-50 dark:bg-green-950 text-sm min-w-[120px]">Conductor</TableHead>
+            <TableHead className="bg-cyan-50 dark:bg-cyan-950 text-sm w-20">Turn 01</TableHead>
+            <TableHead className="bg-cyan-50 dark:bg-cyan-950 text-sm w-20">Turn 02</TableHead>
             {/* Meter / Fuel columns */}
-            <TableHead className="bg-slate-100 dark:bg-slate-900 text-xs min-w-[80px]">Model</TableHead>
-            <TableHead className="bg-slate-100 dark:bg-slate-900 text-xs w-20 text-right">Start KM</TableHead>
-            <TableHead className="bg-slate-100 dark:bg-slate-900 text-xs w-20 text-right">End KM</TableHead>
-            <TableHead className="bg-slate-100 dark:bg-slate-900 text-xs w-20 text-right">Mileage</TableHead>
-            <TableHead className="bg-slate-100 dark:bg-slate-900 text-xs w-18 text-right">Fuel (L)</TableHead>
-            <TableHead className="bg-slate-100 dark:bg-slate-900 text-xs w-18 text-right">KM/L</TableHead>
-            <TableHead className="bg-slate-100 dark:bg-slate-900 text-xs w-18 text-right">Std Rate</TableHead>
-            <TableHead className="bg-slate-100 dark:bg-slate-900 text-xs w-20 text-right">Perform</TableHead>
+            <TableHead className="bg-slate-100 dark:bg-slate-900 text-sm min-w-[100px]">Model</TableHead>
+            <TableHead className="bg-slate-100 dark:bg-slate-900 text-sm w-24 text-right">Start KM</TableHead>
+            <TableHead className="bg-slate-100 dark:bg-slate-900 text-sm w-24 text-right">End KM</TableHead>
+            <TableHead className="bg-slate-100 dark:bg-slate-900 text-sm w-24 text-right">Mileage</TableHead>
+            <TableHead className="bg-slate-100 dark:bg-slate-900 text-sm w-24 text-right">Fuel (L)</TableHead>
+            <TableHead className="bg-slate-100 dark:bg-slate-900 text-sm w-24 text-right">KM/L</TableHead>
+            <TableHead className="bg-slate-100 dark:bg-slate-900 text-sm w-24 text-right">Std Rate</TableHead>
+            <TableHead className="bg-slate-100 dark:bg-slate-900 text-sm w-24 text-right">Perform</TableHead>
             {/* Financial columns */}
-            <TableHead className="bg-amber-50 dark:bg-amber-950 text-xs w-20 text-right">Target</TableHead>
-            <TableHead className="bg-amber-50 dark:bg-amber-950 text-xs w-24 text-right">Passenger</TableHead>
-            <TableHead className="bg-amber-50 dark:bg-amber-950 text-xs w-20 text-right">Luggage</TableHead>
-            <TableHead className="bg-amber-50 dark:bg-amber-950 text-xs w-24 text-right">Expenses</TableHead>
-            <TableHead className="bg-amber-50 dark:bg-amber-950 text-xs w-24 text-right">Net</TableHead>
+            <TableHead className="bg-amber-50 dark:bg-amber-950 text-sm w-28 text-right">Target</TableHead>
+            <TableHead className="bg-amber-50 dark:bg-amber-950 text-sm w-28 text-right">Passenger</TableHead>
+            <TableHead className="bg-amber-50 dark:bg-amber-950 text-sm w-28 text-right">Luggage</TableHead>
+            <TableHead className="bg-amber-50 dark:bg-amber-950 text-sm w-28 text-right">Expenses</TableHead>
+            <TableHead className="bg-amber-50 dark:bg-amber-950 text-sm w-28 text-right">Net</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
