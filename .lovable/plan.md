@@ -1,64 +1,66 @@
 
 
-# Special Hire Spreadsheet — Full Operations Tracking View
+# Fix Special Hire KPI Cards Not Updating
 
-## What You Want
-A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
+## Root Cause
 
-## Column Mapping (Your Columns → Database Fields)
+Two problems:
 
-The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
+1. **Supabase 1000-row limit**: The query fetches all rows with `.select('status, gross_revenue, ...')`. Supabase caps results at 1000 rows by default. With 2000+ quotations, `quotations.length` is capped and never reflects the real count.
 
-| Group | Columns | Source |
-|---|---|---|
-| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
-| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
-| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
-| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
-| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
-| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
+2. **No `is_active_version` filter**: The query counts ALL quotation versions (including old revisions), inflating the number. The QuotationsList filters by `is_active_version = true`, but the KPI query does not.
 
-## Implementation Plan
+3. **No realtime refresh**: KPIs only load on mount and when the comparison period changes. Adding a new quotation calls `loadStats()` from `handleFormSubmit`, but if a quotation is added from the public form or another tab, the KPIs stay stale.
 
-### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
-- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
-- Map to a flat `SpreadsheetHire` interface with all ~45 columns
-- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
-- Realtime subscription on `special_hire_quotations` for live updates
-- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
+## Plan
 
-### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
-- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
-- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
-- Inline click-to-edit cells for editable fields
-- Dropdown selects for status fields
-- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
-- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
-- Search, Refresh, Export Excel toolbar
+### File: `src/pages/SpecialHire.tsx` — Fix `loadStats()`
 
-### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
-- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
+Replace the current fetch-all-rows approach with **server-side counting** using `{ count: 'exact', head: true }` for each metric. This bypasses the 1000-row limit entirely.
 
-### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
-- New tab trigger with `Table2` icon labeled "Sheet"
-- TabsContent rendering `<SpecialHireSpreadsheet />`
+**Current (broken):**
+```typescript
+const { data: quotations } = await supabase
+  .from('special_hire_quotations')
+  .select('status, gross_revenue, approval_status, created_at');
+const totalQuotations = quotations?.length || 0; // capped at 1000
+```
 
-### User-Friendly Design Decisions
-- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
-- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
-- **Smart defaults**: empty expense fields show "0" and are click-to-edit
-- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
-- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
+**Fixed:**
+```typescript
+// Total active quotations (server-side count)
+const { count: totalQuotations } = await supabase
+  .from('special_hire_quotations')
+  .select('*', { count: 'exact', head: true })
+  .eq('is_active_version', true);
 
-### Files to Create/Edit
+// Pending quotations
+const { count: pendingQuotations } = await supabase
+  .from('special_hire_quotations')
+  .select('*', { count: 'exact', head: true })
+  .eq('is_active_version', true)
+  .eq('status', 'pending');
 
-| File | Action |
-|---|---|
-| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
-| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
+// Confirmed trips
+const { count: confirmedTrips } = await supabase
+  .from('special_hire_quotations')
+  .select('*', { count: 'exact', head: true })
+  .eq('is_active_version', true)
+  .eq('status', 'confirmed');
 
-### DB Note
-The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
+// Pending approvals
+const { count: pendingApprovals } = await supabase
+  .from('special_hire_quotations')
+  .select('*', { count: 'exact', head: true })
+  .eq('is_active_version', true)
+  .eq('approval_status', 'pending');
+```
+
+Same pattern for comparison period counts (adding `.lte('created_at', comparisonDate)`).
+
+For **revenue** (needs actual values, not just count): use `.select('amount')` with `.eq('status', 'approved')` — revenue comes from payments table which likely has fewer rows, but apply the same `{ count }` pattern if needed, or use `.limit(10000)` to be safe.
+
+### Also in `src/pages/SpecialHire.tsx` — Add realtime subscription
+
+Add a `useEffect` subscribing to `postgres_changes` on `special_hire_quotations` and `special_hire_payments` to auto-refresh KPIs when data changes (matching the pattern already used in the spreadsheet).
 
