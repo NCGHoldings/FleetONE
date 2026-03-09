@@ -416,11 +416,11 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
               </>
             ) : (
               <>
-                <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                  <b>CUSTOMER :</b> {quotation.customer_name}
+                <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                  <b>CUSTOMER{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_name}
                 </p>
-                <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                  <b>ADDRESS :</b> {quotation.customer_address || ""}
+                <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                  <b>ADDRESS{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_address || ""}
                 </p>
               </>
             )}
