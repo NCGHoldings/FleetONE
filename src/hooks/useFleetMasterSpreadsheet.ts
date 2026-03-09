@@ -54,9 +54,9 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
-  const fetchRoster = useCallback(async () => {
+  const fetchRoster = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
 
       // Fetch roster with bus info including model and expected_km_per_liter
       const { data: rosterData, error: rosterError } = await supabase
@@ -197,7 +197,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
       console.error("Error fetching fleet roster:", error);
       toast({ title: "Error", description: "Failed to load fleet roster", variant: "destructive" });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [dateStr]);
 
@@ -244,7 +244,8 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
           .eq("id", row.trip_id);
 
         if (error) throw error;
-        await fetchRoster();
+        // Silent refresh — no loading spinner, preserves scroll
+        await fetchRoster(true);
         return;
       }
 
@@ -258,12 +259,13 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
 
       if (error) throw error;
 
+      // Optimistic local update
       setExpandedRows(prev => prev.map(r =>
         r.id === rosterId ? { ...r, [field]: finalValue } : r
       ));
 
       if (field === 'trips_per_day') {
-        await fetchRoster();
+        await fetchRoster(true);
       }
     } catch (error: any) {
       console.error("Error updating field:", error);
