@@ -224,6 +224,30 @@ export default function SpecialHire() {
     }
   }, [hasPageAccess, comparisonPeriod]);
 
+  // Realtime subscription for KPI auto-refresh
+  useEffect(() => {
+    if (!hasPageAccess) return;
+
+    const quotationsChannel = supabase
+      .channel('kpi-quotations-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'special_hire_quotations' }, () => {
+        loadStats();
+      })
+      .subscribe();
+
+    const paymentsChannel = supabase
+      .channel('kpi-payments-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'special_hire_payments' }, () => {
+        loadStats();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(quotationsChannel);
+      supabase.removeChannel(paymentsChannel);
+    };
+  }, [hasPageAccess, comparisonPeriod]);
+
   // Redirect from approvals tab if not admin
   useEffect(() => {
     if (activeTab === 'approvals' && !isAdmin) {
