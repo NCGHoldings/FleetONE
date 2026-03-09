@@ -74,7 +74,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
 
     return (
       <span
-        className="cursor-pointer hover:bg-accent/50 px-1 py-0.5 rounded block truncate text-xs"
+        className="cursor-pointer hover:bg-accent/50 px-2 py-1 rounded block truncate text-sm"
         onClick={() => startEdit(cellKey, value)}
         title={String(value ?? '')}
       >
