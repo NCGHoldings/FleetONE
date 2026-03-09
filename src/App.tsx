@@ -10,6 +10,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { PageAccessGuard } from "./components/auth/PageAccessGuard";
 import { SeasonalThemeProvider } from "./components/seasonal/SeasonalThemeProvider";
 import { CompanyProvider } from "./contexts/CompanyContext";
+import { ThemeProvider } from "next-themes";
 
 // Pages
 import Auth from "./pages/Auth";
@@ -89,14 +90,15 @@ import PublicYutongSpreadsheet from "./pages/PublicYutongSpreadsheet";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <CompanyProvider>
-      <TooltipProvider delayDuration={300} skipDelayDuration={100}>
-        <Toaster />
-        <Sonner />
-        <AuthProvider>
-          <SeasonalThemeProvider>
-            <BrowserRouter>
+  <ThemeProvider attribute="class" defaultTheme="light" storageKey="ncg-theme">
+    <QueryClientProvider client={queryClient}>
+      <CompanyProvider>
+        <TooltipProvider delayDuration={300} skipDelayDuration={100}>
+          <Toaster />
+          <Sonner />
+          <AuthProvider>
+            <SeasonalThemeProvider>
+              <BrowserRouter>
           <Routes>
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
@@ -826,9 +828,10 @@ const App = () => (
           </BrowserRouter>
         </SeasonalThemeProvider>
         </AuthProvider>
-      </TooltipProvider>
-    </CompanyProvider>
-  </QueryClientProvider>
+        </TooltipProvider>
+      </CompanyProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;
