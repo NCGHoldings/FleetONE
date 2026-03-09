@@ -194,55 +194,55 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
                     key={`${row.id}-${row.trip_sequence}`}
                     className={`${isSubRow ? 'bg-muted/30' : ''} hover:bg-accent/30`}
                   >
-                    <TableCell className="text-xs font-mono sticky left-0 bg-background z-10">
+                    <TableCell className="text-sm font-mono sticky left-0 bg-background z-10 py-1.5">
                       {isSubRow ? '' : globalIndex}
                     </TableCell>
-                    <TableCell className="text-xs font-semibold">{isSubRow ? '' : row.bus_no}</TableCell>
-                    <TableCell className="text-xs">{renderEditableCell(row, 'route_label', row.route_label)}</TableCell>
-                    <TableCell className="text-xs font-mono text-center">{row.trip_sequence}</TableCell>
-                    <TableCell className="text-xs">{renderDropdownCell(row, 'bus_type', row.bus_type || '', BUS_TYPE_OPTIONS)}</TableCell>
-                    <TableCell className="text-xs">{renderDropdownCell(row, 'permit_type', row.permit_type || '', PERMIT_TYPE_OPTIONS)}</TableCell>
-                    <TableCell className="text-xs">{renderEditableCell(row, 'trips_per_day', row.trips_per_day, 'number')}</TableCell>
-                    <TableCell className="text-xs">{renderDropdownCell(row, 'remark', row.remark || '', REMARK_OPTIONS)}</TableCell>
-                    <TableCell className="text-xs">{renderEditableCell(row, 'default_driver', row.default_driver)}</TableCell>
-                    <TableCell className="text-xs">{renderEditableCell(row, 'default_conductor', row.default_conductor)}</TableCell>
-                    <TableCell className="text-xs">{renderEditableCell(row, 'turn_01_time', row.turn_01_time)}</TableCell>
-                    <TableCell className="text-xs">{renderEditableCell(row, 'turn_02_time', row.turn_02_time)}</TableCell>
+                    <TableCell className="text-sm font-semibold py-1.5">{isSubRow ? '' : row.bus_no}</TableCell>
+                    <TableCell className="text-sm py-1.5">{renderEditableCell(row, 'route_label', row.route_label)}</TableCell>
+                    <TableCell className="text-sm font-mono text-center py-1.5">{row.trip_sequence}</TableCell>
+                    <TableCell className="text-sm py-1.5">{renderDropdownCell(row, 'bus_type', row.bus_type || '', BUS_TYPE_OPTIONS)}</TableCell>
+                    <TableCell className="text-sm py-1.5">{renderDropdownCell(row, 'permit_type', row.permit_type || '', PERMIT_TYPE_OPTIONS)}</TableCell>
+                    <TableCell className="text-sm py-1.5">{renderEditableCell(row, 'trips_per_day', row.trips_per_day, 'number')}</TableCell>
+                    <TableCell className="text-sm py-1.5">{renderDropdownCell(row, 'remark', row.remark || '', REMARK_OPTIONS)}</TableCell>
+                    <TableCell className="text-sm py-1.5">{renderEditableCell(row, 'default_driver', row.default_driver)}</TableCell>
+                    <TableCell className="text-sm py-1.5">{renderEditableCell(row, 'default_conductor', row.default_conductor)}</TableCell>
+                    <TableCell className="text-sm py-1.5">{renderEditableCell(row, 'turn_01_time', row.turn_01_time)}</TableCell>
+                    <TableCell className="text-sm py-1.5">{renderEditableCell(row, 'turn_02_time', row.turn_02_time)}</TableCell>
                     {/* Meter / Fuel cells */}
-                    <TableCell className="text-xs text-muted-foreground">{isSubRow ? '' : row.bus_model || '-'}</TableCell>
-                    <TableCell className="text-xs text-right font-mono">
+                    <TableCell className="text-sm text-muted-foreground py-1.5">{isSubRow ? '' : row.bus_model || '-'}</TableCell>
+                    <TableCell className="text-sm text-right font-mono py-1.5">
                       {renderEditableCell(row, 'odometer_start', row.start_meter || '', 'number')}
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono">
+                    <TableCell className="text-sm text-right font-mono py-1.5">
                       {renderEditableCell(row, 'odometer_end', row.end_meter || '', 'number')}
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono font-semibold">
+                    <TableCell className="text-sm text-right font-mono font-semibold py-1.5">
                       {row.total_mileage > 0 ? row.total_mileage.toLocaleString() : '-'}
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono">
+                    <TableCell className="text-sm text-right font-mono py-1.5">
                       {renderEditableCell(row, 'fuel_liters', row.fuel_liters || '', 'number')}
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono">
+                    <TableCell className="text-sm text-right font-mono py-1.5">
                       {hasFuelData ? row.fuel_consumption.toFixed(2) : '-'}
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono text-muted-foreground">
+                    <TableCell className="text-sm text-right font-mono text-muted-foreground py-1.5">
                       {isSubRow ? '' : (row.standard_rate > 0 ? row.standard_rate.toFixed(2) : '-')}
                     </TableCell>
-                    <TableCell className={`text-xs text-right font-mono font-bold ${getPerformanceColor(row.performance, hasFuelData)}`}>
+                    <TableCell className={`text-sm text-right font-mono font-bold py-1.5 ${getPerformanceColor(row.performance, hasFuelData)}`}>
                       {hasFuelData ? (row.performance >= 0 ? '+' : '') + row.performance.toFixed(2) : '-'}
                     </TableCell>
                     {/* Financial cells */}
-                    <TableCell className="text-xs text-right font-mono">{renderEditableCell(row, 'day_target', row.day_target, 'number')}</TableCell>
-                    <TableCell className="text-xs text-right font-mono text-green-700 dark:text-green-400">
+                    <TableCell className="text-sm text-right font-mono py-1.5">{renderEditableCell(row, 'day_target', row.day_target, 'number')}</TableCell>
+                    <TableCell className="text-sm text-right font-mono text-green-700 dark:text-green-400 py-1.5">
                       {row.passenger_income > 0 ? formatLKR(row.passenger_income) : '-'}
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono text-green-700 dark:text-green-400">
+                    <TableCell className="text-sm text-right font-mono text-green-700 dark:text-green-400 py-1.5">
                       {row.luggage_income > 0 ? formatLKR(row.luggage_income) : '-'}
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono text-destructive">
+                    <TableCell className="text-sm text-right font-mono text-destructive py-1.5">
                       {row.total_expenses > 0 ? formatLKR(row.total_expenses) : '-'}
                     </TableCell>
-                    <TableCell className={`text-xs text-right font-mono font-bold ${row.net_income >= 0 ? 'text-green-700 dark:text-green-400' : 'text-destructive'}`}>
+                    <TableCell className={`text-sm text-right font-mono font-bold py-1.5 ${row.net_income >= 0 ? 'text-green-700 dark:text-green-400' : 'text-destructive'}`}>
                       {(row.passenger_income + row.luggage_income + row.total_expenses) > 0 ? formatLKR(row.net_income) : '-'}
                     </TableCell>
                   </TableRow>
