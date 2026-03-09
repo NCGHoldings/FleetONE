@@ -424,15 +424,15 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                 </p>
               </>
             )}
-            <p style={{ margin: "3px 0", fontSize: "13px" }}>
-              <b>CONTACT :</b> {quotation.customer_phone}{quotation.customer_email ? ` / ${quotation.customer_email}` : ''}
+            <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+              <b>CONTACT{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_phone}{quotation.customer_email ? ` / ${quotation.customer_email}` : ''}
             </p>
-            <p style={{ margin: "3px 0", fontSize: "13px" }}>
-              <b>DATE :</b> {formattedDate}
+            <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+              <b>DATE{'\u00A0'}:{'\u00A0'}</b>{formattedDate}
             </p>
             {quotation.finance_company && (
-              <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                <b>FINANCE COMPANY :</b> {quotation.finance_company}
+              <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                <b>FINANCE{'\u00A0'}COMPANY{'\u00A0'}:{'\u00A0'}</b>{quotation.finance_company}
               </p>
             )}
           </div>
