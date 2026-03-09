@@ -423,7 +423,8 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
               )}
               {selectedShipment && !isCreatingShipment && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  ✓ Linked to {shipments.find(s => s.id === selectedShipment)?.shipment_numbeo   o      </p>
+                  ✓ Linked to {shipments.find(s => s.id === selectedShipment)?.shipment_no}
+                </p>
               )}
             </div>
           </div>
