@@ -74,6 +74,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-1.5 sm:gap-3">
+        <DarkModeToggle />
         <Button variant="ghost" size="icon" className="relative h-9 w-9 hover:scale-110 transition-all duration-300 hover:bg-primary/10">
           <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
           <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-gradient-to-r from-destructive to-warning rounded-full text-[8px] sm:text-xs flex items-center justify-center text-destructive-foreground">

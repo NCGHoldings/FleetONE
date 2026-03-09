@@ -90,14 +90,15 @@ import PublicYutongSpreadsheet from "./pages/PublicYutongSpreadsheet";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <CompanyProvider>
-      <TooltipProvider delayDuration={300} skipDelayDuration={100}>
-        <Toaster />
-        <Sonner />
-        <AuthProvider>
-          <SeasonalThemeProvider>
-            <BrowserRouter>
+  <ThemeProvider attribute="class" defaultTheme="light" storageKey="ncg-theme">
+    <QueryClientProvider client={queryClient}>
+      <CompanyProvider>
+        <TooltipProvider delayDuration={300} skipDelayDuration={100}>
+          <Toaster />
+          <Sonner />
+          <AuthProvider>
+            <SeasonalThemeProvider>
+              <BrowserRouter>
           <Routes>
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
