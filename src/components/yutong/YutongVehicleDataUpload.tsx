@@ -71,7 +71,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
   const fetchShipments = async () => {
     const { data } = await supabase
       .from('yutong_shipment_groups')
-      .select('id, shipment_number, shipment_name')
+      .select('id, shipment_no, shipment_name')
       .order('created_at', { ascending: false });
     setShipments(data || []);
   };
