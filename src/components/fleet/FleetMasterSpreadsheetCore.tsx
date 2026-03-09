@@ -181,7 +181,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
             <React.Fragment key={sectionName}>
               {/* Section header */}
               <TableRow>
-                <TableCell colSpan={TOTAL_COLUMNS} className="bg-blue-700 text-white font-bold text-xs py-1.5 px-4">
+                <TableCell colSpan={TOTAL_COLUMNS} className="bg-blue-700 text-white font-bold text-sm py-2 px-4">
                   {sectionName}
                 </TableCell>
               </TableRow>
