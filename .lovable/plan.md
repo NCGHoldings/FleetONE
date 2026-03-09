@@ -1,64 +1,31 @@
 
 
-# Special Hire Spreadsheet — Full Operations Tracking View
+# Fix Fleet Sheet: Larger Cells + Auto-Save Without Scroll Reset
 
-## What You Want
-A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
+## Problems
+1. **Cells still too small** — the screenshot shows data entry areas are cramped; inputs and clickable spans need more height/padding
+2. **After editing a cell and pressing Enter, the spreadsheet refreshes and scrolls to the top** — the `fetchRoster()` call sets `loading=true`, which unmounts the table and remounts it at scroll position 0
+3. **User has to manually refresh** — they want seamless inline save that keeps their position
 
-## Column Mapping (Your Columns → Database Fields)
+## Changes
 
-The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
+### 1. Larger cells & inputs — `FleetMasterSpreadsheetCore.tsx`
+- Increase input height from `h-8` to `h-9` (36px)
+- Increase clickable span padding from `px-2 py-1` to `px-2 py-2`
+- Add `min-h-[36px]` to all `TableCell` elements
+- Increase column widths further: financial columns `w-28` → `w-32`, crew columns `min-w-[120px]` → `min-w-[140px]`, route `min-w-[160px]` → `min-w-[180px]`
 
-| Group | Columns | Source |
-|---|---|---|
-| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
-| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
-| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
-| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
-| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
-| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
+### 2. Prevent scroll reset on save — `useFleetMasterSpreadsheet.ts`
+- **Remove `setLoading(true)` from `fetchRoster` when it's called as a background refresh** — add an optional `silent` parameter: `fetchRoster(silent?: boolean)` that skips `setLoading(true)`
+- In `updateField`: call `fetchRoster(true)` (silent) so the table never unmounts/remounts
+- For roster field updates (non-trip fields), keep optimistic local state update (`setExpandedRows`) and only call silent `fetchRoster` for `trips_per_day` changes
 
-## Implementation Plan
+### 3. Preserve scroll position — `FleetMasterSpreadsheetCore.tsx`
+- Store a `ref` on the scrollable container div
+- Before any data refresh, save `scrollTop` and `scrollLeft`
+- After rows re-render (via `useEffect` on `rows`), restore the saved scroll position
+- This ensures the user stays exactly where they were after an edit
 
-### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
-- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
-- Map to a flat `SpreadsheetHire` interface with all ~45 columns
-- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
-- Realtime subscription on `special_hire_quotations` for live updates
-- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
-
-### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
-- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
-- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
-- Inline click-to-edit cells for editable fields
-- Dropdown selects for status fields
-- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
-- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
-- Search, Refresh, Export Excel toolbar
-
-### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
-- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
-
-### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
-- New tab trigger with `Table2` icon labeled "Sheet"
-- TabsContent rendering `<SpecialHireSpreadsheet />`
-
-### User-Friendly Design Decisions
-- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
-- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
-- **Smart defaults**: empty expense fields show "0" and are click-to-edit
-- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
-- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
-
-### Files to Create/Edit
-
-| File | Action |
-|---|---|
-| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
-| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
-
-### DB Note
-The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
+### 4. Auto-advance to next cell (optional UX improvement)
+- On Enter key, after committing, move focus to the next editable cell below (same column, next row) instead of just closing the editor — making bulk data entry faster
 
