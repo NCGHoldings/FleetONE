@@ -101,8 +101,8 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     queryFn: async () => {
       const { data, error } = await supabase
         .from("buses")
-        .select("id, bus_number, bus_name")
-        .order("bus_number");
+        .select("id, bus_no")
+        .order("bus_no");
       if (error) throw error;
       return data || [];
     },
