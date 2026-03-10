@@ -1232,7 +1232,7 @@ export async function syncPaymentToFinanceAR(
     .from("ar_invoices")
     .insert({
       company_id: effectiveCompanyId,
-      business_unit_code: businessUnitCode || 'SBO',
+      business_unit_code: 'SBO',
       customer_id: customerId,
       invoice_number: schoolInv.invoice_number,
       invoice_date: schoolInv.invoice_month,
