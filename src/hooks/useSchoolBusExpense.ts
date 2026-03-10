@@ -261,7 +261,7 @@ export function usePostExpenseToGL() {
           total_credit: amount,
           status: "posted",
           company_id: effectiveCompanyId, // Use NCG Holding for consolidated GL
-          business_unit_code: businessUnitCode || "SBO", // Tag with business unit
+          business_unit_code: "SBO", // Always tag School Bus as SBO
           business_unit_id: selectedCompanyId, // Original company for reference
           posted_at: new Date().toISOString(),
         })
