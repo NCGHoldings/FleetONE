@@ -31,7 +31,97 @@ interface DocumentViewerProps {
   onSignatureUpdated?: () => void;
 }
 
-export const DocumentViewer = ({ 
+import React from 'react';
+
+// Memoized preview content to prevent blob URL recreation on every render
+const MemoizedPreviewContent = React.memo(({ 
+  document, 
+  currentDocument, 
+  toUint8FromAny, 
+  createPdfBlobUrl, 
+  handleDownload,
+  pdfViewerDownloadRef
+}: {
+  document: DocumentViewerProps['document'];
+  currentDocument: DocumentViewerProps['document'];
+  toUint8FromAny: (raw: string) => Uint8Array | null;
+  createPdfBlobUrl: (arr: Uint8Array) => string;
+  handleDownload: () => void;
+  pdfViewerDownloadRef: React.MutableRefObject<(() => void) | null>;
+}) => {
+  const displayData = currentDocument.document_data || document.document_data;
+
+  const pdfUrl = useMemo(() => {
+    try {
+      if (!displayData) return '';
+      const arr = toUint8FromAny(displayData);
+      if (!arr) return '';
+      return createPdfBlobUrl(arr);
+    } catch (error) {
+      console.error('Error creating PDF URL:', error);
+      return '';
+    }
+  }, [displayData]);
+
+  // Cleanup blob URL on unmount or when it changes
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    };
+  }, [pdfUrl]);
+
+  const handleDownloadReady = useCallback((downloadFn: () => void) => {
+    pdfViewerDownloadRef.current = downloadFn;
+  }, [pdfViewerDownloadRef]);
+
+  const handleSave = useCallback((canvasData: string) => {
+    console.log('Canvas annotations saved:', canvasData);
+  }, []);
+
+  if (!document.document_data) {
+    return (
+      <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
+        <div className="text-center">
+          <p>Document data not available</p>
+          <p className="text-sm">Please try regenerating the document</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!pdfUrl) {
+    return (
+      <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
+        <div className="text-center">
+          <p>Unable to display document</p>
+          <p className="text-sm">The document data appears to be corrupted</p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-4"
+            onClick={handleDownload}
+          >
+            Try Download Instead
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[70vh]">
+      <EnhancedPDFViewer
+        pdfUrl={pdfUrl}
+        onDownloadReady={handleDownloadReady}
+        onSave={handleSave}
+      />
+    </div>
+  );
+});
+
+MemoizedPreviewContent.displayName = 'MemoizedPreviewContent';
+
+export const DocumentViewer = ({
   isOpen, 
   onClose, 
   document, 
