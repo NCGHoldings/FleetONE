@@ -34,6 +34,7 @@ const formSchema = z.object({
   representative_name: z.string().optional(),
   designation: z.string().optional(),
   bus_model_id: z.string().min(1, 'Bus model is required'),
+  vehicle_year: z.number().min(2000).max(2100).default(new Date().getFullYear()),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.number().min(1, 'Unit price is required'),
   discount_amount: z.number().min(0).optional(),
@@ -117,6 +118,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
     resolver: zodResolver(formSchema),
     defaultValues: {
       quantity: initialData?.quantity || 1,
+      vehicle_year: new Date().getFullYear(),
       discount_amount: 0,
       valid_days: 30,
       customer_type: 'personal',
@@ -355,6 +357,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
         inquiry_id: initialData?.inquiryId || null,
         representative_name: data.representative_name || null,
         designation: data.designation || null,
+        vehicle_year: data.vehicle_year || new Date().getFullYear(),
       };
 
       const { data: quotation, error } = await supabase
@@ -796,7 +799,27 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
                 )}
               />
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
+                <FormField
+                  control={form.control}
+                  name="vehicle_year"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Year *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          onChange={(e) => field.onChange(Number(e.target.value))} 
+                          placeholder={`${new Date().getFullYear()}`}
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">Default: current year</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="quantity"

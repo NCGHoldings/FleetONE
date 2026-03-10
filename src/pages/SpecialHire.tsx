@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AdminApprovalInterface } from '../components/special-hire/AdminApprovalInterface';
-import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield, TrendingDown, Calendar, CalendarDays, ChevronDown, Users, Workflow } from 'lucide-react';
+import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield, TrendingDown, Calendar, CalendarDays, ChevronDown, Users, Workflow, Table2 } from 'lucide-react';
+import { SpecialHireSpreadsheet } from "@/components/special-hire/spreadsheet/SpecialHireSpreadsheet";
 import { SpecialHireFlowDiagram } from "@/components/special-hire/SpecialHireFlowDiagram";
 import { CostCalculator } from "@/components/special-hire/CostCalculator";
 import { EnhancedCostCalculator } from "@/components/special-hire/EnhancedCostCalculator";
@@ -147,54 +148,47 @@ export default function SpecialHire() {
       const currentDate = new Date();
       const comparisonDate = new Date();
       comparisonDate.setDate(currentDate.getDate() - daysBack);
+      const comparisonISO = comparisonDate.toISOString();
 
-      // Get current period quotation stats
-      const { data: quotations, error } = await supabase
-        .from('special_hire_quotations')
-        .select('status, gross_revenue, approval_status, created_at');
+      // Server-side counts for current period (bypasses 1000-row limit)
+      const [
+        totalRes, pendingRes, confirmedRes, pendingApprovalRes,
+        compTotalRes, compPendingRes, compConfirmedRes, compPendingApprovalRes,
+        pendingFinanceRes, compPendingFinanceRes,
+        revenueRes, compRevenueRes,
+      ] = await Promise.all([
+        // Current counts with is_active_version filter
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true),
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'pending'),
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'confirmed'),
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('approval_status', 'pending'),
+        // Comparison counts
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).lte('created_at', comparisonISO),
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'pending').lte('created_at', comparisonISO),
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'confirmed').lte('created_at', comparisonISO),
+        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('approval_status', 'pending').lte('created_at', comparisonISO),
+        // Payment counts
+        supabase.from('special_hire_payments').select('*', { count: 'exact', head: true }).eq('status', 'pending_finance'),
+        supabase.from('special_hire_payments').select('*', { count: 'exact', head: true }).eq('status', 'pending_finance').lte('created_at', comparisonISO),
+        // Revenue (need actual amounts)
+        supabase.from('special_hire_payments').select('amount').eq('status', 'approved'),
+        supabase.from('special_hire_payments').select('amount').eq('status', 'approved').lte('created_at', comparisonISO),
+      ]);
 
-      if (error) throw error;
+      const totalQuotations = totalRes.count ?? 0;
+      const pendingQuotations = pendingRes.count ?? 0;
+      const confirmedTrips = confirmedRes.count ?? 0;
+      const pendingApprovals = pendingApprovalRes.count ?? 0;
+      const pendingFinanceApprovals = pendingFinanceRes.count ?? 0;
+      const totalRevenue = revenueRes.data?.reduce((sum, p) => sum + (p.amount || 0), 0) ?? 0;
 
-      // Get comparison period quotation stats
-      const { data: comparisonQuotations, error: compError } = await supabase
-        .from('special_hire_quotations')
-        .select('status, gross_revenue, approval_status, created_at')
-        .lte('created_at', comparisonDate.toISOString());
+      const compTotalQuotations = compTotalRes.count ?? 0;
+      const compPendingQuotations = compPendingRes.count ?? 0;
+      const compConfirmedTrips = compConfirmedRes.count ?? 0;
+      const compPendingApprovals = compPendingApprovalRes.count ?? 0;
+      const compPendingFinanceApprovals = compPendingFinanceRes.count ?? 0;
+      const compTotalRevenue = compRevenueRes.data?.reduce((sum, p) => sum + (p.amount || 0), 0) ?? 0;
 
-      if (compError) throw compError;
-
-      // Get current payment stats  
-      const { data: payments, error: paymentsError } = await supabase
-        .from('special_hire_payments')
-        .select('status, amount, created_at');
-
-      if (paymentsError) throw paymentsError;
-
-      // Get comparison payment stats
-      const { data: comparisonPayments, error: compPaymentsError } = await supabase
-        .from('special_hire_payments')
-        .select('status, amount, created_at')
-        .lte('created_at', comparisonDate.toISOString());
-
-      if (compPaymentsError) throw compPaymentsError;
-
-      // Current stats
-      const totalQuotations = quotations?.length || 0;
-      const pendingQuotations = quotations?.filter(q => q.status === 'pending').length || 0;
-      const confirmedTrips = quotations?.filter(q => q.status === 'confirmed').length || 0;
-      const pendingApprovals = quotations?.filter(q => q.approval_status === 'pending').length || 0;
-      const pendingFinanceApprovals = payments?.filter(p => p.status === 'pending_finance').length || 0;
-      const totalRevenue = payments?.filter(p => p.status === 'approved').reduce((sum, p) => sum + p.amount, 0) || 0;
-
-      // Comparison stats
-      const compTotalQuotations = comparisonQuotations?.length || 0;
-      const compPendingQuotations = comparisonQuotations?.filter(q => q.status === 'pending').length || 0;
-      const compConfirmedTrips = comparisonQuotations?.filter(q => q.status === 'confirmed').length || 0;
-      const compPendingApprovals = comparisonQuotations?.filter(q => q.approval_status === 'pending').length || 0;
-      const compPendingFinanceApprovals = comparisonPayments?.filter(p => p.status === 'pending_finance').length || 0;
-      const compTotalRevenue = comparisonPayments?.filter(p => p.status === 'approved').reduce((sum, p) => sum + p.amount, 0) || 0;
-
-      // Calculate percentage changes
       const calculateChange = (current: number, previous: number) => {
         if (previous === 0) return current > 0 ? 100 : 0;
         return ((current - previous) / previous) * 100;
@@ -228,6 +222,30 @@ export default function SpecialHire() {
     if (hasPageAccess) {
       loadStats();
     }
+  }, [hasPageAccess, comparisonPeriod]);
+
+  // Realtime subscription for KPI auto-refresh
+  useEffect(() => {
+    if (!hasPageAccess) return;
+
+    const quotationsChannel = supabase
+      .channel('kpi-quotations-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'special_hire_quotations' }, () => {
+        loadStats();
+      })
+      .subscribe();
+
+    const paymentsChannel = supabase
+      .channel('kpi-payments-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'special_hire_payments' }, () => {
+        loadStats();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(quotationsChannel);
+      supabase.removeChannel(paymentsChannel);
+    };
   }, [hasPageAccess, comparisonPeriod]);
 
   // Redirect from approvals tab if not admin
@@ -464,6 +482,11 @@ export default function SpecialHire() {
               <span>Referrals</span>
             </TabsTrigger>
 
+            <TabsTrigger value="spreadsheet" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+              <Table2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Sheet</span>
+            </TabsTrigger>
+
             {isAdmin && (
               <TabsTrigger value="system-flow" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
                 <Workflow className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -542,6 +565,10 @@ export default function SpecialHire() {
         {/* Referral Agents content */}
         <TabsContent value="referral-agents" className="space-y-6">
           <ReferralAgentsManagement />
+        </TabsContent>
+
+        <TabsContent value="spreadsheet" className="space-y-6">
+          <SpecialHireSpreadsheet />
         </TabsContent>
 
         {/* System Flow Diagram - Admin only */}

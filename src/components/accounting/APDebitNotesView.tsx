@@ -6,8 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, FileText, Search, Printer } from "lucide-react";
+import { Plus, FileText, Search, Printer, Pencil, Trash2 } from "lucide-react";
 import { useAPDebitNotes, useVendors, useAPInvoices } from "@/hooks/useAccountingData";
+import { useDeleteAPDebitNote } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
 import { StatusBadge } from "./shared/StatusBadge";
@@ -15,6 +16,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const APDebitNotesView = () => {
   const { data: debitNotes, isLoading, refetch } = useAPDebitNotes();
@@ -24,6 +35,9 @@ export const APDebitNotesView = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [printDocumentOpen, setPrintDocumentOpen] = useState(false);
   const [printDocumentData, setPrintDocumentData] = useState<any>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [editingNote, setEditingNote] = useState<any>(null);
+  const deleteDebitNote = useDeleteAPDebitNote();
   const [formData, setFormData] = useState({
     vendor_id: "",
     original_invoice_id: "",
@@ -47,19 +61,31 @@ export const APDebitNotesView = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from("ap_debit_notes").insert({
-        debit_note_number: generateDebitNoteNumber(),
-        vendor_id: formData.vendor_id,
-        original_invoice_id: formData.original_invoice_id || null,
-        debit_date: formData.debit_date,
-        amount: parseFloat(formData.amount),
-        reason: formData.reason,
-        status: "draft",
-      });
-
-      if (error) throw error;
-      toast.success("Debit note created successfully");
+      if (editingNote) {
+        const { error } = await supabase.from("ap_debit_notes").update({
+          vendor_id: formData.vendor_id,
+          original_invoice_id: formData.original_invoice_id || null,
+          debit_date: formData.debit_date,
+          amount: parseFloat(formData.amount),
+          reason: formData.reason,
+        }).eq("id", editingNote.id);
+        if (error) throw error;
+        toast.success("Debit note updated successfully");
+      } else {
+        const { error } = await supabase.from("ap_debit_notes").insert({
+          debit_note_number: generateDebitNoteNumber(),
+          vendor_id: formData.vendor_id,
+          original_invoice_id: formData.original_invoice_id || null,
+          debit_date: formData.debit_date,
+          amount: parseFloat(formData.amount),
+          reason: formData.reason,
+          status: "draft",
+        });
+        if (error) throw error;
+        toast.success("Debit note created successfully");
+      }
       setIsDialogOpen(false);
+      setEditingNote(null);
       setFormData({
         vendor_id: "",
         original_invoice_id: "",
@@ -69,7 +95,26 @@ export const APDebitNotesView = () => {
       });
       refetch();
     } catch (error: any) {
-      toast.error(error.message || "Failed to create debit note");
+      toast.error(error.message || "Failed to save debit note");
+    }
+  };
+
+  const handleEdit = (dn: any) => {
+    setEditingNote(dn);
+    setFormData({
+      vendor_id: dn.vendor_id || "",
+      original_invoice_id: dn.original_invoice_id || "",
+      debit_date: dn.debit_date,
+      amount: dn.amount?.toString() || "",
+      reason: dn.reason || "",
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = () => {
+    if (deleteConfirmId) {
+      deleteDebitNote.mutate(deleteConfirmId);
+      setDeleteConfirmId(null);
     }
   };
 
@@ -86,13 +131,15 @@ export const APDebitNotesView = () => {
           <h2 className="text-2xl font-bold">AP Debit Notes</h2>
           <p className="text-sm text-muted-foreground">Manage vendor debit notes and adjustments</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingNote(null); }}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />New Debit Note</Button>
+            <Button onClick={() => { setEditingNote(null); setFormData({ vendor_id: "", original_invoice_id: "", debit_date: format(new Date(), "yyyy-MM-dd"), amount: "", reason: "" }); }}>
+              <Plus className="h-4 w-4 mr-2" />New Debit Note
+            </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>Create Debit Note</DialogTitle>
+              <DialogTitle>{editingNote ? "Edit Debit Note" : "Create Debit Note"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -133,7 +180,7 @@ export const APDebitNotesView = () => {
               </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                <Button type="submit">Create Debit Note</Button>
+                <Button type="submit">{editingNote ? "Update" : "Create"} Debit Note</Button>
               </div>
             </form>
           </DialogContent>
@@ -174,16 +221,37 @@ export const APDebitNotesView = () => {
                     <td className="py-3 px-2 text-right font-semibold text-green-600"><CurrencyDisplay amount={dn.amount} /></td>
                     <td className="py-3 px-2"><StatusBadge status={dn.status || "draft"} /></td>
                     <td className="py-3 px-2">
-                      <Button 
-                        size="sm" 
-                        variant="ghost"
-                        onClick={() => {
-                          setPrintDocumentData(dn);
-                          setPrintDocumentOpen(true);
-                        }}
-                      >
-                        <Printer className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          title="Edit"
+                          onClick={() => handleEdit(dn)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        {(dn.status === "draft") && (
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            title="Delete"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteConfirmId(dn.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => {
+                            setPrintDocumentData(dn);
+                            setPrintDocumentOpen(true);
+                          }}
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -192,6 +260,24 @@ export const APDebitNotesView = () => {
           </table>
         </div>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Debit Note?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this debit note.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Document Print Preview Modal */}
       <FinanceDocumentPreviewModal

@@ -154,7 +154,17 @@ export function SinotruckOrderInvoiceGenerator({ order, onRefresh }: SinotruckOr
       proforma_amount: config.proformaAmount,
       finance_company_name: config.financeCompanyName,
       finance_company_address: config.financeCompanyAddress,
-      proforma_purpose: config.proformaPurpose
+      proforma_purpose: config.proformaPurpose,
+      // Tax invoice fields
+      is_tax_invoice: config.isTaxInvoice,
+      customer_vat_number: config.customerVatNumber,
+      tax_rate: config.taxRate,
+      supplier_tin: config.supplierTin,
+      purchaser_tin: config.purchaserTin,
+      place_of_supply: config.placeOfSupply,
+      date_of_delivery: config.dateOfDelivery,
+      mode_of_payment: config.modeOfPayment,
+      additional_information: config.additionalInformation
     };
 
     const result = await generateAndStoreDraftInvoice(

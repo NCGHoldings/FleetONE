@@ -415,6 +415,134 @@ export type Database = {
           },
         ]
       }
+      ai_chat_messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          language: string | null
+          metadata: Json | null
+          role: string
+          session_id: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          language?: string | null
+          metadata?: Json | null
+          role: string
+          session_id?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          language?: string | null
+          metadata?: Json | null
+          role?: string
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_chat_sessions: {
+        Row: {
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          preferred_language: string | null
+          product_interest: string | null
+          session_token: string
+          status: string | null
+          updated_at: string | null
+          visitor_email: string | null
+          visitor_name: string | null
+          visitor_phone: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          preferred_language?: string | null
+          product_interest?: string | null
+          session_token: string
+          status?: string | null
+          updated_at?: string | null
+          visitor_email?: string | null
+          visitor_name?: string | null
+          visitor_phone?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          preferred_language?: string | null
+          product_interest?: string | null
+          session_token?: string
+          status?: string | null
+          updated_at?: string | null
+          visitor_email?: string | null
+          visitor_name?: string | null
+          visitor_phone?: string | null
+        }
+        Relationships: []
+      }
+      ai_chatbot_knowledge: {
+        Row: {
+          answer_en: string
+          answer_si: string | null
+          answer_ta: string | null
+          category: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          question_en: string | null
+          question_si: string | null
+          question_ta: string | null
+          sort_order: number | null
+          tags: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          answer_en: string
+          answer_si?: string | null
+          answer_ta?: string | null
+          category: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          question_en?: string | null
+          question_si?: string | null
+          question_ta?: string | null
+          sort_order?: number | null
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          answer_en?: string
+          answer_si?: string | null
+          answer_ta?: string | null
+          category?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          question_en?: string | null
+          question_si?: string | null
+          question_ta?: string | null
+          sort_order?: number | null
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       ap_ageing_buckets: {
         Row: {
           bucket_name: string
@@ -598,6 +726,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           balance: number
+          bus_id: string | null
           business_unit_code: string | null
           company_id: string | null
           created_at: string | null
@@ -613,6 +742,8 @@ export type Database = {
           paid_amount: number | null
           period_id: string | null
           reference: string | null
+          route_id: string | null
+          school_route_id: string | null
           status: string | null
           subtotal: number | null
           tax_amount: number | null
@@ -626,6 +757,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           balance: number
+          bus_id?: string | null
           business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -641,6 +773,8 @@ export type Database = {
           paid_amount?: number | null
           period_id?: string | null
           reference?: string | null
+          route_id?: string | null
+          school_route_id?: string | null
           status?: string | null
           subtotal?: number | null
           tax_amount?: number | null
@@ -654,6 +788,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           balance?: number
+          bus_id?: string | null
           business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -669,6 +804,8 @@ export type Database = {
           paid_amount?: number | null
           period_id?: string | null
           reference?: string | null
+          route_id?: string | null
+          school_route_id?: string | null
           status?: string | null
           subtotal?: number | null
           tax_amount?: number | null
@@ -678,6 +815,13 @@ export type Database = {
           wht_amount?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ap_invoices_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ap_invoices_company_id_fkey"
             columns: ["company_id"]
@@ -697,6 +841,20 @@ export type Database = {
             columns: ["period_id"]
             isOneToOne: false
             referencedRelation: "financial_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_invoices_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_invoices_school_route_id_fkey"
+            columns: ["school_route_id"]
+            isOneToOne: false
+            referencedRelation: "school_routes"
             referencedColumns: ["id"]
           },
           {
@@ -760,6 +918,70 @@ export type Database = {
           },
         ]
       }
+      ap_payment_lines: {
+        Row: {
+          account_id: string | null
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          line_total: number | null
+          payment_id: string
+          quantity: number | null
+          tax_amount: number | null
+          tax_rate: number | null
+          unit_price: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          line_total?: number | null
+          payment_id: string
+          quantity?: number | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          unit_price?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          line_total?: number | null
+          payment_id?: string
+          quantity?: number | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ap_payment_lines_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payment_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payment_lines_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "ap_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ap_payments: {
         Row: {
           amount: number
@@ -767,6 +989,8 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           bank_account_id: string | null
+          bank_fee_amount: number | null
+          bank_fee_type: string | null
           business_unit_code: string | null
           cheque_date: string | null
           cheque_number: string | null
@@ -775,6 +999,7 @@ export type Database = {
           created_by: string | null
           id: string
           is_advance: boolean | null
+          is_direct_payment: boolean | null
           journal_entry_id: string | null
           notes: string | null
           payment_date: string
@@ -782,7 +1007,9 @@ export type Database = {
           payment_number: string
           reference: string | null
           status: string | null
+          total_with_fees: number | null
           updated_at: string | null
+          vendor_bank_account_id: string | null
           vendor_id: string | null
         }
         Insert: {
@@ -791,6 +1018,8 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bank_account_id?: string | null
+          bank_fee_amount?: number | null
+          bank_fee_type?: string | null
           business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
@@ -799,6 +1028,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_advance?: boolean | null
+          is_direct_payment?: boolean | null
           journal_entry_id?: string | null
           notes?: string | null
           payment_date: string
@@ -806,7 +1036,9 @@ export type Database = {
           payment_number: string
           reference?: string | null
           status?: string | null
+          total_with_fees?: number | null
           updated_at?: string | null
+          vendor_bank_account_id?: string | null
           vendor_id?: string | null
         }
         Update: {
@@ -815,6 +1047,8 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bank_account_id?: string | null
+          bank_fee_amount?: number | null
+          bank_fee_type?: string | null
           business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
@@ -823,6 +1057,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_advance?: boolean | null
+          is_direct_payment?: boolean | null
           journal_entry_id?: string | null
           notes?: string | null
           payment_date?: string
@@ -830,10 +1065,19 @@ export type Database = {
           payment_number?: string
           reference?: string | null
           status?: string | null
+          total_with_fees?: number | null
           updated_at?: string | null
+          vendor_bank_account_id?: string | null
           vendor_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ap_payments_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ap_payments_company_id_fkey"
             columns: ["company_id"]
@@ -849,10 +1093,86 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ap_payments_vendor_bank_account_id_fkey"
+            columns: ["vendor_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ap_payments_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ap_reconciliation_items: {
+        Row: {
+          cleared: boolean
+          cleared_amount: number
+          cleared_at: string | null
+          cleared_by: string | null
+          company_id: string | null
+          created_at: string
+          credit_amount: number
+          debit_amount: number
+          doc_date: string | null
+          doc_number: string | null
+          id: string
+          reconciliation_id: string
+          remarks: string | null
+          source_id: string | null
+          source_type: string
+        }
+        Insert: {
+          cleared?: boolean
+          cleared_amount?: number
+          cleared_at?: string | null
+          cleared_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          credit_amount?: number
+          debit_amount?: number
+          doc_date?: string | null
+          doc_number?: string | null
+          id?: string
+          reconciliation_id: string
+          remarks?: string | null
+          source_id?: string | null
+          source_type: string
+        }
+        Update: {
+          cleared?: boolean
+          cleared_amount?: number
+          cleared_at?: string | null
+          cleared_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          credit_amount?: number
+          debit_amount?: number
+          doc_date?: string | null
+          doc_number?: string | null
+          id?: string
+          reconciliation_id?: string
+          remarks?: string | null
+          source_id?: string | null
+          source_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ap_reconciliation_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_reconciliation_items_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "ap_reconciliations"
             referencedColumns: ["id"]
           },
         ]
@@ -1436,6 +1756,11 @@ export type Database = {
       ar_invoices: {
         Row: {
           balance: number
+          bus_category_id: string | null
+          bus_id: string | null
+          bus_no: string | null
+          bus_sub_category_id: string | null
+          bus_type: string | null
           business_unit_code: string | null
           company_id: string | null
           created_at: string | null
@@ -1459,6 +1784,11 @@ export type Database = {
         }
         Insert: {
           balance: number
+          bus_category_id?: string | null
+          bus_id?: string | null
+          bus_no?: string | null
+          bus_sub_category_id?: string | null
+          bus_type?: string | null
           business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -1482,6 +1812,11 @@ export type Database = {
         }
         Update: {
           balance?: number
+          bus_category_id?: string | null
+          bus_id?: string | null
+          bus_no?: string | null
+          bus_sub_category_id?: string | null
+          bus_type?: string | null
           business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -1504,6 +1839,27 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ar_invoices_bus_category_id_fkey"
+            columns: ["bus_category_id"]
+            isOneToOne: false
+            referencedRelation: "bus_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_invoices_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_invoices_bus_sub_category_id_fkey"
+            columns: ["bus_sub_category_id"]
+            isOneToOne: false
+            referencedRelation: "bus_sub_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ar_invoices_company_id_fkey"
             columns: ["company_id"]
@@ -1667,6 +2023,75 @@ export type Database = {
             columns: ["journal_entry_id"]
             isOneToOne: false
             referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ar_reconciliation_items: {
+        Row: {
+          cleared: boolean
+          cleared_amount: number
+          cleared_at: string | null
+          cleared_by: string | null
+          company_id: string | null
+          created_at: string
+          credit_amount: number
+          debit_amount: number
+          doc_date: string | null
+          doc_number: string | null
+          id: string
+          reconciliation_id: string
+          remarks: string | null
+          source_id: string | null
+          source_type: string
+        }
+        Insert: {
+          cleared?: boolean
+          cleared_amount?: number
+          cleared_at?: string | null
+          cleared_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          credit_amount?: number
+          debit_amount?: number
+          doc_date?: string | null
+          doc_number?: string | null
+          id?: string
+          reconciliation_id: string
+          remarks?: string | null
+          source_id?: string | null
+          source_type: string
+        }
+        Update: {
+          cleared?: boolean
+          cleared_amount?: number
+          cleared_at?: string | null
+          cleared_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          credit_amount?: number
+          debit_amount?: number
+          doc_date?: string | null
+          doc_number?: string | null
+          id?: string
+          reconciliation_id?: string
+          remarks?: string | null
+          source_id?: string | null
+          source_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ar_reconciliation_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_reconciliation_items_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "ar_reconciliations"
             referencedColumns: ["id"]
           },
         ]
@@ -4470,6 +4895,63 @@ export type Database = {
           },
         ]
       }
+      cheque_books: {
+        Row: {
+          bank_account_id: string
+          company_id: string | null
+          created_at: string | null
+          end_number: number
+          id: string
+          is_active: boolean | null
+          next_number: number
+          notes: string | null
+          prefix: string | null
+          start_number: number
+          updated_at: string | null
+        }
+        Insert: {
+          bank_account_id: string
+          company_id?: string | null
+          created_at?: string | null
+          end_number: number
+          id?: string
+          is_active?: boolean | null
+          next_number: number
+          notes?: string | null
+          prefix?: string | null
+          start_number: number
+          updated_at?: string | null
+        }
+        Update: {
+          bank_account_id?: string
+          company_id?: string | null
+          created_at?: string | null
+          end_number?: number
+          id?: string
+          is_active?: boolean | null
+          next_number?: number
+          notes?: string | null
+          prefix?: string | null
+          start_number?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cheque_books_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cheque_books_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cheque_register: {
         Row: {
           amount: number
@@ -5126,6 +5608,77 @@ export type Database = {
           },
         ]
       }
+      customer_categories: {
+        Row: {
+          advance_account_id: string | null
+          ar_account_id: string | null
+          category_code: string
+          category_name: string
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          revenue_account_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          advance_account_id?: string | null
+          ar_account_id?: string | null
+          category_code: string
+          category_name: string
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          revenue_account_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          advance_account_id?: string | null
+          ar_account_id?: string | null
+          category_code?: string
+          category_name?: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          revenue_account_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_categories_advance_account_id_fkey"
+            columns: ["advance_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_categories_ar_account_id_fkey"
+            columns: ["ar_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_categories_revenue_account_id_fkey"
+            columns: ["revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_portal_access: {
         Row: {
           created_at: string | null
@@ -5352,6 +5905,7 @@ export type Database = {
           credit_limit: number | null
           credit_used: number | null
           currency: string | null
+          customer_category_id: string | null
           customer_code: string
           customer_name: string
           customer_type: string | null
@@ -5376,6 +5930,7 @@ export type Database = {
           credit_limit?: number | null
           credit_used?: number | null
           currency?: string | null
+          customer_category_id?: string | null
           customer_code: string
           customer_name: string
           customer_type?: string | null
@@ -5400,6 +5955,7 @@ export type Database = {
           credit_limit?: number | null
           credit_used?: number | null
           currency?: string | null
+          customer_category_id?: string | null
           customer_code?: string
           customer_name?: string
           customer_type?: string | null
@@ -5426,6 +5982,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_customer_category_id_fkey"
+            columns: ["customer_category_id"]
+            isOneToOne: false
+            referencedRelation: "customer_categories"
             referencedColumns: ["id"]
           },
         ]
@@ -7437,6 +8000,87 @@ export type Database = {
           },
         ]
       }
+      fleet_master_roster: {
+        Row: {
+          bus_id: string | null
+          bus_type: string | null
+          created_at: string
+          day_target: number | null
+          default_conductor: string | null
+          default_driver: string | null
+          id: string
+          is_active: boolean
+          permit_type: string | null
+          remark: string | null
+          route_id: string | null
+          route_label: string | null
+          route_start_date: string | null
+          section: string | null
+          sort_order: number | null
+          trips_per_day: number
+          turn_01_time: string | null
+          turn_02_time: string | null
+          updated_at: string
+        }
+        Insert: {
+          bus_id?: string | null
+          bus_type?: string | null
+          created_at?: string
+          day_target?: number | null
+          default_conductor?: string | null
+          default_driver?: string | null
+          id?: string
+          is_active?: boolean
+          permit_type?: string | null
+          remark?: string | null
+          route_id?: string | null
+          route_label?: string | null
+          route_start_date?: string | null
+          section?: string | null
+          sort_order?: number | null
+          trips_per_day?: number
+          turn_01_time?: string | null
+          turn_02_time?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bus_id?: string | null
+          bus_type?: string | null
+          created_at?: string
+          day_target?: number | null
+          default_conductor?: string | null
+          default_driver?: string | null
+          id?: string
+          is_active?: boolean
+          permit_type?: string | null
+          remark?: string | null
+          route_id?: string | null
+          route_label?: string | null
+          route_start_date?: string | null
+          section?: string | null
+          sort_order?: number | null
+          trips_per_day?: number
+          turn_01_time?: string | null
+          turn_02_time?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_master_roster_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: true
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_master_roster_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       frequency_rules: {
         Row: {
           created_at: string
@@ -7746,6 +8390,115 @@ export type Database = {
             columns: ["mapping_id"]
             isOneToOne: false
             referencedRelation: "module_gl_mappings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gl_settings: {
+        Row: {
+          bank_account_id: string | null
+          company_id: string
+          created_at: string
+          customer_advance_account_id: string | null
+          default_expense_account_id: string | null
+          expense_account_id: string | null
+          id: string
+          sales_revenue_account_id: string | null
+          trade_payable_account_id: string | null
+          trade_receivable_account_id: string | null
+          updated_at: string
+          wht_payable_account_id: string | null
+        }
+        Insert: {
+          bank_account_id?: string | null
+          company_id: string
+          created_at?: string
+          customer_advance_account_id?: string | null
+          default_expense_account_id?: string | null
+          expense_account_id?: string | null
+          id?: string
+          sales_revenue_account_id?: string | null
+          trade_payable_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string
+          wht_payable_account_id?: string | null
+        }
+        Update: {
+          bank_account_id?: string | null
+          company_id?: string
+          created_at?: string
+          customer_advance_account_id?: string | null
+          default_expense_account_id?: string | null
+          expense_account_id?: string | null
+          id?: string
+          sales_revenue_account_id?: string | null
+          trade_payable_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string
+          wht_payable_account_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gl_settings_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_customer_advance_account_id_fkey"
+            columns: ["customer_advance_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_default_expense_account_id_fkey"
+            columns: ["default_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_expense_account_id_fkey"
+            columns: ["expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_sales_revenue_account_id_fkey"
+            columns: ["sales_revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_trade_payable_account_id_fkey"
+            columns: ["trade_payable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_trade_receivable_account_id_fkey"
+            columns: ["trade_receivable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_wht_payable_account_id_fkey"
+            columns: ["wht_payable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -8795,6 +9548,82 @@ export type Database = {
             columns: ["to_gl_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intercompany_reconciliations: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          details: Json | null
+          difference: number | null
+          id: string
+          notes: string | null
+          reconciled_at: string | null
+          reconciled_by: string | null
+          reconciliation_date: string
+          status: string
+          unit_a_balance: number
+          unit_a_id: string
+          unit_b_balance: number
+          unit_b_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          details?: Json | null
+          difference?: number | null
+          id?: string
+          notes?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date: string
+          status?: string
+          unit_a_balance?: number
+          unit_a_id: string
+          unit_b_balance?: number
+          unit_b_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          details?: Json | null
+          difference?: number | null
+          id?: string
+          notes?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date?: string
+          status?: string
+          unit_a_balance?: number
+          unit_a_id?: string
+          unit_b_balance?: number
+          unit_b_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intercompany_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intercompany_reconciliations_unit_a_id_fkey"
+            columns: ["unit_a_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intercompany_reconciliations_unit_b_id_fkey"
+            columns: ["unit_b_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -13591,51 +14420,76 @@ export type Database = {
       }
       petty_cash_funds: {
         Row: {
+          approval_required_above: number | null
+          branch_id: string | null
           business_unit_code: string
           company_id: string | null
           created_at: string | null
           current_balance: number
           custodian_id: string | null
           fund_code: string | null
+          fund_limit: number | null
           fund_name: string
+          fund_type: string | null
           gl_account_id: string | null
           id: string
           is_active: boolean | null
           last_replenished_at: string | null
+          low_balance_threshold: number | null
+          notes: string | null
           opening_balance: number
           updated_at: string | null
         }
         Insert: {
+          approval_required_above?: number | null
+          branch_id?: string | null
           business_unit_code: string
           company_id?: string | null
           created_at?: string | null
           current_balance?: number
           custodian_id?: string | null
           fund_code?: string | null
+          fund_limit?: number | null
           fund_name: string
+          fund_type?: string | null
           gl_account_id?: string | null
           id?: string
           is_active?: boolean | null
           last_replenished_at?: string | null
+          low_balance_threshold?: number | null
+          notes?: string | null
           opening_balance?: number
           updated_at?: string | null
         }
         Update: {
+          approval_required_above?: number | null
+          branch_id?: string | null
           business_unit_code?: string
           company_id?: string | null
           created_at?: string | null
           current_balance?: number
           custodian_id?: string | null
           fund_code?: string | null
+          fund_limit?: number | null
           fund_name?: string
+          fund_type?: string | null
           gl_account_id?: string | null
           id?: string
           is_active?: boolean | null
           last_replenished_at?: string | null
+          low_balance_threshold?: number | null
+          notes?: string | null
           opening_balance?: number
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "petty_cash_funds_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "petty_cash_funds_company_id_fkey"
             columns: ["company_id"]
@@ -13659,52 +14513,227 @@ export type Database = {
           },
         ]
       }
-      petty_cash_transactions: {
+      petty_cash_reconciliation_items: {
         Row: {
           amount: number
-          balance_after: number
-          created_at: string | null
-          created_by: string | null
+          cleared: boolean
+          company_id: string | null
+          created_at: string
           description: string | null
-          expense_request_id: string | null
           id: string
-          journal_entry_id: string | null
-          petty_cash_fund_id: string
-          receipt_number: string | null
-          transaction_type: string
+          reconciliation_id: string
+          remarks: string | null
+          transaction_id: string | null
         }
         Insert: {
-          amount: number
-          balance_after: number
-          created_at?: string | null
-          created_by?: string | null
+          amount?: number
+          cleared?: boolean
+          company_id?: string | null
+          created_at?: string
           description?: string | null
-          expense_request_id?: string | null
           id?: string
-          journal_entry_id?: string | null
-          petty_cash_fund_id: string
-          receipt_number?: string | null
-          transaction_type: string
+          reconciliation_id: string
+          remarks?: string | null
+          transaction_id?: string | null
         }
         Update: {
           amount?: number
-          balance_after?: number
+          cleared?: boolean
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          reconciliation_id?: string
+          remarks?: string | null
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_reconciliation_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_reconciliation_items_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "petty_cash_reconciliations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_reconciliation_items_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "petty_cash_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      petty_cash_reconciliations: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          difference: number | null
+          fund_id: string
+          id: string
+          notes: string | null
+          physical_count: number
+          reconciled_at: string | null
+          reconciled_by: string | null
+          reconciliation_date: string
+          status: string
+          system_balance: number
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          difference?: number | null
+          fund_id: string
+          id?: string
+          notes?: string | null
+          physical_count?: number
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date: string
+          status?: string
+          system_balance?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          difference?: number | null
+          fund_id?: string
+          id?: string
+          notes?: string | null
+          physical_count?: number
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date?: string
+          status?: string
+          system_balance?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_reconciliations_fund_id_fkey"
+            columns: ["fund_id"]
+            isOneToOne: false
+            referencedRelation: "petty_cash_funds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      petty_cash_transactions: {
+        Row: {
+          amount: number
+          approved_by: string | null
+          attachment_url: string | null
+          balance_after: number
+          branch_id: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          expense_category: string | null
+          expense_request_id: string | null
+          gl_account_id: string | null
+          id: string
+          journal_entry_id: string | null
+          payee_name: string | null
+          payment_method: string | null
+          petty_cash_fund_id: string
+          receipt_number: string | null
+          reference_number: string | null
+          status: string | null
+          transaction_type: string
+          voucher_number: string | null
+        }
+        Insert: {
+          amount: number
+          approved_by?: string | null
+          attachment_url?: string | null
+          balance_after: number
+          branch_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          expense_category?: string | null
           expense_request_id?: string | null
+          gl_account_id?: string | null
           id?: string
           journal_entry_id?: string | null
+          payee_name?: string | null
+          payment_method?: string | null
+          petty_cash_fund_id: string
+          receipt_number?: string | null
+          reference_number?: string | null
+          status?: string | null
+          transaction_type: string
+          voucher_number?: string | null
+        }
+        Update: {
+          amount?: number
+          approved_by?: string | null
+          attachment_url?: string | null
+          balance_after?: number
+          branch_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expense_category?: string | null
+          expense_request_id?: string | null
+          gl_account_id?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          payee_name?: string | null
+          payment_method?: string | null
           petty_cash_fund_id?: string
           receipt_number?: string | null
+          reference_number?: string | null
+          status?: string | null
           transaction_type?: string
+          voucher_number?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "petty_cash_transactions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "petty_cash_transactions_expense_request_id_fkey"
             columns: ["expense_request_id"]
             isOneToOne: false
             referencedRelation: "expense_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_transactions_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -15576,6 +16605,44 @@ export type Database = {
             columns: ["journal_entry_id"]
             isOneToOne: false
             referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_permit_change_history: {
+        Row: {
+          change_type: string
+          changed_at: string
+          changed_by: string | null
+          changes: Json | null
+          description: string | null
+          id: string
+          permit_id: string
+        }
+        Insert: {
+          change_type?: string
+          changed_at?: string
+          changed_by?: string | null
+          changes?: Json | null
+          description?: string | null
+          id?: string
+          permit_id: string
+        }
+        Update: {
+          change_type?: string
+          changed_at?: string
+          changed_by?: string | null
+          changes?: Json | null
+          description?: string | null
+          id?: string
+          permit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_permit_change_history_permit_id_fkey"
+            columns: ["permit_id"]
+            isOneToOne: false
+            referencedRelation: "route_permits"
             referencedColumns: ["id"]
           },
         ]
@@ -19367,6 +20434,7 @@ export type Database = {
           finance_customer_id: string | null
           fixed_rate: number | null
           fuel_cost_fuel_only: number | null
+          fuel_price_per_liter: number | null
           gross_revenue: number | null
           hire_charge: number | null
           hire_type: string
@@ -19466,6 +20534,7 @@ export type Database = {
           finance_customer_id?: string | null
           fixed_rate?: number | null
           fuel_cost_fuel_only?: number | null
+          fuel_price_per_liter?: number | null
           gross_revenue?: number | null
           hire_charge?: number | null
           hire_type: string
@@ -19565,6 +20634,7 @@ export type Database = {
           finance_customer_id?: string | null
           fixed_rate?: number | null
           fuel_cost_fuel_only?: number | null
+          fuel_price_per_liter?: number | null
           gross_revenue?: number | null
           hire_charge?: number | null
           hire_type?: string
@@ -20160,12 +21230,18 @@ export type Database = {
       staff_registry: {
         Row: {
           address: string | null
+          blood_group: string | null
           contact_number: string | null
           created_at: string
           daily_rate: number | null
+          date_of_birth: string | null
           emergency_contact: string | null
           id: string
           is_active: boolean | null
+          joined_date: string | null
+          license_expiry: string | null
+          license_number: string | null
+          license_type: string | null
           monthly_salary: number | null
           nic_number: string | null
           notes: string | null
@@ -20177,12 +21253,18 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          blood_group?: string | null
           contact_number?: string | null
           created_at?: string
           daily_rate?: number | null
+          date_of_birth?: string | null
           emergency_contact?: string | null
           id?: string
           is_active?: boolean | null
+          joined_date?: string | null
+          license_expiry?: string | null
+          license_number?: string | null
+          license_type?: string | null
           monthly_salary?: number | null
           nic_number?: string | null
           notes?: string | null
@@ -20194,12 +21276,18 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          blood_group?: string | null
           contact_number?: string | null
           created_at?: string
           daily_rate?: number | null
+          date_of_birth?: string | null
           emergency_contact?: string | null
           id?: string
           is_active?: boolean | null
+          joined_date?: string | null
+          license_expiry?: string | null
+          license_number?: string | null
+          license_type?: string | null
           monthly_salary?: number | null
           nic_number?: string | null
           notes?: string | null
@@ -20544,6 +21632,75 @@ export type Database = {
             columns: ["to_warehouse_id"]
             isOneToOne: false
             referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subledger_reconciliations: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          details: Json | null
+          difference: number | null
+          gl_account_id: string | null
+          gl_balance: number
+          id: string
+          notes: string | null
+          reconciled_at: string | null
+          reconciled_by: string | null
+          reconciliation_date: string
+          reconciliation_type: string
+          status: string
+          subledger_total: number
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          details?: Json | null
+          difference?: number | null
+          gl_account_id?: string | null
+          gl_balance?: number
+          id?: string
+          notes?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date: string
+          reconciliation_type: string
+          status?: string
+          subledger_total?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          details?: Json | null
+          difference?: number | null
+          gl_account_id?: string | null
+          gl_balance?: number
+          id?: string
+          notes?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date?: string
+          reconciliation_type?: string
+          status?: string
+          subledger_total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subledger_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subledger_reconciliations_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -21913,6 +23070,131 @@ export type Database = {
           },
         ]
       }
+      vendor_bank_accounts: {
+        Row: {
+          account_holder_name: string | null
+          account_label: string | null
+          account_number: string
+          bank_branch: string | null
+          bank_name: string
+          company_id: string | null
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          vendor_id: string
+        }
+        Insert: {
+          account_holder_name?: string | null
+          account_label?: string | null
+          account_number: string
+          bank_branch?: string | null
+          bank_name: string
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          vendor_id: string
+        }
+        Update: {
+          account_holder_name?: string | null
+          account_label?: string | null
+          account_number?: string
+          bank_branch?: string | null
+          bank_name?: string
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_bank_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_bank_accounts_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_categories: {
+        Row: {
+          advance_account_id: string | null
+          ap_account_id: string | null
+          category_code: string
+          category_name: string
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          expense_account_id: string | null
+          id: string
+          is_active: boolean
+          updated_at: string | null
+        }
+        Insert: {
+          advance_account_id?: string | null
+          ap_account_id?: string | null
+          category_code: string
+          category_name: string
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          expense_account_id?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string | null
+        }
+        Update: {
+          advance_account_id?: string | null
+          ap_account_id?: string | null
+          category_code?: string
+          category_name?: string
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          expense_account_id?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_categories_advance_account_id_fkey"
+            columns: ["advance_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_categories_ap_account_id_fkey"
+            columns: ["ap_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_categories_expense_account_id_fkey"
+            columns: ["expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_performance: {
         Row: {
           calculated_at: string | null
@@ -22204,6 +23486,7 @@ export type Database = {
           phone: string | null
           tax_id: string | null
           updated_at: string | null
+          vendor_category_id: string | null
           vendor_code: string
           vendor_name: string
           vendor_type: string | null
@@ -22230,6 +23513,7 @@ export type Database = {
           phone?: string | null
           tax_id?: string | null
           updated_at?: string | null
+          vendor_category_id?: string | null
           vendor_code: string
           vendor_name: string
           vendor_type?: string | null
@@ -22256,6 +23540,7 @@ export type Database = {
           phone?: string | null
           tax_id?: string | null
           updated_at?: string | null
+          vendor_category_id?: string | null
           vendor_code?: string
           vendor_name?: string
           vendor_type?: string | null
@@ -22275,6 +23560,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendors_vendor_category_id_fkey"
+            columns: ["vendor_category_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_categories"
             referencedColumns: ["id"]
           },
         ]
@@ -24543,7 +25835,7 @@ export type Database = {
           payment_structure: Json | null
           progress_percentage: number | null
           quantity: number
-          quotation_id: string
+          quotation_id: string | null
           seating_capacity: number | null
           special_features: Json | null
           status: string
@@ -24581,13 +25873,13 @@ export type Database = {
           payment_structure?: Json | null
           progress_percentage?: number | null
           quantity?: number
-          quotation_id: string
+          quotation_id?: string | null
           seating_capacity?: number | null
           special_features?: Json | null
           status?: string
           total_amount: number
           total_paid?: number | null
-          unit_price: number
+          unit_price?: number
           updated_at?: string
           vehicle_condition?: string | null
           year_of_manufacture?: number | null
@@ -24619,7 +25911,7 @@ export type Database = {
           payment_structure?: Json | null
           progress_percentage?: number | null
           quantity?: number
-          quotation_id?: string
+          quotation_id?: string | null
           seating_capacity?: number | null
           special_features?: Json | null
           status?: string
@@ -25096,6 +26388,7 @@ export type Database = {
           updated_at: string
           valid_days: number
           valid_until: string
+          vehicle_year: number | null
           version_number: string | null
           warranty_terms: string | null
         }
@@ -25148,6 +26441,7 @@ export type Database = {
           updated_at?: string
           valid_days?: number
           valid_until: string
+          vehicle_year?: number | null
           version_number?: string | null
           warranty_terms?: string | null
         }
@@ -25200,6 +26494,7 @@ export type Database = {
           updated_at?: string
           valid_days?: number
           valid_until?: string
+          vehicle_year?: number | null
           version_number?: string | null
           warranty_terms?: string | null
         }
@@ -26508,6 +27803,10 @@ export type Database = {
         Returns: string
       }
       expire_temporary_accounts: { Args: never; Returns: number }
+      force_delete_coa_for_company: {
+        Args: { p_company_id: string }
+        Returns: Json
+      }
       generate_budget_code: { Args: { p_fiscal_year: number }; Returns: string }
       generate_customer_code: { Args: never; Returns: string }
       generate_employee_id: { Args: never; Returns: string }
@@ -26534,6 +27833,7 @@ export type Database = {
         Args: { p_parent_id: string }
         Returns: string
       }
+      generate_petty_cash_voucher_number: { Args: never; Returns: string }
       generate_sbs_batch_number: { Args: never; Returns: string }
       generate_sbs_invoice_number: {
         Args: { p_prefix?: string }
@@ -26577,6 +27877,10 @@ export type Database = {
       get_liability_account_setting: {
         Args: { p_setting_id: string }
         Returns: string
+      }
+      get_next_cheque_number: {
+        Args: { p_bank_account_id: string }
+        Returns: Json
       }
       get_user_page_permissions: {
         Args: { _user_id: string }

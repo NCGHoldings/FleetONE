@@ -1,6 +1,8 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { convertNumberToWords } from './number-to-words';
+import { generateSriLankaTaxInvoiceHTML } from './sri-lanka-tax-invoice-generator';
+import { resolveTaxInvoiceHTML } from './tax-invoice-template-resolver';
 
 export interface YutongOrderInvoiceData {
   invoice_no: string;
@@ -41,6 +43,17 @@ export interface YutongOrderInvoiceData {
   tax_rate?: number;
   base_amount?: number;
   vat_amount?: number;
+  // Sri Lanka Tax Invoice additional fields
+  supplier_tin?: string;
+  supplier_name?: string;
+  supplier_address?: string;
+  supplier_phone?: string;
+  purchaser_tin?: string;
+  purchaser_phone?: string;
+  date_of_delivery?: string;
+  place_of_supply?: string;
+  mode_of_payment?: string;
+  additional_information?: string;
   // Payment tracking
   paymentsReceived?: Array<{
     payment_date: string;
@@ -87,11 +100,51 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
    const baseAmount = isTaxInvoice ? (data.base_amount || data.total / (1 + taxRate / 100)) : data.subtotal;
    const vatAmount = isTaxInvoice ? (data.vat_amount || data.total - baseAmount) : 0;
    const taxAmountInWords = isTaxInvoice ? convertNumberToWords(baseAmount) : amountInWords;
+
+   // For tax invoices, use the Sri Lankan government-mandated format
+   if (isTaxInvoice) {
+     const vehicleDescription = [
+       data.make,
+       data.bus_model,
+       `${data.seating_capacity} Seater`,
+       `${data.year_of_manufacture}`,
+       data.vehicle_condition,
+       data.fuel_type,
+       `Engine: ${data.engine_number}`,
+       `Chassis: ${data.chassis_number}`,
+     ].filter(Boolean).join(' | ');
+
+     return generateSriLankaTaxInvoiceHTML({
+       invoiceDate: data.invoice_date,
+       taxInvoiceNo: data.invoice_no,
+       supplierTin: data.supplier_tin || data.company_vat_number || '',
+       supplierName: data.supplier_name || 'NCG Holdings (Pvt) Ltd',
+       supplierAddress: data.supplier_address || '157 Y, Kabellawita, Weniweikola, Polgasowita',
+       supplierPhone: data.supplier_phone || '0770455981',
+       purchaserTin: data.purchaser_tin || data.customer_vat_number || '',
+       purchaserName: data.customer_name,
+       purchaserAddress: data.address,
+       purchaserPhone: data.purchaser_phone || data.contact || '',
+       dateOfDelivery: data.date_of_delivery,
+       placeOfSupply: data.place_of_supply,
+       additionalInformation: data.additional_information,
+       lineItems: [{
+         reference: '1',
+         description: vehicleDescription,
+         quantity: data.quantity,
+         unitPrice: baseAmount / data.quantity,
+         amountExclVat: baseAmount,
+       }],
+       vatRate: taxRate,
+       modeOfPayment: data.mode_of_payment,
+       preparedBy: data.preparedBy ? { name: data.preparedBy.approver_name, signature: data.preparedBy.signature_data, date: data.preparedBy.approval_date } : undefined,
+       approvedBy: data.approvedBy ? { name: data.approvedBy.approver_name, signature: data.approvedBy.signature_data, date: data.approvedBy.approval_date } : undefined,
+       customerSignature: data.receivedBy ? { name: data.receivedBy.approver_name, signature: data.receivedBy.signature_data, date: data.receivedBy.approval_date } : undefined,
+     });
+   }
    
    // Header image based on invoice type - prioritize custom header from template
-   const defaultHeaderImage = isTaxInvoice 
-     ? '/lovable-uploads/yutong-tax-invoice-header.png' 
-     : '/lovable-uploads/yutong-invoice-header.png';
+   const defaultHeaderImage = '/lovable-uploads/yutong-invoice-header.png';
    const headerImage = data.customHeaderImageUrl || defaultHeaderImage;
 
   return `<!doctype html>
@@ -129,41 +182,23 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
   ` : ''}
 
   ${isProforma ? `
-  .proforma-badge {
-    position: absolute;
-    top: 120px;
-    right: 40px;
-    background: linear-gradient(135deg, #f97316, #ea580c);
-    color: white;
-    padding: 10px 25px;
-    font-size: 16px;
-    font-weight: bold;
-    border-radius: 6px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
-  }
   .proforma-info {
-    background: #fff7ed;
-    border: 2px solid #f97316;
+    background: #e8f6ff;
+    border: 2px solid #0b2f66;
     border-radius: 8px;
     padding: 16px;
     margin: 20px 40px 0;
   }
   .proforma-info h4 {
-    color: #ea580c;
+    color: #0b2f66;
     margin: 0 0 10px 0;
     font-size: 16px;
+    font-weight: bold;
   }
   .proforma-info p {
     margin: 4px 0;
     font-size: 14px;
-    color: #9a3412;
-  }
-  .proforma-amount-display {
-    background: #fff7ed;
-    border: 2px solid #f97316;
-    color: #ea580c;
+    color: #0b2f66;
   }
   ` : ''}
    
@@ -213,10 +248,26 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
      border-right-color: rgba(255,255,255,0.3);
    }
    
-   .merged-cell {
-     vertical-align: middle !important;
-     text-align: center;
-   }
+    .merged-cell {
+      vertical-align: middle !important;
+      text-align: center;
+      position: relative;
+    }
+    .merged-cell-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      width: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 8px;
+      box-sizing: border-box;
+      font-weight: 700;
+    }
 
   .invoice-container {
     width: 900px;
@@ -274,13 +325,19 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
   }
 
   .meta-left .row, .meta-right .row {
-    margin: 6px 0;
+    margin: 4px 0;
     display: flex;
-    justify-content: space-between;
+    align-items: baseline;
   }
 
   .meta-left .label, .meta-right .label {
     font-weight: 700;
+    min-width: 140px;
+    flex-shrink: 0;
+  }
+
+  .meta-right .label {
+    min-width: 160px;
   }
 
   .attn {
@@ -675,7 +732,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
   <!-- PAGE 1: Product & Pricing Information -->
   <div class="page">
     ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
-    ${isProforma ? '<div class="proforma-badge">Proforma Invoice</div>' : ''}
+    
     <div class="page-content">
       <div class="header-section">
          <img src="${headerImage}" alt="Invoice Header" class="header-image">
@@ -716,11 +773,11 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
         </thead>
         <tbody>
           <tr class="invoice-body">
-             <td style="font-weight: 700; width: 45%;">MAKE</td>
-             <td>${data.make}</td>
-              <td rowspan="8" class="qty merged-cell">${data.quantity}.00</td>
-              <td rowspan="8" class="price merged-cell">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : (isProforma && data.proforma_amount ? (data.proforma_amount / data.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.unit_price.toLocaleString('en-US', { minimumFractionDigits: 2 }))}</td>
-              <td rowspan="8" class="total merged-cell">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+             <td style="font-weight: 700; width: 25%;">MAKE</td>
+             <td style="width: 30%;">${data.make}</td>
+               <td rowspan="8" class="qty merged-cell"><div class="merged-cell-content">${data.quantity}.00</div></td>
+               <td rowspan="8" class="price merged-cell"><div class="merged-cell-content">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : (isProforma && data.proforma_amount ? (data.proforma_amount / data.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.unit_price.toLocaleString('en-US', { minimumFractionDigits: 2 }))}</div></td>
+               <td rowspan="8" class="total merged-cell"><div class="merged-cell-content">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div></td>
            </tr>
            <tr class="invoice-body">
              <td style="font-weight: 700;">BUS MODEL</td>
@@ -785,7 +842,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
 
       ${isProforma ? `
         <div class="proforma-info">
-          <h4>⚠️ PROFORMA INVOICE NOTICE</h4>
+          <h4>PROFORMA INVOICE NOTICE</h4>
           <p>This is a proforma invoice issued for ${(data.proforma_purpose || 'financing').replace('_', ' ')} purposes only.</p>
           <p>The amount shown represents ${data.proforma_amount_percentage || 0}% of the total vehicle price.</p>
           <p>This document is not a demand for payment and should not be used for tax purposes.</p>
@@ -985,14 +1042,84 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
   console.log('📄 Starting PDF generation for invoice:', data.invoice_no);
   
    const isTaxInvoice = data.invoice_category === 'tax_invoice' || data.is_tax_invoice;
-   const headerImagePath = isTaxInvoice 
-     ? '/lovable-uploads/yutong-tax-invoice-header.png' 
-     : '/lovable-uploads/yutong-invoice-header.png';
-   
+
+   // For tax invoices, no header image needed (uses government format)
+   if (isTaxInvoice) {
+     const taxRate = data.tax_rate || 18;
+     const baseAmount = data.base_amount || data.total / (1 + taxRate / 100);
+     const vehicleDescription = [
+       data.make, data.bus_model, `${data.seating_capacity} Seater`,
+       `${data.year_of_manufacture}`, data.vehicle_condition, data.fuel_type,
+       `Engine: ${data.engine_number}`, `Chassis: ${data.chassis_number}`,
+     ].filter(Boolean).join(' | ');
+
+     const taxInvoiceData = {
+       invoiceDate: data.invoice_date,
+       taxInvoiceNo: data.invoice_no,
+       supplierTin: data.supplier_tin || data.company_vat_number || '',
+       supplierName: data.supplier_name || 'NCG Holdings (Pvt) Ltd',
+       supplierAddress: data.supplier_address || '157 Y, Kabellawita, Weniweikola, Polgasowita',
+       supplierPhone: data.supplier_phone || '0770455981',
+       purchaserTin: data.purchaser_tin || data.customer_vat_number || '',
+       purchaserName: data.customer_name,
+       purchaserAddress: data.address,
+       purchaserPhone: data.purchaser_phone || data.contact || '',
+       dateOfDelivery: data.date_of_delivery,
+       placeOfSupply: data.place_of_supply,
+       additionalInformation: data.additional_information,
+       lineItems: [{ reference: '1', description: vehicleDescription, quantity: data.quantity, unitPrice: baseAmount / data.quantity, amountExclVat: baseAmount }],
+       vatRate: taxRate,
+       modeOfPayment: data.mode_of_payment,
+       preparedBy: data.preparedBy ? { name: data.preparedBy.approver_name, signature: data.preparedBy.signature_data, date: data.preparedBy.approval_date } : undefined,
+       approvedBy: data.approvedBy ? { name: data.approvedBy.approver_name, signature: data.approvedBy.signature_data, date: data.approvedBy.approval_date } : undefined,
+       customerSignature: data.receivedBy ? { name: data.receivedBy.approver_name, signature: data.receivedBy.signature_data, date: data.receivedBy.approval_date } : undefined,
+     };
+
+     const htmlContent = await resolveTaxInvoiceHTML(taxInvoiceData);
+     const container = document.createElement('div');
+     container.innerHTML = htmlContent;
+     container.style.position = 'absolute';
+     container.style.left = '-9999px';
+     document.body.appendChild(container);
+
+     try {
+       const page = container.querySelector('.tax-invoice-page') as HTMLElement;
+       if (!page) throw new Error('Tax invoice page not found');
+
+       const pdf = new jsPDF('p', 'mm', 'a4');
+       const pdfWidth = pdf.internal.pageSize.getWidth();
+       const pdfHeight = pdf.internal.pageSize.getHeight();
+
+       const canvas = await html2canvas(page, {
+         scale: 2.5,
+         useCORS: true,
+         allowTaint: true,
+         backgroundColor: '#ffffff',
+         logging: false,
+         width: 800,
+         windowWidth: 800
+       });
+
+       const imgData = canvas.toDataURL('image/jpeg', 0.95);
+       const ratio = Math.min(pdfWidth / canvas.width, pdfHeight / canvas.height);
+       const scaledWidth = canvas.width * ratio;
+       const scaledHeight = canvas.height * ratio;
+       const imgX = (pdfWidth - scaledWidth) / 2;
+
+       pdf.addImage(imgData, 'JPEG', imgX, 0, scaledWidth, scaledHeight);
+       const blob = pdf.output('blob');
+       return blob;
+     } finally {
+       document.body.removeChild(container);
+     }
+   }
+
+   const headerImagePath = '/lovable-uploads/yutong-invoice-header.png';
+  
   // Pre-load header image as base64
   console.log('🖼️ Loading header image...');
-   const headerImageBase64 = await loadImageAsBase64(headerImagePath);
-  
+  const headerImageBase64 = await loadImageAsBase64(headerImagePath);
+   
    if (!headerImageBase64) {
     console.warn('⚠️ Header image failed to load, proceeding anyway...');
   }

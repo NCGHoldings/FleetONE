@@ -14,6 +14,7 @@ interface YutongQuotation {
   contact_person?: string;
   bus_model: string;
   bus_model_id?: string;
+  seating_capacity?: string;
   quantity: number;
   unit_price: number;
   total_price: number;
@@ -75,19 +76,19 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
     if (busModelDetails) {
       return {
         model: busModelDetails.model_name || quotation.bus_model,
-        seating: busModelDetails.capacity ? `${busModelDetails.capacity}` : "37+1+1",
-        engine: busModelDetails.engine || "YUCHAI-YC6A270-50 (Euro V)",
-        year: busModelDetails.manufactured_year?.toString() || "2025",
+        seating: busModelDetails.capacity ? `${busModelDetails.capacity}` : (quotation.seating_capacity || "N/A"),
+        engine: busModelDetails.engine || "N/A",
+        year: (quotation as any).vehicle_year?.toString() || busModelDetails.manufactured_year?.toString() || "N/A",
         condition: busModelDetails.condition || "BRAND NEW",
       };
     }
 
     // Fallback values when bus model details are not available
     return {
-      model: quotation.bus_model || "ZK6907H",
-      seating: "37+1+1",
-      engine: "YUCHAI-YC6A270-50 (Euro V)",
-      year: "2025",
+      model: quotation.bus_model || "N/A",
+      seating: quotation.seating_capacity || "N/A",
+      engine: "N/A",
+      year: (quotation as any).vehicle_year?.toString() || "N/A",
       condition: "BRAND NEW",
     };
   };
@@ -99,12 +100,31 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch bus model details if bus_model_id is available
-        if (quotation.bus_model_id) {
+        // Fetch bus model details - try quotation's bus_model_id first, then walk parent chain
+        let busModelId = quotation.bus_model_id;
+        
+        if (!busModelId && (quotation as any).parent_quotation_id) {
+          // Walk the parent chain to find a valid bus_model_id
+          let parentId = (quotation as any).parent_quotation_id;
+          for (let i = 0; i < 10 && parentId && !busModelId; i++) {
+            const { data: parentData } = await supabase
+              .from("yutong_quotations")
+              .select("bus_model_id, parent_quotation_id")
+              .eq("id", parentId)
+              .maybeSingle();
+            if (parentData?.bus_model_id) {
+              busModelId = parentData.bus_model_id;
+            } else {
+              parentId = parentData?.parent_quotation_id;
+            }
+          }
+        }
+
+        if (busModelId) {
           const { data: busData, error: busError } = await supabase
             .from("yutong_bus_models")
             .select("model_name, capacity, engine, manufactured_year, condition")
-            .eq("id", quotation.bus_model_id)
+            .eq("id", busModelId)
             .maybeSingle();
 
           if (busError) {
@@ -368,51 +388,51 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             {quotation.customer_type === "company" ? (
               <>
                 {quotation.representative_name && (
-                  <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                    <b>CUSTOMER :</b> {quotation.representative_name}
+                  <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                    <b>CUSTOMER{'\u00A0'}:{'\u00A0'}</b>{quotation.representative_name}
                   </p>
                 )}
                 {quotation.designation && (
-                  <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                    <b>DESIGNATION :</b> {quotation.designation}
+                  <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                    <b>DESIGNATION{'\u00A0'}:{'\u00A0'}</b>{quotation.designation}
                   </p>
                 )}
-                <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                  <b>COMPANY :</b> {quotation.customer_name}
+                <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                  <b>COMPANY{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_name}
                 </p>
                 {quotation.business_registration_number && (
-                  <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                    <b>BUSINESS REG NO :</b> {quotation.business_registration_number}
+                  <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                    <b>BUSINESS{'\u00A0'}REG{'\u00A0'}NO{'\u00A0'}:{'\u00A0'}</b>{quotation.business_registration_number}
                   </p>
                 )}
                 {quotation.tax_registration_number && (
-                  <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                    <b>TAX REG NO :</b> {quotation.tax_registration_number}
+                  <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                    <b>TAX{'\u00A0'}REG{'\u00A0'}NO{'\u00A0'}:{'\u00A0'}</b>{quotation.tax_registration_number}
                   </p>
                 )}
-                <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                  <b>ADDRESS :</b> {quotation.customer_address || ""}
+                <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                  <b>ADDRESS{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_address || ""}
                 </p>
               </>
             ) : (
               <>
-                <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                  <b>CUSTOMER :</b> {quotation.customer_name}
+                <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                  <b>CUSTOMER{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_name}
                 </p>
-                <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                  <b>ADDRESS :</b> {quotation.customer_address || ""}
+                <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                  <b>ADDRESS{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_address || ""}
                 </p>
               </>
             )}
-            <p style={{ margin: "3px 0", fontSize: "13px" }}>
-              <b>CONTACT :</b> {quotation.customer_phone}{quotation.customer_email ? ` / ${quotation.customer_email}` : ''}
+            <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+              <b>CONTACT{'\u00A0'}:{'\u00A0'}</b>{quotation.customer_phone}{quotation.customer_email ? ` / ${quotation.customer_email}` : ''}
             </p>
-            <p style={{ margin: "3px 0", fontSize: "13px" }}>
-              <b>DATE :</b> {formattedDate}
+            <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+              <b>DATE{'\u00A0'}:{'\u00A0'}</b>{formattedDate}
             </p>
             {quotation.finance_company && (
-              <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                <b>FINANCE COMPANY :</b> {quotation.finance_company}
+              <p style={{ margin: "3px 0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
+                <b>FINANCE{'\u00A0'}COMPANY{'\u00A0'}:{'\u00A0'}</b>{quotation.finance_company}
               </p>
             )}
           </div>
@@ -477,20 +497,20 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             <tbody>
               {/* Main Bus Product */}
               <tr>
-                <td style={{ padding: "8px", fontSize: "14px", border: "1px solid #003366" }}>
-                  <b>BUS MODEL:</b> YUTONG - {busDetails.model}
+                <td style={{ padding: "8px", fontSize: "14px", border: "1px solid #003366", whiteSpace: "pre-wrap" }}>
+                  <b>BUS{'\u00A0'}MODEL{'\u00A0'}:{'\u00A0'}</b>YUTONG{'\u00A0'}-{'\u00A0'}{busDetails.model}
                   <br />
-                  <b>SEATING CAPACITY:</b> {busDetails.seating}
+                  <b>SEATING{'\u00A0'}CAPACITY{'\u00A0'}:{'\u00A0'}</b>{busDetails.seating}
                   <br />
-                  <b>ENGINE:</b> {busDetails.engine}
+                  <b>ENGINE{'\u00A0'}:{'\u00A0'}</b>{busDetails.engine}
                   <br />
-                  <b>YEAR:</b> {busDetails.year}
+                  <b>YEAR{'\u00A0'}:{'\u00A0'}</b>{busDetails.year}
                   <br />
-                  <b>CONDITION:</b> {busDetails.condition}
+                  <b>CONDITION{'\u00A0'}:{'\u00A0'}</b>{busDetails.condition}
                   {quotation.special_features && (
                     <>
                       <br />
-                      <b>SPECIAL FEATURES:</b> {quotation.special_features}
+                      <b>SPECIAL{'\u00A0'}FEATURES{'\u00A0'}:{'\u00A0'}</b>{quotation.special_features}
                     </>
                   )}
                 </td>
@@ -767,36 +787,6 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             </div>
           )}
 
-          {/* Company Registration Details */}
-          {quotation.customer_type === "company" &&
-            (quotation.business_registration_number || quotation.tax_registration_number) && (
-              <div
-                style={{
-                  fontSize: "14px",
-                  marginTop: "20px",
-                  padding: "15px",
-                  border: "2px solid #003366",
-                  borderRadius: "8px",
-                  background: "#f8f9fa",
-                }}
-              >
-                <h3 style={{ margin: "0 0 10px 0", color: "#003366", fontSize: "16px", fontWeight: "bold" }}>
-                  COMPANY REGISTRATION DETAILS
-                </h3>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                  {quotation.business_registration_number && (
-                    <p style={{ margin: "4px 0" }}>
-                      <b>Business Registration Number:</b> {quotation.business_registration_number}
-                    </p>
-                  )}
-                  {quotation.tax_registration_number && (
-                    <p style={{ margin: "4px 0" }}>
-                      <b>Tax Registration Number:</b> {quotation.tax_registration_number}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
         </div>
 
         {/* Page 1 Footer with Signatures */}
@@ -817,6 +807,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                           src={sig.signature_data}
                           alt={`${sig.signer_name} signature`}
                           style={{ maxHeight: "60px", maxWidth: "100%" }}
+                          crossOrigin="anonymous"
                         />
                       ) : (
                         <div style={{ fontFamily: "cursive", fontSize: "18px" }}>
@@ -924,6 +915,19 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             <p style={{ marginBottom: "6px" }}>
               <b>10. Indemnity, Marketing & Assignment:</b> The buyer agrees to indemnify the seller against any claims arising from use or resale of the vehicle. The seller may use vehicle images for promotional purposes. The buyer may not assign or transfer this agreement without written consent.
             </p>
+
+            <p style={{ marginBottom: "6px", padding: "8px", border: "2px solid #003366", borderRadius: "4px", background: "#e8f0fe" }}>
+              <b>11. Quotation Validity:</b> This quotation is valid for {(() => {
+                try {
+                  const created = new Date(quotation.created_at);
+                  const validUntil = new Date(quotation.valid_until);
+                  const diffDays = Math.round((validUntil.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+                  return diffDays > 0 ? diffDays : 30;
+                } catch { return 30; }
+              })()} days from the date of issue (valid until {(() => {
+                try { return format(new Date(quotation.valid_until), "dd/MM/yyyy"); } catch { return "N/A"; }
+              })()}). After this period, prices and availability are subject to change.
+            </p>
           </div>
 
           {/* Additional Terms Section - Warranty, Delivery, Payment */}
@@ -994,6 +998,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                           src={sig.signature_data}
                           alt={`${sig.signer_name} signature`}
                           style={{ maxHeight: "60px", maxWidth: "100%" }}
+                          crossOrigin="anonymous"
                         />
                       ) : (
                         <div style={{ fontFamily: "cursive", fontSize: "18px" }}>

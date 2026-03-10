@@ -13,6 +13,10 @@ export interface StaffMemberPerformance {
   address?: string;
   license_number?: string;
   license_expiry?: string;
+  license_type?: string;
+  date_of_birth?: string;
+  blood_group?: string;
+  joined_date?: string;
   salary_type?: string;
   daily_rate?: number;
   monthly_salary?: number;
@@ -220,8 +224,12 @@ export function useStaffPerformance(options: UseStaffPerformanceOptions = {}) {
           phone: staff.contact_number,
           nic: staff.nic_number,
           address: staff.address,
-          license_number: undefined, // Not in staff_registry
-          license_expiry: undefined, // Not in staff_registry
+          license_number: staff.license_number || undefined,
+          license_expiry: staff.license_expiry || undefined,
+          license_type: staff.license_type || undefined,
+          date_of_birth: staff.date_of_birth || undefined,
+          blood_group: staff.blood_group || undefined,
+          joined_date: staff.joined_date || undefined,
           salary_type: staff.salary_type,
           daily_rate: staff.daily_rate,
           monthly_salary: staff.monthly_salary,

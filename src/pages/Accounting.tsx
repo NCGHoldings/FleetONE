@@ -45,10 +45,13 @@ import { VendorPerformanceView } from "@/components/accounting/VendorPerformance
 // Gap Analysis - AR/AP Components
 import { ARCreditNotesView } from "@/components/accounting/ARCreditNotesView";
 import { ARAgeingReport } from "@/components/accounting/ARAgeingReport";
-import { ARReconciliationView } from "@/components/accounting/ARReconciliationView";
+import { ARReconciliationWorksheet } from "@/components/accounting/ARReconciliationWorksheet";
 import { APDebitNotesView } from "@/components/accounting/APDebitNotesView";
 import { APAgeingReport } from "@/components/accounting/APAgeingReport";
-import { APReconciliationView } from "@/components/accounting/APReconciliationView";
+import { APReconciliationWorksheet } from "@/components/accounting/APReconciliationWorksheet";
+import { PettyCashReconciliationWorksheet } from "@/components/accounting/PettyCashReconciliationWorksheet";
+import { SubLedgerReconciliationView } from "@/components/accounting/SubLedgerReconciliationView";
+import { IntercompanyReconciliationView } from "@/components/accounting/IntercompanyReconciliationView";
 // Gap Analysis - Inventory Components
 import { InventoryAgeingView } from "@/components/accounting/InventoryAgeingView";
 import { StockReconciliationView } from "@/components/accounting/StockReconciliationView";
@@ -209,6 +212,8 @@ const Accounting = () => {
                   <TabsTrigger value="currencies">Currencies</TabsTrigger>
                   <TabsTrigger value="period-closing">Period Closing</TabsTrigger>
                   <TabsTrigger value="approvals">Approvals</TabsTrigger>
+                  <TabsTrigger value="subledger">Sub-Ledger Recon</TabsTrigger>
+                  <TabsTrigger value="intercompany">Intercompany</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
@@ -422,6 +427,14 @@ const Accounting = () => {
               <TabsContent value="approvals">
                 <PendingApprovalsView />
               </TabsContent>
+
+              <TabsContent value="subledger">
+                <SubLedgerReconciliationView />
+              </TabsContent>
+
+              <TabsContent value="intercompany">
+                <IntercompanyReconciliationView />
+              </TabsContent>
             </Tabs>
           )}
 
@@ -471,7 +484,7 @@ const Accounting = () => {
               </TabsContent>
 
               <TabsContent value="reconciliation">
-                <ARReconciliationView />
+                <ARReconciliationWorksheet />
               </TabsContent>
             </Tabs>
           )}
@@ -523,7 +536,7 @@ const Accounting = () => {
               </TabsContent>
 
               <TabsContent value="reconciliation">
-                <APReconciliationView />
+                <APReconciliationWorksheet />
               </TabsContent>
 
               <TabsContent value="vendor-performance">
@@ -708,6 +721,7 @@ const Accounting = () => {
                   <TabsTrigger value="reconciliation">Bank Reconciliation</TabsTrigger>
                   <TabsTrigger value="transfers">Fund Transfers</TabsTrigger>
                   <TabsTrigger value="payment-batches">Payment Batches</TabsTrigger>
+                  <TabsTrigger value="petty-cash-recon">Petty Cash Recon</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
@@ -738,6 +752,10 @@ const Accounting = () => {
 
               <TabsContent value="payment-batches">
                 <PaymentBatchView />
+              </TabsContent>
+
+              <TabsContent value="petty-cash-recon">
+                <PettyCashReconciliationWorksheet />
               </TabsContent>
             </Tabs>
           )}

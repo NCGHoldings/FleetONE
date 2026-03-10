@@ -133,7 +133,10 @@ export function useBranchFinanceSettings(branchId: string | null) {
   return useQuery({
     queryKey: ["school-bus-finance-settings", selectedCompanyId, branchId],
     queryFn: async () => {
-      // First try to get branch-specific settings
+      const hasConfiguredAccounts = (s: any) =>
+        s && s.trade_receivable_account_id && s.sbs_collection_account_id;
+
+      // First try to get branch-specific settings for selected company
       if (branchId) {
         const { data: branchSettings } = await supabase
           .from("school_bus_finance_settings")
@@ -142,21 +145,49 @@ export function useBranchFinanceSettings(branchId: string | null) {
           .eq("branch_id", branchId)
           .maybeSingle();
 
-        if (branchSettings) {
+        if (hasConfiguredAccounts(branchSettings)) {
           return branchSettings;
+        }
+
+        // Fallback: search across ALL companies for this branch with configured accounts
+        const { data: crossCompanySettings } = await supabase
+          .from("school_bus_finance_settings")
+          .select("*")
+          .eq("branch_id", branchId)
+          .not("trade_receivable_account_id", "is", null)
+          .not("sbs_collection_account_id", "is", null)
+          .limit(1)
+          .maybeSingle();
+
+        if (crossCompanySettings) {
+          return crossCompanySettings;
         }
       }
 
-      // Fallback to default settings (branch_id is null)
-      const { data: defaultSettings, error } = await supabase
+      // Fallback to default settings (branch_id is null) for selected company
+      const { data: defaultSettings } = await supabase
         .from("school_bus_finance_settings")
         .select("*")
         .eq("company_id", selectedCompanyId)
         .is("branch_id", null)
         .maybeSingle();
 
+      if (hasConfiguredAccounts(defaultSettings)) {
+        return defaultSettings;
+      }
+
+      // Final fallback: any default settings with configured accounts
+      const { data: anyDefault, error } = await supabase
+        .from("school_bus_finance_settings")
+        .select("*")
+        .is("branch_id", null)
+        .not("trade_receivable_account_id", "is", null)
+        .not("sbs_collection_account_id", "is", null)
+        .limit(1)
+        .maybeSingle();
+
       if (error) throw error;
-      return defaultSettings;
+      return anyDefault || defaultSettings;
     },
     enabled: !!selectedCompanyId,
   });
@@ -355,6 +386,21 @@ export function useGenerateBulkARInvoices() {
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
 
+      // ── Duplicate guard: check if batch already exists for this branch + month ──
+      const monthStr = format(invoiceMonth, "yyyy-MM-dd");
+      const { data: existingBatch } = await supabase
+        .from("school_ar_invoice_batches")
+        .select("id, batch_number, status")
+        .eq("branch_id", branchId)
+        .eq("invoice_month", monthStr)
+        .maybeSingle();
+
+      if (existingBatch) {
+        throw new Error(
+          `Invoices already generated for ${format(invoiceMonth, "MMMM yyyy")} (Batch: ${existingBatch.batch_number}). Please delete the existing batch before regenerating.`
+        );
+      }
+
       // Get batch number for tracking
       const { data: batchData } = await supabase.rpc("generate_sbs_batch_number");
       const batchNumber = batchData || `SBS-BATCH-${format(new Date(), "yyyyMMdd")}-0001`;
@@ -439,7 +485,7 @@ export function useGenerateBulkARInvoices() {
           .from("customers")
           .insert({
             company_id: effectiveCompanyId,
-            business_unit_code: businessUnitCode || 'SBO',
+            business_unit_code: 'SBO',
             customer_code: `SBS-${branchCode}`,
             customer_name: `School Bus Students - ${branchName}`,
             is_active: true,
@@ -467,9 +513,9 @@ export function useGenerateBulkARInvoices() {
           const amount = Math.max(0, rawAmount - credit);
           
           // Generate unique identifiers for this student
-          const studentShortId = student.id.substring(0, 4).toUpperCase();
+          const uniqueSuffix = `${String(globalIndex).padStart(5, "0")}-${student.id.substring(0, 4).toUpperCase()}`;
           const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(globalIndex).padStart(5, "0")}`;
-          const entryNumber = `SBS-JE-${format(new Date(), "yyyyMMdd")}-${studentShortId}`;
+          const entryNumber = `SBS-JE-${format(invoiceMonth, "yyyyMM")}-${uniqueSuffix}`;
           
           // 1. Create individual Journal Entry for this student
           const { data: journalEntry, error: jeError } = await supabase
@@ -483,7 +529,7 @@ export function useGenerateBulkARInvoices() {
               total_credit: amount,
               status: "posted",
               company_id: effectiveCompanyId,
-              business_unit_code: businessUnitCode || 'SBO',
+              business_unit_code: 'SBO',
               business_unit_id: selectedCompanyId,
               posted_at: new Date().toISOString(),
             })
@@ -530,7 +576,7 @@ export function useGenerateBulkARInvoices() {
           const liabilityAccountId = settings.advance_payments_liability_account_id;
           if (liabilityAccountId && student.payment_balance > 0) {
             const advanceApplyAmount = Math.min(student.payment_balance, amount);
-            const advanceEntryNumber = `SBS-ADV-${format(new Date(), "yyyyMMdd")}-${studentShortId}`;
+            const advanceEntryNumber = `SBS-ADV-${format(invoiceMonth, "yyyyMM")}-${uniqueSuffix}`;
 
             const { data: advanceJE, error: advJEError } = await supabase
               .from("journal_entries")
@@ -543,7 +589,7 @@ export function useGenerateBulkARInvoices() {
                 total_credit: advanceApplyAmount,
                 status: "posted",
                 company_id: effectiveCompanyId,
-                business_unit_code: businessUnitCode || 'SBO',
+                business_unit_code: 'SBO',
                 business_unit_id: selectedCompanyId,
                 posted_at: new Date().toISOString(),
               })
@@ -582,7 +628,7 @@ export function useGenerateBulkARInvoices() {
               .from("ar_invoices")
               .insert({
                 company_id: effectiveCompanyId,
-                business_unit_code: businessUnitCode || 'SBO',
+                business_unit_code: 'SBO',
                 customer_id: customerId,
                 invoice_number: invoiceNumber,
                 invoice_date: format(new Date(), "yyyy-MM-dd"),
@@ -783,7 +829,7 @@ export function usePostPaymentToGL() {
           total_credit: totalCreditAmount,
           status: "posted",
           company_id: effectiveCompanyId,
-          business_unit_code: businessUnitCode || 'SBO',
+          business_unit_code: 'SBO',
           business_unit_id: selectedCompanyId,
           posted_at: new Date().toISOString(),
         })
@@ -863,6 +909,66 @@ export function usePostPaymentToGL() {
           journal_entry_id: journalEntry.id,
         })
         .eq("id", paymentId);
+
+      // Create AR Receipt record in Finance module
+      try {
+        const receiptNumber = `SBS-REC-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        
+        // Get or create SBS customer
+        let receiptCustomerId: string | null = null;
+        const { data: existingCust } = await supabase
+          .from("customers")
+          .select("id")
+          .eq("company_id", effectiveCompanyId)
+          .eq("customer_code", "SBS-DEFAULT")
+          .maybeSingle();
+        
+        receiptCustomerId = existingCust?.id || null;
+        if (!receiptCustomerId) {
+          const { data: newCust } = await supabase
+            .from("customers")
+            .insert({
+              company_id: effectiveCompanyId,
+              business_unit_code: 'SBO',
+              customer_code: "SBS-DEFAULT",
+              customer_name: "School Bus Students",
+              is_active: true,
+            } as any)
+            .select()
+            .single();
+          receiptCustomerId = newCust?.id || null;
+        }
+
+        const { data: arReceipt } = await supabase
+          .from("ar_receipts")
+          .insert({
+            company_id: effectiveCompanyId,
+            business_unit_code: 'SBO',
+            customer_id: receiptCustomerId,
+            receipt_number: receiptNumber,
+            receipt_date: format(new Date(), "yyyy-MM-dd"),
+            amount: amount,
+            payment_method: paymentMethod === 'Bank Transfer' ? 'bank_transfer' : paymentMethod.toLowerCase(),
+            reference: referenceNo || paymentId,
+            status: 'posted',
+            journal_entry_id: journalEntry.id,
+            bank_account_id: null,
+            notes: `School Bus Payment - ${studentName}`,
+            is_advance: (overpaymentAmount && overpaymentAmount > 0) ? true : false,
+          } as any)
+          .select()
+          .single();
+
+        // Link AR receipt back to payment transaction
+        if (arReceipt) {
+          await supabase
+            .from("school_payment_transactions")
+            .update({ ar_receipt_id: arReceipt.id })
+            .eq("id", paymentId);
+        }
+      } catch (receiptError) {
+        console.error("AR Receipt creation failed (non-critical):", receiptError);
+      }
 
       return journalEntry;
     },
@@ -1014,7 +1120,7 @@ export function useBackfillARInvoiceLinks() {
           .from("customers")
           .insert({
             company_id: effectiveCompanyId,
-            business_unit_code: businessUnitCode || 'SBO',
+            business_unit_code: 'SBO',
             customer_code: "SBS-DEFAULT",
             customer_name: "School Bus Students (Backfill)",
             is_active: true,
@@ -1047,7 +1153,7 @@ export function useBackfillARInvoiceLinks() {
             .from("ar_invoices")
             .insert({
               company_id: effectiveCompanyId,
-              business_unit_code: businessUnitCode || 'SBO',
+              business_unit_code: 'SBO',
               customer_id: customerId,
               invoice_number: inv.invoice_number,
               invoice_date: inv.invoice_month,
@@ -1141,7 +1247,7 @@ export async function syncPaymentToFinanceAR(
     .from("ar_invoices")
     .insert({
       company_id: effectiveCompanyId,
-      business_unit_code: businessUnitCode || 'SBO',
+      business_unit_code: 'SBO',
       customer_id: customerId,
       invoice_number: schoolInv.invoice_number,
       invoice_date: schoolInv.invoice_month,
@@ -1168,4 +1274,95 @@ export async function syncPaymentToFinanceAR(
     .eq("id", schoolInvoiceId);
 
   return arInvoice.id;
+}
+
+// Delete an AR invoice batch and all related records (invoices, journal entries)
+export function useDeleteARBatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (batchId: string) => {
+      // 1. Get all school_ar_invoices for this batch (with linked ar_invoice_id and journal refs)
+      const { data: schoolInvoices, error: fetchErr } = await supabase
+        .from("school_ar_invoices")
+        .select("id, ar_invoice_id, invoice_number")
+        .eq("batch_id", batchId);
+
+      if (fetchErr) throw fetchErr;
+
+      // 2. Get the batch itself (for journal_entry_id)
+      const { data: batch } = await supabase
+        .from("school_ar_invoice_batches")
+        .select("id, journal_entry_id")
+        .eq("id", batchId)
+        .single();
+
+      // 3. Collect AR invoice IDs to delete from Finance ERP
+      const arInvoiceIds = (schoolInvoices || [])
+        .map((si) => si.ar_invoice_id)
+        .filter(Boolean) as string[];
+
+      // 4. Delete school_ar_invoices
+      if (schoolInvoices && schoolInvoices.length > 0) {
+        const { error } = await supabase
+          .from("school_ar_invoices")
+          .delete()
+          .eq("batch_id", batchId);
+        if (error) throw error;
+      }
+
+      // 5. Delete linked Finance AR invoice lines + invoices
+      for (const arId of arInvoiceIds) {
+        await supabase.from("ar_invoice_lines").delete().eq("invoice_id", arId);
+        await supabase.from("ar_invoices").delete().eq("id", arId);
+      }
+
+      // 6. Void batch journal entry if exists
+      if (batch?.journal_entry_id) {
+        await supabase
+          .from("journal_entries")
+          .update({ status: "void", notes: "Voided: AR batch deleted" })
+          .eq("id", batch.journal_entry_id);
+      }
+
+      // 7. Delete the batch record
+      const { error: batchDelErr } = await supabase
+        .from("school_ar_invoice_batches")
+        .delete()
+        .eq("id", batchId);
+
+      if (batchDelErr) throw batchDelErr;
+
+      return { deletedInvoices: schoolInvoices?.length || 0 };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["school-ar-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["students-bulk-ar"] });
+      toast.success(`Deleted batch with ${result.deletedInvoices} invoices`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete batch: ${error.message}`);
+    },
+  });
+}
+
+// Check if a batch already exists for a branch + month
+export function useExistingBatch(branchId: string | null, invoiceMonth: Date | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["existing-ar-batch", branchId, invoiceMonth ? format(invoiceMonth, "yyyy-MM-dd") : null],
+    queryFn: async () => {
+      if (!branchId || !invoiceMonth) return null;
+      const monthStr = format(invoiceMonth, "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("school_ar_invoice_batches")
+        .select("id, batch_number, status, total_students, total_amount, created_at")
+        .eq("branch_id", branchId)
+        .eq("invoice_month", monthStr)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!branchId && !!invoiceMonth && enabled,
+  });
 }

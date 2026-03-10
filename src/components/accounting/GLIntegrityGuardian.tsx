@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +55,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const GLIntegrityGuardian = () => {
+  const navigate = useNavigate();
   const scanner = useGLIntegrityScanner();
   const postGap = usePostGapToGL();
   const bulkPost = useBulkPostGapsToGL();
@@ -388,9 +390,12 @@ const GLIntegrityGuardian = () => {
                   </span>
                   <span>
                     {scanResult.allGaps.filter((g) => !g.canAutoPost).length > 0 && (
-                      <span className="text-amber-600">
-                        ⚠ {scanResult.allGaps.filter((g) => !g.canAutoPost).length} gaps need Settings config
-                      </span>
+                      <button
+                        onClick={() => navigate("/settings?tab=core-gl-settings")}
+                        className="text-amber-600 hover:text-amber-700 hover:underline cursor-pointer"
+                      >
+                        ⚠ {scanResult.allGaps.filter((g) => !g.canAutoPost).length} gaps need Settings config →
+                      </button>
                     )}
                   </span>
                 </div>
@@ -404,6 +409,7 @@ const GLIntegrityGuardian = () => {
                     getSeverityBadge={getSeverityBadge}
                     onPostSingle={handlePostSingle}
                     postingId={postingId}
+                    onNavigateConfig={() => navigate("/settings?tab=core-gl-settings")}
                   />
                 ))}
               </>
@@ -536,6 +542,7 @@ interface ModuleGapCardProps {
   getSeverityBadge: (severity: string) => React.ReactNode;
   onPostSingle: (gap: any) => void;
   postingId: string | null;
+  onNavigateConfig: () => void;
 }
 
 const ModuleGapCard = ({
@@ -546,6 +553,7 @@ const ModuleGapCard = ({
   getSeverityBadge,
   onPostSingle,
   postingId,
+  onNavigateConfig,
 }: ModuleGapCardProps) => {
   return (
     <Card className="overflow-hidden">
@@ -632,7 +640,12 @@ const ModuleGapCard = ({
                           )}
                         </Button>
                       ) : (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" disabled>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-amber-600 hover:text-amber-700"
+                          onClick={onNavigateConfig}
+                        >
                           <Settings2 className="h-3 w-3 mr-1" />
                           Config
                         </Button>

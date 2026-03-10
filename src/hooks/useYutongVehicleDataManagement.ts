@@ -63,14 +63,15 @@ export interface ColumnMapping {
 
 // Auto-detect column mappings based on common patterns
 const COLUMN_PATTERNS: Record<string, string[]> = {
-  vehicle_no: ['no', 'no.', 'number', 'sl', 's.no', 'sno', 'sr', 'serial', '#'],
+  vehicle_no: ['no', 'no.', 'number', 'sl', 's.no', 'sno', 'sr', 'serial', '#', 'item', 'item no', 'item number', 'item no.'],
   model: ['model', 'bus model', 'vehicle model', 'type'],
   engine_no: ['engine', 'engine no', 'engine number', 'engine_no', 'eng no', 'eng'],
-  chassis_no: ['chassis', 'chassis no', 'chassis number', 'chassis_no', 'chasis'],
+  chassis_no: ['chassis', 'chassis no', 'chassis number', 'chassis_no', 'chasis', 'vin', 'vin no', 'vin number', 'vin no.'],
   seat_config: ['seat', 'seats', 'seating', 'capacity', 'seat config', 'seater'],
   color: ['color', 'colour', 'paint', 'shade'],
   customer_name: ['customer', 'customer name', 'buyer', 'client', 'owner', 'name'],
   year_of_manufacture: ['year', 'year of manufacture', 'yom', 'mfg year'],
+  order_no: ['order', 'order no', 'order number', 'order no.', 'order_no'],
 };
 
 export function useYutongVehicleDataManagement() {
@@ -260,9 +261,11 @@ export function useYutongVehicleDataManagement() {
   const matchVehicleToOrder = useCallback(async (
     vehicleId: string,
     orderId: string,
-    isAutoMatch: boolean = false
+    isAutoMatch: boolean = false,
+    vehicleData?: VehicleRecord
   ): Promise<boolean> => {
     try {
+      // Update vehicle record match status
       const { error } = await supabase
         .from('yutong_vehicle_records')
         .update({
@@ -273,6 +276,33 @@ export function useYutongVehicleDataManagement() {
         .eq('id', vehicleId);
 
       if (error) throw error;
+
+      // Auto-populate vehicle details into the order
+      if (vehicleData) {
+        const orderUpdate: Record<string, any> = {};
+        if (vehicleData.engine_no) orderUpdate.engine_number = vehicleData.engine_no;
+        if (vehicleData.chassis_no) orderUpdate.chassis_number = vehicleData.chassis_no;
+        if (vehicleData.year_of_manufacture) orderUpdate.year_of_manufacture = vehicleData.year_of_manufacture;
+        if (vehicleData.country_of_origin) orderUpdate.country_of_origin = vehicleData.country_of_origin;
+        if (vehicleData.fuel_type) orderUpdate.fuel_type = vehicleData.fuel_type;
+        if (vehicleData.engine_capacity) orderUpdate.engine_capacity = vehicleData.engine_capacity;
+        if (vehicleData.color) orderUpdate.color_scheme = vehicleData.color;
+
+        if (Object.keys(orderUpdate).length > 0) {
+          const { error: orderError } = await supabase
+            .from('yutong_orders')
+            .update(orderUpdate)
+            .eq('id', orderId);
+
+          if (orderError) {
+            console.error('Error syncing vehicle details to order:', orderError);
+            toast.warning('Vehicle matched but some details could not be synced to order');
+          } else {
+            console.log('✅ Vehicle details synced to order:', orderUpdate);
+          }
+        }
+      }
+
       toast.success('Vehicle matched to order successfully');
       return true;
     } catch (error: any) {

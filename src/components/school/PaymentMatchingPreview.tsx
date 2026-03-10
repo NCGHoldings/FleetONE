@@ -8,6 +8,7 @@ import { CheckCircle, Trash2 } from "lucide-react";
 import { formatDateDisplay } from "@/lib/utils";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
+import { usePostPaymentToGL, useBranchFinanceSettings } from "@/hooks/useSchoolBusFinance";
 
 interface PaymentMatchingPreviewProps {
   importId: string;
@@ -20,6 +21,7 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const postPaymentToGL = usePostPaymentToGL();
 
   useEffect(() => {
     fetchItems();
@@ -111,13 +113,45 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
         });
       });
 
-      const { error } = await supabase
+      const { data: insertedPayments, error } = await supabase
         .from('school_payment_transactions')
-        .insert(transactions);
+        .insert(transactions)
+        .select();
 
       if (error) throw error;
 
-      // Update student balances
+      // Post each payment to GL (async, non-blocking per payment)
+      if (insertedPayments) {
+        for (const txn of insertedPayments) {
+          const student = studentMap.get(txn.student_id);
+          // Get branch_id for the student
+          const { data: studentData } = await supabase
+            .from('school_students')
+            .select('branch_id, student_name')
+            .eq('id', txn.student_id)
+            .single();
+
+          if (studentData?.branch_id) {
+            try {
+              await postPaymentToGL.mutateAsync({
+                paymentId: txn.id,
+                amount: txn.amount_paid,
+                branchId: studentData.branch_id,
+                studentName: studentData.student_name || 'Student',
+                paymentMethod: 'Bank Transfer',
+                referenceNo: txn.reference_no || undefined,
+                fixedAmount: student?.fixed_monthly_amount || 0,
+                overpaymentAmount: txn.difference > 0 ? txn.difference : undefined,
+                previousBalance: student?.payment_balance || 0,
+              });
+            } catch (glError) {
+              console.error("GL posting failed for bank import payment:", glError);
+            }
+          }
+        }
+      }
+
+      // Update student balances (trigger handles this, but ensure)
       for (const txn of transactions) {
         await supabase
           .from('school_students')

@@ -14,11 +14,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AccountForm } from "./AccountForm";
+import { AccountEditForm } from "./AccountEditForm";
 
 export const ChartOfAccountsView = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"tree" | "table">("tree");
   const [showAccountForm, setShowAccountForm] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
   const { selectedCompanyId, selectedCompany } = useCompany();
 
   const { data: accounts, isLoading, refetch } = useQuery({
@@ -37,7 +39,6 @@ export const ChartOfAccountsView = () => {
     enabled: !!selectedCompanyId,
   });
 
-  // Multi-field search filter for accounts (for table view)
   const filteredAccounts = useMemo(() => {
     if (!accounts || !searchTerm.trim()) return accounts || [];
     const query = searchTerm.toLowerCase();
@@ -61,14 +62,8 @@ export const ChartOfAccountsView = () => {
   };
 
   const columns = [
-    {
-      accessorKey: "account_code",
-      header: "Code",
-    },
-    {
-      accessorKey: "account_name",
-      header: "Account Name",
-    },
+    { accessorKey: "account_code", header: "Code" },
+    { accessorKey: "account_name", header: "Account Name" },
     {
       accessorKey: "account_type",
       header: "Type",
@@ -100,11 +95,8 @@ export const ChartOfAccountsView = () => {
       header: "Actions",
       cell: ({ row }: any) => (
         <div className="flex gap-2">
-          <Button size="sm" variant="outline">
+          <Button size="sm" variant="outline" onClick={() => setEditingAccount(row.original)}>
             <Edit className="h-4 w-4" />
-          </Button>
-          <Button size="sm" variant="outline">
-            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       ),
@@ -126,7 +118,7 @@ export const ChartOfAccountsView = () => {
     );
   }
 
-  // Empty COA for selected company
+  // Empty COA
   if (!isLoading && (!accounts || accounts.length === 0)) {
     return (
       <Card className="p-6">
@@ -212,11 +204,26 @@ export const ChartOfAccountsView = () => {
       {viewMode === "tree" ? (
         <ChartOfAccountsTree accounts={accounts || []} allAccounts={accounts || []} searchTerm={searchTerm} onAccountCreated={refetch} />
       ) : (
-        <DataTable
-          columns={columns}
-          data={filteredAccounts}
-        />
+        <DataTable columns={columns} data={filteredAccounts} />
       )}
+
+      {/* Edit Account Dialog */}
+      <Dialog open={!!editingAccount} onOpenChange={(open) => { if (!open) setEditingAccount(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Account</DialogTitle>
+          </DialogHeader>
+          {editingAccount && (
+            <AccountEditForm
+              account={editingAccount}
+              onSuccess={() => {
+                setEditingAccount(null);
+                refetch();
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

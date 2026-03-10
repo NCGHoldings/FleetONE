@@ -208,6 +208,11 @@ export const SinotruckQuotationPreview = forwardRef<HTMLDivElement, SinotruckQuo
               <p className="font-bold mb-1" style={{ color: '#6B8E23' }}>11. Additional Clauses</p>
               <p>The seller retains the right to use photographs or descriptions of the truck for advertising or promotional purposes unless otherwise agreed in writing by both parties. The buyer may not assign, transfer, or sub-contract their rights or obligations under this agreement without the prior written consent of the seller.</p>
             </div>
+            
+            <div style={{ padding: '8px', border: '2px solid #6B8E23', borderRadius: '4px', background: '#f0f5e6' }}>
+              <p className="font-bold mb-1" style={{ color: '#6B8E23' }}>12. Quotation Validity</p>
+              <p>This quotation is valid until <b>{formattedValidUntil}</b>. After this period, prices and availability are subject to change.</p>
+            </div>
           </div>
         </div>
 

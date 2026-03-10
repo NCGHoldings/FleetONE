@@ -99,25 +99,33 @@ export const FinanceDocumentPreviewModal = ({
   }, [businessUnitCode, companyId, documentData?.company_id, companies]);
 
   // Fetch template type to filter templates
-  const { data: templateType } = useQuery({
-    queryKey: ["template-type-by-code", documentType],
+  // For ar_invoice, also fetch tax_invoice type so both appear in the dropdown
+  const relatedTypeCodes = documentType === 'ar_invoice' 
+    ? ['ar_invoice', 'tax_invoice'] 
+    : [documentType];
+
+  const { data: templateTypes } = useQuery({
+    queryKey: ["template-types-by-codes", ...relatedTypeCodes],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("document_template_types")
         .select("*")
-        .eq("type_code", documentType)
-        .eq("is_active", true)
-        .single();
+        .in("type_code", relatedTypeCodes)
+        .eq("is_active", true);
       if (error) throw error;
       return data;
     },
     enabled: !!documentType,
   });
 
-  // Filter templates for this document type AND resolved company
+  // Keep backward compat: templateType is the primary type (used for fallback logic)
+  const templateType = templateTypes?.find(t => t.type_code === documentType);
+  const templateTypeIds = templateTypes?.map(t => t.id) || [];
+
+  // Filter templates for this document type (+ related types) AND resolved company
   const availableTemplates = allTemplates?.filter((t) => {
-    // Must match template type and be active
-    if (t.template_type_id !== templateType?.id || !t.is_active) return false;
+    // Must match one of the template type IDs and be active
+    if (!templateTypeIds.includes(t.template_type_id) || !t.is_active) return false;
     // Filter to resolved company's templates
     if (resolvedCompanyId) {
       return t.company_id === resolvedCompanyId;
@@ -163,7 +171,7 @@ export const FinanceDocumentPreviewModal = ({
       if (documentType === "ar_receipt") {
         const { data, error } = await supabase
           .from("ar_receipt_allocations")
-          .select("*, ar_invoices(invoice_number)")
+          .select("*, ar_invoices(invoice_number, notes)")
           .eq("receipt_id", documentData.id);
         if (error) throw error;
         return data;
@@ -172,7 +180,7 @@ export const FinanceDocumentPreviewModal = ({
       if (documentType === "ap_payment_voucher") {
         const { data, error } = await supabase
           .from("ap_payment_allocations")
-          .select("*, ap_invoices(invoice_number)")
+          .select("*, ap_invoices(invoice_number, notes, ap_invoice_lines(description))")
           .eq("payment_id", documentData.id);
         if (error) throw error;
         return data;
@@ -349,6 +357,7 @@ export const FinanceDocumentPreviewModal = ({
 
   const documentTitle = {
     ar_invoice: "AR Invoice",
+    tax_invoice: "Tax Invoice",
     ar_receipt: "AR Receipt",
     ar_credit_note: "Credit Note",
     ap_invoice: "AP Invoice",

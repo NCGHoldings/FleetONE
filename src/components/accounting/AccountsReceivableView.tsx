@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, CheckCircle, Eye, FileText, Printer, Search } from "lucide-react";
+import { Plus, CheckCircle, Eye, FileText, Printer, Search, Pencil, Trash2 } from "lucide-react";
 import { ARInvoiceForm } from "./ARInvoiceForm";
 import { ARReceiptForm } from "./ARReceiptForm";
 import { ARAgeingReport } from "./ARAgeingReport";
@@ -9,6 +9,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useARInvoices } from "@/hooks/useAccountingData";
+import { useDeleteARInvoice } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -18,6 +19,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
 import { Input } from "@/components/ui/input";
@@ -33,7 +44,10 @@ export const AccountsReceivableView = () => {
   const [printDocumentData, setPrintDocumentData] = useState<any>(null);
   const [printDocumentType, setPrintDocumentType] = useState<string>("ar_invoice");
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<any>(null);
   const { data: invoices, isLoading } = useARInvoices(statusFilter);
+  const deleteInvoice = useDeleteARInvoice();
 
   // Multi-field search filter
   const filteredInvoices = useMemo(() => {
@@ -44,7 +58,9 @@ export const AccountsReceivableView = () => {
       inv.customers?.customer_name?.toLowerCase().includes(query) ||
       inv.customers?.customer_code?.toLowerCase().includes(query) ||
       inv.status?.toLowerCase().includes(query) ||
-      inv.reference?.toLowerCase().includes(query)
+      inv.reference?.toLowerCase().includes(query) ||
+      inv.bus_no?.toLowerCase().includes(query) ||
+      inv.bus_categories?.name?.toLowerCase().includes(query)
     );
   }, [invoices, searchQuery]);
 
@@ -65,9 +81,19 @@ export const AccountsReceivableView = () => {
     return new Date(dueDate) < new Date();
   };
 
+  const canEdit = (status: string) => !["paid", "posted"].includes(status);
+  const canDelete = (status: string) => ["draft", "cancelled"].includes(status);
+
   const handleReceiveClick = (invoice: any) => {
     setSelectedInvoiceForReceipt(invoice);
     setReceiptFormOpen(true);
+  };
+
+  const handleDelete = () => {
+    if (deleteConfirmId) {
+      deleteInvoice.mutate(deleteConfirmId);
+      setDeleteConfirmId(null);
+    }
   };
 
   const columns = [
@@ -87,6 +113,35 @@ export const AccountsReceivableView = () => {
           <p className="text-xs text-muted-foreground">{row.original.customers?.customer_code}</p>
         </div>
       ),
+    },
+    {
+      accessorKey: "bus_no",
+      header: "Bus No.",
+      cell: ({ row }: any) => {
+        const busNo = row.original.bus_no;
+        if (!busNo) return <span className="text-muted-foreground text-xs">—</span>;
+        return <span className="font-mono text-sm">{busNo}</span>;
+      },
+    },
+    {
+      accessorKey: "bus_categories.name",
+      header: "Category",
+      cell: ({ row }: any) => {
+        const cat = row.original.bus_categories;
+        if (!cat) return <span className="text-muted-foreground text-xs">—</span>;
+        return (
+          <Badge
+            variant="outline"
+            className="text-xs"
+            style={{
+              borderColor: cat.color,
+              color: cat.color,
+            }}
+          >
+            {cat.name}
+          </Badge>
+        );
+      },
     },
     {
       accessorKey: "invoice_date",
@@ -137,28 +192,55 @@ export const AccountsReceivableView = () => {
     {
       id: "actions",
       header: "Actions",
-      cell: ({ row }: any) => (
-        <div className="flex gap-2">
-          <Button 
-            size="sm" 
-            variant="ghost" 
-            title="View Details"
-            onClick={() => setViewInvoice(row.original)}
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          {row.original.balance > 0 && (
+      cell: ({ row }: any) => {
+        const status = row.original.status || "draft";
+        return (
+          <div className="flex gap-1">
             <Button 
               size="sm" 
-              variant="outline"
-              onClick={() => handleReceiveClick(row.original)}
+              variant="ghost" 
+              title="View Details"
+              onClick={() => setViewInvoice(row.original)}
             >
-              <CheckCircle className="h-4 w-4 mr-1" />
-              Receive
+              <Eye className="h-4 w-4" />
             </Button>
-          )}
-        </div>
-      ),
+            {canEdit(status) && (
+              <Button 
+                size="sm" 
+                variant="ghost"
+                title="Edit Invoice"
+                onClick={() => {
+                  setEditingInvoice(row.original);
+                  setInvoiceFormOpen(true);
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            {canDelete(status) && (
+              <Button 
+                size="sm" 
+                variant="ghost"
+                title="Delete Invoice"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setDeleteConfirmId(row.original.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+            {row.original.balance > 0 && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => handleReceiveClick(row.original)}
+              >
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Receive
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -208,7 +290,7 @@ export const AccountsReceivableView = () => {
               <FileText className="h-4 w-4 mr-2" />
               AR Ageing Report
             </Button>
-            <Button onClick={() => setInvoiceFormOpen(true)}>
+            <Button onClick={() => { setEditingInvoice(null); setInvoiceFormOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" />
               New Invoice
             </Button>
@@ -219,7 +301,7 @@ export const AccountsReceivableView = () => {
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by invoice #, customer, status..."
+            placeholder="Search by invoice #, customer, bus no., category, status..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 max-w-md"
@@ -261,7 +343,7 @@ export const AccountsReceivableView = () => {
       </Card>
 
       {/* AR Invoice Form Dialog */}
-      <ARInvoiceForm open={invoiceFormOpen} onOpenChange={setInvoiceFormOpen} />
+      <ARInvoiceForm open={invoiceFormOpen} onOpenChange={(open) => { setInvoiceFormOpen(open); if (!open) setEditingInvoice(null); }} editingInvoice={editingInvoice} />
 
       {/* AR Receipt Form Dialog */}
       <ARReceiptForm 
@@ -316,6 +398,20 @@ export const AccountsReceivableView = () => {
                     {format(new Date(viewInvoice.due_date), "MMM dd, yyyy")}
                   </p>
                 </div>
+                {viewInvoice.bus_no && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Bus Number</p>
+                    <p className="font-medium font-mono">{viewInvoice.bus_no}</p>
+                  </div>
+                )}
+                {viewInvoice.bus_categories?.name && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Bus Category</p>
+                    <Badge variant="outline" style={{ borderColor: viewInvoice.bus_categories.color, color: viewInvoice.bus_categories.color }}>
+                      {viewInvoice.bus_categories.name}
+                    </Badge>
+                  </div>
+                )}
               </div>
               
               <Separator />
@@ -364,6 +460,32 @@ export const AccountsReceivableView = () => {
                   <Printer className="h-4 w-4 mr-2" />
                   Print Invoice
                 </Button>
+                {canEdit(viewInvoice.status) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setViewInvoice(null);
+                      setEditingInvoice(viewInvoice);
+                      setInvoiceFormOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
+                {canDelete(viewInvoice.status) && (
+                  <Button
+                    variant="outline"
+                    className="text-destructive border-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      setViewInvoice(null);
+                      setDeleteConfirmId(viewInvoice.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                )}
                 {viewInvoice.balance > 0 && (
                   <Button 
                     className="flex-1"
@@ -381,6 +503,24 @@ export const AccountsReceivableView = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete AR Invoice?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this invoice and all associated line items.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Document Print Preview Modal */}
       <FinanceDocumentPreviewModal

@@ -9,15 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { useCreateBankAccount } from "@/hooks/useAccountingMutations";
+import { useCreateBankAccount, useUpdateBankAccount } from "@/hooks/useAccountingMutations";
 import { useChartOfAccounts, useCurrencies } from "@/hooks/useAccountingData";
 import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
 
 const bankAccountSchema = z.object({
   account_code: z.string().min(1, "Account code is required"),
   account_name: z.string().min(1, "Account name is required"),
-  bank_name: z.string().min(1, "Bank name is required"),
-  account_number: z.string().min(1, "Account number is required"),
+  bank_name: z.string().optional(),
+  account_number: z.string().optional(),
   branch: z.string().optional(),
   account_type: z.string().optional(),
   currency: z.string().optional(),
@@ -26,6 +27,15 @@ const bankAccountSchema = z.object({
   is_active: z.boolean().optional(),
   is_default: z.boolean().optional(),
   notes: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.account_type !== "petty_cash") {
+    if (!data.bank_name || data.bank_name.trim() === "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bank_name"], message: "Bank name is required" });
+    }
+    if (!data.account_number || data.account_number.trim() === "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["account_number"], message: "Account number is required" });
+    }
+  }
 });
 
 type BankAccountFormData = z.infer<typeof bankAccountSchema>;
@@ -33,12 +43,15 @@ type BankAccountFormData = z.infer<typeof bankAccountSchema>;
 interface BankAccountFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  bankAccount?: any;
 }
 
-export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) => {
+export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccountFormProps) => {
   const { data: accounts } = useChartOfAccounts();
   const { data: currencies = [] } = useCurrencies();
   const createBankAccount = useCreateBankAccount();
+  const updateBankAccount = useUpdateBankAccount();
+  const isEditing = !!bankAccount;
 
   const bankAccounts = accounts?.filter(a => 
     a.account_type === "asset" && 
@@ -62,29 +75,64 @@ export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) =>
     },
   });
 
+  // Pre-populate form when editing
+  useEffect(() => {
+    if (bankAccount && open) {
+      form.reset({
+        account_code: bankAccount.account_code || "",
+        account_name: bankAccount.account_name || "",
+        bank_name: bankAccount.bank_name || "",
+        account_number: bankAccount.account_number || "",
+        branch: bankAccount.branch || "",
+        account_type: bankAccount.account_type || "current",
+        currency: bankAccount.currency || "LKR",
+        opening_balance: bankAccount.opening_balance || 0,
+        gl_account_id: bankAccount.gl_account_id || undefined,
+        is_active: bankAccount.is_active ?? true,
+        is_default: bankAccount.is_default ?? false,
+        notes: bankAccount.notes || "",
+      });
+    } else if (!bankAccount && open) {
+      form.reset();
+    }
+  }, [bankAccount, open, form]);
+
+  const watchedAccountType = form.watch("account_type");
+  const isPettyCash = watchedAccountType === "petty_cash";
+
   const onSubmit = async (data: BankAccountFormData) => {
     try {
-      await createBankAccount.mutateAsync({
+      const payload = {
         account_code: data.account_code,
         account_name: data.account_name,
-        bank_name: data.bank_name,
-        account_number: data.account_number,
+        bank_name: data.bank_name || "",
+        account_number: data.account_number || "",
         branch: data.branch,
         account_type: data.account_type,
         currency: data.currency || "LKR",
         opening_balance: data.opening_balance || 0,
-        current_balance: data.opening_balance || 0,
         gl_account_id: data.gl_account_id,
         is_active: data.is_active ?? true,
         is_default: data.is_default ?? false,
         notes: data.notes,
-      });
+      };
+
+      if (isEditing) {
+        await updateBankAccount.mutateAsync({ id: bankAccount.id, ...payload });
+      } else {
+        await createBankAccount.mutateAsync({
+          ...payload,
+          current_balance: data.opening_balance || 0,
+        });
+      }
       form.reset();
       onOpenChange(false);
     } catch (error) {
       // Error handled in mutation
     }
   };
+
+  const isPending = createBankAccount.isPending || updateBankAccount.isPending;
 
   // Filter active currencies and ensure LKR is always available
   const activeCurrencies = currencies.filter(c => c.is_active);
@@ -94,7 +142,7 @@ export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) =>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add Bank Account</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Bank Account" : "Add Bank Account"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -143,11 +191,11 @@ export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) =>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="bank_name">Bank Name *</Label>
+              <Label htmlFor="bank_name">Bank Name {!isPettyCash && "*"}</Label>
               <Input 
                 id="bank_name" 
                 {...form.register("bank_name")} 
-                placeholder="Commercial Bank"
+                placeholder={isPettyCash ? "Optional" : "Commercial Bank"}
               />
               {form.formState.errors.bank_name && (
                 <p className="text-xs text-destructive">{form.formState.errors.bank_name.message}</p>
@@ -165,11 +213,11 @@ export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) =>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="account_number">Account Number *</Label>
+              <Label htmlFor="account_number">Account Number {!isPettyCash && "*"}</Label>
               <Input 
                 id="account_number" 
                 {...form.register("account_number")} 
-                placeholder="1234567890"
+                placeholder={isPettyCash ? "Optional" : "1234567890"}
               />
               {form.formState.errors.account_number && (
                 <p className="text-xs text-destructive">{form.formState.errors.account_number.message}</p>
@@ -185,17 +233,14 @@ export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) =>
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* Always show LKR first if not in database */}
                   {!hasLKR && (
                     <SelectItem value="LKR">LKR - Sri Lankan Rupee</SelectItem>
                   )}
-                  {/* Show currencies from database */}
                   {activeCurrencies.map((curr) => (
                     <SelectItem key={curr.currency_code} value={curr.currency_code}>
                       {curr.currency_code} - {curr.currency_name}
                     </SelectItem>
                   ))}
-                  {/* Fallback if no currencies in database */}
                   {activeCurrencies.length === 0 && (
                     <>
                       <SelectItem value="USD">USD - US Dollar</SelectItem>
@@ -271,9 +316,9 @@ export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) =>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createBankAccount.isPending}>
-              {createBankAccount.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Add Bank Account
+            <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEditing ? "Update Bank Account" : "Add Bank Account"}
             </Button>
           </div>
         </form>

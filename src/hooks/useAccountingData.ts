@@ -316,6 +316,11 @@ export const useARInvoices = (status?: string) => {
             billing_address,
             phone,
             email
+          ),
+          bus_categories (
+            name,
+            color,
+            code
           )
         `)
         .order("invoice_date", { ascending: false });
@@ -368,6 +373,20 @@ export const useAPInvoices = (status?: string) => {
             phone,
             contact_person,
             payment_terms
+          ),
+          routes (
+            id,
+            route_name,
+            route_no
+          ),
+          buses (
+            id,
+            bus_no
+          ),
+          school_routes (
+            id,
+            route_name,
+            route_code
           )
         `)
         .order("invoice_date", { ascending: false });
@@ -460,6 +479,20 @@ export const useAPPayments = () => {
             email,
             phone,
             contact_person
+          ),
+          bank_accounts (
+            id,
+            account_name,
+            bank_name,
+            account_number
+          ),
+          vendor_bank_accounts (
+            id,
+            bank_name,
+            bank_branch,
+            account_number,
+            account_holder_name,
+            account_label
           )
         `)
         .order("payment_date", { ascending: false });
@@ -474,7 +507,34 @@ export const useAPPayments = () => {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        // Fallback: if join fails (e.g. missing FK), retry without bank_accounts join
+        console.warn('AP Payments query failed, retrying without bank_accounts join:', error.message);
+        let fallbackQuery = supabase
+          .from("ap_payments")
+          .select(`
+            *,
+            vendors (
+              vendor_code, vendor_name, address, bank_account, bank_name, bank_branch,
+              tax_id, currency, email, phone, contact_person
+            ),
+            vendor_bank_accounts (
+              id, bank_name, bank_branch, account_number, account_holder_name, account_label
+            )
+          `)
+          .order("payment_date", { ascending: false });
+
+        if (effectiveCompanyId) {
+          fallbackQuery = fallbackQuery.eq("company_id", effectiveCompanyId);
+        }
+        if (autoBusinessUnitCode) {
+          fallbackQuery = fallbackQuery.eq("business_unit_code", autoBusinessUnitCode);
+        }
+
+        const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+        if (fallbackError) throw fallbackError;
+        return fallbackData;
+      }
       return data;
     },
     enabled: !!selectedCompanyId,
@@ -531,6 +591,79 @@ export const useBankTransactions = (bankAccountId?: string) => {
       return data;
     },
     enabled: !!selectedCompanyId,
+  });
+};
+
+// Reconciliation-specific hook: fetches ALL unreconciled + date-filtered reconciled transactions
+export const useBankTransactionsForRecon = (
+  bankAccountId?: string,
+  fromDate?: string,
+  toDate?: string
+) => {
+  const { selectedCompanyId } = useCompany();
+
+  return useQuery({
+    queryKey: ["bank-transactions-recon", bankAccountId, selectedCompanyId, fromDate, toDate],
+    queryFn: async () => {
+      // Fetch all unreconciled transactions (no limit)
+      let unreconciledQuery = supabase
+        .from("bank_transactions")
+        .select("*")
+        .eq("is_reconciled", false)
+        .order("transaction_date", { ascending: false });
+
+      if (selectedCompanyId) {
+        unreconciledQuery = unreconciledQuery.eq("company_id", selectedCompanyId);
+      }
+      if (bankAccountId) {
+        unreconciledQuery = unreconciledQuery.eq("bank_account_id", bankAccountId);
+      }
+
+      const { data: unreconciled, error: err1 } = await unreconciledQuery;
+      if (err1) throw err1;
+
+      // Fetch reconciled transactions within date range (for display)
+      let reconciledData: typeof unreconciled = [];
+      if (fromDate || toDate) {
+        let reconciledQuery = supabase
+          .from("bank_transactions")
+          .select("*")
+          .eq("is_reconciled", true)
+          .order("transaction_date", { ascending: false })
+          .limit(500);
+
+        if (selectedCompanyId) {
+          reconciledQuery = reconciledQuery.eq("company_id", selectedCompanyId);
+        }
+        if (bankAccountId) {
+          reconciledQuery = reconciledQuery.eq("bank_account_id", bankAccountId);
+        }
+        if (fromDate) {
+          reconciledQuery = reconciledQuery.gte("transaction_date", fromDate);
+        }
+        if (toDate) {
+          reconciledQuery = reconciledQuery.lte("transaction_date", toDate);
+        }
+
+        const { data: reconciled, error: err2 } = await reconciledQuery;
+        if (err2) throw err2;
+        reconciledData = reconciled || [];
+      }
+
+      // Merge and deduplicate
+      const allTxns = [...(unreconciled || []), ...reconciledData];
+      const seen = new Set<string>();
+      const unique = allTxns.filter((t) => {
+        if (seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      });
+
+      return unique.sort((a, b) =>
+        new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
+      );
+    },
+    enabled: !!selectedCompanyId && !!bankAccountId,
   });
 };
 

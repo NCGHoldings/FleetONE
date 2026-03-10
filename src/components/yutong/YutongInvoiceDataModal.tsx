@@ -63,8 +63,8 @@ export function YutongInvoiceDataModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.engine_number || !formData.chassis_number || !formData.color_scheme) {
-      toast.error('Please fill in all required fields');
+    if (!formData.color_scheme) {
+      toast.error('Please fill in at least the color scheme');
       return;
     }
 
@@ -111,24 +111,22 @@ export function YutongInvoiceDataModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="engine_number">Engine Number *</Label>
+              <Label htmlFor="engine_number">Engine Number</Label>
               <Input
                 id="engine_number"
                 value={formData.engine_number}
                 onChange={(e) => setFormData({ ...formData, engine_number: e.target.value })}
-                placeholder="e.g., 7525D007365"
-                required
+                placeholder="e.g., 7525D007365 (optional for proforma)"
               />
             </div>
 
             <div>
-              <Label htmlFor="chassis_number">Chassis Number *</Label>
+              <Label htmlFor="chassis_number">Chassis Number</Label>
               <Input
                 id="chassis_number"
                 value={formData.chassis_number}
                 onChange={(e) => setFormData({ ...formData, chassis_number: e.target.value })}
-                placeholder="e.g., LZYTATF6651013439"
-                required
+                placeholder="e.g., LZYTATF6651013439 (optional for proforma)"
               />
             </div>
 

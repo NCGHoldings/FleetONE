@@ -148,7 +148,7 @@ export function CostBreakdown({ data }: Props) {
     // totalDistance = full distance WITH additional km (for fuel/maintenance calculations)
     totalDistance: data.totalDistance || (baseTripDistance + additionalDistanceFromChargesCalc),
     busTypeEfficiency: data.busTypeEfficiency || 8,
-    fuelPricePerLiter: data.fuelPricePerLiter || data.fuelPrice || 350,
+    fuelPricePerLiter: data.fuelPricePerLiter || data.fuelPrice || 0,
     maintenanceRatePerKm: data.maintenanceRatePerKm || 20,
     grossRevenue: data.grossRevenue || 0,
     customerTotalWithFuel: data.customerTotalWithFuel || 0,

@@ -5,22 +5,35 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Eye, Truck, FileText, MoreHorizontal } from "lucide-react";
+import { Plus, Search, Eye, Truck, FileText, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useSalesOrders, useUpdateSalesOrderStatus } from "@/hooks/useSalesOrders";
+import { useDeleteSalesOrder } from "@/hooks/useAccountingMutations";
 import { SalesOrderForm } from "./SalesOrderForm";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const SalesOrderView = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   
   const { data: orders, isLoading } = useSalesOrders(statusFilter === "all" ? undefined : statusFilter);
   const updateStatus = useUpdateSalesOrderStatus();
+  const deleteSO = useDeleteSalesOrder();
   
   const filteredOrders = orders?.filter(order =>
     order.so_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -37,7 +50,6 @@ export const SalesOrderView = () => {
       cancelled: "bg-red-500",
       invoiced: "bg-teal-500",
     };
-    
     return (
       <Badge className={`${statusColors[status] || "bg-gray-500"} text-white`}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -48,8 +60,14 @@ export const SalesOrderView = () => {
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     await updateStatus.mutateAsync({ id: orderId, status: newStatus });
   };
+
+  const handleDelete = () => {
+    if (deleteConfirmId) {
+      deleteSO.mutate(deleteConfirmId);
+      setDeleteConfirmId(null);
+    }
+  };
   
-  // Calculate summary metrics
   const totalOrders = filteredOrders.length;
   const totalValue = filteredOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
   const pendingOrders = filteredOrders.filter(o => ["draft", "confirmed", "processing"].includes(o.status)).length;
@@ -182,10 +200,19 @@ export const SalesOrderView = () => {
                               View Details
                             </DropdownMenuItem>
                             {order.status === "draft" && (
-                              <DropdownMenuItem onClick={() => handleStatusChange(order.id, "confirmed")}>
-                                <FileText className="h-4 w-4 mr-2" />
-                                Confirm Order
-                              </DropdownMenuItem>
+                              <>
+                                <DropdownMenuItem onClick={() => handleStatusChange(order.id, "confirmed")}>
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  Confirm Order
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="text-destructive"
+                                  onClick={() => setDeleteConfirmId(order.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Order
+                                </DropdownMenuItem>
+                              </>
                             )}
                             {order.status === "confirmed" && (
                               <DropdownMenuItem onClick={() => handleStatusChange(order.id, "processing")}>
@@ -278,10 +305,44 @@ export const SalesOrderView = () => {
                   <p>{selectedOrder.notes}</p>
                 </div>
               )}
+
+              {selectedOrder.status === "draft" && (
+                <div className="border-t pt-4 flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="text-destructive border-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      setSelectedOrder(null);
+                      setDeleteConfirmId(selectedOrder.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Sales Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. Only draft orders can be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

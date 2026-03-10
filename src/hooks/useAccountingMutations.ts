@@ -341,6 +341,11 @@ export const useCreateARInvoice = () => {
       total_amount: number;
       tax_amount?: number;
       notes?: string;
+      bus_id?: string;
+      bus_no?: string;
+      bus_type?: string;
+      bus_category_id?: string;
+      bus_sub_category_id?: string;
       lines?: Array<{
         description: string;
         quantity: number;
@@ -356,7 +361,7 @@ export const useCreateARInvoice = () => {
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
       
-      const { lines, ...headerData } = invoice;
+      const { lines, bus_id, bus_no, bus_type, bus_category_id, bus_sub_category_id, ...headerData } = invoice;
       
       const { data, error } = await supabase
         .from("ar_invoices")
@@ -366,6 +371,11 @@ export const useCreateARInvoice = () => {
           status: "unpaid",
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,
+          bus_id: bus_id || null,
+          bus_no: bus_no || null,
+          bus_type: bus_type || null,
+          bus_category_id: bus_category_id || null,
+          bus_sub_category_id: bus_sub_category_id || null,
         }])
         .select()
         .single();
@@ -384,20 +394,28 @@ export const useCreateARInvoice = () => {
 
       // ========== AUTO GL POSTING: DR Trade Receivable, CR Sales Revenue ==========
       try {
-        const { data: glSettings } = await supabase
-          .from("gl_settings")
-          .select("trade_receivable_account_id, sales_revenue_account_id")
-          .eq("company_id", effectiveCompanyId)
-          .maybeSingle();
+        const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
+        const resolved = await resolveCustomerARAccounts(invoice.customer_id, effectiveCompanyId);
 
-        if (glSettings?.trade_receivable_account_id && glSettings?.sales_revenue_account_id && invoice.total_amount > 0) {
+        // Fallback to global settings if resolution didn't find revenue account
+        let revenueAccountId = resolved.revenueAccountId;
+        if (!revenueAccountId) {
+          const { data: glSettings } = await (supabase as any)
+            .from("gl_settings")
+            .select("sales_revenue_account_id")
+            .eq("company_id", effectiveCompanyId)
+            .maybeSingle();
+          revenueAccountId = glSettings?.sales_revenue_account_id || null;
+        }
+
+        if (resolved.arAccountId && revenueAccountId && invoice.total_amount > 0) {
           const { postARInvoiceToGL } = await import("@/lib/gl-posting-utils");
           const glResult = await postARInvoiceToGL({
             invoiceNumber: invoice.invoice_number,
             invoiceDate: invoice.invoice_date,
             totalAmount: invoice.total_amount,
-            tradeReceivableId: glSettings.trade_receivable_account_id,
-            salesRevenueId: glSettings.sales_revenue_account_id,
+            tradeReceivableId: resolved.arAccountId,
+            salesRevenueId: revenueAccountId,
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
           });
@@ -517,17 +535,10 @@ export const useCreateARReceipt = () => {
         bankGLAccountId = bankAccount?.gl_account_id || null;
       }
 
-      // Find Trade Receivable account from COA
-      const { data: receivableAccounts } = await supabase
-        .from("chart_of_accounts")
-        .select("id, account_name")
-        .eq("company_id", effectiveCompanyId)
-        .eq("account_type", "asset")
-        .eq("is_active", true)
-        .ilike("account_name", "%trade receivable%")
-        .limit(1);
-
-      const tradeReceivableId = receivableAccounts?.[0]?.id || null;
+      // Find Trade Receivable and Advance accounts via customer category resolution
+      const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
+      const resolved = await resolveCustomerARAccounts(receipt.customer_id, effectiveCompanyId);
+      const tradeReceivableId = resolved.arAccountId;
 
       // Get customer name for GL posting description
       let customerName = "";
@@ -549,17 +560,19 @@ export const useCreateARReceipt = () => {
         let glResult: { success: boolean; journalEntryId?: string; error?: string };
 
         if (receipt.is_advance) {
-          // Find Customer Advance (Liability) account
-          const { data: advanceAccounts } = await supabase
-            .from("chart_of_accounts")
-            .select("id")
-            .eq("company_id", effectiveCompanyId)
-            .eq("account_type", "liability")
-            .eq("is_active", true)
-            .ilike("account_name", "%customer advance%")
-            .limit(1);
-
-          const customerAdvanceId = advanceAccounts?.[0]?.id;
+          // Use resolved advance account or fallback to COA search
+          let customerAdvanceId = resolved.advanceAccountId;
+          if (!customerAdvanceId) {
+            const { data: advanceAccounts } = await supabase
+              .from("chart_of_accounts")
+              .select("id")
+              .eq("company_id", effectiveCompanyId)
+              .eq("account_type", "liability")
+              .eq("is_active", true)
+              .ilike("account_name", "%customer advance%")
+              .limit(1);
+            customerAdvanceId = advanceAccounts?.[0]?.id || null;
+          }
 
           if (customerAdvanceId) {
             glResult = await postAdvanceReceiptToGL({
@@ -618,6 +631,8 @@ export const useCreateARReceipt = () => {
           credit_amount: 0,
           reference: receipt.reference || receipt.receipt_number,
           company_id: selectedCompanyId,
+          source_type: "ar_receipt",
+          source_id: data.id,
         }]);
 
         // Update bank account balance (increase on receipt)
@@ -689,6 +704,9 @@ export const useCreateAPInvoice = () => {
       tax_amount?: number;
       wht_amount?: number;
       notes?: string;
+      route_id?: string;
+      bus_id?: string;
+      school_route_id?: string;
       lines?: Array<{
         description: string;
         quantity: number;
@@ -696,6 +714,7 @@ export const useCreateAPInvoice = () => {
         tax_amount?: number;
         tax_code?: string;
         line_total: number;
+        account_id?: string;
       }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
@@ -714,6 +733,9 @@ export const useCreateAPInvoice = () => {
           status: "unpaid",
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,
+          route_id: invoice.route_id || null,
+          bus_id: invoice.bus_id || null,
+          school_route_id: invoice.school_route_id || null,
         }])
         .select()
         .single();
@@ -730,6 +752,7 @@ export const useCreateAPInvoice = () => {
           tax_amount: line.tax_amount || 0,
           tax_code: line.tax_code,
           line_total: line.line_total,
+          account_id: line.account_id || null,
           company_id: effectiveCompanyId,
         }));
         
@@ -771,10 +794,23 @@ export const useCreateAPPayment = () => {
       reference?: string;
       notes?: string;
       is_advance?: boolean;
+      is_direct_payment?: boolean;
+      vendor_bank_account_id?: string;
+      bank_fee_amount?: number;
+      bank_fee_type?: string;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
         wht_deducted?: number;
+      }>;
+      direct_lines?: Array<{
+        account_id: string;
+        description: string;
+        quantity: number;
+        unit_price: number;
+        tax_rate: number;
+        tax_amount: number;
+        line_total: number;
       }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
@@ -805,10 +841,13 @@ export const useCreateAPPayment = () => {
           reference: payment.reference,
           notes: payment.notes,
           is_advance: payment.is_advance || false,
+          is_direct_payment: payment.is_direct_payment || false,
+          bank_fee_amount: payment.bank_fee_amount || 0,
+          bank_fee_type: payment.bank_fee_type || null,
           status: "posted",
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,
-        }])
+        } as any])
         .select()
         .single();
       
@@ -851,6 +890,27 @@ export const useCreateAPPayment = () => {
         }
       }
 
+      // ========== DIRECT PAYMENT LINES ==========
+      if (payment.is_direct_payment && payment.direct_lines?.length) {
+        const linesToInsert = payment.direct_lines.map((line) => ({
+          payment_id: data.id,
+          account_id: line.account_id,
+          description: line.description,
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          tax_rate: line.tax_rate,
+          tax_amount: line.tax_amount,
+          line_total: line.line_total,
+          company_id: effectiveCompanyId,
+        }));
+        const { error: linesError } = await supabase
+          .from("ap_payment_lines" as any)
+          .insert(linesToInsert);
+        if (linesError) {
+          console.error("[AP Direct Payment] Failed to insert lines:", linesError);
+        }
+      }
+
       // ========== GL POSTING ==========
       // Get the bank account's linked GL account if a bank account is selected
       let bankGLAccountId: string | null = null;
@@ -863,85 +923,165 @@ export const useCreateAPPayment = () => {
         bankGLAccountId = bankAccount?.gl_account_id || null;
       }
 
-      // Find Trade Payable account from COA (look for liability accounts with "payable" in name)
-      const { data: payableAccounts } = await supabase
-        .from("chart_of_accounts")
-        .select("id, account_name")
-        .eq("company_id", effectiveCompanyId)
-        .eq("account_type", "liability")
-        .eq("is_active", true)
-        .ilike("account_name", "%trade payable%")
-        .limit(1);
-      
-      const tradePayableId = payableAccounts?.[0]?.id || null;
+      // For direct payments: GL post per line (debit each line's account, credit bank)
+      if (payment.is_direct_payment && payment.direct_lines?.length && bankGLAccountId && payment.amount > 0) {
+        // Build journal entry lines: debit each expense account, credit bank
+        const jeLines: Array<{ account_id: string; description: string; debit_amount: number; credit_amount: number }> = [];
+        
+        for (const line of payment.direct_lines) {
+          if (line.account_id && line.line_total > 0) {
+            jeLines.push({
+              account_id: line.account_id,
+              description: line.description || `Direct payment line`,
+              debit_amount: line.line_total,
+              credit_amount: 0,
+            });
+          }
+        }
+        // Credit bank for total
+        jeLines.push({
+          account_id: bankGLAccountId,
+          description: `Direct Payment ${payment.payment_number} to ${vendorName}`,
+          debit_amount: 0,
+          credit_amount: payment.amount,
+        });
 
-      // Find WHT Payable account if needed
-      let whtPayableId: string | null = null;
-      if (totalWhtDeducted > 0) {
-        const { data: whtAccounts } = await supabase
+        const totalDebit = jeLines.reduce((s, l) => s + l.debit_amount, 0);
+        const totalCredit = jeLines.reduce((s, l) => s + l.credit_amount, 0);
+
+        // Create journal entry
+        const { data: je, error: jeError } = await supabase
+          .from("journal_entries")
+          .insert([{
+            entry_number: `JE-DP-${payment.payment_number}`,
+            entry_date: payment.payment_date,
+            description: `Direct Payment ${payment.payment_number} to ${vendorName}`,
+            reference: payment.reference || payment.payment_number,
+            total_debit: totalDebit,
+            total_credit: totalCredit,
+            status: "posted",
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode,
+          }])
+          .select()
+          .single();
+
+        if (!jeError && je) {
+          const jelLines = jeLines.map((l) => ({
+            journal_entry_id: je.id,
+            account_id: l.account_id,
+            description: l.description,
+            debit: l.debit_amount,
+            credit: l.credit_amount,
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode,
+          }));
+          await supabase.from("journal_entry_lines").insert(jelLines);
+
+          // Update COA balances
+          for (const l of jelLines) {
+            if (l.debit > 0) {
+              const { data: acc } = await supabase.from("chart_of_accounts").select("current_balance").eq("id", l.account_id).single();
+              if (acc) {
+                await supabase.from("chart_of_accounts").update({ current_balance: (acc.current_balance || 0) + l.debit }).eq("id", l.account_id);
+              }
+            }
+            if (l.credit > 0) {
+              const { data: acc } = await supabase.from("chart_of_accounts").select("current_balance").eq("id", l.account_id).single();
+              if (acc) {
+                await supabase.from("chart_of_accounts").update({ current_balance: (acc.current_balance || 0) - l.credit }).eq("id", l.account_id);
+              }
+            }
+          }
+
+          // Link journal entry to payment
+          await supabase.from("ap_payments").update({ journal_entry_id: je.id }).eq("id", data.id);
+        }
+      } else if (!payment.is_direct_payment) {
+        // Normal / Advance payment GL posting (existing logic)
+        // Find Trade Payable account from COA
+        const { data: payableAccounts } = await supabase
           .from("chart_of_accounts")
-          .select("id")
+          .select("id, account_name")
           .eq("company_id", effectiveCompanyId)
           .eq("account_type", "liability")
           .eq("is_active", true)
-          .ilike("account_name", "%wht%payable%")
+          .ilike("account_name", "%trade payable%")
           .limit(1);
-        whtPayableId = whtAccounts?.[0]?.id || null;
-      }
-
-      // Only post to GL if we have the required accounts
-      if (tradePayableId && bankGLAccountId && payment.amount > 0) {
-        // Import the GL posting utility dynamically to avoid circular dependencies
-        const { postAPPaymentToGL } = await import("@/lib/gl-posting-utils");
         
-        const glResult = await postAPPaymentToGL({
-          paymentNumber: payment.payment_number,
-          paymentDate: payment.payment_date,
-          amount: payment.amount,
-          whtAmount: totalWhtDeducted > 0 ? totalWhtDeducted : undefined,
-          bankAccountId: bankGLAccountId,
-          tradePayableId: tradePayableId,
-          whtPayableId: totalWhtDeducted > 0 ? whtPayableId || undefined : undefined,
-          companyId: effectiveCompanyId,
-          businessUnitCode: businessUnitCode || undefined,
-          vendorName: vendorName,
-        });
+        const tradePayableId = payableAccounts?.[0]?.id || null;
 
-        // Link journal entry to payment if GL posting succeeded
-        if (glResult.success && glResult.journalEntryId) {
-          await supabase
-            .from("ap_payments")
-            .update({ journal_entry_id: glResult.journalEntryId })
-            .eq("id", data.id);
+        // Find WHT Payable account if needed
+        let whtPayableId: string | null = null;
+        if (totalWhtDeducted > 0) {
+          const { data: whtAccounts } = await supabase
+            .from("chart_of_accounts")
+            .select("id")
+            .eq("company_id", effectiveCompanyId)
+            .eq("account_type", "liability")
+            .eq("is_active", true)
+            .ilike("account_name", "%wht%payable%")
+            .limit(1);
+          whtPayableId = whtAccounts?.[0]?.id || null;
         }
-      } else if (payment.amount > 0) {
-        // Warn user when GL posting is skipped
-        if (!bankGLAccountId) {
-          console.warn("[AP Payment GL] Bank account has no linked GL account, skipping GL posting");
-          toast.warning("GL posting skipped: Bank account has no linked GL account. Configure it in Banking → Edit Account → GL Account.");
-        }
-        if (!tradePayableId) {
-          console.warn("[AP Payment GL] Trade Payable account not found in COA");
-          toast.warning("GL posting skipped: 'Trade Payable' account not found in Chart of Accounts.");
+
+        // Only post to GL if we have the required accounts
+        if (tradePayableId && bankGLAccountId && payment.amount > 0) {
+          const { postAPPaymentToGL } = await import("@/lib/gl-posting-utils");
+          
+          const glResult = await postAPPaymentToGL({
+            paymentNumber: payment.payment_number,
+            paymentDate: payment.payment_date,
+            amount: payment.amount,
+            whtAmount: totalWhtDeducted > 0 ? totalWhtDeducted : undefined,
+            bankAccountId: bankGLAccountId,
+            tradePayableId: tradePayableId,
+            whtPayableId: totalWhtDeducted > 0 ? whtPayableId || undefined : undefined,
+            companyId: effectiveCompanyId,
+            businessUnitCode: businessUnitCode || undefined,
+            vendorName: vendorName,
+          });
+
+          if (glResult.success && glResult.journalEntryId) {
+            await supabase
+              .from("ap_payments")
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq("id", data.id);
+          }
+        } else if (payment.amount > 0) {
+          if (!bankGLAccountId) {
+            console.warn("[AP Payment GL] Bank account has no linked GL account, skipping GL posting");
+            toast.warning("GL posting skipped: Bank account has no linked GL account. Configure it in Banking → Edit Account → GL Account.");
+          }
+          if (!tradePayableId) {
+            console.warn("[AP Payment GL] Trade Payable account not found in COA");
+            toast.warning("GL posting skipped: 'Trade Payable' account not found in Chart of Accounts.");
+          }
         }
       }
 
       // ========== BANK TRANSACTION ==========
       // Create bank transaction record if bank account is selected (use selectedCompanyId to match bank account)
+      const totalWithFees = payment.amount + (payment.bank_fee_amount || 0);
       if (payment.bank_account_id && payment.amount > 0) {
+        const feeBreakdown = payment.bank_fee_amount && payment.bank_fee_amount > 0
+          ? ` (Payment: ${payment.amount.toLocaleString()}, Bank Fee: ${payment.bank_fee_amount.toLocaleString()})`
+          : '';
         await supabase.from("bank_transactions").insert([{
           bank_account_id: payment.bank_account_id,
           transaction_date: payment.payment_date,
           transaction_type: "payment",
-          description: `AP Payment to ${vendorName} - ${payment.payment_number}`,
-          credit_amount: payment.amount,
+          description: `AP Payment to ${vendorName} - ${payment.payment_number}${feeBreakdown}`,
+          credit_amount: totalWithFees,
           debit_amount: 0,
           reference: payment.reference || payment.payment_number,
           cheque_number: payment.cheque_number,
           company_id: selectedCompanyId,
+          source_type: "ap_payment",
+          source_id: data.id,
         }]);
 
-        // Update bank account balance
+        // Update bank account balance with total including fees
         const { data: bankAccount } = await supabase
           .from("bank_accounts")
           .select("current_balance")
@@ -949,11 +1089,24 @@ export const useCreateAPPayment = () => {
           .single();
 
         if (bankAccount) {
-          const newBalance = (bankAccount.current_balance || 0) - payment.amount;
+          const newBalance = (bankAccount.current_balance || 0) - totalWithFees;
           await supabase
             .from("bank_accounts")
             .update({ current_balance: newBalance })
             .eq("id", payment.bank_account_id);
+        }
+
+        // Auto-create bank_fee_charges record if bank fee is included
+        if (payment.bank_fee_amount && payment.bank_fee_amount > 0) {
+          await supabase.from("bank_fee_charges").insert([{
+            bank_account_id: payment.bank_account_id,
+            fee_date: payment.payment_date,
+            amount: payment.bank_fee_amount,
+            fee_type: payment.bank_fee_type || "bank_charge",
+            description: `Bank fee for AP Payment ${payment.payment_number} to ${vendorName}`,
+            ap_payment_id: data.id,
+            company_id: selectedCompanyId,
+          } as any]);
         }
       }
 
@@ -1483,36 +1636,57 @@ export const useApproveAPInvoice = () => {
         const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId || '') ? getBusinessUnitCode() : undefined;
 
         // Fetch invoice details
-        const { data: invoice } = await supabase
+        const { data: invoice } = await (supabase as any)
           .from("ap_invoices")
-          .select("invoice_number, invoice_date, total_amount, expense_account_id, vendors(vendor_name)")
+          .select("invoice_number, invoice_date, total_amount, vendors(vendor_name)")
           .eq("id", id)
           .single();
 
+        // Fetch invoice lines with per-line account_id
+        const { data: invoiceLines } = await (supabase as any)
+          .from("ap_invoice_lines")
+          .select("account_id, line_total, description")
+          .eq("invoice_id", id);
+
         // Fetch GL settings
-        const { data: glSettings } = await supabase
+        const { data: glSettings } = await (supabase as any)
           .from("gl_settings")
           .select("trade_payable_account_id, default_expense_account_id")
           .eq("company_id", effectiveCompanyId)
           .maybeSingle();
 
-        const expenseAccountId = invoice?.expense_account_id || glSettings?.default_expense_account_id;
+        const defaultExpenseAccountId = glSettings?.default_expense_account_id;
         const tradePayableId = glSettings?.trade_payable_account_id;
 
-        if (invoice && expenseAccountId && tradePayableId && invoice.total_amount > 0) {
+        if (invoice && defaultExpenseAccountId && tradePayableId && invoice.total_amount > 0) {
           const { postAPInvoiceToGL } = await import("@/lib/gl-posting-utils");
           const vendorData = invoice.vendors as any;
+
+          // Build per-line expense entries, falling back to default account
+          const expenseLines = (invoiceLines || []).map((line: any) => ({
+            accountId: line.account_id || defaultExpenseAccountId,
+            amount: line.line_total || 0,
+            description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
+          }));
+
           const glResult = await postAPInvoiceToGL({
             invoiceNumber: invoice.invoice_number,
             invoiceDate: invoice.invoice_date,
             totalAmount: invoice.total_amount,
-            expenseAccountId,
+            expenseAccountId: defaultExpenseAccountId,
             tradePayableId,
             companyId: effectiveCompanyId,
             businessUnitCode,
             vendorName: vendorData?.vendor_name,
+            expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
           });
-          if (!glResult.success) {
+          if (glResult.success && glResult.journalEntryId) {
+            // Link journal_entry_id back to ap_invoices so GL Guardian sees it as posted
+            await (supabase as any)
+              .from("ap_invoices")
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq("id", id);
+          } else if (!glResult.success) {
             console.warn("AP Invoice GL posting failed:", glResult.error);
           }
         }
@@ -1553,7 +1727,7 @@ export const useApproveAPPayment = () => {
           .single();
 
         // Fetch GL settings
-        const { data: glSettings } = await supabase
+        const { data: glSettings } = await (supabase as any)
           .from("gl_settings")
           .select("trade_payable_account_id, bank_account_id")
           .eq("company_id", effectiveCompanyId)
@@ -2514,7 +2688,7 @@ export const useApproveStockAdjustment = () => {
           .single();
 
         // Fetch GL settings for inventory
-        const { data: glSettings } = await supabase
+        const { data: glSettings } = await (supabase as any)
           .from("gl_settings")
           .select("*")
           .eq("company_id", effectiveCompanyId)
@@ -3125,6 +3299,45 @@ export const useCreateBankAccount = () => {
   });
 };
 
+export const useUpdateBankAccount = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (account: {
+      id: string;
+      account_code?: string;
+      account_name?: string;
+      bank_name?: string;
+      account_number?: string;
+      branch?: string;
+      account_type?: string;
+      currency?: string;
+      opening_balance?: number;
+      gl_account_id?: string;
+      is_active?: boolean;
+      is_default?: boolean;
+      notes?: string;
+    }) => {
+      const { id, ...updateData } = account;
+      const { data, error } = await supabase
+        .from("bank_accounts")
+        .update(updateData)
+        .eq("id", id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
+      toast.success("Bank account updated successfully");
+    },
+    onError: (error) => toast.error(`Failed to update bank account: ${error.message}`),
+  });
+};
+
 // ============ Asset Categories ============
 export const useCreateAssetCategory = () => {
   const queryClient = useQueryClient();
@@ -3419,5 +3632,283 @@ export const useProcessRecurringEntry = () => {
       toast.success("Recurring entry processed");
     },
     onError: (error: any) => toast.error(`Failed to process: ${error.message}`),
+  });
+};
+
+// ============ DELETE & UPDATE MUTATIONS FOR EDIT/DELETE FEATURE ============
+
+export const useDeleteARInvoice = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // First delete related lines
+      await supabase.from("ar_invoice_lines").delete().eq("invoice_id", id);
+      const { error } = await supabase.from("ar_invoices").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices", selectedCompanyId] });
+      toast.success("AR Invoice deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+export const useDeleteAPInvoice = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from("ap_invoice_lines").delete().eq("invoice_id", id);
+      const { error } = await supabase.from("ap_invoices").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
+      toast.success("AP Invoice deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+export const useDeleteItem = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("items").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items", selectedCompanyId] });
+      toast.success("Item deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+export const useDeleteSalesOrder = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from("sales_order_lines").delete().eq("sales_order_id", id);
+      const { error } = await supabase.from("sales_orders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      toast.success("Sales order deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+export const useDeletePurchaseOrder = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from("purchase_order_lines").delete().eq("purchase_order_id", id);
+      const { error } = await supabase.from("purchase_orders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders", selectedCompanyId] });
+      toast.success("Purchase order deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+export const useDeleteARCreditNote = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ar_credit_notes").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ar-credit-notes", selectedCompanyId] });
+      toast.success("Credit note deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+export const useDeleteAPDebitNote = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ap_debit_notes").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ap-debit-notes", selectedCompanyId] });
+      toast.success("Debit note deleted successfully");
+    },
+    onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+// ============ UPDATE MUTATIONS FOR AP/AR INVOICES ============
+
+export const useUpdateAPInvoice = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async ({ id, data, lines }: {
+      id: string;
+      data: {
+        vendor_id: string;
+        invoice_number: string;
+        invoice_date: string;
+        due_date: string;
+        subtotal?: number;
+        total_amount: number;
+        tax_amount?: number;
+        wht_amount?: number;
+        notes?: string;
+        route_id?: string;
+        bus_id?: string;
+        school_route_id?: string;
+      };
+      lines: Array<{
+        description: string;
+        quantity: number;
+        unit_price: number;
+        tax_amount?: number;
+        tax_code?: string;
+        line_total: number;
+        account_id?: string;
+      }>;
+    }) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      
+      const { error: headerError } = await supabase
+        .from("ap_invoices")
+        .update({
+          vendor_id: data.vendor_id,
+          invoice_number: data.invoice_number,
+          invoice_date: data.invoice_date,
+          due_date: data.due_date,
+          subtotal: data.subtotal,
+          total_amount: data.total_amount,
+          tax_amount: data.tax_amount,
+          wht_amount: data.wht_amount,
+          balance: data.total_amount - (data.wht_amount || 0),
+          notes: data.notes,
+          route_id: data.route_id || null,
+          bus_id: data.bus_id || null,
+          school_route_id: data.school_route_id || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+      if (headerError) throw headerError;
+
+      // Delete old lines, insert new
+      await supabase.from("ap_invoice_lines").delete().eq("invoice_id", id);
+      if (lines.length > 0) {
+        const lineData = lines.map(l => ({
+          invoice_id: id,
+          description: l.description,
+          quantity: l.quantity,
+          unit_price: l.unit_price,
+          tax_amount: l.tax_amount,
+          tax_code: l.tax_code,
+          line_total: l.line_total,
+          account_id: l.account_id,
+          company_id: effectiveCompanyId,
+        }));
+        const { error: linesError } = await supabase.from("ap_invoice_lines").insert(lineData);
+        if (linesError) throw linesError;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      toast.success("AP Invoice updated successfully");
+    },
+    onError: (error) => toast.error(`Failed to update AP Invoice: ${error.message}`),
+  });
+};
+
+export const useUpdateARInvoice = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async ({ id, data, lines }: {
+      id: string;
+      data: {
+        customer_id: string;
+        invoice_number: string;
+        invoice_date: string;
+        due_date: string;
+        total_amount: number;
+        tax_amount?: number;
+        notes?: string;
+        bus_id?: string;
+        bus_no?: string;
+        bus_type?: string;
+        bus_category_id?: string;
+        bus_sub_category_id?: string;
+      };
+      lines: Array<{
+        description: string;
+        quantity: number;
+        unit_price: number;
+        line_total: number;
+        tax_code?: string;
+        account_id?: string;
+      }>;
+    }) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      
+      const { error: headerError } = await supabase
+        .from("ar_invoices")
+        .update({
+          customer_id: data.customer_id,
+          invoice_number: data.invoice_number,
+          invoice_date: data.invoice_date,
+          due_date: data.due_date,
+          total_amount: data.total_amount,
+          tax_amount: data.tax_amount,
+          balance: data.total_amount,
+          notes: data.notes,
+          bus_id: data.bus_id || null,
+          bus_no: data.bus_no || null,
+          bus_type: data.bus_type || null,
+          bus_category_id: data.bus_category_id || null,
+          bus_sub_category_id: data.bus_sub_category_id || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+      if (headerError) throw headerError;
+
+      await supabase.from("ar_invoice_lines").delete().eq("invoice_id", id);
+      if (lines.length > 0) {
+        const lineData = lines.map(l => ({
+          invoice_id: id,
+          description: l.description,
+          quantity: l.quantity,
+          unit_price: l.unit_price,
+          line_total: l.line_total,
+          tax_code: l.tax_code,
+          account_id: l.account_id,
+          company_id: effectiveCompanyId,
+        }));
+        const { error: linesError } = await supabase.from("ar_invoice_lines").insert(lineData);
+        if (linesError) throw linesError;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      toast.success("AR Invoice updated successfully");
+    },
+    onError: (error) => toast.error(`Failed to update AR Invoice: ${error.message}`),
   });
 };

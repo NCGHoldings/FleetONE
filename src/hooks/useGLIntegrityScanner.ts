@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
 import { createAndPostJournalEntry, generateEntryNumber } from "@/lib/gl-posting-utils";
+import { EXPENSE_CATEGORIES } from "@/hooks/useExpenseRequests";
 
 // ============ Types ============
 
@@ -92,6 +93,7 @@ interface ScanTarget {
   dateColumn: string;
   amountColumn: string;
   glCheckType: "journal_entry_id" | "gl_posted";
+  hasCompanyId?: boolean; // defaults to true; set false for tables without company_id
   extraFilters?: Record<string, any>;
   suggestedDebit: string;
   suggestedCredit: string;
@@ -179,11 +181,12 @@ const SCAN_TARGETS: ScanTarget[] = [
   {
     module: "maintenance",
     moduleLabel: "Maintenance Logs",
-    tableName: "maintenance_logs",
-    refColumn: "id",
+    tableName: "asset_maintenance_logs",
+    refColumn: "maintenance_number",
     dateColumn: "maintenance_date",
     amountColumn: "cost",
     glCheckType: "gl_posted",
+    hasCompanyId: true,
     extraFilters: { status: "completed" },
     suggestedDebit: "Maintenance Expense",
     suggestedCredit: "Bank / Cash",
@@ -193,28 +196,14 @@ const SCAN_TARGETS: ScanTarget[] = [
     moduleCreditKey: "bank_account_id",
   },
   {
-    module: "insurance",
-    moduleLabel: "Insurance Premiums",
-    tableName: "insurance_records",
-    refColumn: "policy_number",
-    dateColumn: "issue_date",
-    amountColumn: "premium_amount",
-    glCheckType: "journal_entry_id",
-    suggestedDebit: "Prepaid Insurance",
-    suggestedCredit: "Bank / Cash",
-    severity: "warning",
-    moduleSettingsName: "insurance",
-    moduleDebitKey: "prepaid_insurance_account_id",
-    moduleCreditKey: "bank_account_id",
-  },
-  {
     module: "special_hire",
     moduleLabel: "Special Hire Payments",
     tableName: "special_hire_payments",
-    refColumn: "id",
+    refColumn: "reference_no",
     dateColumn: "created_at",
     amountColumn: "amount",
     glCheckType: "journal_entry_id",
+    hasCompanyId: false,
     extraFilters: { status: "approved" },
     suggestedDebit: "Bank / Cash",
     suggestedCredit: "Revenue / Receivables",
@@ -223,56 +212,18 @@ const SCAN_TARGETS: ScanTarget[] = [
     glSettingsCreditKey: "trade_receivable_account_id",
   },
   {
-    module: "school_bus",
-    moduleLabel: "School Bus Payments",
-    tableName: "school_bus_payments",
-    refColumn: "receipt_number",
-    dateColumn: "payment_date",
-    amountColumn: "amount",
-    glCheckType: "journal_entry_id",
-    suggestedDebit: "Bank / Cash",
-    suggestedCredit: "Transport Revenue",
-    severity: "warning",
-    moduleSettingsName: "school_bus",
-    moduleDebitKey: "bank_account_id",
-    moduleCreditKey: "revenue_account_id",
-  },
-  {
     module: "leasing",
     moduleLabel: "Leasing Payments",
-    tableName: "loan_payments",
-    refColumn: "id",
+    tableName: "bus_loan_payments",
+    refColumn: "payment_number",
     dateColumn: "payment_date",
     amountColumn: "total_installment",
     glCheckType: "journal_entry_id",
+    hasCompanyId: false,
     extraFilters: { payment_status: "paid" },
     suggestedDebit: "Leasing Liability + Interest",
     suggestedCredit: "Bank / Cash",
     severity: "warning",
-  },
-  {
-    module: "ncge_trips",
-    moduleLabel: "NCG Express Trips",
-    tableName: "ncg_express_daily_trips",
-    refColumn: "trip_no",
-    dateColumn: "trip_date",
-    amountColumn: "income",
-    glCheckType: "journal_entry_id",
-    suggestedDebit: "Cash / Bank",
-    suggestedCredit: "Ticket Revenue",
-    severity: "warning",
-  },
-  {
-    module: "ncge_expenses",
-    moduleLabel: "NCG Express Expenses",
-    tableName: "ncg_express_daily_expenses",
-    refColumn: "id",
-    dateColumn: "expense_date",
-    amountColumn: "fuel_cost",
-    glCheckType: "journal_entry_id",
-    suggestedDebit: "Fuel Expense",
-    suggestedCredit: "Cash / Bank",
-    severity: "info",
   },
 ];
 
@@ -374,6 +325,57 @@ async function runAuditRules(
       ? `Enable auto-posting for: ${manualModules.join(", ")} to eliminate manual GL posting work`
       : undefined,
     learnMore: "Auto-posting eliminates manual work — when a transaction is created/approved, the GL entry is created automatically. This ensures no transaction is ever missed.",
+  });
+
+  // ---- EXPENSE CATEGORY MAPPING COMPLETENESS ----
+
+  // Rule: Expense Category GL Mappings
+  const expenseSettings = moduleSettingsMap.get("expense_requests");
+  const expenseMappings: Array<{ expense_category: string; gl_account_id: string }> = expenseSettings?.mappings || [];
+  const allCategoryValues = EXPENSE_CATEGORIES.map(c => c.value);
+  const mappedCategories = expenseMappings.filter(m => m.gl_account_id && m.gl_account_id.length > 0).map(m => m.expense_category);
+  const unmappedCategories = allCategoryValues.filter(c => !mappedCategories.includes(c));
+  const unmappedLabels = unmappedCategories.map(v => EXPENSE_CATEGORIES.find(c => c.value === v)?.label || v);
+  
+  // Check if fallback accounts exist for unmapped categories
+  let fallbacksAvailable = 0;
+  if (unmappedCategories.length > 0) {
+    try {
+      // Check for "general expense" fallback
+      const { data: generalExpense } = await supabase
+        .from("chart_of_accounts")
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("account_type", "expense")
+        .ilike("account_name", "%general expense%")
+        .limit(1)
+        .maybeSingle();
+      
+      if (generalExpense) fallbacksAvailable++;
+      
+      // Check if default_expense_account_id is set in gl_settings
+      if (glSettings?.default_expense_account_id) fallbacksAvailable++;
+    } catch { /* ignore */ }
+  }
+
+  const mappingPercentage = allCategoryValues.length > 0 ? Math.round((mappedCategories.length / allCategoryValues.length) * 100) : 100;
+  const hasCriticalGap = unmappedCategories.length > allCategoryValues.length * 0.5 && fallbacksAvailable === 0;
+
+  rules.push({
+    id: "config_expense_category_mappings",
+    name: "Expense Category GL Mappings",
+    category: "configuration",
+    description: "All expense categories have explicit GL account mappings",
+    status: unmappedCategories.length === 0 ? "pass" : hasCriticalGap ? "fail" : "warning",
+    score: mappingPercentage,
+    weight: 15,
+    details: unmappedCategories.length === 0
+      ? `All ${allCategoryValues.length} expense categories are mapped to GL accounts`
+      : `${mappedCategories.length}/${allCategoryValues.length} mapped. Unmapped: ${unmappedLabels.slice(0, 5).join(", ")}${unmappedLabels.length > 5 ? ` (+${unmappedLabels.length - 5} more)` : ""}${fallbacksAvailable > 0 ? " (fallbacks available)" : " (NO fallbacks!)"}`,
+    recommendation: unmappedCategories.length > 0
+      ? "Go to Settings → Module GL Mappings → Expense Requests to map missing categories. Categories without mappings will fail GL posting."
+      : undefined,
+    learnMore: "Each expense category (Food, Fuel, Repairs, etc.) needs a GL account mapping so the system knows which expense account to debit when posting. Without mappings, expense approval will fail with 'No GL account mapped' errors.",
   });
 
   // ---- COMPLETENESS RULES ----
@@ -503,6 +505,216 @@ async function runAuditRules(
     learnMore: "Double-entry bookkeeping requires every transaction to have equal debits and credits. If DR ≠ CR, the accounting equation (Assets = Liabilities + Equity) is broken.",
   });
 
+  // ---- CONFIGURATION RULES (continued) ----
+
+  // Rule 8: Vendor Category GL Mappings
+  let totalVendorCategories = 0;
+  let vendorCatsWithGL = 0;
+  try {
+    const { data: vendorCats } = await supabase
+      .from("vendor_categories")
+      .select("id, ap_account_id, expense_account_id")
+      .eq("company_id", companyId)
+      .eq("is_active", true);
+
+    totalVendorCategories = (vendorCats || []).length;
+    vendorCatsWithGL = (vendorCats || []).filter(
+      (c: any) => c.ap_account_id || c.expense_account_id
+    ).length;
+  } catch { /* ignore */ }
+
+  if (totalVendorCategories > 0) {
+    const vendorCatPct = Math.round((vendorCatsWithGL / totalVendorCategories) * 100);
+    rules.push({
+      id: "config_vendor_category_gl",
+      name: "Vendor Category GL Mappings",
+      category: "configuration",
+      description: "All vendor categories have AP/Expense GL accounts mapped",
+      status: vendorCatsWithGL === totalVendorCategories ? "pass" : vendorCatsWithGL > 0 ? "warning" : "fail",
+      score: vendorCatPct,
+      weight: 8,
+      details: vendorCatsWithGL === totalVendorCategories
+        ? `All ${totalVendorCategories} vendor categories have GL mappings`
+        : `${vendorCatsWithGL}/${totalVendorCategories} vendor categories have GL account mappings`,
+      recommendation: vendorCatsWithGL < totalVendorCategories
+        ? "Go to Settings → Vendor Categories and assign AP/Expense GL accounts to each category for accurate vendor-level tracking"
+        : undefined,
+      learnMore: "Vendor categories allow different GL account mappings per vendor type (e.g., Spare Parts vs Utilities). Without mappings, all vendors fall back to the global Trade Payable account, losing granular expense tracking.",
+    });
+  } else {
+    rules.push({
+      id: "config_vendor_category_gl",
+      name: "Vendor Category GL Mappings",
+      category: "configuration",
+      description: "All vendor categories have AP/Expense GL accounts mapped",
+      status: "not_applicable",
+      score: 100,
+      weight: 8,
+      details: "No vendor categories defined — using global GL defaults",
+      learnMore: "Vendor categories allow different GL account mappings per vendor type. Create categories in Settings → Vendor Categories for granular tracking.",
+    });
+  }
+
+  // Rule 9: Customer Category GL Mappings
+  let totalCustomerCategories = 0;
+  let customerCatsWithGL = 0;
+  try {
+    const { data: customerCats } = await supabase
+      .from("customer_categories")
+      .select("id, ar_account_id, revenue_account_id")
+      .eq("company_id", companyId)
+      .eq("is_active", true);
+
+    totalCustomerCategories = (customerCats || []).length;
+    customerCatsWithGL = (customerCats || []).filter(
+      (c: any) => c.ar_account_id || c.revenue_account_id
+    ).length;
+  } catch { /* ignore */ }
+
+  if (totalCustomerCategories > 0) {
+    const customerCatPct = Math.round((customerCatsWithGL / totalCustomerCategories) * 100);
+    rules.push({
+      id: "config_customer_category_gl",
+      name: "Customer Category GL Mappings",
+      category: "configuration",
+      description: "All customer categories have AR/Revenue GL accounts mapped",
+      status: customerCatsWithGL === totalCustomerCategories ? "pass" : customerCatsWithGL > 0 ? "warning" : "fail",
+      score: customerCatPct,
+      weight: 8,
+      details: customerCatsWithGL === totalCustomerCategories
+        ? `All ${totalCustomerCategories} customer categories have GL mappings`
+        : `${customerCatsWithGL}/${totalCustomerCategories} customer categories have GL account mappings`,
+      recommendation: customerCatsWithGL < totalCustomerCategories
+        ? "Go to Settings → Customer Categories and assign AR/Revenue GL accounts to each category for segmented revenue tracking"
+        : undefined,
+      learnMore: "Customer categories enable distinct AR and Revenue account mappings per customer type (e.g., External, Government, Intercompany). Without mappings, all customers use global GL defaults.",
+    });
+  } else {
+    rules.push({
+      id: "config_customer_category_gl",
+      name: "Customer Category GL Mappings",
+      category: "configuration",
+      description: "All customer categories have AR/Revenue GL accounts mapped",
+      status: "not_applicable",
+      score: 100,
+      weight: 8,
+      details: "No customer categories defined — using global GL defaults",
+      learnMore: "Customer categories enable segmented revenue tracking. Create categories in Settings → Customer Categories.",
+    });
+  }
+
+  // ---- TIMELINESS RULES (continued) ----
+
+  // Rule 10: Financial Period Status
+  let openPeriodCount = 0;
+  let oldOpenPeriods = 0;
+  let currentPeriodOpen = false;
+  try {
+    const { data: periods } = await (supabase as any)
+      .from("financial_periods")
+      .select("id, period_name, start_date, end_date, status")
+      .eq("company_id", companyId)
+      .eq("status", "open");
+
+    openPeriodCount = (periods || []).length;
+    const now = new Date();
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+    for (const period of periods || []) {
+      const endDate = new Date((period as any).end_date);
+      if (endDate < threeMonthsAgo) {
+        oldOpenPeriods++;
+      }
+      if (new Date((period as any).start_date) <= now && endDate >= now) {
+        currentPeriodOpen = true;
+      }
+    }
+  } catch { /* ignore */ }
+
+  rules.push({
+    id: "timeliness_period_status",
+    name: "Financial Period Management",
+    category: "timeliness",
+    description: "Current period is open and old periods are properly closed",
+    status: currentPeriodOpen && oldOpenPeriods === 0 ? "pass" : oldOpenPeriods > 0 ? "warning" : !currentPeriodOpen && openPeriodCount === 0 ? "fail" : "warning",
+    score: currentPeriodOpen && oldOpenPeriods === 0 ? 100 : oldOpenPeriods > 0 ? Math.max(30, 100 - oldOpenPeriods * 25) : openPeriodCount > 0 ? 60 : 20,
+    weight: 10,
+    details: currentPeriodOpen
+      ? oldOpenPeriods > 0
+        ? `Current period is open but ${oldOpenPeriods} old period(s) are still open and should be closed`
+        : `${openPeriodCount} period(s) open — current period is active`
+      : openPeriodCount > 0
+        ? `${openPeriodCount} period(s) open but none covers the current date`
+        : "No financial periods are open — transactions cannot be posted",
+    recommendation: oldOpenPeriods > 0
+      ? "Close old financial periods via Settings → Financial Periods → Period Closing Checklist to prevent backdated postings"
+      : !currentPeriodOpen
+        ? "Open a financial period for the current month in Settings → Financial Periods"
+        : undefined,
+    learnMore: "Financial periods control which dates accept GL postings. Old open periods allow unauthorized backdated entries. The current period must be open for normal operations. Always close periods after month-end reconciliation.",
+  });
+
+  // Rule 11: Bank Reconciliation Timeliness
+  let recentReconCount = 0;
+  let totalBankAccounts = 0;
+  try {
+    const { count: bankCount } = await supabase
+      .from("bank_accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", companyId)
+      .eq("is_active", true);
+
+    totalBankAccounts = bankCount || 0;
+
+    if (totalBankAccounts > 0) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const { count: reconCount } = await supabase
+        .from("bank_reconciliations")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", companyId)
+        .gte("reconciliation_date", thirtyDaysAgo.toISOString().split("T")[0]);
+
+      recentReconCount = reconCount || 0;
+    }
+  } catch { /* ignore */ }
+
+  if (totalBankAccounts > 0) {
+    const reconPct = Math.min(100, Math.round((recentReconCount / totalBankAccounts) * 100));
+    rules.push({
+      id: "timeliness_bank_recon",
+      name: "Bank Reconciliation Timeliness",
+      category: "timeliness",
+      description: "Bank accounts have been reconciled within the last 30 days",
+      status: recentReconCount >= totalBankAccounts ? "pass" : recentReconCount > 0 ? "warning" : "fail",
+      score: reconPct,
+      weight: 10,
+      details: recentReconCount >= totalBankAccounts
+        ? `All ${totalBankAccounts} bank accounts reconciled in the last 30 days`
+        : recentReconCount > 0
+          ? `${recentReconCount}/${totalBankAccounts} bank accounts reconciled recently`
+          : `No bank reconciliations in the last 30 days (${totalBankAccounts} active accounts)`,
+      recommendation: recentReconCount < totalBankAccounts
+        ? "Go to Banking → Reconciliation to reconcile outstanding bank accounts. Monthly reconciliation is an accounting best practice."
+        : undefined,
+      learnMore: "Bank reconciliation verifies that your books match the actual bank statement. Unreconciled accounts may hide errors, fraud, or unrecorded transactions. Best practice: reconcile monthly.",
+    });
+  } else {
+    rules.push({
+      id: "timeliness_bank_recon",
+      name: "Bank Reconciliation Timeliness",
+      category: "timeliness",
+      description: "Bank accounts have been reconciled within the last 30 days",
+      status: "not_applicable",
+      score: 100,
+      weight: 10,
+      details: "No active bank accounts configured",
+      learnMore: "Set up bank accounts in Banking to enable reconciliation tracking.",
+    });
+  }
+
   // ---- CALCULATE OVERALL SCORE ----
   const totalWeight = rules.reduce((sum, r) => sum + r.weight, 0);
   const weightedScore = rules.reduce((sum, r) => sum + (r.score * r.weight) / totalWeight, 0);
@@ -550,7 +762,7 @@ export function useGLIntegrityScanner() {
     mutationFn: async (): Promise<ScanResult> => {
       if (!effectiveCompanyId) throw new Error("No company selected");
 
-      const { data: glSettings } = await supabase
+      const { data: glSettings } = await (supabase as any)
         .from("gl_settings")
         .select("*")
         .eq("company_id", effectiveCompanyId)
@@ -579,8 +791,12 @@ export function useGLIntegrityScanner() {
         try {
           let query = (supabase as any)
             .from(target.tableName)
-            .select(`id, ${target.refColumn}, ${target.dateColumn}, ${target.amountColumn}`)
-            .eq("company_id", effectiveCompanyId);
+            .select(`id, ${target.refColumn}, ${target.dateColumn}, ${target.amountColumn}${target.module === "expense_requests" ? ", expense_category" : ""}`);
+
+          // Only filter by company_id if the table has it
+          if (target.hasCompanyId !== false) {
+            query = query.eq("company_id", effectiveCompanyId);
+          }
 
           if (target.glCheckType === "journal_entry_id") {
             query = query.is("journal_entry_id", null);
@@ -636,6 +852,23 @@ export function useGLIntegrityScanner() {
             const amount = record[target.amountColumn];
             if (!amount || amount <= 0) continue;
 
+            // For expense_requests, check if the category has a mapping
+            let isMissingMapping = false;
+            let effectiveCanAutoPost = canAutoPost;
+            let effectiveDescription = `${target.moduleLabel}: ${record[target.refColumn] || "N/A"} - LKR ${amount.toLocaleString()}`;
+            
+            if (target.module === "expense_requests" && record.expense_category) {
+              const expSettings = moduleSettingsMap.get("expense_requests");
+              const expMappings: Array<{ expense_category: string; gl_account_id: string }> = expSettings?.mappings || [];
+              const catMapping = expMappings.find((m: any) => m.expense_category === record.expense_category && m.gl_account_id);
+              if (!catMapping) {
+                isMissingMapping = true;
+                const catLabel = EXPENSE_CATEGORIES.find(c => c.value === record.expense_category)?.label || record.expense_category;
+                effectiveDescription = `⚠️ UNPOSTABLE - ${target.moduleLabel}: ${record[target.refColumn] || "N/A"} - Category "${catLabel}" has no GL mapping - LKR ${amount.toLocaleString()}`;
+                effectiveCanAutoPost = false; // Can't auto-post without mapping
+              }
+            }
+
             allGaps.push({
               id: `${target.module}-${record.id}`,
               module: target.module,
@@ -645,12 +878,12 @@ export function useGLIntegrityScanner() {
               recordRef: record[target.refColumn] || record.id.substring(0, 8),
               recordDate: record[target.dateColumn] || new Date().toISOString(),
               amount,
-              description: `${target.moduleLabel}: ${record[target.refColumn] || "N/A"} - LKR ${amount.toLocaleString()}`,
-              severity: target.severity,
+              description: effectiveDescription,
+              severity: isMissingMapping ? "critical" : target.severity,
               suggestedDebit: debitLabel,
               suggestedCredit: creditLabel,
-              canAutoPost,
-              postingData: canAutoPost
+              canAutoPost: effectiveCanAutoPost,
+              postingData: effectiveCanAutoPost
                 ? { debitAccountId: debitAccountId!, creditAccountId: creditAccountId!, debitLabel, creditLabel }
                 : undefined,
             });
@@ -748,7 +981,7 @@ export function usePostGapToGL() {
       if (!result.success) throw new Error(result.error || "Failed to create journal entry");
 
       const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
-      if (gap.tableName === "maintenance_logs" || gap.tableName === "expense_requests") {
+      if (gap.tableName === "asset_maintenance_logs" || gap.tableName === "expense_requests" || gap.tableName === "bus_loan_payments") {
         updateData.gl_posted = true;
         updateData.journal_entry_id = result.journalEntryId;
       } else {
@@ -811,7 +1044,7 @@ export function useBulkPostGapsToGL() {
           if (!result.success) { failed++; continue; }
 
           const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
-          if (gap.tableName === "maintenance_logs" || gap.tableName === "expense_requests") {
+          if (gap.tableName === "asset_maintenance_logs" || gap.tableName === "expense_requests" || gap.tableName === "bus_loan_payments") {
             updateData.gl_posted = true;
             updateData.journal_entry_id = result.journalEntryId;
           } else {

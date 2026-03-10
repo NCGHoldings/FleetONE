@@ -1,4 +1,5 @@
-import { BarChart3, Bus, Calendar, Settings, Users, Wrench, Shield, MessageSquare, FileText, MapPin, UserCheck, DollarSign, Lightbulb, Star, ChevronDown, Truck, TrendingUp, AlertTriangle, Package, Settings2, GraduationCap, ShoppingCart, FileSpreadsheet, Home, Sparkles, BookOpen, Upload, Clock, Activity, Monitor, Car, Megaphone, CheckSquare, FolderKanban, Share2 } from "lucide-react";
+import { BarChart3, Bus, Calendar, Settings, Users, Wrench, Shield, MessageSquare, FileText, MapPin, UserCheck, DollarSign, Lightbulb, Star, ChevronDown, Truck, TrendingUp, AlertTriangle, Package, Settings2, GraduationCap, ShoppingCart, FileSpreadsheet, Home, Sparkles, BookOpen, Upload, Clock, Activity, Monitor, Car, Megaphone, CheckSquare, FolderKanban, Share2, Store } from "lucide-react";
+import { useExternalSystem } from "./ExternalSystemContext";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarTrigger, useSidebar, SidebarHeader } from "@/components/ui/sidebar";
@@ -296,6 +297,7 @@ export function AppSidebar() {
     state
   } = useSidebar();
   const collapsed = state === "collapsed";
+  const { openExternalSystem } = useExternalSystem();
   const location = useLocation();
   const currentPath = location.pathname;
   const [logoUrl, setLogoUrl] = useState<string>('');
@@ -356,6 +358,47 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="py-4">
+        {/* External Systems Quick Access */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <button
+                    onClick={() => openExternalSystem({ name: "Stores One", url: "https://storesone.lovable.app" })}
+                    className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-medium shadow-md hover:from-emerald-700 hover:to-emerald-600 hover:shadow-lg transition-all duration-300 rounded-lg w-full text-left"
+                  >
+                    <Store className="w-5 h-5 transition-all duration-300" />
+                    {!collapsed && <span className="font-medium transition-all duration-300">Stores One</span>}
+                  </button>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <button
+                    onClick={() => openExternalSystem({ name: "Document ERP", url: "https://docs.lgh.lk" })}
+                    className="bg-gradient-to-r from-blue-600 to-blue-500 text-white font-medium shadow-md hover:from-blue-700 hover:to-blue-600 hover:shadow-lg transition-all duration-300 rounded-lg w-full text-left"
+                  >
+                    <BookOpen className="w-5 h-5 transition-all duration-300" />
+                    {!collapsed && <span className="font-medium transition-all duration-300">Document ERP</span>}
+                  </button>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <button
+                    onClick={() => openExternalSystem({ name: "Garage One", url: "https://staging.garageone.ncg.lk/login" })}
+                    className="bg-gradient-to-r from-orange-600 to-orange-500 text-white font-medium shadow-md hover:from-orange-700 hover:to-orange-600 hover:shadow-lg transition-all duration-300 rounded-lg w-full text-left"
+                  >
+                    <Wrench className="w-5 h-5 transition-all duration-300" />
+                    {!collapsed && <span className="font-medium transition-all duration-300">Garage One</span>}
+                  </button>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         {/* Always visible Home link */}
         <SidebarGroup>
           <SidebarGroupContent>

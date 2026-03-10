@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Building2, ArrowUpDown, CheckCircle2, RefreshCw, Landmark } from "lucide-react";
+import { Plus, Building2, ArrowUpDown, CheckCircle2, RefreshCw, Landmark, Pencil } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -17,10 +17,12 @@ import { InterBankTransferForm } from "./InterBankTransferForm";
 import { InterBankTransferList } from "./InterBankTransferList";
 import { BankFeeForm } from "./BankFeeForm";
 import { BankFeesList } from "./BankFeesList";
+import { ChequeBookManagement } from "./ChequeBookManagement";
 
 export const BankingView = () => {
   const [selectedBankId, setSelectedBankId] = useState<string | undefined>();
   const [showBankForm, setShowBankForm] = useState(false);
+  const [editingBankAccount, setEditingBankAccount] = useState<any>(null);
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [showReconciliation, setShowReconciliation] = useState(false);
   const [showTransferForm, setShowTransferForm] = useState(false);
@@ -70,6 +72,22 @@ export const BankingView = () => {
         <Badge variant={row.original.is_active ? "default" : "secondary"}>
           {row.original.is_active ? "Active" : "Inactive"}
         </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }: any) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            setEditingBankAccount(row.original);
+            setShowBankForm(true);
+          }}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
       ),
     },
   ];
@@ -212,6 +230,7 @@ export const BankingView = () => {
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="transfers">Fund Transfers</TabsTrigger>
           <TabsTrigger value="bank_fees">Bank Fees</TabsTrigger>
+          <TabsTrigger value="cheque_books">Cheque Books</TabsTrigger>
           <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
         </TabsList>
 
@@ -306,6 +325,10 @@ export const BankingView = () => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="cheque_books">
+          <ChequeBookManagement />
+        </TabsContent>
+
         <TabsContent value="reconciliation">
           <Card className="p-6">
             <div className="flex justify-between items-center mb-6">
@@ -342,7 +365,14 @@ export const BankingView = () => {
       </Tabs>
 
       {/* Forms */}
-      <BankAccountForm open={showBankForm} onOpenChange={setShowBankForm} />
+      <BankAccountForm
+        open={showBankForm}
+        onOpenChange={(open) => {
+          setShowBankForm(open);
+          if (!open) setEditingBankAccount(null);
+        }}
+        bankAccount={editingBankAccount}
+      />
       <BankTransactionForm 
         open={showTransactionForm} 
         onOpenChange={setShowTransactionForm}

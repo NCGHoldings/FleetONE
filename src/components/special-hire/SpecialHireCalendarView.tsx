@@ -3,11 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import {
     CalendarDays, Bus, MapPin, Clock, CheckCircle, XCircle,
     AlertCircle, DollarSign, Users, Eye, Building, Phone,
-    TrendingUp, Loader2, FileText, CreditCard, Pause
+    TrendingUp, Loader2, FileText, CreditCard, Pause, GitBranch
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -59,6 +60,15 @@ interface CalendarQuotation {
     contact_number?: string;
     approval_status?: string;
     bus_fleet_details?: any;
+    version_number?: string;
+    parent_quotation_id?: string;
+    is_active_version?: boolean;
+}
+
+interface GroupedHire {
+    groupId: string;
+    allVersions: CalendarQuotation[];
+    displayQuotation: CalendarQuotation;
 }
 
 // Calculate the Final Total (matches QuotationPreview logic)
@@ -75,43 +85,52 @@ const calculateFinalTotal = (q: CalendarQuotation): number => {
 
 // Derive the combined status label for display
 const getDisplayStatus = (q: CalendarQuotation): string => {
-    // If the quotation is confirmed, use trip_status for more detail
     if (q.status === 'confirmed') {
         const ts = q.trip_status || 'confirmed';
         const totalAmount = calculateFinalTotal(q);
         const totalPaid = q.total_paid || 0;
 
-        // Check payment-based statuses
         if (ts === 'cancelled') return 'cancelled';
         if (ts === 'completed') return 'completed';
         if (ts === 'on_hold') return 'on_hold';
         if (ts === 'no_bus_allocated') return 'no_bus_allocated';
 
-        // Payment-based
         if (totalPaid >= totalAmount && totalAmount > 0) return 'fully_paid';
         if ((q.advance_paid || 0) > 0 && totalPaid < totalAmount) return 'advance_paid';
         if (ts === 'paid') return 'paid';
         return 'confirmed';
     }
 
-    return q.status; // draft, sent, accepted, rejected, declined
+    return q.status;
+};
+
+// Get base quotation number by stripping version suffix
+const getBaseQuotationNo = (quotationNo: string): string => {
+    return quotationNo.replace(/-v\d+\.\d+$/, '');
+};
+
+// Parse version number for sorting
+const parseVersion = (version: string | undefined): number => {
+    if (!version) return 0;
+    const parts = version.split('.');
+    return (parseInt(parts[0] || '0') * 1000) + parseInt(parts[1] || '0');
 };
 
 // Status config for badges
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-    draft: { label: 'Draft', color: 'text-gray-700', bg: 'bg-gray-100', icon: FileText },
-    sent: { label: 'Sent', color: 'text-blue-700', bg: 'bg-blue-100', icon: FileText },
-    accepted: { label: 'Accepted', color: 'text-emerald-700', bg: 'bg-emerald-100', icon: CheckCircle },
-    rejected: { label: 'Rejected', color: 'text-red-700', bg: 'bg-red-100', icon: XCircle },
-    declined: { label: 'Declined', color: 'text-red-700', bg: 'bg-red-100', icon: XCircle },
-    confirmed: { label: 'Confirmed', color: 'text-blue-700', bg: 'bg-blue-100', icon: Clock },
-    advance_paid: { label: 'Advance Paid', color: 'text-teal-700', bg: 'bg-teal-100', icon: CreditCard },
-    fully_paid: { label: 'Fully Paid', color: 'text-green-700', bg: 'bg-green-100', icon: DollarSign },
-    paid: { label: 'Paid', color: 'text-green-700', bg: 'bg-green-100', icon: DollarSign },
-    completed: { label: 'Completed', color: 'text-purple-700', bg: 'bg-purple-100', icon: CheckCircle },
-    cancelled: { label: 'Cancelled', color: 'text-red-700', bg: 'bg-red-100', icon: XCircle },
-    on_hold: { label: 'On Hold', color: 'text-yellow-700', bg: 'bg-yellow-100', icon: Pause },
-    no_bus_allocated: { label: 'No Bus', color: 'text-orange-700', bg: 'bg-orange-100', icon: AlertCircle },
+    draft: { label: 'Draft', color: 'text-gray-700 dark:text-gray-300', bg: 'bg-gray-100 dark:bg-gray-800', icon: FileText },
+    sent: { label: 'Sent', color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-100 dark:bg-blue-900/40', icon: FileText },
+    accepted: { label: 'Accepted', color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-100 dark:bg-emerald-900/40', icon: CheckCircle },
+    rejected: { label: 'Rejected', color: 'text-red-700 dark:text-red-300', bg: 'bg-red-100 dark:bg-red-900/40', icon: XCircle },
+    declined: { label: 'Declined', color: 'text-red-700 dark:text-red-300', bg: 'bg-red-100 dark:bg-red-900/40', icon: XCircle },
+    confirmed: { label: 'Confirmed', color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-100 dark:bg-blue-900/40', icon: Clock },
+    advance_paid: { label: 'Advance Paid', color: 'text-teal-700 dark:text-teal-300', bg: 'bg-teal-100 dark:bg-teal-900/40', icon: CreditCard },
+    fully_paid: { label: 'Fully Paid', color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', icon: DollarSign },
+    paid: { label: 'Paid', color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900/40', icon: DollarSign },
+    completed: { label: 'Completed', color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/40', icon: CheckCircle },
+    cancelled: { label: 'Cancelled', color: 'text-red-700 dark:text-red-300', bg: 'bg-red-100 dark:bg-red-900/40', icon: XCircle },
+    on_hold: { label: 'On Hold', color: 'text-yellow-700 dark:text-yellow-300', bg: 'bg-yellow-100 dark:bg-yellow-900/40', icon: Pause },
+    no_bus_allocated: { label: 'No Bus', color: 'text-orange-700 dark:text-orange-300', bg: 'bg-orange-100 dark:bg-orange-900/40', icon: AlertCircle },
 };
 
 export function SpecialHireCalendarView() {
@@ -123,8 +142,8 @@ export function SpecialHireCalendarView() {
     const [monthLoading, setMonthLoading] = useState(false);
     const [selectedQuotation, setSelectedQuotation] = useState<any | null>(null);
     const [showModal, setShowModal] = useState(false);
+    const [selectedVersions, setSelectedVersions] = useState<Record<string, string>>({});
 
-    // safeParseJSON helper
     const safeParseJSON = <T,>(value: any, fallback: T): T => {
         if (value === null || value === undefined || value === '') return fallback;
         if (typeof value === 'object') return value as T;
@@ -132,7 +151,7 @@ export function SpecialHireCalendarView() {
         catch { return fallback; }
     };
 
-    // Load quotations for a specific date
+    // Load ALL versions for a specific date (no is_active_version filter)
     const loadQuotationsForDate = async (date: Date) => {
         setLoading(true);
         try {
@@ -148,7 +167,6 @@ export function SpecialHireCalendarView() {
             capacity
           )
         `)
-                .eq('is_active_version', true)
                 .gte('pickup_datetime', dayStart.toISOString())
                 .lt('pickup_datetime', dayEnd.toISOString())
                 .order('pickup_datetime', { ascending: true });
@@ -181,7 +199,7 @@ export function SpecialHireCalendarView() {
         }
     };
 
-    // Load dates that have hires for the current month (dot indicators)
+    // Load dates that have hires for the current month (deduplicated by parent)
     const loadMonthDates = async (month: Date) => {
         setMonthLoading(true);
         try {
@@ -190,18 +208,23 @@ export function SpecialHireCalendarView() {
 
             const { data, error } = await supabase
                 .from('special_hire_quotations')
-                .select('pickup_datetime')
-                .eq('is_active_version', true)
+                .select('pickup_datetime, parent_quotation_id, id, is_active_version')
                 .gte('pickup_datetime', start.toISOString())
                 .lte('pickup_datetime', end.toISOString());
 
             if (error) throw error;
 
-            const dates = new Set<string>();
+            // Deduplicate: only count one entry per parent group per date
+            const dateParentMap = new Map<string, Set<string>>();
             (data || []).forEach((item: any) => {
-                const d = new Date(item.pickup_datetime);
-                dates.add(format(d, 'yyyy-MM-dd'));
+                const d = format(new Date(item.pickup_datetime), 'yyyy-MM-dd');
+                const groupId = item.parent_quotation_id || item.id;
+                if (!dateParentMap.has(d)) dateParentMap.set(d, new Set());
+                dateParentMap.get(d)!.add(groupId);
             });
+
+            const dates = new Set<string>();
+            dateParentMap.forEach((_, dateStr) => dates.add(dateStr));
             setMonthDates(dates);
         } catch (error: any) {
             console.error('Error loading month dates:', error);
@@ -210,7 +233,6 @@ export function SpecialHireCalendarView() {
         }
     };
 
-    // Load data on mount and when date/month changes
     useEffect(() => {
         loadQuotationsForDate(selectedDate);
     }, [selectedDate]);
@@ -219,7 +241,6 @@ export function SpecialHireCalendarView() {
         loadMonthDates(currentMonth);
     }, [currentMonth]);
 
-    // Realtime subscription
     useEffect(() => {
         const channel = supabase
             .channel('calendar-quotation-changes')
@@ -242,30 +263,57 @@ export function SpecialHireCalendarView() {
         };
     }, [selectedDate, currentMonth]);
 
-    // Group quotations by display status
-    const groupedQuotations = useMemo(() => {
-        const groups: Record<string, CalendarQuotation[]> = {};
-        quotations.forEach(q => {
-            const status = getDisplayStatus(q);
-            if (!groups[status]) groups[status] = [];
-            groups[status].push(q);
-        });
-        return groups;
-    }, [quotations]);
+    // Group quotations by parent (deduplicate versions)
+    const groupedHires = useMemo((): GroupedHire[] => {
+        const groups = new Map<string, CalendarQuotation[]>();
 
-    // Stats for the selected date
-    const stats = useMemo(() => {
-        const total = quotations.length;
-        const counts: Record<string, number> = {};
         quotations.forEach(q => {
-            const status = getDisplayStatus(q);
+            const groupId = q.parent_quotation_id || q.id;
+            if (!groups.has(groupId)) groups.set(groupId, []);
+            groups.get(groupId)!.push(q);
+        });
+
+        const result: GroupedHire[] = [];
+        groups.forEach((versions, groupId) => {
+            // Sort by version number descending (latest first)
+            versions.sort((a, b) => parseVersion(b.version_number) - parseVersion(a.version_number));
+
+            // Determine which version to display
+            const selectedId = selectedVersions[groupId];
+            let displayQuotation: CalendarQuotation;
+
+            if (selectedId) {
+                displayQuotation = versions.find(v => v.id === selectedId) || versions[0];
+            } else {
+                // Default: active version, or latest
+                const active = versions.find(v => v.is_active_version);
+                displayQuotation = active || versions[0];
+            }
+
+            result.push({ groupId, allVersions: versions, displayQuotation });
+        });
+
+        // Sort groups by pickup time
+        result.sort((a, b) =>
+            new Date(a.displayQuotation.pickup_datetime).getTime() -
+            new Date(b.displayQuotation.pickup_datetime).getTime()
+        );
+
+        return result;
+    }, [quotations, selectedVersions]);
+
+    // Stats based on deduplicated hires
+    const stats = useMemo(() => {
+        const total = groupedHires.length;
+        const counts: Record<string, number> = {};
+        groupedHires.forEach(g => {
+            const status = getDisplayStatus(g.displayQuotation);
             counts[status] = (counts[status] || 0) + 1;
         });
-        const totalRevenue = quotations.reduce((sum, q) => sum + calculateFinalTotal(q), 0);
+        const totalRevenue = groupedHires.reduce((sum, g) => sum + calculateFinalTotal(g.displayQuotation), 0);
         return { total, counts, totalRevenue };
-    }, [quotations]);
+    }, [groupedHires]);
 
-    // Calendar modifiers — highlight dates with hires
     const hasHiresDates = useMemo(() => {
         return Array.from(monthDates).map(d => new Date(d + 'T00:00:00'));
     }, [monthDates]);
@@ -279,6 +327,10 @@ export function SpecialHireCalendarView() {
         if (date) setSelectedDate(date);
     };
 
+    const handleVersionChange = (groupId: string, versionId: string) => {
+        setSelectedVersions(prev => ({ ...prev, [groupId]: versionId }));
+    };
+
     const renderStatusBadge = (status: string) => {
         const config = STATUS_CONFIG[status] || STATUS_CONFIG.draft;
         const Icon = config.icon;
@@ -290,23 +342,20 @@ export function SpecialHireCalendarView() {
         );
     };
 
-    // Stat cards to display
     const statCards = [
-        { key: 'total', label: 'Total Hires', value: stats.total, icon: CalendarDays, bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700' },
-        { key: 'confirmed', label: 'Confirmed', value: stats.counts['confirmed'] || 0, icon: Clock, bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700' },
-        { key: 'advance_paid', label: 'Advance Paid', value: stats.counts['advance_paid'] || 0, icon: CreditCard, bg: 'bg-teal-50 border-teal-200', text: 'text-teal-700' },
-        { key: 'fully_paid', label: 'Fully Paid', value: stats.counts['fully_paid'] || 0, icon: DollarSign, bg: 'bg-green-50 border-green-200', text: 'text-green-700' },
-        { key: 'completed', label: 'Completed', value: stats.counts['completed'] || 0, icon: CheckCircle, bg: 'bg-purple-50 border-purple-200', text: 'text-purple-700' },
-        { key: 'cancelled', label: 'Cancelled', value: stats.counts['cancelled'] || 0, icon: XCircle, bg: 'bg-red-50 border-red-200', text: 'text-red-700' },
-        { key: 'on_hold', label: 'On Hold', value: stats.counts['on_hold'] || 0, icon: Pause, bg: 'bg-yellow-50 border-yellow-200', text: 'text-yellow-700' },
+        { key: 'total', label: 'Total Hires', value: stats.total, icon: CalendarDays, bg: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800', text: 'text-blue-700 dark:text-blue-300' },
+        { key: 'confirmed', label: 'Confirmed', value: stats.counts['confirmed'] || 0, icon: Clock, bg: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800', text: 'text-blue-700 dark:text-blue-300' },
+        { key: 'advance_paid', label: 'Advance Paid', value: stats.counts['advance_paid'] || 0, icon: CreditCard, bg: 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800', text: 'text-teal-700 dark:text-teal-300' },
+        { key: 'fully_paid', label: 'Fully Paid', value: stats.counts['fully_paid'] || 0, icon: DollarSign, bg: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800', text: 'text-green-700 dark:text-green-300' },
+        { key: 'completed', label: 'Completed', value: stats.counts['completed'] || 0, icon: CheckCircle, bg: 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800', text: 'text-purple-700 dark:text-purple-300' },
+        { key: 'cancelled', label: 'Cancelled', value: stats.counts['cancelled'] || 0, icon: XCircle, bg: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800', text: 'text-red-700 dark:text-red-300' },
+        { key: 'on_hold', label: 'On Hold', value: stats.counts['on_hold'] || 0, icon: Pause, bg: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800', text: 'text-yellow-700 dark:text-yellow-300' },
     ];
 
-    // Only show stat cards with values > 0 (except total always shows)
     const visibleStatCards = statCards.filter(s => s.key === 'total' || s.value > 0);
 
     return (
         <div className="space-y-4">
-            {/* Layout: Calendar + Hire Details */}
             <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4 lg:gap-6">
 
                 {/* Left Panel — Calendar */}
@@ -405,7 +454,7 @@ export function SpecialHireCalendarView() {
                     )}
 
                     {/* Empty State */}
-                    {!loading && quotations.length === 0 && (
+                    {!loading && groupedHires.length === 0 && (
                         <Card className="border-dashed">
                             <CardContent className="py-16">
                                 <div className="text-center space-y-3">
@@ -423,18 +472,21 @@ export function SpecialHireCalendarView() {
                         </Card>
                     )}
 
-                    {/* Hire Cards */}
-                    {!loading && quotations.length > 0 && (
+                    {/* Hire Cards — Deduplicated */}
+                    {!loading && groupedHires.length > 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {quotations.map((q) => {
+                            {groupedHires.map((group) => {
+                                const q = group.displayQuotation;
                                 const displayStatus = getDisplayStatus(q);
                                 const finalTotal = calculateFinalTotal(q);
                                 const totalPaid = q.total_paid || 0;
                                 const advancePaid = q.advance_paid || 0;
+                                const hasMultipleVersions = group.allVersions.length > 1;
+                                const baseNo = getBaseQuotationNo(q.quotation_no);
 
                                 return (
                                     <Card
-                                        key={q.id}
+                                        key={group.groupId}
                                         className="shadow-sm hover:shadow-md transition-all cursor-pointer group border-l-4"
                                         style={{
                                             borderLeftColor: `var(--${displayStatus}-border, hsl(var(--border)))`,
@@ -444,11 +496,39 @@ export function SpecialHireCalendarView() {
                                         <CardContent className="p-4 space-y-3">
                                             {/* Header Row */}
                                             <div className="flex items-start justify-between">
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-semibold text-sm">{q.quotation_no}</span>
+                                                <div className="space-y-1 min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-semibold text-sm truncate">{baseNo}</span>
                                                         {renderStatusBadge(displayStatus)}
                                                     </div>
+
+                                                    {/* Version Selector */}
+                                                    {hasMultipleVersions ? (
+                                                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                                            <GitBranch className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                                            <Select
+                                                                value={q.id}
+                                                                onValueChange={(val) => handleVersionChange(group.groupId, val)}
+                                                            >
+                                                                <SelectTrigger className="h-6 text-[11px] w-auto min-w-[100px] max-w-[160px] px-2 py-0 border-dashed">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {group.allVersions.map(v => (
+                                                                        <SelectItem key={v.id} value={v.id} className="text-xs">
+                                                                            v{v.version_number || '1.0'}
+                                                                            {v.is_active_version && ' (active)'}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                    ) : (
+                                                        q.version_number && (
+                                                            <span className="text-[10px] text-muted-foreground">v{q.version_number}</span>
+                                                        )
+                                                    )}
+
                                                     <div className="flex items-center gap-1.5 text-sm">
                                                         <Users className="h-3.5 w-3.5 text-muted-foreground" />
                                                         <span className="font-medium">{q.customer_name}</span>
@@ -508,11 +588,11 @@ export function SpecialHireCalendarView() {
                                                 {totalPaid > 0 && (
                                                     <div className="text-right">
                                                         <p className="text-xs text-muted-foreground">Paid</p>
-                                                        <p className="font-semibold text-sm text-green-600">
+                                                        <p className="font-semibold text-sm text-green-600 dark:text-green-400">
                                                             LKR {totalPaid.toLocaleString()}
                                                         </p>
                                                         {advancePaid > 0 && totalPaid < finalTotal && (
-                                                            <p className="text-[10px] text-teal-600">
+                                                            <p className="text-[10px] text-teal-600 dark:text-teal-400">
                                                                 Advance: LKR {advancePaid.toLocaleString()}
                                                             </p>
                                                         )}
@@ -520,7 +600,7 @@ export function SpecialHireCalendarView() {
                                                 )}
                                                 {totalPaid === 0 && q.status === 'confirmed' && (
                                                     <div className="text-right">
-                                                        <Badge variant="secondary" className="bg-gray-100 text-gray-600 text-[10px]">
+                                                        <Badge variant="secondary" className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[10px]">
                                                             <AlertCircle className="w-2.5 h-2.5 mr-0.5" />
                                                             No Payments
                                                         </Badge>

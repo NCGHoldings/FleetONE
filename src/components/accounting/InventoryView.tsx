@@ -2,15 +2,26 @@ import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Package, AlertTriangle, TrendingDown, BarChart3, Search } from "lucide-react";
+import { Plus, Package, AlertTriangle, TrendingDown, BarChart3, Search, Pencil, Trash2 } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useItems, useItemStock, useItemCategories } from "@/hooks/useAccountingData";
+import { useDeleteItem } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { ItemForm } from "./ItemForm";
 import { StockAdjustmentForm } from "./StockAdjustmentForm";
 import { ItemCategoryForm } from "./ItemCategoryForm";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const InventoryView = () => {
   const { data: items, isLoading } = useItems();
@@ -20,6 +31,9 @@ export const InventoryView = () => {
   const [showAdjustmentForm, setShowAdjustmentForm] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const deleteItem = useDeleteItem();
 
   // Multi-field search filter for items
   const filteredItems = useMemo(() => {
@@ -48,6 +62,13 @@ export const InventoryView = () => {
     if (quantity <= 0) return { label: "Out of Stock", variant: "destructive" as const };
     if (quantity <= reorderLevel) return { label: "Low Stock", variant: "outline" as const };
     return { label: "In Stock", variant: "default" as const };
+  };
+
+  const handleDelete = () => {
+    if (deleteConfirmId) {
+      deleteItem.mutate(deleteConfirmId);
+      setDeleteConfirmId(null);
+    }
   };
 
   const itemColumns = [
@@ -106,9 +127,28 @@ export const InventoryView = () => {
       id: "actions",
       header: "Actions",
       cell: ({ row }: any) => (
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline">Edit</Button>
-          <Button size="sm" variant="outline">Adjust</Button>
+        <div className="flex gap-1">
+          <Button 
+            size="sm" 
+            variant="ghost"
+            title="Edit Item"
+            onClick={() => {
+              setEditingItem(row.original);
+              setShowItemForm(true);
+            }}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button 
+            size="sm" 
+            variant="ghost"
+            title="Delete Item"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleteConfirmId(row.original.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setShowAdjustmentForm(true)}>Adjust</Button>
         </div>
       ),
     },
@@ -184,7 +224,7 @@ export const InventoryView = () => {
             <BarChart3 className="h-4 w-4 mr-2" />
             Stock Adjustment
           </Button>
-          <Button onClick={() => setShowItemForm(true)}>
+          <Button onClick={() => { setEditingItem(null); setShowItemForm(true); }}>
             <Plus className="h-4 w-4 mr-2" />
             Add Item
           </Button>
@@ -308,9 +348,27 @@ export const InventoryView = () => {
         </Tabs>
       </Card>
 
-      <ItemForm open={showItemForm} onOpenChange={setShowItemForm} />
+      <ItemForm open={showItemForm} onOpenChange={(open) => { setShowItemForm(open); if (!open) setEditingItem(null); }} />
       <StockAdjustmentForm open={showAdjustmentForm} onOpenChange={setShowAdjustmentForm} />
       <ItemCategoryForm open={showCategoryForm} onOpenChange={setShowCategoryForm} />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Item?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this item and may affect related stock records.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

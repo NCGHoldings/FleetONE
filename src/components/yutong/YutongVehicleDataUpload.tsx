@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, X, Loader2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, X, Loader2, Plus, Ship } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import * as XLSX from 'xlsx';
 import { useYutongVehicleDataManagement, ColumnMapping } from '@/hooks/useYutongVehicleDataManagement';
@@ -18,16 +18,38 @@ interface Props {
 }
 
 const FIELD_OPTIONS = [
-  { value: 'vehicle_no', label: 'Vehicle No' },
+  { value: 'vehicle_no', label: 'Vehicle No / Item No' },
   { value: 'model', label: 'Model' },
   { value: 'engine_no', label: 'Engine No' },
-  { value: 'chassis_no', label: 'Chassis No' },
+  { value: 'chassis_no', label: 'Chassis No / VIN No' },
   { value: 'seat_config', label: 'Seat Config' },
   { value: 'color', label: 'Color' },
   { value: 'customer_name', label: 'Customer Name' },
   { value: 'year_of_manufacture', label: 'Year of Manufacture' },
+  { value: 'order_no', label: 'Order No (stored in raw data)' },
   { value: 'skip', label: '-- Skip Column --' },
 ];
+
+// Detect if a row is a section header (e.g. "C9 Customers and Exstock - 37+1+1 = 9")
+function isSectionHeaderRow(row: any[], mappedFields: Record<number, string | null>): boolean {
+  // If most mapped fields (engine, chassis, model) are empty, it's likely a header
+  let mappedCellsEmpty = 0;
+  let mappedCellsTotal = 0;
+  
+  for (const [idxStr, field] of Object.entries(mappedFields)) {
+    if (!field || field === 'skip') continue;
+    if (['engine_no', 'chassis_no', 'model', 'seat_config', 'color'].includes(field)) {
+      mappedCellsTotal++;
+      const val = row[parseInt(idxStr)];
+      if (val === null || val === undefined || String(val).trim() === '') {
+        mappedCellsEmpty++;
+      }
+    }
+  }
+  
+  // If 3+ important fields are empty, likely a header row
+  return mappedCellsTotal >= 3 && mappedCellsEmpty >= 3;
+}
 
 export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
   const [file, setFile] = useState<File | null>(null);
@@ -40,20 +62,43 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
   const [shipments, setShipments] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
+  const [isCreatingShipment, setIsCreatingShipment] = useState(false);
+  const [newShipmentName, setNewShipmentName] = useState('');
+  const [headerRowIndices, setHeaderRowIndices] = useState<Set<number>>(new Set());
 
   const { autoDetectColumnMapping, createDataSheet, insertVehicleRecords, isLoading } = useYutongVehicleDataManagement();
 
-  // Fetch shipments on mount
-  useState(() => {
-    const fetchShipments = async () => {
-      const { data } = await supabase
-        .from('yutong_shipment_groups')
-        .select('id, shipment_number, shipment_name')
-        .order('created_at', { ascending: false });
-      setShipments(data || []);
-    };
+  const fetchShipments = async () => {
+    const { data } = await supabase
+      .from('yutong_shipment_groups')
+      .select('id, shipment_no, shipment_name')
+      .order('created_at', { ascending: false });
+    setShipments(data || []);
+  };
+
+  useEffect(() => {
     fetchShipments();
-  });
+  }, []);
+
+  // Recompute header rows when mappings change
+  useEffect(() => {
+    if (allData.length > 0 && columnMappings.length > 0) {
+      const mappedFields: Record<number, string | null> = {};
+      columnMappings.forEach((m, idx) => {
+        mappedFields[idx] = m.mappedTo;
+      });
+      
+      const headerIndices = new Set<number>();
+      allData.forEach((row, idx) => {
+        if (isSectionHeaderRow(row, mappedFields)) {
+          headerIndices.add(idx);
+        }
+      });
+      setHeaderRowIndices(headerIndices);
+    }
+  }, [allData, columnMappings]);
+
+  const validDataCount = allData.length - headerRowIndices.size;
 
   const processFile = useCallback(async (acceptedFile: File) => {
     setIsProcessing(true);
@@ -74,7 +119,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
 
       setFile(acceptedFile);
       setHeaders(fileHeaders);
-      setPreviewData(dataRows.slice(0, 5));
+      setPreviewData(dataRows.slice(0, 10));
       setAllData(dataRows);
       setSheetName(acceptedFile.name.replace(/\.[^/.]+$/, ''));
 
@@ -114,10 +159,41 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
     });
   };
 
+  const handleCreateShipment = async () => {
+    if (!newShipmentName.trim()) {
+      toast.error('Please enter a shipment name');
+      return;
+    }
+    
+    setIsProcessing(true);
+    try {
+      const { data, error } = await (supabase
+        .from('yutong_shipment_groups') as any)
+        .insert({
+          shipment_name: newShipmentName.trim(),
+          status: 'planning',
+        })
+        .select('id, shipment_no, shipment_name')
+        .single();
+
+      if (error) throw error;
+      
+      setShipments(prev => [data, ...prev]);
+      setSelectedShipment(data.id);
+      setIsCreatingShipment(false);
+      setNewShipmentName('');
+      toast.success(`Shipment ${data.shipment_no} created`);
+    } catch (error: any) {
+      console.error('Error creating shipment:', error);
+      toast.error(error.message || 'Failed to create shipment');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleImport = async () => {
     if (!file) return;
 
-    // Validate at least model is mapped
     const modelMapping = columnMappings.find(m => m.mappedTo === 'model');
     if (!modelMapping) {
       toast.error('Please map at least the "Model" column');
@@ -126,7 +202,6 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
 
     setIsProcessing(true);
     try {
-      // Create column mapping object
       const mappingObj: Record<string, string> = {};
       columnMappings.forEach(m => {
         if (m.mappedTo) {
@@ -134,7 +209,6 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
         }
       });
 
-      // Create data sheet record
       const sheetId = await createDataSheet(
         sheetName,
         file.name,
@@ -146,26 +220,30 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
         throw new Error('Failed to create data sheet');
       }
 
-      // Transform data based on mappings
-      const vehicleRecords = allData.map(row => {
-        const record: any = { raw_data: {} };
-        headers.forEach((header, idx) => {
-          const mapping = columnMappings[idx];
-          const value = row[idx];
-          record.raw_data[header] = value;
-          
-          if (mapping?.mappedTo && value !== null && value !== undefined) {
-            if (mapping.mappedTo === 'year_of_manufacture') {
-              record[mapping.mappedTo] = parseInt(String(value)) || null;
-            } else {
-              record[mapping.mappedTo] = String(value).trim();
+      // Filter out section header rows and transform data
+      const vehicleRecords = allData
+        .filter((_, idx) => !headerRowIndices.has(idx))
+        .map(row => {
+          const record: any = { raw_data: {} };
+          headers.forEach((header, idx) => {
+            const mapping = columnMappings[idx];
+            const value = row[idx];
+            record.raw_data[header] = value;
+            
+            if (mapping?.mappedTo && value !== null && value !== undefined) {
+              if (mapping.mappedTo === 'order_no') {
+                // Store order_no only in raw_data
+                record.raw_data['_order_no'] = String(value).trim();
+              } else if (mapping.mappedTo === 'year_of_manufacture') {
+                record[mapping.mappedTo] = parseInt(String(value)) || null;
+              } else {
+                record[mapping.mappedTo] = String(value).trim();
+              }
             }
-          }
+          });
+          return record;
         });
-        return record;
-      });
 
-      // Insert vehicle records
       const success = await insertVehicleRecords(sheetId, vehicleRecords, selectedShipment || undefined);
       
       if (success) {
@@ -189,6 +267,24 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
     setSheetName('');
     setSelectedShipment('');
     setStep('upload');
+    setIsCreatingShipment(false);
+    setNewShipmentName('');
+    setHeaderRowIndices(new Set());
+  };
+
+  // Get model summary from data
+  const getModelSummary = () => {
+    const modelIdx = columnMappings.findIndex(m => m.mappedTo === 'model');
+    if (modelIdx === -1) return {};
+    const counts: Record<string, number> = {};
+    allData.forEach((row, idx) => {
+      if (headerRowIndices.has(idx)) return;
+      const model = String(row[modelIdx] || '').trim();
+      if (model) {
+        counts[model] = (counts[model] || 0) + 1;
+      }
+    });
+    return counts;
   };
 
   if (step === 'upload') {
@@ -200,7 +296,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
             Upload Vehicle Data Sheet
           </CardTitle>
           <CardDescription>
-            Upload an Excel or CSV file containing vehicle details (No, Model, Engine No, Chassis No, Seat, Color, Customer Name)
+            Upload an Excel or CSV file containing vehicle details (Item No, Model, Engine No, VIN/Chassis No, Seat, Color, Customer Name, Order No)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -232,9 +328,11 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
     );
   }
 
+  const modelSummary = getModelSummary();
+
   return (
     <div className="space-y-6">
-      {/* File Info */}
+      {/* File Info & Shipment */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -242,7 +340,13 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
               <FileSpreadsheet className="h-8 w-8 text-green-500" />
               <div>
                 <CardTitle className="text-lg">{file?.name}</CardTitle>
-                <CardDescription>{allData.length} rows detected</CardDescription>
+                <CardDescription>
+                  {allData.length} rows detected
+                  {headerRowIndices.size > 0 && (
+                    <span className="text-orange-500"> · {headerRowIndices.size} section header(s) will be skipped</span>
+                  )}
+                  <span className="text-primary font-medium"> · {validDataCount} vehicles to import</span>
+                </CardDescription>
               </div>
             </div>
             <Button variant="ghost" size="icon" onClick={resetForm}>
@@ -251,6 +355,17 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Model Summary */}
+          {Object.keys(modelSummary).length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(modelSummary).map(([model, count]) => (
+                <Badge key={model} variant="secondary" className="text-xs">
+                  {model}: {count} units
+                </Badge>
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Sheet Name</Label>
@@ -261,20 +376,56 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
               />
             </div>
             <div>
-              <Label>Link to Shipment (Optional)</Label>
-              <Select value={selectedShipment || 'none'} onValueChange={(v) => setSelectedShipment(v === 'none' ? '' : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select shipment..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Shipment</SelectItem>
-                  {shipments.map(s => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.shipment_number} - {s.shipment_name}
+              <Label>Link to Shipment</Label>
+              {isCreatingShipment ? (
+                <div className="flex gap-2">
+                  <Input
+                    value={newShipmentName}
+                    onChange={(e) => setNewShipmentName(e.target.value)}
+                    placeholder="Shipment name (e.g. Shipment 7)"
+                    className="flex-1"
+                  />
+                  <Button size="sm" onClick={handleCreateShipment} disabled={isProcessing}>
+                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setIsCreatingShipment(false)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Select value={selectedShipment || 'none'} onValueChange={(v) => {
+                  if (v === 'create_new') {
+                    setIsCreatingShipment(true);
+                    setNewShipmentName(sheetName || '');
+                  } else {
+                    setSelectedShipment(v === 'none' ? '' : v);
+                  }
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select shipment..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="create_new">
+                      <span className="flex items-center gap-2 text-primary font-medium">
+                        <Plus className="h-3 w-3" /> Create New Shipment
+                      </span>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    <SelectItem value="none">No Shipment</SelectItem>
+                    {shipments.map(s => (
+                      <SelectItem key={s.id} value={s.id}>
+                        <span className="flex items-center gap-2">
+                          <Ship className="h-3 w-3" /> {s.shipment_nohipment_name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {selectedShipment && !isCreatingShipment && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  ✓ Linked to {shipments.find(s => s.id === selectedShipment)?.shipment_no}
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
@@ -285,7 +436,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
         <CardHeader>
           <CardTitle>Column Mapping</CardTitle>
           <CardDescription>
-            Review auto-detected mappings and adjust if needed. Columns marked with green are auto-detected.
+            Review auto-detected mappings and adjust if needed. Green = auto-detected.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -318,7 +469,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
                       value={mapping.mappedTo || 'skip'}
                       onValueChange={(v) => updateMapping(idx, v)}
                     >
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-[200px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -348,19 +499,22 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Data Preview</CardTitle>
-          <CardDescription>First 5 rows of your data</CardDescription>
+          <CardDescription>
+            First {Math.min(previewData.length, 10)} rows · Section headers highlighted in orange will be skipped during import
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8">#</TableHead>
                   {headers.map((h, idx) => (
                     <TableHead key={idx} className="whitespace-nowrap">
                       {h}
                       {columnMappings[idx]?.mappedTo && (
                         <span className="block text-xs text-primary font-normal">
-                          → {columnMappings[idx].mappedTo}
+                          → {FIELD_OPTIONS.find(f => f.value === columnMappings[idx].mappedTo)?.label || columnMappings[idx].mappedTo}
                         </span>
                       )}
                     </TableHead>
@@ -368,39 +522,66 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {previewData.map((row, rowIdx) => (
-                  <TableRow key={rowIdx}>
-                    {headers.map((_, colIdx) => (
-                      <TableCell key={colIdx} className="whitespace-nowrap">
-                        {row[colIdx] ?? '-'}
+                {previewData.map((row, rowIdx) => {
+                  const isHeader = headerRowIndices.has(rowIdx);
+                  return (
+                    <TableRow key={rowIdx} className={isHeader ? 'bg-orange-500/10 opacity-60' : ''}>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {rowIdx + 1}
+                        {isHeader && (
+                          <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 bg-orange-500/10 text-orange-600 border-orange-500/30">
+                            skip
+                          </Badge>
+                        )}
                       </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
+                      {headers.map((_, colIdx) => (
+                        <TableCell key={colIdx} className="whitespace-nowrap text-sm">
+                          {row[colIdx] ?? '-'}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
+          {allData.length > 10 && (
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              ... and {allData.length - 10} more rows
+            </p>
+          )}
         </CardContent>
       </Card>
 
       {/* Actions */}
-      <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={resetForm}>
-          Cancel
-        </Button>
-        <Button onClick={handleImport} disabled={isProcessing || isLoading}>
-          {isProcessing || isLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Importing...
-            </>
-          ) : (
-            <>
-              <Upload className="h-4 w-4 mr-2" />
-              Import {allData.length} Vehicles
-            </>
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-muted-foreground">
+          {validDataCount} vehicles will be imported
+          {selectedShipment && (
+            <Badge variant="outline" className="ml-2">
+              <Ship className="h-3 w-3 mr-1" />
+              {shipments.find(s => s.id === selectedShipment)?.shipment_number}
+ o      </Badge>
           )}
-        </Button>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={resetForm}>
+            Cancel
+          </Button>
+          <Button onClick={handleImport} disabled={isProcessing || isLoading}>
+            {isProcessing || isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 mr-2" />
+                Import {validDataCount} Vehicles
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
