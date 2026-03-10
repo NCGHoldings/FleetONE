@@ -576,7 +576,7 @@ export function useGenerateBulkARInvoices() {
           const liabilityAccountId = settings.advance_payments_liability_account_id;
           if (liabilityAccountId && student.payment_balance > 0) {
             const advanceApplyAmount = Math.min(student.payment_balance, amount);
-            const advanceEntryNumber = `SBS-ADV-${format(new Date(), "yyyyMMdd")}-${studentShortId}`;
+            const advanceEntryNumber = `SBS-ADV-${format(invoiceMonth, "yyyyMM")}-${uniqueSuffix}`;
 
             const { data: advanceJE, error: advJEError } = await supabase
               .from("journal_entries")
