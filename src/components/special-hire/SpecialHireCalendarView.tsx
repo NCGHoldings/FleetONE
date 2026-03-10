@@ -209,18 +209,19 @@ export function SpecialHireCalendarView() {
             const start = startOfMonth(month);
             const end = endOfMonth(month);
 
+            const filterColumn = viewMode === 'hires' ? 'pickup_datetime' : 'created_at';
+
             const { data, error } = await supabase
                 .from('special_hire_quotations')
-                .select('pickup_datetime, parent_quotation_id, id, is_active_version')
-                .gte('pickup_datetime', start.toISOString())
-                .lte('pickup_datetime', end.toISOString());
+                .select(`${filterColumn}, parent_quotation_id, id, is_active_version`)
+                .gte(filterColumn, start.toISOString())
+                .lte(filterColumn, end.toISOString());
 
             if (error) throw error;
 
-            // Deduplicate: only count one entry per parent group per date
             const dateParentMap = new Map<string, Set<string>>();
             (data || []).forEach((item: any) => {
-                const d = format(new Date(item.pickup_datetime), 'yyyy-MM-dd');
+                const d = format(new Date(item[filterColumn]), 'yyyy-MM-dd');
                 const groupId = item.parent_quotation_id || item.id;
                 if (!dateParentMap.has(d)) dateParentMap.set(d, new Set());
                 dateParentMap.get(d)!.add(groupId);
