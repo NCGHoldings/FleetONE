@@ -52,8 +52,13 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
   const updateInvoice = useUpdateARInvoice();
   const generateNumber = useGenerateNumber();
   const [isGenerating, setIsGenerating] = useState(false);
-
-  const isEditing = !!editingInvoice;
+  const [busData, setBusData] = useState<{
+    bus_id?: string;
+    bus_no?: string;
+    bus_type?: string;
+    bus_category_id?: string;
+    bus_sub_category_id?: string;
+  }>({});
 
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 },
