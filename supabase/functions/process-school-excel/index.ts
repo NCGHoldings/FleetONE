@@ -45,8 +45,26 @@ interface ImportResult {
   errors: string[];
 }
 
+// Normalize service_type: "yes"/"Yes" → "BothWay", "no"/"No" → "OneWay"
+function normalizeServiceType(value: any): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  const str = String(value).trim().toLowerCase();
+  if (str === 'yes' || str === 'bothway' || str === 'both way' || str === 'both') return 'BothWay';
+  if (str === 'no' || str === 'oneway' || str === 'one way' || str === 'one') return 'OneWay';
+  // Default to BothWay for any unrecognized non-empty value
+  return 'BothWay';
+}
+
+// Fix admission_no: RO → R0 (letter O to digit 0)
+function fixAdmissionNo(value: any): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  let str = String(value).trim();
+  // Replace RO/Ro at the start with R0
+  str = str.replace(/^[Rr][Oo]/, 'R0');
+  return str;
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -87,20 +105,18 @@ serve(async (req) => {
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       
-      // Skip empty rows
-      if (!row.student_name || row.student_name.trim() === '') {
+      if (!row.student_name || String(row.student_name).trim() === '') {
         continue;
       }
 
       try {
         const normalizedData: any = {};
         
-        // Normalize all fields with proper type conversion
         Object.keys(row).forEach(key => {
           const value = row[key];
           if (value === null || value === undefined || value === '') {
             normalizedData[key] = null;
-          } else if (key === 'payment_amount' || key === 'update_new') {
+          } else if (key === 'payment_amount' || key === 'update_new' || key === 'fixed_amount' || key === 'amount_due') {
             const numValue = parseFloat(value);
             normalizedData[key] = isNaN(numValue) ? null : numValue;
           } else if (typeof value === 'string') {
@@ -110,9 +126,13 @@ serve(async (req) => {
           }
         });
 
+        // Handle field aliases: fixed_amount → update_new, amount_due → payment_amount
+        const updateNewValue = normalizedData.update_new ?? normalizedData.fixed_amount ?? null;
+        const paymentAmountValue = normalizedData.payment_amount ?? normalizedData.amount_due ?? null;
+
         const record: StudentRecord = {
           student_name: normalizedData.student_name,
-          admission_no: normalizedData.admission_no,
+          admission_no: fixAdmissionNo(normalizedData.admission_no),
           grade: normalizedData.grade,
           school_location: normalizedData.school_location,
           route: normalizedData.route,
@@ -126,12 +146,12 @@ serve(async (req) => {
           email_id: normalizedData.email_id,
           father_contact_no: normalizedData.father_contact_no,
           mother_contact_no: normalizedData.mother_contact_no,
-          service_type: normalizedData.service_type,
+          service_type: normalizeServiceType(normalizedData.service_type),
           pickup_point: normalizedData.pickup_point,
           dropoff_point: normalizedData.dropoff_point,
           payment_status: normalizedData.payment_status?.toLowerCase() || 'pending',
-          payment_amount: normalizedData.payment_amount,
-          update_new: normalizedData.update_new
+          payment_amount: paymentAmountValue,
+          update_new: updateNewValue
         };
 
         validatedRecords.push(record);
@@ -145,98 +165,88 @@ serve(async (req) => {
       throw new Error('No valid student records found in the uploaded data');
     }
 
-    // Step 3: Process records in batches
-    const BATCH_SIZE = 250;
+    // Step 3: Process records
     let insertedCount = 0;
     let updatedCount = 0;
     let skippedCount = 0;
 
-    for (let i = 0; i < validatedRecords.length; i += BATCH_SIZE) {
-      const batch = validatedRecords.slice(i, i + BATCH_SIZE);
-      console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} (${batch.length} records)`);
-
-      if (mode === 'replace_all') {
-        // Replace All: Direct insert all records
-        const recordsToInsert = batch.map(record => ({
+    if (mode === 'replace_all') {
+      // Per-record insert so one bad row doesn't kill the batch
+      for (let i = 0; i < validatedRecords.length; i++) {
+        const record = validatedRecords[i];
+        const recordToInsert = {
           ...record,
           branch_id,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }));
+        };
 
-        const { data: batchResult, error: batchError } = await supabaseClient
+        const { error: insertError } = await supabaseClient
           .from('school_students')
-          .insert(recordsToInsert)
-          .select('id');
+          .insert(recordToInsert);
 
-        if (batchError) {
-          console.error('Batch insert error:', batchError);
-          errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batchError.message}`);
+        if (insertError) {
+          console.error(`Row ${i + 1} insert error:`, insertError.message, JSON.stringify(record));
+          errors.push(`Row ${i + 1} (${record.student_name}): ${insertError.message}`);
+          skippedCount++;
         } else {
-          insertedCount += batchResult?.length || 0;
+          insertedCount++;
         }
-      } else {
-        // Upsert mode: Check for existing and update/insert accordingly
-        for (const record of batch) {
-          try {
-            let existingQuery = supabaseClient
-              .from('school_students')
-              .select('id')
-              .eq('branch_id', branch_id)
-              .eq('is_active', true);
+      }
+    } else {
+      // Upsert mode
+      for (const record of validatedRecords) {
+        try {
+          let existingQuery = supabaseClient
+            .from('school_students')
+            .select('id')
+            .eq('branch_id', branch_id)
+            .eq('is_active', true);
 
-            // Primary key: admission_no if available
-            if (record.admission_no) {
-              existingQuery = existingQuery.eq('admission_no', record.admission_no);
-            } else {
-              // Fallback: student_name
-              existingQuery = existingQuery.eq('student_name', record.student_name);
-            }
-
-            const { data: existing } = await existingQuery.single();
-
-            if (existing) {
-              // Update existing record
-              const { error: updateError } = await supabaseClient
-                .from('school_students')
-                .update({
-                  ...record,
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', existing.id);
-
-              if (updateError) {
-                console.error('Update error:', updateError);
-                errors.push(`Update error for ${record.student_name}: ${updateError.message}`);
-              } else {
-                updatedCount++;
-              }
-            } else {
-              // Insert new record
-              const { error: insertError } = await supabaseClient
-                .from('school_students')
-                .insert({
-                  ...record,
-                  branch_id,
-                  is_active: true,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                });
-
-              if (insertError) {
-                console.error('Insert error:', insertError);
-                errors.push(`Insert error for ${record.student_name}: ${insertError.message}`);
-              } else {
-                insertedCount++;
-              }
-            }
-          } catch (error: unknown) {
-            console.error('Processing error:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-            errors.push(`Processing error for ${record.student_name}: ${errorMessage}`);
-            skippedCount++;
+          if (record.admission_no) {
+            existingQuery = existingQuery.eq('admission_no', record.admission_no);
+          } else {
+            existingQuery = existingQuery.eq('student_name', record.student_name);
           }
+
+          const { data: existing } = await existingQuery.single();
+
+          if (existing) {
+            const { error: updateError } = await supabaseClient
+              .from('school_students')
+              .update({
+                ...record,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existing.id);
+
+            if (updateError) {
+              errors.push(`Update error for ${record.student_name}: ${updateError.message}`);
+            } else {
+              updatedCount++;
+            }
+          } else {
+            const { error: insertError } = await supabaseClient
+              .from('school_students')
+              .insert({
+                ...record,
+                branch_id,
+                is_active: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              });
+
+            if (insertError) {
+              errors.push(`Insert error for ${record.student_name}: ${insertError.message}`);
+            } else {
+              insertedCount++;
+            }
+          }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+          errors.push(`Processing error for ${record.student_name}: ${errorMessage}`);
+          skippedCount++;
         }
       }
     }
@@ -247,7 +257,7 @@ serve(async (req) => {
       inserted: insertedCount,
       updated: updatedCount,
       skipped: skippedCount,
-      errors: errors.slice(0, 10) // Show first 10 errors
+      errors: errors.slice(0, 20)
     };
 
     console.log('Import completed:', result);
@@ -255,7 +265,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         ...result,
-        message: `Import completed: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped`
+        message: `Import completed: ${insertedCount} inserted, ${updatedCount} updated, ${skippedCount} skipped${errors.length > 0 ? `, ${errors.length} errors` : ''}`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

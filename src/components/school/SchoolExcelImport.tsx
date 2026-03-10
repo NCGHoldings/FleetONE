@@ -55,7 +55,8 @@ const REQUIRED_COLUMNS = [
   { dbColumn: "driver_name", label: "Driver Name", required: false },
   { dbColumn: "driver_contact_no", label: "Driver Contact No", required: false },
   { dbColumn: "service_type", label: "OneWay / BothWay", required: false },
-  { dbColumn: "update_new", label: "Update New (Expected Fee)", required: false },
+  { dbColumn: "update_new", label: "Fixed Amount (New Fee)", required: false },
+  { dbColumn: "payment_amount", label: "Amount Due (Paid)", required: false },
 ];
 
 interface Props {
@@ -80,10 +81,10 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
     const uploadedFile = event.target.files?.[0];
     if (!uploadedFile) return;
 
-    if (!uploadedFile.name.match(/\.(xlsx|xls)$/)) {
+    if (!uploadedFile.name.match(/\.(xlsx|xls|csv)$/i)) {
       toast({
         title: "Invalid File",
-        description: "Please upload an Excel file (.xlsx or .xls)",
+        description: "Please upload an Excel (.xlsx, .xls) or CSV (.csv) file",
         variant: "destructive",
       });
       return;
@@ -143,19 +144,34 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
   const autoMapColumns = (headers: string[]) => {
     const mapping: Record<string, string> = {};
     
+    // Flexible matching aliases
+    const aliases: Record<string, string[]> = {
+      update_new: ['fixed amount', 'fixed_amount', 'update new', 'update_new', 'new fee', 'monthly fee', 'expected fee'],
+      payment_amount: ['amount due', 'amount_due', 'paid amount', 'paid', 'payment amount', 'payment_amount'],
+      service_type: ['oneway', 'bothway', 'one way', 'both way', 'service type', 'service_type'],
+    };
+
     REQUIRED_COLUMNS.forEach(col => {
-      const matchingHeader = headers.find(header => 
-        header.toLowerCase().includes(col.label.toLowerCase()) ||
-        col.label.toLowerCase().includes(header.toLowerCase()) ||
-        header.toLowerCase().replace(/\s+/g, "").includes(col.dbColumn.toLowerCase())
-      );
+      const matchingHeader = headers.find(header => {
+        const h = header.toLowerCase().replace(/\s+/g, ' ').trim();
+        const hNoSpace = h.replace(/\s+/g, '');
+        
+        // Check aliases first
+        const colAliases = aliases[col.dbColumn];
+        if (colAliases) {
+          return colAliases.some(alias => h.includes(alias) || hNoSpace.includes(alias.replace(/\s+/g, '')));
+        }
+        
+        // Default matching
+        return h.includes(col.label.toLowerCase()) ||
+          col.label.toLowerCase().includes(h) ||
+          hNoSpace.includes(col.dbColumn.toLowerCase());
+      });
       
       if (matchingHeader) {
         mapping[col.dbColumn] = matchingHeader;
       }
     });
-
-    // Skip monthly payment columns for now - focusing on student data only
 
     setColumnMapping(mapping);
   };
@@ -269,14 +285,14 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
           {!file && (
             <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
               <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-medium mb-2">Upload Excel File</h3>
+              <h3 className="text-lg font-medium mb-2">Upload File</h3>
               <p className="text-muted-foreground mb-4">
-                Select an Excel file (.xlsx or .xls) containing student data
+                Select an Excel (.xlsx, .xls) or CSV (.csv) file containing student data
               </p>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 onChange={handleFileUpload}
                 className="hidden"
               />
