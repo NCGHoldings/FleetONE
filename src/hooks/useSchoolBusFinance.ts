@@ -1321,7 +1321,7 @@ export function useDeleteARBatch() {
       if (batch?.journal_entry_id) {
         await supabase
           .from("journal_entries")
-          .update({ status: "voided", notes: "Voided: AR batch deleted" })
+          .update({ status: "void", notes: "Voided: AR batch deleted" })
           .eq("id", batch.journal_entry_id);
       }
 
