@@ -58,7 +58,9 @@ export const AccountsReceivableView = () => {
       inv.customers?.customer_name?.toLowerCase().includes(query) ||
       inv.customers?.customer_code?.toLowerCase().includes(query) ||
       inv.status?.toLowerCase().includes(query) ||
-      inv.reference?.toLowerCase().includes(query)
+      inv.reference?.toLowerCase().includes(query) ||
+      inv.bus_no?.toLowerCase().includes(query) ||
+      inv.bus_categories?.name?.toLowerCase().includes(query)
     );
   }, [invoices, searchQuery]);
 

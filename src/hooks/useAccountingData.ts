@@ -316,6 +316,11 @@ export const useARInvoices = (status?: string) => {
             billing_address,
             phone,
             email
+          ),
+          bus_categories (
+            name,
+            color,
+            code
           )
         `)
         .order("invoice_date", { ascending: false });
