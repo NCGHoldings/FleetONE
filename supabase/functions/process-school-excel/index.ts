@@ -82,6 +82,12 @@ serve(async (req) => {
     }
 
     console.log(`Processing ${data.length} student records for branch ${branch_id} in ${mode} mode`);
+    
+    // Debug: log first record keys and values
+    if (data.length > 0) {
+      console.log('First record keys:', Object.keys(data[0]));
+      console.log('First record values:', JSON.stringify(data[0]));
+    }
 
     // Step 1: Replace All mode - soft clear existing students
     if (mode === 'replace_all') {
