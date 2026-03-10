@@ -491,9 +491,14 @@ export function SpecialHireCalendarView() {
                                         <CalendarDays className="h-7 w-7 text-muted-foreground" />
                                     </div>
                                     <div>
-                                        <h3 className="font-medium text-base">No hires scheduled</h3>
+                                        <h3 className="font-medium text-base">
+                                            {viewMode === 'hires' ? 'No hires scheduled' : 'No quotations created'}
+                                        </h3>
                                         <p className="text-sm text-muted-foreground mt-1">
-                                            There are no special hires for {format(selectedDate, 'MMMM d, yyyy')}
+                                            {viewMode === 'hires'
+                                                ? `There are no special hires for ${format(selectedDate, 'MMMM d, yyyy')}`
+                                                : `No quotations were created on ${format(selectedDate, 'MMMM d, yyyy')}`
+                                            }
                                         </p>
                                     </div>
                                 </div>
