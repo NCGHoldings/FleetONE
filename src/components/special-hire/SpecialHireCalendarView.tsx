@@ -159,6 +159,8 @@ export function SpecialHireCalendarView() {
             const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
             const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 
+            const filterColumn = viewMode === 'hires' ? 'pickup_datetime' : 'created_at';
+
             const { data, error } = await supabase
                 .from('special_hire_quotations')
                 .select(`
@@ -168,9 +170,9 @@ export function SpecialHireCalendarView() {
             capacity
           )
         `)
-                .gte('pickup_datetime', dayStart.toISOString())
-                .lt('pickup_datetime', dayEnd.toISOString())
-                .order('pickup_datetime', { ascending: true });
+                .gte(filterColumn, dayStart.toISOString())
+                .lt(filterColumn, dayEnd.toISOString())
+                .order(filterColumn, { ascending: true });
 
             if (error) throw error;
 
