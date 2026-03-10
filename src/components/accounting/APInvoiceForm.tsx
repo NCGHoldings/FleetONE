@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "cmdk";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useVendors, useTaxCodes } from "@/hooks/useAccountingData";
 import { useCreateAPInvoice, useUpdateAPInvoice } from "@/hooks/useAccountingMutations";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -536,7 +536,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                             </CommandItem>
                           ))}
                         </CommandGroup>
-                        <CommandGroup heading="Add New">
+                        <CommandGroup heading="Add New" forceMount>
                           <div className="flex items-center gap-1 px-2 py-1">
                             <Input
                               placeholder="New route name"
@@ -597,7 +597,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                             </CommandItem>
                           ))}
                         </CommandGroup>
-                        <CommandGroup heading="Add New">
+                        <CommandGroup heading="Add New" forceMount>
                           <div className="flex items-center gap-1 px-2 py-1">
                             <Input
                               placeholder="New bus number"
@@ -658,7 +658,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                             </CommandItem>
                           ))}
                         </CommandGroup>
-                        <CommandGroup heading="Add New">
+                        <CommandGroup heading="Add New" forceMount>
                           <div className="flex items-center gap-1 px-2 py-1">
                             <Input
                               placeholder="New school route name"
