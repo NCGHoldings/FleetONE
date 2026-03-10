@@ -10,17 +10,17 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { User, Users } from 'lucide-react';
+import { User, Users, Pencil } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (editType: 'staff_edit' | 'customer_request', reason?: string) => void;
+  onConfirm: (editType: 'staff_edit' | 'customer_request' | 'quick_edit', reason?: string) => void;
   quotationNo: string;
 }
 
 export function EditTypeSelectionModal({ isOpen, onClose, onConfirm, quotationNo }: Props) {
-  const [selectedType, setSelectedType] = useState<'staff_edit' | 'customer_request' | null>(null);
+  const [selectedType, setSelectedType] = useState<'staff_edit' | 'customer_request' | 'quick_edit' | null>(null);
   const [reason, setReason] = useState('');
 
   const handleConfirm = () => {
