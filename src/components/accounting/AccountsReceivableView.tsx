@@ -115,6 +115,35 @@ export const AccountsReceivableView = () => {
       ),
     },
     {
+      accessorKey: "bus_no",
+      header: "Bus No.",
+      cell: ({ row }: any) => {
+        const busNo = row.original.bus_no;
+        if (!busNo) return <span className="text-muted-foreground text-xs">—</span>;
+        return <span className="font-mono text-sm">{busNo}</span>;
+      },
+    },
+    {
+      accessorKey: "bus_categories.name",
+      header: "Category",
+      cell: ({ row }: any) => {
+        const cat = row.original.bus_categories;
+        if (!cat) return <span className="text-muted-foreground text-xs">—</span>;
+        return (
+          <Badge
+            variant="outline"
+            className="text-xs"
+            style={{
+              borderColor: cat.color,
+              color: cat.color,
+            }}
+          >
+            {cat.name}
+          </Badge>
+        );
+      },
+    },
+    {
       accessorKey: "invoice_date",
       header: "Invoice Date",
       cell: ({ row }: any) => format(new Date(row.original.invoice_date), "MMM dd, yyyy"),
