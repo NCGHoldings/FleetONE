@@ -658,7 +658,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                             </CommandItem>
                           ))}
                         </CommandGroup>
-                        <CommandGroup heading="Add New">
+                        <CommandGroup heading="Add New" forceMount>
                           <div className="flex items-center gap-1 px-2 py-1">
                             <Input
                               placeholder="New school route name"
