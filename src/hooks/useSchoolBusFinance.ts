@@ -1138,7 +1138,7 @@ export function useBackfillARInvoiceLinks() {
             .from("ar_invoices")
             .insert({
               company_id: effectiveCompanyId,
-              business_unit_code: businessUnitCode || 'SBO',
+              business_unit_code: 'SBO',
               customer_id: customerId,
               invoice_number: inv.invoice_number,
               invoice_date: inv.invoice_month,
