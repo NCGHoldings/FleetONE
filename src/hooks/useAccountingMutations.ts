@@ -3801,6 +3801,9 @@ export const useUpdateAPInvoice = () => {
           wht_amount: data.wht_amount,
           balance: data.total_amount - (data.wht_amount || 0),
           notes: data.notes,
+          route_id: data.route_id || null,
+          bus_id: data.bus_id || null,
+          school_route_id: data.school_route_id || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", id);

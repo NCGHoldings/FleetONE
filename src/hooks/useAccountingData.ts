@@ -373,6 +373,21 @@ export const useAPInvoices = (status?: string) => {
             phone,
             contact_person,
             payment_terms
+          ),
+          routes (
+            id,
+            route_name,
+            route_number
+          ),
+          buses (
+            id,
+            bus_number,
+            bus_name
+          ),
+          school_routes (
+            id,
+            route_name,
+            route_number
           )
         `)
         .order("invoice_date", { ascending: false });
