@@ -447,10 +447,11 @@ export function SpecialHireCalendarView() {
                     {/* Date Header */}
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-semibold">
+                            {viewMode === 'hires' ? 'Hires on ' : 'Created on '}
                             {format(selectedDate, 'EEEE, MMMM d, yyyy')}
                         </h2>
                         <Badge variant="outline" className="text-sm">
-                            {stats.total} hire{stats.total !== 1 ? 's' : ''}
+                            {stats.total} {viewMode === 'hires' ? 'hire' : 'quotation'}{stats.total !== 1 ? 's' : ''}
                         </Badge>
                     </div>
 
