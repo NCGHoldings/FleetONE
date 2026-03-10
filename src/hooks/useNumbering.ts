@@ -89,7 +89,7 @@ export function useUpdateNumberingSequence() {
 export function useGenerateNumber() {
   const { selectedCompanyId } = useCompany();
 
-  return async (entityType: string): Promise<string> => {
+  return useCallback(async (entityType: string): Promise<string> => {
     const { data, error } = await supabase.rpc("generate_entity_number", {
       p_entity_type: entityType,
       p_company_id: selectedCompanyId,
@@ -97,13 +97,12 @@ export function useGenerateNumber() {
 
     if (error) {
       console.error("Failed to generate number:", error);
-      // Fallback format
       const timestamp = Date.now().toString().slice(-6);
       return `${entityType.toUpperCase()}-${timestamp}`;
     }
 
     return data as string;
-  };
+  }, [selectedCompanyId]);
 }
 
 export function generatePreviewNumber(config: NumberingSequence): string {
