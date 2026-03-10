@@ -285,14 +285,14 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
           {!file && (
             <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
               <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-medium mb-2">Upload Excel File</h3>
+              <h3 className="text-lg font-medium mb-2">Upload File</h3>
               <p className="text-muted-foreground mb-4">
-                Select an Excel file (.xlsx or .xls) containing student data
+                Select an Excel (.xlsx, .xls) or CSV (.csv) file containing student data
               </p>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 onChange={handleFileUpload}
                 className="hidden"
               />
