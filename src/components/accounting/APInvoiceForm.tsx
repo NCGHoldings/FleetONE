@@ -508,7 +508,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                       className={cn("w-full justify-between font-normal", !selectedRouteId && "text-muted-foreground")}
                     >
                       {selectedRoute
-                        ? `${selectedRoute.route_number ? selectedRoute.route_number + " - " : ""}${selectedRoute.route_name}`
+                        ? `${selectedRoute.route_no ? selectedRoute.route_no + " - " : ""}${selectedRoute.route_name}`
                         : "Select route..."}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
