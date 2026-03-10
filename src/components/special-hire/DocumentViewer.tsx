@@ -374,69 +374,14 @@ export const DocumentViewer = ({
             </TabsList>
             
             <TabsContent value="preview" className="flex-1 overflow-hidden border rounded-lg bg-gray-50 mt-2">
-              {(() => {
-                if (!document.document_data) {
-                  return (
-                    <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
-                      <div className="text-center">
-                        <p>Document data not available</p>
-                        <p className="text-sm">Please try regenerating the document</p>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Use currentDocument state for updated PDF
-                const displayDoc = currentDocument.document_data !== document.document_data ? currentDocument : document;
-                const pdfUrl = (() => {
-                  try {
-                    if (!displayDoc.document_data) return '';
-                    const arr = toUint8FromAny(displayDoc.document_data);
-                    if (!arr) return '';
-                    return createPdfBlobUrl(arr);
-                  } catch (error) {
-                    console.error('Error creating PDF URL:', error);
-                    return '';
-                  }
-                })();
-                const blobUrl = pdfUrl;
-                
-                if (!pdfUrl && !blobUrl) {
-                  return (
-                    <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
-                      <div className="text-center">
-                        <p>Unable to display document</p>
-                        <p className="text-sm">The document data appears to be corrupted</p>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="mt-4"
-                          onClick={handleDownload}
-                        >
-                          Try Download Instead
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Use the enhanced PDF viewer with editing capabilities
-                return (
-                  <div className="h-[70vh]">
-                    <EnhancedPDFViewer
-                      pdfUrl={blobUrl || pdfUrl}
-                      onDownloadReady={(downloadFn) => {
-                        pdfViewerDownloadRef.current = downloadFn;
-                      }}
-                      onSave={(canvasData) => {
-                        console.log('Canvas annotations saved:', canvasData);
-                        // Here you could save the canvas data to your database
-                        // for persistent annotations
-                      }}
-                    />
-                  </div>
-                );
-              })()}
+              <MemoizedPreviewContent
+                document={document}
+                currentDocument={currentDocument}
+                toUint8FromAny={toUint8FromAny}
+                createPdfBlobUrl={createPdfBlobUrl}
+                handleDownload={handleDownload}
+                pdfViewerDownloadRef={pdfViewerDownloadRef}
+              />
             </TabsContent>
             
             {!isCustomerBalanceInvoice && (
