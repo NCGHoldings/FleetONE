@@ -58,7 +58,9 @@ export const AccountsReceivableView = () => {
       inv.customers?.customer_name?.toLowerCase().includes(query) ||
       inv.customers?.customer_code?.toLowerCase().includes(query) ||
       inv.status?.toLowerCase().includes(query) ||
-      inv.reference?.toLowerCase().includes(query)
+      inv.reference?.toLowerCase().includes(query) ||
+      inv.bus_no?.toLowerCase().includes(query) ||
+      inv.bus_categories?.name?.toLowerCase().includes(query)
     );
   }, [invoices, searchQuery]);
 
@@ -111,6 +113,35 @@ export const AccountsReceivableView = () => {
           <p className="text-xs text-muted-foreground">{row.original.customers?.customer_code}</p>
         </div>
       ),
+    },
+    {
+      accessorKey: "bus_no",
+      header: "Bus No.",
+      cell: ({ row }: any) => {
+        const busNo = row.original.bus_no;
+        if (!busNo) return <span className="text-muted-foreground text-xs">—</span>;
+        return <span className="font-mono text-sm">{busNo}</span>;
+      },
+    },
+    {
+      accessorKey: "bus_categories.name",
+      header: "Category",
+      cell: ({ row }: any) => {
+        const cat = row.original.bus_categories;
+        if (!cat) return <span className="text-muted-foreground text-xs">—</span>;
+        return (
+          <Badge
+            variant="outline"
+            className="text-xs"
+            style={{
+              borderColor: cat.color,
+              color: cat.color,
+            }}
+          >
+            {cat.name}
+          </Badge>
+        );
+      },
     },
     {
       accessorKey: "invoice_date",
@@ -270,7 +301,7 @@ export const AccountsReceivableView = () => {
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by invoice #, customer, status..."
+            placeholder="Search by invoice #, customer, bus no., category, status..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 max-w-md"
@@ -367,6 +398,20 @@ export const AccountsReceivableView = () => {
                     {format(new Date(viewInvoice.due_date), "MMM dd, yyyy")}
                   </p>
                 </div>
+                {viewInvoice.bus_no && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Bus Number</p>
+                    <p className="font-medium font-mono">{viewInvoice.bus_no}</p>
+                  </div>
+                )}
+                {viewInvoice.bus_categories?.name && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Bus Category</p>
+                    <Badge variant="outline" style={{ borderColor: viewInvoice.bus_categories.color, color: viewInvoice.bus_categories.color }}>
+                      {viewInvoice.bus_categories.name}
+                    </Badge>
+                  </div>
+                )}
               </div>
               
               <Separator />

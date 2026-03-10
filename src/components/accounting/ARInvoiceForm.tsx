@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
+import { BusSelector } from "./BusSelector";
 
 const invoiceSchema = z.object({
   invoice_number: z.string().min(1, "Invoice number is required"),
@@ -51,6 +52,13 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
   const updateInvoice = useUpdateARInvoice();
   const generateNumber = useGenerateNumber();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [busData, setBusData] = useState<{
+    bus_id?: string;
+    bus_no?: string;
+    bus_type?: string;
+    bus_category_id?: string;
+    bus_sub_category_id?: string;
+  }>({});
 
   const isEditing = !!editingInvoice;
 
@@ -80,6 +88,15 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
         notes: editingInvoice.notes || "",
       });
 
+      // Pre-fill bus data
+      setBusData({
+        bus_id: editingInvoice.bus_id || undefined,
+        bus_no: editingInvoice.bus_no || undefined,
+        bus_type: editingInvoice.bus_type || undefined,
+        bus_category_id: editingInvoice.bus_category_id || undefined,
+        bus_sub_category_id: editingInvoice.bus_sub_category_id || undefined,
+      });
+
       // Fetch existing lines
       const fetchLines = async () => {
         const { data: existingLines } = await supabase
@@ -102,6 +119,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
       fetchLines();
     } else {
       setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
+      setBusData({});
     }
   }, [open, editingInvoice]);
 
@@ -169,6 +187,14 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
     }));
 
     try {
+      const busFields = {
+        bus_id: busData.bus_id,
+        bus_no: busData.bus_no,
+        bus_type: busData.bus_type,
+        bus_category_id: busData.bus_category_id,
+        bus_sub_category_id: busData.bus_sub_category_id,
+      };
+
       if (isEditing) {
         await updateInvoice.mutateAsync({
           id: editingInvoice.id,
@@ -180,6 +206,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
             total_amount: grandTotal,
             tax_amount: totalTax,
             notes: data.notes,
+            ...busFields,
           },
           lines: lineData,
         });
@@ -192,11 +219,13 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
           total_amount: grandTotal,
           tax_amount: totalTax,
           notes: data.notes,
+          ...busFields,
           lines: lineData,
         });
       }
       onOpenChange(false);
       form.reset();
+      setBusData({});
       setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
     } catch (error) {
       // Error handled by mutation
@@ -293,6 +322,12 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                   </FormItem>
                 )}
               />
+            </div>
+
+            {/* Bus Selection */}
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <h3 className="font-semibold text-sm mb-3">Bus Details (Optional)</h3>
+              <BusSelector value={busData} onChange={setBusData} />
             </div>
 
             {/* Invoice Lines */}

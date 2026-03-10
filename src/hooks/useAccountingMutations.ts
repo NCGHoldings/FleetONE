@@ -341,6 +341,11 @@ export const useCreateARInvoice = () => {
       total_amount: number;
       tax_amount?: number;
       notes?: string;
+      bus_id?: string;
+      bus_no?: string;
+      bus_type?: string;
+      bus_category_id?: string;
+      bus_sub_category_id?: string;
       lines?: Array<{
         description: string;
         quantity: number;
@@ -356,7 +361,7 @@ export const useCreateARInvoice = () => {
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
       
-      const { lines, ...headerData } = invoice;
+      const { lines, bus_id, bus_no, bus_type, bus_category_id, bus_sub_category_id, ...headerData } = invoice;
       
       const { data, error } = await supabase
         .from("ar_invoices")
@@ -366,6 +371,11 @@ export const useCreateARInvoice = () => {
           status: "unpaid",
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,
+          bus_id: bus_id || null,
+          bus_no: bus_no || null,
+          bus_type: bus_type || null,
+          bus_category_id: bus_category_id || null,
+          bus_sub_category_id: bus_sub_category_id || null,
         }])
         .select()
         .single();
@@ -3828,6 +3838,11 @@ export const useUpdateARInvoice = () => {
         total_amount: number;
         tax_amount?: number;
         notes?: string;
+        bus_id?: string;
+        bus_no?: string;
+        bus_type?: string;
+        bus_category_id?: string;
+        bus_sub_category_id?: string;
       };
       lines: Array<{
         description: string;
@@ -3851,6 +3866,11 @@ export const useUpdateARInvoice = () => {
           tax_amount: data.tax_amount,
           balance: data.total_amount,
           notes: data.notes,
+          bus_id: data.bus_id || null,
+          bus_no: data.bus_no || null,
+          bus_type: data.bus_type || null,
+          bus_category_id: data.bus_category_id || null,
+          bus_sub_category_id: data.bus_sub_category_id || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", id);
