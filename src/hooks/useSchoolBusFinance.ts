@@ -574,7 +574,7 @@ export function useGenerateBulkARInvoices() {
                 total_credit: advanceApplyAmount,
                 status: "posted",
                 company_id: effectiveCompanyId,
-                business_unit_code: businessUnitCode || 'SBO',
+                business_unit_code: 'SBO',
                 business_unit_id: selectedCompanyId,
                 posted_at: new Date().toISOString(),
               })
