@@ -136,7 +136,7 @@ serve(async (req) => {
         const updateNewValue = normalizedData.update_new ?? normalizedData.fixed_amount ?? null;
         const paymentAmountValue = normalizedData.payment_amount ?? normalizedData.amount_due ?? null;
 
-        const record: StudentRecord = {
+        const record: any = {
           student_name: normalizedData.student_name,
           admission_no: fixAdmissionNo(normalizedData.admission_no),
           grade: normalizedData.grade,
@@ -157,7 +157,9 @@ serve(async (req) => {
           dropoff_point: normalizedData.dropoff_point,
           payment_status: normalizedData.payment_status?.toLowerCase() || 'pending',
           payment_amount: paymentAmountValue,
-          update_new: updateNewValue
+          update_new: updateNewValue,
+          fixed_monthly_amount: updateNewValue,
+          current_amount_due: updateNewValue
         };
 
         validatedRecords.push(record);
