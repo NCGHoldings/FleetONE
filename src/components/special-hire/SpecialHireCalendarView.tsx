@@ -371,7 +371,31 @@ export function SpecialHireCalendarView() {
                                 Select Date
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="p-2">
+                        <CardContent className="p-2 space-y-3">
+                            {/* View Mode Toggle */}
+                            <div className="flex rounded-lg bg-muted p-1 mx-1">
+                                <button
+                                    onClick={() => setViewMode('hires')}
+                                    className={`flex-1 text-xs font-medium py-1.5 px-2 rounded-md transition-all ${
+                                        viewMode === 'hires'
+                                            ? 'bg-background text-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    Hires on Date
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('created')}
+                                    className={`flex-1 text-xs font-medium py-1.5 px-2 rounded-md transition-all ${
+                                        viewMode === 'created'
+                                            ? 'bg-background text-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    Created on Date
+                                </button>
+                            </div>
+
                             <Calendar
                                 mode="single"
                                 selected={selectedDate}
