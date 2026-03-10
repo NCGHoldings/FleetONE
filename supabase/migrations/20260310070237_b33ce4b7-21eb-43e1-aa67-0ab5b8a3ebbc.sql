@@ -1,0 +1,1 @@
+UPDATE school_students SET fixed_monthly_amount = update_new, current_amount_due = update_new WHERE update_new IS NOT NULL AND fixed_monthly_amount IS NULL AND is_active = true;
