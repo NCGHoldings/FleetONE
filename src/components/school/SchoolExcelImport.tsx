@@ -144,19 +144,34 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
   const autoMapColumns = (headers: string[]) => {
     const mapping: Record<string, string> = {};
     
+    // Flexible matching aliases
+    const aliases: Record<string, string[]> = {
+      update_new: ['fixed amount', 'fixed_amount', 'update new', 'update_new', 'new fee', 'monthly fee', 'expected fee'],
+      payment_amount: ['amount due', 'amount_due', 'paid amount', 'paid', 'payment amount', 'payment_amount'],
+      service_type: ['oneway', 'bothway', 'one way', 'both way', 'service type', 'service_type'],
+    };
+
     REQUIRED_COLUMNS.forEach(col => {
-      const matchingHeader = headers.find(header => 
-        header.toLowerCase().includes(col.label.toLowerCase()) ||
-        col.label.toLowerCase().includes(header.toLowerCase()) ||
-        header.toLowerCase().replace(/\s+/g, "").includes(col.dbColumn.toLowerCase())
-      );
+      const matchingHeader = headers.find(header => {
+        const h = header.toLowerCase().replace(/\s+/g, ' ').trim();
+        const hNoSpace = h.replace(/\s+/g, '');
+        
+        // Check aliases first
+        const colAliases = aliases[col.dbColumn];
+        if (colAliases) {
+          return colAliases.some(alias => h.includes(alias) || hNoSpace.includes(alias.replace(/\s+/g, '')));
+        }
+        
+        // Default matching
+        return h.includes(col.label.toLowerCase()) ||
+          col.label.toLowerCase().includes(h) ||
+          hNoSpace.includes(col.dbColumn.toLowerCase());
+      });
       
       if (matchingHeader) {
         mapping[col.dbColumn] = matchingHeader;
       }
     });
-
-    // Skip monthly payment columns for now - focusing on student data only
 
     setColumnMapping(mapping);
   };
