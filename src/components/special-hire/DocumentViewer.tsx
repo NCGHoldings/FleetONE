@@ -42,6 +42,11 @@ export const DocumentViewer = ({
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [currentDocument, setCurrentDocument] = useState(document);
   const pdfViewerDownloadRef = useRef<(() => void) | null>(null);
+
+  // Sync currentDocument when document prop changes
+  useEffect(() => {
+    setCurrentDocument(document);
+  }, [document]);
   const { user, hasRole } = useAuth();
   
   // Check if user can manage signatures - allow all authenticated users
