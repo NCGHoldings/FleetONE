@@ -84,12 +84,8 @@ import CustomerPortal from "./pages/CustomerPortal";
 import VendorPortal from "./pages/VendorPortal";
 import WhatsAppHub from "./pages/WhatsAppHub";
 import SystemIssueTracker from "./pages/SystemIssueTracker";
-<<<<<<< Updated upstream
 import PublicYutongReport from "./pages/PublicYutongReport";
 import PublicYutongSpreadsheet from "./pages/PublicYutongSpreadsheet";
-=======
-import { AIChatWidget } from "./components/ai-chatbot/AIChatWidget";
->>>>>>> Stashed changes
 
 const queryClient = new QueryClient();
 
@@ -829,7 +825,6 @@ const App = () => (
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-          <AIChatWidget />
           </BrowserRouter>
         </SeasonalThemeProvider>
         </AuthProvider>
