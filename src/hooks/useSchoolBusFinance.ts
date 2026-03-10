@@ -1105,7 +1105,7 @@ export function useBackfillARInvoiceLinks() {
           .from("customers")
           .insert({
             company_id: effectiveCompanyId,
-            business_unit_code: businessUnitCode || 'SBO',
+            business_unit_code: 'SBO',
             customer_code: "SBS-DEFAULT",
             customer_name: "School Bus Students (Backfill)",
             is_active: true,
