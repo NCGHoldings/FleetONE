@@ -864,6 +864,66 @@ export function usePostPaymentToGL() {
         })
         .eq("id", paymentId);
 
+      // Create AR Receipt record in Finance module
+      try {
+        const receiptNumber = `SBS-REC-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        
+        // Get or create SBS customer
+        let receiptCustomerId: string | null = null;
+        const { data: existingCust } = await supabase
+          .from("customers")
+          .select("id")
+          .eq("company_id", effectiveCompanyId)
+          .eq("customer_code", "SBS-DEFAULT")
+          .maybeSingle();
+        
+        receiptCustomerId = existingCust?.id || null;
+        if (!receiptCustomerId) {
+          const { data: newCust } = await supabase
+            .from("customers")
+            .insert({
+              company_id: effectiveCompanyId,
+              business_unit_code: businessUnitCode || 'SBO',
+              customer_code: "SBS-DEFAULT",
+              customer_name: "School Bus Students",
+              is_active: true,
+            } as any)
+            .select()
+            .single();
+          receiptCustomerId = newCust?.id || null;
+        }
+
+        const { data: arReceipt } = await supabase
+          .from("ar_receipts")
+          .insert({
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode || 'SBO',
+            customer_id: receiptCustomerId,
+            receipt_number: receiptNumber,
+            receipt_date: format(new Date(), "yyyy-MM-dd"),
+            amount: amount,
+            payment_method: paymentMethod === 'Bank Transfer' ? 'bank_transfer' : paymentMethod.toLowerCase(),
+            reference: referenceNo || paymentId,
+            status: 'posted',
+            journal_entry_id: journalEntry.id,
+            bank_account_id: null,
+            notes: `School Bus Payment - ${studentName}`,
+            is_advance: (overpaymentAmount && overpaymentAmount > 0) ? true : false,
+          } as any)
+          .select()
+          .single();
+
+        // Link AR receipt back to payment transaction
+        if (arReceipt) {
+          await supabase
+            .from("school_payment_transactions")
+            .update({ ar_receipt_id: arReceipt.id })
+            .eq("id", paymentId);
+        }
+      } catch (receiptError) {
+        console.error("AR Receipt creation failed (non-critical):", receiptError);
+      }
+
       return journalEntry;
     },
     onSuccess: () => {
