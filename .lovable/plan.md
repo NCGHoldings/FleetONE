@@ -1,38 +1,64 @@
 
 
-# Fix "Finance Settings Not Configured" + Verify Bulk AR Per-Student Flow
+# Special Hire Spreadsheet — Full Operations Tracking View
 
-## Problem 1: Settings Show "Not Configured" Despite Being Saved
+## What You Want
+A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
 
-The database has **4 settings rows** across 2 companies:
-- **NCG Holding** (`f40b0a9d`): 2 rows with `trade_receivable_account_id = NULL`, `sbs_collection_account_id = NULL`
-- **School Bus Operations** (`0fba4a2f`): 2 rows with accounts **properly configured**
+## Column Mapping (Your Columns → Database Fields)
 
-`useBranchFinanceSettings()` queries using `selectedCompanyId`. When the user navigates school bus pages while the company selector shows "NCG Holding" (the parent), it finds the holding company's settings which have NULL accounts — triggering the "Not Configured" warning.
+The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
 
-**Fix**: Update `useBranchFinanceSettings` to also search across related sub-company settings when the current company's settings have null accounts. Specifically, add a fallback: if the found settings have null `trade_receivable_account_id`, try querying with the SBO sub-company ID.
+| Group | Columns | Source |
+|---|---|---|
+| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
+| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
+| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
+| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
+| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
+| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
 
-### Files to Edit
-**`src/hooks/useSchoolBusFinance.ts`** — `useBranchFinanceSettings` function (lines 130-163):
-- After finding settings for `selectedCompanyId`, check if `trade_receivable_account_id` is null
-- If null, try the other company ID — fetch all `school_bus_finance_settings` matching this `branch_id` regardless of company, and pick the one with configured accounts
-- This ensures settings are always found regardless of which company context the user is viewing from
+## Implementation Plan
 
-Also update the `BulkARInvoiceDialog.tsx` default settings fallback query (lines 34-45) to search across all companies when the primary query returns null accounts.
+### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
+- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
+- Map to a flat `SpreadsheetHire` interface with all ~45 columns
+- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
+- Realtime subscription on `special_hire_quotations` for live updates
+- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
 
-## Problem 2: Confirm Bulk AR Creates Individual Invoices (Already Working)
+### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
+- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
+- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
+- Inline click-to-edit cells for editable fields
+- Dropdown selects for status fields
+- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
+- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
+- Search, Refresh, Export Excel toolbar
 
-The code already creates **individual** `ar_invoices` and `school_ar_invoices` per student (confirmed in lines 460-625 of `useSchoolBusFinance.ts`). Each student gets:
-- Their own Journal Entry with unique `entry_number`
-- Their own `ar_invoices` record with unique `invoice_number`
-- Their own `school_ar_invoices` record linked to the AR invoice
+### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
+- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
 
-This is correct — no changes needed for this part.
+### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
+- New tab trigger with `Table2` icon labeled "Sheet"
+- TabsContent rendering `<SpecialHireSpreadsheet />`
 
-## Summary of Changes
+### User-Friendly Design Decisions
+- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
+- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
+- **Smart defaults**: empty expense fields show "0" and are click-to-edit
+- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
+- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
 
-| File | Change |
+### Files to Create/Edit
+
+| File | Action |
 |---|---|
-| `src/hooks/useSchoolBusFinance.ts` | Update `useBranchFinanceSettings` to fallback across companies when settings have null accounts |
-| `src/components/school/BulkARInvoiceDialog.tsx` | Remove redundant default settings query (already handled by the hook fallback) |
+| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
+| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
+| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
+| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
+
+### DB Note
+The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
 
