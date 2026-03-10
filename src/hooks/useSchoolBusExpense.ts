@@ -396,3 +396,130 @@ export function useAddRouteExpenseWithGL() {
     },
   });
 }
+
+// Post staff cost to GL
+export function usePostStaffCostToGL() {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+  
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = getBusinessUnitCode();
+
+  return useMutation({
+    mutationFn: async ({
+      staffCostId,
+      branchId,
+      staffName,
+      role,
+      amount,
+      costDate,
+    }: {
+      staffCostId: string;
+      branchId: string;
+      staffName: string;
+      role: string;
+      amount: number;
+      costDate: string;
+    }) => {
+      // Get finance settings for salary account
+      const { data: settings } = await supabase
+        .from("school_bus_finance_settings")
+        .select("*")
+        .eq("company_id", selectedCompanyId)
+        .eq("branch_id", branchId)
+        .maybeSingle();
+
+      let effectiveSettings = settings;
+      if (!settings) {
+        const { data: defaultSettings } = await supabase
+          .from("school_bus_finance_settings")
+          .select("*")
+          .eq("company_id", selectedCompanyId)
+          .is("branch_id", null)
+          .maybeSingle();
+        effectiveSettings = defaultSettings;
+      }
+
+      if (!effectiveSettings?.salary_expense_account_id) {
+        console.log("Salary expense account not configured, skipping GL posting");
+        return null;
+      }
+
+      const cashAccountId = effectiveSettings.expense_cash_account_id || effectiveSettings.cash_account_id;
+      if (!cashAccountId) {
+        console.log("Cash account not configured for staff costs, skipping GL posting");
+        return null;
+      }
+
+      const entryNumber = `SBS-SAL-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      const { data: journalEntry, error: jeError } = await supabase
+        .from("journal_entries")
+        .insert({
+          entry_number: entryNumber,
+          entry_date: costDate,
+          description: `School Bus Staff Cost - ${staffName} (${role})`,
+          reference: `STAFF-${staffCostId}`,
+          total_debit: amount,
+          total_credit: amount,
+          status: "posted",
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode || "SBO",
+          business_unit_id: selectedCompanyId,
+          posted_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (jeError) throw jeError;
+
+      // DR: Salary Expense, CR: Cash/Bank
+      const { error: linesError } = await supabase
+        .from("journal_entry_lines")
+        .insert([
+          {
+            journal_entry_id: journalEntry.id,
+            account_id: effectiveSettings.salary_expense_account_id,
+            description: `Salary - ${staffName} (${role})`,
+            debit: amount,
+            credit: 0,
+            company_id: effectiveCompanyId,
+          },
+          {
+            journal_entry_id: journalEntry.id,
+            account_id: cashAccountId,
+            description: `Payment for staff salary - ${staffName}`,
+            debit: 0,
+            credit: amount,
+            company_id: effectiveCompanyId,
+          },
+        ]);
+
+      if (linesError) throw linesError;
+
+      await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
+      // Update staff cost record with GL reference
+      await supabase
+        .from("route_staff_costs")
+        .update({
+          journal_entry_id: journalEntry.id,
+          posted_to_gl: true,
+        } as any)
+        .eq("id", staffCostId);
+
+      return journalEntry;
+    },
+    onSuccess: (data) => {
+      if (data) {
+        queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+        queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+        toast.success("Staff cost posted to GL");
+      }
+    },
+    onError: (error) => {
+      console.error("Staff cost GL posting error:", error);
+    },
+  });
+}
