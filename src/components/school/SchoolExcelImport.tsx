@@ -187,6 +187,19 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
       }
     });
 
+    console.log('Auto-mapping result:', mapping);
+    console.log('Excel headers:', headers);
+    
+    // Show mapping summary toast
+    const mappedFields = Object.keys(mapping);
+    const unmappedFields = REQUIRED_COLUMNS.filter(c => !mapping[c.dbColumn]).map(c => c.label);
+    toast({
+      title: `Auto-mapped ${mappedFields.length} columns`,
+      description: unmappedFields.length > 0 
+        ? `Not detected: ${unmappedFields.join(', ')}. Please map manually.`
+        : 'All columns detected!',
+    });
+
     setColumnMapping(mapping);
   };
 

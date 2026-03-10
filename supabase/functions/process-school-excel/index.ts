@@ -266,6 +266,12 @@ serve(async (req) => {
       errors: errors.slice(0, 20)
     };
 
+    // Debug: field population stats
+    const withAdmission = validatedRecords.filter(r => r.admission_no).length;
+    const withUpdateNew = validatedRecords.filter(r => r.update_new !== null && r.update_new !== undefined).length;
+    const withPayment = validatedRecords.filter(r => r.payment_amount !== null && r.payment_amount !== undefined).length;
+    console.log(`Field stats: admission_no=${withAdmission}, update_new=${withUpdateNew}, payment_amount=${withPayment}`);
+
     console.log('Import completed:', result);
 
     return new Response(
