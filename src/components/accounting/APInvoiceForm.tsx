@@ -589,11 +589,11 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                           {buses?.map((bus) => (
                             <CommandItem
                               key={bus.id}
-                              value={`${bus.bus_number} ${bus.bus_name || ""}`}
+                              value={bus.bus_no}
                               onSelect={() => { setSelectedBusId(bus.id); setBusPopoverOpen(false); }}
                             >
                               <Check className={cn("mr-2 h-4 w-4", selectedBusId === bus.id ? "opacity-100" : "opacity-0")} />
-                              {bus.bus_number}{bus.bus_name ? ` - ${bus.bus_name}` : ""}
+                              {bus.bus_no}
                             </CommandItem>
                           ))}
                         </CommandGroup>
