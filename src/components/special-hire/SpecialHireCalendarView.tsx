@@ -239,11 +239,11 @@ export function SpecialHireCalendarView() {
 
     useEffect(() => {
         loadQuotationsForDate(selectedDate);
-    }, [selectedDate]);
+    }, [selectedDate, viewMode]);
 
     useEffect(() => {
         loadMonthDates(currentMonth);
-    }, [currentMonth]);
+    }, [currentMonth, viewMode]);
 
     useEffect(() => {
         const channel = supabase
