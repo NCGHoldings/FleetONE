@@ -73,11 +73,14 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
 
   // Handle tool changes
   // Pass download function to parent once canvas is ready
+  const onDownloadReadyRef = useRef(onDownloadReady);
+  onDownloadReadyRef.current = onDownloadReady;
+  
   useEffect(() => {
-    if (fabricCanvas && isCanvasReady && onDownloadReady) {
-      onDownloadReady(handleDownloadWithAnnotations);
+    if (fabricCanvas && isCanvasReady && onDownloadReadyRef.current) {
+      onDownloadReadyRef.current(handleDownloadWithAnnotations);
     }
-  }, [fabricCanvas, isCanvasReady, onDownloadReady]);
+  }, [fabricCanvas, isCanvasReady]);
 
   useEffect(() => {
     if (!fabricCanvas) return;
