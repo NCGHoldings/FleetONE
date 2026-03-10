@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -137,21 +137,28 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     }
   }, [paymentMethod, watchedBankAccountId, open]);
 
+  const hasGeneratedNumber = useRef(false);
+
   // Reset form and generate payment number when dialog opens
   useEffect(() => {
     if (open) {
-      setIsAdvance(isAdvanceMode);
-      setIsDirectPayment(false);
-      setDirectLines([createEmptyLine()]);
-      form.setValue("is_advance", isAdvanceMode);
-      setAdvanceAmount(0);
-      setSelectedBankAccountId("");
-      setIncludeBankFee(false);
-      setBankFeeAmount(0);
-      setBankFeeType("bank_charge");
-      generateNumber("payment").then((num) => {
-        form.setValue("payment_number", num);
-      });
+      if (!hasGeneratedNumber.current) {
+        setIsAdvance(isAdvanceMode);
+        setIsDirectPayment(false);
+        setDirectLines([createEmptyLine()]);
+        form.setValue("is_advance", isAdvanceMode);
+        setAdvanceAmount(0);
+        setSelectedBankAccountId("");
+        setIncludeBankFee(false);
+        setBankFeeAmount(0);
+        setBankFeeType("bank_charge");
+        generateNumber("payment").then((num) => {
+          form.setValue("payment_number", num);
+        });
+        hasGeneratedNumber.current = true;
+      }
+    } else {
+      hasGeneratedNumber.current = false;
     }
   }, [open, isAdvanceMode, form, generateNumber]);
 
