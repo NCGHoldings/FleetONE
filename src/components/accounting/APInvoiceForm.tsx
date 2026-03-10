@@ -8,15 +8,20 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "cmdk";
 import { useVendors, useTaxCodes } from "@/hooks/useAccountingData";
 import { useCreateAPInvoice, useUpdateAPInvoice } from "@/hooks/useAccountingMutations";
 import { useCompany } from "@/contexts/CompanyContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays } from "date-fns";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Bus, Route } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const invoiceSchema = z.object({
   invoice_number: z.string().min(1, "Invoice number is required"),
@@ -53,12 +58,70 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
   const createInvoice = useCreateAPInvoice();
   const updateInvoice = useUpdateAPInvoice();
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const queryClient = useQueryClient();
 
   const isEditing = !!editingInvoice;
 
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 },
   ]);
+
+  // Route/Bus/School Route state
+  const [selectedRouteId, setSelectedRouteId] = useState<string>("");
+  const [selectedBusId, setSelectedBusId] = useState<string>("");
+  const [selectedSchoolRouteId, setSelectedSchoolRouteId] = useState<string>("");
+  const [routePopoverOpen, setRoutePopoverOpen] = useState(false);
+  const [busPopoverOpen, setBusPopoverOpen] = useState(false);
+  const [schoolRoutePopoverOpen, setSchoolRoutePopoverOpen] = useState(false);
+  const [newRouteName, setNewRouteName] = useState("");
+  const [newBusNumber, setNewBusNumber] = useState("");
+  const [newSchoolRouteName, setNewSchoolRouteName] = useState("");
+  const [addingRoute, setAddingRoute] = useState(false);
+  const [addingBus, setAddingBus] = useState(false);
+  const [addingSchoolRoute, setAddingSchoolRoute] = useState(false);
+
+  // Fetch routes
+  const { data: routes } = useQuery({
+    queryKey: ["routes-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("routes")
+        .select("id, route_name, route_no")
+        .eq("is_active", true)
+        .order("route_name");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Fetch buses
+  const { data: buses } = useQuery({
+    queryKey: ["buses-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("buses")
+        .select("id, bus_no")
+        .order("bus_no");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Fetch school routes
+  const { data: schoolRoutes } = useQuery({
+    queryKey: ["school-routes-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("school_routes")
+        .select("id, route_name, route_code")
+        .order("route_name");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open,
+  });
 
   const form = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceSchema),
@@ -87,6 +150,9 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
           : 5,
         notes: editingInvoice.notes || "",
       });
+      setSelectedRouteId(editingInvoice.route_id || "");
+      setSelectedBusId(editingInvoice.bus_id || "");
+      setSelectedSchoolRouteId(editingInvoice.school_route_id || "");
 
       // Fetch existing lines
       const fetchLines = async () => {
@@ -111,6 +177,9 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     } else {
       // New invoice - reset
       setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
+      setSelectedRouteId("");
+      setSelectedBusId("");
+      setSelectedSchoolRouteId("");
     }
   }, [open, editingInvoice]);
 
@@ -206,11 +275,81 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     }
   };
 
+  // Add new route inline
+  const handleAddRoute = async () => {
+    if (!newRouteName.trim()) return;
+    setAddingRoute(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from("routes")
+        .insert([{ route_name: newRouteName.trim(), route_no: 'NEW', start_location: 'TBD', end_location: 'TBD', is_active: true }])
+        .select("id")
+        .single();
+      if (error) throw error;
+      setSelectedRouteId(data.id);
+      setNewRouteName("");
+      queryClient.invalidateQueries({ queryKey: ["routes-list"] });
+      toast.success("Route added");
+    } catch (err: any) {
+      toast.error(`Failed to add route: ${err.message}`);
+    } finally {
+      setAddingRoute(false);
+    }
+  };
+
+  // Add new bus inline
+  const handleAddBus = async () => {
+    if (!newBusNumber.trim()) return;
+    setAddingBus(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from("buses")
+        .insert([{ bus_no: newBusNumber.trim(), capacity: 0, year: new Date().getFullYear() }])
+        .select("id")
+        .single();
+      if (error) throw error;
+      setSelectedBusId(data.id);
+      setNewBusNumber("");
+      queryClient.invalidateQueries({ queryKey: ["buses-list"] });
+      toast.success("Bus added");
+    } catch (err: any) {
+      toast.error(`Failed to add bus: ${err.message}`);
+    } finally {
+      setAddingBus(false);
+    }
+  };
+
+  // Add new school route inline
+  const handleAddSchoolRoute = async () => {
+    if (!newSchoolRouteName.trim()) return;
+    setAddingSchoolRoute(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from("school_routes")
+        .insert([{ route_name: newSchoolRouteName.trim(), route_code: 'NEW-' + Date.now().toString().slice(-4) }])
+        .select("id")
+        .single();
+      if (error) throw error;
+      setSelectedSchoolRouteId(data.id);
+      setNewSchoolRouteName("");
+      queryClient.invalidateQueries({ queryKey: ["school-routes-list"] });
+      toast.success("School route added");
+    } catch (err: any) {
+      toast.error(`Failed to add school route: ${err.message}`);
+    } finally {
+      setAddingSchoolRoute(false);
+    }
+  };
+
   const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.unit_price, 0);
   const totalTax = lines.reduce((sum, line) => sum + (line.quantity * line.unit_price * line.tax_rate) / 100, 0);
   const grossTotal = subtotal + totalTax;
   const whtAmount = applyWht ? (subtotal * whtRate) / 100 : 0;
   const netPayable = grossTotal - whtAmount;
+
+  const selectedRoute = routes?.find(r => r.id === selectedRouteId);
+  const selectedBus = buses?.find(b => b.id === selectedBusId);
+  const selectedSchoolRoute = schoolRoutes?.find(r => r.id === selectedSchoolRouteId);
 
   const onSubmit = async (data: InvoiceFormData) => {
     const lineData = lines
@@ -239,6 +378,9 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
             tax_amount: totalTax,
             wht_amount: whtAmount,
             notes: data.notes,
+            route_id: selectedRouteId || undefined,
+            bus_id: selectedBusId || undefined,
+            school_route_id: selectedSchoolRouteId || undefined,
           },
           lines: lineData,
         });
@@ -253,12 +395,18 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
           tax_amount: totalTax,
           wht_amount: whtAmount,
           notes: data.notes,
+          route_id: selectedRouteId || undefined,
+          bus_id: selectedBusId || undefined,
+          school_route_id: selectedSchoolRouteId || undefined,
           lines: lineData,
         });
       }
       onOpenChange(false);
       form.reset();
       setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
+      setSelectedRouteId("");
+      setSelectedBusId("");
+      setSelectedSchoolRouteId("");
     } catch (error) {
       // Error handled by mutation
     }
@@ -343,6 +491,192 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                   </FormItem>
                 )}
               />
+            </div>
+
+            {/* Route, Bus, School Route Selectors */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Route Selector */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-1">
+                  <Route className="h-3.5 w-3.5" /> Route
+                </label>
+                <Popover open={routePopoverOpen} onOpenChange={setRoutePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn("w-full justify-between font-normal", !selectedRouteId && "text-muted-foreground")}
+                    >
+                      {selectedRoute
+                        ? `${selectedRoute.route_no ? selectedRoute.route_no + " - " : ""}${selectedRoute.route_name}`
+                        : "Select route..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0 z-[100]">
+                    <Command>
+                      <CommandInput placeholder="Search routes..." className="border-b" />
+                      <CommandList>
+                        <CommandEmpty>No routes found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="__clear__"
+                            onSelect={() => { setSelectedRouteId(""); setRoutePopoverOpen(false); }}
+                          >
+                            <span className="text-muted-foreground">— None —</span>
+                          </CommandItem>
+                          {routes?.map((route) => (
+                            <CommandItem
+                              key={route.id}
+                              value={`${route.route_no || ""} ${route.route_name}`}
+                              onSelect={() => { setSelectedRouteId(route.id); setRoutePopoverOpen(false); }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", selectedRouteId === route.id ? "opacity-100" : "opacity-0")} />
+                              {route.route_no ? `${route.route_no} - ` : ""}{route.route_name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                        <CommandGroup heading="Add New">
+                          <div className="flex items-center gap-1 px-2 py-1">
+                            <Input
+                              placeholder="New route name"
+                              value={newRouteName}
+                              onChange={(e) => setNewRouteName(e.target.value)}
+                              className="h-7 text-xs"
+                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddRoute())}
+                            />
+                            <Button size="sm" variant="ghost" onClick={handleAddRoute} disabled={addingRoute || !newRouteName.trim()} className="h-7 px-2">
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Bus Selector */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-1">
+                  <Bus className="h-3.5 w-3.5" /> Bus
+                </label>
+                <Popover open={busPopoverOpen} onOpenChange={setBusPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn("w-full justify-between font-normal", !selectedBusId && "text-muted-foreground")}
+                    >
+                      {selectedBus
+                        ? selectedBus.bus_no
+                        : "Select bus..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0 z-[100]">
+                    <Command>
+                      <CommandInput placeholder="Search buses..." className="border-b" />
+                      <CommandList>
+                        <CommandEmpty>No buses found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="__clear__"
+                            onSelect={() => { setSelectedBusId(""); setBusPopoverOpen(false); }}
+                          >
+                            <span className="text-muted-foreground">— None —</span>
+                          </CommandItem>
+                          {buses?.map((bus) => (
+                            <CommandItem
+                              key={bus.id}
+                              value={bus.bus_no}
+                              onSelect={() => { setSelectedBusId(bus.id); setBusPopoverOpen(false); }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", selectedBusId === bus.id ? "opacity-100" : "opacity-0")} />
+                              {bus.bus_no}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                        <CommandGroup heading="Add New">
+                          <div className="flex items-center gap-1 px-2 py-1">
+                            <Input
+                              placeholder="New bus number"
+                              value={newBusNumber}
+                              onChange={(e) => setNewBusNumber(e.target.value)}
+                              className="h-7 text-xs"
+                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddBus())}
+                            />
+                            <Button size="sm" variant="ghost" onClick={handleAddBus} disabled={addingBus || !newBusNumber.trim()} className="h-7 px-2">
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* School Route Selector */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-1">
+                  <Route className="h-3.5 w-3.5" /> School Route
+                </label>
+                <Popover open={schoolRoutePopoverOpen} onOpenChange={setSchoolRoutePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn("w-full justify-between font-normal", !selectedSchoolRouteId && "text-muted-foreground")}
+                    >
+                      {selectedSchoolRoute
+                        ? `${selectedSchoolRoute.route_code ? selectedSchoolRoute.route_code + " - " : ""}${selectedSchoolRoute.route_name}`
+                        : "Select school route..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0 z-[100]">
+                    <Command>
+                      <CommandInput placeholder="Search school routes..." className="border-b" />
+                      <CommandList>
+                        <CommandEmpty>No school routes found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="__clear__"
+                            onSelect={() => { setSelectedSchoolRouteId(""); setSchoolRoutePopoverOpen(false); }}
+                          >
+                            <span className="text-muted-foreground">— None —</span>
+                          </CommandItem>
+                          {schoolRoutes?.map((route) => (
+                            <CommandItem
+                              key={route.id}
+                              value={`${route.route_code || ""} ${route.route_name}`}
+                              onSelect={() => { setSelectedSchoolRouteId(route.id); setSchoolRoutePopoverOpen(false); }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", selectedSchoolRouteId === route.id ? "opacity-100" : "opacity-0")} />
+                              {route.route_code ? `${route.route_code} - ` : ""}{route.route_name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                        <CommandGroup heading="Add New">
+                          <div className="flex items-center gap-1 px-2 py-1">
+                            <Input
+                              placeholder="New school route name"
+                              value={newSchoolRouteName}
+                              onChange={(e) => setNewSchoolRouteName(e.target.value)}
+                              className="h-7 text-xs"
+                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddSchoolRoute())}
+                            />
+                            <Button size="sm" variant="ghost" onClick={handleAddSchoolRoute} disabled={addingSchoolRoute || !newSchoolRouteName.trim()} className="h-7 px-2">
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
 
             {/* Invoice Lines */}

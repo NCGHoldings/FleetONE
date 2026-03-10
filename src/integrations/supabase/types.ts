@@ -726,6 +726,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           balance: number
+          bus_id: string | null
           business_unit_code: string | null
           company_id: string | null
           created_at: string | null
@@ -741,6 +742,8 @@ export type Database = {
           paid_amount: number | null
           period_id: string | null
           reference: string | null
+          route_id: string | null
+          school_route_id: string | null
           status: string | null
           subtotal: number | null
           tax_amount: number | null
@@ -754,6 +757,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           balance: number
+          bus_id?: string | null
           business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -769,6 +773,8 @@ export type Database = {
           paid_amount?: number | null
           period_id?: string | null
           reference?: string | null
+          route_id?: string | null
+          school_route_id?: string | null
           status?: string | null
           subtotal?: number | null
           tax_amount?: number | null
@@ -782,6 +788,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           balance?: number
+          bus_id?: string | null
           business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -797,6 +804,8 @@ export type Database = {
           paid_amount?: number | null
           period_id?: string | null
           reference?: string | null
+          route_id?: string | null
+          school_route_id?: string | null
           status?: string | null
           subtotal?: number | null
           tax_amount?: number | null
@@ -806,6 +815,13 @@ export type Database = {
           wht_amount?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ap_invoices_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ap_invoices_company_id_fkey"
             columns: ["company_id"]
@@ -825,6 +841,20 @@ export type Database = {
             columns: ["period_id"]
             isOneToOne: false
             referencedRelation: "financial_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_invoices_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_invoices_school_route_id_fkey"
+            columns: ["school_route_id"]
+            isOneToOne: false
+            referencedRelation: "school_routes"
             referencedColumns: ["id"]
           },
           {

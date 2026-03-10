@@ -124,6 +124,26 @@ export const AccountsPayableView = () => {
       ),
     },
     {
+      accessorKey: "routes.route_name",
+      header: "Route",
+      cell: ({ row }: any) => {
+        const route = row.original.routes;
+        const schoolRoute = row.original.school_routes;
+        if (route) return <span className="text-xs">{route.route_no ? `${route.route_no} - ` : ""}{route.route_name}</span>;
+        if (schoolRoute) return <span className="text-xs text-primary">{schoolRoute.route_code ? `${schoolRoute.route_code} - ` : ""}{schoolRoute.route_name}</span>;
+        return <span className="text-xs text-muted-foreground">—</span>;
+      },
+    },
+    {
+      accessorKey: "buses.bus_no",
+      header: "Bus",
+      cell: ({ row }: any) => {
+        const bus = row.original.buses;
+        if (bus) return <span className="text-xs font-mono">{bus.bus_no}</span>;
+        return <span className="text-xs text-muted-foreground">—</span>;
+      },
+    },
+    {
       accessorKey: "invoice_date",
       header: "Invoice Date",
       cell: ({ row }: any) => format(new Date(row.original.invoice_date), "MMM dd, yyyy"),
