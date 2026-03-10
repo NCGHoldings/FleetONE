@@ -187,6 +187,14 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
     }));
 
     try {
+      const busFields = {
+        bus_id: busData.bus_id,
+        bus_no: busData.bus_no,
+        bus_type: busData.bus_type,
+        bus_category_id: busData.bus_category_id,
+        bus_sub_category_id: busData.bus_sub_category_id,
+      };
+
       if (isEditing) {
         await updateInvoice.mutateAsync({
           id: editingInvoice.id,
@@ -198,6 +206,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
             total_amount: grandTotal,
             tax_amount: totalTax,
             notes: data.notes,
+            ...busFields,
           },
           lines: lineData,
         });
@@ -210,11 +219,13 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
           total_amount: grandTotal,
           tax_amount: totalTax,
           notes: data.notes,
+          ...busFields,
           lines: lineData,
         });
       }
       onOpenChange(false);
       form.reset();
+      setBusData({});
       setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
     } catch (error) {
       // Error handled by mutation
