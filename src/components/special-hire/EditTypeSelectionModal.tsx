@@ -10,17 +10,17 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { User, Users } from 'lucide-react';
+import { User, Users, Pencil } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (editType: 'staff_edit' | 'customer_request', reason?: string) => void;
+  onConfirm: (editType: 'staff_edit' | 'customer_request' | 'quick_edit', reason?: string) => void;
   quotationNo: string;
 }
 
 export function EditTypeSelectionModal({ isOpen, onClose, onConfirm, quotationNo }: Props) {
-  const [selectedType, setSelectedType] = useState<'staff_edit' | 'customer_request' | null>(null);
+  const [selectedType, setSelectedType] = useState<'staff_edit' | 'customer_request' | 'quick_edit' | null>(null);
   const [reason, setReason] = useState('');
 
   const handleConfirm = () => {
@@ -86,6 +86,28 @@ export function EditTypeSelectionModal({ isOpen, onClose, onConfirm, quotationNo
                 <h3 className="font-medium">Customer Request</h3>
                 <p className="text-sm text-muted-foreground">
                   Changes requested by the customer. This will create a new version with detailed edit history and may require re-approval.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Edit Option */}
+          <div 
+            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+              selectedType === 'quick_edit' 
+                ? 'border-primary bg-primary/5' 
+                : 'border-border hover:border-muted-foreground/30'
+            }`}
+            onClick={() => setSelectedType('quick_edit')}
+          >
+            <div className="flex items-start space-x-3">
+              <Pencil className={`h-5 w-5 mt-0.5 ${
+                selectedType === 'quick_edit' ? 'text-primary' : 'text-muted-foreground'
+              }`} />
+              <div>
+                <h3 className="font-medium">Quick Edit (No Price Change)</h3>
+                <p className="text-sm text-muted-foreground">
+                  Update customer name, phone, email, company, or notes without recalculating the quotation price.
                 </p>
               </div>
             </div>

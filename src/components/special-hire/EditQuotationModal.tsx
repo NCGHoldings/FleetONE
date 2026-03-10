@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SpecialHireForm } from './SpecialHireForm';
 import { EditTypeSelectionModal } from './EditTypeSelectionModal';
+import { QuickEditModal } from './QuickEditModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -13,12 +14,12 @@ interface Props {
 export function EditQuotationModal({ quotation, onClose, onUpdate }: Props) {
   const [showEditTypeModal, setShowEditTypeModal] = useState(true);
   const [editConfig, setEditConfig] = useState<{
-    editType: 'staff_edit' | 'customer_request';
+    editType: 'staff_edit' | 'customer_request' | 'quick_edit';
     reason?: string;
   } | null>(null);
   const { toast } = useToast();
 
-  const handleEditTypeConfirm = (editType: 'staff_edit' | 'customer_request', reason?: string) => {
+  const handleEditTypeConfirm = (editType: 'staff_edit' | 'customer_request' | 'quick_edit', reason?: string) => {
     setEditConfig({ editType, reason });
     setShowEditTypeModal(false);
   };
@@ -110,13 +111,23 @@ export function EditQuotationModal({ quotation, onClose, onUpdate }: Props) {
     return null;
   }
 
+  if (editConfig.editType === 'quick_edit') {
+    return (
+      <QuickEditModal
+        quotation={quotation}
+        onClose={onClose}
+        onUpdate={onUpdate}
+      />
+    );
+  }
+
   return (
     <SpecialHireForm 
       initialData={quotation}
       isEditing={true}
       onSubmit={handleFormSubmit}
       onCancel={onClose}
-      editConfig={editConfig}
+      editConfig={editConfig as { editType: 'staff_edit' | 'customer_request'; reason?: string }}
     />
   );
 }
