@@ -86,7 +86,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     queryFn: async () => {
       const { data, error } = await supabase
         .from("routes")
-        .select("id, route_name, route_number")
+        .select("id, route_name, route_no")
         .eq("is_active", true)
         .order("route_name");
       if (error) throw error;
