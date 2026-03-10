@@ -82,6 +82,12 @@ serve(async (req) => {
     }
 
     console.log(`Processing ${data.length} student records for branch ${branch_id} in ${mode} mode`);
+    
+    // Debug: log first record keys and values
+    if (data.length > 0) {
+      console.log('First record keys:', Object.keys(data[0]));
+      console.log('First record values:', JSON.stringify(data[0]));
+    }
 
     // Step 1: Replace All mode - soft clear existing students
     if (mode === 'replace_all') {
@@ -259,6 +265,12 @@ serve(async (req) => {
       skipped: skippedCount,
       errors: errors.slice(0, 20)
     };
+
+    // Debug: field population stats
+    const withAdmission = validatedRecords.filter(r => r.admission_no).length;
+    const withUpdateNew = validatedRecords.filter(r => r.update_new !== null && r.update_new !== undefined).length;
+    const withPayment = validatedRecords.filter(r => r.payment_amount !== null && r.payment_amount !== undefined).length;
+    console.log(`Field stats: admission_no=${withAdmission}, update_new=${withUpdateNew}, payment_amount=${withPayment}`);
 
     console.log('Import completed:', result);
 
