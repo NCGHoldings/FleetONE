@@ -1726,6 +1726,11 @@ export type Database = {
       ar_invoices: {
         Row: {
           balance: number
+          bus_category_id: string | null
+          bus_id: string | null
+          bus_no: string | null
+          bus_sub_category_id: string | null
+          bus_type: string | null
           business_unit_code: string | null
           company_id: string | null
           created_at: string | null
@@ -1749,6 +1754,11 @@ export type Database = {
         }
         Insert: {
           balance: number
+          bus_category_id?: string | null
+          bus_id?: string | null
+          bus_no?: string | null
+          bus_sub_category_id?: string | null
+          bus_type?: string | null
           business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -1772,6 +1782,11 @@ export type Database = {
         }
         Update: {
           balance?: number
+          bus_category_id?: string | null
+          bus_id?: string | null
+          bus_no?: string | null
+          bus_sub_category_id?: string | null
+          bus_type?: string | null
           business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -1794,6 +1809,27 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ar_invoices_bus_category_id_fkey"
+            columns: ["bus_category_id"]
+            isOneToOne: false
+            referencedRelation: "bus_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_invoices_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_invoices_bus_sub_category_id_fkey"
+            columns: ["bus_sub_category_id"]
+            isOneToOne: false
+            referencedRelation: "bus_sub_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ar_invoices_company_id_fkey"
             columns: ["company_id"]
