@@ -513,9 +513,9 @@ export function useGenerateBulkARInvoices() {
           const amount = Math.max(0, rawAmount - credit);
           
           // Generate unique identifiers for this student
-          const studentShortId = student.id.substring(0, 4).toUpperCase();
+          const uniqueSuffix = `${String(globalIndex).padStart(5, "0")}-${student.id.substring(0, 4).toUpperCase()}`;
           const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(globalIndex).padStart(5, "0")}`;
-          const entryNumber = `SBS-JE-${format(new Date(), "yyyyMMdd")}-${studentShortId}`;
+          const entryNumber = `SBS-JE-${format(invoiceMonth, "yyyyMM")}-${uniqueSuffix}`;
           
           // 1. Create individual Journal Entry for this student
           const { data: journalEntry, error: jeError } = await supabase
