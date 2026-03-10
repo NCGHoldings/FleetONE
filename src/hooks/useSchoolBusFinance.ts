@@ -133,7 +133,10 @@ export function useBranchFinanceSettings(branchId: string | null) {
   return useQuery({
     queryKey: ["school-bus-finance-settings", selectedCompanyId, branchId],
     queryFn: async () => {
-      // First try to get branch-specific settings
+      const hasConfiguredAccounts = (s: any) =>
+        s && s.trade_receivable_account_id && s.sbs_collection_account_id;
+
+      // First try to get branch-specific settings for selected company
       if (branchId) {
         const { data: branchSettings } = await supabase
           .from("school_bus_finance_settings")
@@ -142,21 +145,49 @@ export function useBranchFinanceSettings(branchId: string | null) {
           .eq("branch_id", branchId)
           .maybeSingle();
 
-        if (branchSettings) {
+        if (hasConfiguredAccounts(branchSettings)) {
           return branchSettings;
+        }
+
+        // Fallback: search across ALL companies for this branch with configured accounts
+        const { data: crossCompanySettings } = await supabase
+          .from("school_bus_finance_settings")
+          .select("*")
+          .eq("branch_id", branchId)
+          .not("trade_receivable_account_id", "is", null)
+          .not("sbs_collection_account_id", "is", null)
+          .limit(1)
+          .maybeSingle();
+
+        if (crossCompanySettings) {
+          return crossCompanySettings;
         }
       }
 
-      // Fallback to default settings (branch_id is null)
-      const { data: defaultSettings, error } = await supabase
+      // Fallback to default settings (branch_id is null) for selected company
+      const { data: defaultSettings } = await supabase
         .from("school_bus_finance_settings")
         .select("*")
         .eq("company_id", selectedCompanyId)
         .is("branch_id", null)
         .maybeSingle();
 
+      if (hasConfiguredAccounts(defaultSettings)) {
+        return defaultSettings;
+      }
+
+      // Final fallback: any default settings with configured accounts
+      const { data: anyDefault, error } = await supabase
+        .from("school_bus_finance_settings")
+        .select("*")
+        .is("branch_id", null)
+        .not("trade_receivable_account_id", "is", null)
+        .not("sbs_collection_account_id", "is", null)
+        .limit(1)
+        .maybeSingle();
+
       if (error) throw error;
-      return defaultSettings;
+      return anyDefault || defaultSettings;
     },
     enabled: !!selectedCompanyId,
   });

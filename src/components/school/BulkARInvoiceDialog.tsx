@@ -30,21 +30,8 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
   const { data: settings, isLoading: settingsLoading } = useBranchFinanceSettings(branchId);
   const generateBulkAR = useGenerateBulkARInvoices();
 
-  // Also fetch default settings if branch settings not found
-  const { data: defaultSettings } = useQuery({
-    queryKey: ["school-bus-finance-settings-default"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("school_bus_finance_settings")
-        .select("*")
-        .is("branch_id", null)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const effectiveSettings = settings || defaultSettings;
+  // useBranchFinanceSettings now handles cross-company fallback internally
+  const effectiveSettings = settings;
 
   // Select all students by default when dialog opens
   useEffect(() => {
