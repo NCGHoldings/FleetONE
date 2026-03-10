@@ -88,6 +88,15 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
         notes: editingInvoice.notes || "",
       });
 
+      // Pre-fill bus data
+      setBusData({
+        bus_id: editingInvoice.bus_id || undefined,
+        bus_no: editingInvoice.bus_no || undefined,
+        bus_type: editingInvoice.bus_type || undefined,
+        bus_category_id: editingInvoice.bus_category_id || undefined,
+        bus_sub_category_id: editingInvoice.bus_sub_category_id || undefined,
+      });
+
       // Fetch existing lines
       const fetchLines = async () => {
         const { data: existingLines } = await supabase
@@ -110,6 +119,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
       fetchLines();
     } else {
       setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
+      setBusData({});
     }
   }, [open, editingInvoice]);
 
