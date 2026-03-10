@@ -398,6 +398,20 @@ export const AccountsReceivableView = () => {
                     {format(new Date(viewInvoice.due_date), "MMM dd, yyyy")}
                   </p>
                 </div>
+                {viewInvoice.bus_no && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Bus Number</p>
+                    <p className="font-medium font-mono">{viewInvoice.bus_no}</p>
+                  </div>
+                )}
+                {viewInvoice.bus_categories?.name && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Bus Category</p>
+                    <Badge variant="outline" style={{ borderColor: viewInvoice.bus_categories.color, color: viewInvoice.bus_categories.color }}>
+                      {viewInvoice.bus_categories.name}
+                    </Badge>
+                  </div>
+                )}
               </div>
               
               <Separator />
