@@ -3772,6 +3772,9 @@ export const useUpdateAPInvoice = () => {
         tax_amount?: number;
         wht_amount?: number;
         notes?: string;
+        route_id?: string;
+        bus_id?: string;
+        school_route_id?: string;
       };
       lines: Array<{
         description: string;
