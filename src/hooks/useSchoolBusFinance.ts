@@ -386,6 +386,21 @@ export function useGenerateBulkARInvoices() {
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
 
+      // ── Duplicate guard: check if batch already exists for this branch + month ──
+      const monthStr = format(invoiceMonth, "yyyy-MM-dd");
+      const { data: existingBatch } = await supabase
+        .from("school_ar_invoice_batches")
+        .select("id, batch_number, status")
+        .eq("branch_id", branchId)
+        .eq("invoice_month", monthStr)
+        .maybeSingle();
+
+      if (existingBatch) {
+        throw new Error(
+          `Invoices already generated for ${format(invoiceMonth, "MMMM yyyy")} (Batch: ${existingBatch.batch_number}). Please delete the existing batch before regenerating.`
+        );
+      }
+
       // Get batch number for tracking
       const { data: batchData } = await supabase.rpc("generate_sbs_batch_number");
       const batchNumber = batchData || `SBS-BATCH-${format(new Date(), "yyyyMMdd")}-0001`;
