@@ -55,7 +55,8 @@ const REQUIRED_COLUMNS = [
   { dbColumn: "driver_name", label: "Driver Name", required: false },
   { dbColumn: "driver_contact_no", label: "Driver Contact No", required: false },
   { dbColumn: "service_type", label: "OneWay / BothWay", required: false },
-  { dbColumn: "update_new", label: "Update New (Expected Fee)", required: false },
+  { dbColumn: "update_new", label: "Fixed Amount (New Fee)", required: false },
+  { dbColumn: "payment_amount", label: "Amount Due (Paid)", required: false },
 ];
 
 interface Props {
