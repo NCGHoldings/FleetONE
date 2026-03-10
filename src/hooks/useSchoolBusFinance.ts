@@ -928,7 +928,7 @@ export function usePostPaymentToGL() {
           .from("ar_receipts")
           .insert({
             company_id: effectiveCompanyId,
-            business_unit_code: businessUnitCode || 'SBO',
+            business_unit_code: 'SBO',
             customer_id: receiptCustomerId,
             receipt_number: receiptNumber,
             receipt_date: format(new Date(), "yyyy-MM-dd"),
