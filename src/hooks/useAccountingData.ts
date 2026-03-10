@@ -377,17 +377,16 @@ export const useAPInvoices = (status?: string) => {
           routes (
             id,
             route_name,
-            route_number
+            route_no
           ),
           buses (
             id,
-            bus_number,
-            bus_name
+            bus_no
           ),
           school_routes (
             id,
             route_name,
-            route_number
+            route_code
           )
         `)
         .order("invoice_date", { ascending: false });
