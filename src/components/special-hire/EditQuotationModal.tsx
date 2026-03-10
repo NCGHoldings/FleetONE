@@ -127,7 +127,7 @@ export function EditQuotationModal({ quotation, onClose, onUpdate }: Props) {
       isEditing={true}
       onSubmit={handleFormSubmit}
       onCancel={onClose}
-      editConfig={editConfig}
+      editConfig={editConfig as { editType: 'staff_edit' | 'customer_request'; reason?: string }}
     />
   );
 }
