@@ -157,7 +157,7 @@ export function usePostFuelExpenseToGL() {
           total_credit: expense.amount,
           status: "posted",
           company_id: effectiveCompanyId,
-          business_unit_code: businessUnitCode || 'SBO',
+           business_unit_code: 'SBO',
           business_unit_id: selectedCompanyId,
           posted_at: new Date().toISOString(),
         })
@@ -243,7 +243,7 @@ export function usePostFuelExpenseToGL() {
           .from("ap_invoices")
           .insert({
             company_id: effectiveCompanyId,
-            business_unit_code: businessUnitCode || 'SBO',
+            business_unit_code: 'SBO',
             vendor_id: expense.vendorId,
             invoice_number: invoiceNumber,
             invoice_date: expense.expenseDate,

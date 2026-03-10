@@ -154,7 +154,7 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
               .from("customers")
               .insert({
                 company_id: effectiveCompanyId,
-                business_unit_code: businessUnitCode || 'SBO',
+                business_unit_code: 'SBO',
                 customer_code: "SBS-DEFAULT",
                 customer_name: "School Bus Students",
                 is_active: true,

@@ -1,54 +1,64 @@
 
 
-# Fix School Bus Business Unit Tagging + Payment AR Sync
+# Special Hire Spreadsheet — Full Operations Tracking View
 
-## Root Cause Found
+## What You Want
+A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
 
-Database evidence confirms the bug: the two newest School Bus invoices and journal entries have `business_unit_code: 'LTV'` instead of `'SBO'`. This happened because `getBusinessUnitCode()` returns whatever sub-company is currently active in the company switcher — if the user had "Light Vehicles" selected while creating School Bus invoices, they get tagged 'LTV'.
+## Column Mapping (Your Columns → Database Fields)
 
-```text
-CURRENT (BROKEN):
-  Company Switcher = "Light Vehicles (LTV)"
-  → getBusinessUnitCode() = 'LTV'
-  → School Bus invoice created with business_unit_code = 'LTV'  ← WRONG
-  → Invoice invisible under "School Bus Operations" view
+The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
 
-FIXED:
-  School Bus code ALWAYS hard-codes 'SBO'
-  → Invoice always visible under "School Bus Operations" view
-```
+| Group | Columns | Source |
+|---|---|---|
+| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
+| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
+| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
+| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
+| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
+| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
 
-## Changes
+## Implementation Plan
 
-### 1. Hard-code 'SBO' in all School Bus finance functions (`src/hooks/useSchoolBusFinance.ts`)
+### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
+- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
+- Map to a flat `SpreadsheetHire` interface with all ~45 columns
+- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
+- Realtime subscription on `special_hire_quotations` for live updates
+- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
 
-Replace every `businessUnitCode || 'SBO'` with just `'SBO'`. The School Bus module must always tag its records as SBO regardless of company switcher state.
+### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
+- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
+- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
+- Inline click-to-edit cells for editable fields
+- Dropdown selects for status fields
+- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
+- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
+- Search, Refresh, Export Excel toolbar
 
-Affected functions:
-- `useGenerateBulkARInvoices` — customers, journal entries, journal lines, AR invoices, advance JEs
-- `usePostPaymentToGL` — journal entries, journal lines, customers, AR receipts
-- `useBackfillARInvoiceLinks` — customers, AR invoices
+### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
+- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
 
-### 2. Hard-code 'SBO' in RecordPaymentModal AR sync (`src/components/school/RecordPaymentModal.tsx`)
+### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
+- New tab trigger with `Table2` icon labeled "Sheet"
+- TabsContent rendering `<SpecialHireSpreadsheet />`
 
-Same fix for the customer creation fallback in the payment sync flow.
+### User-Friendly Design Decisions
+- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
+- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
+- **Smart defaults**: empty expense fields show "0" and are click-to-edit
+- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
+- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
 
-### 3. Fix existing bad data (SQL migration)
+### Files to Create/Edit
 
-Update the 2 incorrectly tagged AR invoices and journal entries:
-```sql
-UPDATE ar_invoices SET business_unit_code = 'SBO' WHERE invoice_number LIKE 'SBS-%' AND business_unit_code != 'SBO';
-UPDATE journal_entries SET business_unit_code = 'SBO' WHERE description LIKE 'School Bus%' AND business_unit_code != 'SBO';
-UPDATE customers SET business_unit_code = 'SBO' WHERE customer_code LIKE 'SBS-%' AND business_unit_code != 'SBO';
-UPDATE ar_receipts SET business_unit_code = 'SBO' WHERE notes LIKE 'School Bus%' AND business_unit_code != 'SBO';
-```
+| File | Action |
+|---|---|
+| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
+| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
+| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
+| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
 
-### 4. Payment AR auto-update verification
-
-The payment-to-AR-invoice sync in `RecordPaymentModal.tsx` (lines 127-201) already updates `ar_invoices.paid_amount`, `balance`, and `status` after each payment. This is working correctly — confirmed by the existing paid invoice (`SBS-INV-202602-00001` shows `status: paid, paid_amount: 6200`). The only issue was the wrong business unit tag preventing visibility.
-
-## Files to Edit
-- `src/hooks/useSchoolBusFinance.ts` — Replace all `businessUnitCode || 'SBO'` with `'SBO'`
-- `src/components/school/RecordPaymentModal.tsx` — Same fix for customer creation
-- New SQL migration — Fix existing incorrectly tagged records
+### DB Note
+The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
 

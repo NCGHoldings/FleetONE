@@ -470,7 +470,7 @@ export function useGenerateBulkARInvoices() {
           .from("customers")
           .insert({
             company_id: effectiveCompanyId,
-            business_unit_code: businessUnitCode || 'SBO',
+            business_unit_code: 'SBO',
             customer_code: `SBS-${branchCode}`,
             customer_name: `School Bus Students - ${branchName}`,
             is_active: true,
@@ -514,7 +514,7 @@ export function useGenerateBulkARInvoices() {
               total_credit: amount,
               status: "posted",
               company_id: effectiveCompanyId,
-              business_unit_code: businessUnitCode || 'SBO',
+              business_unit_code: 'SBO',
               business_unit_id: selectedCompanyId,
               posted_at: new Date().toISOString(),
             })
@@ -574,7 +574,7 @@ export function useGenerateBulkARInvoices() {
                 total_credit: advanceApplyAmount,
                 status: "posted",
                 company_id: effectiveCompanyId,
-                business_unit_code: businessUnitCode || 'SBO',
+                business_unit_code: 'SBO',
                 business_unit_id: selectedCompanyId,
                 posted_at: new Date().toISOString(),
               })
@@ -613,7 +613,7 @@ export function useGenerateBulkARInvoices() {
               .from("ar_invoices")
               .insert({
                 company_id: effectiveCompanyId,
-                business_unit_code: businessUnitCode || 'SBO',
+                business_unit_code: 'SBO',
                 customer_id: customerId,
                 invoice_number: invoiceNumber,
                 invoice_date: format(new Date(), "yyyy-MM-dd"),
@@ -814,7 +814,7 @@ export function usePostPaymentToGL() {
           total_credit: totalCreditAmount,
           status: "posted",
           company_id: effectiveCompanyId,
-          business_unit_code: businessUnitCode || 'SBO',
+          business_unit_code: 'SBO',
           business_unit_id: selectedCompanyId,
           posted_at: new Date().toISOString(),
         })
@@ -914,7 +914,7 @@ export function usePostPaymentToGL() {
             .from("customers")
             .insert({
               company_id: effectiveCompanyId,
-              business_unit_code: businessUnitCode || 'SBO',
+              business_unit_code: 'SBO',
               customer_code: "SBS-DEFAULT",
               customer_name: "School Bus Students",
               is_active: true,
@@ -928,7 +928,7 @@ export function usePostPaymentToGL() {
           .from("ar_receipts")
           .insert({
             company_id: effectiveCompanyId,
-            business_unit_code: businessUnitCode || 'SBO',
+            business_unit_code: 'SBO',
             customer_id: receiptCustomerId,
             receipt_number: receiptNumber,
             receipt_date: format(new Date(), "yyyy-MM-dd"),
@@ -1105,7 +1105,7 @@ export function useBackfillARInvoiceLinks() {
           .from("customers")
           .insert({
             company_id: effectiveCompanyId,
-            business_unit_code: businessUnitCode || 'SBO',
+            business_unit_code: 'SBO',
             customer_code: "SBS-DEFAULT",
             customer_name: "School Bus Students (Backfill)",
             is_active: true,
@@ -1138,7 +1138,7 @@ export function useBackfillARInvoiceLinks() {
             .from("ar_invoices")
             .insert({
               company_id: effectiveCompanyId,
-              business_unit_code: businessUnitCode || 'SBO',
+              business_unit_code: 'SBO',
               customer_id: customerId,
               invoice_number: inv.invoice_number,
               invoice_date: inv.invoice_month,
@@ -1232,7 +1232,7 @@ export async function syncPaymentToFinanceAR(
     .from("ar_invoices")
     .insert({
       company_id: effectiveCompanyId,
-      business_unit_code: businessUnitCode || 'SBO',
+      business_unit_code: 'SBO',
       customer_id: customerId,
       invoice_number: schoolInv.invoice_number,
       invoice_date: schoolInv.invoice_month,
