@@ -650,11 +650,11 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                           {schoolRoutes?.map((route) => (
                             <CommandItem
                               key={route.id}
-                              value={`${route.route_number || ""} ${route.route_name}`}
+                              value={`${route.route_code || ""} ${route.route_name}`}
                               onSelect={() => { setSelectedSchoolRouteId(route.id); setSchoolRoutePopoverOpen(false); }}
                             >
                               <Check className={cn("mr-2 h-4 w-4", selectedSchoolRouteId === route.id ? "opacity-100" : "opacity-0")} />
-                              {route.route_number ? `${route.route_number} - ` : ""}{route.route_name}
+                              {route.route_code ? `${route.route_code} - ` : ""}{route.route_name}
                             </CommandItem>
                           ))}
                         </CommandGroup>
