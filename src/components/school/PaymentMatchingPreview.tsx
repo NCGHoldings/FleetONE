@@ -21,6 +21,7 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const postPaymentToGL = usePostPaymentToGL();
 
   useEffect(() => {
     fetchItems();
