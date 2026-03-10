@@ -149,6 +149,20 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
       update_new: ['fixed amount', 'fixed_amount', 'update new', 'update_new', 'new fee', 'monthly fee', 'expected fee'],
       payment_amount: ['amount due', 'amount_due', 'paid amount', 'paid', 'payment amount', 'payment_amount'],
       service_type: ['oneway', 'bothway', 'one way', 'both way', 'service type', 'service_type'],
+      admission_no: ['admission no', 'admission_no', 'ad no', 'reg no', 'registration no', 'student id', 'id no', 'admission number', 'reg number'],
+      grade: ['grade', 'class', 'standard'],
+      parent_name: ['parent name', 'parent_name', 'guardian', 'guardian name'],
+      father_contact_no: ['father contact', 'father_contact', 'father phone', 'father mobile', 'father no'],
+      mother_contact_no: ['mother contact', 'mother_contact', 'mother phone', 'mother mobile', 'mother no'],
+      pickup_point: ['pickup point', 'pick up', 'pickup', 'pick-up'],
+      dropoff_point: ['dropoff point', 'drop off', 'dropoff', 'drop-off'],
+      student_name: ['student name', 'student_name', 'name', 'full name'],
+      address: ['address', 'home address', 'residential'],
+      email_id: ['email', 'email_id', 'e-mail'],
+      route: ['route', 'route name', 'bus route'],
+      bus_reg_no: ['bus reg', 'bus no', 'bus number', 'vehicle no', 'bus_reg_no'],
+      driver_name: ['driver name', 'driver_name', 'driver'],
+      driver_contact_no: ['driver contact', 'driver_contact', 'driver phone', 'driver no'],
     };
 
     REQUIRED_COLUMNS.forEach(col => {
