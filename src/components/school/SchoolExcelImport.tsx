@@ -81,10 +81,10 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
     const uploadedFile = event.target.files?.[0];
     if (!uploadedFile) return;
 
-    if (!uploadedFile.name.match(/\.(xlsx|xls)$/)) {
+    if (!uploadedFile.name.match(/\.(xlsx|xls|csv)$/i)) {
       toast({
         title: "Invalid File",
-        description: "Please upload an Excel file (.xlsx or .xls)",
+        description: "Please upload an Excel (.xlsx, .xls) or CSV (.csv) file",
         variant: "destructive",
       });
       return;
