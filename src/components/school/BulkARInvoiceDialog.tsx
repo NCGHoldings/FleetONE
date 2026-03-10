@@ -11,8 +11,6 @@ import { CalendarIcon, FileSpreadsheet, Users, DollarSign, AlertCircle, CheckCir
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useStudentsForBulkAR, useGenerateBulkARInvoices, useBranchFinanceSettings } from "@/hooks/useSchoolBusFinance";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
 
 interface BulkARInvoiceDialogProps {
   open: boolean;
