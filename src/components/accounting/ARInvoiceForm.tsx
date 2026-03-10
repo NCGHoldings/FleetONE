@@ -60,6 +60,8 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
     bus_sub_category_id?: string;
   }>({});
 
+  const isEditing = !!editingInvoice;
+
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 },
   ]);
