@@ -111,6 +111,16 @@ export function EditQuotationModal({ quotation, onClose, onUpdate }: Props) {
     return null;
   }
 
+  if (editConfig.editType === 'quick_edit') {
+    return (
+      <QuickEditModal
+        quotation={quotation}
+        onClose={onClose}
+        onUpdate={onUpdate}
+      />
+    );
+  }
+
   return (
     <SpecialHireForm 
       initialData={quotation}

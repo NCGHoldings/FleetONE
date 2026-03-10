@@ -91,6 +91,28 @@ export function EditTypeSelectionModal({ isOpen, onClose, onConfirm, quotationNo
             </div>
           </div>
 
+          {/* Quick Edit Option */}
+          <div 
+            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+              selectedType === 'quick_edit' 
+                ? 'border-primary bg-primary/5' 
+                : 'border-border hover:border-muted-foreground/30'
+            }`}
+            onClick={() => setSelectedType('quick_edit')}
+          >
+            <div className="flex items-start space-x-3">
+              <Pencil className={`h-5 w-5 mt-0.5 ${
+                selectedType === 'quick_edit' ? 'text-primary' : 'text-muted-foreground'
+              }`} />
+              <div>
+                <h3 className="font-medium">Quick Edit (No Price Change)</h3>
+                <p className="text-sm text-muted-foreground">
+                  Update customer name, phone, email, company, or notes without recalculating the quotation price.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Reason/Notes field - shown for customer requests */}
           {selectedType === 'customer_request' && (
             <div className="space-y-2">
