@@ -1,38 +1,34 @@
 
 
-# Fix: AR Invoice Creation & School Bus Auto-AR Issues
+# Add "View Mode" Toggle to Special Hire Calendar
 
-## Issues Found
+## What the user wants
+Currently the calendar only shows quotations whose **pickup date** matches the selected date. The user wants a toggle to switch between:
+1. **Hires on Date** (current behavior) — quotations with `pickup_datetime` on selected date
+2. **Created on Date** (new) — quotations with `created_at` on selected date
 
-### 1. Buses Inline Add Fails — Missing Required Fields
-The `buses` table requires `model` (string) and `type` (string) as NOT NULL columns. The current inline add in `APInvoiceForm.tsx` only provides `bus_no`, `capacity`, and `year`:
-```typescript
-// BROKEN - missing model and type
-.insert([{ bus_no: newBusNumber.trim(), capacity: 0, year: new Date().getFullYear() }])
+## Changes — Single file: `src/components/special-hire/SpecialHireCalendarView.tsx`
+
+### 1. Add toggle state
+Add a `viewMode` state: `'hires' | 'created'` defaulting to `'hires'`.
+
+### 2. Update `loadQuotationsForDate`
+When `viewMode === 'created'`, filter by `created_at` instead of `pickup_datetime`:
 ```
-This causes a database error every time a user tries to add a new bus from the dropdown.
+.gte('created_at', dayStart.toISOString())
+.lt('created_at', dayEnd.toISOString())
+```
 
-### 2. AR Invoice Number Running (Same Bug as AP Payment)
-`ARInvoiceForm.tsx` line 127-135 has the same pattern that was fixed in `APPaymentForm.tsx` — the `generateNumber` is in the `useEffect` deps. While `useCallback` stabilized the function reference, the effect still lacks a `useRef` guard. On form re-opens, `form.getValues("invoice_number")` returns `""` after reset, triggering repeated generation.
+### 3. Update `loadMonthDates`
+Same logic — use `created_at` when in "created" mode so calendar dots reflect the correct dates.
 
-### 3. School Bus Auto-AR — `as any` Cast Hides Missing business_unit_code on JE Lines
-In `useSchoolBusFinance.ts`, the journal entry lines insert (line 546-564) does NOT include `business_unit_code` on the lines, while the manual JE creation in `useAccountingMutations.ts` (line 65) does. This causes school bus JE lines to be invisible when the sub-company view filters by `business_unit_code`.
+### 4. Add `viewMode` to useEffect dependencies
+Both data-loading effects need to re-run when `viewMode` changes.
 
-## Fixes
+### 5. Add toggle UI
+Place a segmented toggle (using existing `Tabs` or two `Button` variants) in the left panel header, below "Select Date":
+- **Hires on Date** — shows trips happening that day
+- **Created on Date** — shows quotations created that day
 
-### File: `src/components/accounting/APInvoiceForm.tsx`
-- Fix `handleAddBus` to include required `model` and `type` fields with defaults (`model: "N/A"`, `type: "bus"`)
-
-### File: `src/components/accounting/ARInvoiceForm.tsx`
-- Add `useRef` guard (`hasGeneratedNumber`) to prevent repeated invoice number generation — same pattern as the AP Payment fix
-
-### File: `src/hooks/useSchoolBusFinance.ts`
-- Add `business_unit_code: 'SBO'` to all `journal_entry_lines` inserts (lines 546-564 and 600-619)
-- This ensures school bus GL entries are visible when filtering by business unit
-
-| File | Change |
-|---|---|
-| `src/components/accounting/APInvoiceForm.tsx` | Add `model` and `type` to bus insert |
-| `src/components/accounting/ARInvoiceForm.tsx` | Add useRef guard for invoice number generation |
-| `src/hooks/useSchoolBusFinance.ts` | Add `business_unit_code: 'SBO'` to JE line inserts |
+Also update the right panel header label to reflect which mode is active (e.g. "Hires on Tuesday..." vs "Quotations created on Tuesday...").
 
