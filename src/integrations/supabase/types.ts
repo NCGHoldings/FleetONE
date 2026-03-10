@@ -8403,7 +8403,9 @@ export type Database = {
           default_expense_account_id: string | null
           expense_account_id: string | null
           id: string
+          input_tax_account_id: string | null
           sales_revenue_account_id: string | null
+          tax_payable_account_id: string | null
           trade_payable_account_id: string | null
           trade_receivable_account_id: string | null
           updated_at: string
@@ -8417,7 +8419,9 @@ export type Database = {
           default_expense_account_id?: string | null
           expense_account_id?: string | null
           id?: string
+          input_tax_account_id?: string | null
           sales_revenue_account_id?: string | null
+          tax_payable_account_id?: string | null
           trade_payable_account_id?: string | null
           trade_receivable_account_id?: string | null
           updated_at?: string
@@ -8431,7 +8435,9 @@ export type Database = {
           default_expense_account_id?: string | null
           expense_account_id?: string | null
           id?: string
+          input_tax_account_id?: string | null
           sales_revenue_account_id?: string | null
+          tax_payable_account_id?: string | null
           trade_payable_account_id?: string | null
           trade_receivable_account_id?: string | null
           updated_at?: string
@@ -8474,8 +8480,22 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gl_settings_input_tax_account_id_fkey"
+            columns: ["input_tax_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gl_settings_sales_revenue_account_id_fkey"
             columns: ["sales_revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_settings_tax_payable_account_id_fkey"
+            columns: ["tax_payable_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
