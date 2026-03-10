@@ -324,9 +324,9 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     if (!newSchoolRouteName.trim()) return;
     setAddingSchoolRoute(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("school_routes")
-        .insert([{ route_name: newSchoolRouteName.trim() }])
+        .insert([{ route_name: newSchoolRouteName.trim(), route_code: 'NEW-' + Date.now().toString().slice(-4) }])
         .select("id")
         .single();
       if (error) throw error;
