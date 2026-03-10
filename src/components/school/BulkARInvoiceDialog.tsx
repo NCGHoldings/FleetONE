@@ -7,10 +7,11 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CalendarIcon, FileSpreadsheet, Users, DollarSign, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { CalendarIcon, FileSpreadsheet, Users, DollarSign, AlertCircle, CheckCircle, Loader2, AlertTriangle, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useStudentsForBulkAR, useGenerateBulkARInvoices, useBranchFinanceSettings } from "@/hooks/useSchoolBusFinance";
+import { useStudentsForBulkAR, useGenerateBulkARInvoices, useBranchFinanceSettings, useExistingBatch, useDeleteARBatch } from "@/hooks/useSchoolBusFinance";
+import { toast } from "sonner";
 
 interface BulkARInvoiceDialogProps {
   open: boolean;
@@ -27,8 +28,9 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
   const { data: students, isLoading: studentsLoading } = useStudentsForBulkAR(branchId);
   const { data: settings, isLoading: settingsLoading } = useBranchFinanceSettings(branchId);
   const generateBulkAR = useGenerateBulkARInvoices();
+  const { data: existingBatch, isLoading: checkingBatch, refetch: refetchBatch } = useExistingBatch(branchId, invoiceMonth, open);
+  const deleteARBatch = useDeleteARBatch();
 
-  // useBranchFinanceSettings now handles cross-company fallback internally
   const effectiveSettings = settings;
 
   // Select all students by default when dialog opens
@@ -60,10 +62,19 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
   const selectedStudentsList = students?.filter((s) => selectedStudents.has(s.id)) || [];
   const totalAmount = selectedStudentsList.reduce((sum, s) => sum + (s.current_amount_due || s.fixed_monthly_amount || 0), 0);
 
-  const handleGenerateInvoices = async () => {
-    if (!effectiveSettings) {
-      return;
+  const handleDeleteAndRegenerate = async () => {
+    if (!existingBatch) return;
+    try {
+      await deleteARBatch.mutateAsync(existingBatch.id);
+      await refetchBatch();
+      toast.success("Existing batch deleted. You can now generate new invoices.");
+    } catch (error) {
+      // Error toast handled by the mutation
     }
+  };
+
+  const handleGenerateInvoices = async () => {
+    if (!effectiveSettings) return;
 
     setStep("processing");
 
@@ -119,6 +130,36 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
                     Please configure Trade Receivables and SBS Collection accounts in <strong>School Bus → Settings → Finance</strong> tab before generating invoices.
                     Without these settings, invoices cannot be posted to the General Ledger.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Existing Batch Warning */}
+            {existingBatch && (
+              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-medium text-amber-700">Invoices Already Exist</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Batch <strong>{existingBatch.batch_number}</strong> was already generated for{" "}
+                    <strong>{format(invoiceMonth, "MMMM yyyy")}</strong> with{" "}
+                    {existingBatch.total_students} students (LKR {existingBatch.total_amount?.toLocaleString()}).
+                    Created on {format(new Date(existingBatch.created_at), "dd MMM yyyy HH:mm")}.
+                  </p>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="mt-3"
+                    onClick={handleDeleteAndRegenerate}
+                    disabled={deleteARBatch.isPending}
+                  >
+                    {deleteARBatch.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 mr-2" />
+                    )}
+                    Delete Existing Batch & Regenerate
+                  </Button>
                 </div>
               </div>
             )}
@@ -251,7 +292,7 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
               </Button>
               <Button
                 onClick={() => setStep("confirm")}
-                disabled={selectedStudents.size === 0 || !isSettingsConfigured}
+                disabled={selectedStudents.size === 0 || !isSettingsConfigured || !!existingBatch}
               >
                 Continue to Preview
               </Button>

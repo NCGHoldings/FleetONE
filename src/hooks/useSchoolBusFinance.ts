@@ -386,6 +386,21 @@ export function useGenerateBulkARInvoices() {
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
 
+      // ── Duplicate guard: check if batch already exists for this branch + month ──
+      const monthStr = format(invoiceMonth, "yyyy-MM-dd");
+      const { data: existingBatch } = await supabase
+        .from("school_ar_invoice_batches")
+        .select("id, batch_number, status")
+        .eq("branch_id", branchId)
+        .eq("invoice_month", monthStr)
+        .maybeSingle();
+
+      if (existingBatch) {
+        throw new Error(
+          `Invoices already generated for ${format(invoiceMonth, "MMMM yyyy")} (Batch: ${existingBatch.batch_number}). Please delete the existing batch before regenerating.`
+        );
+      }
+
       // Get batch number for tracking
       const { data: batchData } = await supabase.rpc("generate_sbs_batch_number");
       const batchNumber = batchData || `SBS-BATCH-${format(new Date(), "yyyyMMdd")}-0001`;
@@ -1259,4 +1274,95 @@ export async function syncPaymentToFinanceAR(
     .eq("id", schoolInvoiceId);
 
   return arInvoice.id;
+}
+
+// Delete an AR invoice batch and all related records (invoices, journal entries)
+export function useDeleteARBatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (batchId: string) => {
+      // 1. Get all school_ar_invoices for this batch (with linked ar_invoice_id and journal refs)
+      const { data: schoolInvoices, error: fetchErr } = await supabase
+        .from("school_ar_invoices")
+        .select("id, ar_invoice_id, invoice_number")
+        .eq("batch_id", batchId);
+
+      if (fetchErr) throw fetchErr;
+
+      // 2. Get the batch itself (for journal_entry_id)
+      const { data: batch } = await supabase
+        .from("school_ar_invoice_batches")
+        .select("id, journal_entry_id")
+        .eq("id", batchId)
+        .single();
+
+      // 3. Collect AR invoice IDs to delete from Finance ERP
+      const arInvoiceIds = (schoolInvoices || [])
+        .map((si) => si.ar_invoice_id)
+        .filter(Boolean) as string[];
+
+      // 4. Delete school_ar_invoices
+      if (schoolInvoices && schoolInvoices.length > 0) {
+        const { error } = await supabase
+          .from("school_ar_invoices")
+          .delete()
+          .eq("batch_id", batchId);
+        if (error) throw error;
+      }
+
+      // 5. Delete linked Finance AR invoice lines + invoices
+      for (const arId of arInvoiceIds) {
+        await supabase.from("ar_invoice_lines").delete().eq("invoice_id", arId);
+        await supabase.from("ar_invoices").delete().eq("id", arId);
+      }
+
+      // 6. Void batch journal entry if exists
+      if (batch?.journal_entry_id) {
+        await supabase
+          .from("journal_entries")
+          .update({ status: "void", notes: "Voided: AR batch deleted" })
+          .eq("id", batch.journal_entry_id);
+      }
+
+      // 7. Delete the batch record
+      const { error: batchDelErr } = await supabase
+        .from("school_ar_invoice_batches")
+        .delete()
+        .eq("id", batchId);
+
+      if (batchDelErr) throw batchDelErr;
+
+      return { deletedInvoices: schoolInvoices?.length || 0 };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["school-ar-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["students-bulk-ar"] });
+      toast.success(`Deleted batch with ${result.deletedInvoices} invoices`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete batch: ${error.message}`);
+    },
+  });
+}
+
+// Check if a batch already exists for a branch + month
+export function useExistingBatch(branchId: string | null, invoiceMonth: Date | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["existing-ar-batch", branchId, invoiceMonth ? format(invoiceMonth, "yyyy-MM-dd") : null],
+    queryFn: async () => {
+      if (!branchId || !invoiceMonth) return null;
+      const monthStr = format(invoiceMonth, "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("school_ar_invoice_batches")
+        .select("id, batch_number, status, total_students, total_amount, created_at")
+        .eq("branch_id", branchId)
+        .eq("invoice_month", monthStr)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!branchId && !!invoiceMonth && enabled,
+  });
 }
