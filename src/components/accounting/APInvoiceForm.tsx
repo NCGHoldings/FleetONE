@@ -569,7 +569,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                       className={cn("w-full justify-between font-normal", !selectedBusId && "text-muted-foreground")}
                     >
                       {selectedBus
-                        ? `${selectedBus.bus_number}${selectedBus.bus_name ? " - " + selectedBus.bus_name : ""}`
+                        ? selectedBus.bus_no
                         : "Select bus..."}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
