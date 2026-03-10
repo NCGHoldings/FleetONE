@@ -733,6 +733,9 @@ export const useCreateAPInvoice = () => {
           status: "unpaid",
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,
+          route_id: invoice.route_id || null,
+          bus_id: invoice.bus_id || null,
+          school_route_id: invoice.school_route_id || null,
         }])
         .select()
         .single();
