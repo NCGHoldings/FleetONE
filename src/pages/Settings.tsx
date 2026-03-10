@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag, Target, Users, Wallet, Hash, Bus, Car, Truck, Settings2 } from "lucide-react";
+import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag, Target, Users, Wallet, Hash, Bus, Car, Truck, Settings2, Bot, Percent } from "lucide-react";
 import { GrantAccessButton } from "@/components/accounting/GrantAccessButton";
 import { DataEntrySettings } from "@/components/trips/DataEntrySettings";
 import { ConductorSubmissionQRGenerator } from "@/components/trips/ConductorSubmissionQRGenerator";
@@ -32,8 +32,13 @@ import { NCGExpressFinanceSettings } from "@/components/settings/NCGExpressFinan
 import { LeasingFinanceSettings } from "@/components/settings/LeasingFinanceSettings";
 import { ModuleFinanceSettingsView } from "@/components/settings/ModuleFinanceSettingsView";
 import { CoreGLSettings } from "@/components/settings/CoreGLSettings";
+<<<<<<< Updated upstream
 import { CustomerCategoryManagement } from "@/components/accounting/CustomerCategoryManagement";
 import { VendorCategoryManagement } from "@/components/accounting/VendorCategoryManagement";
+=======
+import { TransactionFeeSettings } from "@/components/settings/TransactionFeeSettings";
+import { AIChatbotSettings } from "@/components/ai-chatbot/AIChatbotSettings";
+>>>>>>> Stashed changes
 
 export default function Settings() {
   const { user } = useAuth();
@@ -85,7 +90,7 @@ export default function Settings() {
         title: "Password Updated",
         description: "Your password has been changed successfully.",
       });
-      
+
       setPasswordData({
         currentPassword: "",
         newPassword: "",
@@ -170,6 +175,7 @@ export default function Settings() {
             <Settings2 className="h-3 w-3" />
             Core GL Settings
           </TabsTrigger>
+<<<<<<< Updated upstream
           <TabsTrigger value="customer-categories" className="flex items-center gap-1">
             <Tag className="h-3 w-3" />
             Customer Categories
@@ -177,267 +183,276 @@ export default function Settings() {
           <TabsTrigger value="vendor-categories" className="flex items-center gap-1">
             <Tag className="h-3 w-3" />
             Vendor Categories
+=======
+          <TabsTrigger value="transaction-fees" className="flex items-center gap-1">
+            <Percent className="h-3 w-3" />
+            Transaction Fees
+>>>>>>> Stashed changes
           </TabsTrigger>
           <TabsTrigger value="module-finance" className="flex items-center gap-1">
             <Wallet className="h-3 w-3" />
             Module GL Mappings
           </TabsTrigger>
+          <TabsTrigger value="ai-chatbot" className="flex items-center gap-1">
+            <Bot className="h-3 w-3" />
+            AI Chatbot
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="account" className="space-y-6 mt-6">
           <div className="grid gap-6 max-w-2xl">
-        {/* Account Security */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock className="w-5 h-5" />
-              Account Security
-            </CardTitle>
-            <CardDescription>Update your password and security settings</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="current-password">Current Password</Label>
-              <Input
-                id="current-password"
-                type="password"
-                value={passwordData.currentPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                disabled={loading}
-              />
-            </div>
+            {/* Account Security */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Lock className="w-5 h-5" />
+                  Account Security
+                </CardTitle>
+                <CardDescription>Update your password and security settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="current-password">Current Password</Label>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                    disabled={loading}
+                  />
+                </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="new-password">New Password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={passwordData.newPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                disabled={loading}
-              />
-            </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                    disabled={loading}
+                  />
+                </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                value={passwordData.confirmPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                disabled={loading}
-              />
-            </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="confirm-password">Confirm New Password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    disabled={loading}
+                  />
+                </div>
 
-            <Button onClick={handlePasswordChange} disabled={loading}>
-              Change Password
-            </Button>
-          </CardContent>
-        </Card>
+                <Button onClick={handlePasswordChange} disabled={loading}>
+                  Change Password
+                </Button>
+              </CardContent>
+            </Card>
 
-        {/* Notification Preferences */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="w-5 h-5" />
-              Notification Preferences
-            </CardTitle>
-            <CardDescription>Choose what notifications you want to receive</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Email Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive notifications via email
-                </p>
-              </div>
-              <Switch
-                checked={preferences.emailNotifications}
-                onCheckedChange={() => handlePreferenceChange("emailNotifications")}
-              />
-            </div>
+            {/* Notification Preferences */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="w-5 h-5" />
+                  Notification Preferences
+                </CardTitle>
+                <CardDescription>Choose what notifications you want to receive</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Email Notifications</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive notifications via email
+                    </p>
+                  </div>
+                  <Switch
+                    checked={preferences.emailNotifications}
+                    onCheckedChange={() => handlePreferenceChange("emailNotifications")}
+                  />
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Push Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive push notifications in the browser
-                </p>
-              </div>
-              <Switch
-                checked={preferences.pushNotifications}
-                onCheckedChange={() => handlePreferenceChange("pushNotifications")}
-              />
-            </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Push Notifications</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive push notifications in the browser
+                    </p>
+                  </div>
+                  <Switch
+                    checked={preferences.pushNotifications}
+                    onCheckedChange={() => handlePreferenceChange("pushNotifications")}
+                  />
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Payment Reminders</Label>
-                <p className="text-sm text-muted-foreground">
-                  Get reminders about upcoming payments
-                </p>
-              </div>
-              <Switch
-                checked={preferences.paymentReminders}
-                onCheckedChange={() => handlePreferenceChange("paymentReminders")}
-              />
-            </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Payment Reminders</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Get reminders about upcoming payments
+                    </p>
+                  </div>
+                  <Switch
+                    checked={preferences.paymentReminders}
+                    onCheckedChange={() => handlePreferenceChange("paymentReminders")}
+                  />
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Trip Updates</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive updates about trip status changes
-                </p>
-              </div>
-              <Switch
-                checked={preferences.tripUpdates}
-                onCheckedChange={() => handlePreferenceChange("tripUpdates")}
-              />
-            </div>
-          </CardContent>
-        </Card>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Trip Updates</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive updates about trip status changes
+                    </p>
+                  </div>
+                  <Switch
+                    checked={preferences.tripUpdates}
+                    onCheckedChange={() => handlePreferenceChange("tripUpdates")}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
           </div>
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-6 mt-6">
           <div className="grid gap-6 max-w-2xl">
-        {/* Notification Preferences */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="w-5 h-5" />
-              Notification Preferences
-            </CardTitle>
-            <CardDescription>Choose what notifications you want to receive</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Email Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive notifications via email
-                </p>
-              </div>
-              <Switch
-                checked={preferences.emailNotifications}
-                onCheckedChange={() => handlePreferenceChange("emailNotifications")}
-              />
-            </div>
+            {/* Notification Preferences */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="w-5 h-5" />
+                  Notification Preferences
+                </CardTitle>
+                <CardDescription>Choose what notifications you want to receive</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Email Notifications</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive notifications via email
+                    </p>
+                  </div>
+                  <Switch
+                    checked={preferences.emailNotifications}
+                    onCheckedChange={() => handlePreferenceChange("emailNotifications")}
+                  />
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Push Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive push notifications in the browser
-                </p>
-              </div>
-              <Switch
-                checked={preferences.pushNotifications}
-                onCheckedChange={() => handlePreferenceChange("pushNotifications")}
-              />
-            </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Push Notifications</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive push notifications in the browser
+                    </p>
+                  </div>
+                  <Switch
+                    checked={preferences.pushNotifications}
+                    onCheckedChange={() => handlePreferenceChange("pushNotifications")}
+                  />
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Payment Reminders</Label>
-                <p className="text-sm text-muted-foreground">
-                  Get reminders about upcoming payments
-                </p>
-              </div>
-              <Switch
-                checked={preferences.paymentReminders}
-                onCheckedChange={() => handlePreferenceChange("paymentReminders")}
-              />
-            </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Payment Reminders</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Get reminders about upcoming payments
+                    </p>
+                  </div>
+                  <Switch
+                    checked={preferences.paymentReminders}
+                    onCheckedChange={() => handlePreferenceChange("paymentReminders")}
+                  />
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Trip Updates</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive updates about trip status changes
-                </p>
-              </div>
-              <Switch
-                checked={preferences.tripUpdates}
-                onCheckedChange={() => handlePreferenceChange("tripUpdates")}
-              />
-            </div>
-          </CardContent>
-        </Card>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Trip Updates</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive updates about trip status changes
+                    </p>
+                  </div>
+                  <Switch
+                    checked={preferences.tripUpdates}
+                    onCheckedChange={() => handlePreferenceChange("tripUpdates")}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
         <TabsContent value="display" className="space-y-6 mt-6">
           <div className="grid gap-6 max-w-2xl">
-        {/* Display Preferences */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="w-5 h-5" />
-              Display Preferences
-            </CardTitle>
-            <CardDescription>Customize how the app looks and feels</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="theme">Theme</Label>
-              <p className="text-sm text-muted-foreground">
-                Theme customization coming soon
-              </p>
-            </div>
+            {/* Display Preferences */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="w-5 h-5" />
+                  Display Preferences
+                </CardTitle>
+                <CardDescription>Customize how the app looks and feels</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="theme">Theme</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Theme customization coming soon
+                  </p>
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div className="grid gap-2">
-              <Label htmlFor="language" className="flex items-center gap-2">
-                <Globe className="w-4 h-4" />
-                Language
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Multi-language support coming soon
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+                <div className="grid gap-2">
+                  <Label htmlFor="language" className="flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    Language
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Multi-language support coming soon
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
         <TabsContent value="admin" className="space-y-6 mt-6">
           <div className="grid gap-6 max-w-2xl">
-        {/* Admin Features */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="w-5 h-5" />
-              Admin Features
-            </CardTitle>
-            <CardDescription>Administrative tools and access management</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label>Accounting Module Access</Label>
-              <p className="text-sm text-muted-foreground mb-2">
-                Grant accounting access to all super_admin, admin, and finance users
-              </p>
-              <GrantAccessButton />
-            </div>
-          </CardContent>
-        </Card>
+            {/* Admin Features */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  Admin Features
+                </CardTitle>
+                <CardDescription>Administrative tools and access management</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-2">
+                  <Label>Accounting Module Access</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Grant accounting access to all super_admin, admin, and finance users
+                  </p>
+                  <GrantAccessButton />
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
@@ -656,16 +671,25 @@ export default function Settings() {
           <CoreGLSettings />
         </TabsContent>
 
+<<<<<<< Updated upstream
         <TabsContent value="customer-categories" className="space-y-6 mt-6">
           <CustomerCategoryManagement />
         </TabsContent>
 
         <TabsContent value="vendor-categories" className="space-y-6 mt-6">
           <VendorCategoryManagement />
+=======
+        <TabsContent value="transaction-fees" className="space-y-6 mt-6">
+          <TransactionFeeSettings />
+>>>>>>> Stashed changes
         </TabsContent>
 
         <TabsContent value="module-finance" className="space-y-6 mt-6">
           <ModuleFinanceSettingsView />
+        </TabsContent>
+
+        <TabsContent value="ai-chatbot" className="space-y-6 mt-6">
+          <AIChatbotSettings />
         </TabsContent>
       </Tabs>
     </div>
