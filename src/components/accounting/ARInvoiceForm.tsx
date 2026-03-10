@@ -324,6 +324,12 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
               />
             </div>
 
+            {/* Bus Selection */}
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <h3 className="font-semibold text-sm mb-3">Bus Details (Optional)</h3>
+              <BusSelector value={busData} onChange={setBusData} />
+            </div>
+
             {/* Invoice Lines */}
             <div className="space-y-4">
               <div className="flex justify-between items-center">
