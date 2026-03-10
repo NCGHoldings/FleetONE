@@ -143,6 +143,7 @@ export function SpecialHireCalendarView() {
     const [selectedQuotation, setSelectedQuotation] = useState<any | null>(null);
     const [showModal, setShowModal] = useState(false);
     const [selectedVersions, setSelectedVersions] = useState<Record<string, string>>({});
+    const [viewMode, setViewMode] = useState<'hires' | 'created'>('hires');
 
     const safeParseJSON = <T,>(value: any, fallback: T): T => {
         if (value === null || value === undefined || value === '') return fallback;
@@ -158,6 +159,8 @@ export function SpecialHireCalendarView() {
             const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
             const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 
+            const filterColumn = viewMode === 'hires' ? 'pickup_datetime' : 'created_at';
+
             const { data, error } = await supabase
                 .from('special_hire_quotations')
                 .select(`
@@ -167,9 +170,9 @@ export function SpecialHireCalendarView() {
             capacity
           )
         `)
-                .gte('pickup_datetime', dayStart.toISOString())
-                .lt('pickup_datetime', dayEnd.toISOString())
-                .order('pickup_datetime', { ascending: true });
+                .gte(filterColumn, dayStart.toISOString())
+                .lt(filterColumn, dayEnd.toISOString())
+                .order(filterColumn, { ascending: true });
 
             if (error) throw error;
 
@@ -206,18 +209,19 @@ export function SpecialHireCalendarView() {
             const start = startOfMonth(month);
             const end = endOfMonth(month);
 
+            const filterColumn = viewMode === 'hires' ? 'pickup_datetime' : 'created_at';
+
             const { data, error } = await supabase
                 .from('special_hire_quotations')
-                .select('pickup_datetime, parent_quotation_id, id, is_active_version')
-                .gte('pickup_datetime', start.toISOString())
-                .lte('pickup_datetime', end.toISOString());
+                .select(`${filterColumn}, parent_quotation_id, id, is_active_version`)
+                .gte(filterColumn, start.toISOString())
+                .lte(filterColumn, end.toISOString());
 
             if (error) throw error;
 
-            // Deduplicate: only count one entry per parent group per date
             const dateParentMap = new Map<string, Set<string>>();
             (data || []).forEach((item: any) => {
-                const d = format(new Date(item.pickup_datetime), 'yyyy-MM-dd');
+                const d = format(new Date(item[filterColumn]), 'yyyy-MM-dd');
                 const groupId = item.parent_quotation_id || item.id;
                 if (!dateParentMap.has(d)) dateParentMap.set(d, new Set());
                 dateParentMap.get(d)!.add(groupId);
@@ -235,11 +239,11 @@ export function SpecialHireCalendarView() {
 
     useEffect(() => {
         loadQuotationsForDate(selectedDate);
-    }, [selectedDate]);
+    }, [selectedDate, viewMode]);
 
     useEffect(() => {
         loadMonthDates(currentMonth);
-    }, [currentMonth]);
+    }, [currentMonth, viewMode]);
 
     useEffect(() => {
         const channel = supabase
@@ -367,7 +371,31 @@ export function SpecialHireCalendarView() {
                                 Select Date
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="p-2">
+                        <CardContent className="p-2 space-y-3">
+                            {/* View Mode Toggle */}
+                            <div className="flex rounded-lg bg-muted p-1 mx-1">
+                                <button
+                                    onClick={() => setViewMode('hires')}
+                                    className={`flex-1 text-xs font-medium py-1.5 px-2 rounded-md transition-all ${
+                                        viewMode === 'hires'
+                                            ? 'bg-background text-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    Hires on Date
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('created')}
+                                    className={`flex-1 text-xs font-medium py-1.5 px-2 rounded-md transition-all ${
+                                        viewMode === 'created'
+                                            ? 'bg-background text-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    Created on Date
+                                </button>
+                            </div>
+
                             <Calendar
                                 mode="single"
                                 selected={selectedDate}
@@ -419,10 +447,11 @@ export function SpecialHireCalendarView() {
                     {/* Date Header */}
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-semibold">
+                            {viewMode === 'hires' ? 'Hires on ' : 'Created on '}
                             {format(selectedDate, 'EEEE, MMMM d, yyyy')}
                         </h2>
                         <Badge variant="outline" className="text-sm">
-                            {stats.total} hire{stats.total !== 1 ? 's' : ''}
+                            {stats.total} {viewMode === 'hires' ? 'hire' : 'quotation'}{stats.total !== 1 ? 's' : ''}
                         </Badge>
                     </div>
 
@@ -462,9 +491,14 @@ export function SpecialHireCalendarView() {
                                         <CalendarDays className="h-7 w-7 text-muted-foreground" />
                                     </div>
                                     <div>
-                                        <h3 className="font-medium text-base">No hires scheduled</h3>
+                                        <h3 className="font-medium text-base">
+                                            {viewMode === 'hires' ? 'No hires scheduled' : 'No quotations created'}
+                                        </h3>
                                         <p className="text-sm text-muted-foreground mt-1">
-                                            There are no special hires for {format(selectedDate, 'MMMM d, yyyy')}
+                                            {viewMode === 'hires'
+                                                ? `There are no special hires for ${format(selectedDate, 'MMMM d, yyyy')}`
+                                                : `No quotations were created on ${format(selectedDate, 'MMMM d, yyyy')}`
+                                            }
                                         </p>
                                     </div>
                                 </div>
