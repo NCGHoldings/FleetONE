@@ -280,9 +280,9 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     if (!newRouteName.trim()) return;
     setAddingRoute(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("routes")
-        .insert([{ route_name: newRouteName.trim(), is_active: true }])
+        .insert([{ route_name: newRouteName.trim(), route_no: 'NEW', start_location: 'TBD', end_location: 'TBD', is_active: true }])
         .select("id")
         .single();
       if (error) throw error;
