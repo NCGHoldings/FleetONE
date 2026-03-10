@@ -787,36 +787,6 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             </div>
           )}
 
-          {/* Company Registration Details */}
-          {quotation.customer_type === "company" &&
-            (quotation.business_registration_number || quotation.tax_registration_number) && (
-              <div
-                style={{
-                  fontSize: "14px",
-                  marginTop: "20px",
-                  padding: "15px",
-                  border: "2px solid #003366",
-                  borderRadius: "8px",
-                  background: "#f8f9fa",
-                }}
-              >
-                <h3 style={{ margin: "0 0 10px 0", color: "#003366", fontSize: "16px", fontWeight: "bold" }}>
-                  COMPANY REGISTRATION DETAILS
-                </h3>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                  {quotation.business_registration_number && (
-                    <p style={{ margin: "4px 0" }}>
-                      <b>Business Registration Number:</b> {quotation.business_registration_number}
-                    </p>
-                  )}
-                  {quotation.tax_registration_number && (
-                    <p style={{ margin: "4px 0" }}>
-                      <b>Tax Registration Number:</b> {quotation.tax_registration_number}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
         </div>
 
         {/* Page 1 Footer with Signatures */}
