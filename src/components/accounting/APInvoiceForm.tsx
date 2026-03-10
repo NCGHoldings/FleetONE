@@ -302,9 +302,9 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     if (!newBusNumber.trim()) return;
     setAddingBus(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("buses")
-        .insert([{ bus_number: newBusNumber.trim() }])
+        .insert([{ bus_no: newBusNumber.trim(), capacity: 0, year: new Date().getFullYear() }])
         .select("id")
         .single();
       if (error) throw error;
