@@ -103,6 +103,7 @@ const App = () => (
           <Routes>
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/accept-invite" element={<AcceptInvite />} />
             <Route path="/install" element={<InstallApp />} />
             <Route path="/public/complaint" element={<PublicComplaint />} />

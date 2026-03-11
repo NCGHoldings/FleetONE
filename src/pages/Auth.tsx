@@ -237,6 +237,18 @@ export default function Auth() {
                       )}
                     </Button>
                   </div>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="px-0 text-xs text-muted-foreground hover:text-primary"
+                      onClick={handleForgotPassword}
+                      disabled={loading || forgotLoading}
+                    >
+                      {forgotLoading ? "Sending..." : "Forgot Password?"}
+                    </Button>
+                  </div>
                 </div>
 
                 {error && (
