@@ -1,27 +1,44 @@
 
 
-# Grant Super Admin Access to lghsashi@gmail.com
+# Fix: Fuel Price Not Applying to New Quotes
 
-## Current State
-- **User ID**: `461d6742-d4a5-492b-889a-7f11a2ebf2c2`
-- **Current role**: `staff` only
-- **Current page access**: All 24 pages set to `false`
+## Problem
+When you update the fuel price in Fuel Settings, the change only saves to the **default** parking location row. But when generating a quote, the system fetches fuel settings by the **selected parking location** — which may be a different row that still has the old price.
 
-## What Needs to Happen
+## Root Cause
+In `FuelSettingsAdmin.tsx`, `handleSaveFuelPrice` updates only the default row:
+```typescript
+.update({ diesel_price_lkr_per_l: ... })
+.eq('id', defaultSettings.id)  // Only updates ONE row
+```
 
-### 1. Create a temporary edge function `grant-full-access`
-A simple edge function that uses the service role key to:
-- Add `super_admin` role to `user_roles` table
-- Set `has_access = true` for all 26 pages in `user_page_permissions`
+But `SpecialHireForm.tsx` fetches by parking location:
+```typescript
+.from('fuel_settings')
+.eq('id', data.parkingLocationId)  // Could be a DIFFERENT row
+```
 
-### 2. Deploy and call it
-- Deploy the function
-- Call it with `{ "target_email": "lghsashi@gmail.com" }`
-- Verify the changes took effect
+## Fix
 
-### 3. Clean up
-- Delete the edge function after use (it's a one-time admin operation)
+### File: `src/components/special-hire/FuelSettingsAdmin.tsx`
 
-### Pages to grant (26 total)
-`dashboard`, `customers`, `daily_trips`, `fleet_management`, `maintenance`, `insurance`, `staff_management`, `staff_performance`, `route_permits`, `driver_training`, `real_time_tracking`, `driver_allocation`, `staff_attendance`, `school_bus_service`, `complaints`, `special_hire`, `document_manager`, `feedback`, `yutong_quotations`, `yutong_bus_models`, `yutong_addons`, `nsp_daily_sales`, `nsp_summary`, `governance_calendar`, `seasonal_themes`, `accounting`
+Update `handleSaveFuelPrice` to apply the diesel price to **all** parking location rows (since diesel price is a global value, not location-specific):
+
+```typescript
+// Update ALL rows with the new fuel price
+const { error } = await supabase
+  .from('fuel_settings')
+  .update({
+    diesel_price_lkr_per_l: defaultSettings.diesel_price_lkr_per_l,
+    maintenance_rate_lkr_per_km: defaultSettings.maintenance_rate_lkr_per_km
+  })
+  .gte('id', '00000000-0000-0000-0000-000000000000');
+  // removes the .eq('id', defaultSettings.id) filter
+```
+
+This ensures that regardless of which parking location is selected in a quote, the latest fuel price is always used.
+
+Also reload the full settings list after saving so the UI reflects the change across all location cards.
+
+### One file changed, one line fix.
 
