@@ -1,0 +1,1 @@
+UPDATE fuel_settings SET diesel_price_lkr_per_l = 303 WHERE diesel_price_lkr_per_l != 303;

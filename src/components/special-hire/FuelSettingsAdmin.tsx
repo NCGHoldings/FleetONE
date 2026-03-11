@@ -99,7 +99,7 @@ export function FuelSettingsAdmin() {
           diesel_price_lkr_per_l: defaultSettings.diesel_price_lkr_per_l,
           maintenance_rate_lkr_per_km: defaultSettings.maintenance_rate_lkr_per_km
         })
-        .gte('id', '00000000-0000-0000-0000-000000000000');
+        .not('id', 'is', null);
 
       if (error) throw error;
       
