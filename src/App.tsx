@@ -14,6 +14,7 @@ import { ThemeProvider } from "next-themes";
 
 // Pages
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import AcceptInvite from "./pages/AcceptInvite";
 import InstallApp from "./pages/InstallApp";
 import Welcome from "./pages/Welcome";
