@@ -14,6 +14,7 @@ import { ThemeProvider } from "next-themes";
 
 // Pages
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import AcceptInvite from "./pages/AcceptInvite";
 import InstallApp from "./pages/InstallApp";
 import Welcome from "./pages/Welcome";
@@ -102,6 +103,7 @@ const App = () => (
           <Routes>
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/accept-invite" element={<AcceptInvite />} />
             <Route path="/install" element={<InstallApp />} />
             <Route path="/public/complaint" element={<PublicComplaint />} />
