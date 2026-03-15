@@ -3,12 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  Bus, 
-  Users, 
-  IndianRupee, 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  Bus,
+  Users,
+  IndianRupee,
+  TrendingUp,
+  TrendingDown,
   AlertCircle,
   Plus,
   Settings,
@@ -35,29 +35,31 @@ interface RouteCardProps {
     profitMargin: number;
     students: any[];
   };
+  branchId: string;
   onAddExpense: (routeId: string, expense: any) => Promise<void>;
   onAddStaff: (routeId: string, staff: any) => Promise<void>;
   onUpdateRoute: (routeId: string, updates: any) => Promise<void>;
   onViewStudents: (routeId: string, students: any[]) => void;
 }
 
-export function EnhancedRouteCard({ 
-  route, 
-  onAddExpense, 
-  onAddStaff, 
-  onUpdateRoute, 
-  onViewStudents 
+export function EnhancedRouteCard({
+  route,
+  branchId,
+  onAddExpense,
+  onAddStaff,
+  onUpdateRoute,
+  onViewStudents
 }: RouteCardProps) {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [staffModalOpen, setStaffModalOpen] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
-  const paymentRate = route.totalStudents > 0 
+  const paymentRate = route.totalStudents > 0
     ? ((route.totalStudents - (route.outstandingAmount / (route.totalIncome + route.outstandingAmount || 1)) * route.totalStudents) / route.totalStudents) * 100
     : 0;
 
   const isProfitable = route.netProfit > 0;
-  
+
   return (
     <>
       <Card className="hover:shadow-lg transition-shadow">
@@ -175,7 +177,7 @@ export function EnhancedRouteCard({
                   <div className="font-semibold">LKR {route.staffCosts.toLocaleString()}</div>
                 </div>
               </div>
-              
+
               {route.drivers.length > 0 && (
                 <div className="space-y-2">
                   <div className="text-sm font-medium text-muted-foreground">Drivers:</div>
@@ -237,7 +239,8 @@ export function EnhancedRouteCard({
         onOpenChange={setExpenseModalOpen}
         routeId={route.routeId}
         routeName={route.routeName}
-        onAddExpense={(expense) => onAddExpense(route.routeId, expense)}
+        branchId={branchId}
+        routeBusRegNos={route.busRegNos}
       />
 
       <RouteStaffModal

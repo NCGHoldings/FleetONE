@@ -123,11 +123,12 @@ const BankReconciliationWorksheet = () => {
     return base;
   }, [transactions, displayFilter, clearedState]);
 
-  // Compute summaries
+  // Compute summaries — include both newly-cleared and already-reconciled items
   const summary = useMemo(() => {
     let paymentCount = 0, paymentTotal = 0;
     let depositCount = 0, depositTotal = 0;
     let clearedPaymentTotal = 0, clearedDepositTotal = 0;
+    let clearedCount = 0;
 
     transactions.forEach((t) => {
       const payment = t.debit_amount || 0;
@@ -136,10 +137,14 @@ const BankReconciliationWorksheet = () => {
       if (payment > 0) { paymentCount++; paymentTotal += payment; }
       if (deposit > 0) { depositCount++; depositTotal += deposit; }
 
+      // Count as cleared if user ticked the checkbox OR it was already reconciled
       const cs = clearedState[t.id];
-      if (cs?.cleared) {
-        if (payment > 0) clearedPaymentTotal += cs.clearedAmount;
-        if (deposit > 0) clearedDepositTotal += cs.clearedAmount;
+      const isCleared = cs?.cleared || t.is_reconciled;
+      if (isCleared) {
+        clearedCount++;
+        const clearedAmt = cs?.clearedAmount ?? (payment > 0 ? payment : deposit);
+        if (payment > 0) clearedPaymentTotal += clearedAmt;
+        if (deposit > 0) clearedDepositTotal += clearedAmt;
       }
     });
 
@@ -152,6 +157,7 @@ const BankReconciliationWorksheet = () => {
       paymentCount, paymentTotal,
       depositCount, depositTotal,
       clearedPaymentTotal, clearedDepositTotal,
+      clearedCount,
       bookBalance,
       clearedBookBalance,
       stmtEndBal,
@@ -214,32 +220,43 @@ const BankReconciliationWorksheet = () => {
     if (reconMode === "statement" && !statementBalance) return toast.error("Enter statement ending balance");
     if (!statementDate) return toast.error("Enter statement date");
 
+    // Only include NEWLY cleared items (not already-reconciled ones)
     const clearedIds = Object.entries(clearedState)
-      .filter(([, v]) => v.cleared)
+      .filter(([id, v]) => {
+        if (!v.cleared) return false;
+        // Skip already-reconciled transactions
+        const txn = transactions.find(t => t.id === id);
+        return txn && !txn.is_reconciled;
+      })
       .map(([id]) => id);
     const clearedAmounts: Record<string, number> = {};
     clearedIds.forEach((id) => { clearedAmounts[id] = clearedState[id].clearedAmount; });
 
     if (clearedIds.length === 0) {
-      return toast.error("No transactions are cleared for this reconciliation");
+      return toast.error("No new transactions are cleared. Tick checkboxes on unreconciled items first.");
     }
 
-    await saveReconciliation.mutateAsync({
-      bank_account_id: selectedAccountId,
-      statement_date: statementDate,
-      statement_no: statementNo,
-      statement_balance: summary.stmtEndBal,
-      book_balance: summary.bookBalance,
-      adjusted_book_balance: summary.clearedBookBalance,
-      difference: summary.difference,
-      cleared_transaction_ids: clearedIds,
-      cleared_amounts: clearedAmounts,
-    });
+    try {
+      await saveReconciliation.mutateAsync({
+        bank_account_id: selectedAccountId,
+        statement_date: statementDate,
+        statement_no: statementNo,
+        statement_balance: summary.stmtEndBal,
+        book_balance: summary.bookBalance,
+        adjusted_book_balance: summary.clearedBookBalance,
+        difference: summary.difference,
+        cleared_transaction_ids: clearedIds,
+        cleared_amounts: clearedAmounts,
+      });
 
-    setClearedState({});
-    setStatementNo("");
-    setStatementBalance("");
-  }, [selectedAccountId, reconMode, statementDate, statementNo, statementBalance, clearedState, summary, saveReconciliation]);
+      toast.success(`✅ ${clearedIds.length} transaction(s) reconciled successfully`);
+      setClearedState({});
+      setStatementNo("");
+      setStatementBalance("");
+    } catch (err) {
+      // Error is already shown by the mutation's onError
+    }
+  }, [selectedAccountId, reconMode, statementDate, statementNo, statementBalance, clearedState, transactions, summary, saveReconciliation]);
 
   const handleCancel = useCallback(() => {
     setClearedState({});
