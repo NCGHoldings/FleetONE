@@ -90,20 +90,33 @@ export function useRealtimeSpecialHire() {
     try {
       console.log('Fetching quotations with payments and invoices...');
       
-      // Fetch quotations
-      const { data: quotationsData, error: quotationsError } = await supabase
-        .from('special_hire_quotations')
-        .select(`
-          *,
-          bus_types!bus_type_id (
-            name,
-            capacity
-          )
-        `)
-        .eq('status', 'confirmed')
-        .order('created_at', { ascending: false });
+      // Fetch confirmed quotations in batches to bypass Supabase row limits
+      const batchSize = 1000;
+      let allQuotationsData: any[] = [];
+      let from = 0;
+      let hasMore = true;
 
-      if (quotationsError) throw quotationsError;
+      while (hasMore) {
+        const { data, error: batchError } = await supabase
+          .from('special_hire_quotations')
+          .select(`
+            *,
+            bus_types!bus_type_id (
+              name,
+              capacity
+            )
+          `)
+          .eq('status', 'confirmed')
+          .order('created_at', { ascending: false })
+          .range(from, from + batchSize - 1);
+
+        if (batchError) throw batchError;
+        allQuotationsData = allQuotationsData.concat(data || []);
+        hasMore = (data?.length || 0) === batchSize;
+        from += batchSize;
+      }
+
+      const quotationsData = allQuotationsData;
 
       // Fetch all payments for these quotations
       const quotationIds = quotationsData?.map(q => q.id) || [];
