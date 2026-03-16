@@ -649,7 +649,7 @@ Deno.serve(async (req) => {
           }
         } catch (error) {
           console.error(`[FIOS] Exception updating odometer for ${data.bus_no}:`, error);
-          odometerUpdates.push({ bus_no: data.bus_no, success: false, error: error.message });
+          odometerUpdates.push({ bus_no: data.bus_no, success: false, error: (error as Error).message });
         }
       }
     }
