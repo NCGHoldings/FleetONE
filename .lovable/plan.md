@@ -1,60 +1,64 @@
 
 
-# Fix: Total Quotations Showing 2000 Instead of 2088
+# Special Hire Spreadsheet — Full Operations Tracking View
 
-## Problem
-The "Quotations (2000)" count shown in the `QuotationsList` header is derived from `filteredQuotations.length` — the number of rows actually fetched from Supabase. Supabase enforces a server-side row limit (likely configured to 2000 for this project). Since there are now 2088 active quotations, the query silently truncates at 2000.
+## What You Want
+A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
 
-The **dashboard KPI cards** (`stats.totalQuotations`) already use `{ count: 'exact', head: true }` and show the correct count. The problem is specifically in components that fetch actual rows and use `.length` for counts.
+## Column Mapping (Your Columns → Database Fields)
 
-## Affected Areas
+The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
 
-| Component | How it counts | Issue |
+| Group | Columns | Source |
 |---|---|---|
-| `QuotationsList.tsx` line 1047 | `filteredQuotations.length` | Capped at 2000 |
-| `useSpecialHireSpreadsheetData.ts` line 84-96 | fetches all rows, no pagination | Capped at 2000 |
-| `useRealtimeSpecialHire.ts` line 94-104 | fetches confirmed rows | Will hit limit as confirmed grows |
-| `SpecialHireCalendarView.tsx` line 214 | monthly date query | Less likely to hit limit (date-filtered) |
+| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
+| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
+| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
+| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
+| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
+| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
 
-## Fix
+## Implementation Plan
 
-### 1. `QuotationsList.tsx` — Paginated fetch
-Replace the single `.select()` call with a paginated fetch loop that uses `.range(from, to)` to retrieve all rows in batches of 1000:
+### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
+- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
+- Map to a flat `SpreadsheetHire` interface with all ~45 columns
+- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
+- Realtime subscription on `special_hire_quotations` for live updates
+- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
 
-```typescript
-const loadQuotations = async () => {
-  try {
-    const batchSize = 1000;
-    let allData: any[] = [];
-    let from = 0;
-    let hasMore = true;
+### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
+- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
+- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
+- Inline click-to-edit cells for editable fields
+- Dropdown selects for status fields
+- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
+- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
+- Search, Refresh, Export Excel toolbar
 
-    while (hasMore) {
-      const { data, error } = await supabase
-        .from('special_hire_quotations')
-        .select(`*, bus_types!bus_type_id (name, capacity)`)
-        .eq('is_active_version', true)
-        .order('created_at', { ascending: false })
-        .range(from, from + batchSize - 1);
+### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
+- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
 
-      if (error) throw error;
-      allData = allData.concat(data || []);
-      hasMore = (data?.length || 0) === batchSize;
-      from += batchSize;
-    }
-    // ...rest of transform logic uses allData
-  }
-};
-```
+### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
+- New tab trigger with `Table2` icon labeled "Sheet"
+- TabsContent rendering `<SpecialHireSpreadsheet />`
 
-### 2. `useSpecialHireSpreadsheetData.ts` — Same paginated pattern
-Apply the same batch-fetch approach to the spreadsheet data hook.
+### User-Friendly Design Decisions
+- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
+- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
+- **Smart defaults**: empty expense fields show "0" and are click-to-edit
+- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
+- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
 
-### 3. `useRealtimeSpecialHire.ts` — Same paginated pattern
-Apply to the confirmed quotations fetch (currently filtered to `status=confirmed`, but will hit the limit as the dataset grows).
+### Files to Create/Edit
 
-### Files to modify
-- `src/components/special-hire/QuotationsList.tsx`
-- `src/hooks/useSpecialHireSpreadsheetData.ts`
-- `src/hooks/useRealtimeSpecialHire.ts`
+| File | Action |
+|---|---|
+| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
+| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
+| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
+| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
+
+### DB Note
+The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
 

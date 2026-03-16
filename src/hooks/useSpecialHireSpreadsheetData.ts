@@ -81,21 +81,33 @@ export function useSpecialHireSpreadsheetData() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: quotations, error } = await supabase
-        .from('special_hire_quotations')
-        .select(`
-          id, quotation_no, status, trip_status, company_name, customer_name, customer_phone,
-          pickup_location, drop_location, pickup_datetime, drop_datetime,
-          number_of_buses, km_trip, gross_revenue, total_paid, advance_paid, balance_due,
-          special_request, assigned_bus_no, assigned_driver_name, assigned_conductor_name,
-          other_expenses, discount_amount_lkr, bus_type_id, exceeding_distance_charge,
-          overtime_charge, overnight_charge,
-          bus_types:bus_type_id(name)
-        `)
-        .eq('is_active_version', true)
-        .order('created_at', { ascending: false });
+      // Fetch all quotations in batches to bypass Supabase row limits
+      const batchSize = 1000;
+      let quotations: any[] = [];
+      let from = 0;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('special_hire_quotations')
+          .select(`
+            id, quotation_no, status, trip_status, company_name, customer_name, customer_phone,
+            pickup_location, drop_location, pickup_datetime, drop_datetime,
+            number_of_buses, km_trip, gross_revenue, total_paid, advance_paid, balance_due,
+            special_request, assigned_bus_no, assigned_driver_name, assigned_conductor_name,
+            other_expenses, discount_amount_lkr, bus_type_id, exceeding_distance_charge,
+            overtime_charge, overnight_charge,
+            bus_types:bus_type_id(name)
+          `)
+          .eq('is_active_version', true)
+          .order('created_at', { ascending: false })
+          .range(from, from + batchSize - 1);
+
+        if (error) throw error;
+        quotations = quotations.concat(data || []);
+        hasMore = (data?.length || 0) === batchSize;
+        from += batchSize;
+      }
 
       // Fetch payments
       const quotationIds = (quotations || []).map(q => q.id);

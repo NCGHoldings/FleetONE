@@ -145,20 +145,33 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
 
   const loadQuotations = async () => {
     try {
-      // Fetch quotations without versions (much faster)
-      const { data: quotationsData, error } = await supabase
-        .from('special_hire_quotations')
-        .select(`
-          *,
-          bus_types!bus_type_id (
-            name,
-            capacity
-          )
-        `)
-        .eq('is_active_version', true)
-        .order('created_at', { ascending: false });
+      // Fetch quotations in batches to bypass Supabase row limits
+      const batchSize = 1000;
+      let allQuotationsData: any[] = [];
+      let from = 0;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('special_hire_quotations')
+          .select(`
+            *,
+            bus_types!bus_type_id (
+              name,
+              capacity
+            )
+          `)
+          .eq('is_active_version', true)
+          .order('created_at', { ascending: false })
+          .range(from, from + batchSize - 1);
+
+        if (error) throw error;
+        allQuotationsData = allQuotationsData.concat(data || []);
+        hasMore = (data?.length || 0) === batchSize;
+        from += batchSize;
+      }
+
+      const quotationsData = allQuotationsData;
 
       // Get all unique user IDs
       const userIds = [...new Set(quotationsData?.map(q => q.created_by).filter(Boolean))];
