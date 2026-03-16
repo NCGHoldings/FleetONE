@@ -127,6 +127,7 @@ interface Props {
 export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }: Props) {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [hireTypeFilter, setHireTypeFilter] = useState('all');
@@ -145,14 +146,23 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
 
   const loadQuotations = async () => {
     try {
-      // Fetch quotations in batches to bypass Supabase row limits
+      // Get exact total count via a head-only query
+      const { count: exactCount } = await supabase
+        .from('special_hire_quotations')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active_version', true);
+
+      setTotalCount(exactCount || 0);
+
+      // Fetch all quotations using cursor-based pagination to bypass offset limits
       const batchSize = 1000;
       let allQuotationsData: any[] = [];
-      let from = 0;
+      let lastCreatedAt: string | null = null;
+      let lastId: string | null = null;
       let hasMore = true;
 
       while (hasMore) {
-        const { data, error } = await supabase
+        let query = supabase
           .from('special_hire_quotations')
           .select(`
             *,
@@ -163,12 +173,26 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
           `)
           .eq('is_active_version', true)
           .order('created_at', { ascending: false })
-          .range(from, from + batchSize - 1);
+          .order('id', { ascending: false })
+          .limit(batchSize);
+
+        // Apply cursor filter for subsequent batches
+        if (lastCreatedAt && lastId) {
+          query = query.or(`created_at.lt.${lastCreatedAt},and(created_at.eq.${lastCreatedAt},id.lt.${lastId})`);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
-        allQuotationsData = allQuotationsData.concat(data || []);
-        hasMore = (data?.length || 0) === batchSize;
-        from += batchSize;
+        const batch = data || [];
+        allQuotationsData = allQuotationsData.concat(batch);
+        hasMore = batch.length === batchSize;
+
+        if (batch.length > 0) {
+          const lastItem = batch[batch.length - 1];
+          lastCreatedAt = lastItem.created_at;
+          lastId = lastItem.id;
+        }
       }
 
       const quotationsData = allQuotationsData;
@@ -1057,7 +1081,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Quotations ({filteredQuotations.length})</CardTitle>
+            <CardTitle>Quotations ({searchTerm || statusFilter !== 'all' || hireTypeFilter !== 'all' || approvalFilter !== 'all' || dateFilter !== 'all' ? filteredQuotations.length : totalCount})</CardTitle>
             <Button 
               onClick={() => setShowExportModal(true)}
               className="flex items-center gap-2"
