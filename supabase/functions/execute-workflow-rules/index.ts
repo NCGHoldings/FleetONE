@@ -117,9 +117,9 @@ serve(async (req: Request) => {
               trigger_entity_type: payload.module,
               trigger_entity_id: payload.entity_id,
               action_type: action.type,
-              action_result: { error: actionErr.message },
+              action_result: { error: (actionErr as Error).message },
               success: false,
-              error_message: actionErr.message,
+              error_message: (actionErr as Error).message,
               company_id: rule.company_id
             });
           }
