@@ -1,27 +1,60 @@
 
 
-# Grant Super Admin Access to abiwork12345@gmail.com
+# Fix: Total Quotations Showing 2000 Instead of 2088
 
-## Current State
-- **User ID**: `82b15c32-1b42-4740-bc3b-2e9f6603e875`
-- **Current role**: `supervisor`
-- **Needs**: `super_admin` role + `has_access = true` for all 60 pages
+## Problem
+The "Quotations (2000)" count shown in the `QuotationsList` header is derived from `filteredQuotations.length` — the number of rows actually fetched from Supabase. Supabase enforces a server-side row limit (likely configured to 2000 for this project). Since there are now 2088 active quotations, the query silently truncates at 2000.
 
-## Plan
+The **dashboard KPI cards** (`stats.totalQuotations`) already use `{ count: 'exact', head: true }` and show the correct count. The problem is specifically in components that fetch actual rows and use `.length` for counts.
 
-### 1. Add super_admin role
-Upsert a `super_admin` row into `user_roles` for this user.
+## Affected Areas
 
-### 2. Grant access to all pages
-Upsert `has_access = true` for all 60 page identifiers found in the system into `user_page_permissions`.
+| Component | How it counts | Issue |
+|---|---|---|
+| `QuotationsList.tsx` line 1047 | `filteredQuotations.length` | Capped at 2000 |
+| `useSpecialHireSpreadsheetData.ts` line 84-96 | fetches all rows, no pagination | Capped at 2000 |
+| `useRealtimeSpecialHire.ts` line 94-104 | fetches confirmed rows | Will hit limit as confirmed grows |
+| `SpecialHireCalendarView.tsx` line 214 | monthly date query | Less likely to hit limit (date-filtered) |
 
-### 3. Implementation
-Create a temporary edge function `grant-full-access` that:
-- Uses the service role key to bypass RLS
-- Adds `super_admin` role
-- Grants access to all pages
-- Execute it, then delete it
+## Fix
 
-### Pages (60 total)
-All existing page identifiers from the database: `accounting`, `api_usage`, `budgeting`, `business_ideas`, `complaints`, `conductor_submissions`, `customers`, `daily_trips`, `dashboard`, `data_entry_settings`, `document_manager`, `driver_allocation`, `driver_training`, `executive_dashboard`, `feedback`, `feedback_module`, `fleet_analytics`, `fleet_management`, `governance_calendar`, `governance_holidays`, `insurance`, `late_entry_requests`, `lightvehicle_addons`, `lightvehicle_quotations`, `lightvehicle_referral`, `lightvehicle_vehicle_data`, `lightvehicle_vehicle_models`, `maintenance`, `marketing_dashboard`, `marketing_job_requests`, `marketing_projects`, `marketing_social`, `marketing_tasks`, `marketing_team`, `nsp_daily_sales`, `nsp_summary`, `real_time_tracking`, `route_permits`, `scheduled_tasks`, `school_bus_service`, `seasonal_themes`, `sinotruck_customers`, `sinotruck_quotations`, `sinotruck_truck_models`, `special_hire`, `staff_attendance`, `staff_management`, `staff_performance`, `system_health`, `system_issues`, `trips_analytics`, `tyre_management`, `vehicle_inquiries`, `whatsapp_hub`, `yutong_addons`, `yutong_bus_models`, `yutong_old_sales`, `yutong_quotations`, `yutong_referral`, `yutong_vehicle_data`
+### 1. `QuotationsList.tsx` — Paginated fetch
+Replace the single `.select()` call with a paginated fetch loop that uses `.range(from, to)` to retrieve all rows in batches of 1000:
+
+```typescript
+const loadQuotations = async () => {
+  try {
+    const batchSize = 1000;
+    let allData: any[] = [];
+    let from = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('special_hire_quotations')
+        .select(`*, bus_types!bus_type_id (name, capacity)`)
+        .eq('is_active_version', true)
+        .order('created_at', { ascending: false })
+        .range(from, from + batchSize - 1);
+
+      if (error) throw error;
+      allData = allData.concat(data || []);
+      hasMore = (data?.length || 0) === batchSize;
+      from += batchSize;
+    }
+    // ...rest of transform logic uses allData
+  }
+};
+```
+
+### 2. `useSpecialHireSpreadsheetData.ts` — Same paginated pattern
+Apply the same batch-fetch approach to the spreadsheet data hook.
+
+### 3. `useRealtimeSpecialHire.ts` — Same paginated pattern
+Apply to the confirmed quotations fetch (currently filtered to `status=confirmed`, but will hit the limit as the dataset grows).
+
+### Files to modify
+- `src/components/special-hire/QuotationsList.tsx`
+- `src/hooks/useSpecialHireSpreadsheetData.ts`
+- `src/hooks/useRealtimeSpecialHire.ts`
 
