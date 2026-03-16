@@ -125,7 +125,7 @@ Focus on identifying patterns, opportunities, and risks.`;
     risks: "Identify potential risks, anomalies, and areas requiring immediate attention.",
   };
 
-  return `${basePrompt}\n\n${typeSpecific[analysisType] || typeSpecific.comprehensive}`;
+  return `${basePrompt}\n\n${typeSpecific[analysisType as keyof typeof typeSpecific] || typeSpecific.comprehensive}`;
 }
 
 function buildUserPrompt(context: any, analysisType: string) {

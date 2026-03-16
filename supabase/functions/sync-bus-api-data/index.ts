@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('[Sync] Fatal error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error as Error).message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
