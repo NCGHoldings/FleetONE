@@ -23,6 +23,9 @@ export interface SpreadsheetOrder {
   order_date: string;
   expected_delivery_date: string | null;
   notes: string | null;
+  invoice_count: number;
+  quotation_id: string | null;
+  finance_customer_id: string | null;
 }
 
 export interface NewOrderData {
@@ -50,7 +53,7 @@ export function useYutongSpreadsheetData() {
         .select(`
           id, order_no, bus_model, quantity, total_amount, status, current_phase,
           total_paid, balance_due, payment_mode, progress_percentage, order_date,
-          expected_delivery_date, notes,
+          expected_delivery_date, notes, quotation_id, finance_customer_id,
           yutong_quotations(customer_name, company_name)
         `)
         .order('order_date', { ascending: false });
@@ -64,6 +67,16 @@ export function useYutongSpreadsheetData() {
       const { data: cashReceipts } = await supabase
         .from('yutong_cash_receipts')
         .select('order_id, amount');
+
+      // Load invoice counts per order
+      const { data: invoiceRecords } = await supabase
+        .from('yutong_invoice_records')
+        .select('order_id');
+
+      const invoiceCountMap = new Map<string, number>();
+      (invoiceRecords || []).forEach((inv: any) => {
+        invoiceCountMap.set(inv.order_id, (invoiceCountMap.get(inv.order_id) || 0) + 1);
+      });
 
       const { data: payments } = await supabase
         .from('yutong_customer_payments')
@@ -112,6 +125,9 @@ export function useYutongSpreadsheetData() {
         order_date: o.order_date || '',
         expected_delivery_date: o.expected_delivery_date,
         notes: o.notes,
+        invoice_count: invoiceCountMap.get(o.id) || 0,
+        quotation_id: o.quotation_id || null,
+        finance_customer_id: o.finance_customer_id || null,
       }));
 
       setOrders(mapped);

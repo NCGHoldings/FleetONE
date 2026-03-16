@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Search, Download, RefreshCw, TrendingUp, DollarSign, ShoppingCart, Percent, Plus, Pencil, Trash2 } from 'lucide-react';
 import { SpreadsheetOrder, NewOrderData } from '@/hooks/useYutongSpreadsheetData';
 import { SpreadsheetDOPanel, SpreadsheetPaymentPanel, SpreadsheetCRPanel } from './SpreadsheetQuickActions';
+import { SpreadsheetInvoicePanel, SpreadsheetRowActions } from './SpreadsheetInvoiceActions';
 import { useSpreadsheetQuickActions } from '@/hooks/useSpreadsheetQuickActions';
 import * as XLSX from 'xlsx';
 
@@ -191,11 +192,11 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
         >
           {type === 'number' && field === 'progress_percentage'
             ? <div className="flex items-center gap-1 w-full">
-                <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
-                  <div className="bg-primary h-full rounded-full transition-all" style={{ width: `${value || 0}%` }} />
-                </div>
-                <span className="text-[10px] w-8 text-right">{value || 0}%</span>
+              <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                <div className="bg-primary h-full rounded-full transition-all" style={{ width: `${value || 0}%` }} />
               </div>
+              <span className="text-[10px] w-8 text-right">{value || 0}%</span>
+            </div>
             : <span>{value || '-'}</span>
           }
         </div>
@@ -291,7 +292,7 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
           <table className="w-full text-xs border-collapse">
             <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
               <tr>
-                {['#', 'Order No', 'Customer', 'Company', 'Bus Model', 'Qty', 'Total Amount', 'Status', 'Phase', 'DO', 'CR', 'Cheque', 'Cash', 'Total Paid', 'Balance Due', 'Pay Mode', 'Progress', 'Order Date', 'Exp. Delivery', 'Remark', ...(hasActions ? ['Actions'] : [])].map((h) => (
+                {['#', 'Order No', 'Customer', 'Company', 'Bus Model', 'Qty', 'Total Amount', 'Status', 'Phase', 'Invoices', 'DO', 'CR', 'Cheque', 'Cash', 'Bank Txfr', 'Total Paid', 'Balance Due', 'Pay Mode', 'Progress', 'Order Date', 'Exp. Delivery', 'Remark', 'Actions'].map((h) => (
                   <th key={h} className="px-2 py-2 text-left font-semibold text-muted-foreground border-b border-r last:border-r-0 whitespace-nowrap select-none">
                     {h}
                   </th>
@@ -313,6 +314,13 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
                   </td>
                   <td className="px-2 py-1 border-r">
                     {renderCell(order, 'current_phase', true, 'dropdown', PHASE_OPTIONS)}
+                  </td>
+                  <td className="px-2 py-1 border-r">
+                    <SpreadsheetInvoicePanel
+                      orderId={order.id}
+                      orderNo={order.order_no}
+                      invoiceCount={order.invoice_count}
+                    />
                   </td>
                   <td className="px-2 py-1 border-r">
                     <SpreadsheetDOPanel
@@ -354,6 +362,17 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
                       loading={quickActions.loading}
                     />
                   </td>
+                  <td className="px-2 py-1 border-r">
+                    <SpreadsheetPaymentPanel
+                      orderId={order.id}
+                      displayValue="-"
+                      paymentMethod="bank_transfer"
+                      fetchPayments={quickActions.fetchPayments}
+                      recordPayment={quickActions.recordPayment}
+                      verifyPayment={quickActions.verifyPayment}
+                      loading={quickActions.loading}
+                    />
+                  </td>
                   <td className="px-2 py-1 border-r text-right font-medium">{formatCurrency(order.total_paid)}</td>
                   <td className={`px-2 py-1 border-r text-right font-semibold ${getBalanceColor(order.balance_due, order.total_amount)}`}>
                     {formatCurrency(order.balance_due)}
@@ -371,23 +390,15 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
                   <td className="px-2 py-1 border-r min-w-[150px]">
                     {renderCell(order, 'notes', true, 'text')}
                   </td>
-                  {hasActions && (
-                    <td className="px-2 py-1 whitespace-nowrap">
-                      <div className="flex gap-1">
-                        {onDeleteOrder && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteOrderId(order.id)}
-                            title="Delete order"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  )}
+                  <td className="px-2 py-1 whitespace-nowrap">
+                    <SpreadsheetRowActions
+                      orderId={order.id}
+                      orderNo={order.order_no}
+                      quotationId={order.quotation_id || undefined}
+                      hasInvoices={order.invoice_count > 0}
+                      onDeleteOrder={onDeleteOrder}
+                    />
+                  </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
@@ -397,16 +408,15 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
             {filtered.length > 0 && (
               <tfoot className="sticky bottom-0 bg-muted/80 backdrop-blur-sm font-semibold">
                 <tr>
-                  <td colSpan={5} className="px-2 py-2 border-t border-r">Totals</td>
-                  <td className="px-2 py-2 border-t border-r text-center">{filtered.reduce((s, o) => s + o.quantity, 0)}</td>
-                  <td className="px-2 py-2 border-t border-r text-right">{formatCurrency(filtered.reduce((s, o) => s + o.total_amount, 0))}</td>
-                  <td colSpan={3} className="px-2 py-2 border-t border-r" />
+                  <td colSpan={6} className="px-2 py-2 border-t border-r text-right">{formatCurrency(filtered.reduce((s, o) => s + o.total_amount, 0))}</td>
+                  <td colSpan={4} className="px-2 py-2 border-t border-r" />
                   <td className="px-2 py-2 border-t border-r text-right">{formatCurrency(filtered.reduce((s, o) => s + o.cr_total, 0))}</td>
                   <td className="px-2 py-2 border-t border-r text-right">{formatCurrency(filtered.reduce((s, o) => s + o.cheque_total, 0))}</td>
                   <td className="px-2 py-2 border-t border-r text-right">{formatCurrency(filtered.reduce((s, o) => s + o.cash_total, 0))}</td>
+                  <td className="px-2 py-2 border-t border-r text-right">-</td>
                   <td className="px-2 py-2 border-t border-r text-right">{formatCurrency(filtered.reduce((s, o) => s + o.total_paid, 0))}</td>
                   <td className="px-2 py-2 border-t border-r text-right">{formatCurrency(filtered.reduce((s, o) => s + o.balance_due, 0))}</td>
-                  <td colSpan={hasActions ? 6 : 5} className="px-2 py-2 border-t" />
+                  <td colSpan={6} className="px-2 py-2 border-t" />
                 </tr>
               </tfoot>
             )}
