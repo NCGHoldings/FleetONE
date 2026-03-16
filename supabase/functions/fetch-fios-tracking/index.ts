@@ -407,6 +407,11 @@ Deno.serve(async (req) => {
         console.log(`[FIOS] ✅ Created new bus: ${parsedBusNo}`);
       }
 
+      if (!bus) {
+        unmatchedVehicles.push(vehicle.nm);
+        continue;
+      }
+
       const lastUpdate = new Date(vehicle.pos.t * 1000).toISOString();
       const status = vehicle.pos.s > 0 ? 'active' : 'inactive';
       const engineHealth = getEngineHealth(vehicle.pos.s, lastUpdate);
