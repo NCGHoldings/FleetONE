@@ -127,7 +127,7 @@ serve(async (req: Request) => {
 
       } catch (ruleErr) {
         console.error(`Error processing rule ${rule.id}:`, ruleErr);
-        results.errors.push(`Rule ${rule.id}: ${ruleErr.message}`);
+        results.errors.push(`Rule ${rule.id}: ${(ruleErr as Error).message}`);
       }
     }
 
