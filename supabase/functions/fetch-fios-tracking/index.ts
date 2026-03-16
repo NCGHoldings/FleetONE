@@ -15,6 +15,8 @@ interface FIOSPosition {
   z: number; // altitude
   s: number; // speed in km/h
   sc: number; // satellite count
+  gsm?: number; // GSM signal strength
+  hdop?: number; // HDOP GPS accuracy
 }
 
 interface FIOSUnit {
@@ -405,6 +407,11 @@ Deno.serve(async (req) => {
         console.log(`[FIOS] ✅ Created new bus: ${parsedBusNo}`);
       }
 
+      if (!bus) {
+        unmatchedVehicles.push(vehicle.nm);
+        continue;
+      }
+
       const lastUpdate = new Date(vehicle.pos.t * 1000).toISOString();
       const status = vehicle.pos.s > 0 ? 'active' : 'inactive';
       const engineHealth = getEngineHealth(vehicle.pos.s, lastUpdate);
@@ -642,7 +649,7 @@ Deno.serve(async (req) => {
           }
         } catch (error) {
           console.error(`[FIOS] Exception updating odometer for ${data.bus_no}:`, error);
-          odometerUpdates.push({ bus_no: data.bus_no, success: false, error: error.message });
+          odometerUpdates.push({ bus_no: data.bus_no, success: false, error: (error as Error).message });
         }
       }
     }
@@ -681,8 +688,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
-        details: error.stack
+        error: (error as Error).message,
+        details: (error as Error).stack
       }),
       { 
         status: 500,

@@ -109,7 +109,7 @@ serve(async (req: Request) => {
 
           } catch (actionErr) {
             console.error(`Error executing action ${action.type}:`, actionErr);
-            results.errors.push(`Action ${action.type}: ${actionErr.message}`);
+            results.errors.push(`Action ${action.type}: ${(actionErr as Error).message}`);
 
             // Log the failure
             await supabase.from('workflow_execution_log').insert({
@@ -117,9 +117,9 @@ serve(async (req: Request) => {
               trigger_entity_type: payload.module,
               trigger_entity_id: payload.entity_id,
               action_type: action.type,
-              action_result: { error: actionErr.message },
+              action_result: { error: (actionErr as Error).message },
               success: false,
-              error_message: actionErr.message,
+              error_message: (actionErr as Error).message,
               company_id: rule.company_id
             });
           }
@@ -127,7 +127,7 @@ serve(async (req: Request) => {
 
       } catch (ruleErr) {
         console.error(`Error processing rule ${rule.id}:`, ruleErr);
-        results.errors.push(`Rule ${rule.id}: ${ruleErr.message}`);
+        results.errors.push(`Rule ${rule.id}: ${(ruleErr as Error).message}`);
       }
     }
 
@@ -145,7 +145,7 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('Error in execute-workflow-rules:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

@@ -72,7 +72,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in analyze-trips function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -125,7 +125,7 @@ Focus on identifying patterns, opportunities, and risks.`;
     risks: "Identify potential risks, anomalies, and areas requiring immediate attention.",
   };
 
-  return `${basePrompt}\n\n${typeSpecific[analysisType] || typeSpecific.comprehensive}`;
+  return `${basePrompt}\n\n${typeSpecific[analysisType as keyof typeof typeSpecific] || typeSpecific.comprehensive}`;
 }
 
 function buildUserPrompt(context: any, analysisType: string) {
