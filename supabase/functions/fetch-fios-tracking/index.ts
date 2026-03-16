@@ -15,6 +15,8 @@ interface FIOSPosition {
   z: number; // altitude
   s: number; // speed in km/h
   sc: number; // satellite count
+  gsm?: number; // GSM signal strength
+  hdop?: number; // HDOP GPS accuracy
 }
 
 interface FIOSUnit {
