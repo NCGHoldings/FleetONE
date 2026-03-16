@@ -250,7 +250,7 @@ Deno.serve(async (req) => {
           .eq('id', connection.id);
 
         errorCount++;
-        results.push({ bus_no: connection.bus_no, status: 'error', error: error.message });
+        results.push({ bus_no: connection.bus_no, status: 'error', error: (error as Error).message });
       }
     }
 
