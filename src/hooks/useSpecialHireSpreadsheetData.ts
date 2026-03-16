@@ -92,7 +92,7 @@ export function useSpecialHireSpreadsheetData() {
         let query = supabase
           .from('special_hire_quotations')
           .select(`
-            id, quotation_no, status, trip_status, company_name, customer_name, customer_phone,
+            id, created_at, quotation_no, status, trip_status, company_name, customer_name, customer_phone,
             pickup_location, drop_location, pickup_datetime, drop_datetime,
             number_of_buses, km_trip, gross_revenue, total_paid, advance_paid, balance_due,
             special_request, assigned_bus_no, assigned_driver_name, assigned_conductor_name,
