@@ -1081,7 +1081,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Quotations ({filteredQuotations.length})</CardTitle>
+            <CardTitle>Quotations ({searchTerm || statusFilter !== 'all' || hireTypeFilter !== 'all' || approvalFilter !== 'all' || dateFilter !== 'all' ? filteredQuotations.length : totalCount})</CardTitle>
             <Button 
               onClick={() => setShowExportModal(true)}
               className="flex items-center gap-2"
