@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
           .update({
             last_sync_at: new Date().toISOString(),
             last_sync_status: 'failed',
-            last_error_message: error.message
+            last_error_message: (error as Error).message
           })
           .eq('id', connection.id);
 
