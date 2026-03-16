@@ -109,7 +109,7 @@ serve(async (req: Request) => {
 
           } catch (actionErr) {
             console.error(`Error executing action ${action.type}:`, actionErr);
-            results.errors.push(`Action ${action.type}: ${actionErr.message}`);
+            results.errors.push(`Action ${action.type}: ${(actionErr as Error).message}`);
 
             // Log the failure
             await supabase.from('workflow_execution_log').insert({
