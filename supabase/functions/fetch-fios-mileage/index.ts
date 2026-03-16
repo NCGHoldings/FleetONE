@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
           odometerUpdates.push({
             bus_no: vehicle.bus_no,
             success: false,
-            error: error.message
+            error: (error as Error).message
           });
         }
       }
@@ -211,8 +211,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
-        details: error.stack
+        error: (error as Error).message,
+        details: (error as Error).stack
       }),
       { 
         status: 500,

@@ -245,12 +245,12 @@ Deno.serve(async (req) => {
           .update({
             last_sync_at: new Date().toISOString(),
             last_sync_status: 'failed',
-            last_error_message: error.message
+            last_error_message: (error as Error).message
           })
           .eq('id', connection.id);
 
         errorCount++;
-        results.push({ bus_no: connection.bus_no, status: 'error', error: error.message });
+        results.push({ bus_no: connection.bus_no, status: 'error', error: (error as Error).message });
       }
     }
 
@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('[Sync] Fatal error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error as Error).message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
