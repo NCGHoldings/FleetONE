@@ -127,6 +127,7 @@ interface Props {
 export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }: Props) {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [hireTypeFilter, setHireTypeFilter] = useState('all');
