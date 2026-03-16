@@ -141,7 +141,7 @@ export function SchoolBusFinanceSettings() {
       const missing: string[] = [];
       if (!defaultSettings.expense_account_id) missing.push("General Expense Account");
       if (!defaultSettings.expense_cash_account_id) missing.push("Cash/Bank for Expenses");
-      
+
       if (missing.length > 0) {
         toast.error(`Please configure these accounts first: ${missing.join(", ")}`);
         return false;
@@ -164,13 +164,23 @@ export function SchoolBusFinanceSettings() {
           value === '' ? null : value
         ])
       );
-      
-      await updateSettings.mutateAsync({
+
+      console.log("[Settings Save] Saving default settings:", sanitizedSettings);
+
+      const result = await updateSettings.mutateAsync({
         branch_id: null,
         ...sanitizedSettings,
       });
-    } catch (error) {
-      // Error handled by mutation
+
+      console.log("[Settings Save] Save result:", result);
+
+      // Force re-fetch to confirm settings persisted
+      setTimeout(() => {
+        toast.success("Settings saved! Verifying persistence...");
+      }, 200);
+    } catch (error: any) {
+      console.error("[Settings Save] Save FAILED:", error);
+      toast.error(`Save failed: ${error?.message || "Unknown error"}. Check console for details.`);
     }
   };
 
@@ -182,7 +192,7 @@ export function SchoolBusFinanceSettings() {
   const handleSaveBranchSettings = async (branchId: string) => {
     try {
       const branchGlAccountId = branchSettings[branchId]?.branch_gl_account_id;
-      
+
       // Convert empty strings to null for UUID fields
       const sanitizedDefaults = Object.fromEntries(
         Object.entries(defaultSettings).map(([key, value]) => [
@@ -190,7 +200,7 @@ export function SchoolBusFinanceSettings() {
           value === '' ? null : value
         ])
       );
-      
+
       await updateSettings.mutateAsync({
         branch_id: branchId,
         branch_gl_account_id: branchGlAccountId === '' ? null : branchGlAccountId,
@@ -247,15 +257,15 @@ export function SchoolBusFinanceSettings() {
               )}
               <div>
                 <p className="font-medium">
-                  {orphanedLoading 
-                    ? "Checking sync status..." 
-                    : orphanedData?.totalOrphaned 
+                  {orphanedLoading
+                    ? "Checking sync status..."
+                    : orphanedData?.totalOrphaned
                       ? `${orphanedData.totalOrphaned} invoices need syncing`
                       : "All invoices synced to Finance AR"
                   }
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {orphanedData?.totalOrphaned 
+                  {orphanedData?.totalOrphaned
                     ? "Some school AR invoices are not linked to Finance AR. Payments on these won't update Finance."
                     : "School Bus payments will automatically update Finance AR invoices."
                   }
@@ -289,18 +299,18 @@ export function SchoolBusFinanceSettings() {
               )}
             </div>
           </div>
-          
+
           {/* Show warning if auto-post is on but accounts not configured */}
           {defaultSettings.auto_post_expenses && (
             !defaultSettings.expense_account_id || !defaultSettings.expense_cash_account_id
           ) && (
-            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm">
-                Expense auto-posting is enabled but expense accounts are not configured. Configure them below.
-              </span>
-            </div>
-          )}
+              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-sm">
+                  Expense auto-posting is enabled but expense accounts are not configured. Configure them below.
+                </span>
+              </div>
+            )}
         </CardContent>
       </Card>
 

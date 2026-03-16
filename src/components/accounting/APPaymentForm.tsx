@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen, Landmark, FileText, Plus, Trash2 } from "lucide-react";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
+import { CurrencyInput } from "@/components/ui/currency-input";
 
 const paymentSchema = z.object({
   payment_number: z.string().min(1, "Payment number is required"),
@@ -83,7 +84,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const { data: vendors } = useVendors();
   const { data: bankAccounts } = useBankAccounts();
   const { data: allInvoices } = useAPInvoices();
-  
+
   const createPayment = useCreateAPPayment();
   const approveInvoice = useApproveAPInvoice();
   const generateNumber = useGenerateNumber();
@@ -307,17 +308,17 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const totalPayment = isDirectPayment
     ? directLinesTotal
     : isAdvance
-    ? advanceAmount
-    : allocations.reduce((sum, a) => sum + a.allocated_amount, 0);
+      ? advanceAmount
+      : allocations.reduce((sum, a) => sum + a.allocated_amount, 0);
   const totalWhtDeducted = allocations.reduce((sum, a) => sum + a.wht_deducted, 0);
   const effectiveBankFee = includeBankFee ? bankFeeAmount : 0;
   const totalWithFees = totalPayment + effectiveBankFee;
 
   const onSubmit = async (data: PaymentFormData) => {
     const selectedAllocations = isAdvance || isDirectPayment
-      ? [] 
+      ? []
       : allocations.filter((a) => a.selected && a.allocated_amount > 0);
-    
+
     try {
       await createPayment.mutateAsync({
         payment_number: data.payment_number,
@@ -342,14 +343,14 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
         })),
         direct_lines: isDirectPayment
           ? directLines.filter((l) => l.account_id && l.line_total > 0).map((l) => ({
-              account_id: l.account_id,
-              description: l.description,
-              quantity: l.quantity,
-              unit_price: l.unit_price,
-              tax_rate: l.tax_rate,
-              tax_amount: l.tax_amount,
-              line_total: l.line_total,
-            }))
+            account_id: l.account_id,
+            description: l.description,
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            tax_rate: l.tax_rate,
+            tax_amount: l.tax_amount,
+            line_total: l.line_total,
+          }))
           : undefined,
       });
       onOpenChange(false);
@@ -368,9 +369,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
 
   const canSubmit = isDirectPayment
     ? directLinesTotal > 0 && selectedVendorId && directLines.some((l) => l.account_id)
-    : isAdvance 
-    ? advanceAmount > 0 && selectedVendorId 
-    : totalPayment > 0;
+    : isAdvance
+      ? advanceAmount > 0 && selectedVendorId
+      : totalPayment > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -652,13 +653,10 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
               <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
                 <div>
                   <Label className="text-sm font-medium">Fee Amount</Label>
-                  <Input
-                    type="number"
+                  <CurrencyInput
                     value={bankFeeAmount}
-                    onChange={(e) => setBankFeeAmount(parseFloat(e.target.value) || 0)}
+                    onChange={(val) => setBankFeeAmount(val)}
                     placeholder="0.00"
-                    min={0}
-                    step="0.01"
                     className="mt-1"
                   />
                 </div>
@@ -685,14 +683,11 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
               <div className="p-4 border rounded-lg bg-orange-50 dark:bg-orange-950/20">
                 <FormItem>
                   <FormLabel className="text-lg font-semibold">Advance Amount</FormLabel>
-                  <Input
-                    type="number"
+                  <CurrencyInput
                     value={advanceAmount}
-                    onChange={(e) => setAdvanceAmount(parseFloat(e.target.value) || 0)}
+                    onChange={(val) => setAdvanceAmount(val)}
                     className="text-2xl h-14 font-bold"
                     placeholder="Enter advance amount"
-                    min={0}
-                    step="0.01"
                   />
                   <p className="text-sm text-muted-foreground mt-1">
                     This amount will be recorded as an advance and can be allocated to invoices later.
@@ -755,13 +750,11 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                             />
                           </td>
                           <td className="px-2 py-2">
-                            <Input
-                              type="number"
+                            <CurrencyInput
                               value={line.unit_price}
-                              onChange={(e) => updateLine(line.id, "unit_price", parseFloat(e.target.value) || 0)}
-                              className="h-8 text-right"
-                              min={0}
-                              step="0.01"
+                              onChange={(val) => updateLine(line.id, "unit_price", val)}
+                              className="h-8"
+                              placeholder="0.00"
                             />
                           </td>
                           <td className="px-2 py-2">
@@ -840,9 +833,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold">Allocate to Invoices</h3>
                   {allocations.length > 0 && (
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
                       size="sm"
                       onClick={handleMarkFullPayment}
                     >
@@ -895,14 +888,11 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                                 />
                               </td>
                               <td className="px-3 py-2">
-                                <Input
-                                  type="number"
+                                <CurrencyInput
                                   value={alloc.allocated_amount}
-                                  onChange={(e) => updateAllocation(alloc.invoice_id, "allocated_amount", parseFloat(e.target.value) || 0)}
-                                  className="h-8 text-right"
-                                  max={alloc.balance}
-                                  min={0}
-                                  step="0.01"
+                                  onChange={(val) => updateAllocation(alloc.invoice_id, "allocated_amount", Math.min(val, alloc.balance))}
+                                  className="h-8"
+                                  placeholder="0.00"
                                 />
                               </td>
                             </tr>

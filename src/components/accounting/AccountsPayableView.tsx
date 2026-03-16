@@ -167,6 +167,18 @@ export const AccountsPayableView = () => {
       cell: ({ row }: any) => <CurrencyDisplay amount={row.original.total_amount || 0} />,
     },
     {
+      accessorKey: "paid_amount",
+      header: "Paid Amount",
+      cell: ({ row }: any) => {
+        const paid = row.original.paid_amount || ((row.original.total_amount || 0) - (row.original.balance || 0));
+        return (
+          <span className={paid > 0 ? "text-green-600 font-medium" : "text-muted-foreground"}>
+            <CurrencyDisplay amount={paid} />
+          </span>
+        );
+      },
+    },
+    {
       accessorKey: "wht_amount",
       header: "WHT",
       cell: ({ row }: any) => (
@@ -201,17 +213,17 @@ export const AccountsPayableView = () => {
         const status = row.original.status || "draft";
         return (
           <div className="flex gap-1">
-            <Button 
-              size="sm" 
-              variant="ghost" 
+            <Button
+              size="sm"
+              variant="ghost"
               title="View Details"
               onClick={() => setViewInvoice(row.original)}
             >
               <Eye className="h-4 w-4" />
             </Button>
             {canEdit(status) && (
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 variant="ghost"
                 title="Edit Invoice"
                 onClick={() => {
@@ -223,8 +235,8 @@ export const AccountsPayableView = () => {
               </Button>
             )}
             {canDelete(status) && (
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 variant="ghost"
                 title="Delete Invoice"
                 className="text-destructive hover:text-destructive"
@@ -234,8 +246,8 @@ export const AccountsPayableView = () => {
               </Button>
             )}
             {row.original.approval_status === "pending" && (
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 variant="outline"
                 className="text-green-600 border-green-600 hover:bg-green-50"
                 onClick={() => approveInvoice.mutate(row.original.id)}
@@ -246,8 +258,8 @@ export const AccountsPayableView = () => {
               </Button>
             )}
             {row.original.balance > 0 && row.original.approval_status === "approved" && (
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 variant="outline"
                 onClick={() => handlePayClick(row.original)}
               >
@@ -368,8 +380,8 @@ export const AccountsPayableView = () => {
       <APInvoiceForm open={invoiceFormOpen} onOpenChange={(open) => { setInvoiceFormOpen(open); if (!open) setEditingInvoice(null); }} editingInvoice={editingInvoice} />
 
       {/* AP Payment Form Dialog */}
-      <APPaymentForm 
-        open={paymentFormOpen} 
+      <APPaymentForm
+        open={paymentFormOpen}
         onOpenChange={(open) => {
           setPaymentFormOpen(open);
           if (!open) setSelectedInvoiceForPayment(null);
@@ -424,9 +436,9 @@ export const AccountsPayableView = () => {
                   </p>
                 </div>
               </div>
-              
+
               <Separator />
-              
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Amount</p>
@@ -465,7 +477,7 @@ export const AccountsPayableView = () => {
               )}
 
               <div className="pt-4 flex gap-2">
-                <Button 
+                <Button
                   variant="outline"
                   className="flex-1"
                   onClick={() => {
@@ -504,7 +516,7 @@ export const AccountsPayableView = () => {
                   </Button>
                 )}
                 {viewInvoice.balance > 0 && viewInvoice.approval_status === "approved" && (
-                  <Button 
+                  <Button
                     className="flex-1"
                     onClick={() => {
                       setViewInvoice(null);

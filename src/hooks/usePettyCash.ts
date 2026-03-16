@@ -150,8 +150,8 @@ export const usePettyCashTransactions = (fundId?: string, filters?: { status?: s
   });
 };
 
-export const useAllPettyCashTransactions = (filters?: { 
-  transactionType?: string; status?: string; category?: string; 
+export const useAllPettyCashTransactions = (filters?: {
+  transactionType?: string; status?: string; category?: string;
   dateFrom?: string; dateTo?: string; branchId?: string;
 }) => {
   const { selectedCompanyId } = useCompany();
@@ -324,13 +324,102 @@ export const useCreatePettyCashTransaction = () => {
         .single();
 
       if (error) throw error;
+
+      // ========== AUTO GL POSTING ==========
+      if (selectedCompanyId && data.amount && data.amount > 0) {
+        try {
+          // Get the fund's GL account
+          const { data: fund } = await supabase
+            .from("petty_cash_funds")
+            .select("gl_account_id, fund_name")
+            .eq("id", data.petty_cash_fund_id!)
+            .single();
+
+          const fundGLAccountId = fund?.gl_account_id;
+          const expenseGLAccountId = data.gl_account_id; // transaction-level expense account
+
+          if (fundGLAccountId && data.transaction_type === "disbursement" && expenseGLAccountId) {
+            // Disbursement: DR Expense → CR Petty Cash Fund
+            const { postPettyCashDisbursementToGL } = await import("@/lib/gl-posting-utils");
+            const glResult = await postPettyCashDisbursementToGL({
+              voucherNumber: data.voucher_number || data.receipt_number || result.id.substring(0, 8),
+              transactionDate: new Date().toISOString().split("T")[0],
+              amount: data.amount,
+              expenseAccountId: expenseGLAccountId,
+              pettyCashFundAccountId: fundGLAccountId,
+              companyId: selectedCompanyId,
+              description: data.description || undefined,
+              payeeName: data.payee_name || undefined,
+            });
+
+            if (glResult.success && glResult.journalEntryId) {
+              await supabase
+                .from("petty_cash_transactions")
+                .update({ journal_entry_id: glResult.journalEntryId })
+                .eq("id", result.id);
+            } else if (!glResult.success) {
+              console.warn("[Petty Cash GL] Disbursement GL posting failed:", glResult.error);
+            }
+          } else if (fundGLAccountId && data.transaction_type === "replenishment") {
+            // Replenishment: DR Petty Cash Fund → CR Bank
+            // Look for a default bank GL account
+            const { data: glSettings } = await (supabase as any)
+              .from("gl_settings")
+              .select("bank_account_id")
+              .eq("company_id", selectedCompanyId)
+              .maybeSingle();
+
+            let bankGLAccountId = glSettings?.bank_account_id;
+
+            // If no GL setting, try the first active bank account's GL link
+            if (!bankGLAccountId) {
+              const { data: bankAcct } = await supabase
+                .from("bank_accounts")
+                .select("gl_account_id")
+                .eq("company_id", selectedCompanyId)
+                .eq("is_active", true)
+                .limit(1)
+                .single();
+              bankGLAccountId = bankAcct?.gl_account_id;
+            }
+
+            if (bankGLAccountId) {
+              const { postPettyCashReplenishmentToGL } = await import("@/lib/gl-posting-utils");
+              const glResult = await postPettyCashReplenishmentToGL({
+                referenceNumber: data.reference_number || result.id.substring(0, 8),
+                transactionDate: new Date().toISOString().split("T")[0],
+                amount: data.amount,
+                pettyCashFundAccountId: fundGLAccountId,
+                bankAccountId: bankGLAccountId,
+                companyId: selectedCompanyId,
+                fundName: fund?.fund_name || undefined,
+              });
+
+              if (glResult.success && glResult.journalEntryId) {
+                await supabase
+                  .from("petty_cash_transactions")
+                  .update({ journal_entry_id: glResult.journalEntryId })
+                  .eq("id", result.id);
+              } else if (!glResult.success) {
+                console.warn("[Petty Cash GL] Replenishment GL posting failed:", glResult.error);
+              }
+            }
+          }
+        } catch (glError) {
+          // Non-blocking: transaction is saved, GL posting is best-effort
+          console.error("[Petty Cash GL] Auto GL posting error:", glError);
+        }
+      }
+
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["petty-cash-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["petty-cash-all-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });
-      toast({ title: "Transaction Recorded", description: "The petty cash transaction has been recorded." });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      toast({ title: "Transaction Recorded", description: "The petty cash transaction has been recorded with GL posting." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -455,11 +544,82 @@ export const useCreateIOU = () => {
         .single();
 
       if (error) throw error;
+
+      // ========== AUTO GL POSTING (IOU Issuance) ==========
+      // DR Staff Advance (Asset) → CR Cash/Petty Cash
+      if (selectedCompanyId && data.amount && data.amount > 0) {
+        try {
+          // Find Staff Advance account
+          const { data: advanceAccounts } = await supabase
+            .from("chart_of_accounts")
+            .select("id")
+            .eq("company_id", selectedCompanyId)
+            .eq("account_type", "asset")
+            .eq("is_active", true)
+            .or("account_name.ilike.%staff advance%,account_name.ilike.%employee advance%,account_name.ilike.%iou%")
+            .limit(1);
+
+          // Find Cash/Petty Cash account
+          const { data: cashAccounts } = await supabase
+            .from("chart_of_accounts")
+            .select("id")
+            .eq("company_id", selectedCompanyId)
+            .eq("account_type", "asset")
+            .eq("is_active", true)
+            .or("account_name.ilike.%cash%,account_name.ilike.%petty cash%")
+            .limit(1);
+
+          const staffAdvanceId = advanceAccounts?.[0]?.id;
+          const cashAccountId = cashAccounts?.[0]?.id;
+
+          // Get staff name for description
+          let staffName: string | undefined;
+          if (data.staff_id) {
+            const { data: staffData } = await supabase
+              .from("staff_registry")
+              .select("staff_name")
+              .eq("id", data.staff_id)
+              .single();
+            staffName = staffData?.staff_name;
+          }
+
+          if (staffAdvanceId && cashAccountId) {
+            const { postIOUIssuanceToGL } = await import("@/lib/gl-posting-utils");
+            const glResult = await postIOUIssuanceToGL({
+              iouNumber: (result as any).iou_number || result.id.substring(0, 8),
+              issuedDate: data.issued_date || new Date().toISOString().split("T")[0],
+              amount: data.amount,
+              staffAdvanceAccountId: staffAdvanceId,
+              cashAccountId: cashAccountId,
+              companyId: selectedCompanyId,
+              businessUnitCode: data.business_unit_code || undefined,
+              staffName,
+              purpose: data.purpose || undefined,
+            });
+
+            if (glResult.success && glResult.journalEntryId) {
+              await supabase
+                .from("iou_records")
+                .update({ journal_entry_id: glResult.journalEntryId })
+                .eq("id", result.id);
+            } else if (!glResult.success) {
+              console.warn("[IOU GL] Issuance GL posting failed:", glResult.error);
+            }
+          } else {
+            console.warn("[IOU GL] Staff Advance or Cash account not found in COA, skipping GL posting");
+          }
+        } catch (glError) {
+          console.error("[IOU GL] Auto GL posting error:", glError);
+        }
+      }
+
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["iou-records"] });
-      toast({ title: "IOU Created", description: "The IOU record has been created successfully." });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      toast({ title: "IOU Created", description: "The IOU record has been created with GL posting." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -469,9 +629,17 @@ export const useCreateIOU = () => {
 
 export const useUpdateIOU = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
 
   return useMutation({
     mutationFn: async ({ id, ...data }: Partial<IOURecord> & { id: string }) => {
+      // Fetch current record to detect status change
+      const { data: currentRecord } = await supabase
+        .from("iou_records")
+        .select("status, amount, iou_number, staff_id, company_id, business_unit_code, journal_entry_id")
+        .eq("id", id)
+        .single();
+
       const { data: result, error } = await supabase
         .from("iou_records")
         .update(data)
@@ -480,10 +648,85 @@ export const useUpdateIOU = () => {
         .single();
 
       if (error) throw error;
+
+      // ========== AUTO GL POSTING (IOU Settlement) ==========
+      // Only post GL when status changes to "settled"
+      const companyId = selectedCompanyId || currentRecord?.company_id;
+      const isBeingSettled = data.status === "settled" && currentRecord?.status !== "settled";
+
+      if (isBeingSettled && companyId && currentRecord?.amount && currentRecord.amount > 0) {
+        try {
+          // Find Staff Advance account
+          const { data: advanceAccounts } = await supabase
+            .from("chart_of_accounts")
+            .select("id")
+            .eq("company_id", companyId)
+            .eq("account_type", "asset")
+            .eq("is_active", true)
+            .or("account_name.ilike.%staff advance%,account_name.ilike.%employee advance%,account_name.ilike.%iou%")
+            .limit(1);
+
+          // Find a general expense account
+          const { data: expenseAccounts } = await supabase
+            .from("chart_of_accounts")
+            .select("id")
+            .eq("company_id", companyId)
+            .eq("account_type", "expense")
+            .eq("is_active", true)
+            .limit(1);
+
+          const staffAdvanceId = advanceAccounts?.[0]?.id;
+          const expenseAccountId = expenseAccounts?.[0]?.id;
+
+          // Get staff name
+          let staffName: string | undefined;
+          if (currentRecord.staff_id) {
+            const { data: staffData } = await supabase
+              .from("staff_registry")
+              .select("staff_name")
+              .eq("id", currentRecord.staff_id)
+              .single();
+            staffName = staffData?.staff_name;
+          }
+
+          if (staffAdvanceId && expenseAccountId) {
+            const { postIOUSettlementToGL } = await import("@/lib/gl-posting-utils");
+            const settledAmount = data.settled_amount || currentRecord.amount;
+
+            const glResult = await postIOUSettlementToGL({
+              iouNumber: currentRecord.iou_number || id.substring(0, 8),
+              settlementDate: new Date().toISOString().split("T")[0],
+              settledAmount,
+              expenseAccountId,
+              staffAdvanceAccountId: staffAdvanceId,
+              companyId,
+              businessUnitCode: currentRecord.business_unit_code || undefined,
+              staffName,
+            });
+
+            if (glResult.success && glResult.journalEntryId) {
+              // Update journal_entry_id only if not already set (don't override issuance JE)
+              if (!currentRecord.journal_entry_id) {
+                await supabase
+                  .from("iou_records")
+                  .update({ journal_entry_id: glResult.journalEntryId })
+                  .eq("id", id);
+              }
+            } else if (!glResult.success) {
+              console.warn("[IOU GL] Settlement GL posting failed:", glResult.error);
+            }
+          }
+        } catch (glError) {
+          console.error("[IOU GL] Settlement auto GL posting error:", glError);
+        }
+      }
+
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["iou-records"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       toast({ title: "IOU Updated", description: "The IOU record has been updated." });
     },
     onError: (error: Error) => {
