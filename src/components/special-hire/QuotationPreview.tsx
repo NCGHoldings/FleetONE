@@ -420,7 +420,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     width: "12.5%",
                   }}
                 >
-                  Drop-off Date
+                  Drop-off{"\u00A0"}Date
                 </th>
                 <td
                   style={{
