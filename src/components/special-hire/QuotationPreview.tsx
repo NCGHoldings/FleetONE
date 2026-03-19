@@ -962,8 +962,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             <div className="bg-gray-50 p-3 rounded border">
               <div className="flex items-center gap-2 text-sm mb-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="font-medium text-green-700">Start:</span>
-                <span className="text-gray-800">{parsedQuotation.pickup_location}</span>
+        <span className="font-medium text-green-700">Start:{"\u00A0"}</span>
+                <span className="text-gray-800" style={{ whiteSpace: "pre-wrap" }}>{parsedQuotation.pickup_location}</span>
               </div>
 
               {intermediateStops.map((stop: any, index: number) => (
