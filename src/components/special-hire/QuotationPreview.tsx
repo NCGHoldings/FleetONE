@@ -736,7 +736,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                       color: "#374151",
                     }}
                   >
-                    Total Fleet
+                     Total{"\u00A0"}Fleet
                   </td>
                   <td
                     style={{
