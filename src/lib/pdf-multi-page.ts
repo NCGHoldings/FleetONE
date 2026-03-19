@@ -109,9 +109,8 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
 
     // Convert to image and add to PDF
     const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.92);
-    const destWidthMM = CONTENT_WIDTH_MM;
-    const destHeightMM = (sliceHeight / pxPerMM);
-    pdf.addImage(pageImgData, 'JPEG', MARGIN_MM, MARGIN_MM, destWidthMM, destHeightMM);
+    const destHeightMM = sliceHeight / pxPerMM;
+    pdf.addImage(pageImgData, 'JPEG', 0, 0, A4_WIDTH_MM, destHeightMM);
 
     currentY += sliceHeight;
     pageIndex++;
