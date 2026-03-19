@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import jsPDF from 'jspdf';
+import { canvasToMultiPagePDF } from '@/lib/pdf-multi-page';
 import html2canvas from 'html2canvas';
 import {
   AlertDialog,

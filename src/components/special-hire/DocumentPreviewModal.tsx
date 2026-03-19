@@ -25,7 +25,7 @@ import { BalanceInvoicePreview } from './BalanceInvoicePreview';
 import { PostTripAdjustmentPreview } from './PostTripAdjustmentPreview';
 import { format } from 'date-fns';
 import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { canvasToMultiPagePDF } from '@/lib/pdf-multi-page';
 
 interface DocumentPreviewModalProps {
   isOpen: boolean;
