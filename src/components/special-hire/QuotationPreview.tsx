@@ -985,7 +985,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
 
         {/* Extra Charges */}
         <div data-pdf-section="extra-charges">
-        <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Extra Charges</div>
+        <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Extra{"\u00A0"}Charges</div>
         <div className="text-xs leading-tight text-gray-800">
           {rateCard ? (
             <>
