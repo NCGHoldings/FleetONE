@@ -252,7 +252,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           {/* Right Block */}
           <div className="text-right" style={{ maxWidth: "45%" }}>
             <div className="bg-blue-600 text-white font-bold text-lg px-4 py-2 inline-block mb-2 w-full">
-              Quotation Special Hire
+              Quotation{"\u00A0"}Special{"\u00A0"}Hire
             </div>
             <div className="text-sm leading-tight text-black">
               No. 157 Y, Kabellaowita, Weniwelkola,
