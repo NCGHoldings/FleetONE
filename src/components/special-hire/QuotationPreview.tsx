@@ -955,7 +955,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
 
         {/* Route Information */}
         {intermediateStops.length > 0 && (
-          <div className="mt-3 mb-3">
+          <div data-pdf-section="route-info" className="mt-3 mb-3">
             <div className="text-sm font-semibold text-blue-600 mb-2">Route Details</div>
             <div className="bg-gray-50 p-3 rounded border">
               <div className="flex items-center gap-2 text-sm mb-2">
