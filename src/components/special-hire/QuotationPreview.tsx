@@ -986,25 +986,25 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         {/* Extra Charges */}
         <div data-pdf-section="extra-charges">
         <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Extra{"\u00A0"}Charges</div>
-        <div className="text-xs leading-tight text-gray-800">
+        <div className="text-xs leading-tight text-gray-800" style={{ whiteSpace: "pre-wrap" }}>
           {rateCard ? (
             <>
-              Exceeding Per Kilometer will be charged Rs {rateCard.exceeding_km_rate_lkr?.toLocaleString() || "300.00"}
+              Exceeding{"\u00A0"}Per{"\u00A0"}Kilometer{"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged{"\u00A0"}Rs{"\u00A0"}{rateCard.exceeding_km_rate_lkr?.toLocaleString() || "300.00"}
               <br />
-              Exceeding per hour will be charged Rs {rateCard.overtime_rate_lkr_per_hour?.toLocaleString() || "1500.00"}
+              Exceeding{"\u00A0"}per{"\u00A0"}hour{"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged{"\u00A0"}Rs{"\u00A0"}{rateCard.overtime_rate_lkr_per_hour?.toLocaleString() || "1500.00"}
               <br />
               {rateCard.overnight_charge_lkr_per_day > 0 && (
                 <>
-                  Overnight charge per day: Rs {rateCard.overnight_charge_lkr_per_day.toLocaleString()}
+                  Overnight{"\u00A0"}charge{"\u00A0"}per{"\u00A0"}day:{"\u00A0"}Rs{"\u00A0"}{rateCard.overnight_charge_lkr_per_day.toLocaleString()}
                   <br />
                 </>
               )}
             </>
           ) : (
             <>
-              Exceeding Per Kilometer will be charged Rs 300.00
+              Exceeding{"\u00A0"}Per{"\u00A0"}Kilometer{"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged{"\u00A0"}Rs{"\u00A0"}300.00
               <br />
-              Exceeding per hour will be charged Rs 1500.00
+              Exceeding{"\u00A0"}per{"\u00A0"}hour{"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged{"\u00A0"}Rs{"\u00A0"}1500.00
               <br />
             </>
           )}
@@ -1013,14 +1013,14 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           {additionalCharges.filter((charge) => charge.type === "additional_distance").length > 0 && (
             <>
               <br />
-              <strong>Additional Distance Charges:</strong>
+              <strong>Additional{"\u00A0"}Distance{"\u00A0"}Charges:</strong>
               <br />
               {additionalCharges
                 .filter((charge) => charge.type === "additional_distance")
                 .map((charge, index) => (
                   <span key={index}>
-                    Additional {charge.distance || 0} km: Rs {charge.amount?.toLocaleString() || "0.00"}
-                    {charge.reason && ` (${charge.reason})`}
+                    Additional{"\u00A0"}{charge.distance || 0}{"\u00A0"}km:{"\u00A0"}Rs{"\u00A0"}{charge.amount?.toLocaleString() || "0.00"}
+                    {charge.reason && <>{"\u00A0"}({charge.reason})</>}
                     <br />
                   </span>
                 ))}
