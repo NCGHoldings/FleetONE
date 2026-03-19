@@ -283,7 +283,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <span className="text-gray-800">{parsedQuotation.customer_phone}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="font-semibold text-blue-600 min-w-[80px]">Customer Name:</span>
+              <span className="font-semibold text-blue-600 min-w-[80px]">Customer{"\u00A0"}Name:</span>
               <span className="text-gray-800">{parsedQuotation.customer_name}</span>
             </div>
             <div className="flex items-center gap-1">
