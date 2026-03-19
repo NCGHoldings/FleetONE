@@ -317,7 +317,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     width: "25%",
                   }}
                 >
-                  Pick-up Location
+                  Pick-up{"\u00A0"}Location
                 </th>
                 <td
                   style={{
