@@ -94,7 +94,7 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
       backgroundColor: '#ffffff',
       logging: false,
       letterRendering: true,
-    });
+    } as any);
 
     const scaleFactor = CONTENT_WIDTH_MM / (canvas.width / 2);
     const sectionHeightMM = (canvas.height / 2) * scaleFactor;
