@@ -682,7 +682,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                         textAlign: "right",
                       }}
                     >
-                      Additional Charges
+                       Additional{"\u00A0"}Charges
                     </td>
                     <td
                       style={{
