@@ -1042,9 +1042,9 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
 
         {/* Footer for Page 1 */}
-        <div data-pdf-section="footer-p1" className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center">
-          For more information call <strong>074 289 3612</strong>
-          <br />© 2025 NCG Express. All Rights Reserved.
+        <div data-pdf-section="footer-p1" className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center" style={{ whiteSpace: "pre-wrap" }}>
+          For{"\u00A0"}more{"\u00A0"}information{"\u00A0"}call{"\u00A0"}<strong>074{"\u00A0"}289{"\u00A0"}3612</strong>
+          <br />©{"\u00A0"}2025{"\u00A0"}NCG{"\u00A0"}Express.{"\u00A0"}All{"\u00A0"}Rights{"\u00A0"}Reserved.
         </div>
       </div>
 
