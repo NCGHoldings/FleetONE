@@ -344,7 +344,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     width: "12.5%",
                   }}
                 >
-                  Pick-up Date
+                  Pick-up{"\u00A0"}Date
                 </th>
                 <td
                   style={{
