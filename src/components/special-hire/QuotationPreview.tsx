@@ -211,6 +211,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           maxWidth: "210mm",
           padding: "15mm",
           boxSizing: "border-box",
+          whiteSpace: "pre-wrap",
         }}
       >
         {/* DRAFT Watermark */}
@@ -251,7 +252,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           {/* Right Block */}
           <div className="text-right" style={{ maxWidth: "45%" }}>
             <div className="bg-blue-600 text-white font-bold text-lg px-4 py-2 inline-block mb-2 w-full">
-              Quotation Special Hire
+              Quotation{"\u00A0"}Special{"\u00A0"}Hire
             </div>
             <div className="text-sm leading-tight text-black">
               No. 157 Y, Kabellaowita, Weniwelkola,
@@ -263,9 +264,9 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               specialhire.ncgexpress@ncg.lk
             </div>
             <div className="text-xs mt-1 text-gray-700">
-              Quotation Generated on {format(new Date(parsedQuotation.created_at), "dd/MM/yyyy, hh:mm a")}
-              <br />
-              Quotation No: {parsedQuotation.quotation_no}
+              Quotation{"\u00A0"}Generated{"\u00A0"}on{"\u00A0"}{format(new Date(parsedQuotation.created_at), "dd/MM/yyyy, hh:mm a")}
+               <br />
+               Quotation{"\u00A0"}No:{"\u00A0"}{parsedQuotation.quotation_no}
             </div>
           </div>
         </div>
@@ -274,19 +275,19 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         <div data-pdf-section="customer-details" className="mt-3">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex items-center gap-1">
-              <span className="font-semibold text-blue-600 min-w-[80px]">Company Name:</span>
+              <span className="font-semibold text-blue-600 min-w-[80px]">Company{"\u00A0"}Name:</span>
               <span className="text-gray-800">{parsedQuotation.company_name || "NCG Express"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="font-semibold text-blue-600 min-w-[80px]">Contact Number:</span>
+              <span className="font-semibold text-blue-600 min-w-[80px]">Contact{"\u00A0"}Number:</span>
               <span className="text-gray-800">{parsedQuotation.customer_phone}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="font-semibold text-blue-600 min-w-[80px]">Customer Name:</span>
+              <span className="font-semibold text-blue-600 min-w-[80px]">Customer{"\u00A0"}Name:</span>
               <span className="text-gray-800">{parsedQuotation.customer_name}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="font-semibold text-blue-600 min-w-[80px]">Email Address:</span>
+              <span className="font-semibold text-blue-600 min-w-[80px]">Email{"\u00A0"}Address:</span>
               <span className="text-gray-800">{parsedQuotation.customer_email || "N/A"}</span>
             </div>
           </div>
@@ -316,7 +317,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     width: "25%",
                   }}
                 >
-                  Pick-up Location
+                  Pick-up{"\u00A0"}Location
                 </th>
                 <td
                   style={{
@@ -343,7 +344,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     width: "12.5%",
                   }}
                 >
-                  Pick-up Date
+                  Pick-up{"\u00A0"}Date
                 </th>
                 <td
                   style={{
@@ -367,7 +368,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     width: "12.5%",
                   }}
                 >
-                  Pick-up Time
+                  Pick-up{"\u00A0"}Time
                 </th>
                 <td
                   style={{
@@ -392,7 +393,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     verticalAlign: "middle",
                   }}
                 >
-                  Drop-off Location
+                  Drop-off{"\u00A0"}Location
                 </th>
                 <td
                   style={{
@@ -419,7 +420,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     width: "12.5%",
                   }}
                 >
-                  Drop-off Date
+                  Drop-off{"\u00A0"}Date
                 </th>
                 <td
                   style={{
@@ -447,7 +448,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     width: "12.5%",
                   }}
                 >
-                  Drop-off Time
+                  Drop-off{"\u00A0"}Time
                 </th>
                 <td
                   style={{
@@ -563,7 +564,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                   width: "27%",
                 }}
               >
-                Total Cost
+                Total{"\u00A0"}Cost
               </th>
             </tr>
           </thead>
@@ -614,7 +615,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                         verticalAlign: "middle",
                       }}
                     >
-                      <div style={{ fontSize: "11px", color: "#374151" }}>Route Details</div>
+                      <div style={{ fontSize: "11px", color: "#374151" }}>Route{"\u00A0"}Details</div>
                     </td>
                     <td
                       style={{
@@ -681,7 +682,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                         textAlign: "right",
                       }}
                     >
-                      Additional Charges
+                       Additional{"\u00A0"}Charges
                     </td>
                     <td
                       style={{
@@ -735,7 +736,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                       color: "#374151",
                     }}
                   >
-                    Total Fleet
+                     Total{"\u00A0"}Fleet
                   </td>
                   <td
                     style={{
@@ -774,7 +775,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     }}
                   >
                     <div style={{ fontSize: "11px", color: "#374151", marginBottom: "4px" }}>
-                      Subtotal: LKR{" "}
+                      Subtotal:{"\u00A0"}LKR{" "}
                       {(() => {
                         const subtotal =
                           calculateFinalCustomerTotal(parsedQuotation) + (parsedQuotation.discount_amount_lkr || 0);
@@ -797,8 +798,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                         color: "#374151",
                       }}
                     >
-                      Final Total: LKR {calculateFinalCustomerTotal(parsedQuotation).toLocaleString()}
-                      {parsedQuotation.number_of_buses > 1 && (
+                       Final{"\u00A0"}Total:{"\u00A0"}LKR{"\u00A0"}{calculateFinalCustomerTotal(parsedQuotation).toLocaleString()}
+                    {parsedQuotation.number_of_buses > 1 && (
                         <div
                           style={{
                             fontSize: "10px",
@@ -807,7 +808,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                             marginTop: "2px",
                           }}
                         >
-                          Per Bus: LKR{" "}
+                          Per{"\u00A0"}Bus:{"\u00A0"}LKR{" "}
                           {(
                             calculateFinalCustomerTotal(parsedQuotation) / parsedQuotation.number_of_buses
                           ).toLocaleString()}
@@ -860,7 +861,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     verticalAlign: "middle",
                   }}
                 >
-                  <div style={{ fontSize: "11px", color: "#374151" }}>Route Details</div>
+                   <div style={{ fontSize: "11px", color: "#374151" }}>Route{"\u00A0"}Details</div>
                 </td>
                 <td
                   style={{
@@ -907,17 +908,17 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                   }}
                 >
                   <div style={{ fontSize: "11px", color: "#374151", marginBottom: "4px" }}>
-                    Subtotal: LKR{" "}
-                    {(() => {
-                      const subtotal =
-                        calculateFinalCustomerTotal(parsedQuotation) + (parsedQuotation.discount_amount_lkr || 0);
-                      return subtotal.toLocaleString();
-                    })()}
-                  </div>
+                    Subtotal:{"\u00A0"}LKR{" "}
+                     {(() => {
+                       const subtotal =
+                         calculateFinalCustomerTotal(parsedQuotation) + (parsedQuotation.discount_amount_lkr || 0);
+                       return subtotal.toLocaleString();
+                     })()}
+                   </div>
 
-                  {(parsedQuotation.discount_amount_lkr || 0) > 0 && (
-                    <div style={{ color: "#dc2626", fontSize: "11px", marginBottom: "4px" }}>
-                      Discount: -LKR {parsedQuotation.discount_amount_lkr?.toLocaleString()}
+                   {(parsedQuotation.discount_amount_lkr || 0) > 0 && (
+                     <div style={{ color: "#dc2626", fontSize: "11px", marginBottom: "4px" }}>
+                       Discount:{"\u00A0"}-LKR{"\u00A0"}{parsedQuotation.discount_amount_lkr?.toLocaleString()}
                     </div>
                   )}
                   <div
@@ -930,17 +931,17 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                       color: "#374151",
                     }}
                   >
-                    Final Total: LKR {calculateFinalCustomerTotal(parsedQuotation).toLocaleString()}
+                     Final{"\u00A0"}Total:{"\u00A0"}LKR{"\u00A0"}{calculateFinalCustomerTotal(parsedQuotation).toLocaleString()}
                     {parsedQuotation.number_of_buses > 1 && (
-                      <div
-                        style={{
-                          fontSize: "10px",
-                          color: "#6b7280",
-                          fontWeight: "normal",
-                          marginTop: "2px",
-                        }}
-                      >
-                        Per Bus: LKR{" "}
+                       <div
+                         style={{
+                           fontSize: "10px",
+                           color: "#6b7280",
+                           fontWeight: "normal",
+                           marginTop: "2px",
+                         }}
+                       >
+                         Per{"\u00A0"}Bus:{"\u00A0"}LKR{" "}
                         {(
                           calculateFinalCustomerTotal(parsedQuotation) / parsedQuotation.number_of_buses
                         ).toLocaleString()}
@@ -957,7 +958,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         {/* Route Information */}
         {intermediateStops.length > 0 && (
           <div data-pdf-section="route-info" className="mt-3 mb-3">
-            <div className="text-sm font-semibold text-blue-600 mb-2">Route Details</div>
+            <div className="text-sm font-semibold text-blue-600 mb-2">Route{"\u00A0"}Details</div>
             <div className="bg-gray-50 p-3 rounded border">
               <div className="flex items-center gap-2 text-sm mb-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
@@ -984,7 +985,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
 
         {/* Extra Charges */}
         <div data-pdf-section="extra-charges">
-        <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Extra Charges</div>
+        <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Extra{"\u00A0"}Charges</div>
         <div className="text-xs leading-tight text-gray-800">
           {rateCard ? (
             <>
@@ -1030,13 +1031,13 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
 
         {/* Payment Info */}
         <div data-pdf-section="payment-info">
-          <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment Information</div>
-          <div className="text-xs leading-tight text-gray-800">
-            Account No. : 1934 1401 7578
-            <br />
-            Account Name : NCG EXPRESS (PVT) LTD
-            <br />
-            Bank Name : Sampath Bank, Nugegoda
+          <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment{"\u00A0"}Information</div>
+           <div className="text-xs leading-tight text-gray-800">
+             Account{"\u00A0"}No.{"\u00A0"}:{"\u00A0"}1934{"\u00A0"}1401{"\u00A0"}7578
+             <br />
+             Account{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}NCG{"\u00A0"}EXPRESS{"\u00A0"}(PVT){"\u00A0"}LTD
+             <br />
+             Bank{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}Sampath{"\u00A0"}Bank,{"\u00A0"}Nugegoda
           </div>
         </div>
 
@@ -1059,6 +1060,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           boxSizing: "border-box",
           pageBreakBefore: "always",
           marginTop: "10px",
+          whiteSpace: "pre-wrap",
         }}
       >
         {/* Mini Header for Page 2 */}
@@ -1072,7 +1074,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           </div>
           <div className="text-right">
             <div className="text-sm font-semibold text-blue-600">
-              Quotation No: {parsedQuotation.quotation_no}
+               Quotation{"\u00A0"}No:{"\u00A0"}{parsedQuotation.quotation_no}
             </div>
             <div className="text-xs text-gray-500">
               Terms &amp; Conditions
@@ -1082,7 +1084,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
 
         {/* Terms & Conditions */}
         <div data-pdf-section="terms-conditions">
-          <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Terms and Conditions</div>
+          <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Terms{"\u00A0"}and{"\u00A0"}Conditions</div>
           <div className="text-xs leading-tight text-gray-800">
             This quotation is valid for 7 days from the date of issue. Bookings must be confirmed within 3 working days to
             avoid inconvenience.
