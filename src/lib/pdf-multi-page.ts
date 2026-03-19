@@ -47,7 +47,7 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
   const A4_WIDTH_MM = 210;
   const A4_HEIGHT_MM = 297;
   // Max pixels to scan upward looking for a safe break (at scale=2)
-  const MAX_SEARCH_PX = 150 * SCALE;
+  const MAX_SEARCH_PX = 250 * SCALE;
 
   // 1. Capture entire container as one high-res canvas
   const canvas = await html2canvas(container, {
