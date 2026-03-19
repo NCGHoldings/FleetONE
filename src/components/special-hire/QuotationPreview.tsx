@@ -1084,7 +1084,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
 
         {/* Terms & Conditions */}
         <div data-pdf-section="terms-conditions">
-          <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Terms and Conditions</div>
+          <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Terms{"\u00A0"}and{"\u00A0"}Conditions</div>
           <div className="text-xs leading-tight text-gray-800">
             This quotation is valid for 7 days from the date of issue. Bookings must be confirmed within 3 working days to
             avoid inconvenience.
