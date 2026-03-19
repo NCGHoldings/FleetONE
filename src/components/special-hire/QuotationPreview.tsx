@@ -1025,8 +1025,10 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             </>
           )}
         </div>
+        </div>
 
         {/* Payment Info */}
+        <div data-pdf-section="payment-info">
         <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment Information</div>
         <div className="text-xs leading-tight text-gray-800">
           Account No. : 1934 1401 7578
