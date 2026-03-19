@@ -2,16 +2,16 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
 /**
- * Checks if a row of pixels is entirely white (or near-white).
- * Used to find safe page-break points between content sections.
+ * Checks if a row of pixels is safe to break on — i.e. contains no dark pixels (text).
+ * Light backgrounds, borders, and colored headers are considered safe break points.
  */
-const isRowWhite = (imageData: Uint8ClampedArray, width: number): boolean => {
+const isRowSafeToBreak = (imageData: Uint8ClampedArray, width: number): boolean => {
   for (let x = 0; x < width * 4; x += 4) {
     const r = imageData[x];
     const g = imageData[x + 1];
     const b = imageData[x + 2];
-    // Allow near-white (threshold 250) to handle anti-aliasing
-    if (r < 250 || g < 250 || b < 250) return false;
+    // If any pixel is "dark" (likely text), this row is NOT safe to break
+    if (r < 180 && g < 180 && b < 180) return false;
   }
   return true;
 };
@@ -29,7 +29,7 @@ const findSafeBreakY = (
   const minY = Math.max(0, targetY - maxSearchUp);
   for (let y = targetY; y >= minY; y--) {
     const rowData = ctx.getImageData(0, y, canvasWidth, 1).data;
-    if (isRowWhite(rowData, canvasWidth)) {
+    if (isRowSafeToBreak(rowData, canvasWidth)) {
       return y;
     }
   }
@@ -47,7 +47,7 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
   const A4_WIDTH_MM = 210;
   const A4_HEIGHT_MM = 297;
   // Max pixels to scan upward looking for a safe break (at scale=2)
-  const MAX_SEARCH_PX = 150 * SCALE;
+  const MAX_SEARCH_PX = 250 * SCALE;
 
   // 1. Capture entire container as one high-res canvas
   const canvas = await html2canvas(container, {
