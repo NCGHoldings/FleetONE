@@ -25,7 +25,7 @@ import { BalanceInvoicePreview } from './BalanceInvoicePreview';
 import { PostTripAdjustmentPreview } from './PostTripAdjustmentPreview';
 import { format } from 'date-fns';
 import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { canvasToMultiPagePDF } from '@/lib/pdf-multi-page';
 
 interface DocumentPreviewModalProps {
   isOpen: boolean;
@@ -214,21 +214,8 @@ export function DocumentPreviewModal({
           backgroundColor: '#ffffff',
         });
 
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4',
-        });
-
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-        const imgX = (pdfWidth - imgWidth * ratio) / 2;
-
-        pdf.addImage(imgData, 'PNG', imgX, 10, imgWidth * ratio, imgHeight * ratio);
+        // Create multi-page PDF from canvas
+        const pdf = canvasToMultiPagePDF(canvas);
 
         // Download the PDF
         const fileName = `${documentType.replace(/_/g, '-')}-${quotationData.quotation_no || 'document'}.pdf`;

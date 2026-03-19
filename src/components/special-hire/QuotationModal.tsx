@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Download, Printer, Mail, Loader2, MessageCircle } from 'lucide-react';
 import { QuotationPreview } from './QuotationPreview';
 import { toast } from 'sonner';
-import jsPDF from 'jspdf';
+import { canvasToMultiPagePDF } from '@/lib/pdf-multi-page';
 import html2canvas from 'html2canvas';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -304,21 +304,8 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
         backgroundColor: '#ffffff'
       });
 
-      // Create PDF with proper dimensions - JPEG 92% quality for ~95% smaller files
-      const imgData = canvas.toDataURL('image/jpeg', 0.92);
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      
-      // Calculate dimensions to fit content properly
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 0;
-
-      pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      // Create multi-page PDF from canvas
+      const pdf = canvasToMultiPagePDF(canvas);
 
       // Generate filename with quotation number and date
       const date = new Date().toISOString().split('T')[0];
@@ -346,19 +333,8 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
       backgroundColor: '#ffffff'
     });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.92); // JPEG 92% quality - ~95% smaller files
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = canvas.width;
-    const imgHeight = canvas.height;
-    
-    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-    const imgX = (pdfWidth - imgWidth * ratio) / 2;
-    const imgY = 0;
-
-    pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+    // Create multi-page PDF from canvas
+    const pdf = canvasToMultiPagePDF(canvas);
     
     return pdf.output('datauristring').split(',')[1]; // Get base64 without data:application/pdf;base64, prefix
   };

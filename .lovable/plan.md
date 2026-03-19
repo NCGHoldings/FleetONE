@@ -1,74 +1,64 @@
 
 
-# Fix Special Hire Quotation PDF Format
+# Special Hire Spreadsheet — Full Operations Tracking View
 
-## Problem
-The quotation PDF is badly formatted because:
-1. The entire quotation preview (which can be 2+ pages of content) is captured as a single canvas image and scaled down to fit one A4 page, making text tiny and unreadable
-2. No multi-page support -- content beyond one page is either cut off or compressed
-3. In offscreen rendering (QuotationsList bulk operations), Tailwind CSS classes don't apply correctly, causing the header/layout to break
+## What You Want
+A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
 
-## Solution
-Implement multi-page PDF generation across all 3 quotation PDF generation points. Instead of scaling the entire canvas to fit one page, slice the canvas into A4-height segments and place each segment on a separate PDF page.
+## Column Mapping (Your Columns → Database Fields)
 
-## Files to modify
+The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
 
-### 1. `src/components/special-hire/QuotationModal.tsx`
-- **`handleDownload` (line 294-336)**: Replace single-page logic with multi-page canvas slicing
-- **`generatePDFBase64` (line 339-363)**: Same multi-page fix for email/WhatsApp PDF generation
-- Core change: After capturing the canvas, calculate how many A4 pages are needed based on the content height-to-width ratio, then loop through pages slicing the canvas accordingly
+| Group | Columns | Source |
+|---|---|---|
+| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
+| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
+| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
+| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
+| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
+| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
 
-### 2. `src/components/special-hire/QuotationsList.tsx`
-- **`generatePDFBase64` (line 430-487)**: Same multi-page fix for bulk email/WhatsApp from the list view
-- Also increase the offscreen container width precision and add inline styles fallback
+## Implementation Plan
 
-### 3. `src/components/special-hire/DocumentPreviewModal.tsx`
-- **`handleGeneratePDF` (line 200-249)**: Same multi-page fix for the document preview modal download
+### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
+- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
+- Map to a flat `SpreadsheetHire` interface with all ~45 columns
+- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
+- Realtime subscription on `special_hire_quotations` for live updates
+- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
 
-## Multi-page PDF logic (applied to all 3 files)
+### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
+- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
+- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
+- Inline click-to-edit cells for editable fields
+- Dropdown selects for status fields
+- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
+- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
+- Search, Refresh, Export Excel toolbar
 
-```typescript
-// After html2canvas generates the canvas:
-const pdfWidth = pdf.internal.pageSize.getWidth();
-const pdfHeight = pdf.internal.pageSize.getHeight();
-const imgWidth = canvas.width;
-const imgHeight = canvas.height;
+### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
+- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
 
-// Scale canvas width to fit A4 width
-const scaledWidth = pdfWidth;
-const scaledHeight = (imgHeight * pdfWidth) / imgWidth;
+### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
+- New tab trigger with `Table2` icon labeled "Sheet"
+- TabsContent rendering `<SpecialHireSpreadsheet />`
 
-// If content fits one page, use single page
-if (scaledHeight <= pdfHeight) {
-  pdf.addImage(imgData, 'JPEG', 0, 0, scaledWidth, scaledHeight);
-} else {
-  // Multi-page: slice canvas into page-height segments
-  const pageCanvasHeight = (imgWidth * pdfHeight) / pdfWidth; // canvas pixels per page
-  const totalPages = Math.ceil(imgHeight / pageCanvasHeight);
+### User-Friendly Design Decisions
+- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
+- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
+- **Smart defaults**: empty expense fields show "0" and are click-to-edit
+- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
+- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
 
-  for (let page = 0; page < totalPages; page++) {
-    if (page > 0) pdf.addPage();
+### Files to Create/Edit
 
-    const srcY = page * pageCanvasHeight;
-    const srcH = Math.min(pageCanvasHeight, imgHeight - srcY);
-    const destH = (srcH * pdfWidth) / imgWidth;
+| File | Action |
+|---|---|
+| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
+| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
+| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
+| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
 
-    // Create a temporary canvas for this page slice
-    const pageCanvas = document.createElement('canvas');
-    pageCanvas.width = imgWidth;
-    pageCanvas.height = srcH;
-    const ctx = pageCanvas.getContext('2d');
-    ctx.drawImage(canvas, 0, srcY, imgWidth, srcH, 0, 0, imgWidth, srcH);
-
-    const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.92);
-    pdf.addImage(pageImgData, 'JPEG', 0, 0, pdfWidth, destH);
-  }
-}
-```
-
-## Expected result
-- PDF content spans multiple pages when needed (terms & conditions flow to page 2)
-- Text remains full-size and readable (no compression/squeezing)
-- Header with logo and blue "Quotation Special Hire" banner renders correctly
-- All 3 PDF generation paths (modal download, email/WhatsApp, document preview) produce consistent output
+### DB Note
+The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
 
