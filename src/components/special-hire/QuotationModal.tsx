@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Download, Printer, Mail, Loader2, MessageCircle } from 'lucide-react';
 import { QuotationPreview } from './QuotationPreview';
 import { toast } from 'sonner';
-import { canvasToMultiPagePDF } from '@/lib/pdf-multi-page';
-import html2canvas from 'html2canvas';
+import { sectionBasedPDF } from '@/lib/pdf-multi-page';
 import { supabase } from '@/integrations/supabase/client';
 
 interface QuotationData {
@@ -296,16 +295,7 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
 
     setIsDownloading(true);
     try {
-      // Use html2canvas to capture the quotation content
-      const canvas = await html2canvas(printRef.current, {
-        scale: 1.5, // Optimized for file size while maintaining print quality
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
-      });
-
-      // Create multi-page PDF from canvas
-      const pdf = canvasToMultiPagePDF(canvas);
+      const pdf = await sectionBasedPDF(printRef.current);
 
       // Generate filename with quotation number and date
       const date = new Date().toISOString().split('T')[0];
@@ -326,17 +316,9 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
   const generatePDFBase64 = async (): Promise<string> => {
     if (!printRef.current || !quotation) throw new Error('No content to generate PDF');
 
-    const canvas = await html2canvas(printRef.current, {
-      scale: 1.5, // Optimized for file size while maintaining print quality
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff'
-    });
-
-    // Create multi-page PDF from canvas
-    const pdf = canvasToMultiPagePDF(canvas);
+    const pdf = await sectionBasedPDF(printRef.current);
     
-    return pdf.output('datauristring').split(',')[1]; // Get base64 without data:application/pdf;base64, prefix
+    return pdf.output('datauristring').split(',')[1];
   };
 
   const handleEmail = async () => {

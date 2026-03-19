@@ -24,8 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { canvasToMultiPagePDF } from '@/lib/pdf-multi-page';
-import html2canvas from 'html2canvas';
+import { sectionBasedPDF } from '@/lib/pdf-multi-page';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -450,20 +449,11 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
         setTimeout(resolve, 2000); // Give more time for rendering
       });
 
-      console.log('📸 Generating canvas from DOM...');
-      const canvas = await html2canvas(tempDiv, {
-        scale: 1.5, // Optimized for file size while maintaining print quality
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        logging: false
-      });
+      console.log('📸 Generating section-based PDF...');
+      const pdf = await sectionBasedPDF(tempDiv);
 
-      console.log('✅ Canvas generated:', canvas.width, 'x', canvas.height);
+      console.log('✅ PDF generated');
 
-      // Create multi-page PDF from canvas
-      const pdf = canvasToMultiPagePDF(canvas);
-      
       root.unmount();
       document.body.removeChild(tempDiv);
       

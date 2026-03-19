@@ -237,7 +237,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         )}
 
         {/* Header */}
-        <div className="flex justify-between items-start mb-4">
+        <div data-pdf-section="header" className="flex justify-between items-start mb-4">
           {/* Logo */}
           <div className="w-32">
             <img
@@ -270,7 +270,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
 
         {/* Customer Details */}
-        <div className="mt-3">
+        <div data-pdf-section="customer-details" className="mt-3">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex items-center gap-1">
               <span className="font-semibold text-blue-600 min-w-[80px]">Company Name:</span>
@@ -292,7 +292,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
 
         {/* Pickup Details */}
-        <div style={{ marginTop: "12px" }}>
+        <div data-pdf-section="pickup-details" style={{ marginTop: "12px" }}>
           <table
             style={{
               width: "100%",
@@ -468,6 +468,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
 
         {/* Vehicle Details */}
+        <div data-pdf-section="vehicle-details">
         <table
           style={{
             width: "100%",
@@ -950,10 +951,11 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             )}
           </tbody>
         </table>
+        </div>
 
         {/* Route Information */}
         {intermediateStops.length > 0 && (
-          <div className="mt-3 mb-3">
+          <div data-pdf-section="route-info" className="mt-3 mb-3">
             <div className="text-sm font-semibold text-blue-600 mb-2">Route Details</div>
             <div className="bg-gray-50 p-3 rounded border">
               <div className="flex items-center gap-2 text-sm mb-2">
@@ -980,6 +982,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         )}
 
         {/* Extra Charges */}
+        <div data-pdf-section="extra-charges">
         <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Extra Charges</div>
         <div className="text-xs leading-tight text-gray-800">
           {rateCard ? (
@@ -1022,8 +1025,10 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             </>
           )}
         </div>
+        </div>
 
         {/* Payment Info */}
+        <div data-pdf-section="payment-info">
         <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment Information</div>
         <div className="text-xs leading-tight text-gray-800">
           Account No. : 1934 1401 7578
@@ -1032,8 +1037,10 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           <br />
           Bank Name : Sampath Bank, Nugegoda
         </div>
+        </div>
 
         {/* Terms & Conditions */}
+        <div data-pdf-section="terms-conditions">
         <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Terms and Conditions</div>
         <div className="text-xs leading-tight text-gray-800">
           This quotation is valid for 7 days from the date of issue. Bookings must be confirmed within 3 working days to
@@ -1092,9 +1099,10 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           <br />
           <br />
         </div>
+        </div>
 
         {/* Footer */}
-        <div className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center">
+        <div data-pdf-section="footer" className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center">
           For more information call <strong>074 289 3612</strong>
           <br />© 2025 NCG Express. All Rights Reserved.
         </div>
