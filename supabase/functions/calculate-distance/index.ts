@@ -147,8 +147,17 @@ serve(async (req) => {
     };
 
     // Helper: Geocode a free-text address in Sri Lanka using Google Geocoding API
-    const geocodeLK = async (query: string) => {
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&components=country:LK&key=${GOOGLE_API_KEY}`;
+    // biasLocation: optional {lat, lng} to bias results toward a known location (e.g. pickup point)
+    // This prevents short Plus Codes and ambiguous place names from resolving to distant/wrong locations
+    const geocodeLK = async (query: string, biasLocation?: { lat: number; lng: number }) => {
+      let url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&components=country:LK&key=${GOOGLE_API_KEY}`;
+      
+      // Apply location bias when provided — especially critical for short Plus Codes
+      if (biasLocation) {
+        const { lat, lng } = biasLocation;
+        url += `&location=${lat},${lng}&bounds=${lat - 0.5},${lng - 0.5}|${lat + 0.5},${lng + 0.5}`;
+        console.log('Geocoding with bias:', { query, biasLat: lat, biasLng: lng });
+      }
       console.log('Geocoding with Google:', query);
       const resp = await fetch(url);
       if (!resp.ok) {
