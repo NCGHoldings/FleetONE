@@ -292,7 +292,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
 
         {/* Pickup Details */}
-        <div style={{ marginTop: "12px" }}>
+        <div data-pdf-section="pickup-details" style={{ marginTop: "12px" }}>
           <table
             style={{
               width: "100%",
