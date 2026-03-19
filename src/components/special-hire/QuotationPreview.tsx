@@ -976,8 +976,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
 
               <div className="flex items-center gap-2 text-sm">
                 <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <span className="font-medium text-red-700">End:</span>
-                <span className="text-gray-800">{parsedQuotation.drop_location}</span>
+                <span className="font-medium text-red-700">End:{"\u00A0"}</span>
+                <span className="text-gray-800" style={{ whiteSpace: "pre-wrap" }}>{parsedQuotation.drop_location}</span>
               </div>
             </div>
           </div>
