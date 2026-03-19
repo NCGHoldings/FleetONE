@@ -2,8 +2,133 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
 /**
- * Renders a canvas into a multi-page A4 PDF by slicing the canvas into page-height segments.
- * Returns the jsPDF instance for further use (save, base64 export, etc.).
+ * Checks if a row of pixels is entirely white (or near-white).
+ * Used to find safe page-break points between content sections.
+ */
+const isRowWhite = (imageData: Uint8ClampedArray, width: number): boolean => {
+  for (let x = 0; x < width * 4; x += 4) {
+    const r = imageData[x];
+    const g = imageData[x + 1];
+    const b = imageData[x + 2];
+    // Allow near-white (threshold 250) to handle anti-aliasing
+    if (r < 250 || g < 250 || b < 250) return false;
+  }
+  return true;
+};
+
+/**
+ * Finds a safe Y position to slice the canvas at, scanning upward from targetY
+ * to find a fully white row (gap between sections). Returns the best Y to cut at.
+ */
+const findSafeBreakY = (
+  ctx: CanvasRenderingContext2D,
+  canvasWidth: number,
+  targetY: number,
+  maxSearchUp: number
+): number => {
+  const minY = Math.max(0, targetY - maxSearchUp);
+  for (let y = targetY; y >= minY; y--) {
+    const rowData = ctx.getImageData(0, y, canvasWidth, 1).data;
+    if (isRowWhite(rowData, canvasWidth)) {
+      return y;
+    }
+  }
+  // No white row found within search range — fall back to target
+  return targetY;
+};
+
+/**
+ * Whole-canvas capture with smart page breaks.
+ * Captures the entire container as one canvas, then slices into A4 pages
+ * at whitespace gaps between sections so text is never cut.
+ */
+export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> => {
+  const SCALE = 2;
+  const A4_WIDTH_MM = 210;
+  const A4_HEIGHT_MM = 297;
+  const MARGIN_MM = 10;
+  const CONTENT_WIDTH_MM = A4_WIDTH_MM - MARGIN_MM * 2;
+  const CONTENT_HEIGHT_MM = A4_HEIGHT_MM - MARGIN_MM * 2;
+  // Max pixels to scan upward looking for a safe break (at scale=2)
+  const MAX_SEARCH_PX = 150 * SCALE;
+
+  // 1. Capture entire container as one high-res canvas
+  const canvas = await html2canvas(container, {
+    scale: SCALE,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: '#ffffff',
+    logging: false,
+    letterRendering: true,
+  } as any);
+
+  const imgWidth = canvas.width;
+  const imgHeight = canvas.height;
+
+  // Pixels per mm at this scale
+  const pxPerMM = imgWidth / A4_WIDTH_MM;
+  const pageContentHeightPx = CONTENT_HEIGHT_MM * pxPerMM;
+  const marginPx = MARGIN_MM * pxPerMM;
+
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Could not get canvas 2d context');
+  }
+
+  let currentY = 0;
+  let pageIndex = 0;
+
+  while (currentY < imgHeight) {
+    if (pageIndex > 0) pdf.addPage();
+
+    const remainingHeight = imgHeight - currentY;
+    let sliceHeight: number;
+
+    if (remainingHeight <= pageContentHeightPx) {
+      // Last page — take everything remaining
+      sliceHeight = remainingHeight;
+    } else {
+      // Find a safe break point by scanning upward from the ideal cut line
+      const idealCutY = currentY + pageContentHeightPx;
+      const safeCutY = findSafeBreakY(ctx, imgWidth, Math.floor(idealCutY), MAX_SEARCH_PX);
+      sliceHeight = safeCutY - currentY;
+
+      // Safety: ensure we always advance at least half a page to avoid infinite loops
+      if (sliceHeight < pageContentHeightPx * 0.3) {
+        sliceHeight = pageContentHeightPx;
+      }
+    }
+
+    // Create page slice canvas
+    const pageCanvas = document.createElement('canvas');
+    pageCanvas.width = imgWidth;
+    pageCanvas.height = sliceHeight;
+    const pageCtx = pageCanvas.getContext('2d');
+    if (pageCtx) {
+      pageCtx.fillStyle = '#ffffff';
+      pageCtx.fillRect(0, 0, imgWidth, sliceHeight);
+      pageCtx.drawImage(canvas, 0, currentY, imgWidth, sliceHeight, 0, 0, imgWidth, sliceHeight);
+    }
+
+    // Convert to image and add to PDF
+    const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.92);
+    const destWidthMM = CONTENT_WIDTH_MM;
+    const destHeightMM = (sliceHeight / pxPerMM);
+    pdf.addImage(pageImgData, 'JPEG', MARGIN_MM, MARGIN_MM, destWidthMM, destHeightMM);
+
+    currentY += sliceHeight;
+    pageIndex++;
+
+    // Safety: prevent infinite loop
+    if (pageIndex > 50) break;
+  }
+
+  return pdf;
+};
+
+/**
+ * Legacy helper — kept for backward compatibility.
  */
 export const canvasToMultiPagePDF = (canvas: HTMLCanvasElement): jsPDF => {
   const pdf = new jsPDF('p', 'mm', 'a4');
@@ -11,27 +136,21 @@ export const canvasToMultiPagePDF = (canvas: HTMLCanvasElement): jsPDF => {
   const pdfHeight = pdf.internal.pageSize.getHeight();
   const imgWidth = canvas.width;
   const imgHeight = canvas.height;
-
-  // Scale canvas width to fit A4 width
   const scaledHeight = (imgHeight * pdfWidth) / imgWidth;
 
   if (scaledHeight <= pdfHeight) {
-    // Content fits on a single page
     const imgData = canvas.toDataURL('image/jpeg', 0.92);
     pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, scaledHeight);
   } else {
-    // Multi-page: slice canvas into page-height segments
-    const pageCanvasHeight = (imgWidth * pdfHeight) / pdfWidth; // canvas pixels per A4 page
+    const pageCanvasHeight = (imgWidth * pdfHeight) / pdfWidth;
     const totalPages = Math.ceil(imgHeight / pageCanvasHeight);
 
     for (let page = 0; page < totalPages; page++) {
       if (page > 0) pdf.addPage();
-
       const srcY = page * pageCanvasHeight;
       const srcH = Math.min(pageCanvasHeight, imgHeight - srcY);
       const destH = (srcH * pdfWidth) / imgWidth;
 
-      // Create a temporary canvas for this page slice
       const pageCanvas = document.createElement('canvas');
       pageCanvas.width = imgWidth;
       pageCanvas.height = srcH;
@@ -44,107 +163,6 @@ export const canvasToMultiPagePDF = (canvas: HTMLCanvasElement): jsPDF => {
 
       const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.92);
       pdf.addImage(pageImgData, 'JPEG', 0, 0, pdfWidth, destH);
-    }
-  }
-
-  return pdf;
-};
-
-/**
- * Section-based PDF generation that avoids cutting text at page boundaries.
- * Captures each [data-pdf-section] element individually and places them on pages
- * with intelligent overflow — if a section won't fit, it starts on a new page.
- * Falls back to canvasToMultiPagePDF if no sections are found.
- */
-export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> => {
-  const sections = Array.from(
-    container.querySelectorAll('[data-pdf-section]')
-  ) as HTMLElement[];
-
-  const A4_WIDTH_MM = 210;
-  const A4_HEIGHT_MM = 297;
-  const MARGIN_MM = 10;
-  const CONTENT_WIDTH_MM = A4_WIDTH_MM - MARGIN_MM * 2;
-  const MAX_CONTENT_HEIGHT_MM = A4_HEIGHT_MM - MARGIN_MM * 2;
-  const SECTION_GAP_MM = 2;
-
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  let currentY = MARGIN_MM;
-
-  // Fallback: no sections found, use whole-container canvas slicing
-  if (sections.length === 0) {
-    const canvas = await html2canvas(container, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      letterRendering: true,
-    } as any);
-    return canvasToMultiPagePDF(canvas);
-  }
-
-  for (let i = 0; i < sections.length; i++) {
-    const section = sections[i];
-
-    const canvas = await html2canvas(section, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      letterRendering: true,
-    } as any);
-
-    const scaleFactor = CONTENT_WIDTH_MM / (canvas.width / 2);
-    const sectionHeightMM = (canvas.height / 2) * scaleFactor;
-
-    const remainingSpace = A4_HEIGHT_MM - MARGIN_MM - currentY;
-
-    // If section won't fit and we're not at the top of a page, start new page
-    if (sectionHeightMM > remainingSpace && currentY > MARGIN_MM) {
-      pdf.addPage();
-      currentY = MARGIN_MM;
-    }
-
-    // If section is taller than a full page, slice it
-    if (sectionHeightMM > MAX_CONTENT_HEIGHT_MM) {
-      // Slice this oversized section into page-height segments
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const pxPerMM = (imgWidth / 2) / CONTENT_WIDTH_MM;
-      const pageSliceHeightPx = MAX_CONTENT_HEIGHT_MM * pxPerMM * 2; // *2 because scale=2
-
-      let srcY = 0;
-      while (srcY < imgHeight) {
-        if (currentY > MARGIN_MM) {
-          pdf.addPage();
-          currentY = MARGIN_MM;
-        }
-
-        const srcH = Math.min(pageSliceHeightPx, imgHeight - srcY);
-        const destH = (srcH / 2) * scaleFactor;
-
-        const sliceCanvas = document.createElement('canvas');
-        sliceCanvas.width = imgWidth;
-        sliceCanvas.height = srcH;
-        const ctx = sliceCanvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, imgWidth, srcH);
-          ctx.drawImage(canvas, 0, srcY, imgWidth, srcH, 0, 0, imgWidth, srcH);
-        }
-
-        const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.92);
-        pdf.addImage(sliceData, 'JPEG', MARGIN_MM, currentY, CONTENT_WIDTH_MM, destH);
-
-        currentY += destH + SECTION_GAP_MM;
-        srcY += srcH;
-      }
-    } else {
-      const imgData = canvas.toDataURL('image/jpeg', 0.92);
-      pdf.addImage(imgData, 'JPEG', MARGIN_MM, currentY, CONTENT_WIDTH_MM, sectionHeightMM);
-      currentY += sectionHeightMM + SECTION_GAP_MM;
     }
   }
 
