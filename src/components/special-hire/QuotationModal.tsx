@@ -317,17 +317,9 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
   const generatePDFBase64 = async (): Promise<string> => {
     if (!printRef.current || !quotation) throw new Error('No content to generate PDF');
 
-    const canvas = await html2canvas(printRef.current, {
-      scale: 1.5, // Optimized for file size while maintaining print quality
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff'
-    });
-
-    // Create multi-page PDF from canvas
-    const pdf = canvasToMultiPagePDF(canvas);
+    const pdf = await sectionBasedPDF(printRef.current);
     
-    return pdf.output('datauristring').split(',')[1]; // Get base64 without data:application/pdf;base64, prefix
+    return pdf.output('datauristring').split(',')[1];
   };
 
   const handleEmail = async () => {

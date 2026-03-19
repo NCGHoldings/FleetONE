@@ -207,15 +207,7 @@ export function DocumentPreviewModal({
       
       // Generate PDF from the preview
       if (previewRef.current) {
-        const canvas = await html2canvas(previewRef.current, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-        });
-
-        // Create multi-page PDF from canvas
-        const pdf = canvasToMultiPagePDF(canvas);
+        const pdf = await sectionBasedPDF(previewRef.current);
 
         // Download the PDF
         const fileName = `${documentType.replace(/_/g, '-')}-${quotationData.quotation_no || 'document'}.pdf`;
