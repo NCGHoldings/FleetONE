@@ -1031,13 +1031,13 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
 
         {/* Payment Info */}
         <div data-pdf-section="payment-info">
-          <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment Information</div>
-          <div className="text-xs leading-tight text-gray-800">
-            Account No. : 1934 1401 7578
-            <br />
-            Account Name : NCG EXPRESS (PVT) LTD
-            <br />
-            Bank Name : Sampath Bank, Nugegoda
+          <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment{"\u00A0"}Information</div>
+           <div className="text-xs leading-tight text-gray-800">
+             Account{"\u00A0"}No.{"\u00A0"}:{"\u00A0"}1934{"\u00A0"}1401{"\u00A0"}7578
+             <br />
+             Account{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}NCG{"\u00A0"}EXPRESS{"\u00A0"}(PVT){"\u00A0"}LTD
+             <br />
+             Bank{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}Sampath{"\u00A0"}Bank,{"\u00A0"}Nugegoda
           </div>
         </div>
 
