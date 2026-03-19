@@ -908,17 +908,17 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                   }}
                 >
                   <div style={{ fontSize: "11px", color: "#374151", marginBottom: "4px" }}>
-                    Subtotal: LKR{" "}
-                    {(() => {
-                      const subtotal =
-                        calculateFinalCustomerTotal(parsedQuotation) + (parsedQuotation.discount_amount_lkr || 0);
-                      return subtotal.toLocaleString();
-                    })()}
-                  </div>
+                    Subtotal:{"\u00A0"}LKR{" "}
+                     {(() => {
+                       const subtotal =
+                         calculateFinalCustomerTotal(parsedQuotation) + (parsedQuotation.discount_amount_lkr || 0);
+                       return subtotal.toLocaleString();
+                     })()}
+                   </div>
 
-                  {(parsedQuotation.discount_amount_lkr || 0) > 0 && (
-                    <div style={{ color: "#dc2626", fontSize: "11px", marginBottom: "4px" }}>
-                      Discount: -LKR {parsedQuotation.discount_amount_lkr?.toLocaleString()}
+                   {(parsedQuotation.discount_amount_lkr || 0) > 0 && (
+                     <div style={{ color: "#dc2626", fontSize: "11px", marginBottom: "4px" }}>
+                       Discount:{"\u00A0"}-LKR{"\u00A0"}{parsedQuotation.discount_amount_lkr?.toLocaleString()}
                     </div>
                   )}
                   <div
