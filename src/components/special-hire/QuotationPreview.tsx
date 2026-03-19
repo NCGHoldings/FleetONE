@@ -210,9 +210,6 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           maxWidth: "210mm",
           padding: "15mm",
           boxSizing: "border-box",
-          wordSpacing: "1px",
-          letterSpacing: "0.01em",
-          whiteSpace: "pre-wrap",
         }}
       >
         {/* DRAFT Watermark */}
