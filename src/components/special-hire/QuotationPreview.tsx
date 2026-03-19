@@ -1049,6 +1049,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
 
       {/* ===== PAGE 2: Terms & Conditions ===== */}
       <div
+        data-pdf-page="2"
         className="mx-auto bg-white shadow-lg relative"
         style={{
           width: "210mm",
