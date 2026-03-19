@@ -861,7 +861,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     verticalAlign: "middle",
                   }}
                 >
-                  <div style={{ fontSize: "11px", color: "#374151" }}>Route Details</div>
+                   <div style={{ fontSize: "11px", color: "#374151" }}>Route{"\u00A0"}Details</div>
                 </td>
                 <td
                   style={{
