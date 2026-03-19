@@ -203,9 +203,10 @@ serve(async (req) => {
       ? { lat: pickupCoordsInput[1], lng: pickupCoordsInput[0], formatted_address: pickupLocation }
       : await geocodeLK(pickupLocation);
 
+    // Use pickup point as bias when geocoding drop location (helps with ambiguous names/Plus Codes)
     const dropPoint = hasValidDropCoords
       ? { lat: dropCoordsInput[1], lng: dropCoordsInput[0], formatted_address: dropLocation }
-      : await geocodeLK(dropLocation);
+      : await geocodeLK(dropLocation, { lat: pickupPoint.lat, lng: pickupPoint.lng });
     
     // Log if coordinates were reused (cache hit equivalent)
     if (hasValidPickupCoords) {
