@@ -1027,6 +1027,18 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
         </div>
 
+        {/* Payment Info */}
+        <div data-pdf-section="payment-info">
+          <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment Information</div>
+          <div className="text-xs leading-tight text-gray-800">
+            Account No. : 1934 1401 7578
+            <br />
+            Account Name : NCG EXPRESS (PVT) LTD
+            <br />
+            Bank Name : Sampath Bank, Nugegoda
+          </div>
+        </div>
+
         {/* Footer for Page 1 */}
         <div data-pdf-section="footer-p1" className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center">
           For more information call <strong>074 289 3612</strong>
@@ -1063,18 +1075,6 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             <div className="text-xs text-gray-500">
               Terms &amp; Conditions
             </div>
-          </div>
-        </div>
-
-        {/* Payment Info */}
-        <div data-pdf-section="payment-info">
-          <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment Information</div>
-          <div className="text-xs leading-tight text-gray-800">
-            Account No. : 1934 1401 7578
-            <br />
-            Account Name : NCG EXPRESS (PVT) LTD
-            <br />
-            Bank Name : Sampath Bank, Nugegoda
           </div>
         </div>
 
