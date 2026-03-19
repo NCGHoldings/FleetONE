@@ -461,16 +461,8 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
 
       console.log('✅ Canvas generated:', canvas.width, 'x', canvas.height);
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.92); // JPEG 92% quality - ~95% smaller files
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-
-      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth * ratio, imgHeight * ratio);
+      // Create multi-page PDF from canvas
+      const pdf = canvasToMultiPagePDF(canvas);
       
       root.unmount();
       document.body.removeChild(tempDiv);

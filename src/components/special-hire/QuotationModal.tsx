@@ -333,19 +333,8 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
       backgroundColor: '#ffffff'
     });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.92); // JPEG 92% quality - ~95% smaller files
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = canvas.width;
-    const imgHeight = canvas.height;
-    
-    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-    const imgX = (pdfWidth - imgWidth * ratio) / 2;
-    const imgY = 0;
-
-    pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+    // Create multi-page PDF from canvas
+    const pdf = canvasToMultiPagePDF(canvas);
     
     return pdf.output('datauristring').split(',')[1]; // Get base64 without data:application/pdf;base64, prefix
   };
