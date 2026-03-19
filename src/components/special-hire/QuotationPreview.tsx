@@ -203,6 +203,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
       }}
     >
       <div
+        data-pdf-page="1"
         className="mx-auto bg-white shadow-lg relative"
         style={{
           width: "210mm",
