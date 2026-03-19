@@ -789,13 +789,22 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
       // Calculate distances (same for all buses)
       const validIntermediateStops = intermediateStops.filter(stop => stop.location?.trim());
+      // Build intermediate stops with coordinates for accurate geocoding
+      const stopsWithCoords = validIntermediateStops.map(stop => ({
+        location: stop.location,
+        lat: stop.lat || undefined,
+        lng: stop.lng || undefined,
+      }));
+
       const { data: distanceData, error } = await supabase.functions.invoke('calculate-distance', {
         body: {
           pickupLocation: data.pickupLocation,
           dropLocation: data.dropLocation,
-          intermediateStops: validIntermediateStops,
+          intermediateStops: stopsWithCoords,
           parkingLat: fuelSettings.parking_lat,
           parkingLng: fuelSettings.parking_lng,
+          pickupCoords: pickupCoords,
+          dropCoords: dropCoords,
         }
       });
 
