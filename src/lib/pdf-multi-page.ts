@@ -80,7 +80,7 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
       backgroundColor: '#ffffff',
       logging: false,
       letterRendering: true,
-    });
+    } as any);
     return canvasToMultiPagePDF(canvas);
   }
 
