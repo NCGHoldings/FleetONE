@@ -224,7 +224,8 @@ serve(async (req) => {
           if (typeof stop.lat === 'number' && typeof stop.lng === 'number') {
             intermediatePoints.push({ lat: stop.lat, lng: stop.lng, formatted: stop.location });
           } else {
-            const geo = await geocodeLK(stop.location);
+            // Use pickup point as bias for geocoding intermediate stops
+            const geo = await geocodeLK(stop.location, { lat: pickupPoint.lat, lng: pickupPoint.lng });
             intermediatePoints.push({ lat: geo.lat, lng: geo.lng, formatted: geo.formatted_address });
           }
         } catch (e) {
