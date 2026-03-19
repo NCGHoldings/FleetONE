@@ -207,7 +207,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         className="mx-auto bg-white shadow-lg relative"
         style={{
           width: "210mm",
-          minHeight: "297mm",
+          
           maxWidth: "210mm",
           padding: "15mm",
           boxSizing: "border-box",
