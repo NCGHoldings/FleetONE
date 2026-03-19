@@ -962,22 +962,22 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             <div className="bg-gray-50 p-3 rounded border">
               <div className="flex items-center gap-2 text-sm mb-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="font-medium text-green-700">Start:</span>
-                <span className="text-gray-800">{parsedQuotation.pickup_location}</span>
+        <span className="font-medium text-green-700">Start:{"\u00A0"}</span>
+                <span className="text-gray-800" style={{ whiteSpace: "pre-wrap" }}>{parsedQuotation.pickup_location}</span>
               </div>
 
               {intermediateStops.map((stop: any, index: number) => (
                 <div key={index} className="flex items-center gap-2 text-sm mb-2 ml-4">
                   <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                  <span className="font-medium text-blue-600">Stop {index + 1}:</span>
-                  <span className="text-gray-800">{stop.location}</span>
+                  <span className="font-medium text-blue-600">Stop{"\u00A0"}{index + 1}:{"\u00A0"}</span>
+                  <span className="text-gray-800" style={{ whiteSpace: "pre-wrap" }}>{stop.location}</span>
                 </div>
               ))}
 
               <div className="flex items-center gap-2 text-sm">
                 <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <span className="font-medium text-red-700">End:</span>
-                <span className="text-gray-800">{parsedQuotation.drop_location}</span>
+                <span className="font-medium text-red-700">End:{"\u00A0"}</span>
+                <span className="text-gray-800" style={{ whiteSpace: "pre-wrap" }}>{parsedQuotation.drop_location}</span>
               </div>
             </div>
           </div>
@@ -986,25 +986,25 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         {/* Extra Charges */}
         <div data-pdf-section="extra-charges">
         <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Extra{"\u00A0"}Charges</div>
-        <div className="text-xs leading-tight text-gray-800">
+        <div className="text-xs leading-tight text-gray-800" style={{ whiteSpace: "pre-wrap" }}>
           {rateCard ? (
             <>
-              Exceeding Per Kilometer will be charged Rs {rateCard.exceeding_km_rate_lkr?.toLocaleString() || "300.00"}
+              Exceeding{"\u00A0"}Per{"\u00A0"}Kilometer{"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged{"\u00A0"}Rs{"\u00A0"}{rateCard.exceeding_km_rate_lkr?.toLocaleString() || "300.00"}
               <br />
-              Exceeding per hour will be charged Rs {rateCard.overtime_rate_lkr_per_hour?.toLocaleString() || "1500.00"}
+              Exceeding{"\u00A0"}per{"\u00A0"}hour{"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged{"\u00A0"}Rs{"\u00A0"}{rateCard.overtime_rate_lkr_per_hour?.toLocaleString() || "1500.00"}
               <br />
               {rateCard.overnight_charge_lkr_per_day > 0 && (
                 <>
-                  Overnight charge per day: Rs {rateCard.overnight_charge_lkr_per_day.toLocaleString()}
+                  Overnight{"\u00A0"}charge{"\u00A0"}per{"\u00A0"}day:{"\u00A0"}Rs{"\u00A0"}{rateCard.overnight_charge_lkr_per_day.toLocaleString()}
                   <br />
                 </>
               )}
             </>
           ) : (
             <>
-              Exceeding Per Kilometer will be charged Rs 300.00
+              Exceeding{"\u00A0"}Per{"\u00A0"}Kilometer{"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged{"\u00A0"}Rs{"\u00A0"}300.00
               <br />
-              Exceeding per hour will be charged Rs 1500.00
+              Exceeding{"\u00A0"}per{"\u00A0"}hour{"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged{"\u00A0"}Rs{"\u00A0"}1500.00
               <br />
             </>
           )}
@@ -1013,14 +1013,14 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           {additionalCharges.filter((charge) => charge.type === "additional_distance").length > 0 && (
             <>
               <br />
-              <strong>Additional Distance Charges:</strong>
+              <strong>Additional{"\u00A0"}Distance{"\u00A0"}Charges:</strong>
               <br />
               {additionalCharges
                 .filter((charge) => charge.type === "additional_distance")
                 .map((charge, index) => (
                   <span key={index}>
-                    Additional {charge.distance || 0} km: Rs {charge.amount?.toLocaleString() || "0.00"}
-                    {charge.reason && ` (${charge.reason})`}
+                    Additional{"\u00A0"}{charge.distance || 0}{"\u00A0"}km:{"\u00A0"}Rs{"\u00A0"}{charge.amount?.toLocaleString() || "0.00"}
+                    {charge.reason && <>{"\u00A0"}({charge.reason})</>}
                     <br />
                   </span>
                 ))}
@@ -1042,9 +1042,9 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
 
         {/* Footer for Page 1 */}
-        <div data-pdf-section="footer-p1" className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center">
-          For more information call <strong>074 289 3612</strong>
-          <br />© 2025 NCG Express. All Rights Reserved.
+        <div data-pdf-section="footer-p1" className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center" style={{ whiteSpace: "pre-wrap" }}>
+          For{"\u00A0"}more{"\u00A0"}information{"\u00A0"}call{"\u00A0"}<strong>074{"\u00A0"}289{"\u00A0"}3612</strong>
+          <br />©{"\u00A0"}2025{"\u00A0"}NCG{"\u00A0"}Express.{"\u00A0"}All{"\u00A0"}Rights{"\u00A0"}Reserved.
         </div>
       </div>
 
@@ -1085,65 +1085,55 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         {/* Terms & Conditions */}
         <div data-pdf-section="terms-conditions">
           <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Terms{"\u00A0"}and{"\u00A0"}Conditions</div>
-          <div className="text-xs leading-tight text-gray-800">
-            This quotation is valid for 7 days from the date of issue. Bookings must be confirmed within 3 working days to
-            avoid inconvenience.
+          <div className="text-xs leading-tight text-gray-800" style={{ whiteSpace: "pre-wrap" }}>
+            This{"\u00A0"}quotation{"\u00A0"}is{"\u00A0"}valid{"\u00A0"}for{"\u00A0"}7{"\u00A0"}days{"\u00A0"}from{"\u00A0"}the{"\u00A0"}date{"\u00A0"}of{"\u00A0"}issue.{"\u00A0"}Bookings{"\u00A0"}must{"\u00A0"}be{"\u00A0"}confirmed{"\u00A0"}within{"\u00A0"}3{"\u00A0"}working{"\u00A0"}days{"\u00A0"}to{"\u00A0"}avoid{"\u00A0"}inconvenience.
             <br />
             <br />
-            <strong>Upon confirmation of hire:</strong> 50% advance payment of the total hire cost must be made. The
-            balance payment must be settled before the hire date.
+            <strong>Upon{"\u00A0"}confirmation{"\u00A0"}of{"\u00A0"}hire:</strong>{"\u00A0"}50%{"\u00A0"}advance{"\u00A0"}payment{"\u00A0"}of{"\u00A0"}the{"\u00A0"}total{"\u00A0"}hire{"\u00A0"}cost{"\u00A0"}must{"\u00A0"}be{"\u00A0"}made.{"\u00A0"}The{"\u00A0"}balance{"\u00A0"}payment{"\u00A0"}must{"\u00A0"}be{"\u00A0"}settled{"\u00A0"}before{"\u00A0"}the{"\u00A0"}hire{"\u00A0"}date.
             <br />
             <br />
-            <strong>Cancellation Policy:</strong>
+            <strong>Cancellation{"\u00A0"}Policy:</strong>
             <br />
-            • If cancelled 14 days or more before the hire date: 10% cancellation fee (based on the full hire rate) will
-            be charged. The balance of any advance payment will be refunded.
+            •{"\u00A0"}If{"\u00A0"}cancelled{"\u00A0"}14{"\u00A0"}days{"\u00A0"}or{"\u00A0"}more{"\u00A0"}before{"\u00A0"}the{"\u00A0"}hire{"\u00A0"}date:{"\u00A0"}10%{"\u00A0"}cancellation{"\u00A0"}fee{"\u00A0"}(based{"\u00A0"}on{"\u00A0"}the{"\u00A0"}full{"\u00A0"}hire{"\u00A0"}rate){"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged.{"\u00A0"}The{"\u00A0"}balance{"\u00A0"}of{"\u00A0"}any{"\u00A0"}advance{"\u00A0"}payment{"\u00A0"}will{"\u00A0"}be{"\u00A0"}refunded.
             <br />
-            • If cancelled within 14 days of the hire date: 20% cancellation fee (based on the full hire rate) will be
-            charged. The balance of any advance payment will be refunded.
+            •{"\u00A0"}If{"\u00A0"}cancelled{"\u00A0"}within{"\u00A0"}14{"\u00A0"}days{"\u00A0"}of{"\u00A0"}the{"\u00A0"}hire{"\u00A0"}date:{"\u00A0"}20%{"\u00A0"}cancellation{"\u00A0"}fee{"\u00A0"}(based{"\u00A0"}on{"\u00A0"}the{"\u00A0"}full{"\u00A0"}hire{"\u00A0"}rate){"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged.{"\u00A0"}The{"\u00A0"}balance{"\u00A0"}of{"\u00A0"}any{"\u00A0"}advance{"\u00A0"}payment{"\u00A0"}will{"\u00A0"}be{"\u00A0"}refunded.
             <br />
             <br />
-            <strong>Excess Mileage:</strong> A flat charge applies for the first 5 km exceeding the agreed destination.
-            From the 6th km onwards, an additional per-km charge will be applied.
+            <strong>Excess{"\u00A0"}Mileage:</strong>{"\u00A0"}A{"\u00A0"}flat{"\u00A0"}charge{"\u00A0"}applies{"\u00A0"}for{"\u00A0"}the{"\u00A0"}first{"\u00A0"}5{"\u00A0"}km{"\u00A0"}exceeding{"\u00A0"}the{"\u00A0"}agreed{"\u00A0"}destination.{"\u00A0"}From{"\u00A0"}the{"\u00A0"}6th{"\u00A0"}km{"\u00A0"}onwards,{"\u00A0"}an{"\u00A0"}additional{"\u00A0"}per-km{"\u00A0"}charge{"\u00A0"}will{"\u00A0"}be{"\u00A0"}applied.
             <br />
             <br />
-            Any change in destination must be approved in writing by a higher official of NCG Express (Private) Limited.
+            Any{"\u00A0"}change{"\u00A0"}in{"\u00A0"}destination{"\u00A0"}must{"\u00A0"}be{"\u00A0"}approved{"\u00A0"}in{"\u00A0"}writing{"\u00A0"}by{"\u00A0"}a{"\u00A0"}higher{"\u00A0"}official{"\u00A0"}of{"\u00A0"}NCG{"\u00A0"}Express{"\u00A0"}(Private){"\u00A0"}Limited.
             <br />
             <br />
-            <strong>Garbage Penalty (per bus):</strong>
+            <strong>Garbage{"\u00A0"}Penalty{"\u00A0"}(per{"\u00A0"}bus):</strong>
             <br />
-            • Rs. 5,000 for Leyland and D7 models.
+            •{"\u00A0"}Rs.{"\u00A0"}5,000{"\u00A0"}for{"\u00A0"}Leyland{"\u00A0"}and{"\u00A0"}D7{"\u00A0"}models.
             <br />
-            • Rs. 10,000 for Super Luxury models.
-            <br />
-            <br />
-            <strong>Damage Policy:</strong> If the bus is damaged, the customer will be charged twice the actual repair
-            cost required to restore it to original condition.
+            •{"\u00A0"}Rs.{"\u00A0"}10,000{"\u00A0"}for{"\u00A0"}Super{"\u00A0"}Luxury{"\u00A0"}models.
             <br />
             <br />
-            For hires of more than one day, customers must provide food and accommodation for the driver. For further
-            information, please contact us at 074 289 3612.
+            <strong>Damage{"\u00A0"}Policy:</strong>{"\u00A0"}If{"\u00A0"}the{"\u00A0"}bus{"\u00A0"}is{"\u00A0"}damaged,{"\u00A0"}the{"\u00A0"}customer{"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged{"\u00A0"}twice{"\u00A0"}the{"\u00A0"}actual{"\u00A0"}repair{"\u00A0"}cost{"\u00A0"}required{"\u00A0"}to{"\u00A0"}restore{"\u00A0"}it{"\u00A0"}to{"\u00A0"}original{"\u00A0"}condition.
             <br />
             <br />
-            <strong>Customer Responsibilities:</strong>
+            For{"\u00A0"}hires{"\u00A0"}of{"\u00A0"}more{"\u00A0"}than{"\u00A0"}one{"\u00A0"}day,{"\u00A0"}customers{"\u00A0"}must{"\u00A0"}provide{"\u00A0"}food{"\u00A0"}and{"\u00A0"}accommodation{"\u00A0"}for{"\u00A0"}the{"\u00A0"}driver.{"\u00A0"}For{"\u00A0"}further{"\u00A0"}information,{"\u00A0"}please{"\u00A0"}contact{"\u00A0"}us{"\u00A0"}at{"\u00A0"}074{"\u00A0"}289{"\u00A0"}3612.
             <br />
-            • The customer is required to pre-check and verify the bus mileage before the hire, as this is a compulsory
-            procedure.
             <br />
-            • Google Maps mileage may differ from the actual mileage, and customers must rely on the verified mileage
-            recorded at the start of the hire.
+            <strong>Customer{"\u00A0"}Responsibilities:</strong>
             <br />
-            • Alcohol consumption is strictly prohibited on the bus, and any violation may result in immediate termination
-            of service without refund.
+            •{"\u00A0"}The{"\u00A0"}customer{"\u00A0"}is{"\u00A0"}required{"\u00A0"}to{"\u00A0"}pre-check{"\u00A0"}and{"\u00A0"}verify{"\u00A0"}the{"\u00A0"}bus{"\u00A0"}mileage{"\u00A0"}before{"\u00A0"}the{"\u00A0"}hire,{"\u00A0"}as{"\u00A0"}this{"\u00A0"}is{"\u00A0"}a{"\u00A0"}compulsory{"\u00A0"}procedure.
+            <br />
+            •{"\u00A0"}Google{"\u00A0"}Maps{"\u00A0"}mileage{"\u00A0"}may{"\u00A0"}differ{"\u00A0"}from{"\u00A0"}the{"\u00A0"}actual{"\u00A0"}mileage,{"\u00A0"}and{"\u00A0"}customers{"\u00A0"}must{"\u00A0"}rely{"\u00A0"}on{"\u00A0"}the{"\u00A0"}verified{"\u00A0"}mileage{"\u00A0"}recorded{"\u00A0"}at{"\u00A0"}the{"\u00A0"}start{"\u00A0"}of{"\u00A0"}the{"\u00A0"}hire.
+            <br />
+            •{"\u00A0"}Alcohol{"\u00A0"}consumption{"\u00A0"}is{"\u00A0"}strictly{"\u00A0"}prohibited{"\u00A0"}on{"\u00A0"}the{"\u00A0"}bus,{"\u00A0"}and{"\u00A0"}any{"\u00A0"}violation{"\u00A0"}may{"\u00A0"}result{"\u00A0"}in{"\u00A0"}immediate{"\u00A0"}termination{"\u00A0"}of{"\u00A0"}service{"\u00A0"}without{"\u00A0"}refund.
             <br />
             <br />
           </div>
         </div>
 
         {/* Footer */}
-        <div data-pdf-section="footer" className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center">
-          For more information call <strong>074 289 3612</strong>
-          <br />© 2025 NCG Express. All Rights Reserved.
+        <div data-pdf-section="footer" className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center" style={{ whiteSpace: "pre-wrap" }}>
+          For{"\u00A0"}more{"\u00A0"}information{"\u00A0"}call{"\u00A0"}<strong>074{"\u00A0"}289{"\u00A0"}3612</strong>
+          <br />©{"\u00A0"}2025{"\u00A0"}NCG{"\u00A0"}Express.{"\u00A0"}All{"\u00A0"}Rights{"\u00A0"}Reserved.
         </div>
       </div>
     </div>
