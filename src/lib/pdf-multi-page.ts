@@ -93,6 +93,7 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
       allowTaint: true,
       backgroundColor: '#ffffff',
       logging: false,
+      letterRendering: true,
     });
 
     const scaleFactor = CONTENT_WIDTH_MM / (canvas.width / 2);
