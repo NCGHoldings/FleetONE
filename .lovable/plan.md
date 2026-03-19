@@ -1,64 +1,66 @@
 
+## Goal
+Fix “spaces missing / words stick together” in Special Hire downloaded PDFs on macOS (Chrome/Safari), even though the PDF is image-based. The downloaded PDF must match the on-screen preview’s word spacing.
 
-# Special Hire Spreadsheet — Full Operations Tracking View
+## What’s causing it (most likely)
+In `src/lib/pdf-multi-page.ts`, `sectionBasedPDF()` currently uses `html2canvas` with `letterRendering: true`. On macOS this frequently causes html2canvas to render text with incorrect spacing (spaces collapse or get extremely thin), and because we embed that canvas as an image, the defect is preserved in the PDF.
 
-## What You Want
-A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
+## Implementation plan (minimal, targeted, keeps preview unchanged)
 
-## Column Mapping (Your Columns → Database Fields)
+### 1) Make html2canvas render text normally (primary fix)
+**File:** `src/lib/pdf-multi-page.ts`
 
-The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
+- Change `html2canvasOpts`:
+  - Remove `letterRendering: true` (or explicitly set `letterRendering: false`)
+  - Explicitly set:
+    - `foreignObjectRendering: false`
+    - `removeContainer: true`
+    - `scrollX: 0`, `scrollY: 0`
+- Rationale: this matches patterns already used elsewhere in the repo (invoice/lightvehicle/yutong generators) and is the most common fix for collapsed/missing spaces.
 
-| Group | Columns | Source |
-|---|---|---|
-| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
-| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
-| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
-| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
-| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
-| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
+### 2) Ensure fonts + images are fully ready before capture (stability fix)
+**File:** `src/lib/pdf-multi-page.ts`
 
-## Implementation Plan
+Add two small helpers and use them before each capture:
+- `await document.fonts.ready` (guarded: only if `document.fonts?.ready` exists)
+- Wait for images inside each `[data-pdf-page]`:
+  - For each `img`, do `await img.decode()` when available, otherwise wait for `load/error` (with a short timeout fallback)
+- Rationale: prevents html2canvas measuring text before fonts finalize (another common cause of subtle spacing/kerning issues).
 
-### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
-- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
-- Map to a flat `SpreadsheetHire` interface with all ~45 columns
-- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
-- Realtime subscription on `special_hire_quotations` for live updates
-- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
+### 3) Switch image encoding to PNG for sharper text edges (quality fix)
+**File:** `src/lib/pdf-multi-page.ts`
 
-### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
-- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
-- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
-- Inline click-to-edit cells for editable fields
-- Dropdown selects for status fields
-- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
-- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
-- Search, Refresh, Export Excel toolbar
+- Change `canvas.toDataURL('image/jpeg', 0.95)` → `canvas.toDataURL('image/png')`
+- Change `pdf.addImage(..., 'JPEG', ...)` → `pdf.addImage(..., 'PNG', ...)`
+- Rationale: JPEG subsampling can blur thin gaps/space edges, making “words stick” more noticeable. PNG is lossless.
 
-### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
-- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
+### 4) Add an `onclone` CSS normalization (last-mile fix for macOS)
+**File:** `src/lib/pdf-multi-page.ts`
 
-### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
-- New tab trigger with `Table2` icon labeled "Sheet"
-- TabsContent rendering `<SpecialHireSpreadsheet />`
+Add `onclone` in html2canvas options to apply a small style patch to the cloned document (only affects capture, not the visible preview), e.g.:
+- Force consistent spacing behavior:
+  - `letter-spacing: normal !important;`
+  - `word-spacing: normal !important;`
+  - `text-rendering: geometricPrecision;` (optional)
+  - `-webkit-font-smoothing: antialiased;` (optional)
+- Scope it to the cloned container (the passed `container` / `[data-pdf-page]` subtree) to avoid unintended side effects.
 
-### User-Friendly Design Decisions
-- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
-- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
-- **Smart defaults**: empty expense fields show "0" and are click-to-edit
-- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
-- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
+### 5) Keep the “1 page element = 1 PDF page” behavior
+No change to how pages are split: still capture each `[data-pdf-page]` as one canvas and insert into a corresponding PDF page. The fix is strictly about capture fidelity.
 
-### Files to Create/Edit
+## Acceptance checks
+1) On macOS (Chrome and Safari), open a Special Hire quotation → Download PDF:
+   - Verify word spacing is correct across:
+     - Header/meta block
+     - Tables
+     - Paragraph blocks (Extra Charges / Terms & Conditions)
+2) Verify no regression:
+   - No blank pages introduced
+   - Layout matches preview (same wrapping/line breaks as before)
+3) Quick spot-check another module that uses `sectionBasedPDF` (`DocumentPreviewModal` / `QuotationsList`) to ensure PDF generation still works.
 
-| File | Action |
-|---|---|
-| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
-| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
+## Files touched
+- `src/lib/pdf-multi-page.ts` (all changes concentrated here)
 
-### DB Note
-The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
-
+## Risk / rollback
+- If disabling `letterRendering` reintroduces any prior “character overlap” issues in other documents, we’ll add an optional `options` parameter to `sectionBasedPDF(container, { letterRendering?: boolean })` and only disable it for Special Hire flows. (We’ll only do this if we observe a regression.)
