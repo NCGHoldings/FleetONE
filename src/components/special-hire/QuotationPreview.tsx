@@ -393,7 +393,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     verticalAlign: "middle",
                   }}
                 >
-                  Drop-off Location
+                  Drop-off{"\u00A0"}Location
                 </th>
                 <td
                   style={{
