@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Download, Printer, Mail, Loader2, MessageCircle } from 'lucide-react';
 import { QuotationPreview } from './QuotationPreview';
 import { toast } from 'sonner';
-import { canvasToMultiPagePDF } from '@/lib/pdf-multi-page';
-import html2canvas from 'html2canvas';
+import { sectionBasedPDF } from '@/lib/pdf-multi-page';
 import { supabase } from '@/integrations/supabase/client';
 
 interface QuotationData {

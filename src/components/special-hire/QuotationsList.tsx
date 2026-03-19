@@ -24,8 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { canvasToMultiPagePDF } from '@/lib/pdf-multi-page';
-import html2canvas from 'html2canvas';
+import { sectionBasedPDF } from '@/lib/pdf-multi-page';
 import {
   AlertDialog,
   AlertDialogAction,
