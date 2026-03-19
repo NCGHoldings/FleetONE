@@ -1099,9 +1099,10 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           <br />
           <br />
         </div>
+        </div>
 
         {/* Footer */}
-        <div className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center">
+        <div data-pdf-section="footer" className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center">
           For more information call <strong>074 289 3612</strong>
           <br />© 2025 NCG Express. All Rights Reserved.
         </div>
