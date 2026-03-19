@@ -46,9 +46,6 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
   const SCALE = 2;
   const A4_WIDTH_MM = 210;
   const A4_HEIGHT_MM = 297;
-  const MARGIN_MM = 10;
-  const CONTENT_WIDTH_MM = A4_WIDTH_MM - MARGIN_MM * 2;
-  const CONTENT_HEIGHT_MM = A4_HEIGHT_MM - MARGIN_MM * 2;
   // Max pixels to scan upward looking for a safe break (at scale=2)
   const MAX_SEARCH_PX = 150 * SCALE;
 
@@ -67,8 +64,7 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
 
   // Pixels per mm at this scale
   const pxPerMM = imgWidth / A4_WIDTH_MM;
-  const pageContentHeightPx = CONTENT_HEIGHT_MM * pxPerMM;
-  const marginPx = MARGIN_MM * pxPerMM;
+  const pageContentHeightPx = A4_HEIGHT_MM * pxPerMM;
 
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const ctx = canvas.getContext('2d');
@@ -113,9 +109,8 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
 
     // Convert to image and add to PDF
     const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.92);
-    const destWidthMM = CONTENT_WIDTH_MM;
-    const destHeightMM = (sliceHeight / pxPerMM);
-    pdf.addImage(pageImgData, 'JPEG', MARGIN_MM, MARGIN_MM, destWidthMM, destHeightMM);
+    const destHeightMM = sliceHeight / pxPerMM;
+    pdf.addImage(pageImgData, 'JPEG', 0, 0, A4_WIDTH_MM, destHeightMM);
 
     currentY += sliceHeight;
     pageIndex++;
