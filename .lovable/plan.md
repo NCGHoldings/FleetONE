@@ -1,64 +1,49 @@
 
 
-# Special Hire Spreadsheet — Full Operations Tracking View
+# Fix Content Overflow and Blank Pages in Special Hire Quotation PDF
 
-## What You Want
-A single, wide spreadsheet (like the Yutong Orders Spreadsheet) for Special Hire that consolidates all hire data — from quotation through trip operations to financials — in one editable grid with inline editing, search, KPIs, and Excel export.
+## Problem
+Two issues visible in the screenshot:
 
-## Column Mapping (Your Columns → Database Fields)
+1. **Content overflowing the right edge** — The cancellation policy text is cut off on the right side. Root cause: every single space in body text paragraphs was replaced with `\u00A0` (non-breaking space). Combined with `whiteSpace: "pre-wrap"`, this creates unbreakable lines that cannot wrap, causing horizontal overflow.
 
-The spreadsheet will be organized into **color-coded column groups** for readability, with horizontal scroll and frozen first columns:
+2. **Blank pages in PDF** — The Page 2 div has `minHeight: "297mm"`, so even though the T&C content is shorter than a full A4 page, `html2canvas` captures the full 297mm height. The smart-break algorithm then sees this large canvas and may produce an extra blank page from the whitespace at the bottom.
 
-| Group | Columns | Source |
-|---|---|---|
-| **Hire Info** (blue) | #, No of Hires (quotation_no), Cancelled/Completed (status), Company Name, Customer Name, Contact Number, Route (pickup→drop), Type of Bus, No of Bus, Mileage (km_trip), Quotation Amount (gross_revenue), Completed Hires Amount (total_paid), Date (pickup_datetime), Addi. Cus Requests (special_request), Number of Days | `special_hire_quotations` + `bus_types` |
-| **Operations** (green) | Number of Buses Deployed, Bus Number (assigned_bus_no), Driver (assigned_driver_name), Assistant (assigned_conductor_name), From (pickup_location), To (drop_location), Pick up Time, Drop off Time, Remark (Operation) | `special_hire_quotations` |
-| **Invoice** (light blue) | Invoice Number, Invoiced Kilo Meters (actual_km from adjustments), Invoice Amount, Discount, Price After Discount | `special_hire_invoices` + `special_hire_trip_adjustments` |
-| **Meter/KM** (white) | Check In Meter, Check Out Meter, Actual Kilo Meters, Charges for Additional Distance, Charges for Additional Hours | `special_hire_trip_adjustments` |
-| **Expenses** (orange) | Fuel Cost (Actual), Driver Wages, Assistance Wages, Driver Meal Allowance, Assistance Meal Allowance, Wages, Maintenance, Other (Permit, Highway) | Editable — new `special_hire_trip_expenses` table or inline JSON on quotation |
-| **Summary** (yellow) | Net Income, Per Day Total Buses, Advance Payment, Advanced Payment Date, Balance Payment, Date, Remark | Computed + `special_hire_payments` |
+## Solution
 
-## Implementation Plan
+### File: `src/components/special-hire/QuotationPreview.tsx`
 
-### 1. New Hook: `src/hooks/useSpecialHireSpreadsheetData.ts`
-- Fetch confirmed quotations with joins to `bus_types`, `special_hire_payments`, `special_hire_invoices`, `special_hire_trip_adjustments`
-- Map to a flat `SpreadsheetHire` interface with all ~45 columns
-- Provide `updateField()` for inline edits (updates `special_hire_quotations` or related tables)
-- Realtime subscription on `special_hire_quotations` for live updates
-- Since expense fields (fuel cost actual, wages, meal allowances, maintenance, etc.) don't exist in the DB yet, store them as a JSON column `trip_expenses` on `special_hire_quotations` (avoids needing a new table — same pattern as `other_expenses` already on the table)
+**1. Remove `\u00A0` from all body text paragraphs (T&C, Extra Charges, etc.)**
+- Keep `\u00A0` only for short labels (e.g., "Bus\u00A0Type:", "Account\u00A0No.:")
+- Revert paragraph text back to regular spaces — the `whiteSpace: "pre-wrap"` style already preserves normal spaces during `html2canvas` capture
+- This allows long sentences to wrap naturally at the container boundary
 
-### 2. New Component: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`
-- Follow exact same pattern as `YutongSpreadsheetCore.tsx`
-- Color-coded column group headers (blue/green/light-blue/orange/yellow) matching the user's Excel screenshots
-- Inline click-to-edit cells for editable fields
-- Dropdown selects for status fields
-- Frozen first 2-3 columns (row #, quotation no) for horizontal scrolling
-- KPI cards: Total Hires, Total Revenue, Total Collected, Net Income
-- Search, Refresh, Export Excel toolbar
+**2. Add `overflowWrap: "break-word"` to both page containers**
+- As a safety net, add `overflowWrap: "break-word"` alongside `whiteSpace: "pre-wrap"` on both `data-pdf-page` divs to force word-breaking if any line still exceeds the container width
 
-### 3. Wrapper: `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx`
-- Simple wrapper like `YutongOrderSpreadsheet` with header + share capability
+**3. Change Page 2 `minHeight` to `height: "auto"`**
+- Remove `minHeight: "297mm"` from the Page 2 div so `html2canvas` only captures the actual content height, eliminating the blank space that produces empty PDF pages
 
-### 4. Add "Spreadsheet" Tab to `src/pages/SpecialHire.tsx`
-- New tab trigger with `Table2` icon labeled "Sheet"
-- TabsContent rendering `<SpecialHireSpreadsheet />`
+### File: `src/lib/pdf-multi-page.ts`
 
-### User-Friendly Design Decisions
-- **Column group color bands** in the header row matching the Excel screenshots (blue for hire info, green for operations, orange for expenses, yellow for financial summary)
-- **Sticky left columns** so quotation # stays visible while scrolling right through 40+ columns
-- **Smart defaults**: empty expense fields show "0" and are click-to-edit
-- **Auto-computed fields**: Net Income = Invoice Amount - total expenses; Balance = Quotation Amount - Total Paid
-- **Collapsible column groups**: ability to hide/show entire groups (e.g., hide Expenses group when just reviewing operations)
+**4. Skip near-empty canvases in `addCanvasToPDF`**
+- Add a guard: if a canvas slice's content height in mm is less than ~10mm (just whitespace), skip adding it as a page. This prevents blank pages from residual whitespace in any captured canvas.
 
-### Files to Create/Edit
+## Technical Detail
+```text
+Current issue:
+  "If\u00A0cancelled\u00A014\u00A0days\u00A0or\u00A0more..." 
+  → entire sentence is ONE unbreakable unit → overflows container
 
-| File | Action |
-|---|---|
-| `src/hooks/useSpecialHireSpreadsheetData.ts` | Create — data hook |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx` | Create — main grid |
-| `src/components/special-hire/spreadsheet/SpecialHireSpreadsheet.tsx` | Create — wrapper |
-| `src/pages/SpecialHire.tsx` | Edit — add Spreadsheet tab |
+Fix:
+  "If cancelled 14 days or more..."  (regular spaces)
+  + whiteSpace: "pre-wrap"           (preserves spaces in html2canvas)
+  + overflowWrap: "break-word"       (safety net for long words)
+  → text wraps normally within the A4 width
 
-### DB Note
-The expense fields (fuel cost actual, driver wages, assistance wages, meal allowances, maintenance, other permits/highway) will be stored in the existing `other_expenses` JSONB column on `special_hire_quotations`, extended with new keys. No new tables needed.
+Blank page fix:
+  Page 2: minHeight: "297mm" → removed (height: auto)
+  → html2canvas captures only actual content
+  → no extra whitespace → no blank PDF pages
+```
 
