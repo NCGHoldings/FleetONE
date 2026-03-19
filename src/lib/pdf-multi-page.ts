@@ -91,8 +91,15 @@ const addCanvasToPDF = (
       pageCtx.drawImage(canvas, 0, currentY, imgWidth, sliceHeight, 0, 0, imgWidth, sliceHeight);
     }
 
-    const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.92);
     const destHeightMM = sliceHeight / pxPerMM;
+
+    // Skip near-empty slices (less than 10mm of content) to avoid blank pages
+    if (destHeightMM < 10) {
+      currentY += sliceHeight;
+      continue;
+    }
+
+    const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.92);
     pdf.addImage(pageImgData, 'JPEG', 0, 0, a4WidthMM, destHeightMM);
 
     currentY += sliceHeight;
