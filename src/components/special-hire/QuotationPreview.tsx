@@ -951,6 +951,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             )}
           </tbody>
         </table>
+        </div>
 
         {/* Route Information */}
         {intermediateStops.length > 0 && (
