@@ -296,16 +296,7 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
 
     setIsDownloading(true);
     try {
-      // Use html2canvas to capture the quotation content
-      const canvas = await html2canvas(printRef.current, {
-        scale: 1.5, // Optimized for file size while maintaining print quality
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
-      });
-
-      // Create multi-page PDF from canvas
-      const pdf = canvasToMultiPagePDF(canvas);
+      const pdf = await sectionBasedPDF(printRef.current);
 
       // Generate filename with quotation number and date
       const date = new Date().toISOString().split('T')[0];
