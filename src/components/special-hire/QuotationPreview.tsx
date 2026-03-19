@@ -564,7 +564,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                   width: "27%",
                 }}
               >
-                Total Cost
+                Total{"\u00A0"}Cost
               </th>
             </tr>
           </thead>
