@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+import { canvasToMultiPagePDF } from '@/lib/pdf-multi-page';
 
 export interface RegenerateQuotationOptions {
   quotationId: string;
