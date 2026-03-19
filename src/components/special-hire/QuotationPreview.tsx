@@ -969,8 +969,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               {intermediateStops.map((stop: any, index: number) => (
                 <div key={index} className="flex items-center gap-2 text-sm mb-2 ml-4">
                   <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                  <span className="font-medium text-blue-600">Stop {index + 1}:</span>
-                  <span className="text-gray-800">{stop.location}</span>
+                  <span className="font-medium text-blue-600">Stop{"\u00A0"}{index + 1}:{"\u00A0"}</span>
+                  <span className="text-gray-800" style={{ whiteSpace: "pre-wrap" }}>{stop.location}</span>
                 </div>
               ))}
 
