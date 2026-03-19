@@ -79,7 +79,8 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
       allowTaint: true,
       backgroundColor: '#ffffff',
       logging: false,
-    });
+      letterRendering: true,
+    } as any);
     return canvasToMultiPagePDF(canvas);
   }
 
@@ -92,7 +93,8 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
       allowTaint: true,
       backgroundColor: '#ffffff',
       logging: false,
-    });
+      letterRendering: true,
+    } as any);
 
     const scaleFactor = CONTENT_WIDTH_MM / (canvas.width / 2);
     const sectionHeightMM = (canvas.height / 2) * scaleFactor;
