@@ -270,7 +270,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
 
         {/* Customer Details */}
-        <div className="mt-3">
+        <div data-pdf-section="customer-details" className="mt-3">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex items-center gap-1">
               <span className="font-semibold text-blue-600 min-w-[80px]">Company Name:</span>
