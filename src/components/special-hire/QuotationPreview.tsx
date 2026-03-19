@@ -1027,78 +1027,113 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
         </div>
 
+        {/* Footer for Page 1 */}
+        <div data-pdf-section="footer-p1" className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center">
+          For more information call <strong>074 289 3612</strong>
+          <br />© 2025 NCG Express. All Rights Reserved.
+        </div>
+      </div>
+
+      {/* ===== PAGE 2: Terms & Conditions ===== */}
+      <div
+        className="mx-auto bg-white shadow-lg relative"
+        style={{
+          width: "210mm",
+          minHeight: "297mm",
+          maxWidth: "210mm",
+          padding: "15mm",
+          boxSizing: "border-box",
+          pageBreakBefore: "always",
+          marginTop: "10px",
+        }}
+      >
+        {/* Mini Header for Page 2 */}
+        <div data-pdf-section="header-p2" className="flex justify-between items-start mb-4">
+          <div className="w-24">
+            <img
+              src="/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png"
+              alt="NCG Express Logo"
+              className="max-w-full h-auto"
+            />
+          </div>
+          <div className="text-right">
+            <div className="text-sm font-semibold text-blue-600">
+              Quotation No: {parsedQuotation.quotation_no}
+            </div>
+            <div className="text-xs text-gray-500">
+              Terms &amp; Conditions
+            </div>
+          </div>
+        </div>
+
         {/* Payment Info */}
         <div data-pdf-section="payment-info">
-        <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment Information</div>
-        <div className="text-xs leading-tight text-gray-800">
-          Account No. : 1934 1401 7578
-          <br />
-          Account Name : NCG EXPRESS (PVT) LTD
-          <br />
-          Bank Name : Sampath Bank, Nugegoda
-        </div>
+          <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment Information</div>
+          <div className="text-xs leading-tight text-gray-800">
+            Account No. : 1934 1401 7578
+            <br />
+            Account Name : NCG EXPRESS (PVT) LTD
+            <br />
+            Bank Name : Sampath Bank, Nugegoda
+          </div>
         </div>
 
         {/* Terms & Conditions */}
         <div data-pdf-section="terms-conditions">
-        <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Terms and Conditions</div>
-        <div className="text-xs leading-tight text-gray-800">
-          This quotation is valid for 7 days from the date of issue. Bookings must be confirmed within 3 working days to
-          avoid inconvenience.
-          <br />
-          <br />
-          <strong>Upon confirmation of hire:</strong> 50% advance payment of the total hire cost must be made. The
-          balance payment must be settled before the hire date.
-          <br />
-          <br />
-          <strong>Cancellation Policy:</strong>
-          <br />
-          • If cancelled 14 days or more before the hire date: 10% cancellation fee (based on the full hire rate) will
-          be charged. The balance of any advance payment will be refunded.
-          <br />
-          • If cancelled within 14 days of the hire date: 20% cancellation fee (based on the full hire rate) will be
-          charged. The balance of any advance payment will be refunded.
-          <br />
-          <br />
-          <strong>Excess Mileage:</strong> A flat charge applies for the first 5 km exceeding the agreed destination.
-          From the 6th km onwards, an additional per-km charge will be applied.
-          <br />
-          <br />
-          <strong>Excess Mileage:</strong> A flat charge applies for the first 5 km exceeding the agreed destination.
-          From the 6th km onwards, an additional per-km charge will be applied.
-          <br />
-          Any change in destination must be approved in writing by a higher official of NCG Express (Private) Limited.
-          <br />
-          <br />
-          <strong>Garbage Penalty (per bus):</strong>
-          <br />
-          • Rs. 5,000 for Leyland and D7 models.
-          <br />
-          • Rs. 10,000 for Super Luxury models.
-          <br />
-          <br />
-          <br />
-          <strong>Damage Policy:</strong> If the bus is damaged, the customer will be charged twice the actual repair
-          cost required to restore it to original condition.
-          <br />
-          <br />
-          For hires of more than one day, customers must provide food and accommodation for the driver. For further
-          information, please contact us at 074 289 3612.
-          <br />
-          <br />
-          <strong>Customer Responsibilities:</strong>
-          <br />
-          • The customer is required to pre-check and verify the bus mileage before the hire, as this is a compulsory
-          procedure.
-          <br />
-          • Google Maps mileage may differ from the actual mileage, and customers must rely on the verified mileage
-          recorded at the start of the hire.
-          <br />
-          • Alcohol consumption is strictly prohibited on the bus, and any violation may result in immediate termination
-          of service without refund.
-          <br />
-          <br />
-        </div>
+          <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Terms and Conditions</div>
+          <div className="text-xs leading-tight text-gray-800">
+            This quotation is valid for 7 days from the date of issue. Bookings must be confirmed within 3 working days to
+            avoid inconvenience.
+            <br />
+            <br />
+            <strong>Upon confirmation of hire:</strong> 50% advance payment of the total hire cost must be made. The
+            balance payment must be settled before the hire date.
+            <br />
+            <br />
+            <strong>Cancellation Policy:</strong>
+            <br />
+            • If cancelled 14 days or more before the hire date: 10% cancellation fee (based on the full hire rate) will
+            be charged. The balance of any advance payment will be refunded.
+            <br />
+            • If cancelled within 14 days of the hire date: 20% cancellation fee (based on the full hire rate) will be
+            charged. The balance of any advance payment will be refunded.
+            <br />
+            <br />
+            <strong>Excess Mileage:</strong> A flat charge applies for the first 5 km exceeding the agreed destination.
+            From the 6th km onwards, an additional per-km charge will be applied.
+            <br />
+            <br />
+            Any change in destination must be approved in writing by a higher official of NCG Express (Private) Limited.
+            <br />
+            <br />
+            <strong>Garbage Penalty (per bus):</strong>
+            <br />
+            • Rs. 5,000 for Leyland and D7 models.
+            <br />
+            • Rs. 10,000 for Super Luxury models.
+            <br />
+            <br />
+            <strong>Damage Policy:</strong> If the bus is damaged, the customer will be charged twice the actual repair
+            cost required to restore it to original condition.
+            <br />
+            <br />
+            For hires of more than one day, customers must provide food and accommodation for the driver. For further
+            information, please contact us at 074 289 3612.
+            <br />
+            <br />
+            <strong>Customer Responsibilities:</strong>
+            <br />
+            • The customer is required to pre-check and verify the bus mileage before the hire, as this is a compulsory
+            procedure.
+            <br />
+            • Google Maps mileage may differ from the actual mileage, and customers must rely on the verified mileage
+            recorded at the start of the hire.
+            <br />
+            • Alcohol consumption is strictly prohibited on the bus, and any violation may result in immediate termination
+            of service without refund.
+            <br />
+            <br />
+          </div>
         </div>
 
         {/* Footer */}
