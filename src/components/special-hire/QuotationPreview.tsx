@@ -279,7 +279,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <span className="text-gray-800">{parsedQuotation.company_name || "NCG Express"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="font-semibold text-blue-600 min-w-[80px]">Contact Number:</span>
+              <span className="font-semibold text-blue-600 min-w-[80px]">Contact{"\u00A0"}Number:</span>
               <span className="text-gray-800">{parsedQuotation.customer_phone}</span>
             </div>
             <div className="flex items-center gap-1">
