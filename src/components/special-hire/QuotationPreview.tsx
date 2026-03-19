@@ -1060,6 +1060,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           boxSizing: "border-box",
           pageBreakBefore: "always",
           marginTop: "10px",
+          whiteSpace: "pre-wrap",
         }}
       >
         {/* Mini Header for Page 2 */}
