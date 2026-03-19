@@ -118,8 +118,6 @@ const addCanvasToPDF = (
 export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> => {
   const SCALE = 2;
   const A4_WIDTH_MM = 210;
-  const A4_HEIGHT_MM = 297;
-  const MAX_SEARCH_PX = 250 * SCALE;
 
   const html2canvasOpts = {
     scale: SCALE,
@@ -131,21 +129,22 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
   } as any;
 
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageIndex = { value: 0 };
 
   // Check for explicit page boundary markers
   const pageElements = container.querySelectorAll<HTMLElement>('[data-pdf-page]');
+  const elements = pageElements.length > 0
+    ? Array.from(pageElements)
+    : [container];
 
-  if (pageElements.length > 1) {
-    // Multi-page mode: capture each page div independently
-    for (const pageEl of Array.from(pageElements)) {
-      const canvas = await html2canvas(pageEl, html2canvasOpts);
-      addCanvasToPDF(pdf, canvas, pageIndex, A4_WIDTH_MM, A4_HEIGHT_MM, MAX_SEARCH_PX);
-    }
-  } else {
-    // Fallback: capture entire container as one canvas
-    const canvas = await html2canvas(container, html2canvasOpts);
-    addCanvasToPDF(pdf, canvas, pageIndex, A4_WIDTH_MM, A4_HEIGHT_MM, MAX_SEARCH_PX);
+  for (let i = 0; i < elements.length; i++) {
+    const canvas = await html2canvas(elements[i], html2canvasOpts);
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+    // Scale image to fill A4 width, height is proportional
+    const imgHeightMM = (canvas.height * A4_WIDTH_MM) / canvas.width;
+
+    if (i > 0) pdf.addPage();
+    pdf.addImage(imgData, 'JPEG', 0, 0, A4_WIDTH_MM, imgHeightMM);
   }
 
   return pdf;
