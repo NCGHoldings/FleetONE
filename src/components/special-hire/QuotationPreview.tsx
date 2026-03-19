@@ -798,8 +798,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                         color: "#374151",
                       }}
                     >
-                      Final Total: LKR {calculateFinalCustomerTotal(parsedQuotation).toLocaleString()}
-                      {parsedQuotation.number_of_buses > 1 && (
+                       Final{"\u00A0"}Total:{"\u00A0"}LKR{"\u00A0"}{calculateFinalCustomerTotal(parsedQuotation).toLocaleString()}
+                    {parsedQuotation.number_of_buses > 1 && (
                         <div
                           style={{
                             fontSize: "10px",
@@ -808,7 +808,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                             marginTop: "2px",
                           }}
                         >
-                          Per Bus: LKR{" "}
+                          Per{"\u00A0"}Bus:{"\u00A0"}LKR{" "}
                           {(
                             calculateFinalCustomerTotal(parsedQuotation) / parsedQuotation.number_of_buses
                           ).toLocaleString()}
