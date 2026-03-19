@@ -1088,46 +1088,46 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         {/* Terms & Conditions */}
         <div data-pdf-section="terms-conditions">
           <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Terms{"\u00A0"}and{"\u00A0"}Conditions</div>
-          <div className="text-xs leading-tight text-gray-800" style={{ whiteSpace: "pre-wrap" }}>
-            This{"\u00A0"}quotation{"\u00A0"}is{"\u00A0"}valid{"\u00A0"}for{"\u00A0"}7{"\u00A0"}days{"\u00A0"}from{"\u00A0"}the{"\u00A0"}date{"\u00A0"}of{"\u00A0"}issue.{"\u00A0"}Bookings{"\u00A0"}must{"\u00A0"}be{"\u00A0"}confirmed{"\u00A0"}within{"\u00A0"}3{"\u00A0"}working{"\u00A0"}days{"\u00A0"}to{"\u00A0"}avoid{"\u00A0"}inconvenience.
+          <div className="text-xs leading-tight text-gray-800" style={{ whiteSpace: "pre-wrap", overflowWrap: "break-word" }}>
+            This quotation is valid for 7 days from the date of issue. Bookings must be confirmed within 3 working days to avoid inconvenience.
             <br />
             <br />
-            <strong>Upon{"\u00A0"}confirmation{"\u00A0"}of{"\u00A0"}hire:</strong>{"\u00A0"}50%{"\u00A0"}advance{"\u00A0"}payment{"\u00A0"}of{"\u00A0"}the{"\u00A0"}total{"\u00A0"}hire{"\u00A0"}cost{"\u00A0"}must{"\u00A0"}be{"\u00A0"}made.{"\u00A0"}The{"\u00A0"}balance{"\u00A0"}payment{"\u00A0"}must{"\u00A0"}be{"\u00A0"}settled{"\u00A0"}before{"\u00A0"}the{"\u00A0"}hire{"\u00A0"}date.
+            <strong>Upon confirmation of hire:</strong> 50% advance payment of the total hire cost must be made. The balance payment must be settled before the hire date.
             <br />
             <br />
-            <strong>Cancellation{"\u00A0"}Policy:</strong>
+            <strong>Cancellation Policy:</strong>
             <br />
-            •{"\u00A0"}If{"\u00A0"}cancelled{"\u00A0"}14{"\u00A0"}days{"\u00A0"}or{"\u00A0"}more{"\u00A0"}before{"\u00A0"}the{"\u00A0"}hire{"\u00A0"}date:{"\u00A0"}10%{"\u00A0"}cancellation{"\u00A0"}fee{"\u00A0"}(based{"\u00A0"}on{"\u00A0"}the{"\u00A0"}full{"\u00A0"}hire{"\u00A0"}rate){"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged.{"\u00A0"}The{"\u00A0"}balance{"\u00A0"}of{"\u00A0"}any{"\u00A0"}advance{"\u00A0"}payment{"\u00A0"}will{"\u00A0"}be{"\u00A0"}refunded.
+            • If cancelled 14 days or more before the hire date: 10% cancellation fee (based on the full hire rate) will be charged. The balance of any advance payment will be refunded.
             <br />
-            •{"\u00A0"}If{"\u00A0"}cancelled{"\u00A0"}within{"\u00A0"}14{"\u00A0"}days{"\u00A0"}of{"\u00A0"}the{"\u00A0"}hire{"\u00A0"}date:{"\u00A0"}20%{"\u00A0"}cancellation{"\u00A0"}fee{"\u00A0"}(based{"\u00A0"}on{"\u00A0"}the{"\u00A0"}full{"\u00A0"}hire{"\u00A0"}rate){"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged.{"\u00A0"}The{"\u00A0"}balance{"\u00A0"}of{"\u00A0"}any{"\u00A0"}advance{"\u00A0"}payment{"\u00A0"}will{"\u00A0"}be{"\u00A0"}refunded.
-            <br />
-            <br />
-            <strong>Excess{"\u00A0"}Mileage:</strong>{"\u00A0"}A{"\u00A0"}flat{"\u00A0"}charge{"\u00A0"}applies{"\u00A0"}for{"\u00A0"}the{"\u00A0"}first{"\u00A0"}5{"\u00A0"}km{"\u00A0"}exceeding{"\u00A0"}the{"\u00A0"}agreed{"\u00A0"}destination.{"\u00A0"}From{"\u00A0"}the{"\u00A0"}6th{"\u00A0"}km{"\u00A0"}onwards,{"\u00A0"}an{"\u00A0"}additional{"\u00A0"}per-km{"\u00A0"}charge{"\u00A0"}will{"\u00A0"}be{"\u00A0"}applied.
+            • If cancelled within 14 days of the hire date: 20% cancellation fee (based on the full hire rate) will be charged. The balance of any advance payment will be refunded.
             <br />
             <br />
-            Any{"\u00A0"}change{"\u00A0"}in{"\u00A0"}destination{"\u00A0"}must{"\u00A0"}be{"\u00A0"}approved{"\u00A0"}in{"\u00A0"}writing{"\u00A0"}by{"\u00A0"}a{"\u00A0"}higher{"\u00A0"}official{"\u00A0"}of{"\u00A0"}NCG{"\u00A0"}Express{"\u00A0"}(Private){"\u00A0"}Limited.
+            <strong>Excess Mileage:</strong> A flat charge applies for the first 5 km exceeding the agreed destination. From the 6th km onwards, an additional per-km charge will be applied.
             <br />
             <br />
-            <strong>Garbage{"\u00A0"}Penalty{"\u00A0"}(per{"\u00A0"}bus):</strong>
-            <br />
-            •{"\u00A0"}Rs.{"\u00A0"}5,000{"\u00A0"}for{"\u00A0"}Leyland{"\u00A0"}and{"\u00A0"}D7{"\u00A0"}models.
-            <br />
-            •{"\u00A0"}Rs.{"\u00A0"}10,000{"\u00A0"}for{"\u00A0"}Super{"\u00A0"}Luxury{"\u00A0"}models.
+            Any change in destination must be approved in writing by a higher official of NCG Express (Private) Limited.
             <br />
             <br />
-            <strong>Damage{"\u00A0"}Policy:</strong>{"\u00A0"}If{"\u00A0"}the{"\u00A0"}bus{"\u00A0"}is{"\u00A0"}damaged,{"\u00A0"}the{"\u00A0"}customer{"\u00A0"}will{"\u00A0"}be{"\u00A0"}charged{"\u00A0"}twice{"\u00A0"}the{"\u00A0"}actual{"\u00A0"}repair{"\u00A0"}cost{"\u00A0"}required{"\u00A0"}to{"\u00A0"}restore{"\u00A0"}it{"\u00A0"}to{"\u00A0"}original{"\u00A0"}condition.
+            <strong>Garbage Penalty (per bus):</strong>
+            <br />
+            • Rs. 5,000 for Leyland and D7 models.
+            <br />
+            • Rs. 10,000 for Super Luxury models.
             <br />
             <br />
-            For{"\u00A0"}hires{"\u00A0"}of{"\u00A0"}more{"\u00A0"}than{"\u00A0"}one{"\u00A0"}day,{"\u00A0"}customers{"\u00A0"}must{"\u00A0"}provide{"\u00A0"}food{"\u00A0"}and{"\u00A0"}accommodation{"\u00A0"}for{"\u00A0"}the{"\u00A0"}driver.{"\u00A0"}For{"\u00A0"}further{"\u00A0"}information,{"\u00A0"}please{"\u00A0"}contact{"\u00A0"}us{"\u00A0"}at{"\u00A0"}074{"\u00A0"}289{"\u00A0"}3612.
+            <strong>Damage Policy:</strong> If the bus is damaged, the customer will be charged twice the actual repair cost required to restore it to original condition.
             <br />
             <br />
-            <strong>Customer{"\u00A0"}Responsibilities:</strong>
+            For hires of more than one day, customers must provide food and accommodation for the driver. For further information, please contact us at 074 289 3612.
             <br />
-            •{"\u00A0"}The{"\u00A0"}customer{"\u00A0"}is{"\u00A0"}required{"\u00A0"}to{"\u00A0"}pre-check{"\u00A0"}and{"\u00A0"}verify{"\u00A0"}the{"\u00A0"}bus{"\u00A0"}mileage{"\u00A0"}before{"\u00A0"}the{"\u00A0"}hire,{"\u00A0"}as{"\u00A0"}this{"\u00A0"}is{"\u00A0"}a{"\u00A0"}compulsory{"\u00A0"}procedure.
             <br />
-            •{"\u00A0"}Google{"\u00A0"}Maps{"\u00A0"}mileage{"\u00A0"}may{"\u00A0"}differ{"\u00A0"}from{"\u00A0"}the{"\u00A0"}actual{"\u00A0"}mileage,{"\u00A0"}and{"\u00A0"}customers{"\u00A0"}must{"\u00A0"}rely{"\u00A0"}on{"\u00A0"}the{"\u00A0"}verified{"\u00A0"}mileage{"\u00A0"}recorded{"\u00A0"}at{"\u00A0"}the{"\u00A0"}start{"\u00A0"}of{"\u00A0"}the{"\u00A0"}hire.
+            <strong>Customer Responsibilities:</strong>
             <br />
-            •{"\u00A0"}Alcohol{"\u00A0"}consumption{"\u00A0"}is{"\u00A0"}strictly{"\u00A0"}prohibited{"\u00A0"}on{"\u00A0"}the{"\u00A0"}bus,{"\u00A0"}and{"\u00A0"}any{"\u00A0"}violation{"\u00A0"}may{"\u00A0"}result{"\u00A0"}in{"\u00A0"}immediate{"\u00A0"}termination{"\u00A0"}of{"\u00A0"}service{"\u00A0"}without{"\u00A0"}refund.
+            • The customer is required to pre-check and verify the bus mileage before the hire, as this is a compulsory procedure.
+            <br />
+            • Google Maps mileage may differ from the actual mileage, and customers must rely on the verified mileage recorded at the start of the hire.
+            <br />
+            • Alcohol consumption is strictly prohibited on the bus, and any violation may result in immediate termination of service without refund.
             <br />
             <br />
           </div>
