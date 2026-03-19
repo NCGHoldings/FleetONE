@@ -775,7 +775,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     }}
                   >
                     <div style={{ fontSize: "11px", color: "#374151", marginBottom: "4px" }}>
-                      Subtotal: LKR{" "}
+                      Subtotal:{"\u00A0"}LKR{" "}
                       {(() => {
                         const subtotal =
                           calculateFinalCustomerTotal(parsedQuotation) + (parsedQuotation.discount_amount_lkr || 0);
