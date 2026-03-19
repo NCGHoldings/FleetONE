@@ -237,7 +237,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         )}
 
         {/* Header */}
-        <div className="flex justify-between items-start mb-4">
+        <div data-pdf-section="header" className="flex justify-between items-start mb-4">
           {/* Logo */}
           <div className="w-32">
             <img
