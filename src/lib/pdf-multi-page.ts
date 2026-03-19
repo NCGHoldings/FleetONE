@@ -29,7 +29,7 @@ const findSafeBreakY = (
   const minY = Math.max(0, targetY - maxSearchUp);
   for (let y = targetY; y >= minY; y--) {
     const rowData = ctx.getImageData(0, y, canvasWidth, 1).data;
-    if (isRowWhite(rowData, canvasWidth)) {
+    if (isRowSafeToBreak(rowData, canvasWidth)) {
       return y;
     }
   }
