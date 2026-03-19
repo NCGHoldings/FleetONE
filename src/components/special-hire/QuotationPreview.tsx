@@ -1056,13 +1056,14 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         className="mx-auto bg-white shadow-lg relative"
         style={{
           width: "210mm",
-          minHeight: "297mm",
           maxWidth: "210mm",
           padding: "15mm",
           boxSizing: "border-box",
           pageBreakBefore: "always",
           marginTop: "10px",
           whiteSpace: "pre-wrap",
+          overflowWrap: "break-word",
+          wordWrap: "break-word",
         }}
       >
         {/* Mini Header for Page 2 */}
