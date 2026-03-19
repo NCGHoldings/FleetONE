@@ -119,13 +119,34 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
   const SCALE = 2;
   const A4_WIDTH_MM = 210;
 
+  // Wait for fonts to be fully loaded before capturing
+  if (document.fonts && document.fonts.ready) {
+    await document.fonts.ready;
+  }
+
   const html2canvasOpts = {
     scale: SCALE,
     useCORS: true,
     allowTaint: true,
     backgroundColor: '#ffffff',
     logging: false,
-    letterRendering: true,
+    letterRendering: false,
+    foreignObjectRendering: false,
+    removeContainer: true,
+    scrollX: 0,
+    scrollY: 0,
+    onclone: (clonedDoc: Document) => {
+      const style = clonedDoc.createElement('style');
+      style.textContent = `
+        * {
+          letter-spacing: normal !important;
+          word-spacing: normal !important;
+          text-rendering: geometricPrecision;
+          -webkit-font-smoothing: antialiased;
+        }
+      `;
+      clonedDoc.head.appendChild(style);
+    },
   } as any;
 
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -137,14 +158,28 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
     : [container];
 
   for (let i = 0; i < elements.length; i++) {
+    // Ensure all images in this section are loaded before capture
+    const images = Array.from(elements[i].querySelectorAll('img'));
+    await Promise.all(
+      images.map((img) =>
+        img.decode
+          ? img.decode().catch(() => {})
+          : new Promise<void>((resolve) => {
+              if (img.complete) return resolve();
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+            })
+      )
+    );
+
     const canvas = await html2canvas(elements[i], html2canvasOpts);
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const imgData = canvas.toDataURL('image/png');
 
     // Scale image to fill A4 width, height is proportional
     const imgHeightMM = (canvas.height * A4_WIDTH_MM) / canvas.width;
 
     if (i > 0) pdf.addPage();
-    pdf.addImage(imgData, 'JPEG', 0, 0, A4_WIDTH_MM, imgHeightMM);
+    pdf.addImage(imgData, 'PNG', 0, 0, A4_WIDTH_MM, imgHeightMM);
   }
 
   return pdf;
