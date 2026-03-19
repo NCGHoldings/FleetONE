@@ -64,8 +64,7 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
 
   // Pixels per mm at this scale
   const pxPerMM = imgWidth / A4_WIDTH_MM;
-  const pageContentHeightPx = CONTENT_HEIGHT_MM * pxPerMM;
-  const marginPx = MARGIN_MM * pxPerMM;
+  const pageContentHeightPx = A4_HEIGHT_MM * pxPerMM;
 
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const ctx = canvas.getContext('2d');
