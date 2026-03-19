@@ -468,6 +468,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
 
         {/* Vehicle Details */}
+        <div data-pdf-section="vehicle-details">
         <table
           style={{
             width: "100%",
