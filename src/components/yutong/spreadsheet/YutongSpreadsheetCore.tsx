@@ -12,6 +12,8 @@ import { SpreadsheetOrder, NewOrderData } from '@/hooks/useYutongSpreadsheetData
 import { SpreadsheetDOPanel, SpreadsheetPaymentPanel, SpreadsheetCRPanel } from './SpreadsheetQuickActions';
 import { SpreadsheetInvoicePanel, SpreadsheetRowActions } from './SpreadsheetInvoiceActions';
 import { useSpreadsheetQuickActions } from '@/hooks/useSpreadsheetQuickActions';
+import { useYutongCashReceipts, YutongCashReceipt } from '@/hooks/useYutongCashReceipts';
+import { YutongCashReceiptModal } from '@/components/yutong/YutongCashReceiptModal';
 import * as XLSX from 'xlsx';
 
 interface YutongSpreadsheetCoreProps {
