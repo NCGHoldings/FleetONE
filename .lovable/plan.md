@@ -1,29 +1,43 @@
 
 
-# Match Tax Invoice to Government EOG Format
+# Fix Cash Receipts Panel in Spreadsheet — Add Create & View
 
-## What's changing
-Update the Sri Lanka Tax Invoice HTML generator (`src/lib/sri-lanka-tax-invoice-generator.ts`) to exactly match the government EOG 02/04/05 format shown in the screenshot. This affects all modules (Yutong, Sinotruck, Light Vehicle) since they all call `generateSriLankaTaxInvoiceHTML`.
+## Problem
+The CR (Cash Receipts) column in the Yutong Orders Spreadsheet is read-only: it lists existing receipts but has no way to **create** a new cash receipt or **view** a receipt's full details (preview/download/sign). The DO and Payment panels both support creation; CR should match.
 
-## Current vs Target differences
-1. **Title**: Current uses underlined text; target has "Tax Invoice" in a double-bordered box centered at top
-2. **Labels**: Target shows underlined field labels (e.g., "Supplier's TIN:", "Date of Invoice:") — current uses bold only
-3. **Supplier/Purchaser block**: Target uses "Supplier's Name:" and "Purchaser's Name:" labels with underlines; current uses just "Name:"
-4. **Layout borders**: Target has clear black borders around every section/cell — matches a traditional printed government form
-5. **Overall aesthetic**: Clean, minimal government form look — no background colors on totals rows, no gray fills
+## Changes
 
-## File to edit
-**`src/lib/sri-lanka-tax-invoice-generator.ts`** — Update the HTML/CSS in `generateSriLankaTaxInvoiceHTML()`:
-- Restyle `.ti-title` to render inside a centered double-bordered box
-- Update label text to match screenshot exactly: "Supplier's TIN:", "Supplier's Name:", "Purchaser's TIN:", "Purchaser's Name:"
-- Add underline styling to all field labels
-- Remove gray background from totals row; keep all rows with consistent black borders
-- Ensure the items table header uses bold text on white/light background matching the screenshot
-- Keep all data bindings and placeholder logic identical — only HTML/CSS changes
+### 1. Add "Create Cash Receipt" to SpreadsheetCRPanel
+**File:** `src/components/yutong/spreadsheet/SpreadsheetQuickActions.tsx`
 
-## What stays the same
-- `SriLankaTaxInvoiceData` interface — no changes
-- `tax-invoice-template-resolver.ts` — no changes
-- All module generators (Yutong, Sinotruck, Light Vehicle) — they call the same function, so they automatically get the updated format
-- DB template system — the fallback generator is what we're updating
+- Add a `+ New CR` button in the CR popover header (matching the DO panel's `+ New DO` pattern)
+- Add an inline form with fields: Amount, Payment Method (cash/cheque/bank_transfer), Date, and optional Reference
+- Wire it to a new `createCR` prop that calls `useYutongCashReceipts().createCashReceipt()`
+- After creation, refetch the CR list to show the new receipt
+
+### 2. Add "View" button on each CR row
+**File:** `src/components/yutong/spreadsheet/SpreadsheetQuickActions.tsx`
+
+- Add a small "View" button on each receipt card in the CR popover
+- Clicking it opens `YutongCashReceiptModal` (the existing modal with preview, signatures, PDF download)
+- Need to fetch full receipt data (via `getCashReceiptByPaymentId` or direct query) since the CRRecord only has summary fields
+
+### 3. Wire createCR through the hook
+**File:** `src/hooks/useSpreadsheetQuickActions.ts`
+
+- Expose `createCashReceipt` from the existing `useYutongCashReceipts` hook (already imported)
+- Add a `createCR` wrapper function that accepts `(orderId, amount, method, date)`, calls `createCashReceipt` with a placeholder paymentId or null, and returns success/failure
+- Add to the returned object
+
+### 4. Update CRPanel props and wiring
+**File:** `src/components/yutong/spreadsheet/YutongSpreadsheetCore.tsx`
+
+- Pass `createCR` and `onViewReceipt` props to `SpreadsheetCRPanel`
+- Add state for the receipt view modal (`YutongCashReceiptModal`)
+- Import and render `YutongCashReceiptModal` at the bottom of the component
+
+## Files touched
+- `src/components/yutong/spreadsheet/SpreadsheetQuickActions.tsx` — Add create form + view button to CRPanel
+- `src/hooks/useSpreadsheetQuickActions.ts` — Expose createCR wrapper
+- `src/components/yutong/spreadsheet/YutongSpreadsheetCore.tsx` — Wire new props + add receipt view modal
 
