@@ -96,7 +96,7 @@ export function generateSriLankaTaxInvoiceHTML(data: SriLankaTaxInvoiceData): st
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: "Times New Roman", "Calibri", serif;
+    font-family: "Times New Roman", serif;
     font-size: 13px;
     color: #000;
     background: #fff;
@@ -114,13 +114,19 @@ export function generateSriLankaTaxInvoiceHTML(data: SriLankaTaxInvoiceData): st
     background: #fff;
     position: relative;
   }
-  .ti-title {
+  /* Double-bordered title box */
+  .ti-title-wrapper {
     text-align: center;
-    font-size: 22px;
+    padding: 12px 0 8px;
+  }
+  .ti-title-box {
+    display: inline-block;
+    border: 3px double #000;
+    padding: 6px 40px;
+    font-size: 20px;
     font-weight: bold;
-    padding: 15px 0 10px;
-    text-decoration: underline;
-    letter-spacing: 2px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
   }
   .ti-row {
     display: flex;
@@ -128,39 +134,45 @@ export function generateSriLankaTaxInvoiceHTML(data: SriLankaTaxInvoiceData): st
   }
   .ti-row .ti-cell {
     flex: 1;
-    padding: 8px 12px;
+    padding: 6px 10px;
     border-right: 1px solid #000;
     font-size: 13px;
   }
   .ti-row .ti-cell:last-child {
     border-right: none;
   }
-  .ti-block {
-    border-top: 1px solid #000;
-    padding: 10px 12px;
-  }
-  .ti-block-row {
-    display: flex;
-    margin: 3px 0;
-  }
-  .ti-block-label {
+  .ti-label {
+    text-decoration: underline;
     font-weight: bold;
-    min-width: 160px;
-    flex-shrink: 0;
-  }
-  .ti-block-value {
-    flex: 1;
   }
   .ti-two-blocks {
     display: flex;
     border-top: 1px solid #000;
   }
-  .ti-two-blocks .ti-block-half {
+  .ti-block-half {
     flex: 1;
-    padding: 10px 12px;
+    padding: 8px 10px;
   }
-  .ti-two-blocks .ti-block-half:first-child {
+  .ti-block-half:first-child {
     border-right: 1px solid #000;
+  }
+  .ti-block-row {
+    display: flex;
+    margin: 2px 0;
+    font-size: 13px;
+  }
+  .ti-block-label {
+    font-weight: bold;
+    text-decoration: underline;
+    min-width: 150px;
+    flex-shrink: 0;
+  }
+  .ti-block-value {
+    flex: 1;
+  }
+  .ti-block {
+    border-top: 1px solid #000;
+    padding: 6px 10px;
   }
   table.ti-items {
     width: 100%;
@@ -168,15 +180,18 @@ export function generateSriLankaTaxInvoiceHTML(data: SriLankaTaxInvoiceData): st
     border-top: 1px solid #000;
   }
   table.ti-items th {
-    background: #f0f0f0;
+    background: #fff;
     font-weight: bold;
     text-align: center;
-    padding: 10px 6px;
+    padding: 8px 4px;
     border: 1px solid #000;
     font-size: 12px;
+    text-decoration: underline;
   }
   table.ti-items td {
     font-size: 13px;
+    border: 1px solid #000;
+    padding: 6px 4px;
   }
   .ti-totals {
     border-top: 2px solid #000;
@@ -190,23 +205,25 @@ export function generateSriLankaTaxInvoiceHTML(data: SriLankaTaxInvoiceData): st
   }
   .ti-totals-label {
     flex: 1;
-    padding: 8px 12px;
+    padding: 6px 10px;
     font-weight: bold;
     border-right: 1px solid #000;
+    text-decoration: underline;
   }
   .ti-totals-value {
     width: 200px;
     text-align: right;
-    padding: 8px 12px;
+    padding: 6px 10px;
     font-weight: bold;
   }
   .ti-words-row {
     border-top: 1px solid #000;
-    padding: 10px 12px;
+    padding: 8px 10px;
   }
   .ti-words-label {
     font-weight: bold;
-    margin-bottom: 4px;
+    text-decoration: underline;
+    margin-bottom: 3px;
   }
   .ti-words-value {
     text-transform: uppercase;
@@ -215,31 +232,31 @@ export function generateSriLankaTaxInvoiceHTML(data: SriLankaTaxInvoiceData): st
   }
   .ti-payment-row {
     border-top: 1px solid #000;
-    padding: 8px 12px;
+    padding: 6px 10px;
     display: flex;
   }
   .ti-footer-ref {
     border-top: 1px solid #000;
-    padding: 6px 12px;
+    padding: 4px 10px;
     font-size: 10px;
-    color: #666;
+    color: #555;
     text-align: right;
   }
   .ti-signatures {
     border-top: 2px solid #000;
     display: flex;
-    padding: 20px 12px 30px;
+    padding: 20px 10px 25px;
     justify-content: space-between;
   }
   .ti-sig-box {
     flex: 1;
     text-align: center;
-    padding: 0 10px;
+    padding: 0 8px;
   }
   .ti-sig-line {
     border-bottom: 1px solid #000;
-    height: 60px;
-    margin: 0 15px 8px;
+    height: 55px;
+    margin: 0 12px 6px;
   }
   .ti-sig-label {
     font-weight: bold;
@@ -248,7 +265,7 @@ export function generateSriLankaTaxInvoiceHTML(data: SriLankaTaxInvoiceData): st
   .ti-sig-name {
     font-size: 11px;
     color: #444;
-    margin-top: 4px;
+    margin-top: 3px;
   }
   .ti-sig-image {
     max-height: 50px;
@@ -265,26 +282,28 @@ export function generateSriLankaTaxInvoiceHTML(data: SriLankaTaxInvoiceData): st
 <body>
 <div class="tax-invoice-container">
   <div class="tax-invoice-page">
-    <!-- Title -->
-    <div class="ti-title">Tax Invoice</div>
+    <!-- Title in double-bordered box -->
+    <div class="ti-title-wrapper">
+      <div class="ti-title-box">Tax Invoice</div>
+    </div>
 
     <!-- Date of Invoice | Tax Invoice No -->
     <div class="ti-row">
-      <div class="ti-cell"><strong>Date of Invoice :</strong> ${formatDate(data.invoiceDate)}</div>
-      <div class="ti-cell"><strong>Tax Invoice No. :</strong> ${data.taxInvoiceNo}</div>
+      <div class="ti-cell"><span class="ti-label">Date of Invoice :</span> ${formatDate(data.invoiceDate)}</div>
+      <div class="ti-cell"><span class="ti-label">Tax Invoice No. :</span> ${data.taxInvoiceNo}</div>
     </div>
 
     <!-- Supplier & Purchaser blocks side by side -->
     <div class="ti-two-blocks">
       <div class="ti-block-half">
         <div class="ti-block-row"><span class="ti-block-label">Supplier's TIN :</span><span class="ti-block-value">${data.supplierTin}</span></div>
-        <div class="ti-block-row"><span class="ti-block-label">Name :</span><span class="ti-block-value">${data.supplierName}</span></div>
+        <div class="ti-block-row"><span class="ti-block-label">Supplier's Name :</span><span class="ti-block-value">${data.supplierName}</span></div>
         <div class="ti-block-row"><span class="ti-block-label">Address :</span><span class="ti-block-value">${data.supplierAddress}</span></div>
         <div class="ti-block-row"><span class="ti-block-label">Telephone No. :</span><span class="ti-block-value">${data.supplierPhone}</span></div>
       </div>
       <div class="ti-block-half">
         <div class="ti-block-row"><span class="ti-block-label">Purchaser's TIN :</span><span class="ti-block-value">${data.purchaserTin}</span></div>
-        <div class="ti-block-row"><span class="ti-block-label">Name :</span><span class="ti-block-value">${data.purchaserName}</span></div>
+        <div class="ti-block-row"><span class="ti-block-label">Purchaser's Name :</span><span class="ti-block-value">${data.purchaserName}</span></div>
         <div class="ti-block-row"><span class="ti-block-label">Address :</span><span class="ti-block-value">${data.purchaserAddress}</span></div>
         <div class="ti-block-row"><span class="ti-block-label">Telephone No. :</span><span class="ti-block-value">${data.purchaserPhone}</span></div>
       </div>
@@ -292,12 +311,12 @@ export function generateSriLankaTaxInvoiceHTML(data: SriLankaTaxInvoiceData): st
 
     <!-- Date of Delivery | Place of Supply -->
     <div class="ti-row">
-      <div class="ti-cell"><strong>Date of Delivery :</strong> ${formatDate(data.dateOfDelivery)}</div>
-      <div class="ti-cell"><strong>Place of Supply :</strong> ${data.placeOfSupply || ''}</div>
+      <div class="ti-cell"><span class="ti-label">Date of Delivery :</span> ${formatDate(data.dateOfDelivery)}</div>
+      <div class="ti-cell"><span class="ti-label">Place of Supply :</span> ${data.placeOfSupply || ''}</div>
     </div>
 
     <!-- Additional Information -->
-    <div class="ti-block" style="border-top:1px solid #000; min-height:40px;">
+    <div class="ti-block" style="min-height:36px;">
       <div class="ti-block-row"><span class="ti-block-label">Additional Information :</span><span class="ti-block-value">${data.additionalInformation || ''}</span></div>
     </div>
 
@@ -328,7 +347,7 @@ export function generateSriLankaTaxInvoiceHTML(data: SriLankaTaxInvoiceData): st
         <div class="ti-totals-label">VAT Amount (Total Value of Supply @ ${vatRate}%)</div>
         <div class="ti-totals-value">${formatCurrency(vatAmount)}</div>
       </div>
-      <div class="ti-totals-row" style="background:#f0f0f0; font-size:15px;">
+      <div class="ti-totals-row" style="font-size:15px;">
         <div class="ti-totals-label">Total Amount including VAT</div>
         <div class="ti-totals-value">${formatCurrency(totalIncludingVat)}</div>
       </div>
