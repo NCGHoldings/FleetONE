@@ -525,6 +525,14 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Cash Receipt View Modal */}
+      <YutongCashReceiptModal
+        isOpen={receiptModalOpen}
+        onClose={() => { setReceiptModalOpen(false); setViewReceipt(null); }}
+        receipt={viewReceipt}
+        onRefresh={onRefresh}
+      />
     </div>
   );
 }
