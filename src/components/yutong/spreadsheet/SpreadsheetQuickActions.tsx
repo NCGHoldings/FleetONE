@@ -238,13 +238,17 @@ interface CRPanelProps {
   orderId: string;
   displayValue: string;
   fetchCRs: (id: string) => Promise<CRRecord[]>;
+  createCR: (orderId: string, amount: number, method: string, date: string, reference?: string) => Promise<boolean>;
+  onViewReceipt: (receiptId: string) => void;
   loading: boolean;
 }
 
-export function SpreadsheetCRPanel({ orderId, displayValue, fetchCRs, loading }: CRPanelProps) {
+export function SpreadsheetCRPanel({ orderId, displayValue, fetchCRs, createCR, onViewReceipt, loading }: CRPanelProps) {
   const [open, setOpen] = useState(false);
   const [crs, setCRs] = useState<CRRecord[]>([]);
   const [fetching, setFetching] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ amount: '', method: 'cash', date: new Date().toISOString().slice(0, 10), reference: '' });
 
   useEffect(() => {
     if (open) {
@@ -253,22 +257,38 @@ export function SpreadsheetCRPanel({ orderId, displayValue, fetchCRs, loading }:
     }
   }, [open, orderId, fetchCRs]);
 
+  const handleCreate = async () => {
+    const amt = parseFloat(form.amount);
+    if (isNaN(amt) || amt <= 0) return;
+    const ok = await createCR(orderId, amt, form.method, form.date, form.reference || undefined);
+    if (ok) {
+      setShowForm(false);
+      setForm({ amount: '', method: 'cash', date: new Date().toISOString().slice(0, 10), reference: '' });
+      fetchCRs(orderId).then(setCRs);
+    }
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="cursor-pointer hover:bg-primary/10 rounded px-1 py-0.5 text-xs text-right transition-colors flex items-center justify-end gap-1 min-h-[28px] w-full" title="Click to view cash receipts">
+        <button className="cursor-pointer hover:bg-primary/10 rounded px-1 py-0.5 text-xs text-right transition-colors flex items-center justify-end gap-1 min-h-[28px] w-full" title="Click to manage cash receipts">
           <Receipt className="h-3 w-3 text-muted-foreground shrink-0" />
           <span>{displayValue}</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-3" align="start">
+      <PopoverContent className="w-80 p-3" align="start">
         <div className="space-y-3">
-          <h4 className="font-semibold text-sm">Cash Receipts</h4>
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold text-sm">Cash Receipts</h4>
+            <Button size="sm" variant="outline" className="h-6 text-xs gap-1" onClick={() => setShowForm(!showForm)}>
+              <Plus className="h-3 w-3" /> New CR
+            </Button>
+          </div>
 
           {fetching ? (
             <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
           ) : crs.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-2">No cash receipts yet. Verify a payment to auto-generate.</p>
+            <p className="text-xs text-muted-foreground text-center py-2">No cash receipts yet</p>
           ) : (
             <div className="space-y-2 max-h-[200px] overflow-y-auto">
               {crs.map(cr => (
@@ -278,8 +298,46 @@ export function SpreadsheetCRPanel({ orderId, displayValue, fetchCRs, loading }:
                     {statusBadge(cr.status)}
                   </div>
                   <div className="text-muted-foreground">{cr.receipt_date} • {formatCurrency(cr.amount)}</div>
+                  <Button size="sm" variant="outline" className="h-5 text-[10px] w-full gap-1" onClick={() => onViewReceipt(cr.id)}>
+                    <FileText className="h-3 w-3" /> View Receipt
+                  </Button>
                 </div>
               ))}
+            </div>
+          )}
+
+          {showForm && (
+            <div className="border-t pt-2 space-y-2">
+              <div className="space-y-1">
+                <Label className="text-[10px]">Amount *</Label>
+                <Input type="number" className="h-7 text-xs" placeholder="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[10px]">Payment Method</Label>
+                  <Select value={form.method} onValueChange={v => setForm(p => ({ ...p, method: v }))}>
+                    <SelectTrigger className="h-7 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash" className="text-xs">Cash</SelectItem>
+                      <SelectItem value="cheque" className="text-xs">Cheque</SelectItem>
+                      <SelectItem value="bank_transfer" className="text-xs">Bank Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px]">Date</Label>
+                  <Input type="date" className="h-7 text-xs" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px]">Reference</Label>
+                <Input className="h-7 text-xs" value={form.reference} onChange={e => setForm(p => ({ ...p, reference: e.target.value }))} />
+              </div>
+              <Button size="sm" className="h-7 text-xs w-full" onClick={handleCreate} disabled={loading || !form.amount}>
+                {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null} Create Cash Receipt
+              </Button>
             </div>
           )}
         </div>

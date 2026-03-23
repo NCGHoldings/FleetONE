@@ -12,6 +12,8 @@ import { SpreadsheetOrder, NewOrderData } from '@/hooks/useYutongSpreadsheetData
 import { SpreadsheetDOPanel, SpreadsheetPaymentPanel, SpreadsheetCRPanel } from './SpreadsheetQuickActions';
 import { SpreadsheetInvoicePanel, SpreadsheetRowActions } from './SpreadsheetInvoiceActions';
 import { useSpreadsheetQuickActions } from '@/hooks/useSpreadsheetQuickActions';
+import { useYutongCashReceipts, YutongCashReceipt } from '@/hooks/useYutongCashReceipts';
+import { YutongCashReceiptModal } from '@/components/yutong/YutongCashReceiptModal';
 import * as XLSX from 'xlsx';
 
 interface YutongSpreadsheetCoreProps {
@@ -50,8 +52,24 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
   const [addForm, setAddForm] = useState<NewOrderData>({ ...emptyForm });
   const [addLoading, setAddLoading] = useState(false);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
+  const [viewReceiptId, setViewReceiptId] = useState<string | null>(null);
+  const [viewReceipt, setViewReceipt] = useState<YutongCashReceipt | null>(null);
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
 
   const quickActions = useSpreadsheetQuickActions(onRefresh);
+  const { getCashReceiptsForOrder } = useYutongCashReceipts();
+
+  const handleViewReceipt = useCallback(async (receiptId: string) => {
+    const { data, error } = await (await import('@/integrations/supabase/client')).supabase
+      .from('yutong_cash_receipts')
+      .select('*')
+      .eq('id', receiptId)
+      .single();
+    if (!error && data) {
+      setViewReceipt(data as YutongCashReceipt);
+      setReceiptModalOpen(true);
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return orders;
@@ -337,6 +355,8 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
                       orderId={order.id}
                       displayValue={order.cr_total ? formatCurrency(order.cr_total) : '-'}
                       fetchCRs={quickActions.fetchCRs}
+                      createCR={quickActions.createStandaloneCR}
+                      onViewReceipt={handleViewReceipt}
                       loading={quickActions.loading}
                     />
                   </td>
@@ -505,6 +525,14 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Cash Receipt View Modal */}
+      <YutongCashReceiptModal
+        isOpen={receiptModalOpen}
+        onClose={() => { setReceiptModalOpen(false); setViewReceipt(null); }}
+        receipt={viewReceipt}
+        onRefresh={onRefresh}
+      />
     </div>
   );
 }

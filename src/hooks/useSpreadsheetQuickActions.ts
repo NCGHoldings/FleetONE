@@ -267,6 +267,52 @@ export function useSpreadsheetQuickActions(refetch: () => void) {
     }
   }, [toast, refetch]);
 
+  // Create a standalone cash receipt (not tied to a payment verification)
+  const createStandaloneCR = useCallback(async (
+    orderId: string,
+    amount: number,
+    method: string,
+    date: string,
+    reference?: string,
+  ) => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { toast({ title: 'Auth required', variant: 'destructive' }); return false; }
+
+      // First create a payment record
+      const { data: payment, error: paymentError } = await supabase
+        .from('yutong_customer_payments')
+        .insert({
+          order_id: orderId,
+          payment_amount: amount,
+          payment_date: date,
+          payment_method: method,
+          payment_reference: reference || null,
+          status: 'verified',
+          verified_at: new Date().toISOString(),
+          verified_by: user.id,
+          created_by: user.id,
+        })
+        .select('id')
+        .single();
+
+      if (paymentError) throw paymentError;
+
+      // Then create the cash receipt
+      await createCashReceipt(payment.id, orderId, amount, method, date);
+
+      toast({ title: 'Cash Receipt Created', description: 'Payment recorded & receipt generated' });
+      refetch();
+      return true;
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [toast, refetch, createCashReceipt]);
+
   return {
     loading,
     fetchPayments,
@@ -276,5 +322,6 @@ export function useSpreadsheetQuickActions(refetch: () => void) {
     verifyPayment,
     createDO,
     updateDOStatus,
+    createStandaloneCR,
   };
 }
