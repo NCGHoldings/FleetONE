@@ -52,8 +52,24 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
   const [addForm, setAddForm] = useState<NewOrderData>({ ...emptyForm });
   const [addLoading, setAddLoading] = useState(false);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
+  const [viewReceiptId, setViewReceiptId] = useState<string | null>(null);
+  const [viewReceipt, setViewReceipt] = useState<YutongCashReceipt | null>(null);
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
 
   const quickActions = useSpreadsheetQuickActions(onRefresh);
+  const { getCashReceiptsForOrder } = useYutongCashReceipts();
+
+  const handleViewReceipt = useCallback(async (receiptId: string) => {
+    const { data, error } = await (await import('@/integrations/supabase/client')).supabase
+      .from('yutong_cash_receipts')
+      .select('*')
+      .eq('id', receiptId)
+      .single();
+    if (!error && data) {
+      setViewReceipt(data as YutongCashReceipt);
+      setReceiptModalOpen(true);
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return orders;
