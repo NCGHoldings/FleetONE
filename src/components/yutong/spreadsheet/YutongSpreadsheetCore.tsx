@@ -355,6 +355,8 @@ export function YutongSpreadsheetCore({ orders, loading, onUpdate, onRefresh, on
                       orderId={order.id}
                       displayValue={order.cr_total ? formatCurrency(order.cr_total) : '-'}
                       fetchCRs={quickActions.fetchCRs}
+                      createCR={quickActions.createStandaloneCR}
+                      onViewReceipt={handleViewReceipt}
                       loading={quickActions.loading}
                     />
                   </td>
