@@ -1,52 +1,49 @@
 
 
-# Fix Proforma Invoice Display and Logic
+# Fix Proforma Invoice: Customer Commitment, Leasing Breakdown & Hide Payment History
 
-## Problems Found
+## Problems from Screenshots
 
-From the screenshots and code review:
+1. **Customer Commitment defaults to 0** — should default to the markup amount (e.g., 110% of 38.25M = 3,825,000 extra = customer commitment)
+2. **Invoice page 1 totals** missing Customer Commitment and "To Be Leased" breakdown lines
+3. **Invoice page 2** shows Payment History and Payment Status on proforma — should be hidden entirely for proforma invoices
+4. **Bank details page** should only show bank info + signatures for proforma, no payment tracking
 
-1. **Invoice shows "110% OF TOTAL"** in the amount-in-words section (line 813) — this percentage should NEVER appear on the document shown to leasing companies
-2. **PAYMENT row appears on proforma** (line 820-821) — proforma invoices should not show payment history in the totals
-3. **TOTAL row shows 38,250,000** (actual bus value via `data.total`) instead of the declared amount (42,075,000) — inconsistent with the unit price/total column above
-4. **SUB TOTAL also shows 38,250,000** — should match the proforma/declared amount
-5. **Customer Commitment shows -3,825,000** (negative) in the modal — broken formula when proforma exceeds bus value
+## Changes
 
-## Fixes
+### File 1: `src/components/yutong/YutongInvoiceTypeModal.tsx`
 
-### File 1: `src/lib/yutong-order-invoice-generator.ts`
+**Default customer commitment** (lines 86-89): Change from `setCustomerCommitment(0)` to calculate default as `proformaAmount - totalAmount` when percentage > 100%, i.e. the markup portion. For percentage mode, auto-calculate: `Math.max(0, proformaAmount - totalAmount)`. Customer commitment field remains editable so user can override.
 
-**Line 813** — Remove percentage from amount-in-words label for proforma:
-- Change from: `AMOUNT IN WORD (${percentage}% OF TOTAL)`
-- Change to: `AMOUNT IN WORDS` (no percentage shown)
+**Pass customer commitment to invoice data**: Ensure `customerCommitment` and `leasingCompanyAmount` (= proformaAmount - customerCommitment) are passed in the config.
 
-**Lines 816-825** — Fix proforma totals section to use `displayAmount` consistently:
-- For proforma invoices:
-  - SUB TOTAL = `displayAmount` (the proforma/declared amount, e.g. 42,075,000)
-  - Hide PAYMENT row entirely (replace with empty or skip)
-  - TOTAL = `displayAmount`
-- For non-proforma, non-tax invoices: keep current behavior (subtotal, payment, balance)
+### File 2: `src/lib/yutong-order-invoice-generator.ts`
 
-**Line 847** — Remove percentage mention from proforma notice text:
-- Change from: "The amount shown represents X% of the total vehicle price."
-- Change to: "The amount shown is the declared vehicle value for financing purposes."
+**Add to interface** (lines 30-88): Add `customer_commitment?: number` and `leasing_amount?: number` fields to `YutongOrderInvoiceData`.
 
-### File 2: `src/components/yutong/YutongInvoiceTypeModal.tsx`
+**Restructure proforma totals** (lines 810-827): Change from 3-row footer (SUB TOTAL / empty / TOTAL) to 4-row footer for proforma:
 
-**Lines 96-98** — Fix customer commitment calculation:
-- When proforma exceeds total (percentage > 100% or fixed > total), customer commitment should default to 0 (not negative)
-- Formula: `Math.max(0, totalAmount - proformaAmount)` for auto-calc mode
-- In fixed mode, customer commitment remains independently editable
+```text
+SUB TOTAL          | 42,075,000.00
+Customer Commitment| 3,825,000.00
+                   |
+TO BE LEASED       | 38,250,000.00   (dark blue row, = total - commitment)
+```
 
-## Technical Details
+- Row 1: SUB TOTAL = displayAmount (declared vehicle value)
+- Row 2: Customer Commitment = `data.customer_commitment` (or 0)
+- Row 3: (amount in words spans these rows)
+- Row 4 (dark blue total-row): "TO BE LEASED" = displayAmount - customer_commitment
 
-The key variable `displayAmount` (line 95) already correctly resolves to `proforma_amount` for proforma invoices. The bug is that the totals footer rows at lines 816-825 bypass `displayAmount` and use `data.subtotal` and `data.total` directly.
+**Hide Payment History for proforma** (lines 884-938): Wrap the entire payment history section and payment status section in a `!isProforma` check. Proforma page 2 shows only bank details + signatures.
 
-The proforma invoice format should be clean:
-- One price shown throughout = declared vehicle value
-- Amount in words = declared vehicle value in words
-- SUB TOTAL = declared vehicle value
-- No PAYMENT row
-- TOTAL = declared vehicle value
-- Proforma notice = generic text without revealing percentage
+### File 3: `src/hooks/useYutongOrderInvoiceManagement.ts`
+
+Pass `customer_commitment` and `leasing_amount` from the proforma config through to the invoice data object stored in the document.
+
+## Summary
+- Customer commitment defaults to markup amount (proforma - actual bus value)
+- Invoice shows: SUB TOTAL (declared value), Customer Commitment, then "TO BE LEASED" (leasing portion) in dark blue
+- Page 2 hides all payment history/status for proforma invoices
+- All values remain editable in the modal
 
