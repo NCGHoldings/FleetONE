@@ -51,14 +51,14 @@ export const SinotruckInvoiceGenerator: React.FC<SinotruckInvoiceGeneratorProps>
     setLoading(true);
     try {
       const canvas = await html2canvas(printRef.current, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         allowTaint: false,
         backgroundColor: '#ffffff',
         logging: false
       });
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
       const pdf = new jsPDF('p', 'mm', 'a4');
       
       const pageWidth = 210;
