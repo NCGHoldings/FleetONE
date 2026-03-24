@@ -45,6 +45,9 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
   const [receipts, setReceipts] = useState<LightVehicleCashReceipt[]>([]);
   const [selectedReceipt, setSelectedReceipt] = useState<LightVehicleCashReceipt | null>(null);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   const { fetchReceiptsForOrder, createReceipt, isCreating } = useLightVehicleCashReceipts();
   
@@ -53,7 +56,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
     payment_date: new Date().toISOString().split('T')[0],
     payment_method: 'bank_transfer',
     reference_no: '',
-    bank_name: '',
+    bank_account_id: '',
     cheque_no: '',
     notes: ''
   });
