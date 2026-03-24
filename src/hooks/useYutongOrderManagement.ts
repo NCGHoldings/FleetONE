@@ -89,6 +89,7 @@ export const useYutongOrderManagement = () => {
           notes: data.notes,
           balance_due: quotation.total_price,
           created_by: user?.id,
+          customer_category_id: (quotation as any).customer_category_id || null,
         } as any)
         .select()
         .single();
