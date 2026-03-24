@@ -191,7 +191,7 @@ export function LightVehicleQuotationViewModal({ quotation, open, onClose }: Lig
         page.style.minHeight = originalMinHeight;
         page.style.maxWidth = originalMaxWidth;
 
-        const imgData = canvas.toDataURL('image/png');
+        const imgData = canvas.toDataURL('image/jpeg', 0.85);
         
         if (i > 0) {
           pdf.addPage();
