@@ -252,27 +252,22 @@ export const useDocumentManagement = () => {
 
       // Generate approved PDF
       const pdfBlob = await generateInvoicePDF(approvedInvoiceData);
-      const arrayBuffer = await pdfBlob.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      
-      let base64String = '';
-      const chunkSize = 1024;
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize);
-        base64String += String.fromCharCode.apply(null, Array.from(chunk));
-      }
-      const base64Data = btoa(base64String);
 
-      // Update document status and data
+      // Upload to storage
+      const newFileName = draftDoc.file_name.replace('DRAFT-', 'APPROVED-');
+      const { storagePath, fileSize } = await uploadPdfToStorage(pdfBlob, newFileName);
+
+      // Update document status and storage path
       const { error: updateError } = await supabase
         .from('document_storage')
         .update({
           document_status: 'approved',
-          document_data: base64Data,
-          file_name: draftDoc.file_name.replace('DRAFT-', 'APPROVED-'),
-          file_size: uint8Array.length,
+          document_data: '',
+          file_name: newFileName,
+          file_size: fileSize,
           approved_by: user?.id,
           approved_at: new Date().toISOString(),
+          storage_path: storagePath,
         })
         .eq('id', documentId);
 
