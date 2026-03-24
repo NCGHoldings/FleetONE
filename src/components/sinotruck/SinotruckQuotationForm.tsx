@@ -160,6 +160,7 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
         created_by: user?.id,
         inquiry_id: initialData?.inquiryId || null,
         referral_agent_id: formData.referral_agent_id || null,
+        customer_category_id: formData.customer_category_id || null,
       }]);
 
       if (error) throw error;
