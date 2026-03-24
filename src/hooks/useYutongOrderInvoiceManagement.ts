@@ -101,8 +101,20 @@ export function useYutongOrderInvoiceManagement() {
         throw new Error(`Invoice number generation failed: ${invoiceNoError.message}`);
       }
       
-      const invoiceNo = invoiceNoData as string;
-      console.log('✅ Invoice number generated:', invoiceNo);
+      let invoiceNo = invoiceNoData as string;
+      
+      // Add type prefix based on invoice category
+      const invoiceCat = invoiceData.invoice_category || 'direct_invoice';
+      const typePrefix = invoiceCat === 'proforma_invoice' ? 'PI-' 
+        : invoiceCat === 'tax_invoice' ? 'TI-' 
+        : 'CI-';
+      // Insert prefix after "NCGH-YT-" or at start
+      if (invoiceNo.includes('NCGH-YT-')) {
+        invoiceNo = invoiceNo.replace('NCGH-YT-', `NCGH-YT-${typePrefix}`);
+      } else {
+        invoiceNo = `${typePrefix}${invoiceNo}`;
+      }
+      console.log('✅ Invoice number generated with prefix:', invoiceNo);
       
       // For draft invoices, signatures will be added later via signature manager
       console.log('📝 Step 1.5: Invoice signatures will be managed separately');

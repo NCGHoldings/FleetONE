@@ -7,7 +7,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Building, Percent, AlertCircle, Receipt } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { FileText, Building, Percent, AlertCircle, Receipt, DollarSign, Users } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export interface ProformaInvoiceConfig {
@@ -17,6 +18,10 @@ export interface ProformaInvoiceConfig {
   financeCompanyName?: string;
   financeCompanyAddress?: string;
   proformaPurpose?: string;
+  amountMode?: 'percentage' | 'fixed';
+  declaredVehicleValue?: number;
+  customerCommitment?: number;
+  leasingCompanyAmount?: number;
    // Tax Invoice fields
    isTaxInvoice?: boolean;
    customerVatNumber?: string;
@@ -47,6 +52,7 @@ const FINANCE_PURPOSES = [
 ];
 
 const COMMON_PERCENTAGES = [60, 70, 80, 90];
+const COMMON_FIXED_INCREMENTS = [500000, 1000000, 2000000, 5000000];
 
 export function YutongInvoiceTypeModal({
   isOpen,
@@ -58,6 +64,9 @@ export function YutongInvoiceTypeModal({
 }: YutongInvoiceTypeModalProps) {
    const [invoiceCategory, setInvoiceCategory] = useState<'direct_invoice' | 'proforma_invoice' | 'tax_invoice'>(defaultInvoiceType);
   const [proformaPercentage, setProformaPercentage] = useState(70);
+  const [amountMode, setAmountMode] = useState<'percentage' | 'fixed'>('percentage');
+  const [fixedAmount, setFixedAmount] = useState(totalAmount);
+  const [customerCommitment, setCustomerCommitment] = useState(0);
   const [financeCompanyName, setFinanceCompanyName] = useState('');
   const [financeCompanyAddress, setFinanceCompanyAddress] = useState('');
   const [proformaPurpose, setProformaPurpose] = useState('bank_leasing');
@@ -74,7 +83,20 @@ export function YutongInvoiceTypeModal({
     setInvoiceCategory(defaultInvoiceType);
   }, [defaultInvoiceType, isOpen]);
 
-  const proformaAmount = Math.round((totalAmount * proformaPercentage) / 100);
+  useEffect(() => {
+    setFixedAmount(totalAmount);
+    setCustomerCommitment(0);
+  }, [totalAmount, isOpen]);
+
+  const proformaAmount = amountMode === 'percentage' 
+    ? Math.round((totalAmount * proformaPercentage) / 100)
+    : fixedAmount;
+
+  const leasingCompanyAmount = proformaAmount;
+  const effectiveCustomerCommitment = amountMode === 'fixed' 
+    ? customerCommitment 
+    : totalAmount - proformaAmount;
+  const declaredVehicleValue = proformaAmount > totalAmount ? proformaAmount : totalAmount;
    
    const taxRate = 18;
    const baseAmount = totalAmount / (1 + taxRate / 100);
@@ -84,11 +106,15 @@ export function YutongInvoiceTypeModal({
     const config: ProformaInvoiceConfig = {
       invoiceCategory,
       ...(invoiceCategory === 'proforma_invoice' && {
-        proformaAmountPercentage: proformaPercentage,
+        amountMode,
+        proformaAmountPercentage: amountMode === 'percentage' ? proformaPercentage : Math.round((proformaAmount / totalAmount) * 100),
         proformaAmount,
         financeCompanyName: financeCompanyName || undefined,
         financeCompanyAddress: financeCompanyAddress || undefined,
-        proformaPurpose
+        proformaPurpose,
+        declaredVehicleValue: proformaAmount > totalAmount ? proformaAmount : undefined,
+        customerCommitment: effectiveCustomerCommitment > 0 ? effectiveCustomerCommitment : undefined,
+        leasingCompanyAmount,
        }),
        ...(invoiceCategory === 'tax_invoice' && {
          isTaxInvoice: true,
@@ -108,6 +134,9 @@ export function YutongInvoiceTypeModal({
   const handleClose = () => {
     setInvoiceCategory('direct_invoice');
     setProformaPercentage(70);
+    setAmountMode('percentage');
+    setFixedAmount(totalAmount);
+    setCustomerCommitment(0);
     setFinanceCompanyName('');
     setFinanceCompanyAddress('');
     setProformaPurpose('bank_leasing');
@@ -159,7 +188,7 @@ export function YutongInvoiceTypeModal({
                   Proforma Invoice
                 </Label>
                 <p className="text-sm text-muted-foreground mt-1">
-                  For bank/finance company - partial amount for leasing purposes
+                  For bank/finance company - flexible amount for leasing purposes
                 </p>
               </div>
             </div>
@@ -276,50 +305,151 @@ export function YutongInvoiceTypeModal({
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Proforma invoice will be generated with the specified percentage of total amount for financing purposes.
+                  Proforma invoice for financing purposes. You can set the amount by percentage or enter a fixed amount (can exceed bus value).
                 </AlertDescription>
               </Alert>
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-2">
-                    <Percent className="h-4 w-4" />
-                    Invoice Amount Percentage
-                  </Label>
-                  <span className="text-lg font-bold text-primary">{proformaPercentage}%</span>
+              {/* Amount Mode Toggle */}
+              <div className="flex items-center justify-between p-3 bg-background rounded border">
+                <div className="flex items-center gap-2">
+                  <Percent className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm">Percentage</Label>
                 </div>
-                
-                <Slider
-                  value={[proformaPercentage]}
-                  onValueChange={([value]) => setProformaPercentage(value)}
-                  min={10}
-                  max={100}
-                  step={5}
-                  className="w-full"
+                <Switch
+                  checked={amountMode === 'fixed'}
+                  onCheckedChange={(checked) => setAmountMode(checked ? 'fixed' : 'percentage')}
                 />
-                
-                <div className="flex gap-2 flex-wrap">
-                  {COMMON_PERCENTAGES.map((pct) => (
-                    <Button
-                      key={pct}
-                      type="button"
-                      variant={proformaPercentage === pct ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setProformaPercentage(pct)}
-                    >
-                      {pct}%
-                    </Button>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm">Fixed Amount</Label>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </div>
+              </div>
 
-                <div className="grid grid-cols-2 gap-4 p-3 bg-background rounded border">
+              {amountMode === 'percentage' ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2">
+                      <Percent className="h-4 w-4" />
+                      Invoice Amount Percentage
+                    </Label>
+                    <span className="text-lg font-bold text-primary">{proformaPercentage}%</span>
+                  </div>
+                  
+                  <Slider
+                    value={[proformaPercentage]}
+                    onValueChange={([value]) => setProformaPercentage(value)}
+                    min={10}
+                    max={150}
+                    step={5}
+                    className="w-full"
+                  />
+                  
+                  <div className="flex gap-2 flex-wrap">
+                    {COMMON_PERCENTAGES.map((pct) => (
+                      <Button
+                        key={pct}
+                        type="button"
+                        variant={proformaPercentage === pct ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setProformaPercentage(pct)}
+                      >
+                        {pct}%
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Proforma Invoice Amount (LKR)
+                    </Label>
+                    <Input
+                      type="number"
+                      value={fixedAmount}
+                      onChange={(e) => setFixedAmount(Number(e.target.value) || 0)}
+                      min={0}
+                      className="text-lg font-bold"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2 flex-wrap">
+                    {COMMON_FIXED_INCREMENTS.map((inc) => (
+                      <Button
+                        key={inc}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFixedAmount(totalAmount + inc)}
+                      >
+                        +{(inc / 1000000).toFixed(1)}M
+                      </Button>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFixedAmount(totalAmount)}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+
+                  {fixedAmount > totalAmount && (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-xs">
+                        Proforma amount exceeds actual bus value by LKR {(fixedAmount - totalAmount).toLocaleString()}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
+
+              {/* Amount Breakdown */}
+              <div className="space-y-3 p-3 bg-background rounded border">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="h-4 w-4 text-primary" />
+                  <Label className="font-semibold text-sm">Amount Breakdown</Label>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-muted-foreground">Total Amount</p>
+                    <p className="text-xs text-muted-foreground">Actual Bus Value</p>
                     <p className="font-medium">LKR {totalAmount.toLocaleString()}</p>
                   </div>
+                  {proformaAmount > totalAmount && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Declared Vehicle Value</p>
+                      <p className="font-bold text-primary">LKR {proformaAmount.toLocaleString()}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t pt-3 space-y-2">
                   <div>
-                    <p className="text-xs text-muted-foreground">Proforma Amount</p>
-                    <p className="font-bold text-primary">LKR {proformaAmount.toLocaleString()}</p>
+                    <Label className="text-xs text-muted-foreground">Leasing Company Amount</Label>
+                    <p className="font-bold text-primary text-lg">LKR {leasingCompanyAmount.toLocaleString()}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Customer Commitment (LKR)</Label>
+                    <Input
+                      type="number"
+                      value={effectiveCustomerCommitment}
+                      onChange={(e) => {
+                        if (amountMode === 'fixed') {
+                          setCustomerCommitment(Number(e.target.value) || 0);
+                        }
+                      }}
+                      disabled={amountMode === 'percentage'}
+                      min={0}
+                      className="text-sm"
+                    />
+                    {amountMode === 'percentage' && (
+                      <p className="text-xs text-muted-foreground italic">Auto-calculated: Total - Proforma</p>
+                    )}
                   </div>
                 </div>
               </div>

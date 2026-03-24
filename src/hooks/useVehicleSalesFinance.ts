@@ -461,6 +461,9 @@ export async function postVehicleInvoiceToGL({
   invoiceAmount,
   settings,
   effectiveCompanyId,
+  isTaxInvoice,
+  taxRate,
+  invoiceNo,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -469,6 +472,9 @@ export async function postVehicleInvoiceToGL({
   invoiceAmount: number;
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
+  isTaxInvoice?: boolean;
+  taxRate?: number;
+  invoiceNo?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
