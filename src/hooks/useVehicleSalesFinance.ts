@@ -267,21 +267,25 @@ export async function createVehicleARInvoice({
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 30); // 30-day payment terms
 
+    const arStatus = status || (advanceAmount >= totalAmount ? 'paid' : advanceAmount > 0 ? 'partial' : 'unpaid');
+
     const { data: invoice, error: invoiceError } = await supabase
       .from('ar_invoices')
       .insert({
         company_id: companyId,
         customer_id: customerId,
-        invoice_number: invoiceNumber,
+        invoice_number: invoiceNo || invoiceNumber,
         invoice_date: new Date().toISOString().split('T')[0],
         due_date: dueDate.toISOString().split('T')[0],
         total_amount: totalAmount,
+        tax_amount: taxAmount || null,
+        subtotal: taxAmount ? totalAmount - taxAmount : null,
         paid_amount: advanceAmount,
         balance: totalAmount - advanceAmount,
-        status: advanceAmount >= totalAmount ? 'paid' : advanceAmount > 0 ? 'partial' : 'unpaid',
-        reference: orderNo,
+        status: arStatus,
+        reference: invoiceNo || orderNo,
         business_unit_code: businessUnitCode,
-        notes: `${module.charAt(0).toUpperCase() + module.slice(1)} vehicle order: ${orderNo}`,
+        notes: `${module.charAt(0).toUpperCase() + module.slice(1)} vehicle order: ${orderNo}${invoiceNo ? ` | Invoice: ${invoiceNo}` : ''}`,
       })
       .select('id, invoice_number')
       .single();
