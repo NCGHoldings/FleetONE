@@ -334,9 +334,11 @@ export function useYutongOrderInvoiceManagement() {
             orderNo,
             customerId: orderDetails.finance_customer_id,
             totalAmount: invoiceAmount,
-            advanceAmount: totalPaid, // Apply already verified payments
+            advanceAmount: totalPaid,
             companyId: NCG_HOLDING_ID,
             settings,
+            customerCategoryId: (orderDetails as any)?.customer_category_id 
+              || orderDetails?.yutong_quotations?.customer_category_id,
           });
 
           if (arResult) {
