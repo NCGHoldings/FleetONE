@@ -1,67 +1,26 @@
 
 
-# Reduce PDF File Sizes Across All Modules
+# Fix: `bank_account_id` Column Missing from Payment Tables
 
 ## Problem
-All document PDFs (special hire quotations, invoices, receipts, advance details) are excessively large because:
+The error `"Could not find the 'bank_account_id' column of 'yutong_customer_payments' in the schema cache"` occurs because the recent code changes insert `bank_account_id` into payment records, but this column was never added to the database.
 
-1. **PNG format used everywhere** -- 12 files use `toDataURL('image/png')` + `addImage(..., 'PNG')`. PNG is lossless and produces files 5-10x larger than JPEG for document screenshots
-2. **High canvas scale (2x-2.5x)** -- every `html2canvas` call uses `scale: 2` or `scale: 2.5`, generating 4-6x more pixels than needed for A4 print quality
-3. **Base64 stored in database** -- the `document_storage` table holds PDFs as base64 text, adding 33% overhead. Current total: ~172MB base64 across 130 documents. Yutong invoices average 14MB each
+Same issue affects `sinotruck_customer_payments` and `lightvehicle_customer_payments`.
 
-## Solution
+## Fix
 
-### 1. Switch all PDF generation from PNG to JPEG with compression
-Change every `toDataURL('image/png')` + `addImage(..., 'PNG')` to `toDataURL('image/jpeg', 0.85)` + `addImage(..., 'JPEG')` across all 12 files. This alone typically reduces file size by 70-80%.
+### 1. Database Migration
+Add `bank_account_id UUID` column to all three payment tables with a foreign key to `bank_accounts`:
+- `yutong_customer_payments`
+- `sinotruck_customer_payments`  
+- `lightvehicle_customer_payments`
 
-### 2. Reduce html2canvas scale from 2/2.5 to 1.5
-Scale 1.5 still produces 150 DPI effective resolution on A4 -- perfectly sharp for print. Reduces pixel count by ~55% vs scale 2.
+Also add `payment_slip_url TEXT` to `sinotruck_customer_payments` (it already has `receipt_url` but the code references `payment_slip_url`).
 
-### 3. Migrate document storage from database to Supabase Storage
-- Store PDFs in a `generated-documents` storage bucket instead of the `document_data` TEXT column
-- Keep metadata (file_name, file_size, quotation_id, etc.) in `document_storage` table
-- Add a `storage_path` column to reference the file in storage
-- Update all read/write operations to use storage instead of the TEXT column
-- This eliminates the 33% base64 overhead and moves large blobs out of the database
+### 2. Code Fix for Sinotruck
+The `sinotruck_customer_payments` table uses `amount` instead of `payment_amount` and `reference_number` instead of `payment_reference`. Verify the Sinotruck and Light Vehicle payment tracking components insert using the correct column names.
 
-### 4. Compress and migrate existing documents
-- Run a data migration to re-encode existing base64 documents into the storage bucket
-- Set `document_data` to NULL after migration to reclaim DB space
-
-## Files to Change
-
-**PDF generation (PNG→JPEG + scale reduction):**
-- `src/lib/pdf-multi-page.ts` -- core multi-page generator
-- `src/lib/yutong-invoice-generator.ts`
-- `src/lib/yutong-order-invoice-generator.ts`
-- `src/lib/sinotruck-order-invoice-generator.ts`
-- `src/lib/lightvehicle-order-invoice-generator.ts`
-- `src/lib/invoice-generator.ts`
-- `src/lib/advance-details-generator.ts`
-- `src/components/yutong/YutongQuotationViewModal.tsx`
-- `src/components/yutong/YutongCashReceiptModal.tsx`
-- `src/components/sinotruck/SinotruckQuotationViewModal.tsx`
-- `src/components/sinotruck/SinotruckInvoiceGenerator.tsx`
-- `src/components/sinotruck/SinotruckCashReceiptModal.tsx`
-- `src/components/lightvehicle/LightVehicleQuotationViewModal.tsx`
-- `src/components/lightvehicle/LightVehicleCashReceiptModal.tsx`
-- `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx`
-- `src/components/shared/UnifiedDocumentPreview.tsx`
-- `src/components/special-hire/EnhancedPDFViewer.tsx`
-- `src/lib/yutong-quotation-regenerator.ts`
-
-**Storage migration:**
-- New Supabase migration (add `storage_path` column, create `generated-documents` bucket)
-- `src/hooks/useDocumentManagement.ts` -- upload to storage instead of inserting base64
-- `src/hooks/useYutongInvoiceManagement.ts` -- same
-- `src/hooks/useDocumentRegeneration.ts` -- same
-- `src/hooks/useFinanceApproval.ts` -- same
-- `src/components/special-hire/DocumentViewer.tsx` -- read from storage
-- `src/components/special-hire/EnhancedDocumentViewer.tsx` -- read from storage
-- `src/components/special-hire/GenerateBalanceInvoiceModal.tsx` -- upload to storage
-
-## Expected Impact
-- Individual PDF size: ~10MB → ~500KB-1MB (90% reduction)
-- Database size: ~172MB base64 → metadata only (~1MB)
-- Total storage: moved to Supabase Storage bucket with efficient binary storage
+## Files
+- New Supabase migration (add columns)
+- Possibly minor column-name fixes in `SinotruckPaymentTracking.tsx` if mismatched
 
