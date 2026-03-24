@@ -62,10 +62,29 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
   });
 
   useEffect(() => {
+    loadBankAccounts();
+  }, []);
+
+  useEffect(() => {
     if (orderId) {
       loadPaymentData();
     }
   }, [orderId]);
+
+  const loadBankAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('id, account_name, bank_name, account_number')
+        .eq('company_id', NCG_HOLDING_ID)
+        .eq('is_active', true)
+        .order('bank_name');
+      if (error) throw error;
+      setBankAccounts(data || []);
+    } catch (error) {
+      console.error('Error loading bank accounts:', error);
+    }
+  };
 
   const loadPaymentData = async () => {
     setIsLoading(true);
