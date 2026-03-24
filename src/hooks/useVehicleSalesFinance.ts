@@ -239,6 +239,9 @@ export async function createVehicleARInvoice({
   companyId,
   settings,
   customerCategoryId,
+  invoiceNo,
+  taxAmount,
+  status,
 }: {
   module: VehicleModule;
   orderId: string;
@@ -249,6 +252,9 @@ export async function createVehicleARInvoice({
   companyId: string;
   settings: VehicleFinanceSettings;
   customerCategoryId?: string;
+  invoiceNo?: string;
+  taxAmount?: number;
+  status?: string;
 }): Promise<{ invoiceId: string; invoiceNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
