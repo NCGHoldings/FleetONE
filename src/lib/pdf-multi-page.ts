@@ -116,7 +116,7 @@ const addCanvasToPDF = (
  * to capturing the entire container as one canvas.
  */
 export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> => {
-  const SCALE = 2;
+  const SCALE = 1.5;
   const A4_WIDTH_MM = 210;
 
   // Wait for fonts to be fully loaded before capturing
