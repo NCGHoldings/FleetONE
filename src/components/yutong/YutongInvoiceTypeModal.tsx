@@ -498,7 +498,7 @@ export function YutongInvoiceTypeModal({
                   <div className="grid grid-cols-2 gap-3 p-2 bg-muted/50 rounded text-sm">
                     <div>
                       <p className="text-xs text-muted-foreground">Customer Commitment</p>
-                      <p className="font-semibold text-orange-600">LKR {effectiveCustomerCommitment.toLocaleString()}</p>
+                      <p className="font-semibold text-destructive">LKR {effectiveCustomerCommitment.toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">To Be Leased</p>
