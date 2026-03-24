@@ -213,6 +213,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         customer_type: data.customer_type || 'personal',
         business_registration_number: data.business_registration_number || null,
         tax_registration_number: data.tax_registration_number || null,
+        customer_category_id: (data as any).customer_category_id || null,
         created_by: user?.id
       };
 
