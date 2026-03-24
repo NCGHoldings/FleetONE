@@ -11648,6 +11648,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           customer_address: string | null
+          customer_category_id: string | null
           customer_email: string | null
           customer_name: string
           customer_phone: string | null
@@ -11697,6 +11698,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           customer_address?: string | null
+          customer_category_id?: string | null
           customer_email?: string | null
           customer_name: string
           customer_phone?: string | null
@@ -11746,6 +11748,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           customer_address?: string | null
+          customer_category_id?: string | null
           customer_email?: string | null
           customer_name?: string
           customer_phone?: string | null
@@ -11784,6 +11787,13 @@ export type Database = {
           year?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lightvehicle_quotations_customer_category_id_fkey"
+            columns: ["customer_category_id"]
+            isOneToOne: false
+            referencedRelation: "customer_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lightvehicle_quotations_model_id_fkey"
             columns: ["model_id"]
@@ -19477,6 +19487,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           customer_address: string | null
+          customer_category_id: string | null
           customer_id: string | null
           customer_name: string
           id: string
@@ -19508,6 +19519,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           customer_address?: string | null
+          customer_category_id?: string | null
           customer_id?: string | null
           customer_name: string
           id?: string
@@ -19539,6 +19551,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           customer_address?: string | null
+          customer_category_id?: string | null
           customer_id?: string | null
           customer_name?: string
           id?: string
@@ -19562,6 +19575,13 @@ export type Database = {
           year?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "sinotruck_quotations_customer_category_id_fkey"
+            columns: ["customer_category_id"]
+            isOneToOne: false
+            referencedRelation: "customer_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sinotruck_quotations_customer_id_fkey"
             columns: ["customer_id"]
@@ -26371,6 +26391,7 @@ export type Database = {
           created_by: string | null
           curtain_colour: string | null
           customer_address: string | null
+          customer_category_id: string | null
           customer_email: string | null
           customer_id: string | null
           customer_name: string
@@ -26424,6 +26445,7 @@ export type Database = {
           created_by?: string | null
           curtain_colour?: string | null
           customer_address?: string | null
+          customer_category_id?: string | null
           customer_email?: string | null
           customer_id?: string | null
           customer_name: string
@@ -26477,6 +26499,7 @@ export type Database = {
           created_by?: string | null
           curtain_colour?: string | null
           customer_address?: string | null
+          customer_category_id?: string | null
           customer_email?: string | null
           customer_id?: string | null
           customer_name?: string
@@ -26524,6 +26547,13 @@ export type Database = {
             columns: ["bus_model_id"]
             isOneToOne: false
             referencedRelation: "yutong_bus_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_quotations_customer_category_id_fkey"
+            columns: ["customer_category_id"]
+            isOneToOne: false
+            referencedRelation: "customer_categories"
             referencedColumns: ["id"]
           },
           {

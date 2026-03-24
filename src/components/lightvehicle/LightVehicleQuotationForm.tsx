@@ -11,9 +11,11 @@ import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useActiveCustomerCategories } from '@/hooks/useCustomerCategories';
 
 const formSchema = z.object({
   customer_type: z.enum(['personal', 'company']).default('personal'),
+  customer_category_id: z.string().optional(),
   customer_name: z.string().min(1, 'Customer name is required'),
   representative_name: z.string().optional(),
   designation: z.string().optional(),
@@ -76,6 +78,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel }: LightVehicleQu
   const [responsiblePersons, setResponsiblePersons] = useState<ResponsiblePerson[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { data: customerCategories } = useActiveCustomerCategories();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -209,6 +212,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel }: LightVehicleQu
         status: 'draft',
         referral_agent_id: data.referral_agent_id || null,
         responsible_person_id: data.responsible_person_id || null,
+        customer_category_id: data.customer_category_id || null,
         created_by: user?.id
       };
 
@@ -265,6 +269,31 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel }: LightVehicleQu
                         <SelectContent>
                           <SelectItem value="personal">Personal Customer</SelectItem>
                           <SelectItem value="company">Company</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="customer_category_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Customer Category</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select customer category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {customerCategories?.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.category_name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />

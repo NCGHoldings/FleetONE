@@ -11,6 +11,7 @@ import { FileText, Link2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useActiveCustomerCategories } from "@/hooks/useCustomerCategories";
 
 // Interface for inquiry data passed from Vehicle Inquiry Hub
 interface InquiryInitialData {
@@ -62,6 +63,7 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
   const [customers, setCustomers] = useState<any[]>([]);
   const [truckModels, setTruckModels] = useState<any[]>([]);
   const [referralAgents, setReferralAgents] = useState<any[]>([]);
+  const { data: customerCategories } = useActiveCustomerCategories();
 
   const [formData, setFormData] = useState({
     customer_id: "",
@@ -73,6 +75,7 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
     payment_terms: DEFAULT_PAYMENT_TERMS,
     valid_until: "",
     referral_agent_id: "",
+    customer_category_id: "",
   });
 
   useEffect(() => {
@@ -157,6 +160,7 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
         created_by: user?.id,
         inquiry_id: initialData?.inquiryId || null,
         referral_agent_id: formData.referral_agent_id || null,
+        customer_category_id: formData.customer_category_id || null,
       }]);
 
       if (error) throw error;
@@ -249,6 +253,25 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
                 value={formData.contact_number}
                 onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Customer Category</Label>
+              <Select
+                value={formData.customer_category_id}
+                onValueChange={(value) => setFormData({ ...formData, customer_category_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select customer category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customerCategories?.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.category_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

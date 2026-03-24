@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { QuotationAddOnsSection } from './QuotationAddOnsSection';
 import { InlineAddOnsSection } from './InlineAddOnsSection';
+import { useActiveCustomerCategories } from '@/hooks/useCustomerCategories';
 
 const formSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required'),
@@ -23,6 +24,7 @@ const formSchema = z.object({
   company_name: z.string().optional(),
   finance_company: z.string().optional(),
   customer_type: z.enum(['personal', 'company']).default('personal'),
+  customer_category_id: z.string().optional(),
   business_registration_number: z.string().optional(),
   tax_registration_number: z.string().optional(),
   bus_model_id: z.string().min(1, 'Bus model is required'),
@@ -78,6 +80,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
   const [customizationOptions, setCustomizationOptions] = useState<any[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { data: customerCategories } = useActiveCustomerCategories();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -210,6 +213,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         customer_type: data.customer_type || 'personal',
         business_registration_number: data.business_registration_number || null,
         tax_registration_number: data.tax_registration_number || null,
+        customer_category_id: (data as any).customer_category_id || null,
         created_by: user?.id
       };
 
@@ -405,6 +409,31 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   />
                 </>
               )}
+
+              <FormField
+                control={form.control}
+                name="customer_category_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select customer category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {customerCategories?.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.category_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}

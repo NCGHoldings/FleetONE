@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { QuotationAddOnsSection } from './QuotationAddOnsSection';
 import { InlineAddOnsSection } from './InlineAddOnsSection';
+import { useActiveCustomerCategories } from '@/hooks/useCustomerCategories';
 import { AddReferralAgentModal } from '@/components/special-hire/AddReferralAgentModal';
 
 const formSchema = z.object({
@@ -28,6 +29,7 @@ const formSchema = z.object({
   contact_person: z.string().optional(),
   finance_company: z.string().optional(),
   customer_type: z.enum(['personal', 'company']).default('personal'),
+  customer_category_id: z.string().optional(),
   business_registration_number: z.string().optional(),
   tax_registration_number: z.string().optional(),
   referral_agent_id: z.string().optional(),
@@ -113,6 +115,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
   const [showAddAgentModal, setShowAddAgentModal] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { data: customerCategories } = useActiveCustomerCategories();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -358,6 +361,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
         representative_name: data.representative_name || null,
         designation: data.designation || null,
         vehicle_year: data.vehicle_year || new Date().getFullYear(),
+        customer_category_id: data.customer_category_id || null,
       };
 
       const { data: quotation, error } = await supabase
@@ -487,6 +491,32 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
                       <SelectContent>
                         <SelectItem value="personal">Personal Customer</SelectItem>
                         <SelectItem value="company">Company</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Customer Category */}
+              <FormField
+                control={form.control}
+                name="customer_category_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select customer category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {customerCategories?.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.category_name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
