@@ -348,11 +348,12 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
       payment_date: new Date().toISOString().split('T')[0],
       payment_method: 'bank_transfer',
       reference_no: '',
-      bank_name: '',
+      bank_account_id: '',
       cheque_no: '',
       notes: ''
     });
     setSelectedSchedule(null);
+    setPaymentProofFile(null);
   };
 
   const getStatusBadge = (status: string) => {
