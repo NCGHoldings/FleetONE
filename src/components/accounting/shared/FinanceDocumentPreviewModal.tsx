@@ -336,7 +336,7 @@ export const FinanceDocumentPreviewModal = ({
       const imgX = (pdfWidth - imgWidth * ratio) / 2;
       const imgY = 10;
 
-      pdf.addImage(imgData, "PNG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      pdf.addImage(imgData, "JPEG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
       
       // Generate filename
       const docNumber = documentData?.invoice_number || 

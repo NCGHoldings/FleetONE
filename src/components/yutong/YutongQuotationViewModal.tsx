@@ -210,7 +210,7 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
           pdf.addImage(imgData, 'JPEG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
         } else {
           // Position at TOP of page (not centered)
-          pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+          pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
         }
       }
 

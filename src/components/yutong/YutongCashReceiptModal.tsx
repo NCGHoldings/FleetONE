@@ -57,7 +57,7 @@ export const YutongCashReceiptModal = ({
       const imgX = (pdfWidth - imgWidth * ratio) / 2;
       const imgY = 0;
 
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
       pdf.save(`Cash-Receipt-${receipt.receipt_no}.pdf`);
       
       toast.success('PDF downloaded successfully');

@@ -91,7 +91,7 @@ export function SinotruckQuotationViewModal({
       const imgWidth = pageWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
       pdf.save(`Sinotruck_Quotation_${quotation.quotation_no}.pdf`);
       
       toast.success('PDF downloaded successfully');

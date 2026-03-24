@@ -98,7 +98,7 @@ export function LightVehicleCashReceiptModal({
       const imgWidth = 210;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
       pdf.save(`${receipt.receipt_no}.pdf`);
       
       toast.success('Receipt downloaded');

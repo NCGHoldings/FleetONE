@@ -205,7 +205,7 @@ export function LightVehicleQuotationViewModal({ quotation, open, onClose }: Lig
           const scaledWidth = (canvas.width * pageHeight) / canvas.height;
           pdf.addImage(imgData, 'JPEG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
         } else {
-          pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+          pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
         }
       }
 
