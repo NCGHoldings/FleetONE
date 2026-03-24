@@ -28,6 +28,8 @@ export interface YutongOrderInvoiceData {
   quantity: number;
   subtotal: number;
   total: number;
+  customer_commitment?: number;
+  leasing_amount?: number;
   invoice_status: 'draft' | 'approved';
   // Invoice category - direct or proforma
   invoice_category?: 'direct_invoice' | 'proforma_invoice' | 'tax_invoice';
