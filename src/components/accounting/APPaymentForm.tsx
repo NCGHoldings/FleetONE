@@ -124,11 +124,17 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     paymentMethod === "cheque" ? watchedBankAccountId : undefined
   );
 
+  // Track previous bank account to detect changes
+  const prevBankAccountRef = useRef<string | undefined>();
+
   // Auto-fetch cheque number when payment method is cheque and bank is selected
   useEffect(() => {
     if (paymentMethod === "cheque" && watchedBankAccountId && open) {
+      const bankChanged = prevBankAccountRef.current !== watchedBankAccountId;
       const currentCheque = form.getValues("cheque_number");
-      if (!currentCheque) {
+      
+      // Fetch if no cheque number OR bank account changed
+      if (!currentCheque || bankChanged) {
         nextChequeNumber.mutate(watchedBankAccountId, {
           onSuccess: (result) => {
             if (result.cheque_number) {
@@ -137,6 +143,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
           },
         });
       }
+      prevBankAccountRef.current = watchedBankAccountId;
     }
   }, [paymentMethod, watchedBankAccountId, open]);
 
