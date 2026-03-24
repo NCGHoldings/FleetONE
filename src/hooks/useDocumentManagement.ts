@@ -395,25 +395,20 @@ export const useDocumentManagement = () => {
 
       // Generate new PDF
       const pdfBlob = await generateInvoicePDF(invoiceData);
-      const arrayBuffer = await pdfBlob.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      
-      let base64String = '';
-      const chunkSize = 1024;
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize);
-        base64String += String.fromCharCode.apply(null, Array.from(chunk));
-      }
-      const base64Data = btoa(base64String);
+
+      // Upload to storage
+      const newFileName = `REGENERATED-${existingDoc.document_type}-${paymentData.quotation.quotation_no}-${Date.now()}.pdf`;
+      const { storagePath, fileSize } = await uploadPdfToStorage(pdfBlob, newFileName);
 
       // Update document
       const { error: updateError } = await supabase
         .from('document_storage')
         .update({
-          document_data: base64Data,
-          file_name: `REGENERATED-${existingDoc.document_type}-${paymentData.quotation.quotation_no}-${Date.now()}.pdf`,
-          file_size: uint8Array.length,
+          document_data: '',
+          file_name: newFileName,
+          file_size: fileSize,
           generated_at: new Date().toISOString(),
+          storage_path: storagePath,
         })
         .eq('id', documentId);
 
