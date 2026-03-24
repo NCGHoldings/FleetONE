@@ -529,7 +529,13 @@ export const useDocumentManagement = () => {
         throw new Error('Document not found');
       }
 
-      const pdfBase64 = document.document_data;
+      // Get PDF base64 from storage or fallback to document_data
+      let pdfBase64: string;
+      if ((document as any).storage_path) {
+        pdfBase64 = await getDocumentAsBase64((document as any).storage_path);
+      } else {
+        pdfBase64 = document.document_data;
+      }
 
       // 5. Send email via edge function
       const { error: emailError } = await supabase.functions.invoke('send-quotation-email', {
