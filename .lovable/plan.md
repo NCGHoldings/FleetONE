@@ -1,61 +1,53 @@
 
 
-# Fix Yutong Full Flow: GL Posting, Customer Category, and Finance Integration
+# Fix Yutong Full Flow: GL Posting, Payment Form, and Data Repair
 
-## Root Cause Analysis
+## Root Causes Found
 
-### Critical Error: `source_module` column does not exist
-The console error `"Could not find the 'source_module' column of 'journal_entries' in the schema cache"` is the primary blocker. In `useVehicleSalesFinance.ts` (line 349), every GL posting inserts `source_module: 'yutong_sales'` into `journal_entries`, but this column does not exist in the database. This causes ALL payment verifications to fail with a 400 error.
+### 1. `source_module` column missing from `journal_entries`
+The database has NO `source_module` column (confirmed via schema query). The code inserts `source_module: 'yutong_sales'` on every GL posting, causing 400 errors. This is why ALL payment verifications fail and no journal entries exist for YUT business unit.
 
-### Customer Category Not Flowing Through
-The `customer_category_id` is saved on quotations but never passed to:
-- `yutong_orders` table (no column exists)
-- `createVehicleCustomer()` function (doesn't accept or set category)
-- AR Invoice creation (no category-based GL resolution)
+### 2. Payment form missing Bank Account selector and Photo Upload
+The Record Payment modal in `YutongPaymentTracking.tsx` has no bank account dropdown (the `bank_accounts` table exists and the column `payment_slip_url` exists on `yutong_customer_payments` but is never used). The Sinotruck and Light Vehicle forms have `bank_name` fields but no proper bank account selector either.
+
+### 3. `resolveCustomerARAccounts` references wrong column
+The fallback query uses `customer_advance_liability_account_id` which does not exist in `gl_settings`. This causes the resolution to silently fail.
+
+### 4. Order trigger counts wrong status
+The `update_yutong_order_financials()` trigger only sums payments with `status = 'received'`, but the app sets status to `'pending'` then `'verified'`. So `total_paid` and `balance_due` never update on the order.
+
+### 5. Customer category not copied to orders
+Data shows all orders have `customer_category_id = NULL` even when quotations have categories set. The code fix was applied but existing orders weren't backfilled.
 
 ## Changes
 
-### 1. Database Migration: Add `source_module` to `journal_entries` + `customer_category_id` to order tables
-- Add `source_module TEXT` column to `journal_entries` (this is referenced by many modules, not just Yutong)
-- Add `customer_category_id UUID` (FK to `customer_categories`) to `yutong_orders`, `sinotruck_orders`, `lightvehicle_orders`
+### 1. Migration: Add `source_module` to `journal_entries` + fix trigger
+- `ALTER TABLE public.journal_entries ADD COLUMN IF NOT EXISTS source_module TEXT`
+- Update `update_yutong_order_financials()` trigger to also count `status = 'verified'`
 
-### 2. Fix `useVehicleSalesFinance.ts` -- Customer Category Integration
-- Update `createVehicleCustomer()` to accept and set `customer_category_id` on the customer record
-- Update `createVehicleARInvoice()` to use category-based GL account resolution via `resolveCustomerARAccounts()`
-- This ensures Internal vs External customers use the correct Trade Receivable and Revenue accounts
+### 2. Fix `resolveCustomerARAccounts` fallback column name
+**File:** `src/hooks/useCustomerCategories.ts`
+- Query `gl_settings` for correct column names (check what actually exists)
 
-### 3. Pass `customer_category_id` through Order Creation
-**File:** `src/hooks/useYutongOrderManagement.ts`
-- Fetch `customer_category_id` from the source quotation
-- Insert it into the order record
-- Add to `CreateOrderData` interface
-
-### 4. Pass Category Through Payment Verification Flow
+### 3. Enhance Record Payment modal with Bank Account + Photo Upload
 **File:** `src/components/yutong/YutongPaymentTracking.tsx`
-- When creating/getting a finance customer, include `customer_category_id` from the order's linked quotation
-- When creating AR Invoice on invoice approval, resolve GL accounts via category
+- Add bank account dropdown (fetch from `bank_accounts` table where `company_id = NCG_HOLDING_ID`)
+- Add optional payment proof file upload to `payment-proofs` storage bucket
+- Save `bank_name` and `payment_slip_url` on the payment record
+- Apply same enhancements to Sinotruck and Light Vehicle payment forms
 
-### 5. Update Supabase Types
-Regenerate types to include the new columns.
+### 4. Data repair script
+- Backfill `customer_category_id` on `yutong_orders` from linked quotations
+- Backfill `customer_category_id` on finance `customers` records from their linked orders/quotations
 
-## Flow After Fix
-```text
-Quotation (customer_category_id) 
-    → Order (inherits customer_category_id)
-        → Record Payment (pending)
-            → Verify Payment 
-                → Create Finance Customer (with category)
-                → GL: DR Bank / CR Customer Advance ← uses source_module tag
-            → Approve System Invoice
-                → Create AR Invoice (category-based GL resolution)
-                → GL: DR Trade Receivable / CR Sales Revenue
-                → Apply Advance: DR Advance / CR Receivable
-```
+### 5. Update Supabase types
+- Add `source_module` to `journal_entries` type definitions
 
 ## Files Touched
-- New Supabase migration (add `source_module` to `journal_entries`, `customer_category_id` to order tables)
-- `src/hooks/useVehicleSalesFinance.ts` -- category-aware customer + AR invoice creation
-- `src/hooks/useYutongOrderManagement.ts` -- pass category to orders
-- `src/components/yutong/YutongPaymentTracking.tsx` -- pass category through verify flow
-- `src/integrations/supabase/types.ts` -- update types
+- New Supabase migration (add `source_module`, fix trigger)
+- `src/hooks/useCustomerCategories.ts` -- fix gl_settings column name
+- `src/components/yutong/YutongPaymentTracking.tsx` -- add bank account + photo upload
+- `src/components/sinotruck/SinotruckPaymentTracking.tsx` -- add bank account selector
+- `src/components/lightvehicle/LightVehiclePaymentTracking.tsx` -- add bank account selector
+- `src/integrations/supabase/types.ts` -- add source_module
 
