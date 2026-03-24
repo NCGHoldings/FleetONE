@@ -1,38 +1,61 @@
 
 
-# Add Cheque Book Management to Cheque Register + Fix Cheque Auto-Issue Flow
+# Add Customer Category to Vehicle Sales Quotation Forms
 
-## Problem
-The Cheque Register page (Banking > Cheque Register tab) has no way to create or manage cheque books — that feature is hidden in a separate "Cheque Books" sub-tab inside BankingView. Users need to register cheque books directly from the Cheque Register and have AP payments auto-assign the next cheque number when "cheque" is selected as payment method.
+## Summary
+Currently, the Yutong, Sinotruck, and Light Vehicle quotation forms only have a "Customer Type" field (Personal/Company). The `customer_categories` table (with entries like "Internal", "External Customer") exists and is used in the Accounting module's Customer master, but is not connected to quotation forms. This means when quotations flow into AR invoices, the system cannot resolve the correct GL accounts via the 3-tier hierarchy (customer category -> global GL settings).
 
-## Current State
-- **ChequeBookManagement** component exists but is only in BankingView's sub-tab — not visible from the Cheque Register
-- **APPaymentForm** already has `useNextChequeNumber` wired, but the auto-fetch only triggers when `cheque_number` is empty AND the form is open — it may not re-trigger on bank account change
-- The Cheque Register (`ChequeRegisterView`) has no link to cheque book management
+## What needs to happen
 
-## Changes
+### 1. Database: Add `customer_category_id` column to all 3 quotation tables
+Create a Supabase migration adding a nullable `customer_category_id` column (FK to `customer_categories.id`) to:
+- `yutong_quotations`
+- `sinotruck_quotations`
+- `lightvehicle_quotations`
 
-### 1. Add Cheque Book Management section to ChequeRegisterView
-**File:** `src/components/accounting/ChequeRegisterView.tsx`
+### 2. Update Yutong Quotation Forms (2 files)
+**Files:** `src/components/yutong/YutongQuotationFormUpdated.tsx` and `src/components/yutong/YutongQuotationForm.tsx`
 
-- Import and render `ChequeBookManagement` component below the cheque table
-- Add a "Cheque Books" tab alongside the existing type filters (All Types / Outgoing / Incoming) OR render it as a collapsible section at the bottom
-- This gives users direct access to register new cheque books and see active books from the same page
+- Add `customer_category_id` to the Zod schema (optional string)
+- Import and use `useActiveCustomerCategories()` hook to load categories
+- Add a "Customer Category" dropdown (Select) in the Customer Information section, below the Customer Type field
+- Include `customer_category_id` in the data sent to Supabase on submit
+- When an existing customer is selected, auto-populate their category if they have one
 
-### 2. Fix cheque number auto-issue on AP Payment
-**File:** `src/components/accounting/APPaymentForm.tsx`
+### 3. Update Sinotruck Quotation Form
+**File:** `src/components/sinotruck/SinotruckQuotationForm.tsx`
 
-- Fix the `useEffect` for cheque auto-fetch: remove the `!currentCheque` guard so switching bank accounts re-fetches a new cheque number
-- Add a "Cheque Book" indicator showing the active book's remaining count and prefix
-- When no active cheque book exists for the selected bank, show a warning with a link/button to register one
+- Add `customer_category_id` to form state
+- Import and use `useActiveCustomerCategories()` hook
+- Add "Customer Category" dropdown in the customer section
+- Include in the insert payload
 
-### 3. Add cheque register entry creation on AP payment submit
-**File:** `src/components/accounting/APPaymentForm.tsx` (submit handler)
+### 4. Update Light Vehicle Quotation Form
+**File:** `src/components/lightvehicle/LightVehicleQuotationForm.tsx`
 
-- When `payment_method === "cheque"`, after payment creation, auto-insert a `cheque_register` entry with status `draft`, linking the cheque number, amount, payee (vendor name), and bank account
-- This ensures every cheque payment automatically appears in the Cheque Register without manual entry
+- Add `customer_category_id` to Zod schema
+- Import and use `useActiveCustomerCategories()` hook
+- Add "Customer Category" dropdown
+- Include in the insert payload
+
+### 5. Auto-populate category when selecting existing customer
+In all 3 forms, when a user selects an existing customer from the dropdown, fetch that customer's `customer_category_id` and auto-set the category dropdown. User can still override it.
+
+## Flow after this change
+```text
+Quotation (with category) → Order → AR Invoice
+                                      ↓
+                              resolveCustomerARAccounts()
+                                      ↓
+                              Uses category GL mapping
+                              (Internal → AR Internal acct)
+                              (External → AR External acct)
+```
 
 ## Files touched
-- `src/components/accounting/ChequeRegisterView.tsx` — Add ChequeBookManagement section
-- `src/components/accounting/APPaymentForm.tsx` — Fix auto-fetch logic + auto-create cheque register entry
+- Supabase migration (new) — add `customer_category_id` to 3 tables
+- `src/components/yutong/YutongQuotationFormUpdated.tsx`
+- `src/components/yutong/YutongQuotationForm.tsx`
+- `src/components/sinotruck/SinotruckQuotationForm.tsx`
+- `src/components/lightvehicle/LightVehicleQuotationForm.tsx`
 
