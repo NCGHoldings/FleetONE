@@ -473,7 +473,25 @@ export async function postVehicleInvoiceToGL({
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
 
-    if (!settings.trade_receivable_account_id || !settings.sales_revenue_account_id) {
+    // Resolve GL accounts via 3-tier hierarchy (customer → category → global)
+    let tradeReceivableId = settings.trade_receivable_account_id;
+    let salesRevenueId = settings.sales_revenue_account_id;
+
+    if (customerId) {
+      try {
+        const { resolveCustomerARAccounts } = await import('@/hooks/useCustomerCategories');
+        const resolved = await resolveCustomerARAccounts(customerId, effectiveCompanyId);
+        if (resolved.arAccountId) tradeReceivableId = resolved.arAccountId;
+        if (resolved.revenueAccountId) salesRevenueId = resolved.revenueAccountId;
+        console.log(`[${module.toUpperCase()} Finance] GL resolution source: ${resolved.source}`, {
+          tradeReceivableId, salesRevenueId
+        });
+      } catch (err) {
+        console.warn(`[${module.toUpperCase()} Finance] Category resolution failed, using settings fallback`, err);
+      }
+    }
+
+    if (!tradeReceivableId || !salesRevenueId) {
       console.error(`[${module.toUpperCase()} Finance] Missing required accounts for invoice posting`);
       toast.error('Missing GL account configuration for invoice posting');
       return null;
