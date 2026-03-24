@@ -329,7 +329,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       : allocations.filter((a) => a.selected && a.allocated_amount > 0);
     
     try {
-      await createPayment.mutateAsync({
+      const paymentResult = await createPayment.mutateAsync({
         payment_number: data.payment_number,
         vendor_id: data.vendor_id,
         payment_date: data.payment_date,
@@ -362,6 +362,28 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
             }))
           : undefined,
       });
+
+      // Auto-create cheque register entry for cheque payments
+      if (data.payment_method === "cheque" && data.cheque_number) {
+        const vendorName = vendors?.find((v) => v.id === data.vendor_id)?.vendor_name || "Unknown";
+        try {
+          await supabase.from("cheque_register").insert({
+            cheque_number: data.cheque_number,
+            cheque_date: data.cheque_date || data.payment_date,
+            payee: vendorName,
+            amount: totalPayment,
+            bank_account_id: data.bank_account_id || null,
+            company_id: selectedCompanyId || null,
+            payment_id: paymentResult?.id || null,
+            cheque_type: "outgoing",
+            status: "draft",
+            reference: data.reference || null,
+            memo: data.notes || null,
+          });
+        } catch (chequeErr) {
+          console.error("Failed to auto-create cheque register entry:", chequeErr);
+        }
+      }
       onOpenChange(false);
       form.reset();
       setAllocations([]);
