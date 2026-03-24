@@ -413,51 +413,100 @@ export function YutongInvoiceTypeModal({
                 </div>
               )}
 
-              {/* Amount Breakdown */}
+              {/* Customer Commitment & Amount Breakdown */}
               <div className="space-y-3 p-3 bg-background rounded border">
                 <div className="flex items-center gap-2 mb-2">
                   <Users className="h-4 w-4 text-primary" />
-                  <Label className="font-semibold text-sm">Amount Breakdown</Label>
+                  <Label className="font-semibold text-sm">Customer Commitment & Leasing Breakdown</Label>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Declared Vehicle Value (Sub Total)</p>
+                    <p className="font-bold text-primary">LKR {proformaAmount.toLocaleString()}</p>
+                  </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Actual Bus Value</p>
                     <p className="font-medium">LKR {totalAmount.toLocaleString()}</p>
                   </div>
-                  {proformaAmount > totalAmount && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Declared Vehicle Value</p>
-                      <p className="font-bold text-primary">LKR {proformaAmount.toLocaleString()}</p>
-                    </div>
-                  )}
                 </div>
 
-                <div className="border-t pt-3 space-y-2">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Leasing Company Amount</Label>
-                    <p className="font-bold text-primary text-lg">LKR {leasingCompanyAmount.toLocaleString()}</p>
+                <div className="border-t pt-3 space-y-3">
+                  {/* Commitment Mode Toggle */}
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Customer Commitment</Label>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className={commitmentMode === 'percentage' ? 'font-bold text-primary' : 'text-muted-foreground'}>%</span>
+                      <Switch
+                        checked={commitmentMode === 'fixed'}
+                        onCheckedChange={(checked) => {
+                          setCommitmentMode(checked ? 'fixed' : 'percentage');
+                          if (checked) {
+                            setCommitmentFixedAmount(Math.round(proformaAmount * commitmentPercentage / 100));
+                          }
+                        }}
+                      />
+                      <span className={commitmentMode === 'fixed' ? 'font-bold text-primary' : 'text-muted-foreground'}>Fixed</span>
+                    </div>
                   </div>
-                  
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Customer Commitment (LKR)</Label>
-                    <Input
-                      type="number"
-                      value={effectiveCustomerCommitment}
-                      onChange={(e) => {
-                        if (amountMode === 'fixed') {
-                          setCustomerCommitment(Number(e.target.value) || 0);
-                        }
-                      }}
-                      disabled={amountMode === 'percentage'}
-                      min={0}
-                      className="text-sm"
-                    />
-                    {amountMode === 'percentage' && (
-                      <p className="text-xs text-muted-foreground italic">Auto-calculated: Total - Proforma</p>
-                    )}
+
+                  {commitmentMode === 'percentage' ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2 flex-wrap">
+                        {COMMITMENT_PERCENTAGES.map((pct) => (
+                          <Button
+                            key={pct}
+                            type="button"
+                            variant={commitmentPercentage === pct ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setCommitmentPercentage(pct)}
+                          >
+                            {pct}%
+                          </Button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Slider
+                          value={[commitmentPercentage]}
+                          onValueChange={([value]) => setCommitmentPercentage(value)}
+                          min={5}
+                          max={80}
+                          step={5}
+                          className="flex-1"
+                        />
+                        <span className="text-sm font-bold w-12 text-right">{commitmentPercentage}%</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Customer pays: LKR {effectiveCustomerCommitment.toLocaleString()}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Input
+                        type="number"
+                        value={commitmentFixedAmount}
+                        onChange={(e) => setCommitmentFixedAmount(Number(e.target.value) || 0)}
+                        min={0}
+                        max={proformaAmount}
+                        className="text-sm"
+                        placeholder="Enter fixed commitment amount"
+                      />
+                    </div>
+                  )}
+
+                  {/* Summary */}
+                  <div className="grid grid-cols-2 gap-3 p-2 bg-muted/50 rounded text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Customer Commitment</p>
+                      <p className="font-semibold text-orange-600">LKR {effectiveCustomerCommitment.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">To Be Leased</p>
+                      <p className="font-bold text-primary">LKR {leasingCompanyAmount.toLocaleString()}</p>
+                    </div>
                   </div>
                 </div>
+              </div>
               </div>
 
               <div className="space-y-3">
