@@ -192,7 +192,7 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
         page.style.minHeight = originalMinHeight;
         page.style.maxWidth = originalMaxWidth;
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const imgData = canvas.toDataURL('image/jpeg', 0.85);
         
         // Add new page if not the first page
         if (i > 0) {
