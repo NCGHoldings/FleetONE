@@ -517,7 +517,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
   }
 
   const canvas = await html2canvas(rootEl, {
-    scale: 2,
+    scale: 1.5,
     useCORS: true,
     allowTaint: false, // avoid PNG signature issues
     backgroundColor: '#ffffff',
