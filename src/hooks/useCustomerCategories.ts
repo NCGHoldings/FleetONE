@@ -192,14 +192,14 @@ export async function resolveCustomerARAccounts(
   // Priority 3: Global fallback
   const { data: glSettings } = await (supabase as any)
     .from("gl_settings")
-    .select("trade_receivable_account_id, sales_revenue_account_id, customer_advance_liability_account_id")
+    .select("trade_receivable_account_id, sales_revenue_account_id, customer_advance_account_id")
     .eq("company_id", companyId)
     .maybeSingle();
 
   return {
     arAccountId: glSettings?.trade_receivable_account_id || null,
     revenueAccountId: glSettings?.sales_revenue_account_id || null,
-    advanceAccountId: glSettings?.customer_advance_liability_account_id || null,
+    advanceAccountId: glSettings?.customer_advance_account_id || null,
     source: "global",
   };
 }
