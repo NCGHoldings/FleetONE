@@ -923,7 +923,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
         </table>
       </div>
 
-      ${data.paymentsReceived && data.paymentsReceived.length > 0 ? `
+      ${!isProforma ? (data.paymentsReceived && data.paymentsReceived.length > 0 ? `
       <!-- Payment History Section -->
       <div class="payment-history-section">
         <h3>Payment History</h3>
@@ -977,7 +977,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
         </div>
         <p class="payment-status-note">No payments received yet. Please make payment as per the terms above.</p>
       </div>
-      `}
+      `) : ''}
 
       <!-- Signatures Section -->
       <div class="signatures-section">
