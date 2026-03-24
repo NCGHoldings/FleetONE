@@ -1,26 +1,43 @@
 
 
-# Fix: `bank_account_id` Column Missing from Payment Tables
+# Fix: Manual Trip Distance Override Not Recalculating Exceeding Distance Charge
 
 ## Problem
-The error `"Could not find the 'bank_account_id' column of 'yutong_customer_payments' in the schema cache"` occurs because the recent code changes insert `bank_account_id` into payment records, but this column was never added to the database.
+When the user overrides the trip distance (e.g., from 222 km to 274 km), the **exceeding distance charge is not recalculated**. The stored charge (LKR 19,565) reflects the old distance, not 174 km × 175 LKR/km = LKR 30,450.
 
-Same issue affects `sinotruck_customer_payments` and `lightvehicle_customer_payments`.
+**Root cause**: In `SpecialHireForm.tsx`, the submit handler at line 1251 always uses `distanceData.kmTrip` (Google Maps result) for all rate card calculations. The manual override (`manualTripDistance`) is only applied at save time for the `km_trip` field, but `exceeding_distance_charge`, `hire_charge`, `gross_revenue`, and all downstream values (fuel, commission, customer total) are computed from the original distance.
 
 ## Fix
 
-### 1. Database Migration
-Add `bank_account_id UUID` column to all three payment tables with a foreign key to `bank_accounts`:
-- `yutong_customer_payments`
-- `sinotruck_customer_payments`  
-- `lightvehicle_customer_payments`
+### File: `src/components/special-hire/SpecialHireForm.tsx`
 
-Also add `payment_slip_url TEXT` to `sinotruck_customer_payments` (it already has `receipt_url` but the code references `payment_slip_url`).
+**Change at line 1251**: Apply the manual trip distance override immediately before rate card calculations:
 
-### 2. Code Fix for Sinotruck
-The `sinotruck_customer_payments` table uses `amount` instead of `payment_amount` and `reference_number` instead of `payment_reference`. Verify the Sinotruck and Light Vehicle payment tracking components insert using the correct column names.
+```typescript
+// BEFORE (bug):
+const tripDistance = Math.round((distanceData.kmTrip || 0) * 10) / 10;
 
-## Files
-- New Supabase migration (add columns)
-- Possibly minor column-name fixes in `SinotruckPaymentTracking.tsx` if mismatched
+// AFTER (fix):
+const calculatedTripDistance = Math.round((distanceData.kmTrip || 0) * 10) / 10;
+const tripDistance = useManualTripDistance && manualTripDistance > 0
+  ? manualTripDistance
+  : calculatedTripDistance;
+```
+
+This single change ensures all downstream calculations (exceeding distance, overtime, fuel, commission, customer total) use the overridden distance when manual override is enabled.
+
+### Also verify `EnhancedCostCalculator.tsx` line 301
+Currently it recalculates exceeding distance from `quotation.km_trip` and the rate card, but then at line 343 it prefers `quotation.exceeding_distance_charge` (the stored value). Since the stored value will now be correct after the form fix, this will work. But as a safety measure, always recalculate from `km_trip` instead of using the stored value:
+
+```typescript
+// Line 343: BEFORE
+const storedExceedingDistanceCharge = quotation.exceeding_distance_charge ?? exceedingDistanceCharge;
+
+// AFTER: Always use recalculated value based on km_trip
+const storedExceedingDistanceCharge = exceedingDistanceCharge;
+```
+
+## Files Changed
+- `src/components/special-hire/SpecialHireForm.tsx` — apply manual distance before calculations
+- `src/components/special-hire/EnhancedCostCalculator.tsx` — always recalculate exceeding charge from km_trip
 
