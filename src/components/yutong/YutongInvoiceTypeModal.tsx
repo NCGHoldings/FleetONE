@@ -85,7 +85,6 @@ export function YutongInvoiceTypeModal({
 
   useEffect(() => {
     setFixedAmount(totalAmount);
-    setCustomerCommitment(0);
   }, [totalAmount, isOpen]);
 
   const proformaAmount = amountMode === 'percentage' 
