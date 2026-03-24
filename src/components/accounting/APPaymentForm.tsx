@@ -169,6 +169,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       }
     } else {
       hasGeneratedNumber.current = false;
+      prevBankAccountRef.current = undefined;
     }
   }, [open, isAdvanceMode, form, generateNumber]);
 
