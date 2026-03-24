@@ -1560,6 +1560,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       if (manualDropToParking !== (originalData.manual_km_drop_to_parking || 0)) return true;
     }
 
+    // Check useManualTripDistance changes
+    if (useManualTripDistance !== (originalData.uses_manual_trip_distance || false)) return true;
+    if (useManualTripDistance) {
+      if (manualTripDistance !== (originalData.manual_km_trip || originalData.km_trip || 0)) return true;
+    }
+
     // Check bus configuration changes
     if (currentData.busTypeId !== originalData.bus_type_id) return true;
     if (currentData.numberOfBuses !== originalData.number_of_buses) return true;
@@ -1758,7 +1764,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         km_parking_to_pickup: useManualParkingDistance ? manualParkingToPickup : costs.km_parking_to_pickup,
         km_trip: useManualTripDistance ? manualTripDistance : costs.km_trip,
         km_drop_to_parking: useManualParkingDistance ? manualDropToParking : costs.km_drop_to_parking,
-        fuel_cost_fuel_only: (useManualParkingDistance || useManualTripDistance) ? (costData?.fuelCostFuelOnly ?? costs.fuel_cost_fuel_only) : costs.fuel_cost_fuel_only,
+        fuel_cost_fuel_only: costs.fuel_cost_fuel_only,
         uses_manual_trip_distance: useManualTripDistance,
         manual_km_trip: useManualTripDistance ? manualTripDistance : 0,
         hire_charge: costs.hire_charge,
@@ -1783,7 +1789,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         total_expenses: costs.total_expenses,
         net_profit: costs.net_profit,
         fuel_price_per_liter: costs.fuel_price_per_liter || costData?.fuelPricePerLiter || null,
-        customer_total_with_fuel: costs.customerTotalWithFuel ?? costData?.customerTotalWithFuel,
+        customer_total_with_fuel: costs.customerTotalWithFuel,
         bus_fleet_details: isMultiBusMode && costs.bus_fleet_details
           ? JSON.stringify(
             // Ensure we're saving the full object structure with buses, total_buses, etc.
