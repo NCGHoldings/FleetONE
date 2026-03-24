@@ -2,26 +2,27 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { format, addDays } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useVendors, useTaxCodes } from "@/hooks/useAccountingData";
+import { useVendors, useTaxCodes, useBankAccounts } from "@/hooks/useAccountingData";
 import { useCreateAPInvoice, useUpdateAPInvoice } from "@/hooks/useAccountingMutations";
-import { useCompany } from "@/contexts/CompanyContext";
 import { supabase } from "@/integrations/supabase/client";
-import { format, addDays } from "date-fns";
-import { Plus, Trash2, Check, ChevronsUpDown, Bus, Route } from "lucide-react";
-import { CurrencyDisplay } from "./shared/CurrencyDisplay";
-import { Checkbox } from "@/components/ui/checkbox";
-import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Loader2, Plus, Trash2, Bus, Route, Check, ChevronsUpDown } from "lucide-react";
+import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { CurrencyInput } from "@/components/ui/currency-input";
 
 const invoiceSchema = z.object({
   invoice_number: z.string().min(1, "Invoice number is required"),
@@ -186,12 +187,12 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
   // Auto-generate AP Invoice number when dialog opens (only for new invoices)
   useEffect(() => {
     if (!open || isEditing) return;
-    
+
     const generateInvoiceNumber = async () => {
       try {
         const year = new Date().getFullYear();
         const prefix = `AP-INV-${year}-`;
-        
+
         let query = supabase
           .from("ap_invoices")
           .select("invoice_number")
@@ -213,7 +214,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
             nextSeq = parseInt(match[1], 10) + 1;
           }
         }
-        
+
         const autoNumber = `${prefix}${String(nextSeq).padStart(4, "0")}`;
         form.setValue("invoice_number", autoNumber);
       } catch (err) {
@@ -416,7 +417,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-7xl w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit AP Invoice" : "Record AP Invoice (Vendor Bill)"}</DialogTitle>
         </DialogHeader>
@@ -732,13 +733,11 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <Input
-                            type="number"
+                          <CurrencyInput
                             value={line.unit_price}
-                            onChange={(e) => updateLine(line.id, "unit_price", parseFloat(e.target.value) || 0)}
-                            className="h-8 text-right"
-                            min={0}
-                            step="0.01"
+                            onChange={(val) => updateLine(line.id, "unit_price", val)}
+                            className="h-8"
+                            placeholder="0.00"
                           />
                         </td>
                         <td className="px-3 py-2">

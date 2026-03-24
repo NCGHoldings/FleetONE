@@ -11,6 +11,7 @@ import { LiveAlertsPanel } from "@/components/dashboard/LiveAlertsPanel";
 import { FleetStatusTable } from "@/components/dashboard/FleetStatusTable";
 import { RoutePerformanceChart } from "@/components/dashboard/RoutePerformanceChart";
 import { QuickStatsWidget } from "@/components/dashboard/QuickStatsWidget";
+import { AdSenseBanner } from "@/components/dashboard/AdSenseBanner";
 
 const formatCurrency = (value: number) => {
   if (value >= 1000000) return `₨ ${(value / 1000000).toFixed(1)}M`;
@@ -121,6 +122,9 @@ export default function Dashboard() {
           />
         </div>
       </div>
+
+      {/* Sponsored Ad Banner (free-tier users only, when enabled) */}
+      <AdSenseBanner />
 
       {/* Alerts and Fleet Status */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

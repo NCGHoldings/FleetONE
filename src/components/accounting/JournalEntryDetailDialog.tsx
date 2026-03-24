@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -5,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
 import { useJournalEntryLines } from "@/hooks/useAccountingData";
+import { DrillDownModal } from "./DrillDownModal";
 import {
   Table,
   TableBody,
@@ -14,6 +16,7 @@ import {
   TableRow,
   TableFooter,
 } from "@/components/ui/table";
+import { ExternalLink } from "lucide-react";
 
 interface JournalEntryDetailDialogProps {
   entry: any;
@@ -23,6 +26,10 @@ interface JournalEntryDetailDialogProps {
 
 export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalEntryDetailDialogProps) => {
   const { data: lines, isLoading } = useJournalEntryLines(entry?.id);
+  const [drillDownAccount, setDrillDownAccount] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   if (!entry) return null;
 
@@ -37,111 +44,138 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
     }
   };
 
+  const handleAccountClick = (line: any) => {
+    if (line.account_id && line.chart_of_accounts) {
+      setDrillDownAccount({
+        id: line.account_id,
+        name: `${line.chart_of_accounts.account_code} - ${line.chart_of_accounts.account_name}`,
+      });
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            Journal Entry: {entry.entry_number}
-            <Badge variant={getStatusVariant(entry.status)}>
-              {entry.status?.toUpperCase()}
-            </Badge>
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              Journal Entry: {entry.entry_number}
+              <Badge variant={getStatusVariant(entry.status)}>
+                {entry.status?.toUpperCase()}
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Entry Header Info */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="p-3">
-              <p className="text-xs text-muted-foreground">Date</p>
-              <p className="font-medium"><DateDisplay date={entry.entry_date} /></p>
-            </Card>
-            <Card className="p-3">
-              <p className="text-xs text-muted-foreground">Reference</p>
-              <p className="font-medium">{entry.reference || "-"}</p>
-            </Card>
-            <Card className="p-3">
-              <p className="text-xs text-muted-foreground">Total Debit</p>
-              <p className="font-medium text-emerald-600"><CurrencyDisplay amount={entry.total_debit} /></p>
-            </Card>
-            <Card className="p-3">
-              <p className="text-xs text-muted-foreground">Total Credit</p>
-              <p className="font-medium text-primary"><CurrencyDisplay amount={entry.total_credit} /></p>
-            </Card>
-          </div>
+          <div className="space-y-6">
+            {/* Entry Header Info */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="p-3">
+                <p className="text-xs text-muted-foreground">Date</p>
+                <p className="font-medium"><DateDisplay date={entry.entry_date} /></p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-xs text-muted-foreground">Reference</p>
+                <p className="font-medium">{entry.reference || "-"}</p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-xs text-muted-foreground">Total Debit</p>
+                <p className="font-medium text-emerald-600"><CurrencyDisplay amount={entry.total_debit} /></p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-xs text-muted-foreground">Total Credit</p>
+                <p className="font-medium text-primary"><CurrencyDisplay amount={entry.total_credit} /></p>
+              </Card>
+            </div>
 
-          {/* Description */}
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Description</p>
-            <p>{entry.description}</p>
-          </div>
+            {/* Description */}
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Description</p>
+              <p>{entry.description}</p>
+            </div>
 
-          <Separator />
+            <Separator />
 
-          {/* Entry Lines */}
-          <div>
-            <h3 className="font-semibold mb-3">Entry Lines</h3>
-            {isLoading ? (
-              <p className="text-muted-foreground">Loading lines...</p>
-            ) : !lines || lines.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No entry lines found for this journal entry.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Account</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Debit</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {lines.map((line: any) => (
-                    <TableRow key={line.id}>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-mono text-sm font-medium">
-                            {line.chart_of_accounts?.account_code || "N/A"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {line.chart_of_accounts?.account_name || "Unknown Account"}
-                          </span>
-                        </div>
+            {/* Entry Lines */}
+            <div>
+              <h3 className="font-semibold mb-3">Entry Lines</h3>
+              <p className="text-xs text-muted-foreground mb-2">💡 Click any account to view its transactions</p>
+              {isLoading ? (
+                <p className="text-muted-foreground">Loading lines...</p>
+              ) : !lines || lines.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No entry lines found for this journal entry.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Debit</TableHead>
+                      <TableHead className="text-right">Credit</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {lines.map((line: any) => (
+                      <TableRow key={line.id}>
+                        <TableCell>
+                          <div
+                            className="flex flex-col cursor-pointer group hover:bg-accent/50 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
+                            onClick={() => handleAccountClick(line)}
+                            title="Click to view account transactions"
+                          >
+                            <span className="font-mono text-sm font-medium group-hover:text-primary flex items-center gap-1">
+                              {line.chart_of_accounts?.account_code || "N/A"}
+                              <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
+                            </span>
+                            <span className="text-xs text-muted-foreground group-hover:text-primary/70">
+                              {line.chart_of_accounts?.account_name || "Unknown Account"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">{line.description || "-"}</TableCell>
+                        <TableCell className="text-right font-medium text-emerald-600">
+                          {line.debit > 0 ? <CurrencyDisplay amount={line.debit} /> : "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-blue-600">
+                          {line.credit > 0 ? <CurrencyDisplay amount={line.credit} /> : "-"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell colSpan={2} className="font-bold">Total</TableCell>
+                      <TableCell className="text-right font-bold">
+                        <CurrencyDisplay amount={entry.total_debit} />
                       </TableCell>
-                      <TableCell className="text-sm">{line.description || "-"}</TableCell>
-                      <TableCell className="text-right font-medium text-emerald-600">
-                        {line.debit > 0 ? <CurrencyDisplay amount={line.debit} /> : "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-blue-600">
-                        {line.credit > 0 ? <CurrencyDisplay amount={line.credit} /> : "-"}
+                      <TableCell className="text-right font-bold">
+                        <CurrencyDisplay amount={entry.total_credit} />
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-                <TableFooter>
-                  <TableRow>
-                    <TableCell colSpan={2} className="font-bold">Total</TableCell>
-                    <TableCell className="text-right font-bold">
-                      <CurrencyDisplay amount={entry.total_debit} />
-                    </TableCell>
-                    <TableCell className="text-right font-bold">
-                      <CurrencyDisplay amount={entry.total_credit} />
-                    </TableCell>
-                  </TableRow>
-                </TableFooter>
-              </Table>
-            )}
-          </div>
+                  </TableFooter>
+                </Table>
+              )}
+            </div>
 
-          {/* Audit Info */}
-          <div className="text-xs text-muted-foreground border-t pt-4">
-            <div className="flex gap-6">
-              <span>Created: {new Date(entry.created_at).toLocaleString()}</span>
-              {entry.posted_at && <span>Posted: {new Date(entry.posted_at).toLocaleString()}</span>}
+            {/* Audit Info */}
+            <div className="text-xs text-muted-foreground border-t pt-4">
+              <div className="flex gap-6">
+                <span>Created: {new Date(entry.created_at).toLocaleString()}</span>
+                {entry.posted_at && <span>Posted: {new Date(entry.posted_at).toLocaleString()}</span>}
+              </div>
             </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* Account Transactions Drill-Down */}
+      <DrillDownModal
+        open={!!drillDownAccount}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setDrillDownAccount(null);
+        }}
+        accountId={drillDownAccount?.id}
+        accountName={drillDownAccount?.name}
+      />
+    </>
   );
 };

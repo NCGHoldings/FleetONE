@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, CheckCircle } from "lucide-react";
+import { CurrencyInput } from "@/components/ui/currency-input";
 
 const receiptSchema = z.object({
   receipt_number: z.string().min(1, "Receipt number is required"),
@@ -165,10 +166,10 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   };
 
   const onSubmit = async (data: ReceiptFormData) => {
-    const selectedAllocations = isAdvance 
-      ? [] 
+    const selectedAllocations = isAdvance
+      ? []
       : allocations.filter((a) => a.selected && a.allocated_amount > 0);
-    
+
     try {
       await createReceipt.mutateAsync({
         receipt_number: data.receipt_number,
@@ -194,8 +195,8 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
     }
   };
 
-  const canSubmit = isAdvance 
-    ? form.watch("amount") > 0 && selectedCustomerId 
+  const canSubmit = isAdvance
+    ? form.watch("amount") > 0 && selectedCustomerId
     : totalAllocated > 0;
 
   return (
@@ -365,14 +366,11 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                     <FormItem>
                       <FormLabel className="text-lg font-semibold">Advance Amount</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        <CurrencyInput
+                          value={field.value}
+                          onChange={(val) => field.onChange(val)}
                           className="text-2xl h-14 font-bold"
                           placeholder="Enter advance amount"
-                          min={0}
-                          step="0.01"
                         />
                       </FormControl>
                       <p className="text-sm text-muted-foreground mt-1">
@@ -391,9 +389,9 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold">Allocate to Invoices</h3>
                   {allocations.length > 0 && (
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
                       size="sm"
                       onClick={handleMarkFullPayment}
                     >
@@ -434,14 +432,11 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                                 <CurrencyDisplay amount={alloc.balance} />
                               </td>
                               <td className="px-3 py-2">
-                                <Input
-                                  type="number"
+                                <CurrencyInput
                                   value={alloc.allocated_amount}
-                                  onChange={(e) => updateAllocation(alloc.invoice_id, parseFloat(e.target.value) || 0)}
-                                  className="h-8 text-right"
-                                  max={alloc.balance}
-                                  min={0}
-                                  step="0.01"
+                                  onChange={(val) => updateAllocation(alloc.invoice_id, Math.min(val, alloc.balance))}
+                                  className="h-8"
+                                  placeholder="0.00"
                                 />
                               </td>
                             </tr>
