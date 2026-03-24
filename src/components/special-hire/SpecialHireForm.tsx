@@ -1248,7 +1248,10 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       }
 
       // Round trip distance to 1 decimal place to avoid floating-point precision errors
-      const tripDistance = Math.round((distanceData.kmTrip || 0) * 10) / 10;
+      const calculatedTripDistance = Math.round((distanceData.kmTrip || 0) * 10) / 10;
+      const tripDistance = useManualTripDistance && manualTripDistance > 0
+        ? manualTripDistance
+        : calculatedTripDistance;
       let rateCard = null;
       let fixedRate = 0;
       let exceedingDistanceCharge = 0;

@@ -340,7 +340,7 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
       const storedFixedRate = quotation.fixed_rate ?? fixedRate;
       let storedOvertimeCharge = quotation.overtime_charge ?? 0;
       let storedOvernightCharge = quotation.overnight_charge ?? 0;
-      const storedExceedingDistanceCharge = quotation.exceeding_distance_charge ?? exceedingDistanceCharge;
+      const storedExceedingDistanceCharge = exceedingDistanceCharge;
       
       // Recalculate overtime/overnight if stored values are 0 (historical data)
       if (storedOvertimeCharge === 0 && 
