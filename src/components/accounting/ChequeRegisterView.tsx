@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, CheckCircle, XCircle, Clock, Check, X, Send, Printer, ArrowDownUp } from "lucide-react";
+import { Plus, FileText, CheckCircle, XCircle, Clock, Check, X, Send, Printer, ArrowDownUp, BookOpen } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useChequeRegister } from "@/hooks/useAccountingData";
@@ -13,8 +13,6 @@ import { ChequeIssueForm } from "./ChequeIssueForm";
 import { ChequePrintPreview } from "./ChequePrintPreview";
 import { ChequeBookManagement } from "./ChequeBookManagement";
 import { useToast } from "@/hooks/use-toast";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { BookOpen, ChevronDown } from "lucide-react";
 
 export const ChequeRegisterView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
