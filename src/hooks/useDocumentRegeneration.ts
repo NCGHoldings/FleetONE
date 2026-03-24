@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
+import { uploadPdfToStorage } from '@/lib/document-storage-helpers';
 
 export const useDocumentRegeneration = () => {
   const [isRegenerating, setIsRegenerating] = useState(false);
