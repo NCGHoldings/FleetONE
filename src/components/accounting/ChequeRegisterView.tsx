@@ -15,6 +15,7 @@ import { ChequeBookManagement } from "./ChequeBookManagement";
 import { useToast } from "@/hooks/use-toast";
 
 export const ChequeRegisterView = () => {
+  const [mainTab, setMainTab] = useState<"register" | "books">("register");
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [chequeTypeFilter, setChequeTypeFilter] = useState<string>("all");
   const [showChequeForm, setShowChequeForm] = useState(false);
