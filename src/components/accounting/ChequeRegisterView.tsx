@@ -11,7 +11,10 @@ import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { ChequeIssueForm } from "./ChequeIssueForm";
 import { ChequePrintPreview } from "./ChequePrintPreview";
+import { ChequeBookManagement } from "./ChequeBookManagement";
 import { useToast } from "@/hooks/use-toast";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { BookOpen, ChevronDown } from "lucide-react";
 
 export const ChequeRegisterView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
