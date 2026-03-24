@@ -401,6 +401,22 @@ export const ChequeRegisterView = () => {
         </Tabs>
       </Card>
 
+      {/* Cheque Book Management */}
+      <Collapsible>
+        <Card className="p-4">
+          <CollapsibleTrigger className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">Cheque Book Management</h3>
+            </div>
+            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4">
+            <ChequeBookManagement />
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
       {/* Forms */}
       <ChequeIssueForm open={showChequeForm} onOpenChange={setShowChequeForm} />
       <ChequePrintPreview open={showPrint} onOpenChange={setShowPrint} cheque={printCheque} />
