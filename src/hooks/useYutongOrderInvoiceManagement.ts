@@ -258,7 +258,7 @@ export function useYutongOrderInvoiceManagement() {
       // Get order details for finance integration
       const { data: orderDetails, error: orderError } = await supabase
         .from('yutong_orders')
-        .select('*, yutong_quotations(customer_name)')
+        .select('*, yutong_quotations(customer_name, customer_category_id)')
         .eq('id', invoice.order_id)
         .single();
 
