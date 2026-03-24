@@ -11,6 +11,7 @@ import { FileText, Link2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useActiveCustomerCategories } from "@/hooks/useCustomerCategories";
 
 // Interface for inquiry data passed from Vehicle Inquiry Hub
 interface InquiryInitialData {

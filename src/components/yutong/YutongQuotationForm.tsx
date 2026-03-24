@@ -24,6 +24,7 @@ const formSchema = z.object({
   company_name: z.string().optional(),
   finance_company: z.string().optional(),
   customer_type: z.enum(['personal', 'company']).default('personal'),
+  customer_category_id: z.string().optional(),
   business_registration_number: z.string().optional(),
   tax_registration_number: z.string().optional(),
   bus_model_id: z.string().min(1, 'Bus model is required'),

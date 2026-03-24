@@ -29,6 +29,7 @@ const formSchema = z.object({
   contact_person: z.string().optional(),
   finance_company: z.string().optional(),
   customer_type: z.enum(['personal', 'company']).default('personal'),
+  customer_category_id: z.string().optional(),
   business_registration_number: z.string().optional(),
   tax_registration_number: z.string().optional(),
   referral_agent_id: z.string().optional(),

@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 const formSchema = z.object({
   customer_type: z.enum(['personal', 'company']).default('personal'),
+  customer_category_id: z.string().optional(),
   customer_name: z.string().min(1, 'Customer name is required'),
   representative_name: z.string().optional(),
   designation: z.string().optional(),
