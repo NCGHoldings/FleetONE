@@ -95,9 +95,9 @@ export function YutongInvoiceTypeModal({
     ? Math.round((totalAmount * proformaPercentage) / 100)
     : fixedAmount;
 
-  const effectiveCustomerCommitment = amountMode === 'fixed' 
-    ? customerCommitment 
-    : Math.max(0, proformaAmount - totalAmount);
+  const effectiveCustomerCommitment = commitmentMode === 'percentage'
+    ? Math.round(proformaAmount * commitmentPercentage / 100)
+    : commitmentFixedAmount;
   const leasingCompanyAmount = proformaAmount - effectiveCustomerCommitment;
   const declaredVehicleValue = proformaAmount > totalAmount ? proformaAmount : totalAmount;
    
