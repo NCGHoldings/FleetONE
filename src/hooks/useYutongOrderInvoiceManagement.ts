@@ -125,7 +125,10 @@ export function useYutongOrderInvoiceManagement() {
         ...invoiceData,
         ...signatureData,
         invoice_no: invoiceNo,
-        invoice_status: 'draft' as const
+        invoice_status: 'draft' as const,
+        // Ensure customer_commitment and leasing_amount are passed through
+        customer_commitment: invoiceData.customer_commitment,
+        leasing_amount: invoiceData.leasing_amount,
       };
       
       // Generate PDF
