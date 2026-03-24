@@ -750,15 +750,14 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         </CardContent>
       </Card>
 
-      {/* Record Payment Modal */}
       <Dialog open={isRecordModalOpen} onOpenChange={setIsRecordModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Record Customer Payment</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             <div>
-              <Label>Payment Amount (LKR)</Label>
+              <Label>Payment Amount (LKR) *</Label>
               <Input
                 type="number"
                 value={paymentForm.amount}
@@ -767,7 +766,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
               />
             </div>
             <div>
-              <Label>Payment Date</Label>
+              <Label>Payment Date *</Label>
               <Input
                 type="date"
                 value={paymentForm.payment_date}
@@ -775,7 +774,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
               />
             </div>
             <div>
-              <Label>Payment Method</Label>
+              <Label>Payment Method *</Label>
               <Select
                 value={paymentForm.payment_method}
                 onValueChange={(value) => setPaymentForm({ ...paymentForm, payment_method: value })}
@@ -792,12 +791,51 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
               </Select>
             </div>
             <div>
+              <Label>Bank Account *</Label>
+              <Select
+                value={paymentForm.bank_account_id}
+                onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select bank account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bankAccounts.map((bank) => (
+                    <SelectItem key={bank.id} value={bank.id}>
+                      <div className="flex items-center gap-2">
+                        <Landmark className="h-3 w-3 text-muted-foreground" />
+                        {bank.bank_name} - {bank.account_name} ({bank.account_number})
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Reference Number</Label>
               <Input
                 value={paymentForm.reference_no}
                 onChange={(e) => setPaymentForm({ ...paymentForm, reference_no: e.target.value })}
                 placeholder="Transaction/cheque reference"
               />
+            </div>
+            <div>
+              <Label>Payment Proof (Optional)</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)}
+                  className="flex-1"
+                />
+                {paymentProofFile && (
+                  <Badge variant="secondary" className="gap-1 whitespace-nowrap">
+                    <Image className="h-3 w-3" />
+                    {paymentProofFile.name.slice(0, 15)}...
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Upload bank slip, receipt photo, or transfer confirmation</p>
             </div>
             <div>
               <Label>Notes</Label>
@@ -813,9 +851,9 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
             <Button variant="outline" onClick={() => setIsRecordModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRecordPayment}>
+            <Button onClick={handleRecordPayment} disabled={isUploading}>
               <DollarSign className="h-4 w-4 mr-2" />
-              Record Payment
+              {isUploading ? 'Uploading...' : 'Record Payment'}
             </Button>
           </DialogFooter>
         </DialogContent>
