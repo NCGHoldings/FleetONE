@@ -83,12 +83,12 @@ export function LightVehicleCashReceiptModal({
       }
 
       const canvas = await html2canvas(iframe.contentDocument.body, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         backgroundColor: '#ffffff'
       });
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
