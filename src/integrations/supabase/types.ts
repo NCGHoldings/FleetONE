@@ -10015,6 +10015,7 @@ export type Database = {
           recurring_frequency: string | null
           reference: string | null
           reversed_entry_id: string | null
+          source_module: string | null
           status: Database["public"]["Enums"]["journal_status"]
           total_credit: number
           total_debit: number
@@ -10042,6 +10043,7 @@ export type Database = {
           recurring_frequency?: string | null
           reference?: string | null
           reversed_entry_id?: string | null
+          source_module?: string | null
           status?: Database["public"]["Enums"]["journal_status"]
           total_credit?: number
           total_debit?: number
@@ -10069,6 +10071,7 @@ export type Database = {
           recurring_frequency?: string | null
           reference?: string | null
           reversed_entry_id?: string | null
+          source_module?: string | null
           status?: Database["public"]["Enums"]["journal_status"]
           total_credit?: number
           total_debit?: number

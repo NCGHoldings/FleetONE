@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { DollarSign, CheckCircle, Clock, Plus, RefreshCw, MoreHorizontal, FileText, Receipt, Eye } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, Plus, RefreshCw, MoreHorizontal, FileText, Receipt, Eye, Landmark, Image } from 'lucide-react';
 import { useLightVehicleCashReceipts, LightVehicleCashReceipt } from '@/hooks/useLightVehicleCashReceipts';
 import { LightVehicleCashReceiptModal } from './LightVehicleCashReceiptModal';
 import {
@@ -45,6 +45,9 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
   const [receipts, setReceipts] = useState<LightVehicleCashReceipt[]>([]);
   const [selectedReceipt, setSelectedReceipt] = useState<LightVehicleCashReceipt | null>(null);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   const { fetchReceiptsForOrder, createReceipt, isCreating } = useLightVehicleCashReceipts();
   
@@ -53,16 +56,35 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
     payment_date: new Date().toISOString().split('T')[0],
     payment_method: 'bank_transfer',
     reference_no: '',
-    bank_name: '',
+    bank_account_id: '',
     cheque_no: '',
     notes: ''
   });
+
+  useEffect(() => {
+    loadBankAccounts();
+  }, []);
 
   useEffect(() => {
     if (orderId) {
       loadPaymentData();
     }
   }, [orderId]);
+
+  const loadBankAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('id, account_name, bank_name, account_number')
+        .eq('company_id', NCG_HOLDING_ID)
+        .eq('is_active', true)
+        .order('bank_name');
+      if (error) throw error;
+      setBankAccounts(data || []);
+    } catch (error) {
+      console.error('Error loading bank accounts:', error);
+    }
+  };
 
   const loadPaymentData = async () => {
     setIsLoading(true);
@@ -147,11 +169,37 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
         return;
       }
 
+      if (!paymentForm.bank_account_id) {
+        toast.error('Please select a bank account');
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error('Authentication error');
         return;
       }
+
+      // Upload payment proof if provided
+      let paymentSlipUrl: string | null = null;
+      if (paymentProofFile) {
+        setIsUploading(true);
+        const fileExt = paymentProofFile.name.split('.').pop();
+        const filePath = `lightvehicle/${orderId}/${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('payment-proofs')
+          .upload(filePath, paymentProofFile);
+        if (uploadError) {
+          toast.error('Failed to upload payment proof');
+          setIsUploading(false);
+          return;
+        }
+        const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(filePath);
+        paymentSlipUrl = urlData?.publicUrl || null;
+        setIsUploading(false);
+      }
+
+      const selectedBank = bankAccounts.find(b => b.id === paymentForm.bank_account_id);
 
       const { error } = await supabase
         .from('lightvehicle_customer_payments')
@@ -162,13 +210,15 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
           payment_date: paymentForm.payment_date,
           payment_method: paymentForm.payment_method,
           reference_number: paymentForm.reference_no || null,
-          bank_name: paymentForm.bank_name || null,
+          bank_account_id: paymentForm.bank_account_id,
+          bank_name: selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_name}` : null,
           cheque_no: paymentForm.cheque_no || null,
+          payment_slip_url: paymentSlipUrl,
           notes: paymentForm.notes || null,
           status: 'pending',
           verification_status: 'pending',
           created_by: user.id
-        });
+        } as any);
 
       if (error) throw error;
 
@@ -341,11 +391,12 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
       payment_date: new Date().toISOString().split('T')[0],
       payment_method: 'bank_transfer',
       reference_no: '',
-      bank_name: '',
+      bank_account_id: '',
       cheque_no: '',
       notes: ''
     });
     setSelectedSchedule(null);
+    setPaymentProofFile(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -627,23 +678,35 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Bank Name</Label>
-                <Input
-                  value={paymentForm.bank_name}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, bank_name: e.target.value })}
-                  placeholder="Bank name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Reference No</Label>
-                <Input
-                  value={paymentForm.reference_no}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, reference_no: e.target.value })}
-                  placeholder="Transaction reference"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Bank Account *</Label>
+              <Select
+                value={paymentForm.bank_account_id}
+                onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select bank account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bankAccounts.map((bank) => (
+                    <SelectItem key={bank.id} value={bank.id}>
+                      <div className="flex items-center gap-2">
+                        <Landmark className="h-3 w-3 text-muted-foreground" />
+                        {bank.bank_name} - {bank.account_name} ({bank.account_number})
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Reference No</Label>
+              <Input
+                value={paymentForm.reference_no}
+                onChange={(e) => setPaymentForm({ ...paymentForm, reference_no: e.target.value })}
+                placeholder="Transaction reference"
+              />
             </div>
 
             {paymentForm.payment_method === 'cheque' && (
@@ -658,6 +721,25 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
             )}
 
             <div className="space-y-2">
+              <Label>Payment Proof (Optional)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)}
+                  className="flex-1"
+                />
+                {paymentProofFile && (
+                  <Badge variant="secondary" className="gap-1 whitespace-nowrap">
+                    <Image className="h-3 w-3" />
+                    {paymentProofFile.name.slice(0, 15)}...
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Upload bank slip or transfer confirmation</p>
+            </div>
+
+            <div className="space-y-2">
               <Label>Notes</Label>
               <Textarea
                 value={paymentForm.notes}
@@ -670,8 +752,8 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
             <Button variant="outline" onClick={() => setIsRecordModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRecordPayment}>
-              Record Payment
+            <Button onClick={handleRecordPayment} disabled={isUploading}>
+              {isUploading ? 'Uploading...' : 'Record Payment'}
             </Button>
           </DialogFooter>
         </DialogContent>

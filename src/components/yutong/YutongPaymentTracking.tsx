@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { DollarSign, CheckCircle, Clock, FileText, Plus, RefreshCw, Eye, Download, MoreHorizontal, Receipt, Landmark } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, FileText, Plus, RefreshCw, Eye, Download, MoreHorizontal, Receipt, Landmark, Upload, Image } from 'lucide-react';
 import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceManagement';
 import { useYutongCashReceipts, YutongCashReceipt } from '@/hooks/useYutongCashReceipts';
 import { YutongCashReceiptModal } from './YutongCashReceiptModal';
@@ -47,13 +47,25 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   const [selectedReceipt, setSelectedReceipt] = useState<YutongCashReceipt | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   
+  // Bank accounts state
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  
+  // Payment proof upload state
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
     payment_date: new Date().toISOString().split('T')[0],
     payment_method: 'bank_transfer',
     reference_no: '',
+    bank_account_id: '',
     notes: ''
   });
+
+  useEffect(() => {
+    loadBankAccounts();
+  }, []);
 
   useEffect(() => {
     if (orderId) {
@@ -69,6 +81,21 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       loadPaymentData();
     }
   }, [selectedOrderId]);
+
+  const loadBankAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('id, account_name, bank_name, account_number')
+        .eq('company_id', NCG_HOLDING_ID)
+        .eq('is_active', true)
+        .order('bank_name');
+      if (error) throw error;
+      setBankAccounts(data || []);
+    } catch (error) {
+      console.error('Error loading bank accounts:', error);
+    }
+  };
 
   const loadAllOrders = async () => {
     try {
@@ -167,12 +194,42 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         return;
       }
 
+      if (!paymentForm.bank_account_id) {
+        toast.error('Please select a bank account');
+        return;
+      }
+
       // Get current user for created_by field
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
         toast.error('Authentication error. Please log in again.');
         return;
       }
+
+      // Upload payment proof if provided
+      let paymentSlipUrl: string | null = null;
+      if (paymentProofFile) {
+        setIsUploading(true);
+        const fileExt = paymentProofFile.name.split('.').pop();
+        const filePath = `yutong/${selectedOrderId}/${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('payment-proofs')
+          .upload(filePath, paymentProofFile);
+        
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          toast.error('Failed to upload payment proof');
+          setIsUploading(false);
+          return;
+        }
+        
+        const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(filePath);
+        paymentSlipUrl = urlData?.publicUrl || null;
+        setIsUploading(false);
+      }
+
+      // Get selected bank account name
+      const selectedBank = bankAccounts.find(b => b.id === paymentForm.bank_account_id);
 
       // Insert payment record with created_by
       const { data: payment, error: paymentError } = await supabase
@@ -184,10 +241,13 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           payment_date: paymentForm.payment_date,
           payment_method: paymentForm.payment_method,
           payment_reference: paymentForm.reference_no || null,
+          bank_account_id: paymentForm.bank_account_id,
+          bank_name: selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_name}` : null,
+          payment_slip_url: paymentSlipUrl,
           notes: paymentForm.notes || null,
           status: 'pending',
           created_by: user.id
-        })
+        } as any)
         .select()
         .single();
 
@@ -394,9 +454,11 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       payment_date: new Date().toISOString().split('T')[0],
       payment_method: 'bank_transfer',
       reference_no: '',
+      bank_account_id: '',
       notes: ''
     });
     setSelectedSchedule(null);
+    setPaymentProofFile(null);
   };
 
   // Cash Receipt handlers
@@ -688,15 +750,14 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         </CardContent>
       </Card>
 
-      {/* Record Payment Modal */}
       <Dialog open={isRecordModalOpen} onOpenChange={setIsRecordModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Record Customer Payment</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             <div>
-              <Label>Payment Amount (LKR)</Label>
+              <Label>Payment Amount (LKR) *</Label>
               <Input
                 type="number"
                 value={paymentForm.amount}
@@ -705,7 +766,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
               />
             </div>
             <div>
-              <Label>Payment Date</Label>
+              <Label>Payment Date *</Label>
               <Input
                 type="date"
                 value={paymentForm.payment_date}
@@ -713,7 +774,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
               />
             </div>
             <div>
-              <Label>Payment Method</Label>
+              <Label>Payment Method *</Label>
               <Select
                 value={paymentForm.payment_method}
                 onValueChange={(value) => setPaymentForm({ ...paymentForm, payment_method: value })}
@@ -730,12 +791,51 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
               </Select>
             </div>
             <div>
+              <Label>Bank Account *</Label>
+              <Select
+                value={paymentForm.bank_account_id}
+                onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select bank account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bankAccounts.map((bank) => (
+                    <SelectItem key={bank.id} value={bank.id}>
+                      <div className="flex items-center gap-2">
+                        <Landmark className="h-3 w-3 text-muted-foreground" />
+                        {bank.bank_name} - {bank.account_name} ({bank.account_number})
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Reference Number</Label>
               <Input
                 value={paymentForm.reference_no}
                 onChange={(e) => setPaymentForm({ ...paymentForm, reference_no: e.target.value })}
                 placeholder="Transaction/cheque reference"
               />
+            </div>
+            <div>
+              <Label>Payment Proof (Optional)</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)}
+                  className="flex-1"
+                />
+                {paymentProofFile && (
+                  <Badge variant="secondary" className="gap-1 whitespace-nowrap">
+                    <Image className="h-3 w-3" />
+                    {paymentProofFile.name.slice(0, 15)}...
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Upload bank slip, receipt photo, or transfer confirmation</p>
             </div>
             <div>
               <Label>Notes</Label>
@@ -751,9 +851,9 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
             <Button variant="outline" onClick={() => setIsRecordModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRecordPayment}>
+            <Button onClick={handleRecordPayment} disabled={isUploading}>
               <DollarSign className="h-4 w-4 mr-2" />
-              Record Payment
+              {isUploading ? 'Uploading...' : 'Record Payment'}
             </Button>
           </DialogFooter>
         </DialogContent>
