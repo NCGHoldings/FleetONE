@@ -547,7 +547,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
   // Convert canvas to JPEG data URL only (avoid PNG signature errors)
   let imgData: string;
   try {
-    imgData = canvas.toDataURL('image/jpeg', 0.95);
+    imgData = canvas.toDataURL('image/jpeg', 0.85);
   } catch (error) {
     console.error('Failed to convert canvas to JPEG:', error);
     throw new Error('Failed to generate image (JPEG) for PDF');

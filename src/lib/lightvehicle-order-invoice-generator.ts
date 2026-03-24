@@ -852,7 +852,7 @@ export async function generateLightVehicleOrderInvoicePDF(data: LightVehicleOrde
       windowWidth: 794,
     });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',

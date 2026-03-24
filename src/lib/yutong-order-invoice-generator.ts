@@ -1162,7 +1162,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
       console.log(`✅ Page ${i + 1} canvas rendered. Size:`, canvas.width, 'x', canvas.height);
 
       // Use JPEG with higher quality for professional output
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
       
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;

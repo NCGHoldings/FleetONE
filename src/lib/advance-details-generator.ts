@@ -408,7 +408,7 @@ export async function generateAdvanceDetailsPDF(
     const imgX = (pdfWidth - imgWidth * ratio) / 2;
     const imgY = 10;
 
-    pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+    pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
 
     const pdfBase64 = pdf.output('datauristring').split(',')[1];
 

@@ -638,7 +638,7 @@ export async function generateSinotruckOrderInvoicePDF(data: SinotruckOrderInvoi
       height: 1270,
     });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
     const pageWidth = 210;
     const pageHeight = 297;
 
