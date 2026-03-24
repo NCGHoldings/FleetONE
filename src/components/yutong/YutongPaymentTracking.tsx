@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { DollarSign, CheckCircle, Clock, FileText, Plus, RefreshCw, Eye, Download, MoreHorizontal, Receipt, Landmark } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, FileText, Plus, RefreshCw, Eye, Download, MoreHorizontal, Receipt, Landmark, Upload, Image } from 'lucide-react';
 import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceManagement';
 import { useYutongCashReceipts, YutongCashReceipt } from '@/hooks/useYutongCashReceipts';
 import { YutongCashReceiptModal } from './YutongCashReceiptModal';
@@ -47,13 +47,25 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   const [selectedReceipt, setSelectedReceipt] = useState<YutongCashReceipt | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   
+  // Bank accounts state
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  
+  // Payment proof upload state
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
     payment_date: new Date().toISOString().split('T')[0],
     payment_method: 'bank_transfer',
     reference_no: '',
+    bank_account_id: '',
     notes: ''
   });
+
+  useEffect(() => {
+    loadBankAccounts();
+  }, []);
 
   useEffect(() => {
     if (orderId) {
