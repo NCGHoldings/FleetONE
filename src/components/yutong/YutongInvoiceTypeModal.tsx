@@ -53,6 +53,7 @@ const FINANCE_PURPOSES = [
 
 const COMMON_PERCENTAGES = [60, 70, 80, 90];
 const COMMON_FIXED_INCREMENTS = [500000, 1000000, 2000000, 5000000];
+const COMMITMENT_PERCENTAGES = [20, 30, 40, 50];
 
 export function YutongInvoiceTypeModal({
   isOpen,
