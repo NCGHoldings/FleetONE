@@ -118,20 +118,10 @@ export const useDocumentManagement = () => {
       };
 
       const pdfBlob = await generateInvoicePDF(draftInvoiceData);
-      const arrayBuffer = await pdfBlob.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      
-      // Convert to base64
-      let base64String = '';
-      const chunkSize = 1024;
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize);
-        base64String += String.fromCharCode.apply(null, Array.from(chunk));
-      }
-      const base64Data = btoa(base64String);
 
-      // Store in database
+      // Upload to Supabase Storage instead of storing base64 in DB
       const fileName = `DRAFT-${invoiceData.document_type}-${invoiceData.quotationNo}-${Date.now()}.pdf`;
+      const { storagePath, fileSize } = await uploadPdfToStorage(pdfBlob, fileName);
       
       const { data, error } = await supabase
         .from('document_storage')
@@ -141,10 +131,11 @@ export const useDocumentManagement = () => {
           document_type: (invoiceData.document_type || 'sales_receipt') as 'sales_receipt' | 'invoice',
           payment_type: invoiceData.invoiceType as 'advance' | 'balance' | 'full',
           document_status: 'draft',
-          document_data: base64Data,
+          document_data: '',
           file_name: fileName,
-          file_size: uint8Array.length,
+          file_size: fileSize,
           generated_by: user.id,
+          storage_path: storagePath,
         })
         .select()
         .single();
