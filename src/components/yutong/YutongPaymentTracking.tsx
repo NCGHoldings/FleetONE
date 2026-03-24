@@ -194,12 +194,42 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         return;
       }
 
+      if (!paymentForm.bank_account_id) {
+        toast.error('Please select a bank account');
+        return;
+      }
+
       // Get current user for created_by field
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
         toast.error('Authentication error. Please log in again.');
         return;
       }
+
+      // Upload payment proof if provided
+      let paymentSlipUrl: string | null = null;
+      if (paymentProofFile) {
+        setIsUploading(true);
+        const fileExt = paymentProofFile.name.split('.').pop();
+        const filePath = `yutong/${selectedOrderId}/${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('payment-proofs')
+          .upload(filePath, paymentProofFile);
+        
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          toast.error('Failed to upload payment proof');
+          setIsUploading(false);
+          return;
+        }
+        
+        const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(filePath);
+        paymentSlipUrl = urlData?.publicUrl || null;
+        setIsUploading(false);
+      }
+
+      // Get selected bank account name
+      const selectedBank = bankAccounts.find(b => b.id === paymentForm.bank_account_id);
 
       // Insert payment record with created_by
       const { data: payment, error: paymentError } = await supabase
@@ -211,10 +241,13 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           payment_date: paymentForm.payment_date,
           payment_method: paymentForm.payment_method,
           payment_reference: paymentForm.reference_no || null,
+          bank_account_id: paymentForm.bank_account_id,
+          bank_name: selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_name}` : null,
+          payment_slip_url: paymentSlipUrl,
           notes: paymentForm.notes || null,
           status: 'pending',
           created_by: user.id
-        })
+        } as any)
         .select()
         .single();
 
