@@ -1,43 +1,40 @@
 
 
-# Fix: Manual Trip Distance Override Not Recalculating Exceeding Distance Charge
+# Fix: `km_trip` in costs object still uses original distance instead of override
 
 ## Problem
-When the user overrides the trip distance (e.g., from 222 km to 274 km), the **exceeding distance charge is not recalculated**. The stored charge (LKR 19,565) reflects the old distance, not 174 km × 175 LKR/km = LKR 30,450.
+Even though the previous fix correctly applied the manual override to `tripDistance` for rate card calculations (line 1252), the **costs object** at line 1418 still writes the original Google Maps distance:
 
-**Root cause**: In `SpecialHireForm.tsx`, the submit handler at line 1251 always uses `distanceData.kmTrip` (Google Maps result) for all rate card calculations. The manual override (`manualTripDistance`) is only applied at save time for the `km_trip` field, but `exceeding_distance_charge`, `hire_charge`, `gross_revenue`, and all downstream values (fuel, commission, customer total) are computed from the original distance.
+```typescript
+// Line 1418 (BUG):
+km_trip: Math.round((distanceData.kmTrip || 0) * 10) / 10,  // ← ignores manual override
+```
+
+This means when the quotation is saved, `km_trip` gets corrected at line 1759 (`useManualTripDistance ? manualTripDistance : costs.km_trip`), but:
+1. The **display data** (`costData`) at line 1459 still shows the old `costs.km_trip`
+2. `totalTripDistance` and `totalDistance` at lines 1504-1505 use `distanceData.kmTrip` directly
+3. When editing/versioning, the recalculated costs carry the wrong `km_trip` in the costs object
 
 ## Fix
 
 ### File: `src/components/special-hire/SpecialHireForm.tsx`
 
-**Change at line 1251**: Apply the manual trip distance override immediately before rate card calculations:
+Three changes using the already-computed `tripDistance` variable:
 
+1. **Line 1418**: Use `tripDistance` instead of `distanceData.kmTrip`
 ```typescript
-// BEFORE (bug):
-const tripDistance = Math.round((distanceData.kmTrip || 0) * 10) / 10;
-
-// AFTER (fix):
-const calculatedTripDistance = Math.round((distanceData.kmTrip || 0) * 10) / 10;
-const tripDistance = useManualTripDistance && manualTripDistance > 0
-  ? manualTripDistance
-  : calculatedTripDistance;
+km_trip: tripDistance,  // already rounded, uses manual override if enabled
 ```
 
-This single change ensures all downstream calculations (exceeding distance, overtime, fuel, commission, customer total) use the overridden distance when manual override is enabled.
-
-### Also verify `EnhancedCostCalculator.tsx` line 301
-Currently it recalculates exceeding distance from `quotation.km_trip` and the rate card, but then at line 343 it prefers `quotation.exceeding_distance_charge` (the stored value). Since the stored value will now be correct after the form fix, this will work. But as a safety measure, always recalculate from `km_trip` instead of using the stored value:
-
+2. **Line 1504**: Use `tripDistance` for totalTripDistance
 ```typescript
-// Line 343: BEFORE
-const storedExceedingDistanceCharge = quotation.exceeding_distance_charge ?? exceedingDistanceCharge;
-
-// AFTER: Always use recalculated value based on km_trip
-const storedExceedingDistanceCharge = exceedingDistanceCharge;
+totalTripDistance: (distanceData.kmParkingToPickup || 0) + tripDistance + (distanceData.kmDropToParking || 0),
 ```
 
-## Files Changed
-- `src/components/special-hire/SpecialHireForm.tsx` — apply manual distance before calculations
-- `src/components/special-hire/EnhancedCostCalculator.tsx` — always recalculate exceeding charge from km_trip
+3. **Line 1505**: Use `tripDistance` for totalDistance
+```typescript
+totalDistance: (distanceData.kmParkingToPickup || 0) + tripDistance + (distanceData.kmDropToParking || 0) + totalAdditionalDistance,
+```
+
+These three lines are the remaining places where the original `distanceData.kmTrip` is used instead of the override-aware `tripDistance`.
 
