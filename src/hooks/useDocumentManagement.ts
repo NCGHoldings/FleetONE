@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { generateInvoicePDF, type InvoiceData, type ApprovalSignature } from '@/lib/invoice-generator';
+import { uploadPdfToStorage, getDocumentAsBase64, blobToBase64 } from '@/lib/document-storage-helpers';
 
 export interface StoredDocument {
   id: string;
