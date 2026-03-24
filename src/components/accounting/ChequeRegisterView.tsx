@@ -11,7 +11,10 @@ import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { ChequeIssueForm } from "./ChequeIssueForm";
 import { ChequePrintPreview } from "./ChequePrintPreview";
+import { ChequeBookManagement } from "./ChequeBookManagement";
 import { useToast } from "@/hooks/use-toast";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { BookOpen, ChevronDown } from "lucide-react";
 
 export const ChequeRegisterView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
@@ -397,6 +400,22 @@ export const ChequeRegisterView = () => {
           ))}
         </Tabs>
       </Card>
+
+      {/* Cheque Book Management */}
+      <Collapsible>
+        <Card className="p-4">
+          <CollapsibleTrigger className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">Cheque Book Management</h3>
+            </div>
+            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4">
+            <ChequeBookManagement />
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Forms */}
       <ChequeIssueForm open={showChequeForm} onOpenChange={setShowChequeForm} />

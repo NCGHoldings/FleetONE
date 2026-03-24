@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,6 +16,8 @@ import { useCreateAPPayment, useApproveAPInvoice } from "@/hooks/useAccountingMu
 import { useVendorBankAccounts } from "@/hooks/useVendorBankAccounts";
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { useNextChequeNumber, useActiveChequeBook } from "@/hooks/useChequeBooks";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
@@ -83,6 +85,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const { data: vendors } = useVendors();
   const { data: bankAccounts } = useBankAccounts();
   const { data: allInvoices } = useAPInvoices();
+  const { selectedCompanyId } = useCompany();
   
   const createPayment = useCreateAPPayment();
   const approveInvoice = useApproveAPInvoice();
@@ -121,11 +124,17 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     paymentMethod === "cheque" ? watchedBankAccountId : undefined
   );
 
+  // Track previous bank account to detect changes
+  const prevBankAccountRef = useRef<string | undefined>();
+
   // Auto-fetch cheque number when payment method is cheque and bank is selected
   useEffect(() => {
     if (paymentMethod === "cheque" && watchedBankAccountId && open) {
+      const bankChanged = prevBankAccountRef.current !== watchedBankAccountId;
       const currentCheque = form.getValues("cheque_number");
-      if (!currentCheque) {
+      
+      // Fetch if no cheque number OR bank account changed
+      if (!currentCheque || bankChanged) {
         nextChequeNumber.mutate(watchedBankAccountId, {
           onSuccess: (result) => {
             if (result.cheque_number) {
@@ -134,6 +143,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
           },
         });
       }
+      prevBankAccountRef.current = watchedBankAccountId;
     }
   }, [paymentMethod, watchedBankAccountId, open]);
 
@@ -159,6 +169,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       }
     } else {
       hasGeneratedNumber.current = false;
+      prevBankAccountRef.current = undefined;
     }
   }, [open, isAdvanceMode, form, generateNumber]);
 
@@ -319,7 +330,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       : allocations.filter((a) => a.selected && a.allocated_amount > 0);
     
     try {
-      await createPayment.mutateAsync({
+      const paymentResult = await createPayment.mutateAsync({
         payment_number: data.payment_number,
         vendor_id: data.vendor_id,
         payment_date: data.payment_date,
@@ -352,6 +363,28 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
             }))
           : undefined,
       });
+
+      // Auto-create cheque register entry for cheque payments
+      if (data.payment_method === "cheque" && data.cheque_number) {
+        const vendorName = vendors?.find((v) => v.id === data.vendor_id)?.vendor_name || "Unknown";
+        try {
+          await supabase.from("cheque_register").insert({
+            cheque_number: data.cheque_number,
+            cheque_date: data.cheque_date || data.payment_date,
+            payee: vendorName,
+            amount: totalPayment,
+            bank_account_id: data.bank_account_id || null,
+            company_id: selectedCompanyId || null,
+            payment_id: paymentResult?.id || null,
+            cheque_type: "outgoing",
+            status: "draft",
+            reference: data.reference || null,
+            memo: data.notes || null,
+          });
+        } catch (chequeErr) {
+          console.error("Failed to auto-create cheque register entry:", chequeErr);
+        }
+      }
       onOpenChange(false);
       form.reset();
       setAllocations([]);
