@@ -1,43 +1,38 @@
 
 
-# Fix Cash Receipts Panel in Spreadsheet — Add Create & View
+# Add Cheque Book Management to Cheque Register + Fix Cheque Auto-Issue Flow
 
 ## Problem
-The CR (Cash Receipts) column in the Yutong Orders Spreadsheet is read-only: it lists existing receipts but has no way to **create** a new cash receipt or **view** a receipt's full details (preview/download/sign). The DO and Payment panels both support creation; CR should match.
+The Cheque Register page (Banking > Cheque Register tab) has no way to create or manage cheque books — that feature is hidden in a separate "Cheque Books" sub-tab inside BankingView. Users need to register cheque books directly from the Cheque Register and have AP payments auto-assign the next cheque number when "cheque" is selected as payment method.
+
+## Current State
+- **ChequeBookManagement** component exists but is only in BankingView's sub-tab — not visible from the Cheque Register
+- **APPaymentForm** already has `useNextChequeNumber` wired, but the auto-fetch only triggers when `cheque_number` is empty AND the form is open — it may not re-trigger on bank account change
+- The Cheque Register (`ChequeRegisterView`) has no link to cheque book management
 
 ## Changes
 
-### 1. Add "Create Cash Receipt" to SpreadsheetCRPanel
-**File:** `src/components/yutong/spreadsheet/SpreadsheetQuickActions.tsx`
+### 1. Add Cheque Book Management section to ChequeRegisterView
+**File:** `src/components/accounting/ChequeRegisterView.tsx`
 
-- Add a `+ New CR` button in the CR popover header (matching the DO panel's `+ New DO` pattern)
-- Add an inline form with fields: Amount, Payment Method (cash/cheque/bank_transfer), Date, and optional Reference
-- Wire it to a new `createCR` prop that calls `useYutongCashReceipts().createCashReceipt()`
-- After creation, refetch the CR list to show the new receipt
+- Import and render `ChequeBookManagement` component below the cheque table
+- Add a "Cheque Books" tab alongside the existing type filters (All Types / Outgoing / Incoming) OR render it as a collapsible section at the bottom
+- This gives users direct access to register new cheque books and see active books from the same page
 
-### 2. Add "View" button on each CR row
-**File:** `src/components/yutong/spreadsheet/SpreadsheetQuickActions.tsx`
+### 2. Fix cheque number auto-issue on AP Payment
+**File:** `src/components/accounting/APPaymentForm.tsx`
 
-- Add a small "View" button on each receipt card in the CR popover
-- Clicking it opens `YutongCashReceiptModal` (the existing modal with preview, signatures, PDF download)
-- Need to fetch full receipt data (via `getCashReceiptByPaymentId` or direct query) since the CRRecord only has summary fields
+- Fix the `useEffect` for cheque auto-fetch: remove the `!currentCheque` guard so switching bank accounts re-fetches a new cheque number
+- Add a "Cheque Book" indicator showing the active book's remaining count and prefix
+- When no active cheque book exists for the selected bank, show a warning with a link/button to register one
 
-### 3. Wire createCR through the hook
-**File:** `src/hooks/useSpreadsheetQuickActions.ts`
+### 3. Add cheque register entry creation on AP payment submit
+**File:** `src/components/accounting/APPaymentForm.tsx` (submit handler)
 
-- Expose `createCashReceipt` from the existing `useYutongCashReceipts` hook (already imported)
-- Add a `createCR` wrapper function that accepts `(orderId, amount, method, date)`, calls `createCashReceipt` with a placeholder paymentId or null, and returns success/failure
-- Add to the returned object
-
-### 4. Update CRPanel props and wiring
-**File:** `src/components/yutong/spreadsheet/YutongSpreadsheetCore.tsx`
-
-- Pass `createCR` and `onViewReceipt` props to `SpreadsheetCRPanel`
-- Add state for the receipt view modal (`YutongCashReceiptModal`)
-- Import and render `YutongCashReceiptModal` at the bottom of the component
+- When `payment_method === "cheque"`, after payment creation, auto-insert a `cheque_register` entry with status `draft`, linking the cheque number, amount, payee (vendor name), and bank account
+- This ensures every cheque payment automatically appears in the Cheque Register without manual entry
 
 ## Files touched
-- `src/components/yutong/spreadsheet/SpreadsheetQuickActions.tsx` — Add create form + view button to CRPanel
-- `src/hooks/useSpreadsheetQuickActions.ts` — Expose createCR wrapper
-- `src/components/yutong/spreadsheet/YutongSpreadsheetCore.tsx` — Wire new props + add receipt view modal
+- `src/components/accounting/ChequeRegisterView.tsx` — Add ChequeBookManagement section
+- `src/components/accounting/APPaymentForm.tsx` — Fix auto-fetch logic + auto-create cheque register entry
 
