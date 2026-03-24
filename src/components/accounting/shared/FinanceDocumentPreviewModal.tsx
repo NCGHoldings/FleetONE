@@ -316,12 +316,12 @@ export const FinanceDocumentPreviewModal = ({
     try {
       const body = iframeRef.current.contentDocument.body;
       const canvas = await html2canvas(body, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         logging: false,
       });
 
-      const imgData = canvas.toDataURL("image/png");
+      const imgData = canvas.toDataURL("image/jpeg", 0.85);
       const pdf = new jsPDF({
         orientation: selectedTemplate?.orientation === "landscape" ? "landscape" : "portrait",
         unit: "mm",
