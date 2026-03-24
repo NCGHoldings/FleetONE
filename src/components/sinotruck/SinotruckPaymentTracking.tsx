@@ -128,11 +128,37 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
         return;
       }
 
+      if (!paymentForm.bank_account_id) {
+        toast.error('Please select a bank account');
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error('Authentication error');
         return;
       }
+
+      // Upload payment proof if provided
+      let paymentSlipUrl: string | null = null;
+      if (paymentProofFile) {
+        setIsUploading(true);
+        const fileExt = paymentProofFile.name.split('.').pop();
+        const filePath = `sinotruck/${orderId}/${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('payment-proofs')
+          .upload(filePath, paymentProofFile);
+        if (uploadError) {
+          toast.error('Failed to upload payment proof');
+          setIsUploading(false);
+          return;
+        }
+        const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(filePath);
+        paymentSlipUrl = urlData?.publicUrl || null;
+        setIsUploading(false);
+      }
+
+      const selectedBank = bankAccounts.find(b => b.id === paymentForm.bank_account_id);
 
       const { error } = await supabase
         .from('sinotruck_customer_payments' as any)
@@ -143,8 +169,10 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
           payment_date: paymentForm.payment_date,
           payment_method: paymentForm.payment_method,
           payment_reference: paymentForm.reference_no || null,
-          bank_name: paymentForm.bank_name || null,
+          bank_account_id: paymentForm.bank_account_id,
+          bank_name: selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_name}` : null,
           cheque_no: paymentForm.cheque_no || null,
+          payment_slip_url: paymentSlipUrl,
           notes: paymentForm.notes || null,
           status: 'pending',
           created_by: user.id
