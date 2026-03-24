@@ -1091,7 +1091,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
        const pdfHeight = pdf.internal.pageSize.getHeight();
 
        const canvas = await html2canvas(page, {
-         scale: 2.5,
+         scale: 1.5,
          useCORS: true,
          allowTaint: true,
          backgroundColor: '#ffffff',
