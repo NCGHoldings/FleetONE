@@ -1150,7 +1150,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
       
       console.log(`🎨 Rendering page ${i + 1}...`);
       const canvas = await html2canvas(page, {
-        scale: 2.5, // Higher quality rendering
+        scale: 1.5,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
