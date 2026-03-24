@@ -174,7 +174,7 @@ export function LightVehicleQuotationViewModal({ quotation, open, onClose }: Lig
         page.style.maxWidth = '210mm';
         
         const canvas = await html2canvas(page, {
-          scale: 2,
+          scale: 1.5,
           useCORS: true,
           allowTaint: false,
           backgroundColor: '#ffffff',
