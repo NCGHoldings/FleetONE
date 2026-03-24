@@ -68,6 +68,9 @@ export function YutongInvoiceTypeModal({
   const [amountMode, setAmountMode] = useState<'percentage' | 'fixed'>('percentage');
   const [fixedAmount, setFixedAmount] = useState(totalAmount);
   const [customerCommitment, setCustomerCommitment] = useState(0);
+  const [commitmentMode, setCommitmentMode] = useState<'percentage' | 'fixed'>('percentage');
+  const [commitmentPercentage, setCommitmentPercentage] = useState(30);
+  const [commitmentFixedAmount, setCommitmentFixedAmount] = useState(0);
   const [financeCompanyName, setFinanceCompanyName] = useState('');
   const [financeCompanyAddress, setFinanceCompanyAddress] = useState('');
   const [proformaPurpose, setProformaPurpose] = useState('bank_leasing');
