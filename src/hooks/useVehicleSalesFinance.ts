@@ -206,6 +206,7 @@ export async function createVehicleCustomer({
         phone: customerPhone || null,
         email: customerEmail || null,
         customer_type: 'individual',
+        customer_category_id: customerCategoryId || null,
         business_unit_code: businessUnitCode,
         is_active: true,
       })
