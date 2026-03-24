@@ -82,6 +82,21 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     }
   }, [selectedOrderId]);
 
+  const loadBankAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('id, account_name, bank_name, account_number')
+        .eq('company_id', NCG_HOLDING_ID)
+        .eq('is_active', true)
+        .order('bank_name');
+      if (error) throw error;
+      setBankAccounts(data || []);
+    } catch (error) {
+      console.error('Error loading bank accounts:', error);
+    }
+  };
+
   const loadAllOrders = async () => {
     try {
       const { data, error } = await supabase
