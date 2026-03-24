@@ -10745,6 +10745,7 @@ export type Database = {
           payment_date: string
           payment_method: string | null
           payment_schedule_id: string | null
+          payment_slip_url: string | null
           receipt_url: string | null
           reference_number: string | null
           status: string | null
@@ -10768,6 +10769,7 @@ export type Database = {
           payment_date: string
           payment_method?: string | null
           payment_schedule_id?: string | null
+          payment_slip_url?: string | null
           receipt_url?: string | null
           reference_number?: string | null
           status?: string | null
@@ -10791,6 +10793,7 @@ export type Database = {
           payment_date?: string
           payment_method?: string | null
           payment_schedule_id?: string | null
+          payment_slip_url?: string | null
           receipt_url?: string | null
           reference_number?: string | null
           status?: string | null
