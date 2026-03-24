@@ -37,3 +37,4 @@ whatsapp-server/.wwebjs_auth/
 playwright-report/
 test-results/
 e2e/.auth/
+supabase/.temp/
