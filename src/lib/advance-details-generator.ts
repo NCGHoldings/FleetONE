@@ -387,13 +387,13 @@ export async function generateAdvanceDetailsPDF(
 ): Promise<{ success: boolean; pdfBase64?: string; error?: string }> {
   try {
     const canvas = await html2canvas(htmlElement, {
-      scale: 2,
+      scale: 1.5,
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
     });
 
-    const imgData = canvas.toDataURL('image/png');
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
