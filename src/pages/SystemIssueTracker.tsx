@@ -9,11 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Bug, AlertTriangle, CheckCircle2, Clock, Search, TrendingUp, 
+  Bug, AlertTriangle, CheckCircle2, Clock, Search, TrendingUp,
   Zap, Eye, ArrowRight, Sparkles, RefreshCw, MessageSquare,
-  ExternalLink, Monitor, Users, Activity
+  ExternalLink, Monitor, Users, Activity, Shield
 } from 'lucide-react';
+import { PerformanceGuardian } from '@/components/system/PerformanceGuardian';
 import {
   useSystemIssuesList,
   useSystemIssueStats,
@@ -211,16 +213,17 @@ function IssueDetailPanel({ issue, onClose }: { issue: SystemIssue; onClose: () 
 }
 
 export default function SystemIssueTracker() {
+  const [activeTab, setActiveTab] = useState('issues');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIssue, setSelectedIssue] = useState<SystemIssue | null>(null);
 
-  const { data: issues = [], isLoading, refetch } = useSystemIssuesList({ 
-    status: statusFilter, 
+  const { data: issues = [], isLoading, refetch } = useSystemIssuesList({
+    status: statusFilter,
     category: categoryFilter,
-    priority: priorityFilter 
+    priority: priorityFilter
   });
   const { data: stats } = useSystemIssueStats();
 
@@ -294,7 +297,7 @@ export default function SystemIssueTracker() {
             System Issue Tracker
           </h1>
           <p className="text-muted-foreground mt-1">
-            Track, diagnose, and resolve system issues reported by users
+            Track, diagnose, and resolve system issues — with automated health monitoring
           </p>
         </div>
         <Button variant="outline" onClick={() => refetch()} className="gap-2">
@@ -302,161 +305,180 @@ export default function SystemIssueTracker() {
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {statCards.map((stat, idx) => (
-          <Card key={idx} className="hover:shadow-md transition-shadow">
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="issues" className="gap-2">
+            <Bug className="h-4 w-4" /> Issues
+          </TabsTrigger>
+          <TabsTrigger value="guardian" className="gap-2">
+            <Shield className="h-4 w-4" /> Guardian
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="guardian" className="mt-6">
+          <PerformanceGuardian />
+        </TabsContent>
+
+        <TabsContent value="issues" className="space-y-6 mt-6">
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {statCards.map((stat, idx) => (
+              <Card key={idx} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                      <span className={stat.color}>{stat.icon}</span>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{stat.value}</p>
+                      <p className="text-xs text-muted-foreground">{stat.title}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Critical Issues Alert */}
+          {(stats?.critical || 0) > 0 && (
+            <div className="p-4 bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-lg flex items-center gap-3">
+              <AlertTriangle className="h-6 w-6 text-red-500 animate-pulse" />
+              <div>
+                <p className="font-semibold text-red-800 dark:text-red-300">
+                  {stats?.critical} Critical Issue{(stats?.critical || 0) > 1 ? 's' : ''} Require Attention
+                </p>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  These issues have been marked as critical priority and should be addressed immediately.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Filters */}
+          <Card>
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                  <span className={stat.color}>{stat.icon}</span>
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search issues by title, reporter, page..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                  <p className="text-xs text-muted-foreground">{stat.title}</p>
-                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    {ISSUE_STATUSES.map(s => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {ISSUE_CATEGORIES.map(c => (
+                      <SelectItem key={c.value} value={c.value}>
+                        {c.icon} {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priority</SelectItem>
+                    {ISSUE_PRIORITIES.map(p => (
+                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
 
-      {/* Critical Issues Alert */}
-      {(stats?.critical || 0) > 0 && (
-        <div className="p-4 bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-lg flex items-center gap-3">
-          <AlertTriangle className="h-6 w-6 text-red-500 animate-pulse" />
-          <div>
-            <p className="font-semibold text-red-800 dark:text-red-300">
-              {stats?.critical} Critical Issue{(stats?.critical || 0) > 1 ? 's' : ''} Require Attention
-            </p>
-            <p className="text-sm text-red-600 dark:text-red-400">
-              These issues have been marked as critical priority and should be addressed immediately.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search issues by title, reporter, page..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                {ISSUE_STATUSES.map(s => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {ISSUE_CATEGORIES.map(c => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.icon} {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem>
-                {ISSUE_PRIORITIES.map(p => (
-                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Issues Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">
-            Reported Issues ({filteredIssues.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredIssues.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Bug className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No issues found</p>
-              <p className="text-sm">When users report issues, they'll appear here.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredIssues.map(issue => (
-                <div
-                  key={issue.id}
-                  onClick={() => setSelectedIssue(issue)}
-                  className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/5 cursor-pointer transition-all hover:shadow-sm group"
-                >
-                  {/* Category Icon */}
-                  <div className="text-xl">
-                    <CategoryIcon category={issue.category} />
-                  </div>
-
-                  {/* Main content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs text-muted-foreground font-mono">#{issue.issue_number}</span>
-                      <h4 className="font-medium truncate">{issue.title}</h4>
-                      {issue.is_auto_diagnosed && (
-                        <Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" />
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>{issue.reporter_name || 'Unknown'}</span>
-                      <span>•</span>
-                      <span>{issue.page_name || issue.page_url || 'N/A'}</span>
-                      <span>•</span>
-                      <span>{new Date(issue.created_at).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-
-                  {/* Right side */}
-                  <div className="flex items-center gap-3 shrink-0">
-                    <PriorityIndicator priority={issue.priority} />
-                    <StatusBadge status={issue.status} />
-                    <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
+          {/* Issues Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">
+                Reported Issues ({filteredIssues.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : filteredIssues.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Bug className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="font-medium">No issues found</p>
+                  <p className="text-sm">When users report issues, they'll appear here.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredIssues.map(issue => (
+                    <div
+                      key={issue.id}
+                      onClick={() => setSelectedIssue(issue)}
+                      className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/5 cursor-pointer transition-all hover:shadow-sm group"
+                    >
+                      {/* Category Icon */}
+                      <div className="text-xl">
+                        <CategoryIcon category={issue.category} />
+                      </div>
 
-      {/* Issue Detail Dialog */}
-      {selectedIssue && (
-        <IssueDetailPanel
-          issue={selectedIssue}
-          onClose={() => setSelectedIssue(null)}
-        />
-      )}
+                      {/* Main content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs text-muted-foreground font-mono">#{issue.issue_number}</span>
+                          <h4 className="font-medium truncate">{issue.title}</h4>
+                          {issue.is_auto_diagnosed && (
+                            <Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span>{issue.reporter_name || 'Unknown'}</span>
+                          <span>•</span>
+                          <span>{issue.page_name || issue.page_url || 'N/A'}</span>
+                          <span>•</span>
+                          <span>{new Date(issue.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+
+                      {/* Right side */}
+                      <div className="flex items-center gap-3 shrink-0">
+                        <PriorityIndicator priority={issue.priority} />
+                        <StatusBadge status={issue.status} />
+                        <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Issue Detail Dialog */}
+          {selectedIssue && (
+            <IssueDetailPanel
+              issue={selectedIssue}
+              onClose={() => setSelectedIssue(null)}
+            />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

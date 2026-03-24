@@ -21,7 +21,7 @@ import { SubmissionsList } from "@/components/special-hire/SubmissionsList";
 import { SpecialHireQRGenerator } from "@/components/special-hire/SpecialHireQRGenerator";
 import { RateCoverageMaps } from "@/components/special-hire/RateCoverageMaps";
 import { ReferralAgentsManagement } from "@/components/special-hire/ReferralAgentsManagement";
-import { SpecialHireDistanceCalculator } from "@/components/special-hire/SpecialHireDistanceCalculator";
+import { GoogleMapsDistanceCalculator } from "@/components/special-hire/GoogleMapsDistanceCalculator";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -569,7 +569,7 @@ export default function SpecialHire() {
         </TabsContent>
 
         <TabsContent value="distance" className="space-y-6">
-          <SpecialHireDistanceCalculator />
+          <GoogleMapsDistanceCalculator />
         </TabsContent>
 
         {/* Referral Agents content */}
