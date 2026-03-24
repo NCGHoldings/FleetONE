@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { DollarSign, CheckCircle, Clock, Plus, RefreshCw, MoreHorizontal, FileText, Receipt, Eye } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, Plus, RefreshCw, MoreHorizontal, FileText, Receipt, Eye, Landmark, Image } from 'lucide-react';
 import { useLightVehicleCashReceipts, LightVehicleCashReceipt } from '@/hooks/useLightVehicleCashReceipts';
 import { LightVehicleCashReceiptModal } from './LightVehicleCashReceiptModal';
 import {
