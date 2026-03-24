@@ -457,6 +457,7 @@ export async function postVehicleInvoiceToGL({
   module,
   orderNo,
   customerName,
+  customerId,
   invoiceAmount,
   settings,
   effectiveCompanyId,
@@ -464,6 +465,7 @@ export async function postVehicleInvoiceToGL({
   module: VehicleModule;
   orderNo: string;
   customerName: string;
+  customerId?: string;
   invoiceAmount: number;
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
