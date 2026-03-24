@@ -507,7 +507,6 @@ export function YutongInvoiceTypeModal({
                   </div>
                 </div>
               </div>
-              </div>
 
               <div className="space-y-3">
                 <Label className="flex items-center gap-2">
