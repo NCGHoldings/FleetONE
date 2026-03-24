@@ -1415,7 +1415,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
       const costs = {
         km_parking_to_pickup: Math.round((distanceData.kmParkingToPickup || 0) * 10) / 10,
-        km_trip: Math.round((distanceData.kmTrip || 0) * 10) / 10,
+        km_trip: tripDistance,
         km_drop_to_parking: Math.round((distanceData.kmDropToParking || 0) * 10) / 10,
         bus_fleet_details: null, // Single bus mode doesn't use fleet details
         fuel_cost_fuel_only: Math.round(totalFuelCost),
