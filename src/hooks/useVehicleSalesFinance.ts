@@ -138,12 +138,14 @@ export async function createVehicleCustomer({
   customerName,
   customerPhone,
   customerEmail,
+  customerCategoryId,
   companyId,
 }: {
   module: VehicleModule;
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
+  customerCategoryId?: string;
   companyId: string;
 }): Promise<string | null> {
   try {
