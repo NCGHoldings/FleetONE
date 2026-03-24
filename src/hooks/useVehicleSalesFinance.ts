@@ -503,8 +503,15 @@ export async function postVehicleInvoiceToGL({
       return null;
     }
 
-    const entryNumber = `${businessUnitCode}-INV-${orderNo}-${Date.now().toString(36).toUpperCase()}`;
-    const description = `${businessUnitCode} INVOICE - ${orderNo} - ${customerName}`;
+    const refLabel = invoiceNo || orderNo;
+    const entryNumber = `${businessUnitCode}-INV-${refLabel}-${Date.now().toString(36).toUpperCase()}`;
+    const description = `${businessUnitCode} INVOICE - ${refLabel} - ${customerName}`;
+
+    // Calculate VAT split if tax invoice
+    const shouldSplitVAT = isTaxInvoice && settings.vat_output_account_id;
+    const effectiveTaxRate = taxRate || 18;
+    const baseAmountExclVAT = shouldSplitVAT ? invoiceAmount / (1 + effectiveTaxRate / 100) : invoiceAmount;
+    const vatAmountCalc = shouldSplitVAT ? invoiceAmount - baseAmountExclVAT : 0;
 
     // Create journal entry
     const { data: journalEntry, error: jeError } = await (supabase as any)
@@ -514,13 +521,14 @@ export async function postVehicleInvoiceToGL({
         entry_number: entryNumber,
         entry_date: new Date().toISOString().split('T')[0],
         description,
-        reference: `${businessUnitCode}-INV-${orderNo}`,
+        reference: invoiceNo || `${businessUnitCode}-INV-${orderNo}`,
         source_module: `${module}_sales`,
         status: 'posted',
         total_debit: invoiceAmount,
         total_credit: invoiceAmount,
         business_unit_code: businessUnitCode,
         posted_at: new Date().toISOString(),
+        notes: invoiceNo ? `Invoice: ${invoiceNo}` : undefined,
       })
       .select('id, entry_number')
       .single();
@@ -530,25 +538,48 @@ export async function postVehicleInvoiceToGL({
       return null;
     }
 
-    // DR Trade Receivable | CR Sales Revenue (using resolved accounts)
-    const lines = [
+    // DR Trade Receivable (full amount)
+    const lines: any[] = [
       {
         journal_entry_id: journalEntry.id,
         account_id: tradeReceivableId,
-        description: `${businessUnitCode} Invoice to ${customerName} - ${orderNo}`,
+        description: `${businessUnitCode} Invoice to ${customerName} - ${refLabel}`,
         debit: invoiceAmount,
         credit: 0,
         company_id: effectiveCompanyId,
       },
-      {
+    ];
+
+    if (shouldSplitVAT) {
+      // CR Sales Revenue (base amount excl VAT)
+      lines.push({
         journal_entry_id: journalEntry.id,
         account_id: salesRevenueId,
-        description: `${businessUnitCode} Sales revenue - ${orderNo}`,
+        description: `${businessUnitCode} Sales revenue (excl. VAT) - ${refLabel}`,
+        debit: 0,
+        credit: Math.round(baseAmountExclVAT * 100) / 100,
+        company_id: effectiveCompanyId,
+      });
+      // CR VAT Output
+      lines.push({
+        journal_entry_id: journalEntry.id,
+        account_id: settings.vat_output_account_id,
+        description: `${businessUnitCode} VAT Output ${effectiveTaxRate}% - ${refLabel}`,
+        debit: 0,
+        credit: Math.round(vatAmountCalc * 100) / 100,
+        company_id: effectiveCompanyId,
+      });
+    } else {
+      // CR Sales Revenue (full amount)
+      lines.push({
+        journal_entry_id: journalEntry.id,
+        account_id: salesRevenueId,
+        description: `${businessUnitCode} Sales revenue - ${refLabel}`,
         debit: 0,
         credit: invoiceAmount,
         company_id: effectiveCompanyId,
-      },
-    ];
+      });
+    }
 
     const { error: linesError } = await supabase
       .from('journal_entry_lines')
