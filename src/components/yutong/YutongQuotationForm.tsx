@@ -80,6 +80,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
   const [customizationOptions, setCustomizationOptions] = useState<any[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { data: customerCategories } = useActiveCustomerCategories();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
