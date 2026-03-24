@@ -77,6 +77,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel }: LightVehicleQu
   const [responsiblePersons, setResponsiblePersons] = useState<ResponsiblePerson[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { data: customerCategories } = useActiveCustomerCategories();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
