@@ -95,7 +95,7 @@ export function YutongInvoiceTypeModal({
   const leasingCompanyAmount = proformaAmount;
   const effectiveCustomerCommitment = amountMode === 'fixed' 
     ? customerCommitment 
-    : totalAmount - proformaAmount;
+    : Math.max(0, totalAmount - proformaAmount);
   const declaredVehicleValue = proformaAmount > totalAmount ? proformaAmount : totalAmount;
    
    const taxRate = 18;

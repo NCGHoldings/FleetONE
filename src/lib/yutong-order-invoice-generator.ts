@@ -844,7 +844,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
         <div class="proforma-info">
           <h4>PROFORMA INVOICE NOTICE</h4>
           <p>This is a proforma invoice issued for ${(data.proforma_purpose || 'financing').replace('_', ' ')} purposes only.</p>
-          <p>The amount shown represents ${data.proforma_amount_percentage || 0}% of the total vehicle price.</p>
+          <p>The amount shown is the declared vehicle value for financing purposes.</p>
           <p>This document is not a demand for payment and should not be used for tax purposes.</p>
         </div>
       ` : ''}
