@@ -1764,7 +1764,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         km_parking_to_pickup: useManualParkingDistance ? manualParkingToPickup : costs.km_parking_to_pickup,
         km_trip: useManualTripDistance ? manualTripDistance : costs.km_trip,
         km_drop_to_parking: useManualParkingDistance ? manualDropToParking : costs.km_drop_to_parking,
-        fuel_cost_fuel_only: (useManualParkingDistance || useManualTripDistance) ? (costData?.fuelCostFuelOnly ?? costs.fuel_cost_fuel_only) : costs.fuel_cost_fuel_only,
+        fuel_cost_fuel_only: costs.fuel_cost_fuel_only,
         uses_manual_trip_distance: useManualTripDistance,
         manual_km_trip: useManualTripDistance ? manualTripDistance : 0,
         hire_charge: costs.hire_charge,
