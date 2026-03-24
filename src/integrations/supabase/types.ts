@@ -6522,6 +6522,7 @@ export type Database = {
           payment_type: string
           quotation_id: string
           ready_to_send: boolean | null
+          storage_path: string | null
           updated_at: string
         }
         Insert: {
@@ -6544,6 +6545,7 @@ export type Database = {
           payment_type: string
           quotation_id: string
           ready_to_send?: boolean | null
+          storage_path?: string | null
           updated_at?: string
         }
         Update: {
@@ -6566,6 +6568,7 @@ export type Database = {
           payment_type?: string
           quotation_id?: string
           ready_to_send?: boolean | null
+          storage_path?: string | null
           updated_at?: string
         }
         Relationships: [

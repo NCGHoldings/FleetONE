@@ -271,7 +271,7 @@ export const generateYutongInvoicePDF = async (data: YutongInvoiceData): Promise
 
     // Convert HTML to canvas
     const canvas = await html2canvas(tempDiv.firstElementChild as HTMLElement, {
-      scale: 2,
+      scale: 1.5,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
@@ -284,7 +284,7 @@ export const generateYutongInvoicePDF = async (data: YutongInvoiceData): Promise
 
     // Create PDF
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const imgData = canvas.toDataURL('image/png');
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
     
     // Calculate dimensions to fit A4
     const imgWidth = 210; // A4 width in mm
@@ -295,14 +295,14 @@ export const generateYutongInvoicePDF = async (data: YutongInvoiceData): Promise
     let position = 0;
 
     // Add first page
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
     heightLeft -= pageHeight;
 
     // Add additional pages if needed
     while (heightLeft >= 0) {
       position = heightLeft - imgHeight;
       pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
     }
 

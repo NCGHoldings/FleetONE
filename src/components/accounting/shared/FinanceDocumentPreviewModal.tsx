@@ -316,12 +316,12 @@ export const FinanceDocumentPreviewModal = ({
     try {
       const body = iframeRef.current.contentDocument.body;
       const canvas = await html2canvas(body, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         logging: false,
       });
 
-      const imgData = canvas.toDataURL("image/png");
+      const imgData = canvas.toDataURL("image/jpeg", 0.85);
       const pdf = new jsPDF({
         orientation: selectedTemplate?.orientation === "landscape" ? "landscape" : "portrait",
         unit: "mm",
@@ -336,7 +336,7 @@ export const FinanceDocumentPreviewModal = ({
       const imgX = (pdfWidth - imgWidth * ratio) / 2;
       const imgY = 10;
 
-      pdf.addImage(imgData, "PNG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      pdf.addImage(imgData, "JPEG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
       
       // Generate filename
       const docNumber = documentData?.invoice_number || 

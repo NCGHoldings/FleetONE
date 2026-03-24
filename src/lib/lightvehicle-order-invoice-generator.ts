@@ -844,7 +844,7 @@ export async function generateLightVehicleOrderInvoicePDF(data: LightVehicleOrde
     await new Promise(resolve => setTimeout(resolve, 300));
 
     const canvas = await html2canvas(container, {
-      scale: 2.5,
+      scale: 1.5,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
@@ -852,7 +852,7 @@ export async function generateLightVehicleOrderInvoicePDF(data: LightVehicleOrde
       windowWidth: 794,
     });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',

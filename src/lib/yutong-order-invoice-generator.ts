@@ -1091,7 +1091,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
        const pdfHeight = pdf.internal.pageSize.getHeight();
 
        const canvas = await html2canvas(page, {
-         scale: 2.5,
+         scale: 1.5,
          useCORS: true,
          allowTaint: true,
          backgroundColor: '#ffffff',
@@ -1100,7 +1100,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
          windowWidth: 800
        });
 
-       const imgData = canvas.toDataURL('image/jpeg', 0.95);
+       const imgData = canvas.toDataURL('image/jpeg', 0.85);
        const ratio = Math.min(pdfWidth / canvas.width, pdfHeight / canvas.height);
        const scaledWidth = canvas.width * ratio;
        const scaledHeight = canvas.height * ratio;
@@ -1150,7 +1150,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
       
       console.log(`🎨 Rendering page ${i + 1}...`);
       const canvas = await html2canvas(page, {
-        scale: 2.5, // Higher quality rendering
+        scale: 1.5,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
@@ -1162,7 +1162,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
       console.log(`✅ Page ${i + 1} canvas rendered. Size:`, canvas.width, 'x', canvas.height);
 
       // Use JPEG with higher quality for professional output
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
       
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;

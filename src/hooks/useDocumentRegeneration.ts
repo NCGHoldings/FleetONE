@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
+import { uploadPdfToStorage } from '@/lib/document-storage-helpers';
 
 export const useDocumentRegeneration = () => {
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -173,32 +174,25 @@ export const useDocumentRegeneration = () => {
 
       // Generate new PDF with updated signatures
       const pdfBlob = await generateInvoicePDF(invoiceData);
-      const arrayBuffer = await pdfBlob.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      
-      let base64String = '';
-      const chunkSize = 1024;
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize);
-        base64String += String.fromCharCode.apply(null, Array.from(chunk));
-      }
-      const base64Data = btoa(base64String);
 
-      // Update document in database with fresh signature data
+      const newFileName = `UPDATED-${existingDoc.document_type}-${quotationData.quotation_no}-${Date.now()}.pdf`;
+      const { storagePath, fileSize } = await uploadPdfToStorage(pdfBlob, newFileName);
+
       const { error: updateError } = await supabase
         .from('document_storage')
         .update({
-          document_data: base64Data,
-          file_name: `UPDATED-${existingDoc.document_type}-${quotationData.quotation_no}-${Date.now()}.pdf`,
-          file_size: uint8Array.length,
+          document_data: '',
+          file_name: newFileName,
+          file_size: fileSize,
           updated_at: new Date().toISOString(),
+          storage_path: storagePath,
         })
         .eq('id', documentId);
 
       if (updateError) throw updateError;
 
       toast.success('Document updated with signatures successfully!');
-      return { success: true, document_data: base64Data };
+      return { success: true, document_data: '' };
     } catch (error) {
       console.error('Error regenerating document with signatures:', error);
       toast.error('Failed to update document with signatures');

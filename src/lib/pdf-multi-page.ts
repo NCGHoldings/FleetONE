@@ -116,7 +116,7 @@ const addCanvasToPDF = (
  * to capturing the entire container as one canvas.
  */
 export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> => {
-  const SCALE = 2;
+  const SCALE = 1.5;
   const A4_WIDTH_MM = 210;
 
   // Wait for fonts to be fully loaded before capturing
@@ -173,13 +173,13 @@ export const sectionBasedPDF = async (container: HTMLElement): Promise<jsPDF> =>
     );
 
     const canvas = await html2canvas(elements[i], html2canvasOpts);
-    const imgData = canvas.toDataURL('image/png');
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
 
     // Scale image to fill A4 width, height is proportional
     const imgHeightMM = (canvas.height * A4_WIDTH_MM) / canvas.width;
 
     if (i > 0) pdf.addPage();
-    pdf.addImage(imgData, 'PNG', 0, 0, A4_WIDTH_MM, imgHeightMM);
+    pdf.addImage(imgData, 'JPEG', 0, 0, A4_WIDTH_MM, imgHeightMM);
   }
 
   return pdf;
