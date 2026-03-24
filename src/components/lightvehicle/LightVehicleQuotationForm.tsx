@@ -211,6 +211,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel }: LightVehicleQu
         status: 'draft',
         referral_agent_id: data.referral_agent_id || null,
         responsible_person_id: data.responsible_person_id || null,
+        customer_category_id: data.customer_category_id || null,
         created_by: user?.id
       };
 
