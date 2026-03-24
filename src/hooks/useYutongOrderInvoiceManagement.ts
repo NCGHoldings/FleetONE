@@ -213,6 +213,57 @@ export function useYutongOrderInvoiceManagement() {
       }
       console.log('✅ Document record created:', document.id);
       
+      // Step 6: Auto-create AR Invoice (draft) at generation time
+      console.log('💰 Step 6: Creating draft AR Invoice...');
+      try {
+        const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
+        
+        // Get order details for customer info
+        const { data: orderDetails } = await supabase
+          .from('yutong_orders')
+          .select('*, yutong_quotations(customer_name, customer_category_id)')
+          .eq('id', orderId)
+          .single();
+        
+        if (settings && orderDetails?.finance_customer_id) {
+          const invoiceAmount = fullInvoiceData.invoice_category === 'proforma_invoice'
+            ? fullInvoiceData.proforma_amount || fullInvoiceData.total
+            : fullInvoiceData.total;
+          
+          const isTax = fullInvoiceData.invoice_category === 'tax_invoice' || fullInvoiceData.is_tax_invoice;
+          const taxAmt = isTax ? (fullInvoiceData.vat_amount || invoiceAmount - invoiceAmount / 1.18) : undefined;
+          
+          const arResult = await createVehicleARInvoice({
+            module: 'yutong',
+            orderId,
+            orderNo: orderDetails.order_no,
+            customerId: orderDetails.finance_customer_id,
+            totalAmount: invoiceAmount,
+            advanceAmount: 0,
+            companyId: NCG_HOLDING_ID,
+            settings,
+            customerCategoryId: (orderDetails as any)?.customer_category_id
+              || orderDetails?.yutong_quotations?.customer_category_id,
+            invoiceNo,
+            taxAmount: taxAmt,
+            status: 'draft',
+          });
+          
+          if (arResult) {
+            await updateOrderFinanceLinks({
+              module: 'yutong',
+              orderId,
+              arInvoiceId: arResult.invoiceId,
+            });
+            console.log(`✅ Draft AR Invoice created: ${arResult.invoiceNumber}`);
+          }
+        } else {
+          console.warn('⚠️ Skipping AR auto-creation: missing settings or finance customer');
+        }
+      } catch (arError) {
+        console.warn('⚠️ AR Invoice auto-creation failed (non-blocking):', arError);
+      }
+      
       console.log('🎉 Invoice generation completed successfully!');
       toast.success('Draft invoice generated successfully');
       
