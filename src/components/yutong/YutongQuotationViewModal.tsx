@@ -207,7 +207,7 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
         if (imgHeight > pageHeight) {
           const scaledHeight = pageHeight;
           const scaledWidth = (canvas.width * pageHeight) / canvas.height;
-          pdf.addImage(imgData, 'PNG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
+          pdf.addImage(imgData, 'JPEG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
         } else {
           // Position at TOP of page (not centered)
           pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
