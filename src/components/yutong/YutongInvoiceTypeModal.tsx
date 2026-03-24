@@ -140,6 +140,9 @@ export function YutongInvoiceTypeModal({
     setAmountMode('percentage');
     setFixedAmount(totalAmount);
     setCustomerCommitment(0);
+    setCommitmentMode('percentage');
+    setCommitmentPercentage(30);
+    setCommitmentFixedAmount(0);
     setFinanceCompanyName('');
     setFinanceCompanyAddress('');
     setProformaPurpose('bank_leasing');
