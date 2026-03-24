@@ -11,6 +11,7 @@ import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useActiveCustomerCategories } from '@/hooks/useCustomerCategories';
 
 const formSchema = z.object({
   customer_type: z.enum(['personal', 'company']).default('personal'),
