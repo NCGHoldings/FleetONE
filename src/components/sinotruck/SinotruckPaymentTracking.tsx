@@ -170,10 +170,13 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
       // 1. Create/Get Finance Customer
       let customerId = orderDetails?.finance_customer_id;
       if (!customerId && settings.auto_create_customer) {
+        const categoryId = (orderDetails as any)?.customer_category_id 
+          || orderDetails?.sinotruck_quotations?.customer_category_id;
         customerId = await createVehicleCustomer({
           module: 'sinotruck',
           customerName,
           customerPhone,
+          customerCategoryId: categoryId || undefined,
           companyId: NCG_HOLDING_ID,
         });
 

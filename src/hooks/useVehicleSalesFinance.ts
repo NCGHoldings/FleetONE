@@ -138,12 +138,14 @@ export async function createVehicleCustomer({
   customerName,
   customerPhone,
   customerEmail,
+  customerCategoryId,
   companyId,
 }: {
   module: VehicleModule;
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
+  customerCategoryId?: string;
   companyId: string;
 }): Promise<string | null> {
   try {
@@ -204,6 +206,7 @@ export async function createVehicleCustomer({
         phone: customerPhone || null,
         email: customerEmail || null,
         customer_type: 'individual',
+        customer_category_id: customerCategoryId || null,
         business_unit_code: businessUnitCode,
         is_active: true,
       })
@@ -235,6 +238,7 @@ export async function createVehicleARInvoice({
   advanceAmount,
   companyId,
   settings,
+  customerCategoryId,
 }: {
   module: VehicleModule;
   orderId: string;
@@ -244,6 +248,7 @@ export async function createVehicleARInvoice({
   advanceAmount: number;
   companyId: string;
   settings: VehicleFinanceSettings;
+  customerCategoryId?: string;
 }): Promise<{ invoiceId: string; invoiceNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
@@ -452,6 +457,7 @@ export async function postVehicleInvoiceToGL({
   module,
   orderNo,
   customerName,
+  customerId,
   invoiceAmount,
   settings,
   effectiveCompanyId,
@@ -459,6 +465,7 @@ export async function postVehicleInvoiceToGL({
   module: VehicleModule;
   orderNo: string;
   customerName: string;
+  customerId?: string;
   invoiceAmount: number;
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
@@ -466,7 +473,25 @@ export async function postVehicleInvoiceToGL({
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
 
-    if (!settings.trade_receivable_account_id || !settings.sales_revenue_account_id) {
+    // Resolve GL accounts via 3-tier hierarchy (customer → category → global)
+    let tradeReceivableId = settings.trade_receivable_account_id;
+    let salesRevenueId = settings.sales_revenue_account_id;
+
+    if (customerId) {
+      try {
+        const { resolveCustomerARAccounts } = await import('@/hooks/useCustomerCategories');
+        const resolved = await resolveCustomerARAccounts(customerId, effectiveCompanyId);
+        if (resolved.arAccountId) tradeReceivableId = resolved.arAccountId;
+        if (resolved.revenueAccountId) salesRevenueId = resolved.revenueAccountId;
+        console.log(`[${module.toUpperCase()} Finance] GL resolution source: ${resolved.source}`, {
+          tradeReceivableId, salesRevenueId
+        });
+      } catch (err) {
+        console.warn(`[${module.toUpperCase()} Finance] Category resolution failed, using settings fallback`, err);
+      }
+    }
+
+    if (!tradeReceivableId || !salesRevenueId) {
       console.error(`[${module.toUpperCase()} Finance] Missing required accounts for invoice posting`);
       toast.error('Missing GL account configuration for invoice posting');
       return null;
@@ -499,11 +524,11 @@ export async function postVehicleInvoiceToGL({
       return null;
     }
 
-    // DR Trade Receivable | CR Sales Revenue
+    // DR Trade Receivable | CR Sales Revenue (using resolved accounts)
     const lines = [
       {
         journal_entry_id: journalEntry.id,
-        account_id: settings.trade_receivable_account_id,
+        account_id: tradeReceivableId,
         description: `${businessUnitCode} Invoice to ${customerName} - ${orderNo}`,
         debit: invoiceAmount,
         credit: 0,
@@ -511,7 +536,7 @@ export async function postVehicleInvoiceToGL({
       },
       {
         journal_entry_id: journalEntry.id,
-        account_id: settings.sales_revenue_account_id,
+        account_id: salesRevenueId,
         description: `${businessUnitCode} Sales revenue - ${orderNo}`,
         debit: 0,
         credit: invoiceAmount,

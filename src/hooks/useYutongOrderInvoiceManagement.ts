@@ -258,7 +258,7 @@ export function useYutongOrderInvoiceManagement() {
       // Get order details for finance integration
       const { data: orderDetails, error: orderError } = await supabase
         .from('yutong_orders')
-        .select('*, yutong_quotations(customer_name)')
+        .select('*, yutong_quotations(customer_name, customer_category_id)')
         .eq('id', invoice.order_id)
         .single();
 
@@ -334,9 +334,11 @@ export function useYutongOrderInvoiceManagement() {
             orderNo,
             customerId: orderDetails.finance_customer_id,
             totalAmount: invoiceAmount,
-            advanceAmount: totalPaid, // Apply already verified payments
+            advanceAmount: totalPaid,
             companyId: NCG_HOLDING_ID,
             settings,
+            customerCategoryId: (orderDetails as any)?.customer_category_id 
+              || orderDetails?.yutong_quotations?.customer_category_id,
           });
 
           if (arResult) {
@@ -354,6 +356,7 @@ export function useYutongOrderInvoiceManagement() {
             module: 'yutong',
             orderNo,
             customerName,
+            customerId: orderDetails.finance_customer_id,
             invoiceAmount,
             settings,
             effectiveCompanyId: NCG_HOLDING_ID,

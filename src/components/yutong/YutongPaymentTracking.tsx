@@ -96,7 +96,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       // Load order details
       const { data: order, error: orderError } = await supabase
         .from('yutong_orders')
-        .select('*, yutong_quotations(quotation_no, customer_name)')
+        .select('*, yutong_quotations(quotation_no, customer_name, customer_category_id)')
         .eq('id', selectedOrderId)
         .single();
 
@@ -251,9 +251,12 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       // 1. Create/Get Finance Customer
       let customerId = orderDetails?.finance_customer_id;
       if (!customerId && settings.auto_create_customer) {
+        const categoryId = (orderDetails as any)?.customer_category_id 
+          || orderDetails?.yutong_quotations?.customer_category_id;
         customerId = await createVehicleCustomer({
           module: 'yutong',
           customerName,
+          customerCategoryId: categoryId || undefined,
           companyId: NCG_HOLDING_ID,
         });
 
