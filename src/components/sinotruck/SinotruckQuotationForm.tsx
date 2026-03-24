@@ -63,6 +63,7 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
   const [customers, setCustomers] = useState<any[]>([]);
   const [truckModels, setTruckModels] = useState<any[]>([]);
   const [referralAgents, setReferralAgents] = useState<any[]>([]);
+  const { data: customerCategories } = useActiveCustomerCategories();
 
   const [formData, setFormData] = useState({
     customer_id: "",
@@ -74,6 +75,7 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
     payment_terms: DEFAULT_PAYMENT_TERMS,
     valid_until: "",
     referral_agent_id: "",
+    customer_category_id: "",
   });
 
   useEffect(() => {
