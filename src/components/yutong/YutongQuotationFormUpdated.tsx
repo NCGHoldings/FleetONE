@@ -115,6 +115,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
   const [showAddAgentModal, setShowAddAgentModal] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { data: customerCategories } = useActiveCustomerCategories();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
