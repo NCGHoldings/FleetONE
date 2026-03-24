@@ -1560,6 +1560,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       if (manualDropToParking !== (originalData.manual_km_drop_to_parking || 0)) return true;
     }
 
+    // Check useManualTripDistance changes
+    if (useManualTripDistance !== (originalData.uses_manual_trip_distance || false)) return true;
+    if (useManualTripDistance) {
+      if (manualTripDistance !== (originalData.manual_km_trip || originalData.km_trip || 0)) return true;
+    }
+
     // Check bus configuration changes
     if (currentData.busTypeId !== originalData.bus_type_id) return true;
     if (currentData.numberOfBuses !== originalData.number_of_buses) return true;
