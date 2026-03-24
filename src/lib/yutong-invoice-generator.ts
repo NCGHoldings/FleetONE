@@ -271,7 +271,7 @@ export const generateYutongInvoicePDF = async (data: YutongInvoiceData): Promise
 
     // Convert HTML to canvas
     const canvas = await html2canvas(tempDiv.firstElementChild as HTMLElement, {
-      scale: 2,
+      scale: 1.5,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
