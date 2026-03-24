@@ -16,6 +16,8 @@ import { useCreateAPPayment, useApproveAPInvoice } from "@/hooks/useAccountingMu
 import { useVendorBankAccounts } from "@/hooks/useVendorBankAccounts";
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { useNextChequeNumber, useActiveChequeBook } from "@/hooks/useChequeBooks";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
