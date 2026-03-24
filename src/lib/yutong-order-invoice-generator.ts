@@ -1100,7 +1100,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
          windowWidth: 800
        });
 
-       const imgData = canvas.toDataURL('image/jpeg', 0.95);
+       const imgData = canvas.toDataURL('image/jpeg', 0.85);
        const ratio = Math.min(pdfWidth / canvas.width, pdfHeight / canvas.height);
        const scaledWidth = canvas.width * ratio;
        const scaledHeight = canvas.height * ratio;
