@@ -1,49 +1,46 @@
 
 
-# Fix Proforma Invoice: Customer Commitment, Leasing Breakdown & Hide Payment History
+# Fix Proforma Invoice: Customer Commitment = 30% of Declared Value + Editable Options
 
-## Problems from Screenshots
+## Problem
 
-1. **Customer Commitment defaults to 0** — should default to the markup amount (e.g., 110% of 38.25M = 3,825,000 extra = customer commitment)
-2. **Invoice page 1 totals** missing Customer Commitment and "To Be Leased" breakdown lines
-3. **Invoice page 2** shows Payment History and Payment Status on proforma — should be hidden entirely for proforma invoices
-4. **Bank details page** should only show bank info + signatures for proforma, no payment tracking
+Currently, customer commitment defaults to the **markup** (proformaAmount - totalAmount = 3,825,000). The user wants:
+
+1. **Customer Commitment = 30% of the declared vehicle value** (e.g., 30% of 42,075,000 = 12,622,500)
+2. The **30% should be adjustable** with both **percentage** and **fixed amount** options
+3. **To Be Leased = Declared Value - Customer Commitment** (e.g., 42,075,000 - 12,622,500 = 29,452,500)
+4. These options available at proforma creation time in the modal
 
 ## Changes
 
 ### File 1: `src/components/yutong/YutongInvoiceTypeModal.tsx`
 
-**Default customer commitment** (lines 86-89): Change from `setCustomerCommitment(0)` to calculate default as `proformaAmount - totalAmount` when percentage > 100%, i.e. the markup portion. For percentage mode, auto-calculate: `Math.max(0, proformaAmount - totalAmount)`. Customer commitment field remains editable so user can override.
+**Add new state** for customer commitment mode:
+- `commitmentMode: 'percentage' | 'fixed'` (default: `'percentage'`)
+- `commitmentPercentage: number` (default: `30`)
+- `commitmentFixedAmount: number`
 
-**Pass customer commitment to invoice data**: Ensure `customerCommitment` and `leasingCompanyAmount` (= proformaAmount - customerCommitment) are passed in the config.
+**Fix commitment calculation** (lines 94-97):
+- Replace current logic with:
+  - Percentage mode: `customerCommitment = proformaAmount * commitmentPercentage / 100`
+  - Fixed mode: `customerCommitment = commitmentFixedAmount`
+- `leasingCompanyAmount = proformaAmount - customerCommitment`
+
+**Replace the Amount Breakdown section** (lines 409-453) with:
+- Show "Customer Commitment" with its own percentage/fixed toggle
+- Quick buttons: 20%, 30%, 40%, 50%
+- In fixed mode: editable input field
+- Display: "To Be Leased" = proformaAmount - customerCommitment
+
+**Update `handleConfirm`** (lines 104-117): pass new `customerCommitment` and `leasingCompanyAmount` values
 
 ### File 2: `src/lib/yutong-order-invoice-generator.ts`
 
-**Add to interface** (lines 30-88): Add `customer_commitment?: number` and `leasing_amount?: number` fields to `YutongOrderInvoiceData`.
-
-**Restructure proforma totals** (lines 810-827): Change from 3-row footer (SUB TOTAL / empty / TOTAL) to 4-row footer for proforma:
-
-```text
-SUB TOTAL          | 42,075,000.00
-Customer Commitment| 3,825,000.00
-                   |
-TO BE LEASED       | 38,250,000.00   (dark blue row, = total - commitment)
-```
-
-- Row 1: SUB TOTAL = displayAmount (declared vehicle value)
-- Row 2: Customer Commitment = `data.customer_commitment` (or 0)
-- Row 3: (amount in words spans these rows)
-- Row 4 (dark blue total-row): "TO BE LEASED" = displayAmount - customer_commitment
-
-**Hide Payment History for proforma** (lines 884-938): Wrap the entire payment history section and payment status section in a `!isProforma` check. Proforma page 2 shows only bank details + signatures.
-
-### File 3: `src/hooks/useYutongOrderInvoiceManagement.ts`
-
-Pass `customer_commitment` and `leasing_amount` from the proforma config through to the invoice data object stored in the document.
+No structural changes needed -- the invoice template already reads `data.customer_commitment` and calculates `displayAmount - customer_commitment` for "TO BE LEASED". The values will be correct once the modal passes the right numbers.
 
 ## Summary
-- Customer commitment defaults to markup amount (proforma - actual bus value)
-- Invoice shows: SUB TOTAL (declared value), Customer Commitment, then "TO BE LEASED" (leasing portion) in dark blue
-- Page 2 hides all payment history/status for proforma invoices
-- All values remain editable in the modal
+- Customer Commitment defaults to 30% of declared amount (not the markup)
+- User can switch between percentage and fixed amount for commitment
+- Quick-select buttons for common percentages (20/30/40/50%)
+- "To Be Leased" automatically = declared value minus commitment
 
