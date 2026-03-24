@@ -361,6 +361,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
         representative_name: data.representative_name || null,
         designation: data.designation || null,
         vehicle_year: data.vehicle_year || new Date().getFullYear(),
+        customer_category_id: data.customer_category_id || null,
       };
 
       const { data: quotation, error } = await supabase
