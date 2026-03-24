@@ -1,46 +1,66 @@
 
 
-# Fix Proforma Invoice: Customer Commitment = 30% of Declared Value + Editable Options
+# Fix AR/AP Invoice GL Posting: Always Hit GL & COA + Vendor Category Resolution
 
-## Problem
+## Current State
 
-Currently, customer commitment defaults to the **markup** (proformaAmount - totalAmount = 3,825,000). The user wants:
+| Action | GL Posted? | Uses Category? | Issue |
+|--------|-----------|----------------|-------|
+| AR Invoice Create (manual) | Yes | Yes (customer category) | Correct |
+| AP Invoice Create (manual) | **NO** | N/A | **Missing GL posting** |
+| AP Invoice Approve | Yes | **NO** (global only) | **Missing vendor category** |
+| AP Invoice Create (auto from expense/fuel) | No | No | Missing GL posting |
 
-1. **Customer Commitment = 30% of the declared vehicle value** (e.g., 30% of 42,075,000 = 12,622,500)
-2. The **30% should be adjustable** with both **percentage** and **fixed amount** options
-3. **To Be Leased = Declared Value - Customer Commitment** (e.g., 42,075,000 - 12,622,500 = 29,452,500)
-4. These options available at proforma creation time in the modal
+## Problems to Fix
 
-## Changes
+1. **AP invoices never hit GL at creation** -- only on approval, and many AP invoices skip approval
+2. **AP approval GL posting ignores vendor categories** -- uses only `gl_settings.default_expense_account_id` instead of the 3-tier resolution (line > vendor category > global)
+3. **No double-posting guard** -- if we add GL posting at creation, approval must check `journal_entry_id` before posting again
 
-### File 1: `src/components/yutong/YutongInvoiceTypeModal.tsx`
+## Plan
 
-**Add new state** for customer commitment mode:
-- `commitmentMode: 'percentage' | 'fixed'` (default: `'percentage'`)
-- `commitmentPercentage: number` (default: `30`)
-- `commitmentFixedAmount: number`
+### File 1: `src/hooks/useAccountingMutations.ts`
 
-**Fix commitment calculation** (lines 94-97):
-- Replace current logic with:
-  - Percentage mode: `customerCommitment = proformaAmount * commitmentPercentage / 100`
-  - Fixed mode: `customerCommitment = commitmentFixedAmount`
-- `leasingCompanyAmount = proformaAmount - customerCommitment`
+**`useCreateAPInvoice` (lines 692-777)** -- Add auto GL posting after insert (same pattern as AR):
+- Import and call `resolveVendorAPAccounts(vendor_id, companyId)` to get expense/AP accounts from vendor category
+- Fall back to `gl_settings.trade_payable_account_id` and `gl_settings.default_expense_account_id` if category has no mapping
+- Build expense lines from `ap_invoice_lines` (using per-line `account_id` when set, else category expense account, else global default)
+- Call `postAPInvoiceToGL()` with resolved accounts
+- Link `journal_entry_id` back to the AP invoice record
+- Invalidate `journal-entries` and `chart-of-accounts` query keys in `onSuccess`
 
-**Replace the Amount Breakdown section** (lines 409-453) with:
-- Show "Customer Commitment" with its own percentage/fixed toggle
-- Quick buttons: 20%, 30%, 40%, 50%
-- In fixed mode: editable input field
-- Display: "To Be Leased" = proformaAmount - customerCommitment
+**`useApproveAPInvoice` (lines 1623-1700)** -- Add double-posting guard:
+- Before GL posting, check if `ap_invoices.journal_entry_id` already exists
+- If it does, skip GL posting (already posted at creation)
+- If not (legacy invoices created before this fix), proceed with existing GL posting but use vendor category resolution instead of global-only
 
-**Update `handleConfirm`** (lines 104-117): pass new `customerCommitment` and `leasingCompanyAmount` values
+**`useApproveAPInvoice` GL account resolution (lines 1651-1659)** -- Replace global-only lookup:
+- Import `resolveVendorAPAccounts` from `useVendorCategories`
+- Use resolved `apAccountId` for Trade Payable (fallback to `gl_settings.trade_payable_account_id`)
+- Use resolved `expenseAccountId` for default expense (fallback to `gl_settings.default_expense_account_id`)
 
-### File 2: `src/lib/yutong-order-invoice-generator.ts`
+### File 2: `src/hooks/useCompanyMutations.ts`
 
-No structural changes needed -- the invoice template already reads `data.customer_commitment` and calculates `displayAmount - customer_commitment` for "TO BE LEASED". The values will be correct once the modal passes the right numbers.
+Check the AP invoice creation here too and add the same GL posting pattern if missing.
+
+### No changes needed:
+- `src/lib/gl-posting-utils.ts` -- `postAPInvoiceToGL` already supports multi-line expense entries and works correctly
+- `src/hooks/useVendorCategories.ts` -- `resolveVendorAPAccounts` already implements the 3-tier resolution
+
+## Flow Diagram
+
+Will generate a Mermaid diagram showing the complete AR/AP invoice flow:
+
+```text
+AR Invoice Create --> Resolve Customer Category --> Post GL (DR Receivable / CR Revenue) --> Link JE
+AP Invoice Create --> Resolve Vendor Category --> Post GL (DR Expense / CR Payable) --> Link JE
+AP Invoice Approve --> Check journal_entry_id --> Skip if exists / Post if missing
+```
 
 ## Summary
-- Customer Commitment defaults to 30% of declared amount (not the markup)
-- User can switch between percentage and fixed amount for commitment
-- Quick-select buttons for common percentages (20/30/40/50%)
-- "To Be Leased" automatically = declared value minus commitment
+
+- AP invoices will hit GL/COA immediately at creation (matching AR behavior)
+- Vendor category GL mappings will be used (3-tier: line > category > global)
+- Double-posting guard on approval prevents duplicate journal entries
+- All invoice types (manual + auto) follow the same GL posting standard
 
