@@ -356,6 +356,7 @@ export function useYutongOrderInvoiceManagement() {
             module: 'yutong',
             orderNo,
             customerName,
+            customerId: orderDetails.finance_customer_id,
             invoiceAmount,
             settings,
             effectiveCompanyId: NCG_HOLDING_ID,
