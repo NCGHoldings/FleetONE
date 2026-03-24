@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { QuotationAddOnsSection } from './QuotationAddOnsSection';
 import { InlineAddOnsSection } from './InlineAddOnsSection';
+import { useActiveCustomerCategories } from '@/hooks/useCustomerCategories';
 
 const formSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required'),
