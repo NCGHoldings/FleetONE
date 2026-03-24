@@ -1,53 +1,67 @@
 
 
-# Fix Yutong Full Flow: GL Posting, Payment Form, and Data Repair
+# Reduce PDF File Sizes Across All Modules
 
-## Root Causes Found
+## Problem
+All document PDFs (special hire quotations, invoices, receipts, advance details) are excessively large because:
 
-### 1. `source_module` column missing from `journal_entries`
-The database has NO `source_module` column (confirmed via schema query). The code inserts `source_module: 'yutong_sales'` on every GL posting, causing 400 errors. This is why ALL payment verifications fail and no journal entries exist for YUT business unit.
+1. **PNG format used everywhere** -- 12 files use `toDataURL('image/png')` + `addImage(..., 'PNG')`. PNG is lossless and produces files 5-10x larger than JPEG for document screenshots
+2. **High canvas scale (2x-2.5x)** -- every `html2canvas` call uses `scale: 2` or `scale: 2.5`, generating 4-6x more pixels than needed for A4 print quality
+3. **Base64 stored in database** -- the `document_storage` table holds PDFs as base64 text, adding 33% overhead. Current total: ~172MB base64 across 130 documents. Yutong invoices average 14MB each
 
-### 2. Payment form missing Bank Account selector and Photo Upload
-The Record Payment modal in `YutongPaymentTracking.tsx` has no bank account dropdown (the `bank_accounts` table exists and the column `payment_slip_url` exists on `yutong_customer_payments` but is never used). The Sinotruck and Light Vehicle forms have `bank_name` fields but no proper bank account selector either.
+## Solution
 
-### 3. `resolveCustomerARAccounts` references wrong column
-The fallback query uses `customer_advance_liability_account_id` which does not exist in `gl_settings`. This causes the resolution to silently fail.
+### 1. Switch all PDF generation from PNG to JPEG with compression
+Change every `toDataURL('image/png')` + `addImage(..., 'PNG')` to `toDataURL('image/jpeg', 0.85)` + `addImage(..., 'JPEG')` across all 12 files. This alone typically reduces file size by 70-80%.
 
-### 4. Order trigger counts wrong status
-The `update_yutong_order_financials()` trigger only sums payments with `status = 'received'`, but the app sets status to `'pending'` then `'verified'`. So `total_paid` and `balance_due` never update on the order.
+### 2. Reduce html2canvas scale from 2/2.5 to 1.5
+Scale 1.5 still produces 150 DPI effective resolution on A4 -- perfectly sharp for print. Reduces pixel count by ~55% vs scale 2.
 
-### 5. Customer category not copied to orders
-Data shows all orders have `customer_category_id = NULL` even when quotations have categories set. The code fix was applied but existing orders weren't backfilled.
+### 3. Migrate document storage from database to Supabase Storage
+- Store PDFs in a `generated-documents` storage bucket instead of the `document_data` TEXT column
+- Keep metadata (file_name, file_size, quotation_id, etc.) in `document_storage` table
+- Add a `storage_path` column to reference the file in storage
+- Update all read/write operations to use storage instead of the TEXT column
+- This eliminates the 33% base64 overhead and moves large blobs out of the database
 
-## Changes
+### 4. Compress and migrate existing documents
+- Run a data migration to re-encode existing base64 documents into the storage bucket
+- Set `document_data` to NULL after migration to reclaim DB space
 
-### 1. Migration: Add `source_module` to `journal_entries` + fix trigger
-- `ALTER TABLE public.journal_entries ADD COLUMN IF NOT EXISTS source_module TEXT`
-- Update `update_yutong_order_financials()` trigger to also count `status = 'verified'`
+## Files to Change
 
-### 2. Fix `resolveCustomerARAccounts` fallback column name
-**File:** `src/hooks/useCustomerCategories.ts`
-- Query `gl_settings` for correct column names (check what actually exists)
+**PDF generation (PNG→JPEG + scale reduction):**
+- `src/lib/pdf-multi-page.ts` -- core multi-page generator
+- `src/lib/yutong-invoice-generator.ts`
+- `src/lib/yutong-order-invoice-generator.ts`
+- `src/lib/sinotruck-order-invoice-generator.ts`
+- `src/lib/lightvehicle-order-invoice-generator.ts`
+- `src/lib/invoice-generator.ts`
+- `src/lib/advance-details-generator.ts`
+- `src/components/yutong/YutongQuotationViewModal.tsx`
+- `src/components/yutong/YutongCashReceiptModal.tsx`
+- `src/components/sinotruck/SinotruckQuotationViewModal.tsx`
+- `src/components/sinotruck/SinotruckInvoiceGenerator.tsx`
+- `src/components/sinotruck/SinotruckCashReceiptModal.tsx`
+- `src/components/lightvehicle/LightVehicleQuotationViewModal.tsx`
+- `src/components/lightvehicle/LightVehicleCashReceiptModal.tsx`
+- `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx`
+- `src/components/shared/UnifiedDocumentPreview.tsx`
+- `src/components/special-hire/EnhancedPDFViewer.tsx`
+- `src/lib/yutong-quotation-regenerator.ts`
 
-### 3. Enhance Record Payment modal with Bank Account + Photo Upload
-**File:** `src/components/yutong/YutongPaymentTracking.tsx`
-- Add bank account dropdown (fetch from `bank_accounts` table where `company_id = NCG_HOLDING_ID`)
-- Add optional payment proof file upload to `payment-proofs` storage bucket
-- Save `bank_name` and `payment_slip_url` on the payment record
-- Apply same enhancements to Sinotruck and Light Vehicle payment forms
+**Storage migration:**
+- New Supabase migration (add `storage_path` column, create `generated-documents` bucket)
+- `src/hooks/useDocumentManagement.ts` -- upload to storage instead of inserting base64
+- `src/hooks/useYutongInvoiceManagement.ts` -- same
+- `src/hooks/useDocumentRegeneration.ts` -- same
+- `src/hooks/useFinanceApproval.ts` -- same
+- `src/components/special-hire/DocumentViewer.tsx` -- read from storage
+- `src/components/special-hire/EnhancedDocumentViewer.tsx` -- read from storage
+- `src/components/special-hire/GenerateBalanceInvoiceModal.tsx` -- upload to storage
 
-### 4. Data repair script
-- Backfill `customer_category_id` on `yutong_orders` from linked quotations
-- Backfill `customer_category_id` on finance `customers` records from their linked orders/quotations
-
-### 5. Update Supabase types
-- Add `source_module` to `journal_entries` type definitions
-
-## Files Touched
-- New Supabase migration (add `source_module`, fix trigger)
-- `src/hooks/useCustomerCategories.ts` -- fix gl_settings column name
-- `src/components/yutong/YutongPaymentTracking.tsx` -- add bank account + photo upload
-- `src/components/sinotruck/SinotruckPaymentTracking.tsx` -- add bank account selector
-- `src/components/lightvehicle/LightVehiclePaymentTracking.tsx` -- add bank account selector
-- `src/integrations/supabase/types.ts` -- add source_module
+## Expected Impact
+- Individual PDF size: ~10MB → ~500KB-1MB (90% reduction)
+- Database size: ~172MB base64 → metadata only (~1MB)
+- Total storage: moved to Supabase Storage bucket with efficient binary storage
 
