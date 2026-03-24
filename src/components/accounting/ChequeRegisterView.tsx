@@ -280,141 +280,116 @@ export const ChequeRegisterView = () => {
             Track issued, post-dated, incoming and cleared cheques
           </p>
         </div>
-        <Button onClick={() => setShowChequeForm(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Cheque
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setMainTab("books")}>
+            <BookOpen className="h-4 w-4 mr-2" />
+            Cheque Books
+          </Button>
+          <Button onClick={() => setShowChequeForm(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Cheque
+          </Button>
+        </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-5">
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Draft</p>
-              <h3 className="text-2xl font-bold mt-1">{draftCount}</h3>
-            </div>
-            <FileText className="h-8 w-8 text-muted-foreground" />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Issued (Pending)</p>
-              <h3 className="text-2xl font-bold mt-1">{issuedCount}</h3>
-            </div>
-            <Clock className="h-8 w-8 text-yellow-600" />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Post-Dated</p>
-              <h3 className="text-2xl font-bold mt-1">{postDatedCount}</h3>
-            </div>
-            <FileText className="h-8 w-8 text-blue-600" />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Outgoing (AP)</p>
-              <h3 className="text-xl font-bold mt-1">
-                <CurrencyDisplay amount={totalOutgoing} />
-              </h3>
-            </div>
-            <ArrowDownUp className="h-8 w-8 text-destructive" />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Incoming (AR)</p>
-              <h3 className="text-xl font-bold text-green-600 mt-1">
-                <CurrencyDisplay amount={totalIncoming} />
-              </h3>
-            </div>
-            <ArrowDownUp className="h-8 w-8 text-green-600" />
-          </div>
-        </Card>
-      </div>
+      {/* Main Tabs: Register vs Cheque Books */}
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "register" | "books")}>
+        <TabsList>
+          <TabsTrigger value="register">
+            <FileText className="h-4 w-4 mr-2" />
+            Cheque Register
+          </TabsTrigger>
+          <TabsTrigger value="books">
+            <BookOpen className="h-4 w-4 mr-2" />
+            Cheque Books
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Cheque Type Filter */}
-      <div className="flex gap-2">
-        <Button
-          variant={chequeTypeFilter === "all" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setChequeTypeFilter("all")}
-        >
-          All Types
-        </Button>
-        <Button
-          variant={chequeTypeFilter === "outgoing" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setChequeTypeFilter("outgoing")}
-        >
-          Outgoing (AP)
-        </Button>
-        <Button
-          variant={chequeTypeFilter === "incoming" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setChequeTypeFilter("incoming")}
-        >
-          Incoming (AR)
-        </Button>
-      </div>
+        <TabsContent value="register" className="space-y-6 mt-4">
+          {/* Summary Cards */}
+          <div className="grid gap-4 md:grid-cols-5">
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Draft</p>
+                  <h3 className="text-2xl font-bold mt-1">{draftCount}</h3>
+                </div>
+                <FileText className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Issued (Pending)</p>
+                  <h3 className="text-2xl font-bold mt-1">{issuedCount}</h3>
+                </div>
+                <Clock className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Post-Dated</p>
+                  <h3 className="text-2xl font-bold mt-1">{postDatedCount}</h3>
+                </div>
+                <FileText className="h-8 w-8 text-primary" />
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Outgoing (AP)</p>
+                  <h3 className="text-xl font-bold mt-1">
+                    <CurrencyDisplay amount={totalOutgoing} />
+                  </h3>
+                </div>
+                <ArrowDownUp className="h-8 w-8 text-destructive" />
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Incoming (AR)</p>
+                  <h3 className="text-xl font-bold mt-1">
+                    <CurrencyDisplay amount={totalIncoming} />
+                  </h3>
+                </div>
+                <ArrowDownUp className="h-8 w-8 text-primary" />
+              </div>
+            </Card>
+          </div>
 
-      {/* Cheque Table */}
-      <Card className="p-6">
-        <Tabs defaultValue="all" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="all" onClick={() => setStatusFilter(undefined)}>
-              All Cheques
-            </TabsTrigger>
-            <TabsTrigger value="draft" onClick={() => setStatusFilter("draft")}>
-              Draft ({draftCount})
-            </TabsTrigger>
-            <TabsTrigger value="issued" onClick={() => setStatusFilter("issued")}>
-              Issued
-            </TabsTrigger>
-            <TabsTrigger value="post_dated" onClick={() => setStatusFilter("post_dated")}>
-              Post-Dated
-            </TabsTrigger>
-            <TabsTrigger value="cleared" onClick={() => setStatusFilter("cleared")}>
-              Cleared
-            </TabsTrigger>
-            <TabsTrigger value="bounced" onClick={() => setStatusFilter("bounced")}>
-              Bounced
-            </TabsTrigger>
-          </TabsList>
+          {/* Cheque Type Filter */}
+          <div className="flex gap-2">
+            <Button variant={chequeTypeFilter === "all" ? "default" : "outline"} size="sm" onClick={() => setChequeTypeFilter("all")}>All Types</Button>
+            <Button variant={chequeTypeFilter === "outgoing" ? "default" : "outline"} size="sm" onClick={() => setChequeTypeFilter("outgoing")}>Outgoing (AP)</Button>
+            <Button variant={chequeTypeFilter === "incoming" ? "default" : "outline"} size="sm" onClick={() => setChequeTypeFilter("incoming")}>Incoming (AR)</Button>
+          </div>
 
-          {["all", "draft", "issued", "post_dated", "cleared", "bounced"].map((tab) => (
-            <TabsContent key={tab} value={tab}>
-              <DataTable
-                columns={columns}
-                data={filteredCheques}
-                searchKey="cheque_number"
-              />
-            </TabsContent>
-          ))}
-        </Tabs>
-      </Card>
+          {/* Cheque Table */}
+          <Card className="p-6">
+            <Tabs defaultValue="all" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="all" onClick={() => setStatusFilter(undefined)}>All Cheques</TabsTrigger>
+                <TabsTrigger value="draft" onClick={() => setStatusFilter("draft")}>Draft ({draftCount})</TabsTrigger>
+                <TabsTrigger value="issued" onClick={() => setStatusFilter("issued")}>Issued</TabsTrigger>
+                <TabsTrigger value="post_dated" onClick={() => setStatusFilter("post_dated")}>Post-Dated</TabsTrigger>
+                <TabsTrigger value="cleared" onClick={() => setStatusFilter("cleared")}>Cleared</TabsTrigger>
+                <TabsTrigger value="bounced" onClick={() => setStatusFilter("bounced")}>Bounced</TabsTrigger>
+              </TabsList>
+              {["all", "draft", "issued", "post_dated", "cleared", "bounced"].map((tab) => (
+                <TabsContent key={tab} value={tab}>
+                  <DataTable columns={columns} data={filteredCheques} searchKey="cheque_number" />
+                </TabsContent>
+              ))}
+            </Tabs>
+          </Card>
+        </TabsContent>
 
-      {/* Cheque Book Management */}
-      <Collapsible>
-        <Card className="p-4">
-          <CollapsibleTrigger className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">Cheque Book Management</h3>
-            </div>
-            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-4">
-            <ChequeBookManagement />
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
+        <TabsContent value="books" className="mt-4">
+          <ChequeBookManagement />
+        </TabsContent>
+      </Tabs>
 
       {/* Forms */}
       <ChequeIssueForm open={showChequeForm} onOpenChange={setShowChequeForm} />
