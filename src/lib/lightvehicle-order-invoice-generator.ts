@@ -844,7 +844,7 @@ export async function generateLightVehicleOrderInvoicePDF(data: LightVehicleOrde
     await new Promise(resolve => setTimeout(resolve, 300));
 
     const canvas = await html2canvas(container, {
-      scale: 2.5,
+      scale: 1.5,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
