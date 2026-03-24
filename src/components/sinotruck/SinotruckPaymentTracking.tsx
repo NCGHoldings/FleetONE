@@ -604,23 +604,35 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Bank Name</Label>
-                <Input
-                  value={paymentForm.bank_name}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, bank_name: e.target.value })}
-                  placeholder="Bank name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Reference No</Label>
-                <Input
-                  value={paymentForm.reference_no}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, reference_no: e.target.value })}
-                  placeholder="Transaction reference"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Bank Account *</Label>
+              <Select
+                value={paymentForm.bank_account_id}
+                onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select bank account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bankAccounts.map((bank) => (
+                    <SelectItem key={bank.id} value={bank.id}>
+                      <div className="flex items-center gap-2">
+                        <Landmark className="h-3 w-3 text-muted-foreground" />
+                        {bank.bank_name} - {bank.account_name} ({bank.account_number})
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Reference No</Label>
+              <Input
+                value={paymentForm.reference_no}
+                onChange={(e) => setPaymentForm({ ...paymentForm, reference_no: e.target.value })}
+                placeholder="Transaction reference"
+              />
             </div>
 
             {paymentForm.payment_method === 'cheque' && (
@@ -635,6 +647,25 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
             )}
 
             <div className="space-y-2">
+              <Label>Payment Proof (Optional)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)}
+                  className="flex-1"
+                />
+                {paymentProofFile && (
+                  <Badge variant="secondary" className="gap-1 whitespace-nowrap">
+                    <Image className="h-3 w-3" />
+                    {paymentProofFile.name.slice(0, 15)}...
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Upload bank slip or transfer confirmation</p>
+            </div>
+
+            <div className="space-y-2">
               <Label>Notes</Label>
               <Textarea
                 value={paymentForm.notes}
@@ -647,8 +678,8 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
             <Button variant="outline" onClick={() => setIsRecordModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRecordPayment}>
-              Record Payment
+            <Button onClick={handleRecordPayment} disabled={isUploading}>
+              {isUploading ? 'Uploading...' : 'Record Payment'}
             </Button>
           </DialogFooter>
         </DialogContent>
