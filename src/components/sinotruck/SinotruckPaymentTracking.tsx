@@ -41,13 +41,16 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
   const [verifyingPayment, setVerifyingPayment] = useState<string | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
     payment_date: new Date().toISOString().split('T')[0],
     payment_method: 'bank_transfer',
     reference_no: '',
-    bank_name: '',
+    bank_account_id: '',
     cheque_no: '',
     notes: ''
   });
