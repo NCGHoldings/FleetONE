@@ -85,6 +85,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const { data: vendors } = useVendors();
   const { data: bankAccounts } = useBankAccounts();
   const { data: allInvoices } = useAPInvoices();
+  const { selectedCompanyId } = useCompany();
   
   const createPayment = useCreateAPPayment();
   const approveInvoice = useApproveAPInvoice();
