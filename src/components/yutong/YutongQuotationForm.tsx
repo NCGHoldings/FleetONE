@@ -412,6 +412,31 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
 
               <FormField
                 control={form.control}
+                name="customer_category_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select customer category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {customerCategories?.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.category_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="bus_model_id"
                 render={({ field }) => (
                   <FormItem>

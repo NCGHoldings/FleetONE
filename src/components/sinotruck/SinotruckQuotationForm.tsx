@@ -256,6 +256,25 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
             </div>
 
             <div className="space-y-2">
+              <Label>Customer Category</Label>
+              <Select
+                value={formData.customer_category_id}
+                onValueChange={(value) => setFormData({ ...formData, customer_category_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select customer category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customerCategories?.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.category_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label>Truck Model *</Label>
               <Select
                 value={formData.truck_model_id}
