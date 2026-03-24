@@ -454,9 +454,11 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       payment_date: new Date().toISOString().split('T')[0],
       payment_method: 'bank_transfer',
       reference_no: '',
+      bank_account_id: '',
       notes: ''
     });
     setSelectedSchedule(null);
+    setPaymentProofFile(null);
   };
 
   // Cash Receipt handlers
