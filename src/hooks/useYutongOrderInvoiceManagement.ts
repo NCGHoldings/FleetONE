@@ -101,8 +101,20 @@ export function useYutongOrderInvoiceManagement() {
         throw new Error(`Invoice number generation failed: ${invoiceNoError.message}`);
       }
       
-      const invoiceNo = invoiceNoData as string;
-      console.log('✅ Invoice number generated:', invoiceNo);
+      let invoiceNo = invoiceNoData as string;
+      
+      // Add type prefix based on invoice category
+      const invoiceCat = invoiceData.invoice_category || 'direct_invoice';
+      const typePrefix = invoiceCat === 'proforma_invoice' ? 'PI-' 
+        : invoiceCat === 'tax_invoice' ? 'TI-' 
+        : 'CI-';
+      // Insert prefix after "NCGH-YT-" or at start
+      if (invoiceNo.includes('NCGH-YT-')) {
+        invoiceNo = invoiceNo.replace('NCGH-YT-', `NCGH-YT-${typePrefix}`);
+      } else {
+        invoiceNo = `${typePrefix}${invoiceNo}`;
+      }
+      console.log('✅ Invoice number generated with prefix:', invoiceNo);
       
       // For draft invoices, signatures will be added later via signature manager
       console.log('📝 Step 1.5: Invoice signatures will be managed separately');
@@ -200,6 +212,57 @@ export function useYutongOrderInvoiceManagement() {
         throw new Error(`Failed to create document record: ${docError.message}`);
       }
       console.log('✅ Document record created:', document.id);
+      
+      // Step 6: Auto-create AR Invoice (draft) at generation time
+      console.log('💰 Step 6: Creating draft AR Invoice...');
+      try {
+        const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
+        
+        // Get order details for customer info
+        const { data: orderDetails } = await supabase
+          .from('yutong_orders')
+          .select('*, yutong_quotations(customer_name, customer_category_id)')
+          .eq('id', orderId)
+          .single();
+        
+        if (settings && orderDetails?.finance_customer_id) {
+          const invoiceAmount = fullInvoiceData.invoice_category === 'proforma_invoice'
+            ? fullInvoiceData.proforma_amount || fullInvoiceData.total
+            : fullInvoiceData.total;
+          
+          const isTax = fullInvoiceData.invoice_category === 'tax_invoice' || fullInvoiceData.is_tax_invoice;
+          const taxAmt = isTax ? (fullInvoiceData.vat_amount || invoiceAmount - invoiceAmount / 1.18) : undefined;
+          
+          const arResult = await createVehicleARInvoice({
+            module: 'yutong',
+            orderId,
+            orderNo: orderDetails.order_no,
+            customerId: orderDetails.finance_customer_id,
+            totalAmount: invoiceAmount,
+            advanceAmount: 0,
+            companyId: NCG_HOLDING_ID,
+            settings,
+            customerCategoryId: (orderDetails as any)?.customer_category_id
+              || orderDetails?.yutong_quotations?.customer_category_id,
+            invoiceNo,
+            taxAmount: taxAmt,
+            status: 'draft',
+          });
+          
+          if (arResult) {
+            await updateOrderFinanceLinks({
+              module: 'yutong',
+              orderId,
+              arInvoiceId: arResult.invoiceId,
+            });
+            console.log(`✅ Draft AR Invoice created: ${arResult.invoiceNumber}`);
+          }
+        } else {
+          console.warn('⚠️ Skipping AR auto-creation: missing settings or finance customer');
+        }
+      } catch (arError) {
+        console.warn('⚠️ AR Invoice auto-creation failed (non-blocking):', arError);
+      }
       
       console.log('🎉 Invoice generation completed successfully!');
       toast.success('Draft invoice generated successfully');
@@ -326,8 +389,25 @@ export function useYutongOrderInvoiceManagement() {
         // Check if AR Invoice already exists
         let arInvoiceId = orderDetails?.ar_invoice_id;
         
-        if (!arInvoiceId && settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
-          // 1. Create AR Invoice in Finance module (at invoice approval)
+        const isTax = invoiceData.invoice_category === 'tax_invoice' || invoiceData.is_tax_invoice;
+        const taxRateVal = invoiceData.tax_rate || 18;
+        const taxAmt = isTax ? (invoiceData.vat_amount || invoiceAmount - invoiceAmount / (1 + taxRateVal / 100)) : undefined;
+        
+        if (arInvoiceId) {
+          // Update existing draft AR invoice to approved status
+          await supabase
+            .from('ar_invoices')
+            .update({
+              status: totalPaid >= invoiceAmount ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid',
+              paid_amount: totalPaid,
+              balance: invoiceAmount - totalPaid,
+              tax_amount: taxAmt || null,
+              subtotal: taxAmt ? invoiceAmount - taxAmt : null,
+            })
+            .eq('id', arInvoiceId);
+          console.log('[Yutong] Updated existing AR Invoice to approved status');
+        } else if (settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
+          // Create AR Invoice if none exists
           const arResult = await createVehicleARInvoice({
             module: 'yutong',
             orderId: invoice.order_id,
@@ -339,6 +419,8 @@ export function useYutongOrderInvoiceManagement() {
             settings,
             customerCategoryId: (orderDetails as any)?.customer_category_id 
               || orderDetails?.yutong_quotations?.customer_category_id,
+            invoiceNo: invoice.invoice_no,
+            taxAmount: taxAmt,
           });
 
           if (arResult) {
@@ -350,8 +432,10 @@ export function useYutongOrderInvoiceManagement() {
             });
             toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
           }
+        }
 
-          // 2. Post Revenue Recognition GL: DR Trade Receivable | CR Sales Revenue
+        // Post Revenue Recognition GL (with VAT split for tax invoices)
+        if (settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
           const revenueGLResult = await postVehicleInvoiceToGL({
             module: 'yutong',
             orderNo,
@@ -360,13 +444,16 @@ export function useYutongOrderInvoiceManagement() {
             invoiceAmount,
             settings,
             effectiveCompanyId: NCG_HOLDING_ID,
+            isTaxInvoice: isTax,
+            taxRate: taxRateVal,
+            invoiceNo: invoice.invoice_no,
           });
 
           if (revenueGLResult) {
             console.log(`[Yutong] Revenue GL posted: ${revenueGLResult.entryNumber}`);
           }
 
-          // 3. Apply advances against receivable: DR Customer Advance | CR Trade Receivable
+          // Apply advances against receivable
           if (totalPaid > 0 && settings.customer_advance_account_id) {
             const advanceResult = await applyAdvanceToReceivable({
               module: 'yutong',
