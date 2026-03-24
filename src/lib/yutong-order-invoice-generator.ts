@@ -810,20 +810,20 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
           <!-- Integrated Footer Rows -->
           <tr class="totals-footer">
             <td colspan="2" rowspan="3" class="amount-words-cell">
-              <div class="amount-label">${isTaxInvoice ? 'AMOUNT IN WORD<br/>(BALANCE PAYABLE)' : `AMOUNT IN WORD${isProforma ? ` (${data.proforma_amount_percentage || 0}% OF TOTAL)` : ''}`}</div>
-              <div class="amount-value">${isTaxInvoice ? taxAmountInWords : amountInWords}</div>
-            </td>
-            <td colspan="2" class="totals-label">${isTaxInvoice ? 'SUB TOTAL' : 'SUB TOTAL'}</td>
-            <td class="totals-value">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-          </tr>
-          <tr class="totals-footer">
-            <td colspan="2" class="totals-label">${isTaxInvoice ? `VAT ${taxRate}%` : 'PAYMENT'}</td>
-            <td class="totals-value">${isTaxInvoice ? vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : (data.totalPaid || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-          </tr>
-          <tr class="totals-footer total-row">
-            <td colspan="2" class="totals-label">TOTAL</td>
-            <td class="totals-value">${(data.balanceDue !== undefined && data.balanceDue !== null && data.balanceDue === 0) ? '-' : data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-          </tr>
+              <div class="amount-label">${isTaxInvoice ? 'AMOUNT IN WORD<br/>(BALANCE PAYABLE)' : 'AMOUNT IN WORDS'}</div>
+               <div class="amount-value">${isTaxInvoice ? taxAmountInWords : amountInWords}</div>
+             </td>
+            <td colspan="2" class="totals-label">SUB TOTAL</td>
+             <td class="totals-value">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : isProforma ? displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
+           <tr class="totals-footer">
+             <td colspan="2" class="totals-label">${isTaxInvoice ? `VAT ${taxRate}%` : isProforma ? '' : 'PAYMENT'}</td>
+             <td class="totals-value">${isTaxInvoice ? vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : isProforma ? '' : (data.totalPaid || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
+           <tr class="totals-footer total-row">
+             <td colspan="2" class="totals-label">TOTAL</td>
+             <td class="totals-value">${isProforma ? displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : (data.balanceDue !== undefined && data.balanceDue !== null && data.balanceDue === 0) ? '-' : data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
         </tbody>
       </table>
        
