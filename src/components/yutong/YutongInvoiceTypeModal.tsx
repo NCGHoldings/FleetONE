@@ -85,17 +85,16 @@ export function YutongInvoiceTypeModal({
 
   useEffect(() => {
     setFixedAmount(totalAmount);
-    setCustomerCommitment(0);
   }, [totalAmount, isOpen]);
 
   const proformaAmount = amountMode === 'percentage' 
     ? Math.round((totalAmount * proformaPercentage) / 100)
     : fixedAmount;
 
-  const leasingCompanyAmount = proformaAmount;
   const effectiveCustomerCommitment = amountMode === 'fixed' 
     ? customerCommitment 
-    : Math.max(0, totalAmount - proformaAmount);
+    : Math.max(0, proformaAmount - totalAmount);
+  const leasingCompanyAmount = proformaAmount - effectiveCustomerCommitment;
   const declaredVehicleValue = proformaAmount > totalAmount ? proformaAmount : totalAmount;
    
    const taxRate = 18;
