@@ -96,7 +96,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       // Load order details
       const { data: order, error: orderError } = await supabase
         .from('yutong_orders')
-        .select('*, yutong_quotations(quotation_no, customer_name)')
+        .select('*, yutong_quotations(quotation_no, customer_name, customer_category_id)')
         .eq('id', selectedOrderId)
         .single();
 

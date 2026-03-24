@@ -524,11 +524,11 @@ export async function postVehicleInvoiceToGL({
       return null;
     }
 
-    // DR Trade Receivable | CR Sales Revenue
+    // DR Trade Receivable | CR Sales Revenue (using resolved accounts)
     const lines = [
       {
         journal_entry_id: journalEntry.id,
-        account_id: settings.trade_receivable_account_id,
+        account_id: tradeReceivableId,
         description: `${businessUnitCode} Invoice to ${customerName} - ${orderNo}`,
         debit: invoiceAmount,
         credit: 0,
@@ -536,7 +536,7 @@ export async function postVehicleInvoiceToGL({
       },
       {
         journal_entry_id: journalEntry.id,
-        account_id: settings.sales_revenue_account_id,
+        account_id: salesRevenueId,
         description: `${businessUnitCode} Sales revenue - ${orderNo}`,
         debit: 0,
         credit: invoiceAmount,
