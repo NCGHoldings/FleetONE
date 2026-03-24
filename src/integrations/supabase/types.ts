@@ -11389,6 +11389,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           current_phase: string | null
+          customer_category_id: string | null
           customer_name: string
           expected_delivery_date: string | null
           finance_customer_id: string | null
@@ -11417,6 +11418,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           current_phase?: string | null
+          customer_category_id?: string | null
           customer_name: string
           expected_delivery_date?: string | null
           finance_customer_id?: string | null
@@ -11445,6 +11447,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           current_phase?: string | null
+          customer_category_id?: string | null
           customer_name?: string
           expected_delivery_date?: string | null
           finance_customer_id?: string | null
@@ -11469,6 +11472,13 @@ export type Database = {
             columns: ["ar_invoice_id"]
             isOneToOne: false
             referencedRelation: "ar_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_orders_customer_category_id_fkey"
+            columns: ["customer_category_id"]
+            isOneToOne: false
+            referencedRelation: "customer_categories"
             referencedColumns: ["id"]
           },
           {
@@ -19284,6 +19294,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           current_phase: string | null
+          customer_category_id: string | null
           customer_id: string | null
           expected_delivery_date: string | null
           finance_customer_id: string | null
@@ -19311,6 +19322,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           current_phase?: string | null
+          customer_category_id?: string | null
           customer_id?: string | null
           expected_delivery_date?: string | null
           finance_customer_id?: string | null
@@ -19338,6 +19350,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           current_phase?: string | null
+          customer_category_id?: string | null
           customer_id?: string | null
           expected_delivery_date?: string | null
           finance_customer_id?: string | null
@@ -19364,6 +19377,13 @@ export type Database = {
             columns: ["ar_invoice_id"]
             isOneToOne: false
             referencedRelation: "ar_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_orders_customer_category_id_fkey"
+            columns: ["customer_category_id"]
+            isOneToOne: false
+            referencedRelation: "customer_categories"
             referencedColumns: ["id"]
           },
           {
@@ -25859,6 +25879,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           current_phase: Database["public"]["Enums"]["yutong_order_phase"]
+          customer_category_id: string | null
           customer_id: string | null
           engine_capacity: number | null
           engine_number: string | null
@@ -25897,6 +25918,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           current_phase?: Database["public"]["Enums"]["yutong_order_phase"]
+          customer_category_id?: string | null
           customer_id?: string | null
           engine_capacity?: number | null
           engine_number?: string | null
@@ -25935,6 +25957,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           current_phase?: Database["public"]["Enums"]["yutong_order_phase"]
+          customer_category_id?: string | null
           customer_id?: string | null
           engine_capacity?: number | null
           engine_number?: string | null
@@ -25968,6 +25991,13 @@ export type Database = {
             columns: ["ar_invoice_id"]
             isOneToOne: false
             referencedRelation: "ar_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_orders_customer_category_id_fkey"
+            columns: ["customer_category_id"]
+            isOneToOne: false
+            referencedRelation: "customer_categories"
             referencedColumns: ["id"]
           },
           {
