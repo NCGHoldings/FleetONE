@@ -1,61 +1,61 @@
 
 
-# Add Customer Category to Vehicle Sales Quotation Forms
+# Fix Yutong Full Flow: GL Posting, Customer Category, and Finance Integration
 
-## Summary
-Currently, the Yutong, Sinotruck, and Light Vehicle quotation forms only have a "Customer Type" field (Personal/Company). The `customer_categories` table (with entries like "Internal", "External Customer") exists and is used in the Accounting module's Customer master, but is not connected to quotation forms. This means when quotations flow into AR invoices, the system cannot resolve the correct GL accounts via the 3-tier hierarchy (customer category -> global GL settings).
+## Root Cause Analysis
 
-## What needs to happen
+### Critical Error: `source_module` column does not exist
+The console error `"Could not find the 'source_module' column of 'journal_entries' in the schema cache"` is the primary blocker. In `useVehicleSalesFinance.ts` (line 349), every GL posting inserts `source_module: 'yutong_sales'` into `journal_entries`, but this column does not exist in the database. This causes ALL payment verifications to fail with a 400 error.
 
-### 1. Database: Add `customer_category_id` column to all 3 quotation tables
-Create a Supabase migration adding a nullable `customer_category_id` column (FK to `customer_categories.id`) to:
-- `yutong_quotations`
-- `sinotruck_quotations`
-- `lightvehicle_quotations`
+### Customer Category Not Flowing Through
+The `customer_category_id` is saved on quotations but never passed to:
+- `yutong_orders` table (no column exists)
+- `createVehicleCustomer()` function (doesn't accept or set category)
+- AR Invoice creation (no category-based GL resolution)
 
-### 2. Update Yutong Quotation Forms (2 files)
-**Files:** `src/components/yutong/YutongQuotationFormUpdated.tsx` and `src/components/yutong/YutongQuotationForm.tsx`
+## Changes
 
-- Add `customer_category_id` to the Zod schema (optional string)
-- Import and use `useActiveCustomerCategories()` hook to load categories
-- Add a "Customer Category" dropdown (Select) in the Customer Information section, below the Customer Type field
-- Include `customer_category_id` in the data sent to Supabase on submit
-- When an existing customer is selected, auto-populate their category if they have one
+### 1. Database Migration: Add `source_module` to `journal_entries` + `customer_category_id` to order tables
+- Add `source_module TEXT` column to `journal_entries` (this is referenced by many modules, not just Yutong)
+- Add `customer_category_id UUID` (FK to `customer_categories`) to `yutong_orders`, `sinotruck_orders`, `lightvehicle_orders`
 
-### 3. Update Sinotruck Quotation Form
-**File:** `src/components/sinotruck/SinotruckQuotationForm.tsx`
+### 2. Fix `useVehicleSalesFinance.ts` -- Customer Category Integration
+- Update `createVehicleCustomer()` to accept and set `customer_category_id` on the customer record
+- Update `createVehicleARInvoice()` to use category-based GL account resolution via `resolveCustomerARAccounts()`
+- This ensures Internal vs External customers use the correct Trade Receivable and Revenue accounts
 
-- Add `customer_category_id` to form state
-- Import and use `useActiveCustomerCategories()` hook
-- Add "Customer Category" dropdown in the customer section
-- Include in the insert payload
+### 3. Pass `customer_category_id` through Order Creation
+**File:** `src/hooks/useYutongOrderManagement.ts`
+- Fetch `customer_category_id` from the source quotation
+- Insert it into the order record
+- Add to `CreateOrderData` interface
 
-### 4. Update Light Vehicle Quotation Form
-**File:** `src/components/lightvehicle/LightVehicleQuotationForm.tsx`
+### 4. Pass Category Through Payment Verification Flow
+**File:** `src/components/yutong/YutongPaymentTracking.tsx`
+- When creating/getting a finance customer, include `customer_category_id` from the order's linked quotation
+- When creating AR Invoice on invoice approval, resolve GL accounts via category
 
-- Add `customer_category_id` to Zod schema
-- Import and use `useActiveCustomerCategories()` hook
-- Add "Customer Category" dropdown
-- Include in the insert payload
+### 5. Update Supabase Types
+Regenerate types to include the new columns.
 
-### 5. Auto-populate category when selecting existing customer
-In all 3 forms, when a user selects an existing customer from the dropdown, fetch that customer's `customer_category_id` and auto-set the category dropdown. User can still override it.
-
-## Flow after this change
+## Flow After Fix
 ```text
-Quotation (with category) → Order → AR Invoice
-                                      ↓
-                              resolveCustomerARAccounts()
-                                      ↓
-                              Uses category GL mapping
-                              (Internal → AR Internal acct)
-                              (External → AR External acct)
+Quotation (customer_category_id) 
+    → Order (inherits customer_category_id)
+        → Record Payment (pending)
+            → Verify Payment 
+                → Create Finance Customer (with category)
+                → GL: DR Bank / CR Customer Advance ← uses source_module tag
+            → Approve System Invoice
+                → Create AR Invoice (category-based GL resolution)
+                → GL: DR Trade Receivable / CR Sales Revenue
+                → Apply Advance: DR Advance / CR Receivable
 ```
 
-## Files touched
-- Supabase migration (new) — add `customer_category_id` to 3 tables
-- `src/components/yutong/YutongQuotationFormUpdated.tsx`
-- `src/components/yutong/YutongQuotationForm.tsx`
-- `src/components/sinotruck/SinotruckQuotationForm.tsx`
-- `src/components/lightvehicle/LightVehicleQuotationForm.tsx`
+## Files Touched
+- New Supabase migration (add `source_module` to `journal_entries`, `customer_category_id` to order tables)
+- `src/hooks/useVehicleSalesFinance.ts` -- category-aware customer + AR invoice creation
+- `src/hooks/useYutongOrderManagement.ts` -- pass category to orders
+- `src/components/yutong/YutongPaymentTracking.tsx` -- pass category through verify flow
+- `src/integrations/supabase/types.ts` -- update types
 
