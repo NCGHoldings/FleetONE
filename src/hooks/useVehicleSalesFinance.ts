@@ -295,6 +295,39 @@ export async function createVehicleARInvoice({
       return null;
     }
 
+    // ========== AUTO GL POSTING at creation: DR Trade Receivable, CR Sales Revenue ==========
+    try {
+      const { resolveCustomerARAccounts } = await import('@/hooks/useCustomerCategories');
+      const resolved = await resolveCustomerARAccounts(customerId, companyId);
+
+      if (resolved.arAccountId && resolved.revenueAccountId && totalAmount > 0) {
+        const { postARInvoiceToGL } = await import('@/lib/gl-posting-utils');
+        const glResult = await postARInvoiceToGL({
+          invoiceNumber: invoice.invoice_number,
+          invoiceDate: new Date().toISOString().split('T')[0],
+          totalAmount: totalAmount,
+          tradeReceivableId: resolved.arAccountId,
+          salesRevenueId: resolved.revenueAccountId,
+          companyId: companyId,
+          businessUnitCode: businessUnitCode,
+          sourceModule: `${module}_sales`,
+        });
+        if (glResult.success && glResult.journalEntryId) {
+          await (supabase as any)
+            .from('ar_invoices')
+            .update({ journal_entry_id: glResult.journalEntryId })
+            .eq('id', invoice.id);
+          console.log(`[${module.toUpperCase()} Finance] GL posted for AR Invoice:`, invoice.invoice_number);
+        } else {
+          console.warn(`[${module.toUpperCase()} Finance] GL posting failed:`, glResult.error);
+        }
+      } else {
+        console.warn(`[${module.toUpperCase()} Finance] Missing GL accounts for AR posting:`, resolved.missingAccounts);
+      }
+    } catch (glErr) {
+      console.warn(`[${module.toUpperCase()} Finance] GL posting error:`, glErr);
+    }
+
     console.log(`[${module.toUpperCase()} Finance] Created AR Invoice:`, invoice?.invoice_number);
     return invoice ? { invoiceId: invoice.id, invoiceNumber: invoice.invoice_number } : null;
   } catch (error) {

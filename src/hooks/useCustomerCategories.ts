@@ -152,6 +152,7 @@ export async function resolveCustomerARAccounts(
   revenueAccountId: string | null;
   advanceAccountId: string | null;
   source: "customer" | "category" | "global";
+  missingAccounts: string[];
 }> {
   // Fetch customer with category join
   const { data: customer } = await supabase
@@ -168,38 +169,46 @@ export async function resolveCustomerARAccounts(
     .eq("id", customerId)
     .single();
 
-  // Priority 1: Customer-specific override
-  if (customer?.ar_account_id) {
-    return {
-      arAccountId: customer.ar_account_id,
-      revenueAccountId: null, // no customer-level revenue override
-      advanceAccountId: null,
-      source: "customer",
-    };
-  }
-
-  // Priority 2: Category mapping
-  const category = customer?.customer_categories as any;
-  if (category?.ar_account_id) {
-    return {
-      arAccountId: category.ar_account_id,
-      revenueAccountId: category.revenue_account_id || null,
-      advanceAccountId: category.advance_account_id || null,
-      source: "category",
-    };
-  }
-
-  // Priority 3: Global fallback
+  // Always fetch global fallback for gap-filling
   const { data: glSettings } = await (supabase as any)
     .from("gl_settings")
     .select("trade_receivable_account_id, sales_revenue_account_id, customer_advance_account_id")
     .eq("company_id", companyId)
     .maybeSingle();
 
-  return {
-    arAccountId: glSettings?.trade_receivable_account_id || null,
-    revenueAccountId: glSettings?.sales_revenue_account_id || null,
-    advanceAccountId: glSettings?.customer_advance_account_id || null,
-    source: "global",
-  };
+  let arAccountId: string | null = null;
+  let revenueAccountId: string | null = null;
+  let advanceAccountId: string | null = null;
+  let source: "customer" | "category" | "global" = "global";
+
+  // Priority 1: Customer-specific override
+  if (customer?.ar_account_id) {
+    arAccountId = customer.ar_account_id;
+    source = "customer";
+  }
+
+  // Priority 2: Category mapping
+  const category = customer?.customer_categories as any;
+  if (!arAccountId && category?.ar_account_id) {
+    arAccountId = category.ar_account_id;
+    source = "category";
+  }
+  if (!revenueAccountId && category?.revenue_account_id) {
+    revenueAccountId = category.revenue_account_id;
+  }
+  if (!advanceAccountId && category?.advance_account_id) {
+    advanceAccountId = category.advance_account_id;
+  }
+
+  // Priority 3: Global fallback for any remaining gaps
+  if (!arAccountId) arAccountId = glSettings?.trade_receivable_account_id || null;
+  if (!revenueAccountId) revenueAccountId = glSettings?.sales_revenue_account_id || null;
+  if (!advanceAccountId) advanceAccountId = glSettings?.customer_advance_account_id || null;
+
+  // Build missing accounts list for actionable UI feedback
+  const missingAccounts: string[] = [];
+  if (!arAccountId) missingAccounts.push("Trade Receivable (Settings → Core GL → trade_receivable_account_id, OR Customer Category → AR Account)");
+  if (!revenueAccountId) missingAccounts.push("Sales Revenue (Settings → Core GL → sales_revenue_account_id, OR Customer Category → Revenue Account)");
+
+  return { arAccountId, revenueAccountId, advanceAccountId, source, missingAccounts };
 }

@@ -84,7 +84,7 @@ export const useOverdueRecurringEntries = () => {
         ...entry,
         days_overdue: Math.floor(
           (new Date(today).getTime() - new Date(entry.next_run_date).getTime()) /
-          (1000 * 60 * 60 * 24)
+            (1000 * 60 * 60 * 24)
         ),
       })) as RecurringEntryOverdue[];
     },
@@ -335,8 +335,8 @@ export const useModuleAutomationHealth = () => {
         message: payrollSettings?.auto_post_on_process
           ? "Auto-post on process: ON"
           : payrollSettings
-            ? "Auto-post disabled — manual GL required"
-            : "Not configured",
+          ? "Auto-post disabled — manual GL required"
+          : "Not configured",
       });
 
       // Commissions
@@ -348,8 +348,8 @@ export const useModuleAutomationHealth = () => {
         message: commSettings?.auto_post_on_paid
           ? "Auto-post on paid: ON"
           : commSettings
-            ? "Auto-post disabled"
-            : "Not configured",
+          ? "Auto-post disabled"
+          : "Not configured",
       });
 
       // Maintenance
@@ -361,8 +361,8 @@ export const useModuleAutomationHealth = () => {
         message: maintSettings?.auto_post_on_complete
           ? "Auto-post on complete: ON"
           : maintSettings
-            ? "Auto-post disabled"
-            : "Not configured",
+          ? "Auto-post disabled"
+          : "Not configured",
       });
 
       // Insurance
@@ -374,8 +374,8 @@ export const useModuleAutomationHealth = () => {
         message: insSettings?.auto_post_premium
           ? "Auto-post premiums: ON"
           : insSettings
-            ? "Auto-post disabled"
-            : "Not configured",
+          ? "Auto-post disabled"
+          : "Not configured",
       });
 
       // Expenses
@@ -387,8 +387,8 @@ export const useModuleAutomationHealth = () => {
         message: expSettings?.auto_post_on_approve
           ? "Auto-post on approve: ON"
           : expSettings
-            ? "Auto-post disabled"
-            : "Not configured",
+          ? "Auto-post disabled"
+          : "Not configured",
       });
 
       // Route Permits
@@ -400,8 +400,8 @@ export const useModuleAutomationHealth = () => {
         message: permitSettings?.auto_post_on_renewal
           ? "Auto-post on renewal: ON"
           : permitSettings
-            ? "Auto-post disabled"
-            : "Not configured",
+          ? "Auto-post disabled"
+          : "Not configured",
       });
 
       // Fuel Expenses
@@ -413,8 +413,8 @@ export const useModuleAutomationHealth = () => {
         message: fuelSettings?.auto_post_on_entry
           ? "Auto-post on entry: ON"
           : fuelSettings
-            ? "Auto-post disabled"
-            : "Not configured",
+          ? "Auto-post disabled"
+          : "Not configured",
       });
 
       // School Bus
@@ -426,8 +426,8 @@ export const useModuleAutomationHealth = () => {
         message: schoolSettings?.auto_post_on_payment
           ? "Auto-post on payment: ON"
           : schoolSettings
-            ? "Auto-post disabled"
-            : "Not configured",
+          ? "Auto-post disabled"
+          : "Not configured",
       });
 
       // Special Hire (check special_hire_finance_settings directly)
@@ -453,8 +453,8 @@ export const useModuleAutomationHealth = () => {
             message: allOn
               ? "All auto-posting: ON"
               : anyOn
-                ? "Partial auto-posting — some options disabled"
-                : "Auto-posting disabled",
+              ? "Partial auto-posting — some options disabled"
+              : "Auto-posting disabled",
           };
         }
       } catch { /* table may not exist */ }
@@ -482,8 +482,8 @@ export const useModuleAutomationHealth = () => {
             message: allOn
               ? "Auto GL + AP Invoice: ON"
               : leasSettings.auto_post_gl_on_payment
-                ? "GL posting ON, AP Invoice OFF"
-                : "Auto-posting disabled",
+              ? "GL posting ON, AP Invoice OFF"
+              : "Auto-posting disabled",
           };
         }
       } catch { /* table may not exist */ }
@@ -549,75 +549,14 @@ export const useModuleAutomationHealth = () => {
             message: allOn
               ? "Auto-post revenue + expenses: ON"
               : s?.auto_post_revenue
-                ? "Revenue ON, Expenses OFF"
-                : s?.auto_post_expenses
-                  ? "Revenue OFF, Expenses ON"
-                  : "Auto-posting disabled",
+              ? "Revenue ON, Expenses OFF"
+              : s?.auto_post_expenses
+              ? "Revenue OFF, Expenses ON"
+              : "Auto-posting disabled",
           };
         }
       } catch { /* ignore */ }
       statuses.push(ncgeStatus);
-
-      // Petty Cash
-      let pcStatus: AutomationHealthStatus = {
-        module: "petty_cash",
-        label: "Petty Cash",
-        status: "disabled",
-        message: "Not configured",
-      };
-      try {
-        const { data: pcFunds } = await (supabase as any)
-          .from("petty_cash_funds")
-          .select("id, gl_account_id")
-          .eq("company_id", selectedCompanyId)
-          .eq("is_active", true);
-        if (pcFunds && pcFunds.length > 0) {
-          const withGL = pcFunds.filter((f: any) => f.gl_account_id).length;
-          const totalFunds = pcFunds.length;
-          pcStatus = {
-            module: "petty_cash",
-            label: "Petty Cash",
-            status: withGL === totalFunds ? "healthy" : withGL > 0 ? "warning" : "error",
-            message: withGL === totalFunds
-              ? `All ${totalFunds} funds have GL accounts — auto-posting active`
-              : withGL > 0
-                ? `${withGL}/${totalFunds} funds have GL accounts — partial posting`
-                : `${totalFunds} funds without GL accounts — no auto-posting`,
-          };
-        }
-      } catch { /* table may not exist */ }
-      statuses.push(pcStatus);
-
-      // IOU / Staff Advances
-      let iouStatus: AutomationHealthStatus = {
-        module: "iou",
-        label: "IOU / Staff Advances",
-        status: "healthy",
-        message: "GL posting active on create/settle",
-      };
-      try {
-        const { data: iouRecords } = await (supabase as any)
-          .from("iou_records")
-          .select("id, journal_entry_id, status")
-          .eq("company_id", selectedCompanyId)
-          .in("status", ["pending", "partially_settled"]);
-        if (iouRecords && iouRecords.length > 0) {
-          const withJE = iouRecords.filter((r: any) => r.journal_entry_id).length;
-          const total = iouRecords.length;
-          iouStatus = {
-            module: "iou",
-            label: "IOU / Staff Advances",
-            status: withJE === total ? "healthy" : withJE > 0 ? "warning" : "error",
-            message: withJE === total
-              ? `${total} active IOUs — all GL posted`
-              : withJE > 0
-                ? `${withJE}/${total} active IOUs have GL entries`
-                : `${total} active IOUs without GL entries`,
-            pendingCount: total - withJE,
-          };
-        }
-      } catch { /* table may not exist */ }
-      statuses.push(iouStatus);
 
       return statuses;
     },
@@ -664,7 +603,7 @@ export const usePendingAmortizations = () => {
           const totalMonths = Math.max(
             1,
             (expiryDate.getFullYear() - issueDate.getFullYear()) * 12 +
-            (expiryDate.getMonth() - issueDate.getMonth())
+              (expiryDate.getMonth() - issueDate.getMonth())
           );
           const monthlyAmount = Math.round(policy.premium_amount / totalMonths);
           const lastPosted = null; // insurance_records has no last_amortization_month column
@@ -714,7 +653,7 @@ export const usePendingAmortizations = () => {
           const totalMonths = Math.max(
             1,
             (expiryDate.getFullYear() - issueDate.getFullYear()) * 12 +
-            (expiryDate.getMonth() - issueDate.getMonth())
+              (expiryDate.getMonth() - issueDate.getMonth())
           );
           const monthlyAmount = Math.round(permit.annual_fee / totalMonths);
           const lastPosted = null; // route_permits has no last_amortization_month column

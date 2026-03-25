@@ -21,35 +21,24 @@ jobs:
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
-        env:
-          GH_PAT: ${{ secrets.GITHUB_TOKEN }}
-          APP_DIR: ${{ secrets.VPS_APP_DIR }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: GH_PAT,APP_DIR
           script: |
             set -e
+            APP_DIR="${{ secrets.VPS_APP_DIR }}"
 
             echo "📦 Navigating to app directory..."
             cd "$APP_DIR"
 
-            echo "🧹 Cleaning untracked files..."
-            git clean -fd
-
-            echo "🔑 Setting up authenticated git remote..."
-            git remote set-url origin "https://x-access-token:${GH_PAT}@github.com/NCGHoldings/FleetONE.git"
-
             echo "⬇️ Pulling latest changes..."
-            git fetch origin main
-            git reset --hard origin/main
+            git pull origin main
 
             echo "📥 Installing dependencies..."
             npm install --legacy-peer-deps
 
             echo "🔨 Building application..."
-            export NODE_OPTIONS="--max-old-space-size=4096"
             npm run build
 
             echo "🔄 Reloading Nginx..."

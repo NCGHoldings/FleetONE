@@ -44,12 +44,7 @@ const BankStatementImportModal = ({ open, onOpenChange, bankAccountId, onImportC
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
-
-    // Clear any previous parse result to prevent stale data display
     setFile(selectedFile);
-    setParseResult(null);
-    setStep("upload");
-    setDetectedBank("");
 
     // Auto-detect bank
     try {
@@ -61,9 +56,6 @@ const BankStatementImportModal = ({ open, onOpenChange, bankAccountId, onImportC
     } catch {
       setDetectedBank("Unknown");
     }
-
-    // Reset input so re-selecting same file triggers onChange
-    e.target.value = "";
   }, []);
 
   const handleParse = useCallback(async () => {
@@ -86,7 +78,7 @@ const BankStatementImportModal = ({ open, onOpenChange, bankAccountId, onImportC
     if (!parseResult || !bankAccountId) return;
     setImporting(true);
     setStep("importing");
-
+    
     let imported = 0;
     const batchSize = 50;
     const txns = parseResult.transactions;

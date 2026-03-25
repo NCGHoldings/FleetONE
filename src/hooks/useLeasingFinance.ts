@@ -203,6 +203,48 @@ export async function createLeasingAPInvoice({
 
     await supabase.from('ap_invoice_lines').insert(lines);
 
+    // ========== AUTO GL POSTING: DR Interest Expense + DR Lease Liability, CR Trade Payable ==========
+    try {
+      if (settings.leasing_liability_account_id && settings.interest_expense_account_id) {
+        // Resolve trade payable from vendor category or global settings
+        const { resolveVendorAPAccounts } = await import('@/hooks/useVendorCategories');
+        const resolved = await resolveVendorAPAccounts(vendorId, companyId);
+        const tradePayableId = resolved.apAccountId;
+
+        if (tradePayableId) {
+          const { postAPInvoiceToGL } = await import('@/lib/gl-posting-utils');
+          const glResult = await postAPInvoiceToGL({
+            invoiceNumber: invoiceNumber,
+            invoiceDate: invoiceDate,
+            totalAmount: paymentData.total_installment,
+            expenseAccountId: settings.interest_expense_account_id,
+            tradePayableId: tradePayableId,
+            companyId: companyId,
+            businessUnitCode: BUSINESS_UNIT_CODE,
+            vendorName: lenderName,
+            expenseLines: [
+              { accountId: settings.leasing_liability_account_id, amount: paymentData.principal_amount, description: `Principal - EMI #${paymentData.payment_number}` },
+              { accountId: settings.interest_expense_account_id, amount: paymentData.interest_amount, description: `Interest - EMI #${paymentData.payment_number}` },
+            ],
+            sourceModule: 'leasing',
+          });
+          if (glResult.success && glResult.journalEntryId) {
+            await (supabase as any)
+              .from('ap_invoices')
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq('id', invoice.id);
+            console.log('[Leasing Finance] GL posted for AP Invoice:', invoiceNumber);
+          } else {
+            console.warn('[Leasing Finance] GL posting failed:', glResult.error);
+          }
+        } else {
+          console.warn('[Leasing Finance] Missing Trade Payable account for GL posting');
+        }
+      }
+    } catch (glErr) {
+      console.warn('[Leasing Finance] GL posting error:', glErr);
+    }
+
     console.log('[Leasing Finance] Created AP Invoice:', invoice.invoice_number);
     return { invoiceId: invoice.id, invoiceNumber: invoice.invoice_number };
   } catch (error) {
@@ -224,6 +266,7 @@ export async function postLeasingPaymentToGL({
   settings,
   busId,
   companyId = NCG_HOLDING_ID,
+  apInvoiceId,
 }: {
   paymentData: LoanPaymentData;
   busNumber: string;
@@ -231,6 +274,7 @@ export async function postLeasingPaymentToGL({
   settings: LeasingFinanceSettings;
   busId?: string;
   companyId?: string;
+  apInvoiceId?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     // Validate required accounts
@@ -281,39 +325,88 @@ export async function postLeasingPaymentToGL({
       return null;
     }
 
-    // Create journal entry lines
-    const lines = [
-      // DR Interest Expense
-      {
-        journal_entry_id: journalEntry.id,
-        account_id: settings.interest_expense_account_id,
-        description: `Interest Expense - EMI #${paymentData.payment_number} - ${busNumber}`,
-        debit: paymentData.interest_amount,
-        credit: 0,
-        company_id: companyId,
-        bus_id: busId || null,
-      },
-      // DR Leasing Liability (reduce principal)
-      {
-        journal_entry_id: journalEntry.id,
-        account_id: settings.leasing_liability_account_id,
-        description: `Principal Payment - EMI #${paymentData.payment_number} - ${busNumber}`,
-        debit: paymentData.principal_amount,
-        credit: 0,
-        company_id: companyId,
-        bus_id: busId || null,
-      },
-      // CR Bank Account
-      {
-        journal_entry_id: journalEntry.id,
-        account_id: settings.bank_account_id,
-        description: `EMI Payment - ${busNumber} - ${lenderName}`,
-        debit: 0,
-        credit: paymentData.total_installment,
-        company_id: companyId,
-        bus_id: busId || null,
-      },
-    ];
+    // Check if AP invoice already has GL posted at creation (new flow)
+    // If yes: payment settles payable (DR Trade Payable / CR Bank)
+    // If no: use legacy flow (DR Interest + DR Liability / CR Bank)
+    let useSettlementFlow = false;
+    if (apInvoiceId) {
+      const { data: apCheck } = await (supabase as any)
+        .from('ap_invoices')
+        .select('journal_entry_id')
+        .eq('id', apInvoiceId)
+        .single();
+      if (apCheck?.journal_entry_id) {
+        useSettlementFlow = true;
+      }
+    }
+
+    let lines: any[];
+    if (useSettlementFlow) {
+      // Settlement: DR Trade Payable / CR Bank (payable was already booked at invoice creation)
+      const { resolveVendorAPAccounts } = await import('@/hooks/useVendorCategories');
+      const { data: apInv } = await (supabase as any)
+        .from('ap_invoices')
+        .select('vendor_id')
+        .eq('id', apInvoiceId)
+        .single();
+      const resolved = await resolveVendorAPAccounts(apInv?.vendor_id || '', companyId);
+      const tradePayableId = resolved.apAccountId || settings.leasing_liability_account_id;
+
+      lines = [
+        {
+          journal_entry_id: journalEntry.id,
+          account_id: tradePayableId,
+          description: `Settle Payable - EMI #${paymentData.payment_number} - ${busNumber}`,
+          debit: paymentData.total_installment,
+          credit: 0,
+          company_id: companyId,
+          bus_id: busId || null,
+        },
+        {
+          journal_entry_id: journalEntry.id,
+          account_id: settings.bank_account_id,
+          description: `EMI Payment - ${busNumber} - ${lenderName}`,
+          debit: 0,
+          credit: paymentData.total_installment,
+          company_id: companyId,
+          bus_id: busId || null,
+        },
+      ];
+    } else {
+      // Legacy: DR Interest + DR Liability / CR Bank
+      lines = [
+        // DR Interest Expense
+        {
+          journal_entry_id: journalEntry.id,
+          account_id: settings.interest_expense_account_id,
+          description: `Interest Expense - EMI #${paymentData.payment_number} - ${busNumber}`,
+          debit: paymentData.interest_amount,
+          credit: 0,
+          company_id: companyId,
+          bus_id: busId || null,
+        },
+        // DR Leasing Liability (reduce principal)
+        {
+          journal_entry_id: journalEntry.id,
+          account_id: settings.leasing_liability_account_id,
+          description: `Principal Payment - EMI #${paymentData.payment_number} - ${busNumber}`,
+          debit: paymentData.principal_amount,
+          credit: 0,
+          company_id: companyId,
+          bus_id: busId || null,
+        },
+        // CR Bank Account
+        {
+          journal_entry_id: journalEntry.id,
+          account_id: settings.bank_account_id,
+          description: `EMI Payment - ${busNumber} - ${lenderName}`,
+          debit: 0,
+          credit: paymentData.total_installment,
+          company_id: companyId,
+          bus_id: busId || null,
+        },
+      ];
+    }
 
     const { error: linesError } = await supabase
       .from('journal_entry_lines')

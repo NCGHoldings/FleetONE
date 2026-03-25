@@ -43,7 +43,7 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
         .select('*', { count: 'exact', head: true })
         .eq('trip_status', 'confirmed')
         .is('assigned_bus_id', null);
-
+      
       newResults.push({
         id: 'confirmed-no-bus',
         name: 'Confirmed Trips Without Bus',
@@ -60,7 +60,7 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true)
         .is('branch_id', null);
-
+      
       newResults.push({
         id: 'students-no-branch',
         name: 'Students Without Branch',
@@ -76,12 +76,12 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
         .from('special_hire_payments')
         .select('id, quotation_id, status, special_hire_quotations(trip_status)')
         .eq('status', 'approved');
-
+      
       const mismatchedPayments = paymentsCheck?.filter(
-        p => p.special_hire_quotations &&
-          (p.special_hire_quotations as any)?.trip_status === 'cancelled'
+        p => p.special_hire_quotations && 
+        (p.special_hire_quotations as any)?.trip_status === 'cancelled'
       ).length || 0;
-
+      
       newResults.push({
         id: 'payments-cancelled-trips',
         name: 'Payments on Cancelled Trips',
@@ -98,15 +98,15 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
         .from('buses')
         .select('id')
         .eq('status', 'active');
-
+      
       const { data: recentTrips } = await supabase
         .from('daily_trips')
         .select('bus_id')
         .gte('trip_date', sevenDaysAgo);
-
+      
       const busesWithTrips = new Set(recentTrips?.map(t => t.bus_id));
       const idleBuses = activeBuses?.filter(b => !busesWithTrips.has(b.id)).length || 0;
-
+      
       newResults.push({
         id: 'idle-buses',
         name: 'Idle Buses (7 days)',
@@ -123,7 +123,7 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
         .select('*', { count: 'exact', head: true })
         .is('customer_id', null)
         .not('status', 'eq', 'cancelled');
-
+      
       newResults.push({
         id: 'yutong-no-customer',
         name: 'Yutong Quotations Without Customer',
@@ -139,7 +139,7 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
         .from('maintenance_records')
         .select('*', { count: 'exact', head: true })
         .is('bus_id', null);
-
+      
       newResults.push({
         id: 'orphan-maintenance',
         name: 'Maintenance Without Vehicle',
@@ -155,14 +155,14 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
         .from('accident_records')
         .select('id')
         .not('status', 'eq', 'closed');
-
+      
       const { data: accidentDocs } = await supabase
         .from('accident_documents')
         .select('accident_id');
-
+      
       const accidentsWithDocs = new Set(accidentDocs?.map(d => d.accident_id));
       const accidentsNoDocs = accidents?.filter(a => !accidentsWithDocs.has(a.id)).length || 0;
-
+      
       newResults.push({
         id: 'accidents-no-docs',
         name: 'Open Accidents Without Documents',
@@ -178,7 +178,7 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
         .from('daily_trips')
         .select('*', { count: 'exact', head: true })
         .is('route_id', null);
-
+      
       newResults.push({
         id: 'trips-no-route',
         name: 'Trips Without Route',
@@ -195,7 +195,7 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
         .from('nsp_daily_sales')
         .select('*', { count: 'exact', head: true })
         .eq('sale_date', today);
-
+      
       newResults.push({
         id: 'nsp-today-entries',
         name: 'NSP Sales Today',
@@ -211,7 +211,7 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
         .from('driver_allocations')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
-
+      
       newResults.push({
         id: 'pending-allocations',
         name: 'Pending Driver Allocations',
@@ -221,143 +221,6 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
         count: pendingAllocations ?? 0,
         action: { label: 'View Allocations', path: '/driver-allocation' }
       });
-
-      // ═══ FINANCE INTEGRITY CHECKS ═══
-
-      // 11. Commission payments without GL posting
-      try {
-        const { count: unpostedCommissions } = await supabase
-          .from('commission_payments')
-          .select('*', { count: 'exact', head: true })
-          .is('journal_entry_id', null)
-          .eq('status', 'approved');
-
-        newResults.push({
-          id: 'commission-no-gl',
-          name: 'Commission Payments Not Posted to GL',
-          modules: ['Commissions', 'Finance'],
-          status: (unpostedCommissions ?? 0) > 0 ? 'error' : 'success',
-          message: (unpostedCommissions ?? 0) > 0 ? `${unpostedCommissions} approved commissions without GL entry` : 'All commissions posted to GL',
-          count: unpostedCommissions ?? 0,
-          action: { label: 'View Commissions', path: '/accounting' }
-        });
-      } catch { /* table may not exist */ }
-
-      // 12. Fuel expenses without GL posting
-      try {
-        const { count: unpostedFuel } = await supabase
-          .from('daily_bus_expenses')
-          .select('*', { count: 'exact', head: true })
-          .is('journal_entry_id', null)
-          .gt('fuel_cost', 0);
-
-        newResults.push({
-          id: 'fuel-expense-no-gl',
-          name: 'Fuel Expenses Not Posted to GL',
-          modules: ['Fuel', 'Finance'],
-          status: (unpostedFuel ?? 0) > 10 ? 'warning' : 'success',
-          message: (unpostedFuel ?? 0) > 0 ? `${unpostedFuel} fuel expense records without GL posting` : 'All fuel expenses posted',
-          count: unpostedFuel ?? 0,
-          action: { label: 'View Expenses', path: '/daily-bus-expenses' }
-        });
-      } catch { /* table may not exist */ }
-
-      // 13. Insurance policies without amortization schedule
-      try {
-        const { count: insuranceNoAmort } = await supabase
-          .from('insurance_policies')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'active')
-          .is('amortization_start_date', null);
-
-        newResults.push({
-          id: 'insurance-no-amortization',
-          name: 'Active Insurance Without Amortization',
-          modules: ['Insurance', 'Finance'],
-          status: (insuranceNoAmort ?? 0) > 0 ? 'warning' : 'success',
-          message: (insuranceNoAmort ?? 0) > 0 ? `${insuranceNoAmort} active policies not amortized` : 'All insurance policies amortized',
-          count: insuranceNoAmort ?? 0,
-          action: { label: 'View Insurance', path: '/insurance' }
-        });
-      } catch { /* table may not exist */ }
-
-      // 14. Payroll entries without GL posting
-      try {
-        const { count: unpostedPayroll } = await supabase
-          .from('payroll_entries')
-          .select('*', { count: 'exact', head: true })
-          .is('journal_entry_id', null)
-          .eq('status', 'approved');
-
-        newResults.push({
-          id: 'payroll-no-gl',
-          name: 'Payroll Entries Not Posted to GL',
-          modules: ['Payroll', 'Finance'],
-          status: (unpostedPayroll ?? 0) > 0 ? 'error' : 'success',
-          message: (unpostedPayroll ?? 0) > 0 ? `${unpostedPayroll} approved payroll without GL entry` : 'All payroll posted to GL',
-          count: unpostedPayroll ?? 0,
-          action: { label: 'View Payroll', path: '/staff-attendance-payroll' }
-        });
-      } catch { /* table may not exist */ }
-
-      // 15. Maintenance work orders completed without GL posting
-      try {
-        const { count: unpostedMaintenance } = await supabase
-          .from('maintenance_records')
-          .select('*', { count: 'exact', head: true })
-          .is('journal_entry_id', null)
-          .eq('status', 'completed')
-          .gt('total_cost', 0);
-
-        newResults.push({
-          id: 'maintenance-no-gl',
-          name: 'Completed Maintenance Not Posted to GL',
-          modules: ['Maintenance', 'Finance'],
-          status: (unpostedMaintenance ?? 0) > 0 ? 'warning' : 'success',
-          message: (unpostedMaintenance ?? 0) > 0 ? `${unpostedMaintenance} completed jobs without GL entry` : 'All maintenance costs posted',
-          count: unpostedMaintenance ?? 0,
-          action: { label: 'View Maintenance', path: '/maintenance' }
-        });
-      } catch { /* table may not exist */ }
-
-      // 16. Route permits expiring within 30 days
-      try {
-        const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const { count: expiringPermits } = await supabase
-          .from('route_permits')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'active')
-          .lte('expiry_date', thirtyDaysFromNow);
-
-        newResults.push({
-          id: 'permits-expiring-soon',
-          name: 'Route Permits Expiring (30 days)',
-          modules: ['Route Permits', 'Operations'],
-          status: (expiringPermits ?? 0) > 0 ? 'warning' : 'success',
-          message: (expiringPermits ?? 0) > 0 ? `${expiringPermits} permits expiring within 30 days` : 'No permits expiring soon',
-          count: expiringPermits ?? 0,
-          action: { label: 'View Permits', path: '/route-permits' }
-        });
-      } catch { /* table may not exist */ }
-
-      // 17. Leasing agreements with overdue payments
-      try {
-        const { count: overdueLeasing } = await supabase
-          .from('leasing_payments')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending')
-          .lt('due_date', new Date().toISOString().split('T')[0]);
-
-        newResults.push({
-          id: 'leasing-overdue',
-          name: 'Overdue Leasing Payments',
-          modules: ['Leasing', 'Finance'],
-          status: (overdueLeasing ?? 0) > 0 ? 'error' : 'success',
-          message: (overdueLeasing ?? 0) > 0 ? `${overdueLeasing} leasing payments overdue` : 'All leasing payments current',
-          count: overdueLeasing ?? 0,
-          action: { label: 'View Leasing', path: '/fleet-management' }
-        });
-      } catch { /* table may not exist */ }
 
     } catch (error) {
       console.error('Cross-module check error:', error);

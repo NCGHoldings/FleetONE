@@ -438,7 +438,21 @@ export function useYutongOrderInvoiceManagement() {
         }
 
         // Post Revenue Recognition GL (with VAT split for tax invoices)
-        if (settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
+        // GUARD: Skip if AR invoice already has GL posted at creation time
+        let skipRevenueGL = false;
+        if (arInvoiceId) {
+          const { data: arCheck } = await (supabase as any)
+            .from('ar_invoices')
+            .select('journal_entry_id')
+            .eq('id', arInvoiceId)
+            .single();
+          if (arCheck?.journal_entry_id) {
+            console.log('[Yutong] AR Invoice already has GL posted (journal_entry_id exists), skipping revenue GL on approval.');
+            skipRevenueGL = true;
+          }
+        }
+
+        if (!skipRevenueGL && settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
           const revenueGLResult = await postVehicleInvoiceToGL({
             module: 'yutong',
             orderNo,

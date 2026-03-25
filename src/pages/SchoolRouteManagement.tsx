@@ -9,12 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { useRouteAnalytics } from "@/hooks/useRouteAnalytics";
 import { EnhancedRouteCard } from "@/components/school/EnhancedRouteCard";
 import { toast } from "@/hooks/use-toast";
-import {
-  ArrowLeft,
-  Plus,
-  RefreshCw,
-  TrendingUp,
-  Users,
+import { 
+  ArrowLeft, 
+  Plus, 
+  RefreshCw, 
+  TrendingUp, 
+  Users, 
   IndianRupee,
   AlertCircle,
   BarChart3,
@@ -52,7 +52,7 @@ function StudentListModal({ open, onOpenChange, students, routeName }: StudentLi
             {students.length} students assigned to this route
           </DialogDescription>
         </DialogHeader>
-
+        
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {students.map((student, index) => (
@@ -66,8 +66,8 @@ function StudentListModal({ open, onOpenChange, students, routeName }: StudentLi
                     Parent: {student.parent_name || 'N/A'}
                   </div>
                   <Badge variant={
-                    student.payment_status === 'paid' ? 'default' :
-                      student.payment_status === 'overdue' ? 'destructive' : 'secondary'
+                    student.payment_status === 'paid' ? 'default' : 
+                    student.payment_status === 'overdue' ? 'destructive' : 'secondary'
                   }>
                     {student.payment_status || 'pending'}
                   </Badge>
@@ -93,7 +93,7 @@ export default function SchoolRouteManagement() {
   const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
   const [selectedRouteName, setSelectedRouteName] = useState("");
   const [studentsModalOpen, setStudentsModalOpen] = useState(false);
-
+  
   const [formData, setFormData] = useState<RouteFormData>({
     route_name: "",
     route_code: "",
@@ -108,14 +108,14 @@ export default function SchoolRouteManagement() {
   });
 
   // Use the enhanced route analytics hook
-  const {
-    routes,
-    loading,
-    error,
-    refetch,
-    addRouteExpense,
-    addStaffCost,
-    updateRouteInfo
+  const { 
+    routes, 
+    loading, 
+    error, 
+    refetch, 
+    addRouteExpense, 
+    addStaffCost, 
+    updateRouteInfo 
   } = useRouteAnalytics(branchId);
 
   const handleViewStudents = (routeId: string, students: any[]) => {
@@ -163,9 +163,9 @@ export default function SchoolRouteManagement() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
+          <Button 
+            variant="ghost" 
+            size="sm" 
             onClick={() => navigate(`/school-bus/branch/${branchId}`)}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -250,7 +250,6 @@ export default function SchoolRouteManagement() {
             <EnhancedRouteCard
               key={route.routeId}
               route={route}
-              branchId={branchId || ""}
               onAddExpense={addRouteExpense}
               onAddStaff={addStaffCost}
               onUpdateRoute={updateRouteInfo}
@@ -264,7 +263,7 @@ export default function SchoolRouteManagement() {
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No Routes Detected</h3>
             <p className="text-muted-foreground text-center max-w-md mb-4">
-              Routes are automatically detected from your student database.
+              Routes are automatically detected from your student database. 
               Import student data with route information to see routes here.
             </p>
             <Button onClick={() => navigate(`/school-bus/branch/${branchId}/import`)}>
