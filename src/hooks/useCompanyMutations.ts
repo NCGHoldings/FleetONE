@@ -350,6 +350,11 @@ export const useCompanyCreateAPInvoice = () => {
         const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
         const resolved = await resolveVendorAPAccounts(invoice.vendor_id, effectiveCompanyId);
 
+        if (resolved.missingAccounts.length > 0 && invoice.total_amount > 0) {
+          console.error("AP GL missing accounts:", resolved.missingAccounts);
+          toast.error(`GL Config Missing: ${resolved.missingAccounts.join("; ")}. Configure in Settings → Core GL or Vendor Categories.`, { duration: 8000 });
+        }
+
         const tradePayableId = resolved.apAccountId;
         const defaultExpenseAccountId = resolved.expenseAccountId;
 
@@ -380,6 +385,7 @@ export const useCompanyCreateAPInvoice = () => {
             businessUnitCode: businessUnitCode || undefined,
             vendorName: vendorData?.vendor_name,
             expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
+            sourceModule: 'manual_ap',
           });
 
           if (glResult.success && glResult.journalEntryId) {
@@ -388,11 +394,11 @@ export const useCompanyCreateAPInvoice = () => {
               .update({ journal_entry_id: glResult.journalEntryId })
               .eq("id", data.id);
           } else if (!glResult.success) {
-            console.warn("AP Invoice GL auto-posting failed:", glResult.error);
+            toast.error(`AP Invoice created but GL posting failed: ${glResult.error}`, { duration: 8000 });
           }
         }
-      } catch (glError) {
-        console.warn("AP Invoice GL auto-posting error:", glError);
+      } catch (glError: any) {
+        toast.error(`AP Invoice created but GL posting error: ${glError?.message || 'Unknown'}`, { duration: 8000 });
       }
 
       return data;
