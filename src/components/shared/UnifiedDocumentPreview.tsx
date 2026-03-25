@@ -91,7 +91,7 @@ export function UnifiedDocumentPreview({
       document.body.appendChild(container);
       
       const canvas = await html2canvas(container, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',

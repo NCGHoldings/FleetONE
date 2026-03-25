@@ -28,6 +28,8 @@ export interface YutongOrderInvoiceData {
   quantity: number;
   subtotal: number;
   total: number;
+  customer_commitment?: number;
+  leasing_amount?: number;
   invoice_status: 'draft' | 'approved';
   // Invoice category - direct or proforma
   invoice_category?: 'direct_invoice' | 'proforma_invoice' | 'tax_invoice';
@@ -807,23 +809,63 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
               <td style="font-weight: 700;">CHASIS NUMBER</td>
              <td>${data.chassis_number}</td>
           </tr>
-          <!-- Integrated Footer Rows -->
-          <tr class="totals-footer">
-            <td colspan="2" rowspan="3" class="amount-words-cell">
-              <div class="amount-label">${isTaxInvoice ? 'AMOUNT IN WORD<br/>(BALANCE PAYABLE)' : `AMOUNT IN WORD${isProforma ? ` (${data.proforma_amount_percentage || 0}% OF TOTAL)` : ''}`}</div>
-              <div class="amount-value">${isTaxInvoice ? taxAmountInWords : amountInWords}</div>
-            </td>
-            <td colspan="2" class="totals-label">${isTaxInvoice ? 'SUB TOTAL' : 'SUB TOTAL'}</td>
-            <td class="totals-value">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-          </tr>
-          <tr class="totals-footer">
-            <td colspan="2" class="totals-label">${isTaxInvoice ? `VAT ${taxRate}%` : 'PAYMENT'}</td>
-            <td class="totals-value">${isTaxInvoice ? vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : (data.totalPaid || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-          </tr>
-          <tr class="totals-footer total-row">
-            <td colspan="2" class="totals-label">TOTAL</td>
-            <td class="totals-value">${(data.balanceDue !== undefined && data.balanceDue !== null && data.balanceDue === 0) ? '-' : data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-          </tr>
+           <!-- Integrated Footer Rows -->
+           ${isProforma ? `
+           <tr class="totals-footer">
+             <td colspan="2" rowspan="4" class="amount-words-cell">
+               <div class="amount-label">AMOUNT IN WORDS</div>
+               <div class="amount-value">${amountInWords}</div>
+             </td>
+             <td colspan="2" class="totals-label">SUB TOTAL</td>
+             <td class="totals-value">${displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
+           <tr class="totals-footer">
+             <td colspan="2" class="totals-label">CUSTOMER COMMITMENT</td>
+             <td class="totals-value">${(data.customer_commitment || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
+           <tr class="totals-footer">
+             <td colspan="2" class="totals-label"></td>
+             <td class="totals-value"></td>
+           </tr>
+           <tr class="totals-footer total-row">
+             <td colspan="2" class="totals-label">TO BE LEASED</td>
+             <td class="totals-value">${(displayAmount - (data.customer_commitment || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
+           ` : isTaxInvoice ? `
+           <tr class="totals-footer">
+             <td colspan="2" rowspan="3" class="amount-words-cell">
+               <div class="amount-label">AMOUNT IN WORD<br/>(BALANCE PAYABLE)</div>
+               <div class="amount-value">${taxAmountInWords}</div>
+             </td>
+             <td colspan="2" class="totals-label">SUB TOTAL</td>
+             <td class="totals-value">${baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
+           <tr class="totals-footer">
+             <td colspan="2" class="totals-label">VAT ${taxRate}%</td>
+             <td class="totals-value">${vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
+           <tr class="totals-footer total-row">
+             <td colspan="2" class="totals-label">TOTAL</td>
+             <td class="totals-value">${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
+           ` : `
+           <tr class="totals-footer">
+             <td colspan="2" rowspan="3" class="amount-words-cell">
+               <div class="amount-label">AMOUNT IN WORDS</div>
+               <div class="amount-value">${amountInWords}</div>
+             </td>
+             <td colspan="2" class="totals-label">SUB TOTAL</td>
+             <td class="totals-value">${data.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
+           <tr class="totals-footer">
+             <td colspan="2" class="totals-label">PAYMENT</td>
+             <td class="totals-value">${(data.totalPaid || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
+           <tr class="totals-footer total-row">
+             <td colspan="2" class="totals-label">TOTAL</td>
+             <td class="totals-value">${(data.balanceDue !== undefined && data.balanceDue !== null && data.balanceDue === 0) ? '-' : data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
+           `}
         </tbody>
       </table>
        
@@ -844,7 +886,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
         <div class="proforma-info">
           <h4>PROFORMA INVOICE NOTICE</h4>
           <p>This is a proforma invoice issued for ${(data.proforma_purpose || 'financing').replace('_', ' ')} purposes only.</p>
-          <p>The amount shown represents ${data.proforma_amount_percentage || 0}% of the total vehicle price.</p>
+          <p>The amount shown is the declared vehicle value for financing purposes.</p>
           <p>This document is not a demand for payment and should not be used for tax purposes.</p>
         </div>
       ` : ''}
@@ -881,7 +923,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
         </table>
       </div>
 
-      ${data.paymentsReceived && data.paymentsReceived.length > 0 ? `
+      ${!isProforma ? (data.paymentsReceived && data.paymentsReceived.length > 0 ? `
       <!-- Payment History Section -->
       <div class="payment-history-section">
         <h3>Payment History</h3>
@@ -935,7 +977,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
         </div>
         <p class="payment-status-note">No payments received yet. Please make payment as per the terms above.</p>
       </div>
-      `}
+      `) : ''}
 
       <!-- Signatures Section -->
       <div class="signatures-section">
@@ -1091,7 +1133,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
        const pdfHeight = pdf.internal.pageSize.getHeight();
 
        const canvas = await html2canvas(page, {
-         scale: 2.5,
+         scale: 1.5,
          useCORS: true,
          allowTaint: true,
          backgroundColor: '#ffffff',
@@ -1100,7 +1142,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
          windowWidth: 800
        });
 
-       const imgData = canvas.toDataURL('image/jpeg', 0.95);
+       const imgData = canvas.toDataURL('image/jpeg', 0.85);
        const ratio = Math.min(pdfWidth / canvas.width, pdfHeight / canvas.height);
        const scaledWidth = canvas.width * ratio;
        const scaledHeight = canvas.height * ratio;
@@ -1150,7 +1192,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
       
       console.log(`🎨 Rendering page ${i + 1}...`);
       const canvas = await html2canvas(page, {
-        scale: 2.5, // Higher quality rendering
+        scale: 1.5,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
@@ -1162,7 +1204,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
       console.log(`✅ Page ${i + 1} canvas rendered. Size:`, canvas.width, 'x', canvas.height);
 
       // Use JPEG with higher quality for professional output
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
       
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;

@@ -1248,7 +1248,10 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       }
 
       // Round trip distance to 1 decimal place to avoid floating-point precision errors
-      const tripDistance = Math.round((distanceData.kmTrip || 0) * 10) / 10;
+      const calculatedTripDistance = Math.round((distanceData.kmTrip || 0) * 10) / 10;
+      const tripDistance = useManualTripDistance && manualTripDistance > 0
+        ? manualTripDistance
+        : calculatedTripDistance;
       let rateCard = null;
       let fixedRate = 0;
       let exceedingDistanceCharge = 0;
@@ -1412,7 +1415,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
       const costs = {
         km_parking_to_pickup: Math.round((distanceData.kmParkingToPickup || 0) * 10) / 10,
-        km_trip: Math.round((distanceData.kmTrip || 0) * 10) / 10,
+        km_trip: tripDistance,
         km_drop_to_parking: Math.round((distanceData.kmDropToParking || 0) * 10) / 10,
         bus_fleet_details: null, // Single bus mode doesn't use fleet details
         fuel_cost_fuel_only: Math.round(totalFuelCost),
@@ -1498,8 +1501,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         totalExpenses: costs.total_expenses,
         netProfit: costs.net_profit,
         numberOfBuses: data.numberOfBuses,
-        totalTripDistance: (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0),
-        totalDistance: (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0) + totalAdditionalDistance,
+        totalTripDistance: (distanceData.kmParkingToPickup || 0) + tripDistance + (distanceData.kmDropToParking || 0),
+        totalDistance: (distanceData.kmParkingToPickup || 0) + tripDistance + (distanceData.kmDropToParking || 0) + totalAdditionalDistance,
         fuelLiters: Math.round(fuelLiters * 10) / 10,
         busTypeName: busTypeData.name,
         busTypeEfficiency: busTypeData.avg_km_per_l || 8,
@@ -1555,6 +1558,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     if (useManualParkingDistance) {
       if (manualParkingToPickup !== (originalData.manual_km_parking_to_pickup || 0)) return true;
       if (manualDropToParking !== (originalData.manual_km_drop_to_parking || 0)) return true;
+    }
+
+    // Check useManualTripDistance changes
+    if (useManualTripDistance !== (originalData.uses_manual_trip_distance || false)) return true;
+    if (useManualTripDistance) {
+      if (manualTripDistance !== (originalData.manual_km_trip || originalData.km_trip || 0)) return true;
     }
 
     // Check bus configuration changes
@@ -1755,7 +1764,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         km_parking_to_pickup: useManualParkingDistance ? manualParkingToPickup : costs.km_parking_to_pickup,
         km_trip: useManualTripDistance ? manualTripDistance : costs.km_trip,
         km_drop_to_parking: useManualParkingDistance ? manualDropToParking : costs.km_drop_to_parking,
-        fuel_cost_fuel_only: (useManualParkingDistance || useManualTripDistance) ? (costData?.fuelCostFuelOnly ?? costs.fuel_cost_fuel_only) : costs.fuel_cost_fuel_only,
+        fuel_cost_fuel_only: costs.fuel_cost_fuel_only,
         uses_manual_trip_distance: useManualTripDistance,
         manual_km_trip: useManualTripDistance ? manualTripDistance : 0,
         hire_charge: costs.hire_charge,
@@ -1780,7 +1789,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         total_expenses: costs.total_expenses,
         net_profit: costs.net_profit,
         fuel_price_per_liter: costs.fuel_price_per_liter || costData?.fuelPricePerLiter || null,
-        customer_total_with_fuel: costs.customerTotalWithFuel ?? costData?.customerTotalWithFuel,
+        customer_total_with_fuel: costs.customerTotalWithFuel,
         bus_fleet_details: isMultiBusMode && costs.bus_fleet_details
           ? JSON.stringify(
             // Ensure we're saving the full object structure with buses, total_buses, etc.

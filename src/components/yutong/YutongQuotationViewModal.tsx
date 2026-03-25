@@ -174,7 +174,7 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
         
         // Create canvas for each page individually
         const canvas = await html2canvas(page, {
-          scale: 2.5,
+          scale: 1.5,
           useCORS: true,
           allowTaint: true,
           backgroundColor: '#ffffff',
@@ -192,7 +192,7 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
         page.style.minHeight = originalMinHeight;
         page.style.maxWidth = originalMaxWidth;
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const imgData = canvas.toDataURL('image/jpeg', 0.85);
         
         // Add new page if not the first page
         if (i > 0) {
@@ -207,10 +207,10 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
         if (imgHeight > pageHeight) {
           const scaledHeight = pageHeight;
           const scaledWidth = (canvas.width * pageHeight) / canvas.height;
-          pdf.addImage(imgData, 'PNG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
+          pdf.addImage(imgData, 'JPEG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
         } else {
           // Position at TOP of page (not centered)
-          pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+          pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
         }
       }
 

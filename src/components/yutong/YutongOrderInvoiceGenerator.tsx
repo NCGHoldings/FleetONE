@@ -241,6 +241,8 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
       finance_company_name: config.financeCompanyName,
       finance_company_address: config.financeCompanyAddress,
        proforma_purpose: config.proformaPurpose,
+       customer_commitment: config.customerCommitment,
+       leasing_amount: config.leasingCompanyAmount,
        
        // Tax invoice fields
        is_tax_invoice: config.isTaxInvoice,

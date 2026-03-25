@@ -6522,6 +6522,7 @@ export type Database = {
           payment_type: string
           quotation_id: string
           ready_to_send: boolean | null
+          storage_path: string | null
           updated_at: string
         }
         Insert: {
@@ -6544,6 +6545,7 @@ export type Database = {
           payment_type: string
           quotation_id: string
           ready_to_send?: boolean | null
+          storage_path?: string | null
           updated_at?: string
         }
         Update: {
@@ -6566,6 +6568,7 @@ export type Database = {
           payment_type?: string
           quotation_id?: string
           ready_to_send?: boolean | null
+          storage_path?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -10730,6 +10733,7 @@ export type Database = {
         Row: {
           amount: number
           ar_receipt_id: string | null
+          bank_account_id: string | null
           bank_name: string | null
           cheque_no: string | null
           created_at: string | null
@@ -10741,6 +10745,7 @@ export type Database = {
           payment_date: string
           payment_method: string | null
           payment_schedule_id: string | null
+          payment_slip_url: string | null
           receipt_url: string | null
           reference_number: string | null
           status: string | null
@@ -10752,6 +10757,7 @@ export type Database = {
         Insert: {
           amount: number
           ar_receipt_id?: string | null
+          bank_account_id?: string | null
           bank_name?: string | null
           cheque_no?: string | null
           created_at?: string | null
@@ -10763,6 +10769,7 @@ export type Database = {
           payment_date: string
           payment_method?: string | null
           payment_schedule_id?: string | null
+          payment_slip_url?: string | null
           receipt_url?: string | null
           reference_number?: string | null
           status?: string | null
@@ -10774,6 +10781,7 @@ export type Database = {
         Update: {
           amount?: number
           ar_receipt_id?: string | null
+          bank_account_id?: string | null
           bank_name?: string | null
           cheque_no?: string | null
           created_at?: string | null
@@ -10785,6 +10793,7 @@ export type Database = {
           payment_date?: string
           payment_method?: string | null
           payment_schedule_id?: string | null
+          payment_slip_url?: string | null
           receipt_url?: string | null
           reference_number?: string | null
           status?: string | null
@@ -10799,6 +10808,13 @@ export type Database = {
             columns: ["ar_receipt_id"]
             isOneToOne: false
             referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_customer_payments_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -18840,6 +18856,7 @@ export type Database = {
       sinotruck_customer_payments: {
         Row: {
           ar_receipt_id: string | null
+          bank_account_id: string | null
           bank_name: string | null
           bank_slip_no: string | null
           cheque_no: string | null
@@ -18854,6 +18871,7 @@ export type Database = {
           payment_method: string | null
           payment_reference: string | null
           payment_schedule_id: string | null
+          payment_slip_url: string | null
           status: string | null
           updated_at: string | null
           verified_at: string | null
@@ -18861,6 +18879,7 @@ export type Database = {
         }
         Insert: {
           ar_receipt_id?: string | null
+          bank_account_id?: string | null
           bank_name?: string | null
           bank_slip_no?: string | null
           cheque_no?: string | null
@@ -18875,6 +18894,7 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string | null
           payment_schedule_id?: string | null
+          payment_slip_url?: string | null
           status?: string | null
           updated_at?: string | null
           verified_at?: string | null
@@ -18882,6 +18902,7 @@ export type Database = {
         }
         Update: {
           ar_receipt_id?: string | null
+          bank_account_id?: string | null
           bank_name?: string | null
           bank_slip_no?: string | null
           cheque_no?: string | null
@@ -18896,6 +18917,7 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string | null
           payment_schedule_id?: string | null
+          payment_slip_url?: string | null
           status?: string | null
           updated_at?: string | null
           verified_at?: string | null
@@ -18907,6 +18929,13 @@ export type Database = {
             columns: ["ar_receipt_id"]
             isOneToOne: false
             referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_customer_payments_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -24651,6 +24680,7 @@ export type Database = {
       yutong_customer_payments: {
         Row: {
           ar_receipt_id: string | null
+          bank_account_id: string | null
           bank_name: string | null
           bank_slip_no: string | null
           cheque_no: string | null
@@ -24673,6 +24703,7 @@ export type Database = {
         }
         Insert: {
           ar_receipt_id?: string | null
+          bank_account_id?: string | null
           bank_name?: string | null
           bank_slip_no?: string | null
           cheque_no?: string | null
@@ -24695,6 +24726,7 @@ export type Database = {
         }
         Update: {
           ar_receipt_id?: string | null
+          bank_account_id?: string | null
           bank_name?: string | null
           bank_slip_no?: string | null
           cheque_no?: string | null
@@ -24721,6 +24753,13 @@ export type Database = {
             columns: ["ar_receipt_id"]
             isOneToOne: false
             referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_customer_payments_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
             referencedColumns: ["id"]
           },
           {

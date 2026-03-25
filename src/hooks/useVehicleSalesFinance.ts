@@ -239,6 +239,9 @@ export async function createVehicleARInvoice({
   companyId,
   settings,
   customerCategoryId,
+  invoiceNo,
+  taxAmount,
+  status,
 }: {
   module: VehicleModule;
   orderId: string;
@@ -249,6 +252,9 @@ export async function createVehicleARInvoice({
   companyId: string;
   settings: VehicleFinanceSettings;
   customerCategoryId?: string;
+  invoiceNo?: string;
+  taxAmount?: number;
+  status?: string;
 }): Promise<{ invoiceId: string; invoiceNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
@@ -261,21 +267,25 @@ export async function createVehicleARInvoice({
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 30); // 30-day payment terms
 
+    const arStatus = status || (advanceAmount >= totalAmount ? 'paid' : advanceAmount > 0 ? 'partial' : 'unpaid');
+
     const { data: invoice, error: invoiceError } = await supabase
       .from('ar_invoices')
       .insert({
         company_id: companyId,
         customer_id: customerId,
-        invoice_number: invoiceNumber,
+        invoice_number: invoiceNo || invoiceNumber,
         invoice_date: new Date().toISOString().split('T')[0],
         due_date: dueDate.toISOString().split('T')[0],
         total_amount: totalAmount,
+        tax_amount: taxAmount || null,
+        subtotal: taxAmount ? totalAmount - taxAmount : null,
         paid_amount: advanceAmount,
         balance: totalAmount - advanceAmount,
-        status: advanceAmount >= totalAmount ? 'paid' : advanceAmount > 0 ? 'partial' : 'unpaid',
-        reference: orderNo,
+        status: arStatus,
+        reference: invoiceNo || orderNo,
         business_unit_code: businessUnitCode,
-        notes: `${module.charAt(0).toUpperCase() + module.slice(1)} vehicle order: ${orderNo}`,
+        notes: `${module.charAt(0).toUpperCase() + module.slice(1)} vehicle order: ${orderNo}${invoiceNo ? ` | Invoice: ${invoiceNo}` : ''}`,
       })
       .select('id, invoice_number')
       .single();
@@ -461,6 +471,9 @@ export async function postVehicleInvoiceToGL({
   invoiceAmount,
   settings,
   effectiveCompanyId,
+  isTaxInvoice,
+  taxRate,
+  invoiceNo,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -469,6 +482,9 @@ export async function postVehicleInvoiceToGL({
   invoiceAmount: number;
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
+  isTaxInvoice?: boolean;
+  taxRate?: number;
+  invoiceNo?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
@@ -497,8 +513,15 @@ export async function postVehicleInvoiceToGL({
       return null;
     }
 
-    const entryNumber = `${businessUnitCode}-INV-${orderNo}-${Date.now().toString(36).toUpperCase()}`;
-    const description = `${businessUnitCode} INVOICE - ${orderNo} - ${customerName}`;
+    const refLabel = invoiceNo || orderNo;
+    const entryNumber = `${businessUnitCode}-INV-${refLabel}-${Date.now().toString(36).toUpperCase()}`;
+    const description = `${businessUnitCode} INVOICE - ${refLabel} - ${customerName}`;
+
+    // Calculate VAT split if tax invoice
+    const shouldSplitVAT = isTaxInvoice && settings.vat_output_account_id;
+    const effectiveTaxRate = taxRate || 18;
+    const baseAmountExclVAT = shouldSplitVAT ? invoiceAmount / (1 + effectiveTaxRate / 100) : invoiceAmount;
+    const vatAmountCalc = shouldSplitVAT ? invoiceAmount - baseAmountExclVAT : 0;
 
     // Create journal entry
     const { data: journalEntry, error: jeError } = await (supabase as any)
@@ -508,13 +531,14 @@ export async function postVehicleInvoiceToGL({
         entry_number: entryNumber,
         entry_date: new Date().toISOString().split('T')[0],
         description,
-        reference: `${businessUnitCode}-INV-${orderNo}`,
+        reference: invoiceNo || `${businessUnitCode}-INV-${orderNo}`,
         source_module: `${module}_sales`,
         status: 'posted',
         total_debit: invoiceAmount,
         total_credit: invoiceAmount,
         business_unit_code: businessUnitCode,
         posted_at: new Date().toISOString(),
+        notes: invoiceNo ? `Invoice: ${invoiceNo}` : undefined,
       })
       .select('id, entry_number')
       .single();
@@ -524,25 +548,48 @@ export async function postVehicleInvoiceToGL({
       return null;
     }
 
-    // DR Trade Receivable | CR Sales Revenue (using resolved accounts)
-    const lines = [
+    // DR Trade Receivable (full amount)
+    const lines: any[] = [
       {
         journal_entry_id: journalEntry.id,
         account_id: tradeReceivableId,
-        description: `${businessUnitCode} Invoice to ${customerName} - ${orderNo}`,
+        description: `${businessUnitCode} Invoice to ${customerName} - ${refLabel}`,
         debit: invoiceAmount,
         credit: 0,
         company_id: effectiveCompanyId,
       },
-      {
+    ];
+
+    if (shouldSplitVAT) {
+      // CR Sales Revenue (base amount excl VAT)
+      lines.push({
         journal_entry_id: journalEntry.id,
         account_id: salesRevenueId,
-        description: `${businessUnitCode} Sales revenue - ${orderNo}`,
+        description: `${businessUnitCode} Sales revenue (excl. VAT) - ${refLabel}`,
+        debit: 0,
+        credit: Math.round(baseAmountExclVAT * 100) / 100,
+        company_id: effectiveCompanyId,
+      });
+      // CR VAT Output
+      lines.push({
+        journal_entry_id: journalEntry.id,
+        account_id: settings.vat_output_account_id,
+        description: `${businessUnitCode} VAT Output ${effectiveTaxRate}% - ${refLabel}`,
+        debit: 0,
+        credit: Math.round(vatAmountCalc * 100) / 100,
+        company_id: effectiveCompanyId,
+      });
+    } else {
+      // CR Sales Revenue (full amount)
+      lines.push({
+        journal_entry_id: journalEntry.id,
+        account_id: salesRevenueId,
+        description: `${businessUnitCode} Sales revenue - ${refLabel}`,
         debit: 0,
         credit: invoiceAmount,
         company_id: effectiveCompanyId,
-      },
-    ];
+      });
+    }
 
     const { error: linesError } = await supabase
       .from('journal_entry_lines')

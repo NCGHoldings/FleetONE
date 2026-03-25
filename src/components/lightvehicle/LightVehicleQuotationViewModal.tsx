@@ -174,7 +174,7 @@ export function LightVehicleQuotationViewModal({ quotation, open, onClose }: Lig
         page.style.maxWidth = '210mm';
         
         const canvas = await html2canvas(page, {
-          scale: 2,
+          scale: 1.5,
           useCORS: true,
           allowTaint: false,
           backgroundColor: '#ffffff',
@@ -191,7 +191,7 @@ export function LightVehicleQuotationViewModal({ quotation, open, onClose }: Lig
         page.style.minHeight = originalMinHeight;
         page.style.maxWidth = originalMaxWidth;
 
-        const imgData = canvas.toDataURL('image/png');
+        const imgData = canvas.toDataURL('image/jpeg', 0.85);
         
         if (i > 0) {
           pdf.addPage();
@@ -203,9 +203,9 @@ export function LightVehicleQuotationViewModal({ quotation, open, onClose }: Lig
         if (imgHeight > pageHeight) {
           const scaledHeight = pageHeight;
           const scaledWidth = (canvas.width * pageHeight) / canvas.height;
-          pdf.addImage(imgData, 'PNG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
+          pdf.addImage(imgData, 'JPEG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
         } else {
-          pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+          pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
         }
       }
 

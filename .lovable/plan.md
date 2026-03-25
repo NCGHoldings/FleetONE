@@ -1,53 +1,93 @@
 
 
-# Fix Yutong Full Flow: GL Posting, Payment Form, and Data Repair
+# Fix AR/AP Auto GL Posting Across All Modules + Full Flow Diagram
 
-## Root Causes Found
+## Current State Analysis
 
-### 1. `source_module` column missing from `journal_entries`
-The database has NO `source_module` column (confirmed via schema query). The code inserts `source_module: 'yutong_sales'` on every GL posting, causing 400 errors. This is why ALL payment verifications fail and no journal entries exist for YUT business unit.
+After thorough code review, here is the complete status of every invoice creation point in the system:
 
-### 2. Payment form missing Bank Account selector and Photo Upload
-The Record Payment modal in `YutongPaymentTracking.tsx` has no bank account dropdown (the `bank_accounts` table exists and the column `payment_slip_url` exists on `yutong_customer_payments` but is never used). The Sinotruck and Light Vehicle forms have `bank_name` fields but no proper bank account selector either.
+### AR Invoice Creation Points
 
-### 3. `resolveCustomerARAccounts` references wrong column
-The fallback query uses `customer_advance_liability_account_id` which does not exist in `gl_settings`. This causes the resolution to silently fail.
+| Source | File | GL at Create? | GL at Approve? | Category Resolution? | Status |
+|--------|------|:---:|:---:|:---:|--------|
+| Manual AR (Accounting module) | `useAccountingMutations.ts` L395-428 | YES | N/A | YES (customer category) | OK |
+| School Bus bulk AR | `useSchoolBusFinance.ts` L627-650 | YES (separate JE) | N/A | Uses branch settings | OK |
+| School Bus backfill AR | `useSchoolBusFinance.ts` L1152-1169 | NO | N/A | NO | MISSING |
+| Special Hire AR | `useSpecialHireFinance.ts` L1550-1568 | Passed from caller | N/A | NO (uses SPH settings) | PARTIAL |
+| Vehicle Sales AR (YUT/SNT/LTV) | `useVehicleSalesFinance.ts` L272-291 | NO | YES (at approval) | YES (at approval) | OK per user choice |
+| `useCompanyMutations.ts` AR | L85-148 | NO | N/A | NO | MISSING |
 
-### 4. Order trigger counts wrong status
-The `update_yutong_order_financials()` trigger only sums payments with `status = 'received'`, but the app sets status to `'pending'` then `'verified'`. So `total_paid` and `balance_due` never update on the order.
+### AP Invoice Creation Points
 
-### 5. Customer category not copied to orders
-Data shows all orders have `customer_category_id = NULL` even when quotations have categories set. The code fix was applied but existing orders weren't backfilled.
+| Source | File | GL at Create? | Category Resolution? | Status |
+|--------|------|:---:|:---:|--------|
+| Manual AP (Accounting module) | `useAccountingMutations.ts` L765-813 | YES | YES (vendor category) | OK |
+| Manual AP Approval | `useAccountingMutations.ts` L1685-1751 | GUARD (skip if exists) | YES (vendor category) | OK |
+| Fuel Expense AP | `useFuelExpenseFinance.ts` L242-258 | YES (linked JE from expense) | Uses fuel settings | OK |
+| Maintenance AP | `useMaintenanceFinance.ts` L311-332 | YES (linked JE from maint) | Uses maintenance settings | OK |
+| Expense Request AP | `useExpenseRequestFinance.ts` L337-360 | YES (linked JE from expense) | Uses expense mappings | OK |
+| Leasing AP | `useLeasingFinance.ts` L156-175 | NO | Uses leasing settings | MISSING |
+| `useCompanyMutations.ts` AP | L243-285 | NO | NO | MISSING |
 
-## Changes
+### Key Gaps to Fix
 
-### 1. Migration: Add `source_module` to `journal_entries` + fix trigger
-- `ALTER TABLE public.journal_entries ADD COLUMN IF NOT EXISTS source_module TEXT`
-- Update `update_yutong_order_financials()` trigger to also count `status = 'verified'`
+1. **`useCompanyMutations.ts` - `useCompanyCreateARInvoice`**: No GL posting, no category resolution. This is a legacy hook -- need to add GL posting matching `useAccountingMutations.ts` pattern.
+2. **`useCompanyMutations.ts` - `useCompanyCreateAPInvoice`**: No GL posting, no category resolution. Same fix needed.
+3. **Leasing AP Invoice** (`useLeasingFinance.ts` L156-175): Creates AP invoice without `journal_entry_id` link. The GL is posted separately on payment, but the invoice itself has no JE at creation.
+4. **School Bus Backfill AR** (`useSchoolBusFinance.ts` L1152-1169): Creates AR invoices without GL posting (backfill scenario -- acceptable since these are historical).
 
-### 2. Fix `resolveCustomerARAccounts` fallback column name
-**File:** `src/hooks/useCustomerCategories.ts`
-- Query `gl_settings` for correct column names (check what actually exists)
+## Plan
 
-### 3. Enhance Record Payment modal with Bank Account + Photo Upload
-**File:** `src/components/yutong/YutongPaymentTracking.tsx`
-- Add bank account dropdown (fetch from `bank_accounts` table where `company_id = NCG_HOLDING_ID`)
-- Add optional payment proof file upload to `payment-proofs` storage bucket
-- Save `bank_name` and `payment_slip_url` on the payment record
-- Apply same enhancements to Sinotruck and Light Vehicle payment forms
+### File 1: `src/hooks/useCompanyMutations.ts`
 
-### 4. Data repair script
-- Backfill `customer_category_id` on `yutong_orders` from linked quotations
-- Backfill `customer_category_id` on finance `customers` records from their linked orders/quotations
+**`useCompanyCreateARInvoice` (lines 85-148)**: Add auto GL posting after insert, same pattern as `useAccountingMutations.ts`:
+- Import `resolveCustomerARAccounts` from `useCustomerCategories`
+- After line insert, resolve customer category for AR/revenue accounts
+- Fall back to `gl_settings.trade_receivable_account_id` / `sales_revenue_account_id`
+- Call `postARInvoiceToGL()` from `gl-posting-utils.ts`
+- Link `journal_entry_id` back to `ar_invoices` record
+- Add `journal-entries` and `chart-of-accounts` to `onSuccess` invalidation
 
-### 5. Update Supabase types
-- Add `source_module` to `journal_entries` type definitions
+**`useCompanyCreateAPInvoice` (lines 243-285)**: Add auto GL posting after insert:
+- Import `resolveVendorAPAccounts` from `useVendorCategories`
+- After insert, resolve vendor category for AP/expense accounts
+- Call `postAPInvoiceToGL()` from `gl-posting-utils.ts`
+- Link `journal_entry_id` back to `ap_invoices` record
+- Add `journal-entries` and `chart-of-accounts` to `onSuccess` invalidation
 
-## Files Touched
-- New Supabase migration (add `source_module`, fix trigger)
-- `src/hooks/useCustomerCategories.ts` -- fix gl_settings column name
-- `src/components/yutong/YutongPaymentTracking.tsx` -- add bank account + photo upload
-- `src/components/sinotruck/SinotruckPaymentTracking.tsx` -- add bank account selector
-- `src/components/lightvehicle/LightVehiclePaymentTracking.tsx` -- add bank account selector
-- `src/integrations/supabase/types.ts` -- add source_module
+### File 2: `src/hooks/useLeasingFinance.ts`
+
+**`createLeasingAPInvoice` (lines 130-211)**: The GL JE is already created separately in `postLeasingPaymentToGL`. However, the AP invoice created here does not link a JE. This is by design (leasing GL posts at payment time, not at invoice creation). No change needed -- the leasing payment flow handles GL correctly.
+
+### File 3: Update Flow Diagram
+
+Create/update `src/components/accounting/InvoiceGLFlowDiagram.tsx` with a comprehensive flow showing all modules and their GL posting behavior.
+
+### File 4: Generate Mermaid Diagram
+
+Create a comprehensive Mermaid diagram at `/mnt/documents/gl-posting-flow.mmd` showing:
+
+```text
+Organization Structure:
+  NCG Holding (Parent)
+    ├── SBO (School Bus) ─── AR: GL at bulk create
+    ├── YUT (Yutong) ────── AR: GL at approval
+    ├── SNT (Sinotruck) ──── AR: GL at approval
+    ├── LTV (Light Vehicle) ─ AR: GL at approval
+    ├── SPH (Special Hire) ── AR: GL at create (via caller)
+    └── FLEET (Leasing) ──── AP: GL at payment
+  NCG Express (Standalone)
+    └── NCGE ─────────────── Revenue/Expense GL at posting
+
+Manual AR/AP Flow:
+  Create Invoice → Resolve Category (3-tier) → Post GL → Link JE
+  Approve Invoice → Check journal_entry_id → Skip if exists
+```
+
+## Summary of Changes
+
+- Fix 2 legacy hooks in `useCompanyMutations.ts` to auto-post GL with category resolution
+- Build comprehensive Mermaid flow diagram covering all companies and modules
+- Update the InvoiceGLFlowDiagram component with complete cross-module status
+- All other modules (manual AR/AP, fuel, maintenance, expense, vehicle sales, special hire, school bus) are already correctly posting GL
 

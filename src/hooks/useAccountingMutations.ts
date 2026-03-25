@@ -460,7 +460,12 @@ export const useCreateARInvoice = () => {
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
           });
-          if (!glResult.success) {
+          if (glResult.success && glResult.journalEntryId) {
+            await (supabase as any)
+              .from("ar_invoices")
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq("id", data.id);
+          } else if (!glResult.success) {
             console.warn("AR Invoice GL posting failed:", glResult.error);
           } else {
             console.log(`[AR GL] Auto-posted GL for ${invoice.invoice_number}`);
@@ -808,74 +813,56 @@ export const useCreateAPInvoice = () => {
           console.warn("Failed to insert AP invoice lines:", lineError.message);
         }
       }
-
-      // ========== AUTO GL POSTING: DR Expense, CR Trade Payable ==========
+      // ========== AUTO GL POSTING at creation: DR Expense, CR Trade Payable ==========
       try {
-        // Fetch GL settings
-        const { data: glSettings } = await (supabase as any)
-          .from("gl_settings")
-          .select("trade_payable_account_id, default_expense_account_id")
-          .eq("company_id", effectiveCompanyId)
-          .maybeSingle();
+        const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
+        const resolved = await resolveVendorAPAccounts(invoice.vendor_id, effectiveCompanyId);
+        
+        const tradePayableId = resolved.apAccountId;
+        const defaultExpenseAccountId = resolved.expenseAccountId;
 
-        let defaultExpenseAccountId = glSettings?.default_expense_account_id;
-        let tradePayableId = glSettings?.trade_payable_account_id;
-
-        // Fallback to school_bus_finance_settings if gl_settings is missing
-        if (!tradePayableId || !defaultExpenseAccountId) {
-          const { data: sbsSettings } = await (supabase as any)
-            .from("school_bus_finance_settings")
-            .select("trade_receivable_account_id, sbs_collection_account_id")
-            .order("updated_at", { ascending: false })
-            .limit(1)
+        // Fetch input tax account for AP invoices
+        let inputTaxAccountId: string | null = null;
+        const totalTax = invoice.tax_amount || 0;
+        if (totalTax > 0) {
+          const { data: glSettingsForTax } = await (supabase as any)
+            .from("gl_settings")
+            .select("input_tax_account_id")
+            .eq("company_id", effectiveCompanyId)
             .maybeSingle();
-          if (sbsSettings) {
-            if (!tradePayableId) tradePayableId = sbsSettings.trade_receivable_account_id || null;
-            if (!defaultExpenseAccountId) defaultExpenseAccountId = sbsSettings.sbs_collection_account_id || null;
+          inputTaxAccountId = glSettingsForTax?.input_tax_account_id || null;
+
+          // Fallback: look for "Input Tax" or "Tax Receivable" in COA
+          if (!inputTaxAccountId) {
+            const { data: taxAccount } = await (supabase as any)
+              .from("chart_of_accounts")
+              .select("id")
+              .eq("company_id", effectiveCompanyId)
+              .or("account_name.ilike.%input tax%,account_name.ilike.%tax receivable%")
+              .limit(1)
+              .maybeSingle();
+            inputTaxAccountId = taxAccount?.id || null;
           }
         }
 
-        // Get vendor name for GL description
-        const { data: vendorData } = await supabase
-          .from("vendors")
-          .select("vendor_name")
-          .eq("id", invoice.vendor_id)
-          .single();
-        const vendorName = vendorData?.vendor_name || "";
-
-        if (defaultExpenseAccountId && tradePayableId && invoice.total_amount > 0) {
+        if (tradePayableId && defaultExpenseAccountId && invoice.total_amount > 0) {
           const { postAPInvoiceToGL } = await import("@/lib/gl-posting-utils");
 
-          // Build per-line expense entries from line items (deduct per-line tax to avoid double-counting)
-          const expenseLines = (lines || []).map((line) => ({
+          // Fetch vendor name for JE description
+          const { data: vendorData } = await supabase
+            .from("vendors")
+            .select("vendor_name")
+            .eq("id", invoice.vendor_id)
+            .single();
+
+          const vendorName = vendorData?.vendor_name || "";
+
+          // Build per-line expense entries using 3-tier resolution: line > category > global
+          const expenseLines = (lines || []).map(line => ({
             accountId: line.account_id || defaultExpenseAccountId,
             amount: (line.line_total || 0) - (line.tax_amount || 0),
             description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
           }));
-
-          // Fetch input tax account for AP invoices
-          let inputTaxAccountId: string | null = null;
-          const totalTax = invoice.tax_amount || 0;
-          if (totalTax > 0) {
-            const { data: glSettingsForTax } = await (supabase as any)
-              .from("gl_settings")
-              .select("input_tax_account_id")
-              .eq("company_id", effectiveCompanyId)
-              .maybeSingle();
-            inputTaxAccountId = glSettingsForTax?.input_tax_account_id || null;
-
-            // Fallback: look for "Input Tax" or "Tax Receivable" in COA
-            if (!inputTaxAccountId) {
-              const { data: taxAccount } = await (supabase as any)
-                .from("chart_of_accounts")
-                .select("id")
-                .eq("company_id", effectiveCompanyId)
-                .or("account_name.ilike.%input tax%,account_name.ilike.%tax receivable%")
-                .limit(1)
-                .maybeSingle();
-              inputTaxAccountId = taxAccount?.id || null;
-            }
-          }
 
           const glResult = await postAPInvoiceToGL({
             invoiceNumber: invoice.invoice_number,
@@ -906,7 +893,7 @@ export const useCreateAPInvoice = () => {
           });
         }
       } catch (glError) {
-        console.warn("[AP GL] GL posting error:", glError);
+        console.warn("[AP GL] GL auto-posting error:", glError);
       }
 
       return data;
@@ -917,7 +904,7 @@ export const useCreateAPInvoice = () => {
       queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
-      toast.success("Vendor invoice recorded successfully");
+      toast.success("Vendor invoice recorded & posted to GL");
     },
     onError: (error) => {
       toast.error(`Failed to record invoice: ${error.message}`);
@@ -1990,17 +1977,23 @@ export const useApproveAPInvoice = () => {
       const { error } = await supabase.from("ap_invoices").update({ approval_status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
 
-      // ========== AUTO GL POSTING: DR Expense, CR Trade Payable ==========
+      // ========== DOUBLE-POSTING GUARD: Skip GL if already posted at creation ==========
       try {
         const effectiveCompanyId = getEffectiveCompanyId();
         const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId || '') ? getBusinessUnitCode() : undefined;
 
-        // Fetch invoice details
+        // Fetch invoice details including journal_entry_id for guard check
         const { data: invoice } = await (supabase as any)
           .from("ap_invoices")
-          .select("invoice_number, invoice_date, total_amount, tax_amount, vendors(vendor_name)")
+          .select("invoice_number, invoice_date, total_amount, tax_amount, vendor_id, journal_entry_id, vendors(vendor_name)")
           .eq("id", id)
           .single();
+
+        // Guard: if already posted to GL at creation time, skip
+        if (invoice?.journal_entry_id) {
+          console.log("AP Invoice already posted to GL (journal_entry_id exists), skipping on approval.");
+          return;
+        }
 
         // Fetch invoice lines with per-line account_id
         const { data: invoiceLines } = await (supabase as any)
@@ -2008,91 +2001,75 @@ export const useApproveAPInvoice = () => {
           .select("account_id, line_total, description, tax_amount")
           .eq("invoice_id", id);
 
-        // Fetch GL settings
-        const { data: glSettings } = await (supabase as any)
-          .from("gl_settings")
-          .select("trade_payable_account_id, default_expense_account_id")
-          .eq("company_id", effectiveCompanyId)
-          .maybeSingle();
+        // Legacy invoice without GL posting — post now using vendor category resolution
+        if (invoice && invoice.total_amount > 0) {
+          const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
+          const resolved = await resolveVendorAPAccounts(invoice.vendor_id, effectiveCompanyId);
+          
+          const tradePayableId = resolved.apAccountId;
+          const defaultExpenseAccountId = resolved.expenseAccountId;
 
-        let defaultExpenseAccountId = glSettings?.default_expense_account_id;
-        let tradePayableId = glSettings?.trade_payable_account_id;
+          if (tradePayableId && defaultExpenseAccountId) {
+            const { postAPInvoiceToGL } = await import("@/lib/gl-posting-utils");
+            const vendorData = invoice.vendors as any;
 
-        // Fallback to school_bus_finance_settings if gl_settings is missing
-        if (!tradePayableId || !defaultExpenseAccountId) {
-          const { data: sbsSettings } = await (supabase as any)
-            .from("school_bus_finance_settings")
-            .select("trade_receivable_account_id, sbs_collection_account_id")
-            .order("updated_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (sbsSettings) {
-            if (!tradePayableId) tradePayableId = sbsSettings.trade_receivable_account_id || null;
-            if (!defaultExpenseAccountId) defaultExpenseAccountId = sbsSettings.sbs_collection_account_id || null;
-          }
-        }
-
-        if (invoice && defaultExpenseAccountId && tradePayableId && invoice.total_amount > 0) {
-          const { postAPInvoiceToGL } = await import("@/lib/gl-posting-utils");
-          const vendorData = invoice.vendors as any;
-
-          // Build per-line expense entries, falling back to default account (deduct per-line tax)
-          const expenseLines = (invoiceLines || []).map((line: any) => ({
-            accountId: line.account_id || defaultExpenseAccountId,
-            amount: (line.line_total || 0) - (line.tax_amount || 0),
-            description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
-          }));
-
-          // Fetch input tax account
-          let inputTaxAccountId: string | null = null;
-          const totalTax = invoice.tax_amount || 0;
-          if (totalTax > 0) {
-            const { data: glSettingsForTax } = await (supabase as any)
-              .from("gl_settings")
-              .select("input_tax_account_id")
-              .eq("company_id", effectiveCompanyId)
-              .maybeSingle();
-            inputTaxAccountId = glSettingsForTax?.input_tax_account_id || null;
-
-            if (!inputTaxAccountId) {
-              const { data: taxAccount } = await (supabase as any)
-                .from("chart_of_accounts")
-                .select("id")
+            // Fetch input tax account
+            let inputTaxAccountId: string | null = null;
+            const totalTax = invoice.tax_amount || 0;
+            if (totalTax > 0) {
+              const { data: glSettingsForTax } = await (supabase as any)
+                .from("gl_settings")
+                .select("input_tax_account_id")
                 .eq("company_id", effectiveCompanyId)
-                .or("account_name.ilike.%input tax%,account_name.ilike.%tax receivable%")
-                .limit(1)
                 .maybeSingle();
-              inputTaxAccountId = taxAccount?.id || null;
+              inputTaxAccountId = glSettingsForTax?.input_tax_account_id || null;
+
+              if (!inputTaxAccountId) {
+                const { data: taxAccount } = await (supabase as any)
+                  .from("chart_of_accounts")
+                  .select("id")
+                  .eq("company_id", effectiveCompanyId)
+                  .or("account_name.ilike.%input tax%,account_name.ilike.%tax receivable%")
+                  .limit(1)
+                  .maybeSingle();
+                inputTaxAccountId = taxAccount?.id || null;
+              }
+            }
+
+            // Build per-line expense entries, falling back to default account (deduct per-line tax)
+            const expenseLines = (invoiceLines || []).map((line: any) => ({
+              accountId: line.account_id || defaultExpenseAccountId,
+              amount: (line.line_total || 0) - (line.tax_amount || 0),
+              description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
+            }));
+
+            const glResult = await postAPInvoiceToGL({
+              invoiceNumber: invoice.invoice_number,
+              invoiceDate: invoice.invoice_date,
+              totalAmount: invoice.total_amount,
+              taxAmount: totalTax,
+              expenseAccountId: defaultExpenseAccountId,
+              tradePayableId,
+              inputTaxAccountId: inputTaxAccountId || undefined,
+              companyId: effectiveCompanyId,
+              businessUnitCode,
+              vendorName: vendorData?.vendor_name,
+              expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
+            });
+
+            if (glResult.success && glResult.journalEntryId) {
+              // Link journal_entry_id back to ap_invoices so GL Guardian sees it as posted
+              await (supabase as any)
+                .from("ap_invoices")
+                .update({ journal_entry_id: glResult.journalEntryId })
+                .eq("id", id);
+              console.log(`[AP GL] Auto-posted GL for ${invoice.invoice_number}`);
+            } else if (!glResult.success) {
+              console.warn("AP Invoice GL posting failed:", glResult.error);
             }
           }
-
-          const glResult = await postAPInvoiceToGL({
-            invoiceNumber: invoice.invoice_number,
-            invoiceDate: invoice.invoice_date,
-            totalAmount: invoice.total_amount,
-            taxAmount: totalTax,
-            expenseAccountId: defaultExpenseAccountId,
-            tradePayableId,
-            inputTaxAccountId: inputTaxAccountId || undefined,
-            companyId: effectiveCompanyId,
-            businessUnitCode,
-            vendorName: vendorData?.vendor_name,
-            expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
-          });
-          if (glResult.success && glResult.journalEntryId) {
-            // Link journal_entry_id back to ap_invoices so GL Guardian sees it as posted
-            await (supabase as any)
-              .from("ap_invoices")
-              .update({ journal_entry_id: glResult.journalEntryId })
-              .eq("id", id);
-            console.log(`[AP GL] Auto-posted GL for ${invoice.invoice_number}`);
-          } else if (!glResult.success) {
-            console.warn("AP Invoice GL posting failed:", glResult.error);
-          }
         } else {
-          console.warn("[AP GL] Skipped GL posting - missing accounts:", {
-            tradePayableId, defaultExpenseAccountId, amount: invoice?.total_amount
-          });
+          console.warn("[AP GL] Skipped GL posting - missing invoice data or zero amount.");
         }
       } catch (glError) {
         console.warn("AP Invoice GL posting error:", glError);

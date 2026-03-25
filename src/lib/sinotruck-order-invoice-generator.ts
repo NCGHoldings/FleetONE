@@ -629,7 +629,7 @@ export async function generateSinotruckOrderInvoicePDF(data: SinotruckOrderInvoi
     const page = pages[i] as HTMLElement;
 
     const canvas = await html2canvas(page, {
-      scale: 2,
+      scale: 1.5,
       useCORS: true,
       allowTaint: false,
       backgroundColor: '#ffffff',
@@ -638,7 +638,7 @@ export async function generateSinotruckOrderInvoicePDF(data: SinotruckOrderInvoi
       height: 1270,
     });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
     const pageWidth = 210;
     const pageHeight = 297;
 

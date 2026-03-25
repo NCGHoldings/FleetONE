@@ -31,7 +31,7 @@ export const regenerateYutongQuotationPDF = async ({
 
     // Generate PDF from the element
     const canvas = await html2canvas(quotationElement, {
-      scale: 2,
+      scale: 1.5,
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff'

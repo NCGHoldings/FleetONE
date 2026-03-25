@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { generateInvoicePDF, type InvoiceData, type ApprovalSignature } from '@/lib/invoice-generator';
+import { uploadPdfToStorage, getDocumentAsBase64, blobToBase64 } from '@/lib/document-storage-helpers';
 
 export interface StoredDocument {
   id: string;
@@ -117,20 +118,10 @@ export const useDocumentManagement = () => {
       };
 
       const pdfBlob = await generateInvoicePDF(draftInvoiceData);
-      const arrayBuffer = await pdfBlob.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      
-      // Convert to base64
-      let base64String = '';
-      const chunkSize = 1024;
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize);
-        base64String += String.fromCharCode.apply(null, Array.from(chunk));
-      }
-      const base64Data = btoa(base64String);
 
-      // Store in database
+      // Upload to Supabase Storage instead of storing base64 in DB
       const fileName = `DRAFT-${invoiceData.document_type}-${invoiceData.quotationNo}-${Date.now()}.pdf`;
+      const { storagePath, fileSize } = await uploadPdfToStorage(pdfBlob, fileName);
       
       const { data, error } = await supabase
         .from('document_storage')
@@ -140,10 +131,11 @@ export const useDocumentManagement = () => {
           document_type: (invoiceData.document_type || 'sales_receipt') as 'sales_receipt' | 'invoice',
           payment_type: invoiceData.invoiceType as 'advance' | 'balance' | 'full',
           document_status: 'draft',
-          document_data: base64Data,
+          document_data: '',
           file_name: fileName,
-          file_size: uint8Array.length,
+          file_size: fileSize,
           generated_by: user.id,
+          storage_path: storagePath,
         })
         .select()
         .single();
@@ -260,27 +252,22 @@ export const useDocumentManagement = () => {
 
       // Generate approved PDF
       const pdfBlob = await generateInvoicePDF(approvedInvoiceData);
-      const arrayBuffer = await pdfBlob.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      
-      let base64String = '';
-      const chunkSize = 1024;
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize);
-        base64String += String.fromCharCode.apply(null, Array.from(chunk));
-      }
-      const base64Data = btoa(base64String);
 
-      // Update document status and data
+      // Upload to storage
+      const newFileName = draftDoc.file_name.replace('DRAFT-', 'APPROVED-');
+      const { storagePath, fileSize } = await uploadPdfToStorage(pdfBlob, newFileName);
+
+      // Update document status and storage path
       const { error: updateError } = await supabase
         .from('document_storage')
         .update({
           document_status: 'approved',
-          document_data: base64Data,
-          file_name: draftDoc.file_name.replace('DRAFT-', 'APPROVED-'),
-          file_size: uint8Array.length,
+          document_data: '',
+          file_name: newFileName,
+          file_size: fileSize,
           approved_by: user?.id,
           approved_at: new Date().toISOString(),
+          storage_path: storagePath,
         })
         .eq('id', documentId);
 
@@ -408,25 +395,20 @@ export const useDocumentManagement = () => {
 
       // Generate new PDF
       const pdfBlob = await generateInvoicePDF(invoiceData);
-      const arrayBuffer = await pdfBlob.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      
-      let base64String = '';
-      const chunkSize = 1024;
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize);
-        base64String += String.fromCharCode.apply(null, Array.from(chunk));
-      }
-      const base64Data = btoa(base64String);
+
+      // Upload to storage
+      const newFileName = `REGENERATED-${existingDoc.document_type}-${paymentData.quotation.quotation_no}-${Date.now()}.pdf`;
+      const { storagePath, fileSize } = await uploadPdfToStorage(pdfBlob, newFileName);
 
       // Update document
       const { error: updateError } = await supabase
         .from('document_storage')
         .update({
-          document_data: base64Data,
-          file_name: `REGENERATED-${existingDoc.document_type}-${paymentData.quotation.quotation_no}-${Date.now()}.pdf`,
-          file_size: uint8Array.length,
+          document_data: '',
+          file_name: newFileName,
+          file_size: fileSize,
           generated_at: new Date().toISOString(),
+          storage_path: storagePath,
         })
         .eq('id', documentId);
 
@@ -547,7 +529,13 @@ export const useDocumentManagement = () => {
         throw new Error('Document not found');
       }
 
-      const pdfBase64 = document.document_data;
+      // Get PDF base64 from storage or fallback to document_data
+      let pdfBase64: string;
+      if ((document as any).storage_path) {
+        pdfBase64 = await getDocumentAsBase64((document as any).storage_path);
+      } else {
+        pdfBase64 = document.document_data;
+      }
 
       // 5. Send email via edge function
       const { error: emailError } = await supabase.functions.invoke('send-quotation-email', {
