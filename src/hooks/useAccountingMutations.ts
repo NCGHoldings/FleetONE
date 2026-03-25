@@ -419,7 +419,12 @@ export const useCreateARInvoice = () => {
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
           });
-          if (!glResult.success) {
+          if (glResult.success && glResult.journalEntryId) {
+            await (supabase as any)
+              .from("ar_invoices")
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq("id", data.id);
+          } else if (!glResult.success) {
             console.warn("AR Invoice GL posting failed:", glResult.error);
           }
         }
