@@ -203,6 +203,48 @@ export async function createLeasingAPInvoice({
 
     await supabase.from('ap_invoice_lines').insert(lines);
 
+    // ========== AUTO GL POSTING: DR Interest Expense + DR Lease Liability, CR Trade Payable ==========
+    try {
+      if (settings.leasing_liability_account_id && settings.interest_expense_account_id) {
+        // Resolve trade payable from vendor category or global settings
+        const { resolveVendorAPAccounts } = await import('@/hooks/useVendorCategories');
+        const resolved = await resolveVendorAPAccounts(vendorId, companyId);
+        const tradePayableId = resolved.apAccountId;
+
+        if (tradePayableId) {
+          const { postAPInvoiceToGL } = await import('@/lib/gl-posting-utils');
+          const glResult = await postAPInvoiceToGL({
+            invoiceNumber: invoiceNumber,
+            invoiceDate: invoiceDate,
+            totalAmount: paymentData.total_installment,
+            expenseAccountId: settings.interest_expense_account_id,
+            tradePayableId: tradePayableId,
+            companyId: companyId,
+            businessUnitCode: BUSINESS_UNIT_CODE,
+            vendorName: lenderName,
+            expenseLines: [
+              { accountId: settings.leasing_liability_account_id, amount: paymentData.principal_amount, description: `Principal - EMI #${paymentData.payment_number}` },
+              { accountId: settings.interest_expense_account_id, amount: paymentData.interest_amount, description: `Interest - EMI #${paymentData.payment_number}` },
+            ],
+            sourceModule: 'leasing',
+          });
+          if (glResult.success && glResult.journalEntryId) {
+            await (supabase as any)
+              .from('ap_invoices')
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq('id', invoice.id);
+            console.log('[Leasing Finance] GL posted for AP Invoice:', invoiceNumber);
+          } else {
+            console.warn('[Leasing Finance] GL posting failed:', glResult.error);
+          }
+        } else {
+          console.warn('[Leasing Finance] Missing Trade Payable account for GL posting');
+        }
+      }
+    } catch (glErr) {
+      console.warn('[Leasing Finance] GL posting error:', glErr);
+    }
+
     console.log('[Leasing Finance] Created AP Invoice:', invoice.invoice_number);
     return { invoiceId: invoice.id, invoiceNumber: invoice.invoice_number };
   } catch (error) {
