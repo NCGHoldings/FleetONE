@@ -266,6 +266,7 @@ export async function postLeasingPaymentToGL({
   settings,
   busId,
   companyId = NCG_HOLDING_ID,
+  apInvoiceId,
 }: {
   paymentData: LoanPaymentData;
   busNumber: string;
@@ -273,6 +274,7 @@ export async function postLeasingPaymentToGL({
   settings: LeasingFinanceSettings;
   busId?: string;
   companyId?: string;
+  apInvoiceId?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     // Validate required accounts
