@@ -360,6 +360,7 @@ export async function postAPInvoiceToGL(params: {
   businessUnitCode?: string;
   vendorName?: string;
   expenseLines?: Array<{ accountId: string; amount: number; description?: string }>;
+  sourceModule?: string;
 }): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
   const debitLines: JournalEntryLine[] = [];
 
