@@ -33,6 +33,7 @@ export interface CreateJournalEntryParams {
   lines: JournalEntryLine[];
   company_id: string;
   business_unit_code?: string;
+  source_module?: string;
 }
 
 // ============ Validation ============
