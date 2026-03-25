@@ -120,6 +120,7 @@ export async function createAndPostJournalEntry(
           posted_at: new Date().toISOString(),
           company_id: params.company_id,
           business_unit_code: params.business_unit_code,
+          source_module: params.source_module,
         },
       ])
       .select()
