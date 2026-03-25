@@ -397,27 +397,23 @@ export const useCreateARInvoice = () => {
         const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
         const resolved = await resolveCustomerARAccounts(invoice.customer_id, effectiveCompanyId);
 
-        // Fallback to global settings if resolution didn't find revenue account
-        let revenueAccountId = resolved.revenueAccountId;
-        if (!revenueAccountId) {
-          const { data: glSettings } = await (supabase as any)
-            .from("gl_settings")
-            .select("sales_revenue_account_id")
-            .eq("company_id", effectiveCompanyId)
-            .maybeSingle();
-          revenueAccountId = glSettings?.sales_revenue_account_id || null;
+        if (resolved.missingAccounts.length > 0 && invoice.total_amount > 0) {
+          console.error("AR GL missing accounts:", resolved.missingAccounts);
+          toast.error(`GL Config Missing: ${resolved.missingAccounts.join("; ")}. Configure in Settings → Core GL or Customer Categories.`, { duration: 8000 });
+          // Invoice is created but flagged — don't block completely
         }
 
-        if (resolved.arAccountId && revenueAccountId && invoice.total_amount > 0) {
+        if (resolved.arAccountId && resolved.revenueAccountId && invoice.total_amount > 0) {
           const { postARInvoiceToGL } = await import("@/lib/gl-posting-utils");
           const glResult = await postARInvoiceToGL({
             invoiceNumber: invoice.invoice_number,
             invoiceDate: invoice.invoice_date,
             totalAmount: invoice.total_amount,
             tradeReceivableId: resolved.arAccountId,
-            salesRevenueId: revenueAccountId,
+            salesRevenueId: resolved.revenueAccountId,
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
+            sourceModule: 'manual_ar',
           });
           if (glResult.success && glResult.journalEntryId) {
             await (supabase as any)
@@ -425,11 +421,11 @@ export const useCreateARInvoice = () => {
               .update({ journal_entry_id: glResult.journalEntryId })
               .eq("id", data.id);
           } else if (!glResult.success) {
-            console.warn("AR Invoice GL posting failed:", glResult.error);
+            toast.error(`AR Invoice created but GL posting failed: ${glResult.error}. Check Settings → Core GL.`, { duration: 8000 });
           }
         }
-      } catch (glError) {
-        console.warn("AR Invoice GL posting error:", glError);
+      } catch (glError: any) {
+        toast.error(`AR Invoice created but GL posting error: ${glError?.message || 'Unknown'}`, { duration: 8000 });
       }
       
       return data;
