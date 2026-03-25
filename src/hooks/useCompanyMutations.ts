@@ -109,6 +109,10 @@ export const useCompanyCreateARInvoice = () => {
         throw new Error("No company selected");
       }
 
+      // Resolve effective company for consolidated GL
+      const effectiveCompanyId = companyContext?.getEffectiveCompanyId?.() || companyId;
+      const businessUnitCode = companyContext?.getBusinessUnitCode?.() || null;
+
       const { lines, ...headerData } = invoice;
       
       const { data, error } = await supabase
@@ -117,7 +121,8 @@ export const useCompanyCreateARInvoice = () => {
           ...headerData,
           balance: invoice.total_amount,
           status: "unpaid",
-          company_id: companyId,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
         }])
         .select()
         .single();
@@ -129,10 +134,50 @@ export const useCompanyCreateARInvoice = () => {
         const lineData = lines.map(line => ({
           invoice_id: data.id,
           ...line,
-          company_id: companyId,
+          company_id: effectiveCompanyId,
         }));
         
         await supabase.from("ar_invoice_lines").insert(lineData);
+      }
+
+      // ========== AUTO GL POSTING: DR Trade Receivable, CR Sales Revenue ==========
+      try {
+        const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
+        const resolved = await resolveCustomerARAccounts(invoice.customer_id, effectiveCompanyId);
+
+        // Fallback to global settings if resolution didn't find revenue account
+        let revenueAccountId = resolved.revenueAccountId;
+        if (!revenueAccountId) {
+          const { data: glSettings } = await (supabase as any)
+            .from("gl_settings")
+            .select("sales_revenue_account_id")
+            .eq("company_id", effectiveCompanyId)
+            .maybeSingle();
+          revenueAccountId = glSettings?.sales_revenue_account_id || null;
+        }
+
+        if (resolved.arAccountId && revenueAccountId && invoice.total_amount > 0) {
+          const { postARInvoiceToGL } = await import("@/lib/gl-posting-utils");
+          const glResult = await postARInvoiceToGL({
+            invoiceNumber: invoice.invoice_number,
+            invoiceDate: invoice.invoice_date,
+            totalAmount: invoice.total_amount,
+            tradeReceivableId: resolved.arAccountId,
+            salesRevenueId: revenueAccountId,
+            companyId: effectiveCompanyId,
+            businessUnitCode: businessUnitCode || undefined,
+          });
+          if (glResult.success && glResult.journalEntryId) {
+            await (supabase as any)
+              .from("ar_invoices")
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq("id", data.id);
+          } else if (!glResult.success) {
+            console.warn("AR Invoice GL posting failed:", glResult.error);
+          }
+        }
+      } catch (glError) {
+        console.warn("AR Invoice GL posting error:", glError);
       }
       
       return data;
@@ -140,6 +185,8 @@ export const useCompanyCreateARInvoice = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ar-invoices", companyId] });
       queryClient.invalidateQueries({ queryKey: ["ar-summary", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       toast.success("Invoice created successfully");
     },
     onError: (error) => {
