@@ -76,7 +76,7 @@ export default function Dashboard() {
           delay={2}
         />
         <EnhancedKPICard
-          title="Today's Trips"
+          title="Today's Fleet Trips 🚀"
           value={kpis?.todayTrips || 0}
           subtitle={`${kpis?.completedTrips || 0} completed`}
           icon={<Calendar className="w-5 h-5" />}
