@@ -402,6 +402,7 @@ export async function postAPInvoiceToGL(params: {
     reference: params.invoiceNumber,
     company_id: params.companyId,
     business_unit_code: params.businessUnitCode,
+    source_module: params.sourceModule,
     lines: [
       ...debitLines,
       {
