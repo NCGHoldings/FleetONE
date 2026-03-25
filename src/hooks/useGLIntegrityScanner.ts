@@ -131,7 +131,7 @@ const SCAN_TARGETS: ScanTarget[] = [
     suggestedDebit: "Expense / COGS",
     suggestedCredit: "Trade Payables",
     severity: "critical",
-    glSettingsKey: "expense_account_id",
+    glSettingsKey: "default_expense_account_id",
     glSettingsCreditKey: "trade_payable_account_id",
   },
   {

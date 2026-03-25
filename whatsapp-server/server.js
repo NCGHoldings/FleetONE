@@ -20,15 +20,6 @@ let connectionStatus = 'disconnected'; // disconnected | qr_ready | connected
 let clientInfo = null;
 const messageLog = [];
 
-/* ─── Missed Call AI State ─── */
-const missedCallLog = [];                     // In-memory log of missed calls
-const activeAIConversations = new Map();      // phone -> { sessionToken, startedAt, contactName }
-const AI_CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 min auto-expire
-
-// Supabase config for edge function calls
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://wwjpdszkmtnzshbulkon.supabase.co';
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '';
-
 /* ─── WhatsApp Client ─── */
 const waClient = new Client({
   authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
@@ -99,117 +90,6 @@ waClient.on('disconnected', (reason) => {
   broadcast({ type: 'status', data: { status: 'disconnected', reason } });
 });
 
-// ─── Incoming Call (Missed Call Detection) ───
-waClient.on('call', async (call) => {
-  console.log(`📞 Incoming call from ${call.from} — ID: ${call.id}`);
-
-  // Wait 15 seconds; if call is rejected or not answered, treat as missed
-  setTimeout(async () => {
-    try {
-      // Reject the call (since we can't answer it programmatically)
-      try { await call.reject(); } catch { /* may already be ended */ }
-
-      const callerPhone = call.from.replace('@c.us', '');
-      let contactName = callerPhone;
-      try {
-        const contact = await waClient.getContactById(call.from);
-        contactName = contact?.pushname || contact?.name || callerPhone;
-      } catch { /* ignore */ }
-
-      console.log(`📞 Missed call from ${contactName} (${callerPhone}) — triggering AI auto-reply`);
-
-      // Log the missed call
-      const missedCall = {
-        id: `mc_${Date.now()}_${callerPhone}`,
-        phone: callerPhone,
-        contactName,
-        timestamp: Date.now(),
-        status: 'ai_handling',     // ai_handling | needs_followup | resolved
-        aiMessages: [],
-      };
-      missedCallLog.unshift(missedCall);
-      if (missedCallLog.length > 200) missedCallLog.pop();
-
-      // Broadcast missed call to frontend
-      broadcast({ type: 'missed_call', data: missedCall });
-
-      // Call the AI to generate a greeting
-      const aiResponse = await callWhatsAppAI({
-        phone_number: callerPhone,
-        contact_name: contactName,
-        is_missed_call: true,
-      });
-
-      if (aiResponse && aiResponse.response) {
-        // Send the AI greeting via WhatsApp
-        const chatId = `${callerPhone}@c.us`;
-        await waClient.sendMessage(chatId, aiResponse.response);
-        console.log(`🤖 AI auto-reply sent to ${contactName}: ${aiResponse.response.substring(0, 60)}...`);
-
-        // Track this as an active AI conversation
-        activeAIConversations.set(callerPhone, {
-          sessionToken: aiResponse.session_token,
-          startedAt: Date.now(),
-          contactName,
-          missedCallId: missedCall.id,
-        });
-
-        // Update missed call log with first AI message
-        missedCall.aiMessages.push({ role: 'assistant', body: aiResponse.response, timestamp: Date.now() });
-        broadcast({ type: 'missed_call_update', data: missedCall });
-      }
-    } catch (err) {
-      console.error('Missed call handler error:', err);
-    }
-  }, 5000); // 5-second delay to let the call ring
-});
-
-// ─── AI Edge Function Caller ───
-async function callWhatsAppAI({ phone_number, contact_name, message, is_missed_call }) {
-  try {
-    const edgeFnUrl = `${SUPABASE_URL}/functions/v1/whatsapp-ai-reply`;
-    const res = await fetch(edgeFnUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({
-        phone_number,
-        contact_name,
-        message,
-        is_missed_call: is_missed_call || false,
-        language: 'auto',
-      }),
-    });
-    if (!res.ok) {
-      console.error('AI edge function error:', res.status, await res.text());
-      return null;
-    }
-    return await res.json();
-  } catch (err) {
-    console.error('AI edge function call failed:', err.message);
-    return null;
-  }
-}
-
-// ─── Cleanup expired AI conversations ───
-setInterval(() => {
-  const now = Date.now();
-  for (const [phone, conv] of activeAIConversations) {
-    if (now - conv.startedAt > AI_CONVERSATION_TIMEOUT) {
-      activeAIConversations.delete(phone);
-      console.log(`🤖 AI conversation expired for ${phone}`);
-      // Update missed call status
-      const mc = missedCallLog.find(m => m.id === conv.missedCallId);
-      if (mc && mc.status === 'ai_handling') {
-        mc.status = 'needs_followup';
-        broadcast({ type: 'missed_call_update', data: mc });
-      }
-    }
-  }
-}, 60000); // Check every minute
-
 // ─── Incoming Message ───
 waClient.on('message', async (msg) => {
   console.log(`📩 Message from ${msg.from}: ${msg.body.substring(0, 50)}`);
@@ -232,47 +112,6 @@ waClient.on('message', async (msg) => {
   messageLog.unshift(messageData);
   if (messageLog.length > 500) messageLog.pop();
   broadcast({ type: 'message', data: messageData });
-
-  // ─── AI Auto-Reply for active missed-call conversations ───
-  if (!msg.fromMe && msg.body && msg.type === 'chat') {
-    const senderPhone = msg.from.replace('@c.us', '');
-    const aiConv = activeAIConversations.get(senderPhone);
-
-    if (aiConv) {
-      console.log(`🤖 AI conversation active for ${senderPhone} — generating reply...`);
-
-      // Update missed call log with customer message
-      const mc = missedCallLog.find(m => m.id === aiConv.missedCallId);
-      if (mc) {
-        mc.aiMessages.push({ role: 'user', body: msg.body, timestamp: Date.now() });
-      }
-
-      // Call AI for response
-      const aiResponse = await callWhatsAppAI({
-        phone_number: senderPhone,
-        contact_name: aiConv.contactName,
-        message: msg.body,
-      });
-
-      if (aiResponse && aiResponse.response) {
-        // Send AI reply
-        await waClient.sendMessage(msg.from, aiResponse.response);
-        console.log(`🤖 AI reply sent to ${senderPhone}: ${aiResponse.response.substring(0, 60)}...`);
-
-        // Update conversation tracking
-        aiConv.startedAt = Date.now(); // Reset timeout on activity
-        if (aiConv.sessionToken !== aiResponse.session_token) {
-          aiConv.sessionToken = aiResponse.session_token;
-        }
-
-        // Update missed call log
-        if (mc) {
-          mc.aiMessages.push({ role: 'assistant', body: aiResponse.response, timestamp: Date.now() });
-          broadcast({ type: 'missed_call_update', data: mc });
-        }
-      }
-    }
-  }
 });
 
 // ─── Outgoing Message (sent by us) ───
@@ -399,54 +238,6 @@ app.get('/api/messages/:chatId', async (req, res) => {
 
 // Get message log (in-memory)
 app.get('/api/log', (req, res) => res.json(messageLog));
-
-// ══════════════════════════════════════════════════════════
-//   MISSED CALL & AI AUTO-REPLY ENDPOINTS
-// ══════════════════════════════════════════════════════════
-
-// Get all missed calls
-app.get('/api/missed-calls', (req, res) => {
-  res.json(missedCallLog);
-});
-
-// Update missed call status
-app.post('/api/missed-calls/:id/resolve', (req, res) => {
-  const mc = missedCallLog.find(m => m.id === req.params.id);
-  if (!mc) return res.status(404).json({ error: 'Missed call not found' });
-
-  mc.status = 'resolved';
-  // Remove from active AI conversations
-  const phone = mc.phone;
-  if (activeAIConversations.has(phone)) {
-    activeAIConversations.delete(phone);
-  }
-  broadcast({ type: 'missed_call_update', data: mc });
-  res.json({ success: true, missedCall: mc });
-});
-
-// Stop AI and mark for manual follow-up
-app.post('/api/missed-calls/:id/takeover', (req, res) => {
-  const mc = missedCallLog.find(m => m.id === req.params.id);
-  if (!mc) return res.status(404).json({ error: 'Missed call not found' });
-
-  mc.status = 'needs_followup';
-  const phone = mc.phone;
-  if (activeAIConversations.has(phone)) {
-    activeAIConversations.delete(phone);
-    console.log(`🤖 AI stopped for ${phone} — taken over by human`);
-  }
-  broadcast({ type: 'missed_call_update', data: mc });
-  res.json({ success: true, missedCall: mc });
-});
-
-// Get active AI conversation count
-app.get('/api/ai-conversations', (req, res) => {
-  const active = [];
-  for (const [phone, conv] of activeAIConversations) {
-    active.push({ phone, contactName: conv.contactName, startedAt: conv.startedAt, missedCallId: conv.missedCallId });
-  }
-  res.json(active);
-});
 
 /* ══════════════════════════════════════════════════════════════
    EMAIL FUNCTIONALITY

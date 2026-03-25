@@ -33,6 +33,7 @@ export interface CreateJournalEntryParams {
   lines: JournalEntryLine[];
   company_id: string;
   business_unit_code?: string;
+  source_module?: string;
 }
 
 // ============ Validation ============
@@ -42,7 +43,7 @@ export interface CreateJournalEntryParams {
  */
 export function validateGLConfig(
   config: Partial<GLAccountConfig>,
-  operation: "ar_invoice" | "ar_receipt" | "ap_invoice" | "ap_payment" | "advance_receipt" | "petty_cash_disbursement" | "petty_cash_replenishment" | "iou_issuance" | "iou_settlement" | "credit_note"
+  operation: "ar_invoice" | "ar_receipt" | "ap_invoice" | "ap_payment" | "advance_receipt"
 ): { valid: boolean; missingAccounts: string[] } {
   const missingAccounts: string[] = [];
 
@@ -66,26 +67,6 @@ export function validateGLConfig(
     case "ap_payment":
       if (!config.bankAccountId) missingAccounts.push("Bank Account");
       if (!config.tradePayableId) missingAccounts.push("Trade Payable");
-      break;
-    case "petty_cash_disbursement":
-      if (!config.expenseAccountId) missingAccounts.push("Expense Account");
-      if (!config.bankAccountId) missingAccounts.push("Petty Cash Fund GL Account");
-      break;
-    case "petty_cash_replenishment":
-      if (!config.bankAccountId) missingAccounts.push("Bank Account");
-      if (!config.expenseAccountId) missingAccounts.push("Petty Cash Fund GL Account");
-      break;
-    case "iou_issuance":
-      if (!config.tradeReceivableId) missingAccounts.push("Staff Advance Account");
-      if (!config.bankAccountId) missingAccounts.push("Cash/Bank Account");
-      break;
-    case "iou_settlement":
-      if (!config.expenseAccountId) missingAccounts.push("Expense Account");
-      if (!config.tradeReceivableId) missingAccounts.push("Staff Advance Account");
-      break;
-    case "credit_note":
-      if (!config.tradeReceivableId) missingAccounts.push("Trade Receivable/Payable");
-      if (!config.salesRevenueId) missingAccounts.push("Revenue/Expense Account");
       break;
   }
 
@@ -139,6 +120,7 @@ export async function createAndPostJournalEntry(
           posted_at: new Date().toISOString(),
           company_id: params.company_id,
           business_unit_code: params.business_unit_code,
+          source_module: params.source_module,
         },
       ])
       .select()
@@ -210,57 +192,41 @@ async function updateAccountBalance(
 
 /**
  * Posts GL entry for AR Invoice creation
- * DR Trade Receivable (gross total)
- * CR Sales Revenue (net amount = total - tax)
- * CR Output Tax Payable (tax amount, if applicable)
+ * DR Trade Receivable
+ * CR Sales Revenue
  */
 export async function postARInvoiceToGL(params: {
   invoiceNumber: string;
   invoiceDate: string;
   totalAmount: number;
-  taxAmount?: number;
   tradeReceivableId: string;
   salesRevenueId: string;
-  taxPayableAccountId?: string;
   companyId: string;
   businessUnitCode?: string;
   customerName?: string;
+  sourceModule?: string;
 }): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
-  const taxAmount = params.taxAmount || 0;
-  const netAmount = params.totalAmount - taxAmount;
-
-  const lines: JournalEntryLine[] = [
-    {
-      account_id: params.tradeReceivableId,
-      description: `Trade Receivable - ${params.invoiceNumber}${params.customerName ? ` - ${params.customerName}` : ""}`,
-      debit: params.totalAmount,
-      credit: 0,
-    },
-    {
-      account_id: params.salesRevenueId,
-      description: `Sales Revenue - ${params.invoiceNumber}`,
-      debit: 0,
-      credit: taxAmount > 0 ? netAmount : params.totalAmount,
-    },
-  ];
-
-  // Add tax line if tax exists and tax account is configured
-  if (taxAmount > 0 && params.taxPayableAccountId) {
-    lines.push({
-      account_id: params.taxPayableAccountId,
-      description: `Output Tax - Invoice ${params.invoiceNumber}`,
-      debit: 0,
-      credit: taxAmount,
-    });
-  }
-
   return createAndPostJournalEntry({
     entry_date: params.invoiceDate,
     description: `AR Invoice: ${params.invoiceNumber}${params.customerName ? ` - ${params.customerName}` : ""}`,
     reference: params.invoiceNumber,
     company_id: params.companyId,
     business_unit_code: params.businessUnitCode,
-    lines,
+    source_module: params.sourceModule,
+    lines: [
+      {
+        account_id: params.tradeReceivableId,
+        description: `Trade Receivable - ${params.invoiceNumber}`,
+        debit: params.totalAmount,
+        credit: 0,
+      },
+      {
+        account_id: params.salesRevenueId,
+        description: `Sales Revenue - ${params.invoiceNumber}`,
+        debit: 0,
+        credit: params.totalAmount,
+      },
+    ],
   });
 }
 
@@ -381,24 +347,21 @@ export async function postAdvanceApplicationToGL(params: {
 
 /**
  * Posts GL entry for AP Invoice approval
- * DR Expense/Inventory Account(s) — one debit line per distinct GL account from invoice lines (net amounts)
- * DR Input Tax Recoverable (tax amount, if applicable)
- * CR Trade Payable — single credit for the total amount (gross)
+ * DR Expense/Inventory Account(s) — one debit line per distinct GL account from invoice lines
+ * CR Trade Payable — single credit for the total amount
  */
 export async function postAPInvoiceToGL(params: {
   invoiceNumber: string;
   invoiceDate: string;
   totalAmount: number;
-  taxAmount?: number;
   expenseAccountId: string; // fallback default
   tradePayableId: string;
-  inputTaxAccountId?: string;
   companyId: string;
   businessUnitCode?: string;
   vendorName?: string;
   expenseLines?: Array<{ accountId: string; amount: number; description?: string }>;
+  sourceModule?: string;
 }): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
-  const taxAmount = params.taxAmount || 0;
   const debitLines: JournalEntryLine[] = [];
 
   if (params.expenseLines && params.expenseLines.length > 0) {
@@ -425,21 +388,10 @@ export async function postAPInvoiceToGL(params: {
     }
   } else {
     // Fallback: single debit to default expense account
-    const expenseAmount = taxAmount > 0 ? (params.totalAmount - taxAmount) : params.totalAmount;
     debitLines.push({
       account_id: params.expenseAccountId,
       description: `Expense/Purchase - ${params.invoiceNumber}`,
-      debit: expenseAmount,
-      credit: 0,
-    });
-  }
-
-  // Add input tax line if tax exists and tax account is configured
-  if (taxAmount > 0 && params.inputTaxAccountId) {
-    debitLines.push({
-      account_id: params.inputTaxAccountId,
-      description: `Input Tax - Invoice ${params.invoiceNumber}`,
-      debit: taxAmount,
+      debit: params.totalAmount,
       credit: 0,
     });
   }
@@ -450,6 +402,7 @@ export async function postAPInvoiceToGL(params: {
     reference: params.invoiceNumber,
     company_id: params.companyId,
     business_unit_code: params.businessUnitCode,
+    source_module: params.sourceModule,
     lines: [
       ...debitLines,
       {
@@ -515,307 +468,7 @@ export async function postAPPaymentToGL(params: {
   });
 }
 
-// ============ Petty Cash GL Posting ============
-
-/**
- * Posts GL entry for Petty Cash Disbursement
- * DR Expense Account (category-specific)
- * CR Petty Cash Fund GL Account
- */
-export async function postPettyCashDisbursementToGL(params: {
-  voucherNumber: string;
-  transactionDate: string;
-  amount: number;
-  expenseAccountId: string;
-  pettyCashFundAccountId: string;
-  companyId: string;
-  businessUnitCode?: string;
-  description?: string;
-  payeeName?: string;
-}): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
-  return createAndPostJournalEntry({
-    entry_date: params.transactionDate,
-    description: `Petty Cash Disbursement: ${params.voucherNumber}${params.payeeName ? ` to ${params.payeeName}` : ""}${params.description ? ` - ${params.description}` : ""}`,
-    reference: params.voucherNumber,
-    company_id: params.companyId,
-    business_unit_code: params.businessUnitCode,
-    lines: [
-      {
-        account_id: params.expenseAccountId,
-        description: `Expense - ${params.voucherNumber}`,
-        debit: params.amount,
-        credit: 0,
-      },
-      {
-        account_id: params.pettyCashFundAccountId,
-        description: `Petty Cash Fund - ${params.voucherNumber}`,
-        debit: 0,
-        credit: params.amount,
-      },
-    ],
-  });
-}
-
-/**
- * Posts GL entry for Petty Cash Replenishment
- * DR Petty Cash Fund GL Account
- * CR Bank/Cash Account
- */
-export async function postPettyCashReplenishmentToGL(params: {
-  referenceNumber: string;
-  transactionDate: string;
-  amount: number;
-  pettyCashFundAccountId: string;
-  bankAccountId: string;
-  companyId: string;
-  businessUnitCode?: string;
-  fundName?: string;
-}): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
-  return createAndPostJournalEntry({
-    entry_date: params.transactionDate,
-    description: `Petty Cash Replenishment: ${params.fundName || params.referenceNumber}`,
-    reference: params.referenceNumber,
-    company_id: params.companyId,
-    business_unit_code: params.businessUnitCode,
-    lines: [
-      {
-        account_id: params.pettyCashFundAccountId,
-        description: `Replenish Petty Cash - ${params.fundName || params.referenceNumber}`,
-        debit: params.amount,
-        credit: 0,
-      },
-      {
-        account_id: params.bankAccountId,
-        description: `Bank Payment (Replenishment) - ${params.referenceNumber}`,
-        debit: 0,
-        credit: params.amount,
-      },
-    ],
-  });
-}
-
-// ============ IOU / Staff Advance GL Posting ============
-
-/**
- * Posts GL entry for IOU Issuance
- * DR Staff Advance (Asset/Receivable)
- * CR Cash/Bank
- */
-export async function postIOUIssuanceToGL(params: {
-  iouNumber: string;
-  issuedDate: string;
-  amount: number;
-  staffAdvanceAccountId: string;
-  cashAccountId: string;
-  companyId: string;
-  businessUnitCode?: string;
-  staffName?: string;
-  purpose?: string;
-}): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
-  return createAndPostJournalEntry({
-    entry_date: params.issuedDate,
-    description: `IOU Issued: ${params.iouNumber}${params.staffName ? ` to ${params.staffName}` : ""}${params.purpose ? ` - ${params.purpose}` : ""}`,
-    reference: params.iouNumber,
-    company_id: params.companyId,
-    business_unit_code: params.businessUnitCode,
-    lines: [
-      {
-        account_id: params.staffAdvanceAccountId,
-        description: `Staff Advance - ${params.iouNumber}`,
-        debit: params.amount,
-        credit: 0,
-      },
-      {
-        account_id: params.cashAccountId,
-        description: `Cash/Bank (IOU Issue) - ${params.iouNumber}`,
-        debit: 0,
-        credit: params.amount,
-      },
-    ],
-  });
-}
-
-/**
- * Posts GL entry for IOU Settlement
- * DR Expense Account(s)
- * CR Staff Advance (Asset/Receivable)
- * If there's a refund (settled < issued), also:
- * DR Cash/Bank (for refund amount)
- * CR Staff Advance
- */
-export async function postIOUSettlementToGL(params: {
-  iouNumber: string;
-  settlementDate: string;
-  settledAmount: number;
-  expenseAccountId: string;
-  staffAdvanceAccountId: string;
-  companyId: string;
-  businessUnitCode?: string;
-  staffName?: string;
-}): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
-  return createAndPostJournalEntry({
-    entry_date: params.settlementDate,
-    description: `IOU Settled: ${params.iouNumber}${params.staffName ? ` by ${params.staffName}` : ""}`,
-    reference: `SETTLE-${params.iouNumber}`,
-    company_id: params.companyId,
-    business_unit_code: params.businessUnitCode,
-    lines: [
-      {
-        account_id: params.expenseAccountId,
-        description: `Expense (IOU Settlement) - ${params.iouNumber}`,
-        debit: params.settledAmount,
-        credit: 0,
-      },
-      {
-        account_id: params.staffAdvanceAccountId,
-        description: `Clear Staff Advance - ${params.iouNumber}`,
-        debit: 0,
-        credit: params.settledAmount,
-      },
-    ],
-  });
-}
-
-// ============ Credit Note / Debit Note GL Posting ============
-
-/**
- * Posts GL reversal for AR Credit Note
- * DR Sales Revenue (reverse the net revenue)
- * DR Output Tax Payable (reverse the tax, if applicable)
- * CR Trade Receivable (reduce what customer owes - gross)
- */
-export async function postARCreditNoteToGL(params: {
-  creditNoteNumber: string;
-  creditNoteDate: string;
-  amount: number;
-  taxAmount?: number;
-  salesRevenueId: string;
-  tradeReceivableId: string;
-  taxPayableAccountId?: string;
-  companyId: string;
-  businessUnitCode?: string;
-  customerName?: string;
-}): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
-  const taxAmount = params.taxAmount || 0;
-  const netAmount = taxAmount > 0 ? params.amount - taxAmount : params.amount;
-
-  const lines: JournalEntryLine[] = [
-    {
-      account_id: params.salesRevenueId,
-      description: `Revenue Reversal - ${params.creditNoteNumber}`,
-      debit: netAmount,
-      credit: 0,
-    },
-  ];
-
-  // Add tax reversal line if applicable
-  if (taxAmount > 0 && params.taxPayableAccountId) {
-    lines.push({
-      account_id: params.taxPayableAccountId,
-      description: `Tax Reversal - ${params.creditNoteNumber}`,
-      debit: taxAmount,
-      credit: 0,
-    });
-  }
-
-  lines.push({
-    account_id: params.tradeReceivableId,
-    description: `Reduce Receivable - ${params.creditNoteNumber}`,
-    debit: 0,
-    credit: params.amount,
-  });
-
-  return createAndPostJournalEntry({
-    entry_date: params.creditNoteDate,
-    description: `AR Credit Note: ${params.creditNoteNumber}${params.customerName ? ` - ${params.customerName}` : ""}`,
-    reference: params.creditNoteNumber,
-    company_id: params.companyId,
-    business_unit_code: params.businessUnitCode,
-    lines,
-  });
-}
-
-/**
- * Posts GL reversal for AP Debit Note
- * DR Trade Payable (reduce what we owe)
- * CR Expense Account (reverse the original expense)
- */
-export async function postAPDebitNoteToGL(params: {
-  debitNoteNumber: string;
-  debitNoteDate: string;
-  amount: number;
-  tradePayableId: string;
-  expenseAccountId: string;
-  companyId: string;
-  businessUnitCode?: string;
-  vendorName?: string;
-}): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
-  return createAndPostJournalEntry({
-    entry_date: params.debitNoteDate,
-    description: `AP Debit Note: ${params.debitNoteNumber}${params.vendorName ? ` - ${params.vendorName}` : ""}`,
-    reference: params.debitNoteNumber,
-    company_id: params.companyId,
-    business_unit_code: params.businessUnitCode,
-    lines: [
-      {
-        account_id: params.tradePayableId,
-        description: `Reduce Payable - ${params.debitNoteNumber}`,
-        debit: params.amount,
-        credit: 0,
-      },
-      {
-        account_id: params.expenseAccountId,
-        description: `Expense Reversal - ${params.debitNoteNumber}`,
-        debit: 0,
-        credit: params.amount,
-      },
-    ],
-  });
-}
-
-/**
- * Posts GL entry for standalone Bank Transaction
- * For deposits: DR Bank Account → CR Contra Account
- * For withdrawals: DR Contra Account → CR Bank Account
- */
-export async function postBankTransactionToGL(params: {
-  reference: string;
-  transactionDate: string;
-  amount: number;
-  bankGLAccountId: string;
-  contraAccountId: string;
-  transactionType: "deposit" | "withdrawal" | "transfer";
-  companyId: string;
-  businessUnitCode?: string;
-  description?: string;
-}): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
-  const isDeposit = params.transactionType === "deposit";
-
-  return createAndPostJournalEntry({
-    entry_date: params.transactionDate,
-    description: `Bank ${params.transactionType}: ${params.description || params.reference}`,
-    reference: params.reference,
-    company_id: params.companyId,
-    business_unit_code: params.businessUnitCode,
-    lines: [
-      {
-        account_id: isDeposit ? params.bankGLAccountId : params.contraAccountId,
-        description: isDeposit ? `Bank Deposit - ${params.reference}` : `${params.description || "Withdrawal"} - ${params.reference}`,
-        debit: params.amount,
-        credit: 0,
-      },
-      {
-        account_id: isDeposit ? params.contraAccountId : params.bankGLAccountId,
-        description: isDeposit ? `${params.description || "Deposit"} - ${params.reference}` : `Bank Withdrawal - ${params.reference}`,
-        debit: 0,
-        credit: params.amount,
-      },
-    ],
-  });
-}
-
 // ============ Balance Reconciliation ============
-
 
 /**
  * Recalculates COA balances from posted journal entry lines

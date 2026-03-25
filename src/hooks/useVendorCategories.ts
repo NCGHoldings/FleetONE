@@ -151,6 +151,7 @@ export async function resolveVendorAPAccounts(
   expenseAccountId: string | null;
   advanceAccountId: string | null;
   source: "category" | "global";
+  missingAccounts: string[];
 }> {
   const { data: vendor } = await supabase
     .from("vendors")
@@ -165,27 +166,39 @@ export async function resolveVendorAPAccounts(
     .eq("id", vendorId)
     .single();
 
-  const category = vendor?.vendor_categories as any;
-  if (category?.ap_account_id) {
-    return {
-      apAccountId: category.ap_account_id,
-      expenseAccountId: category.expense_account_id || null,
-      advanceAccountId: category.advance_account_id || null,
-      source: "category",
-    };
-  }
-
-  // Global fallback
+  // Always fetch global fallback
   const { data: glSettings } = await (supabase as any)
     .from("gl_settings")
     .select("trade_payable_account_id, default_expense_account_id")
     .eq("company_id", companyId)
     .maybeSingle();
 
-  return {
-    apAccountId: glSettings?.trade_payable_account_id || null,
-    expenseAccountId: glSettings?.default_expense_account_id || null,
-    advanceAccountId: null,
-    source: "global",
-  };
+  let apAccountId: string | null = null;
+  let expenseAccountId: string | null = null;
+  let advanceAccountId: string | null = null;
+  let source: "category" | "global" = "global";
+
+  // Priority 1: Category mapping
+  const category = vendor?.vendor_categories as any;
+  if (category?.ap_account_id) {
+    apAccountId = category.ap_account_id;
+    source = "category";
+  }
+  if (category?.expense_account_id) {
+    expenseAccountId = category.expense_account_id;
+  }
+  if (category?.advance_account_id) {
+    advanceAccountId = category.advance_account_id;
+  }
+
+  // Priority 2: Global fallback for any remaining gaps
+  if (!apAccountId) apAccountId = glSettings?.trade_payable_account_id || null;
+  if (!expenseAccountId) expenseAccountId = glSettings?.default_expense_account_id || null;
+
+  // Build missing accounts list for actionable UI feedback
+  const missingAccounts: string[] = [];
+  if (!apAccountId) missingAccounts.push("Trade Payable (Settings → Core GL → trade_payable_account_id, OR Vendor Category → AP Account)");
+  if (!expenseAccountId) missingAccounts.push("Expense Account (Settings → Core GL → default_expense_account_id, OR Vendor Category → Expense Account)");
+
+  return { apAccountId, expenseAccountId, advanceAccountId, source, missingAccounts };
 }

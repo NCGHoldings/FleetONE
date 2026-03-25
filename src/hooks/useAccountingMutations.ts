@@ -9,7 +9,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 export const useCreateJournalEntry = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompany } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (entry: {
       entry_number: string;
@@ -28,12 +28,12 @@ export const useCreateJournalEntry = () => {
       }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       // For consolidated GL: post to parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = getBusinessUnitCode();
       const businessUnitId = isSubCompany(selectedCompanyId) ? selectedCompanyId : null;
-
+      
       const { data: journalEntry, error: entryError } = await supabase
         .from("journal_entries")
         .insert([{
@@ -51,9 +51,9 @@ export const useCreateJournalEntry = () => {
         }])
         .select()
         .single();
-
+      
       if (entryError) throw entryError;
-
+      
       const lines = entry.lines.map((line) => ({
         journal_entry_id: journalEntry.id,
         account_id: line.account_id,
@@ -64,13 +64,13 @@ export const useCreateJournalEntry = () => {
         company_id: effectiveCompanyId,
         business_unit_code: businessUnitCode, // Tag lines too for efficient filtering
       }));
-
+      
       const { error: linesError } = await supabase
         .from("journal_entry_lines")
         .insert(lines);
-
+      
       if (linesError) throw linesError;
-
+      
       return journalEntry;
     },
     onSuccess: () => {
@@ -88,7 +88,7 @@ export const useCreateJournalEntry = () => {
 export const usePostJournalEntry = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (entryId: string) => {
       const { data: entry, error: fetchError } = await supabase
@@ -103,39 +103,39 @@ export const usePostJournalEntry = () => {
         `)
         .eq("id", entryId)
         .single();
-
+      
       if (fetchError) throw fetchError;
-
+      
       for (const line of entry.journal_entry_lines) {
         const netAmount = (line.debit || 0) - (line.credit || 0);
-
+        
         const { data: account } = await supabase
           .from("chart_of_accounts")
           .select("current_balance, account_type")
           .eq("id", line.account_id)
           .single();
-
+        
         if (account) {
           const isDebitNormal = ["asset", "expense"].includes(account.account_type);
           const adjustment = isDebitNormal ? netAmount : -netAmount;
-
+          
           await supabase
             .from("chart_of_accounts")
             .update({ current_balance: (account.current_balance || 0) + adjustment })
             .eq("id", line.account_id);
         }
       }
-
+      
       const { error: statusError } = await supabase
         .from("journal_entries")
-        .update({
+        .update({ 
           status: "posted" as const,
           posted_at: new Date().toISOString(),
         })
         .eq("id", entryId);
-
+      
       if (statusError) throw statusError;
-
+      
       return entry;
     },
     onSuccess: () => {
@@ -153,25 +153,25 @@ export const usePostJournalEntry = () => {
 export const useApproveJournalEntry = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async ({ entryId, level }: { entryId: string; level: number }) => {
       const statusMap: Record<number, "draft" | "posted" | "void"> = {
         1: "draft",
         2: "posted",
       };
-
+      
       const newStatus = statusMap[level] || "posted";
-
+      
       const { error } = await supabase
         .from("journal_entries")
-        .update({
+        .update({ 
           status: newStatus,
           approved_at: new Date().toISOString(),
           posted_at: newStatus === "posted" ? new Date().toISOString() : undefined,
         })
         .eq("id", entryId);
-
+      
       if (error) throw error;
 
       // ========== UPDATE COA BALANCES when posting ==========
@@ -225,7 +225,7 @@ export const useApproveJournalEntry = () => {
 export const useReverseJournalEntry = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (entryId: string) => {
       // Fetch the original entry with lines
@@ -243,44 +243,44 @@ export const useReverseJournalEntry = () => {
         `)
         .eq("id", entryId)
         .single();
-
+      
       if (fetchError) throw fetchError;
-
+      
       // Reverse the account balances
       for (const line of entry.journal_entry_lines) {
         const netAmount = (line.debit || 0) - (line.credit || 0);
-
+        
         const { data: account } = await supabase
           .from("chart_of_accounts")
           .select("current_balance, account_type")
           .eq("id", line.account_id)
           .single();
-
+        
         if (account) {
           const isDebitNormal = ["asset", "expense"].includes(account.account_type);
           const adjustment = isDebitNormal ? -netAmount : netAmount; // Reverse the adjustment
-
+          
           await supabase
             .from("chart_of_accounts")
             .update({ current_balance: (account.current_balance || 0) + adjustment })
             .eq("id", line.account_id);
         }
       }
-
+      
       // Mark original entry as reversed (use 'void' since 'reversed' is not in the enum)
       const { error: statusError } = await supabase
         .from("journal_entries")
-        .update({
+        .update({ 
           status: "void" as const,
           notes: "Reversed",
         })
         .eq("id", entryId);
-
+      
       if (statusError) throw statusError;
-
+      
       // Generate reversal entry number
       const reversalEntryNumber = `REV-${entry.entry_number}`;
-
+      
       // Create reversing entry
       const { data: reversalEntry, error: reversalError } = await supabase
         .from("journal_entries")
@@ -297,9 +297,9 @@ export const useReverseJournalEntry = () => {
         }])
         .select()
         .single();
-
+      
       if (reversalError) throw reversalError;
-
+      
       // Create reversed lines (swap debit/credit)
       const reversedLines = entry.journal_entry_lines.map((line: any) => ({
         journal_entry_id: reversalEntry.id,
@@ -310,9 +310,9 @@ export const useReverseJournalEntry = () => {
         cost_center_id: line.cost_center_id,
         company_id: selectedCompanyId,
       }));
-
+      
       await supabase.from("journal_entry_lines").insert(reversedLines);
-
+      
       return reversalEntry;
     },
     onSuccess: () => {
@@ -331,7 +331,7 @@ export const useReverseJournalEntry = () => {
 export const useCreateARInvoice = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (invoice: {
       invoice_number: string;
@@ -356,13 +356,13 @@ export const useCreateARInvoice = () => {
       }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       // For consolidated GL: post to parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
-
+      
       const { lines, bus_id, bus_no, bus_type, bus_category_id, bus_sub_category_id, ...headerData } = invoice;
-
+      
       const { data, error } = await supabase
         .from("ar_invoices")
         .insert([{
@@ -379,16 +379,16 @@ export const useCreateARInvoice = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
-
+      
       if (lines?.length) {
         const lineData = lines.map(line => ({
           invoice_id: data.id,
           ...line,
           company_id: effectiveCompanyId,
         }));
-
+        
         await supabase.from("ar_invoice_lines").insert(lineData);
       }
 
@@ -397,68 +397,23 @@ export const useCreateARInvoice = () => {
         const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
         const resolved = await resolveCustomerARAccounts(invoice.customer_id, effectiveCompanyId);
 
-        let arAccountId = resolved.arAccountId;
-        let revenueAccountId = resolved.revenueAccountId;
-
-        // Fallback to gl_settings if resolution didn't find accounts
-        if (!arAccountId || !revenueAccountId) {
-          const { data: glSettings } = await (supabase as any)
-            .from("gl_settings")
-            .select("trade_receivable_account_id, sales_revenue_account_id")
-            .eq("company_id", effectiveCompanyId)
-            .maybeSingle();
-          if (!arAccountId) arAccountId = glSettings?.trade_receivable_account_id || null;
-          if (!revenueAccountId) revenueAccountId = glSettings?.sales_revenue_account_id || null;
+        if (resolved.missingAccounts.length > 0 && invoice.total_amount > 0) {
+          console.error("AR GL missing accounts:", resolved.missingAccounts);
+          toast.error(`GL Config Missing: ${resolved.missingAccounts.join("; ")}. Configure in Settings → Core GL or Customer Categories.`, { duration: 8000 });
+          // Invoice is created but flagged — don't block completely
         }
 
-        // Fallback to school_bus_finance_settings if still missing
-        if (!arAccountId || !revenueAccountId) {
-          const { data: sbsSettings } = await (supabase as any)
-            .from("school_bus_finance_settings")
-            .select("trade_receivable_account_id, sbs_collection_account_id")
-            .order("updated_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (sbsSettings) {
-            if (!arAccountId) arAccountId = sbsSettings.trade_receivable_account_id || null;
-            if (!revenueAccountId) revenueAccountId = sbsSettings.sbs_collection_account_id || null;
-          }
-        }
-
-        if (arAccountId && revenueAccountId && invoice.total_amount > 0) {
+        if (resolved.arAccountId && resolved.revenueAccountId && invoice.total_amount > 0) {
           const { postARInvoiceToGL } = await import("@/lib/gl-posting-utils");
-
-          // Fetch tax payable account from gl_settings
-          let taxPayableAccountId: string | null = null;
-          const { data: glSettingsForTax } = await (supabase as any)
-            .from("gl_settings")
-            .select("tax_payable_account_id")
-            .eq("company_id", effectiveCompanyId)
-            .maybeSingle();
-          taxPayableAccountId = glSettingsForTax?.tax_payable_account_id || null;
-
-          // If no dedicated tax_payable_account_id column, look for a "Tax Payable" account in COA
-          if (!taxPayableAccountId && (invoice.tax_amount || 0) > 0) {
-            const { data: taxAccount } = await (supabase as any)
-              .from("chart_of_accounts")
-              .select("id")
-              .eq("company_id", effectiveCompanyId)
-              .ilike("account_name", "%tax payable%")
-              .limit(1)
-              .maybeSingle();
-            taxPayableAccountId = taxAccount?.id || null;
-          }
-
           const glResult = await postARInvoiceToGL({
             invoiceNumber: invoice.invoice_number,
             invoiceDate: invoice.invoice_date,
             totalAmount: invoice.total_amount,
-            taxAmount: invoice.tax_amount || 0,
-            tradeReceivableId: arAccountId,
-            salesRevenueId: revenueAccountId,
-            taxPayableAccountId: taxPayableAccountId || undefined,
+            tradeReceivableId: resolved.arAccountId,
+            salesRevenueId: resolved.revenueAccountId,
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
+            sourceModule: 'manual_ar',
           });
           if (glResult.success && glResult.journalEntryId) {
             await (supabase as any)
@@ -466,19 +421,13 @@ export const useCreateARInvoice = () => {
               .update({ journal_entry_id: glResult.journalEntryId })
               .eq("id", data.id);
           } else if (!glResult.success) {
-            console.warn("AR Invoice GL posting failed:", glResult.error);
-          } else {
-            console.log(`[AR GL] Auto-posted GL for ${invoice.invoice_number}`);
+            toast.error(`AR Invoice created but GL posting failed: ${glResult.error}. Check Settings → Core GL.`, { duration: 8000 });
           }
-        } else {
-          console.warn("[AR GL] Skipped GL posting - missing accounts:", {
-            arAccountId, revenueAccountId, amount: invoice.total_amount
-          });
         }
-      } catch (glError) {
-        console.warn("AR Invoice GL posting error:", glError);
+      } catch (glError: any) {
+        toast.error(`AR Invoice created but GL posting error: ${glError?.message || 'Unknown'}`, { duration: 8000 });
       }
-
+      
       return data;
     },
     onSuccess: () => {
@@ -499,7 +448,7 @@ export const useCreateARInvoice = () => {
 export const useCreateARReceipt = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (receipt: {
       receipt_number: string;
@@ -517,11 +466,11 @@ export const useCreateARReceipt = () => {
       }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       // For consolidated GL: post to parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
-
+      
       const { data, error } = await supabase
         .from("ar_receipts")
         .insert([{
@@ -540,9 +489,9 @@ export const useCreateARReceipt = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
-
+      
       // Only process allocations if not an advance receipt
       if (!receipt.is_advance && receipt.allocations?.length) {
         for (const alloc of receipt.allocations) {
@@ -552,17 +501,17 @@ export const useCreateARReceipt = () => {
             allocated_amount: alloc.allocated_amount,
             company_id: effectiveCompanyId,
           }]);
-
+          
           const { data: invoice } = await supabase
             .from("ar_invoices")
             .select("balance, total_amount, paid_amount")
             .eq("id", alloc.invoice_id)
             .single();
-
+          
           if (invoice) {
             const newPaid = (invoice.paid_amount || 0) + alloc.allocated_amount;
             const newBalance = invoice.total_amount - newPaid;
-
+            
             await supabase
               .from("ar_invoices")
               .update({
@@ -706,7 +655,7 @@ export const useCreateARReceipt = () => {
       // Auto-create cheque register entry for cheque receipts
       if (receipt.payment_method === "cheque") {
         const chequePayee = customerName || `Customer Receipt ${receipt.receipt_number}`;
-
+        
         await supabase.from("cheque_register").insert([{
           cheque_number: receipt.reference || `CHQ-${data.id.slice(0, 8)}`,
           bank_account_id: receipt.bank_account_id,
@@ -720,7 +669,7 @@ export const useCreateARReceipt = () => {
           reference: receipt.reference || receipt.receipt_number,
         } as any]);
       }
-
+      
       return data;
     },
     onSuccess: () => {
@@ -744,7 +693,7 @@ export const useCreateARReceipt = () => {
 export const useCreateAPInvoice = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (invoice: {
       invoice_number: string;
@@ -770,13 +719,13 @@ export const useCreateAPInvoice = () => {
       }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       // For consolidated GL: post to parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
-
+      
       const { lines, ...headerData } = invoice;
-
+      
       const { data, error } = await supabase
         .from("ap_invoices")
         .insert([{
@@ -791,9 +740,9 @@ export const useCreateAPInvoice = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
-
+      
       // Insert line items into ap_invoice_lines
       if (lines?.length) {
         const lineData = lines.map(line => ({
@@ -807,43 +756,25 @@ export const useCreateAPInvoice = () => {
           account_id: line.account_id || null,
           company_id: effectiveCompanyId,
         }));
-
+        
         const { error: lineError } = await supabase.from("ap_invoice_lines").insert(lineData);
         if (lineError) {
           console.warn("Failed to insert AP invoice lines:", lineError.message);
         }
       }
+      
       // ========== AUTO GL POSTING at creation: DR Expense, CR Trade Payable ==========
       try {
         const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
         const resolved = await resolveVendorAPAccounts(invoice.vendor_id, effectiveCompanyId);
         
+        if (resolved.missingAccounts.length > 0 && invoice.total_amount > 0) {
+          console.error("AP GL missing accounts:", resolved.missingAccounts);
+          toast.error(`GL Config Missing: ${resolved.missingAccounts.join("; ")}. Configure in Settings → Core GL or Vendor Categories.`, { duration: 8000 });
+        }
+
         const tradePayableId = resolved.apAccountId;
         const defaultExpenseAccountId = resolved.expenseAccountId;
-
-        // Fetch input tax account for AP invoices
-        let inputTaxAccountId: string | null = null;
-        const totalTax = invoice.tax_amount || 0;
-        if (totalTax > 0) {
-          const { data: glSettingsForTax } = await (supabase as any)
-            .from("gl_settings")
-            .select("input_tax_account_id")
-            .eq("company_id", effectiveCompanyId)
-            .maybeSingle();
-          inputTaxAccountId = glSettingsForTax?.input_tax_account_id || null;
-
-          // Fallback: look for "Input Tax" or "Tax Receivable" in COA
-          if (!inputTaxAccountId) {
-            const { data: taxAccount } = await (supabase as any)
-              .from("chart_of_accounts")
-              .select("id")
-              .eq("company_id", effectiveCompanyId)
-              .or("account_name.ilike.%input tax%,account_name.ilike.%tax receivable%")
-              .limit(1)
-              .maybeSingle();
-            inputTaxAccountId = taxAccount?.id || null;
-          }
-        }
 
         if (tradePayableId && defaultExpenseAccountId && invoice.total_amount > 0) {
           const { postAPInvoiceToGL } = await import("@/lib/gl-posting-utils");
@@ -855,12 +786,10 @@ export const useCreateAPInvoice = () => {
             .eq("id", invoice.vendor_id)
             .single();
 
-          const vendorName = vendorData?.vendor_name || "";
-
           // Build per-line expense entries using 3-tier resolution: line > category > global
           const expenseLines = (lines || []).map(line => ({
             accountId: line.account_id || defaultExpenseAccountId,
-            amount: (line.line_total || 0) - (line.tax_amount || 0),
+            amount: line.line_total || 0,
             description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
           }));
 
@@ -868,14 +797,13 @@ export const useCreateAPInvoice = () => {
             invoiceNumber: invoice.invoice_number,
             invoiceDate: invoice.invoice_date,
             totalAmount: invoice.total_amount,
-            taxAmount: totalTax,
             expenseAccountId: defaultExpenseAccountId,
             tradePayableId,
-            inputTaxAccountId: inputTaxAccountId || undefined,
             companyId: effectiveCompanyId,
-            businessUnitCode,
-            vendorName,
+            businessUnitCode: businessUnitCode || undefined,
+            vendorName: vendorData?.vendor_name,
             expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
+            sourceModule: 'manual_ap',
           });
 
           if (glResult.success && glResult.journalEntryId) {
@@ -883,17 +811,12 @@ export const useCreateAPInvoice = () => {
               .from("ap_invoices")
               .update({ journal_entry_id: glResult.journalEntryId })
               .eq("id", data.id);
-            console.log(`[AP GL] Auto-posted GL for ${invoice.invoice_number}`);
           } else if (!glResult.success) {
-            console.warn("[AP GL] GL posting failed:", glResult.error);
+            toast.error(`AP Invoice created but GL posting failed: ${glResult.error}. Check Settings → Core GL.`, { duration: 8000 });
           }
-        } else {
-          console.warn("[AP GL] Skipped GL posting - missing accounts:", {
-            tradePayableId, defaultExpenseAccountId, amount: invoice.total_amount
-          });
         }
-      } catch (glError) {
-        console.warn("[AP GL] GL auto-posting error:", glError);
+      } catch (glError: any) {
+        toast.error(`AP Invoice created but GL posting error: ${glError?.message || 'Unknown'}`, { duration: 8000 });
       }
 
       return data;
@@ -916,7 +839,7 @@ export const useCreateAPInvoice = () => {
 export const useCreateAPPayment = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (payment: {
       payment_number: string;
@@ -950,7 +873,7 @@ export const useCreateAPPayment = () => {
       }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       // For consolidated GL: post to parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
@@ -962,7 +885,7 @@ export const useCreateAPPayment = () => {
         .eq("id", payment.vendor_id)
         .single();
       const vendorName = vendorData?.vendor_name || "";
-
+      
       const { data, error } = await supabase
         .from("ap_payments")
         .insert([{
@@ -986,12 +909,12 @@ export const useCreateAPPayment = () => {
         } as any])
         .select()
         .single();
-
+      
       if (error) throw error;
 
       // Calculate total WHT deducted
       const totalWhtDeducted = payment.allocations?.reduce((sum, a) => sum + (a.wht_deducted || 0), 0) || 0;
-
+      
       // Only process allocations if not an advance payment
       if (!payment.is_advance && payment.allocations?.length) {
         for (const alloc of payment.allocations) {
@@ -1002,18 +925,18 @@ export const useCreateAPPayment = () => {
             wht_deducted: alloc.wht_deducted || 0,
             company_id: effectiveCompanyId,
           }]);
-
+          
           const { data: invoice } = await supabase
             .from("ap_invoices")
             .select("balance, total_amount, paid_amount")
             .eq("id", alloc.invoice_id)
             .single();
-
+          
           if (invoice) {
             const totalPaid = alloc.allocated_amount + (alloc.wht_deducted || 0);
             const newPaid = (invoice.paid_amount || 0) + totalPaid;
             const newBalance = invoice.total_amount - newPaid;
-
+            
             await supabase
               .from("ap_invoices")
               .update({
@@ -1063,7 +986,7 @@ export const useCreateAPPayment = () => {
       if (payment.is_direct_payment && payment.direct_lines?.length && bankGLAccountId && payment.amount > 0) {
         // Build journal entry lines: debit each expense account, credit bank
         const jeLines: Array<{ account_id: string; description: string; debit_amount: number; credit_amount: number }> = [];
-
+        
         for (const line of payment.direct_lines) {
           if (line.account_id && line.line_total > 0) {
             jeLines.push({
@@ -1144,7 +1067,7 @@ export const useCreateAPPayment = () => {
           .eq("is_active", true)
           .ilike("account_name", "%trade payable%")
           .limit(1);
-
+        
         const tradePayableId = payableAccounts?.[0]?.id || null;
 
         // Find WHT Payable account if needed
@@ -1164,7 +1087,7 @@ export const useCreateAPPayment = () => {
         // Only post to GL if we have the required accounts
         if (tradePayableId && bankGLAccountId && payment.amount > 0) {
           const { postAPPaymentToGL } = await import("@/lib/gl-posting-utils");
-
+          
           const glResult = await postAPPaymentToGL({
             paymentNumber: payment.payment_number,
             paymentDate: payment.payment_date,
@@ -1296,7 +1219,7 @@ export const useCreateAPPayment = () => {
           }
         }
       }
-
+      
       return data;
     },
     onSuccess: () => {
@@ -1319,8 +1242,8 @@ export const useCreateAPPayment = () => {
 // ============ Bank Transactions ============
 export const useCreateBankTransaction = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (transaction: {
       bank_account_id: string;
@@ -1333,10 +1256,7 @@ export const useCreateBankTransaction = () => {
       cheque_number?: string;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
-      const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : undefined;
-
+      
       const { data, error } = await supabase
         .from("bank_transactions")
         .insert([{
@@ -1345,102 +1265,14 @@ export const useCreateBankTransaction = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
-
-      // ========== AUTO GL POSTING ==========
-      try {
-        const amount = (transaction.debit_amount || 0) + (transaction.credit_amount || 0);
-        if (amount > 0) {
-          // Get the bank account's GL account
-          const { data: bankAccount } = await (supabase as any)
-            .from("bank_accounts")
-            .select("gl_account_id, account_name")
-            .eq("id", transaction.bank_account_id)
-            .single();
-
-          const bankGLAccountId = bankAccount?.gl_account_id;
-
-          if (bankGLAccountId) {
-            // Determine contra account - look for a matching account or use default
-            let contraAccountId: string | null = null;
-
-            // Try gl_settings for default
-            const { data: glSettings } = await (supabase as any)
-              .from("gl_settings")
-              .select("default_expense_account_id, sales_revenue_account_id")
-              .eq("company_id", effectiveCompanyId)
-              .maybeSingle();
-
-            if (transaction.debit_amount && transaction.debit_amount > 0) {
-              // Deposit: DR Bank, CR contra (revenue/other income)
-              contraAccountId = glSettings?.sales_revenue_account_id || null;
-              if (!contraAccountId) {
-                const { data: incomeAccount } = await (supabase as any)
-                  .from("chart_of_accounts")
-                  .select("id")
-                  .eq("company_id", effectiveCompanyId)
-                  .or("account_name.ilike.%other income%,account_name.ilike.%sundry income%,account_name.ilike.%miscellaneous income%")
-                  .limit(1)
-                  .maybeSingle();
-                contraAccountId = incomeAccount?.id || null;
-              }
-            } else {
-              // Withdrawal: DR contra (expense), CR Bank
-              contraAccountId = glSettings?.default_expense_account_id || null;
-              if (!contraAccountId) {
-                const { data: expAccount } = await (supabase as any)
-                  .from("chart_of_accounts")
-                  .select("id")
-                  .eq("company_id", effectiveCompanyId)
-                  .eq("account_type", "expense")
-                  .ilike("account_name", "%general expense%")
-                  .limit(1)
-                  .maybeSingle();
-                contraAccountId = expAccount?.id || null;
-              }
-            }
-
-            if (contraAccountId) {
-              const isDeposit = (transaction.debit_amount || 0) > 0;
-              const txType = isDeposit ? "deposit" : "withdrawal";
-
-              const { postBankTransactionToGL } = await import("@/lib/gl-posting-utils");
-              const glResult = await postBankTransactionToGL({
-                reference: transaction.reference || data.id,
-                transactionDate: transaction.transaction_date,
-                amount,
-                bankAccountId: bankGLAccountId,
-                contraAccountId,
-                transactionType: txType as "deposit" | "withdrawal",
-                companyId: effectiveCompanyId,
-                businessUnitCode,
-                description: transaction.description,
-              });
-
-              if (glResult.success) {
-                console.log(`[Bank GL] Auto-posted GL for bank transaction ${data.id}`);
-              } else {
-                console.warn("[Bank GL] GL posting failed:", glResult.error);
-              }
-            } else {
-              console.warn("[Bank GL] No contra account found, skipping GL posting");
-            }
-          } else {
-            console.warn("[Bank GL] Bank account has no GL account linked, skipping GL posting");
-          }
-        }
-      } catch (glError) {
-        console.warn("[Bank GL] GL posting error:", glError);
-      }
-
+      
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       toast.success("Transaction recorded successfully");
     },
     onError: (error) => {
@@ -1453,7 +1285,7 @@ export const useCreateBankTransaction = () => {
 export const useCreateFixedAsset = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (asset: {
       asset_code: string;
@@ -1466,7 +1298,7 @@ export const useCreateFixedAsset = () => {
       department?: string;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data, error } = await supabase
         .from("fixed_assets")
         .insert([{
@@ -1485,7 +1317,7 @@ export const useCreateFixedAsset = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
 
       // ========== ACQUISITION GL POSTING ==========
@@ -1498,7 +1330,7 @@ export const useCreateFixedAsset = () => {
 
       if (category?.asset_account_id && category?.bank_account_id) {
         const { createAndPostJournalEntry, generateEntryNumber } = await import("@/lib/gl-posting-utils");
-
+        
         const glResult = await createAndPostJournalEntry({
           entry_date: asset.purchase_date,
           description: `Asset Acquisition: ${asset.asset_name} (${asset.asset_code})`,
@@ -1545,7 +1377,7 @@ export const useCreateFixedAsset = () => {
 export const useRunDepreciation = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (periodId: string) => {
       let query = supabase
@@ -1560,26 +1392,26 @@ export const useRunDepreciation = () => {
           )
         `)
         .eq("status", "active");
-
+      
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-
+      
       const { data: assets, error: fetchError } = await query;
       if (fetchError) throw fetchError;
-
+      
       const schedules = [];
-
+      
       for (const asset of assets || []) {
         if (!asset.asset_categories) continue;
-
-        const monthlyDepreciation =
-          (asset.purchase_cost - (asset.salvage_value || 0)) /
+        
+        const monthlyDepreciation = 
+          (asset.purchase_cost - (asset.salvage_value || 0)) / 
           ((asset.asset_categories.useful_life_years || 5) * 12);
-
+        
         const newAccumulated = (asset.accumulated_depreciation || 0) + monthlyDepreciation;
         const newNetValue = asset.purchase_cost - newAccumulated;
-
+        
         schedules.push({
           asset_id: asset.id,
           period_id: periodId,
@@ -1590,7 +1422,7 @@ export const useRunDepreciation = () => {
           is_posted: false,
           company_id: selectedCompanyId,
         });
-
+        
         await supabase
           .from("fixed_assets")
           .update({
@@ -1599,11 +1431,11 @@ export const useRunDepreciation = () => {
           })
           .eq("id", asset.id);
       }
-
+      
       if (schedules.length > 0) {
         await supabase.from("asset_depreciation_schedule").insert(schedules);
       }
-
+      
       return { processedAssets: schedules.length };
     },
     onSuccess: (data) => {
@@ -1621,7 +1453,7 @@ export const useRunDepreciation = () => {
 export const useClosePeriod = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (periodId: string) => {
       const { data: unposted } = await supabase
@@ -1630,19 +1462,19 @@ export const useClosePeriod = () => {
         .eq("period_id", periodId)
         .neq("status", "posted")
         .limit(1);
-
+      
       if (unposted?.length) {
         throw new Error("Cannot close period with unposted journal entries");
       }
-
+      
       const { error } = await supabase
         .from("financial_periods")
-        .update({
+        .update({ 
           is_closed: true,
           closed_at: new Date().toISOString(),
         })
         .eq("id", periodId);
-
+      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -1659,7 +1491,7 @@ export const useClosePeriod = () => {
 export const useCreateCustomer = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (customer: {
       customer_code: string;
@@ -1673,11 +1505,11 @@ export const useCreateCustomer = () => {
       is_active?: boolean;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       // For consolidated GL: store under parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
-
+      
       const { data, error } = await supabase
         .from("customers")
         .insert([{
@@ -1687,7 +1519,7 @@ export const useCreateCustomer = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
       return data;
     },
@@ -1704,14 +1536,14 @@ export const useCreateCustomer = () => {
 export const useUpdateCustomer = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string;[key: string]: any }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; [key: string]: any }) => {
       const { error } = await supabase
         .from("customers")
         .update(updates)
         .eq("id", id);
-
+      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -1728,7 +1560,7 @@ export const useUpdateCustomer = () => {
 export const useCreateVendor = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (vendor: {
       vendor_code: string;
@@ -1743,11 +1575,11 @@ export const useCreateVendor = () => {
       is_active?: boolean;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       // For consolidated GL: store under parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
-
+      
       const { data, error } = await supabase
         .from("vendors")
         .insert([{
@@ -1757,7 +1589,7 @@ export const useCreateVendor = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
       return data;
     },
@@ -1774,14 +1606,14 @@ export const useCreateVendor = () => {
 export const useUpdateVendor = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string;[key: string]: any }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; [key: string]: any }) => {
       const { error } = await supabase
         .from("vendors")
         .update(updates)
         .eq("id", id);
-
+      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -1797,84 +1629,24 @@ export const useUpdateVendor = () => {
 // ============ AR Credit Notes ============
 export const useCreateARCreditNote = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: any) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await supabase
         .from("ar_credit_notes")
         .insert([{ ...data, company_id: selectedCompanyId }])
         .select()
         .single();
       if (error) throw error;
-
-      // ========== AUTO GL POSTING (AR Credit Note Reversal) ==========
-      // DR Sales Revenue → CR Trade Receivable
-      const creditAmount = data.amount || data.total_amount || 0;
-      if (creditAmount > 0) {
-        try {
-          const effectiveCompanyId = getEffectiveCompanyId();
-          const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : undefined;
-
-          // Find Trade Receivable account
-          const { data: arAccounts } = await supabase
-            .from("chart_of_accounts")
-            .select("id")
-            .eq("company_id", effectiveCompanyId)
-            .eq("account_type", "asset")
-            .eq("is_active", true)
-            .ilike("account_name", "%trade receivable%")
-            .limit(1);
-
-          // Find Sales Revenue account
-          const { data: revenueAccounts } = await supabase
-            .from("chart_of_accounts")
-            .select("id")
-            .eq("company_id", effectiveCompanyId)
-            .eq("account_type", "revenue")
-            .eq("is_active", true)
-            .limit(1);
-
-          const tradeReceivableId = arAccounts?.[0]?.id;
-          const salesRevenueId = revenueAccounts?.[0]?.id;
-
-          if (tradeReceivableId && salesRevenueId) {
-            const { postARCreditNoteToGL } = await import("@/lib/gl-posting-utils");
-            const glResult = await postARCreditNoteToGL({
-              creditNoteNumber: data.credit_note_number || result.id.substring(0, 8),
-              creditNoteDate: data.credit_note_date || new Date().toISOString().split("T")[0],
-              amount: creditAmount,
-              salesRevenueId,
-              tradeReceivableId,
-              companyId: effectiveCompanyId,
-              businessUnitCode,
-              customerName: data.customer_name,
-            });
-
-            if (glResult.success && glResult.journalEntryId) {
-              await supabase
-                .from("ar_credit_notes")
-                .update({ journal_entry_id: glResult.journalEntryId } as any)
-                .eq("id", result.id);
-            } else if (!glResult.success) {
-              console.warn("[AR Credit Note GL] GL posting failed:", glResult.error);
-            }
-          }
-        } catch (glError) {
-          console.error("[AR Credit Note GL] Auto GL posting error:", glError);
-        }
-      }
-
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ar-invoices", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["ar-credit-notes", selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
-      toast.success("Credit note created with GL posting");
+      toast.success("Credit note created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
   });
@@ -1883,84 +1655,24 @@ export const useCreateARCreditNote = () => {
 // ============ AP Debit Notes ============
 export const useCreateAPDebitNote = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: any) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await supabase
         .from("ap_debit_notes")
         .insert([{ ...data, company_id: selectedCompanyId }])
         .select()
         .single();
       if (error) throw error;
-
-      // ========== AUTO GL POSTING (AP Debit Note Reversal) ==========
-      // DR Trade Payable → CR Expense
-      const debitAmount = data.amount || data.total_amount || 0;
-      if (debitAmount > 0) {
-        try {
-          const effectiveCompanyId = getEffectiveCompanyId();
-          const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : undefined;
-
-          // Find Trade Payable account
-          const { data: apAccounts } = await supabase
-            .from("chart_of_accounts")
-            .select("id")
-            .eq("company_id", effectiveCompanyId)
-            .eq("account_type", "liability")
-            .eq("is_active", true)
-            .ilike("account_name", "%trade payable%")
-            .limit(1);
-
-          // Find an Expense account
-          const { data: expenseAccounts } = await supabase
-            .from("chart_of_accounts")
-            .select("id")
-            .eq("company_id", effectiveCompanyId)
-            .eq("account_type", "expense")
-            .eq("is_active", true)
-            .limit(1);
-
-          const tradePayableId = apAccounts?.[0]?.id;
-          const expenseAccountId = expenseAccounts?.[0]?.id;
-
-          if (tradePayableId && expenseAccountId) {
-            const { postAPDebitNoteToGL } = await import("@/lib/gl-posting-utils");
-            const glResult = await postAPDebitNoteToGL({
-              debitNoteNumber: data.debit_note_number || result.id.substring(0, 8),
-              debitNoteDate: data.debit_note_date || new Date().toISOString().split("T")[0],
-              amount: debitAmount,
-              tradePayableId,
-              expenseAccountId,
-              companyId: effectiveCompanyId,
-              businessUnitCode,
-              vendorName: data.vendor_name,
-            });
-
-            if (glResult.success && glResult.journalEntryId) {
-              await supabase
-                .from("ap_debit_notes")
-                .update({ journal_entry_id: glResult.journalEntryId } as any)
-                .eq("id", result.id);
-            } else if (!glResult.success) {
-              console.warn("[AP Debit Note GL] GL posting failed:", glResult.error);
-            }
-          }
-        } catch (glError) {
-          console.error("[AP Debit Note GL] Auto GL posting error:", glError);
-        }
-      }
-
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["ap-debit-notes", selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
-      toast.success("Debit note created with GL posting");
+      toast.success("Debit note created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
   });
@@ -1970,7 +1682,7 @@ export const useCreateAPDebitNote = () => {
 export const useApproveAPInvoice = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (id: string) => {
       // Update approval status
@@ -1985,7 +1697,7 @@ export const useApproveAPInvoice = () => {
         // Fetch invoice details including journal_entry_id for guard check
         const { data: invoice } = await (supabase as any)
           .from("ap_invoices")
-          .select("invoice_number, invoice_date, total_amount, tax_amount, vendor_id, journal_entry_id, vendors(vendor_name)")
+          .select("invoice_number, invoice_date, total_amount, vendor_id, journal_entry_id, vendors(vendor_name)")
           .eq("id", id)
           .single();
 
@@ -1994,12 +1706,6 @@ export const useApproveAPInvoice = () => {
           console.log("AP Invoice already posted to GL (journal_entry_id exists), skipping on approval.");
           return;
         }
-
-        // Fetch invoice lines with per-line account_id
-        const { data: invoiceLines } = await (supabase as any)
-          .from("ap_invoice_lines")
-          .select("account_id, line_total, description, tax_amount")
-          .eq("invoice_id", id);
 
         // Legacy invoice without GL posting — post now using vendor category resolution
         if (invoice && invoice.total_amount > 0) {
@@ -2010,36 +1716,19 @@ export const useApproveAPInvoice = () => {
           const defaultExpenseAccountId = resolved.expenseAccountId;
 
           if (tradePayableId && defaultExpenseAccountId) {
+            // Fetch invoice lines with per-line account_id
+            const { data: invoiceLines } = await (supabase as any)
+              .from("ap_invoice_lines")
+              .select("account_id, line_total, description")
+              .eq("invoice_id", id);
+
             const { postAPInvoiceToGL } = await import("@/lib/gl-posting-utils");
             const vendorData = invoice.vendors as any;
 
-            // Fetch input tax account
-            let inputTaxAccountId: string | null = null;
-            const totalTax = invoice.tax_amount || 0;
-            if (totalTax > 0) {
-              const { data: glSettingsForTax } = await (supabase as any)
-                .from("gl_settings")
-                .select("input_tax_account_id")
-                .eq("company_id", effectiveCompanyId)
-                .maybeSingle();
-              inputTaxAccountId = glSettingsForTax?.input_tax_account_id || null;
-
-              if (!inputTaxAccountId) {
-                const { data: taxAccount } = await (supabase as any)
-                  .from("chart_of_accounts")
-                  .select("id")
-                  .eq("company_id", effectiveCompanyId)
-                  .or("account_name.ilike.%input tax%,account_name.ilike.%tax receivable%")
-                  .limit(1)
-                  .maybeSingle();
-                inputTaxAccountId = taxAccount?.id || null;
-              }
-            }
-
-            // Build per-line expense entries, falling back to default account (deduct per-line tax)
+            // Build per-line expense entries using 3-tier: line > category > global
             const expenseLines = (invoiceLines || []).map((line: any) => ({
               accountId: line.account_id || defaultExpenseAccountId,
-              amount: (line.line_total || 0) - (line.tax_amount || 0),
+              amount: line.line_total || 0,
               description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
             }));
 
@@ -2047,29 +1736,22 @@ export const useApproveAPInvoice = () => {
               invoiceNumber: invoice.invoice_number,
               invoiceDate: invoice.invoice_date,
               totalAmount: invoice.total_amount,
-              taxAmount: totalTax,
               expenseAccountId: defaultExpenseAccountId,
               tradePayableId,
-              inputTaxAccountId: inputTaxAccountId || undefined,
               companyId: effectiveCompanyId,
               businessUnitCode,
               vendorName: vendorData?.vendor_name,
               expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
             });
-
             if (glResult.success && glResult.journalEntryId) {
-              // Link journal_entry_id back to ap_invoices so GL Guardian sees it as posted
               await (supabase as any)
                 .from("ap_invoices")
                 .update({ journal_entry_id: glResult.journalEntryId })
                 .eq("id", id);
-              console.log(`[AP GL] Auto-posted GL for ${invoice.invoice_number}`);
             } else if (!glResult.success) {
               console.warn("AP Invoice GL posting failed:", glResult.error);
             }
           }
-        } else {
-          console.warn("[AP GL] Skipped GL posting - missing invoice data or zero amount.");
         }
       } catch (glError) {
         console.warn("AP Invoice GL posting error:", glError);
@@ -2088,7 +1770,7 @@ export const useApproveAPInvoice = () => {
 export const useApproveAPPayment = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (id: string) => {
       // Update approval status
@@ -2121,7 +1803,7 @@ export const useApproveAPPayment = () => {
           const { createAndPostJournalEntry } = await import("@/lib/gl-posting-utils");
           const vendorData = payment.vendors as Record<string, string> | null;
           const vendorName = vendorData?.vendor_name || "Vendor";
-
+          
           const glResult = await createAndPostJournalEntry({
             entry_date: payment.payment_date,
             description: `AP Payment: ${payment.payment_number} - ${vendorName}`,
@@ -2171,11 +1853,11 @@ export const useApproveAPPayment = () => {
 export const useCreateItem = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: any) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await supabase
         .from("items")
         .insert([{ ...data, company_id: selectedCompanyId }])
@@ -2195,7 +1877,7 @@ export const useCreateItem = () => {
 export const useCreateItemCategory = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (category: {
       category_code: string;
@@ -2208,7 +1890,7 @@ export const useCreateItemCategory = () => {
       is_active?: boolean;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data, error } = await (supabase as any)
         .from("item_categories")
         .insert([{ ...category, company_id: selectedCompanyId }])
@@ -2227,122 +1909,23 @@ export const useCreateItemCategory = () => {
 
 export const useCreateStockAdjustment = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: any) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
-      const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : undefined;
-
+      
       const { data: result, error } = await supabase
         .from("stock_adjustments")
         .insert([{ ...data, company_id: selectedCompanyId }])
         .select()
         .single();
       if (error) throw error;
-
-      // ========== AUTO GL POSTING ==========
-      try {
-        const adjustmentQty = data.quantity_change || data.adjustment_quantity || 0;
-        const unitCost = data.unit_cost || data.cost_per_unit || 0;
-        const totalValue = Math.abs(adjustmentQty * unitCost);
-
-        if (totalValue > 0) {
-          // Get inventory GL account from item category or gl_settings
-          let inventoryAccountId: string | null = null;
-          let adjustmentAccountId: string | null = null;
-
-          // Try item category first
-          if (data.item_id) {
-            const { data: item } = await (supabase as any)
-              .from("items")
-              .select("category_id, item_categories(inventory_account_id)")
-              .eq("id", data.item_id)
-              .single();
-            if (item?.item_categories?.inventory_account_id) {
-              inventoryAccountId = item.item_categories.inventory_account_id;
-            }
-          }
-
-          // Fallback to gl_settings
-          if (!inventoryAccountId) {
-            const { data: glSettings } = await (supabase as any)
-              .from("gl_settings")
-              .select("inventory_account_id, inventory_adjustment_account_id")
-              .eq("company_id", effectiveCompanyId)
-              .maybeSingle();
-            inventoryAccountId = glSettings?.inventory_account_id || null;
-            adjustmentAccountId = glSettings?.inventory_adjustment_account_id || null;
-          }
-
-          // Fallback: search COA
-          if (!inventoryAccountId) {
-            const { data: invAcct } = await (supabase as any)
-              .from("chart_of_accounts")
-              .select("id")
-              .eq("company_id", effectiveCompanyId)
-              .ilike("account_name", "%inventory%")
-              .eq("account_type", "asset")
-              .limit(1)
-              .maybeSingle();
-            inventoryAccountId = invAcct?.id || null;
-          }
-
-          if (!adjustmentAccountId) {
-            const { data: adjAcct } = await (supabase as any)
-              .from("chart_of_accounts")
-              .select("id")
-              .eq("company_id", effectiveCompanyId)
-              .or("account_name.ilike.%inventory adjustment%,account_name.ilike.%stock adjustment%")
-              .limit(1)
-              .maybeSingle();
-            adjustmentAccountId = adjAcct?.id || null;
-          }
-
-          if (inventoryAccountId && adjustmentAccountId) {
-            const { createAndPostJournalEntry, generateEntryNumber } = await import("@/lib/gl-posting-utils");
-            const isIncrease = adjustmentQty > 0;
-            const reason = data.reason || data.notes || "Stock Adjustment";
-
-            const glResult = await createAndPostJournalEntry({
-              entry_date: data.adjustment_date || new Date().toISOString().split("T")[0],
-              description: `Stock Adjustment: ${reason}`,
-              reference: result.adjustment_number || result.id || generateEntryNumber("STK-ADJ"),
-              company_id: effectiveCompanyId,
-              business_unit_code: businessUnitCode,
-              lines: isIncrease
-                ? [
-                  { account_id: inventoryAccountId, description: `Inventory Increase - ${reason}`, debit: totalValue, credit: 0 },
-                  { account_id: adjustmentAccountId, description: `Stock Adjustment (Increase) - ${reason}`, debit: 0, credit: totalValue },
-                ]
-                : [
-                  { account_id: adjustmentAccountId, description: `Stock Adjustment (Decrease) - ${reason}`, debit: totalValue, credit: 0 },
-                  { account_id: inventoryAccountId, description: `Inventory Decrease - ${reason}`, debit: 0, credit: totalValue },
-                ],
-            });
-
-            if (glResult.success) {
-              console.log(`[Stock GL] Auto-posted GL for stock adjustment ${result.id}`);
-            } else {
-              console.warn("[Stock GL] GL posting failed:", glResult.error);
-            }
-          } else {
-            console.warn("[Stock GL] Missing inventory or adjustment GL accounts, skipping GL posting");
-          }
-        }
-      } catch (glError) {
-        console.warn("[Stock GL] GL posting error:", glError);
-      }
-
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["items", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["item-stock", selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       toast.success("Stock adjusted");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -2353,11 +1936,11 @@ export const useCreateStockAdjustment = () => {
 export const useCreatePurchaseOrder = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: any) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { lines, ...poData } = data;
       const { data: result, error } = await supabase
         .from("purchase_orders")
@@ -2381,11 +1964,11 @@ export const useCreatePurchaseOrder = () => {
 export const useCreateGoodsReceipt = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: any) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { lines, ...grnData } = data;
       const { data: result, error } = await supabase
         .from("goods_receipt_notes")
@@ -2408,7 +1991,7 @@ export const useCreateGoodsReceipt = () => {
 export const useCreateRecurringEntry = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (entry: {
       entry_name: string;
@@ -2421,10 +2004,10 @@ export const useCreateRecurringEntry = () => {
       credit_account_id: string;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await (supabase as any)
         .from("recurring_journal_entries")
-        .insert([{
+        .insert([{ 
           entry_name: entry.entry_name,
           description: entry.description,
           frequency: entry.frequency,
@@ -2453,7 +2036,7 @@ export const useCreateRecurringEntry = () => {
 export const useRunRecurringEntry = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (id: string) => {
       if (!selectedCompanyId) throw new Error("No company selected");
@@ -2581,11 +2164,11 @@ export const useUpdateExchangeRate = () => {
 export const useCreatePurchaseRequisition = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: any) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await supabase
         .from("purchase_requisitions" as any)
         .insert([{ ...data, status: "draft", company_id: selectedCompanyId }])
@@ -2605,7 +2188,7 @@ export const useCreatePurchaseRequisition = () => {
 export const useApprovePurchaseRequisition = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("purchase_requisitions" as any).update({ status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
@@ -2622,16 +2205,16 @@ export const useApprovePurchaseRequisition = () => {
 export const useConvertPRtoPO = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (prId: string) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: prData, error: prError } = await supabase.from("purchase_requisitions" as any).select("*").eq("id", prId).single();
       if (prError) throw prError;
-
+      
       const pr = prData as any;
-
+      
       const { data: po, error: poError } = await supabase.from("purchase_orders").insert([{
         po_number: `PO-${Date.now()}`,
         vendor_id: pr.vendor_id || null,
@@ -2644,9 +2227,9 @@ export const useConvertPRtoPO = () => {
         company_id: selectedCompanyId,
       }]).select().single();
       if (poError) throw poError;
-
+      
       await supabase.from("purchase_requisitions" as any).update({ status: "converted", converted_to_po_id: po.id }).eq("id", prId);
-
+      
       return po;
     },
     onSuccess: () => {
@@ -2662,11 +2245,11 @@ export const useConvertPRtoPO = () => {
 export const useCreateBankReconciliation = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: { bank_account_id: string; statement_date: string; statement_balance: number; book_balance: number }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await supabase.from("bank_reconciliations").insert([{
         ...data,
         reconciliation_date: new Date().toISOString().split('T')[0],
@@ -2688,7 +2271,7 @@ export const useCreateBankReconciliation = () => {
 export const useSaveBankReconciliation = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: {
       bank_account_id: string;
@@ -2702,7 +2285,7 @@ export const useSaveBankReconciliation = () => {
       cleared_amounts: Record<string, number>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       // 1. Create the reconciliation header
       const { data: recon, error: reconError } = await supabase
         .from("bank_reconciliations")
@@ -2757,7 +2340,6 @@ export const useSaveBankReconciliation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-reconciliations"] });
       queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
       queryClient.invalidateQueries({ queryKey: ["last-reconciliation"] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
       toast.success("Reconciliation completed and saved");
@@ -2769,11 +2351,11 @@ export const useSaveBankReconciliation = () => {
 export const useMatchReconciliationItem = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async ({ itemId, transactionId }: { itemId: string; transactionId: string }) => {
-      const { error } = await supabase.from("bank_reconciliation_items" as any).update({
-        bank_transaction_id: transactionId,
+      const { error } = await supabase.from("bank_reconciliation_items" as any).update({ 
+        bank_transaction_id: transactionId, 
         match_status: "matched",
         matched_at: new Date().toISOString(),
       }).eq("id", itemId);
@@ -2791,11 +2373,11 @@ export const useMatchReconciliationItem = () => {
 export const useCreateFundTransfer = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: { from_account_id: string; to_account_id: string; amount: number; transfer_date: string; reference?: string }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await supabase.from("fund_transfers" as any).insert([{
         ...data,
         status: "completed",
@@ -2862,19 +2444,19 @@ export const useCreateFundTransfer = () => {
 export const useCreateAssetDisposal = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: { asset_id: string; disposal_date: string; disposal_type: string; disposal_value?: number; reason?: string }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: asset, error: assetError } = await supabase.from("fixed_assets").select("*, asset_categories(asset_account_id, accumulated_dep_account_id, bank_account_id, gain_loss_disposal_account_id)").eq("id", data.asset_id).single();
       if (assetError) throw assetError;
-
+      
       const nbv = asset.current_value || 0;
       const gainLoss = (data.disposal_value || 0) - nbv;
       const accumulatedDep = asset.accumulated_depreciation || 0;
       const purchaseCost = asset.purchase_cost || 0;
-
+      
       const { data: result, error } = await supabase.from("asset_disposals").insert([{
         ...data,
         net_book_value: nbv,
@@ -2884,16 +2466,16 @@ export const useCreateAssetDisposal = () => {
         company_id: selectedCompanyId,
       }]).select().single();
       if (error) throw error;
-
+      
       await supabase.from("fixed_assets").update({ status: "disposed" }).eq("id", data.asset_id);
 
       // ========== DISPOSAL GL POSTING ==========
       const cat = asset.asset_categories;
       if (cat?.asset_account_id && cat?.accumulated_dep_account_id && cat?.gain_loss_disposal_account_id) {
         const { createAndPostJournalEntry } = await import("@/lib/gl-posting-utils");
-
+        
         const lines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
-
+        
         // DR Accumulated Depreciation (remove contra-asset)
         if (accumulatedDep > 0) {
           lines.push({
@@ -2940,7 +2522,7 @@ export const useCreateAssetDisposal = () => {
           debit: 0,
           credit: purchaseCost,
         });
-
+        
         const glResult = await createAndPostJournalEntry({
           entry_date: data.disposal_date,
           description: `Asset Disposal: ${asset.asset_name} (${asset.asset_code})`,
@@ -2958,7 +2540,7 @@ export const useCreateAssetDisposal = () => {
       } else {
         toast.warning("Disposal recorded — GL accounts not fully configured on category.");
       }
-
+      
       return result;
     },
     onSuccess: () => {
@@ -2976,11 +2558,11 @@ export const useCreateAssetDisposal = () => {
 export const useCreateBadDebtProvision = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: { customer_id?: string; invoice_id?: string; provision_amount: number; provision_date: string; reason?: string }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await supabase.from("ar_bad_debt_provisions").insert([{
         ...data,
         status: "pending",
@@ -3000,10 +2582,10 @@ export const useCreateBadDebtProvision = () => {
 export const useWriteOffBadDebt = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (provisionId: string) => {
-      const { error } = await supabase.from("ar_bad_debt_provisions").update({
+      const { error } = await supabase.from("ar_bad_debt_provisions").update({ 
         status: "written_off",
         write_off_date: new Date().toISOString().split('T')[0],
       }).eq("id", provisionId);
@@ -3022,11 +2604,11 @@ export const useWriteOffBadDebt = () => {
 export const useCreateBatchNumber = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: { item_id: string; batch_number: string; quantity_received: number; expiry_date?: string; manufacture_date?: string }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await supabase.from("batch_numbers").insert([{
         ...data,
         quantity_available: data.quantity_received,
@@ -3047,11 +2629,11 @@ export const useCreateBatchNumber = () => {
 export const useCreateSerialNumber = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: { item_id: string; serial_number: string; status?: string }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await supabase.from("serial_numbers" as any).insert([{
         ...data,
         status: data.status || "available",
@@ -3072,11 +2654,11 @@ export const useCreateSerialNumber = () => {
 export const useCreateWHTCertificate = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: { vendor_id: string; certificate_number: string; certificate_date: string; wht_amount: number; tax_period?: string }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await supabase.from("wht_certificates" as any).insert([{
         ...data,
         status: "issued",
@@ -3097,12 +2679,12 @@ export const useCreateWHTCertificate = () => {
 export const useApprovePurchaseOrder = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("purchase_orders")
-        .update({
+        .update({ 
           status: "approved",
           approved_at: new Date().toISOString(),
         })
@@ -3120,12 +2702,12 @@ export const useApprovePurchaseOrder = () => {
 export const useRejectPurchaseOrder = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       const { error } = await supabase
         .from("purchase_orders")
-        .update({
+        .update({ 
           status: "rejected",
           notes: reason,
         })
@@ -3144,12 +2726,12 @@ export const useRejectPurchaseOrder = () => {
 export const useApproveStockAdjustment = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("stock_adjustments")
-        .update({
+        .update({ 
           status: "approved",
           approved_at: new Date().toISOString(),
         })
@@ -3192,13 +2774,13 @@ export const useApproveStockAdjustment = () => {
             business_unit_code: businessUnitCode || "HQ",
             lines: isIncrease
               ? [
-                { account_id: inventoryAccountId, description: `Inventory Increase - ${itemName}`, debit: adjustment.adjustment_value, credit: 0 },
-                { account_id: adjustmentExpenseId, description: `Stock Adjustment - ${itemName}`, debit: 0, credit: adjustment.adjustment_value },
-              ]
+                  { account_id: inventoryAccountId, description: `Inventory Increase - ${itemName}`, debit: adjustment.adjustment_value, credit: 0 },
+                  { account_id: adjustmentExpenseId, description: `Stock Adjustment - ${itemName}`, debit: 0, credit: adjustment.adjustment_value },
+                ]
               : [
-                { account_id: adjustmentExpenseId, description: `Stock Adjustment Write-off - ${itemName}`, debit: adjustment.adjustment_value, credit: 0 },
-                { account_id: inventoryAccountId, description: `Inventory Decrease - ${itemName}`, debit: 0, credit: adjustment.adjustment_value },
-              ],
+                  { account_id: adjustmentExpenseId, description: `Stock Adjustment Write-off - ${itemName}`, debit: adjustment.adjustment_value, credit: 0 },
+                  { account_id: inventoryAccountId, description: `Inventory Decrease - ${itemName}`, debit: 0, credit: adjustment.adjustment_value },
+                ],
           });
 
           if (!glResult.success) {
@@ -3224,12 +2806,12 @@ export const useApproveStockAdjustment = () => {
 export const useRejectJournalEntry = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       const { error } = await supabase
         .from("journal_entries")
-        .update({
+        .update({ 
           status: "void",
           notes: reason,
         })
@@ -3247,12 +2829,12 @@ export const useRejectJournalEntry = () => {
 export const useRejectAPInvoice = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       const { error } = await supabase
         .from("ap_invoices")
-        .update({
+        .update({ 
           approval_status: "rejected",
           notes: reason,
         })
@@ -3270,12 +2852,12 @@ export const useRejectAPInvoice = () => {
 export const useRejectAPPayment = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       const { error } = await supabase
         .from("ap_payments")
-        .update({
+        .update({ 
           approval_status: "rejected",
           notes: reason,
         })
@@ -3294,11 +2876,11 @@ export const useRejectAPPayment = () => {
 export const useCreateReversingEntry = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async ({ originalEntryId, reverseDate }: { originalEntryId: string; reverseDate: string }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: original, error: fetchError } = await supabase
         .from("journal_entries")
         .select(`
@@ -3307,9 +2889,9 @@ export const useCreateReversingEntry = () => {
         `)
         .eq("id", originalEntryId)
         .single();
-
+      
       if (fetchError) throw fetchError;
-
+      
       const reverseEntryNumber = `REV-${Date.now()}`;
       const { data: reversingEntry, error: entryError } = await supabase
         .from("journal_entries")
@@ -3326,9 +2908,9 @@ export const useCreateReversingEntry = () => {
         }])
         .select()
         .single();
-
+      
       if (entryError) throw entryError;
-
+      
       const reversedLines = original.journal_entry_lines.map((line: any) => ({
         journal_entry_id: reversingEntry.id,
         account_id: line.account_id,
@@ -3338,13 +2920,13 @@ export const useCreateReversingEntry = () => {
         cost_center_id: line.cost_center_id,
         company_id: selectedCompanyId,
       }));
-
+      
       const { error: linesError } = await supabase
         .from("journal_entry_lines")
         .insert(reversedLines);
-
+      
       if (linesError) throw linesError;
-
+      
       return reversingEntry;
     },
     onSuccess: () => {
@@ -3359,19 +2941,19 @@ export const useCreateReversingEntry = () => {
 export const useRunDepreciationWithGL = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (periodId: string) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: period, error: periodError } = await supabase
         .from("financial_periods")
         .select("*")
         .eq("id", periodId)
         .single();
-
+      
       if (periodError) throw periodError;
-
+      
       let query = supabase
         .from("fixed_assets")
         .select(`
@@ -3383,27 +2965,27 @@ export const useRunDepreciationWithGL = () => {
           )
         `)
         .eq("status", "active");
-
+      
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-
+      
       const { data: assets, error: assetsError } = await query;
       if (assetsError) throw assetsError;
-
+      
       const scheduleEntries: any[] = [];
       const journalLines: any[] = [];
       let totalDepreciation = 0;
-
+      
       for (const asset of assets || []) {
         if (!asset.asset_categories) continue;
-
+        
         const usefulLife = asset.asset_categories.useful_life_years || 5;
         const salvage = asset.salvage_value || 0;
         const monthlyDep = (asset.purchase_cost - salvage) / (usefulLife * 12);
         const newAccumulated = (asset.accumulated_depreciation || 0) + monthlyDep;
         const newNBV = asset.purchase_cost - newAccumulated;
-
+        
         scheduleEntries.push({
           asset_id: asset.id,
           depreciation_date: period.end_date,
@@ -3414,7 +2996,7 @@ export const useRunDepreciationWithGL = () => {
           is_posted: true,
           company_id: selectedCompanyId,
         });
-
+        
         if (asset.asset_categories.depreciation_expense_account_id) {
           journalLines.push({
             account_id: asset.asset_categories.depreciation_expense_account_id,
@@ -3424,7 +3006,7 @@ export const useRunDepreciationWithGL = () => {
             company_id: selectedCompanyId,
           });
         }
-
+        
         if (asset.asset_categories.accumulated_dep_account_id) {
           journalLines.push({
             account_id: asset.asset_categories.accumulated_dep_account_id,
@@ -3434,9 +3016,9 @@ export const useRunDepreciationWithGL = () => {
             company_id: selectedCompanyId,
           });
         }
-
+        
         totalDepreciation += monthlyDep;
-
+        
         await supabase
           .from("fixed_assets")
           .update({
@@ -3446,7 +3028,7 @@ export const useRunDepreciationWithGL = () => {
           })
           .eq("id", asset.id);
       }
-
+      
       if (journalLines.length > 0) {
         const { data: journalEntry, error: jeError } = await supabase
           .from("journal_entries")
@@ -3463,16 +3045,16 @@ export const useRunDepreciationWithGL = () => {
           }])
           .select()
           .single();
-
+        
         if (jeError) throw jeError;
-
+        
         const linesWithJE = journalLines.map((line) => ({
           ...line,
           journal_entry_id: journalEntry.id,
         }));
-
+        
         await supabase.from("journal_entry_lines").insert(linesWithJE);
-
+        
         // Update COA balances for each journal line (matches createAndPostJournalEntry behavior)
         for (const line of linesWithJE) {
           const { data: account } = await supabase
@@ -3495,16 +3077,16 @@ export const useRunDepreciationWithGL = () => {
               .eq("id", line.account_id);
           }
         }
-
+        
         for (const entry of scheduleEntries) {
           entry.journal_entry_id = journalEntry.id;
         }
       }
-
+      
       if (scheduleEntries.length > 0) {
         await supabase.from("asset_depreciation_schedule").insert(scheduleEntries);
       }
-
+      
       return { assetsProcessed: assets?.length || 0, totalDepreciation };
     },
     onSuccess: (data) => {
@@ -3522,21 +3104,21 @@ export const useRunDepreciationWithGL = () => {
 export const useRunCurrencyRevaluation = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async ({ periodId, revaluationDate }: { periodId: string; revaluationDate: string }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: rates, error: ratesError } = await supabase
         .from("exchange_rates")
         .select("*")
         .order("effective_date", { ascending: false });
-
+      
       if (ratesError) throw ratesError;
-
+      
       const accountsProcessed = rates?.length || 0;
       const totalGainLoss = 0;
-
+      
       if (rates && rates.length > 0) {
         const { error: jeError } = await supabase
           .from("journal_entries")
@@ -3551,10 +3133,10 @@ export const useRunCurrencyRevaluation = () => {
             period_id: periodId,
             company_id: selectedCompanyId,
           }]);
-
+        
         if (jeError) throw jeError;
       }
-
+      
       return { accountsProcessed, totalGainLoss };
     },
     onSuccess: (data) => {
@@ -3571,15 +3153,15 @@ export const useRunCurrencyRevaluation = () => {
 export const useImportBankStatement = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
-    mutationFn: async ({
-      bankAccountId,
+    mutationFn: async ({ 
+      bankAccountId, 
       transactions,
       statementDate,
       openingBalance,
       closingBalance,
-    }: {
+    }: { 
       bankAccountId: string;
       transactions: Array<{
         date: string;
@@ -3593,7 +3175,7 @@ export const useImportBankStatement = () => {
       closingBalance?: number;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: importRecord, error: importError } = await supabase
         .from("bank_statement_imports")
         .insert([{
@@ -3612,9 +3194,9 @@ export const useImportBankStatement = () => {
         }])
         .select()
         .single();
-
+      
       if (importError) throw importError;
-
+      
       const bankTransactions = transactions.map((t) => ({
         bank_account_id: bankAccountId,
         transaction_date: t.date,
@@ -3628,18 +3210,18 @@ export const useImportBankStatement = () => {
         source_id: importRecord.id,
         company_id: selectedCompanyId,
       }));
-
+      
       const { error: txnError } = await supabase
         .from("bank_transactions")
         .insert(bankTransactions);
-
+      
       if (txnError) throw txnError;
-
+      
       await supabase
         .from("bank_statement_imports")
         .update({ status: "completed" })
         .eq("id", importRecord.id);
-
+      
       return importRecord;
     },
     onSuccess: () => {
@@ -3655,7 +3237,7 @@ export const useImportBankStatement = () => {
 export const useCreateAPCreditNote = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: {
       credit_note_number: string;
@@ -3666,7 +3248,7 @@ export const useCreateAPCreditNote = () => {
       original_invoice_id?: string;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await supabase
         .from("ap_debit_notes")
         .insert([{
@@ -3681,7 +3263,7 @@ export const useCreateAPCreditNote = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
       return result;
     },
@@ -3698,7 +3280,7 @@ export const useCreateAPCreditNote = () => {
 export const useCreateARDebitNote = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (data: {
       debit_note_number: string;
@@ -3709,7 +3291,7 @@ export const useCreateARDebitNote = () => {
       original_invoice_id?: string;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data: result, error } = await supabase
         .from("ar_credit_notes")
         .insert([{
@@ -3724,7 +3306,7 @@ export const useCreateARDebitNote = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
       return result;
     },
@@ -3741,7 +3323,7 @@ export const useCreateARDebitNote = () => {
 export const useCreateBankAccount = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (account: {
       account_code: string;
@@ -3759,7 +3341,7 @@ export const useCreateBankAccount = () => {
       notes?: string;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data, error } = await supabase
         .from("bank_accounts")
         .insert([{
@@ -3768,7 +3350,7 @@ export const useCreateBankAccount = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
       return data;
     },
@@ -3783,7 +3365,7 @@ export const useCreateBankAccount = () => {
 export const useUpdateBankAccount = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (account: {
       id: string;
@@ -3807,7 +3389,7 @@ export const useUpdateBankAccount = () => {
         .eq("id", id)
         .select()
         .single();
-
+      
       if (error) throw error;
       return data;
     },
@@ -3823,7 +3405,7 @@ export const useUpdateBankAccount = () => {
 export const useCreateAssetCategory = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (category: {
       category_code: string;
@@ -3840,7 +3422,7 @@ export const useCreateAssetCategory = () => {
       is_active?: boolean;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data, error } = await supabase
         .from("asset_categories")
         .insert([{
@@ -3849,7 +3431,7 @@ export const useCreateAssetCategory = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
       return data;
     },
@@ -3865,7 +3447,7 @@ export const useCreateAssetCategory = () => {
 export const useCreateCostCenter = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (costCenter: {
       cost_center_code: string;
@@ -3876,7 +3458,7 @@ export const useCreateCostCenter = () => {
       is_active?: boolean;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data, error } = await supabase
         .from("cost_centers")
         .insert([{
@@ -3887,7 +3469,7 @@ export const useCreateCostCenter = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
       return data;
     },
@@ -3903,7 +3485,7 @@ export const useCreateCostCenter = () => {
 export const useCreateBudget = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (budget: {
       budget_code: string;
@@ -3914,10 +3496,10 @@ export const useCreateBudget = () => {
       status?: string;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const startDate = `${budget.fiscal_year}-01-01`;
       const endDate = `${budget.fiscal_year}-12-31`;
-
+      
       const { data, error } = await supabase
         .from("budgets")
         .insert([{
@@ -3933,7 +3515,7 @@ export const useCreateBudget = () => {
         }])
         .select()
         .single();
-
+      
       if (error) throw error;
       return data;
     },
@@ -3949,7 +3531,7 @@ export const useCreateBudget = () => {
 export const useCreateCheque = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (cheque: {
       cheque_number: string;
@@ -3964,7 +3546,7 @@ export const useCreateCheque = () => {
       ar_receipt_id?: string;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
-
+      
       const { data, error } = await supabase
         .from("cheque_register")
         .insert([{
@@ -3982,7 +3564,7 @@ export const useCreateCheque = () => {
         } as any])
         .select()
         .single();
-
+      
       if (error) throw error;
       return data;
     },
@@ -3997,17 +3579,17 @@ export const useCreateCheque = () => {
 export const useUpdateChequeStatus = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async ({ chequeId, status, clearedDate }: { chequeId: string; status: string; clearedDate?: string }) => {
       const updateData: any = { status };
       if (clearedDate) updateData.cleared_date = clearedDate;
-
+      
       const { error } = await supabase
         .from("cheque_register")
         .update(updateData)
         .eq("id", chequeId);
-
+      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -4022,14 +3604,14 @@ export const useUpdateChequeStatus = () => {
 export const useToggleRecurringEntry = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async ({ entryId, isActive }: { entryId: string; isActive: boolean }) => {
       const { error } = await (supabase as any)
         .from("recurring_journal_entries")
         .update({ is_active: isActive })
         .eq("id", entryId);
-
+      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -4042,7 +3624,7 @@ export const useToggleRecurringEntry = () => {
 export const useProcessRecurringEntry = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
-
+  
   return useMutation({
     mutationFn: async (entryId: string) => {
       // Fetch the recurring entry with its template
@@ -4051,12 +3633,12 @@ export const useProcessRecurringEntry = () => {
         .select("*")
         .eq("id", entryId)
         .single();
-
+      
       if (fetchError) throw fetchError;
-
+      
       // Generate unique entry number
       const entryNumber = `REC-${Date.now()}`;
-
+      
       // Create a new journal entry from the template
       const { data: journalEntry, error: journalError } = await supabase
         .from("journal_entries")
@@ -4073,9 +3655,9 @@ export const useProcessRecurringEntry = () => {
         }])
         .select()
         .single();
-
+      
       if (journalError) throw journalError;
-
+      
       // Update last run date and calculate next run date
       const nextRunDate = new Date();
       const frequency = recurringEntry.frequency || "monthly";
@@ -4096,7 +3678,7 @@ export const useProcessRecurringEntry = () => {
           nextRunDate.setFullYear(nextRunDate.getFullYear() + 1);
           break;
       }
-
+      
       await (supabase as any)
         .from("recurring_journal_entries")
         .update({
@@ -4104,7 +3686,7 @@ export const useProcessRecurringEntry = () => {
           next_run_date: nextRunDate.toISOString().split("T")[0],
         })
         .eq("id", entryId);
-
+      
       return journalEntry;
     },
     onSuccess: () => {
@@ -4268,7 +3850,7 @@ export const useUpdateAPInvoice = () => {
       }>;
     }) => {
       const effectiveCompanyId = getEffectiveCompanyId();
-
+      
       const { error: headerError } = await supabase
         .from("ap_invoices")
         .update({
@@ -4347,7 +3929,7 @@ export const useUpdateARInvoice = () => {
       }>;
     }) => {
       const effectiveCompanyId = getEffectiveCompanyId();
-
+      
       const { error: headerError } = await supabase
         .from("ar_invoices")
         .update({

@@ -13,8 +13,6 @@ import {
   Wifi,
   WifiOff,
   Phone,
-  PhoneOff,
-  PhoneMissed,
   FileText,
   Users,
   Circle,
@@ -33,8 +31,6 @@ import {
   Mail,
   Settings,
   CheckCircle2,
-  Bot,
-  UserCheck,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -73,21 +69,6 @@ interface Template {
   name: string;
   body: string;
   category: string;
-}
-
-interface MissedCallMessage {
-  role: 'user' | 'assistant';
-  body: string;
-  timestamp: number;
-}
-
-interface MissedCall {
-  id: string;
-  phone: string;
-  contactName: string;
-  timestamp: number;
-  status: 'ai_handling' | 'needs_followup' | 'resolved';
-  aiMessages: MissedCallMessage[];
 }
 
 /* ─── Default Templates ─── */
@@ -161,15 +142,11 @@ export default function WhatsAppHub() {
   const [templateSearch, setTemplateSearch] = useState('');
 
   // ── Tab State ──
-  const [activeTab, setActiveTab] = useState<'chats' | 'new' | 'templates' | 'email' | 'missed'>('chats');
+  const [activeTab, setActiveTab] = useState<'chats' | 'new' | 'templates' | 'email'>('chats');
 
   // ── Stats ──
   const [sentToday, setSentToday] = useState(0);
   const [messageLog, setMessageLog] = useState<WAMessage[]>([]);
-
-  // ── Missed Call State ──
-  const [missedCalls, setMissedCalls] = useState<MissedCall[]>([]);
-  const [expandedMissedCall, setExpandedMissedCall] = useState<string | null>(null);
 
   // ── Email State ──
   const [emailConfigured, setEmailConfigured] = useState(false);
@@ -272,20 +249,6 @@ export default function WhatsAppHub() {
               });
             });
           }
-
-          if (data.type === 'missed_call') {
-            setMissedCalls(prev => [data.data, ...prev]);
-            toast.warning(`📞 Missed call from ${data.data.contactName}`, {
-              description: 'AI is handling the follow-up automatically',
-              duration: 6000,
-            });
-          }
-
-          if (data.type === 'missed_call_update') {
-            setMissedCalls(prev =>
-              prev.map(mc => mc.id === data.data.id ? data.data : mc)
-            );
-          }
         } catch (err) {
           console.error('[WA-WS] Parse error:', err);
         }
@@ -300,7 +263,6 @@ export default function WhatsAppHub() {
   useEffect(() => {
     connectWS();
     fetchEmailStatus();
-    fetchMissedCalls();
     return () => {
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       wsRef.current?.close();
@@ -542,32 +504,6 @@ export default function WhatsAppHub() {
 
   const totalUnread = useMemo(() => chats.reduce((s, c) => s + c.unreadCount, 0), [chats]);
 
-  const missedCallsActive = useMemo(() => missedCalls.filter(mc => mc.status === 'ai_handling').length, [missedCalls]);
-
-  // ═══════════════════════════════════════════
-  // Missed Call Functions
-  // ═══════════════════════════════════════════
-  const fetchMissedCalls = async () => {
-    try {
-      const res = await fetch(`${WA_SERVER}/api/missed-calls`);
-      if (res.ok) setMissedCalls(await res.json());
-    } catch { /* server offline */ }
-  };
-
-  const handleResolveMissedCall = async (id: string) => {
-    try {
-      await fetch(`${WA_SERVER}/api/missed-calls/${id}/resolve`, { method: 'POST' });
-      toast.success('Marked as resolved');
-    } catch { toast.error('Failed to update'); }
-  };
-
-  const handleTakeoverMissedCall = async (id: string) => {
-    try {
-      await fetch(`${WA_SERVER}/api/missed-calls/${id}/takeover`, { method: 'POST' });
-      toast.success('AI stopped — you can reply manually now');
-    } catch { toast.error('Failed to update'); }
-  };
-
   // ═══════════════════════════════════════════
   // Render Helpers
   // ═══════════════════════════════════════════
@@ -617,7 +553,7 @@ export default function WhatsAppHub() {
                 ? `Connected as ${clientInfo.pushname} (${clientInfo.phone})`
                 : serverOnline
                 ? 'Connecting to WhatsApp...'
-                : 'WhatsApp server starting — auto-connects with npm run dev'}
+                : 'WhatsApp server offline'}
             </p>
           </div>
         </div>
@@ -669,9 +605,9 @@ export default function WhatsAppHub() {
               {waStatus === 'qr_ready' ? 'Scan QR' : 'Connecting'}
             </Badge>
           ) : (
-            <Badge variant="outline" className="text-yellow-500 border-yellow-500/30">
-              <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
-              Starting...
+            <Badge variant="outline" className="text-red-500 border-red-500/30">
+              <WifiOff className="w-3 h-3 mr-1.5" />
+              Offline
             </Badge>
           )}
         </div>
@@ -736,17 +672,19 @@ export default function WhatsAppHub() {
         </Card>
       </div>
 
-      {/* ── Server Starting Info ── */}
+      {/* ── Server Offline Warning ── */}
       {!serverOnline && (
         <Card className="border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/20">
           <CardContent className="p-4 flex items-start gap-3">
-            <Loader2 className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0 animate-spin" />
+            <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="font-medium text-yellow-800 dark:text-yellow-200">WhatsApp Server Starting...</p>
+              <p className="font-medium text-yellow-800 dark:text-yellow-200">WhatsApp Server Offline</p>
               <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                The WhatsApp server starts automatically with <code className="px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900/50 rounded text-xs font-mono">npm run dev</code>.
-                It will connect in a few seconds.
+                Start the server in a terminal:
               </p>
+              <code className="block mt-2 px-3 py-2 bg-yellow-100 dark:bg-yellow-900/50 rounded text-sm font-mono">
+                cd whatsapp-server && npm install && npm start
+              </code>
               <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
                 The system will auto-reconnect when the server is available.
               </p>
@@ -828,20 +766,6 @@ export default function WhatsAppHub() {
                 <CheckCircle2 className="w-3 h-3 ml-1.5 text-green-300" />
               )}
             </Button>
-            <Button
-              variant={activeTab === 'missed' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => { setActiveTab('missed'); fetchMissedCalls(); }}
-              className={activeTab === 'missed' ? 'bg-red-600 hover:bg-red-700' : ''}
-            >
-              <PhoneMissed className="w-4 h-4 mr-2" />
-              Missed Calls
-              {missedCallsActive > 0 && (
-                <Badge className="ml-2 bg-red-500 text-white text-xs px-1.5 py-0 h-5">
-                  {missedCallsActive}
-                </Badge>
-              )}
-            </Button>
           </div>
 
           {/* ═══ Chats Tab ═══ */}
@@ -874,7 +798,9 @@ export default function WhatsAppHub() {
                     filteredChats.map(chat => (
                       <div
                         key={chat.id}
-                        className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors border-b ${selectedChat?.id === chat.id ? 'bg-muted/70' : ''}`}
+                        className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-accent/50 border-b border-border/30 ${
+                          selectedChat?.id === chat.id ? 'bg-accent/70' : ''
+                        }`}
                         onClick={() => handleSelectChat(chat)}
                       >
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 ${getAvatarColor(chat.name)}`}>
@@ -882,18 +808,21 @@ export default function WhatsAppHub() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium truncate">{chat.name}</p>
-                            <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-2">{formatTimestamp(chat.timestamp)}</span>
+                            <span className="font-medium text-sm truncate">{chat.name}</span>
+                            <span className="text-xs text-muted-foreground flex-shrink-0">
+                              {formatTimestamp(chat.timestamp)}
+                            </span>
                           </div>
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs text-muted-foreground truncate">
-                              {chat.lastMessage
-                                ? `${chat.lastMessage.fromMe ? 'You: ' : ''}${chat.lastMessage.body}`
-                                : chat.phone}
+                          <div className="flex items-center justify-between mt-0.5">
+                            <p className="text-xs text-muted-foreground truncate max-w-[180px]">
+                              {chat.lastMessage?.fromMe && (
+                                <CheckCheck className="w-3 h-3 inline mr-1 text-blue-500" />
+                              )}
+                              {chat.lastMessage?.body || 'No messages'}
                             </p>
                             {chat.unreadCount > 0 && (
-                              <Badge className="ml-2 bg-green-500 text-white text-[10px] px-1.5 py-0 h-4 flex-shrink-0">
-                                {chat.unreadCount}
+                              <Badge className="bg-green-500 text-white text-xs px-1.5 py-0 h-5 min-w-[20px] flex items-center justify-center">
+                                {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
                               </Badge>
                             )}
                           </div>
@@ -904,42 +833,61 @@ export default function WhatsAppHub() {
                 </div>
               </Card>
 
-              {/* Chat Messages */}
+              {/* Message View */}
               <Card className="professional-card lg:col-span-2 flex flex-col overflow-hidden">
                 {selectedChat ? (
                   <>
                     {/* Chat Header */}
-                    <div className="flex items-center gap-3 p-3 border-b">
-                      <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setSelectedChat(null)}>
+                    <div className="px-4 py-3 border-b flex items-center gap-3 bg-accent/20">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="lg:hidden"
+                        onClick={() => setSelectedChat(null)}
+                      >
                         <ArrowLeft className="w-4 h-4" />
                       </Button>
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(selectedChat.name)}`}>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(selectedChat.name)}`}>
                         {getInitials(selectedChat.name)}
                       </div>
                       <div>
                         <p className="font-medium text-sm">{selectedChat.name}</p>
-                        <p className="text-xs text-muted-foreground">{selectedChat.phone}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedChat.phone ? `+${selectedChat.phone}` : selectedChat.id.replace('@c.us', '')}
+                        </p>
                       </div>
                     </div>
 
-                    {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-muted/10" style={{ maxHeight: '45vh' }}>
+                    {/* Messages Area */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%239C92AC%22%20fill-opacity%3D%220.03%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')]" style={{ maxHeight: '45vh' }}>
                       {messagesLoading ? (
                         <div className="flex items-center justify-center py-12">
                           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                         </div>
                       ) : chatMessages.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
-                          <p className="text-sm">No messages yet</p>
+                          <p className="text-sm">No messages loaded</p>
                         </div>
                       ) : (
-                        chatMessages.map(msg => (
-                          <div key={msg.id} className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[70%] rounded-2xl px-4 py-2 ${msg.fromMe ? 'bg-green-600 text-white rounded-br-sm' : 'bg-background border rounded-bl-sm'}`}>
-                              <p className="text-sm whitespace-pre-wrap">{msg.body}</p>
-                              <p className={`text-[10px] mt-1 text-right ${msg.fromMe ? 'text-green-100' : 'text-muted-foreground'}`}>
-                                {format(new Date(msg.timestamp), 'HH:mm')}
-                              </p>
+                        chatMessages.map((msg, idx) => (
+                          <div
+                            key={msg.id || idx}
+                            className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div
+                              className={`max-w-[75%] px-3 py-2 rounded-xl text-sm shadow-sm ${
+                                msg.fromMe
+                                  ? 'bg-green-500 text-white rounded-br-sm'
+                                  : 'bg-white dark:bg-gray-800 rounded-bl-sm border'
+                              }`}
+                            >
+                              <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                              <div className={`flex items-center justify-end gap-1 mt-1 text-xs ${
+                                msg.fromMe ? 'text-green-100' : 'text-muted-foreground'
+                              }`}>
+                                <span>{format(new Date(msg.timestamp), 'HH:mm')}</span>
+                                {msg.fromMe && <CheckCheck className="w-3 h-3" />}
+                              </div>
                             </div>
                           </div>
                         ))
@@ -947,27 +895,42 @@ export default function WhatsAppHub() {
                       <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Reply Input */}
-                    <div className="p-3 border-t flex gap-2">
-                      <Input
-                        value={replyText}
-                        onChange={e => setReplyText(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }}
-                        placeholder="Type a message..."
-                        className="flex-1"
-                        disabled={sendingReply}
-                      />
-                      <Button onClick={handleSendReply} disabled={sendingReply || !replyText.trim()} size="icon" className="bg-green-600 hover:bg-green-700">
-                        {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                      </Button>
+                    {/* Reply Bar */}
+                    <div className="px-4 py-3 border-t bg-accent/10">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Type a message..."
+                          value={replyText}
+                          onChange={e => setReplyText(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }}
+                          className="flex-1"
+                          disabled={sendingReply}
+                        />
+                        <Button
+                          size="sm"
+                          onClick={handleSendReply}
+                          disabled={!replyText.trim() || sendingReply}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          {sendingReply ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </>
                 ) : (
-                  <div className="flex items-center justify-center h-full py-20 text-muted-foreground">
-                    <div className="text-center">
-                      <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-20" />
-                      <p className="font-medium">Select a chat to start messaging</p>
-                      <p className="text-sm mt-1">Choose from the list on the left</p>
+                  <div className="flex-1 flex items-center justify-center text-center p-8">
+                    <div>
+                      <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 flex items-center justify-center mb-4">
+                        <MessageSquare className="w-10 h-10 text-green-500" />
+                      </div>
+                      <h3 className="text-lg font-semibold">Select a Chat</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Choose a conversation from the list to view messages and reply.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -979,301 +942,336 @@ export default function WhatsAppHub() {
           {activeTab === 'new' && (
             <Card className="professional-card max-w-2xl">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
                   <Plus className="w-5 h-5 text-green-600" />
                   Send New Message
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Phone Number</label>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Phone Number</label>
                   <Input
+                    placeholder="e.g. 94771234567 (country code + number, no + sign)"
                     value={newPhone}
                     onChange={e => setNewPhone(e.target.value)}
-                    placeholder="e.g. 94771234567"
-                    className="text-sm"
                   />
-                  <p className="text-xs text-muted-foreground">Include country code (e.g. 94 for Sri Lanka)</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sri Lanka: 94XXXXXXXXX | India: 91XXXXXXXXXX | US: 1XXXXXXXXXX
+                  </p>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Message</label>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Message</label>
                   <Textarea
+                    placeholder="Type your message here..."
                     value={newMessage}
                     onChange={e => setNewMessage(e.target.value)}
-                    placeholder="Type your message..."
                     rows={6}
-                    className="text-sm"
+                    className="resize-none"
                   />
+                  <p className="text-xs text-muted-foreground mt-1 text-right">
+                    {newMessage.length} characters
+                  </p>
                 </div>
-                <Button onClick={handleSendNew} disabled={sendingNew || !newPhone.trim() || !newMessage.trim()} className="bg-green-600 hover:bg-green-700">
-                  {sendingNew ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-                  Send Message
-                </Button>
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { setNewPhone(''); setNewMessage(''); }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Clear
+                  </Button>
+                  <Button
+                    onClick={handleSendNew}
+                    disabled={!newPhone.trim() || !newMessage.trim() || sendingNew}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {sendingNew ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-2" />
+                    )}
+                    Send Message
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
 
           {/* ═══ Templates Tab ═══ */}
           {activeTab === 'templates' && (
-            <Card className="professional-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-orange-500" />
-                  Message Templates
-                </CardTitle>
-                <div className="relative mt-3">
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder="Search templates..." value={templateSearch} onChange={e => setTemplateSearch(e.target.value)} className="pl-9 h-9" />
+                  <Input
+                    placeholder="Search templates..."
+                    value={templateSearch}
+                    onChange={e => setTemplateSearch(e.target.value)}
+                    className="pl-9"
+                  />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredTemplates.map(template => (
-                    <Card key={template.id} className="border hover:shadow-md transition-shadow">
-                      <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center gap-2">
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredTemplates.map(template => (
+                  <Card key={template.id} className="professional-card hover:shadow-md transition-shadow">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div>
                           <h4 className="font-medium text-sm">{template.name}</h4>
-                          <Badge variant="outline" className="text-[10px]">{template.category}</Badge>
+                          <Badge variant="outline" className="mt-1 text-xs">
+                            {template.category}
+                          </Badge>
                         </div>
-                        <pre className="text-xs text-muted-foreground whitespace-pre-wrap bg-muted/30 p-3 rounded-lg max-h-36 overflow-y-auto font-sans">
-                          {template.body}
-                        </pre>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleUseTemplate(template)} className="flex-1">
-                            <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-                            Use in WhatsApp
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleUseEmailTemplate(template)} className="flex-1">
-                            <Mail className="w-3.5 h-3.5 mr-1.5" />
-                            Use in Email
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                      </div>
+                      <pre className="text-xs text-muted-foreground whitespace-pre-wrap bg-accent/30 p-3 rounded-lg max-h-32 overflow-y-auto font-sans">
+                        {template.body}
+                      </pre>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => {
+                            navigator.clipboard.writeText(template.body);
+                            toast.success('Copied to clipboard');
+                          }}
+                        >
+                          <Copy className="w-3 h-3 mr-1" />
+                          Copy
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          onClick={() => handleUseTemplate(template)}
+                        >
+                          <Send className="w-3 h-3 mr-1" />
+                          Use
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* ═══ Email Tab ═══ */}
           {activeTab === 'email' && (
-            <Card className="professional-card">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Mail className="h-5 w-5 text-blue-600" />
-                    Email
-                    {emailConfigured && (
-                      <Badge className="text-[10px] bg-green-500/10 text-green-600 border-green-500/30">
-                        <CheckCircle2 className="w-3 h-3 mr-1" />
-                        {emailAddress}
-                      </Badge>
-                    )}
-                  </CardTitle>
-                  {emailConfigured && (
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setEmailSetupMode(!emailSetupMode)}>
-                        <Settings className="w-3.5 h-3.5 mr-1.5" />
-                        Settings
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-red-600" onClick={handleDisconnectEmail}>
-                        <WifiOff className="w-3.5 h-3.5 mr-1.5" />
-                        Disconnect
+            <div className="space-y-4">
+              {/* Email Setup Card */}
+              {!emailConfigured || emailSetupMode ? (
+                <Card className="professional-card max-w-xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Settings className="w-5 h-5 text-blue-600" />
+                      {emailConfigured ? 'Update Email Settings' : 'Setup Email'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg text-sm space-y-1">
+                      <p className="font-medium text-blue-700 dark:text-blue-300">Gmail App Password Setup:</p>
+                      <ol className="text-blue-600 dark:text-blue-400 text-xs list-decimal pl-4 space-y-0.5">
+                        <li>Go to <strong>myaccount.google.com</strong> → Security</li>
+                        <li>Enable <strong>2-Step Verification</strong> if not already</li>
+                        <li>Search for <strong>"App passwords"</strong></li>
+                        <li>Create a new app password and paste it below</li>
+                      </ol>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Sender Name</label>
+                      <Input
+                        placeholder="NCG Express"
+                        value={setupSenderName}
+                        onChange={e => setSetupSenderName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Gmail Address</label>
+                      <Input
+                        type="email"
+                        placeholder="yourname@gmail.com"
+                        value={setupEmail}
+                        onChange={e => setSetupEmail(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">App Password</label>
+                      <Input
+                        type="password"
+                        placeholder="xxxx xxxx xxxx xxxx"
+                        value={setupAppPassword}
+                        onChange={e => setSetupAppPassword(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        This is NOT your Gmail password — it's a generated App Password
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {emailConfigured && (
+                        <Button variant="outline" size="sm" onClick={() => setEmailSetupMode(false)}>
+                          Cancel
+                        </Button>
+                      )}
+                      <Button
+                        onClick={handleConfigureEmail}
+                        disabled={configuringEmail || !setupEmail.trim() || !setupAppPassword.trim()}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {configuringEmail ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                        )}
+                        {configuringEmail ? 'Verifying...' : 'Connect Email'}
                       </Button>
                     </div>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Email Setup */}
-                {(!emailConfigured || emailSetupMode) && (
-                  <Card className="border-blue-200 dark:border-blue-800">
-                    <CardContent className="p-4 space-y-4">
-                      <div>
-                        <h4 className="font-medium text-sm">Configure Email (Gmail)</h4>
-                        <p className="text-xs text-muted-foreground mt-1">Use a Gmail App Password for secure sending</p>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium">Gmail Address</label>
-                          <Input value={setupEmail} onChange={e => setSetupEmail(e.target.value)} placeholder="your.email@gmail.com" className="text-sm" />
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  {/* Email Status Bar */}
+                  <Card className="professional-card border-0 shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                            <Mail className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{emailAddress}</p>
+                            <p className="text-xs text-muted-foreground">Sending as "{emailSenderName}" · {emailsSentToday} sent today</p>
+                          </div>
+                          <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/30">
+                            <Circle className="w-2 h-2 mr-1.5 fill-blue-500 text-blue-500 animate-pulse" />
+                            Connected
+                          </Badge>
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium">App Password</label>
-                          <Input type="password" value={setupAppPassword} onChange={e => setSetupAppPassword(e.target.value)} placeholder="xxxx xxxx xxxx xxxx" className="text-sm" />
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setEmailSetupMode(true)}>
+                            <Settings className="w-4 h-4 mr-1" />
+                            Settings
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 border-red-300 hover:bg-red-50"
+                            onClick={handleDisconnectEmail}
+                          >
+                            <WifiOff className="w-4 h-4 mr-1" />
+                            Disconnect
+                          </Button>
                         </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium">Sender Name</label>
-                        <Input value={setupSenderName} onChange={e => setSetupSenderName(e.target.value)} placeholder="NCG Express" className="text-sm" />
-                      </div>
-                      <Button onClick={handleConfigureEmail} disabled={configuringEmail} size="sm" className="bg-blue-600 hover:bg-blue-700">
-                        {configuringEmail ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                        Configure Email
-                      </Button>
                     </CardContent>
                   </Card>
-                )}
 
-                {/* Compose Email */}
-                {emailConfigured && !emailSetupMode && (
-                  <div className="space-y-4 max-w-2xl">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium">To</label>
-                        <Input value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="recipient@example.com" className="text-sm" />
+                  {/* Compose Email */}
+                  <Card className="professional-card">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Mail className="w-5 h-5 text-blue-600" />
+                        Compose Email
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">To <span className="text-red-500">*</span></label>
+                          <Input
+                            type="email"
+                            placeholder="recipient@example.com"
+                            value={emailTo}
+                            onChange={e => setEmailTo(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">CC <span className="text-muted-foreground text-xs">(optional)</span></label>
+                          <Input
+                            type="email"
+                            placeholder="cc@example.com"
+                            value={emailCc}
+                            onChange={e => setEmailCc(e.target.value)}
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium">CC (optional)</label>
-                        <Input value={emailCc} onChange={e => setEmailCc(e.target.value)} placeholder="cc@example.com" className="text-sm" />
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Subject <span className="text-red-500">*</span></label>
+                        <Input
+                          placeholder="Email subject line..."
+                          value={emailSubject}
+                          onChange={e => setEmailSubject(e.target.value)}
+                        />
                       </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Subject</label>
-                      <Input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} placeholder="Email subject..." className="text-sm" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Body</label>
-                      <Textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} placeholder="Type your email..." rows={6} className="text-sm" />
-                    </div>
-                    <Button onClick={handleSendEmail} disabled={sendingEmail} className="bg-blue-600 hover:bg-blue-700">
-                      {sendingEmail ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-                      Send Email
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-          {/* ═══ Missed Calls Tab ═══ */}
-          {activeTab === 'missed' && (
-            <div className="space-y-4">
-              <Card className="professional-card">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <PhoneMissed className="w-5 h-5 text-red-500" />
-                      Missed Calls — AI Auto-Reply
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      {missedCallsActive > 0 && (
-                        <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/30">
-                          <Bot className="w-3 h-3 mr-1" />
-                          {missedCallsActive} AI Active
-                        </Badge>
-                      )}
-                      <Button variant="outline" size="sm" onClick={fetchMissedCalls}>
-                        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                        Refresh
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {missedCalls.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <PhoneMissed className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                      <p className="font-medium">No missed calls yet</p>
-                      <p className="text-sm mt-1">When a WhatsApp call is missed, AI will automatically reply and handle the inquiry</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {missedCalls.map(mc => (
-                        <Card key={mc.id} className={`border transition-all ${
-                          mc.status === 'ai_handling' ? 'border-orange-500/30 bg-orange-50/30 dark:bg-orange-950/10' :
-                          mc.status === 'needs_followup' ? 'border-yellow-500/30 bg-yellow-50/30 dark:bg-yellow-950/10' :
-                          'border-green-500/30 bg-green-50/30 dark:bg-green-950/10'
-                        }`}>
-                          <CardContent className="p-4">
-                            {/* Header Row */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium ${
-                                  mc.status === 'ai_handling' ? 'bg-orange-500' :
-                                  mc.status === 'needs_followup' ? 'bg-yellow-500' :
-                                  'bg-green-500'
-                                }`}>
-                                  {mc.status === 'ai_handling' ? <Bot className="w-5 h-5" /> :
-                                   mc.status === 'resolved' ? <CheckCircle2 className="w-5 h-5" /> :
-                                   <PhoneMissed className="w-5 h-5" />}
-                                </div>
-                                <div>
-                                  <p className="font-medium text-sm">{mc.contactName}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    +{mc.phone} · {format(new Date(mc.timestamp), 'dd/MM/yyyy HH:mm')}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className={`text-[10px] ${
-                                  mc.status === 'ai_handling' ? 'text-orange-600 border-orange-500/30' :
-                                  mc.status === 'needs_followup' ? 'text-yellow-600 border-yellow-500/30' :
-                                  'text-green-600 border-green-500/30'
-                                }`}>
-                                  {mc.status === 'ai_handling' ? '🤖 AI Handling' :
-                                   mc.status === 'needs_followup' ? '⚠️ Needs Follow-up' :
-                                   '✅ Resolved'}
-                                </Badge>
-                                {mc.status === 'ai_handling' && (
-                                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleTakeoverMissedCall(mc.id)}>
-                                    <UserCheck className="w-3 h-3 mr-1" />
-                                    Take Over
-                                  </Button>
-                                )}
-                                {mc.status !== 'resolved' && (
-                                  <Button variant="outline" size="sm" className="h-7 text-xs text-green-600 border-green-300" onClick={() => handleResolveMissedCall(mc.id)}>
-                                    <CheckCircle2 className="w-3 h-3 mr-1" />
-                                    Resolve
-                                  </Button>
-                                )}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-xs"
-                                  onClick={() => setExpandedMissedCall(expandedMissedCall === mc.id ? null : mc.id)}
-                                >
-                                  {mc.aiMessages.length} messages
-                                  <span className="ml-1">{expandedMissedCall === mc.id ? '▲' : '▼'}</span>
-                                </Button>
-                              </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Body <span className="text-red-500">*</span></label>
+                        <Textarea
+                          placeholder="Write your email content here..."
+                          value={emailBody}
+                          onChange={e => setEmailBody(e.target.value)}
+                          rows={8}
+                          className="resize-none"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1 text-right">{emailBody.length} characters</p>
+                      </div>
+                      <div className="flex items-center justify-between pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setEmailTo(''); setEmailCc(''); setEmailSubject(''); setEmailBody(''); }}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Clear
+                        </Button>
+                        <Button
+                          onClick={handleSendEmail}
+                          disabled={!emailTo.trim() || !emailSubject.trim() || !emailBody.trim() || sendingEmail}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          {sendingEmail ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4 mr-2" />
+                          )}
+                          Send Email
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Email Templates */}
+                  <Card className="professional-card">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <FileText className="w-4 h-4 text-blue-600" />
+                        Quick Email Templates
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {templates.map(template => (
+                          <div
+                            key={template.id}
+                            className="border rounded-lg p-3 hover:bg-accent/30 cursor-pointer transition-colors group"
+                            onClick={() => handleUseEmailTemplate(template)}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <h4 className="text-sm font-medium">{template.name}</h4>
+                              <Badge variant="outline" className="text-xs">{template.category}</Badge>
                             </div>
-
-                            {/* AI Conversation (Expandable) */}
-                            {expandedMissedCall === mc.id && mc.aiMessages.length > 0 && (
-                              <div className="mt-4 space-y-2 border-t pt-3">
-                                <p className="text-xs font-medium text-muted-foreground mb-2">AI Conversation</p>
-                                {mc.aiMessages.map((aiMsg, idx) => (
-                                  <div
-                                    key={idx}
-                                    className={`flex ${aiMsg.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
-                                  >
-                                    <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
-                                      aiMsg.role === 'assistant'
-                                        ? 'bg-orange-100 dark:bg-orange-900/30 rounded-bl-sm'
-                                        : 'bg-muted rounded-br-sm'
-                                    }`}>
-                                      {aiMsg.role === 'assistant' && (
-                                        <p className="text-[10px] font-medium text-orange-600 mb-0.5 flex items-center gap-1">
-                                          <Bot className="w-3 h-3" /> AI Assistant
-                                        </p>
-                                      )}
-                                      <p className="whitespace-pre-wrap text-xs">{aiMsg.body}</p>
-                                      <p className="text-[9px] text-muted-foreground mt-1 text-right">
-                                        {format(new Date(aiMsg.timestamp), 'HH:mm')}
-                                      </p>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                            <p className="text-xs text-muted-foreground line-clamp-2">{template.body.substring(0, 80)}...</p>
+                            <Button size="sm" variant="ghost" className="mt-2 w-full text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Mail className="w-3 h-3 mr-1" />
+                              Use as Email
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </div>
           )}
         </>

@@ -52,14 +52,14 @@ export interface ProcessedTransaction extends BankStatementTransaction {
 const parseDate = (dateValue: any): Date => {
   if (!dateValue) return new Date();
   if (dateValue instanceof Date) return dateValue;
-
+  
   // Handle Excel date serial numbers
   if (typeof dateValue === 'number') {
     return new Date((dateValue - 25569) * 86400 * 1000);
   }
-
+  
   const dateStr = String(dateValue).trim();
-
+  
   // DD/MM/YYYY or DD-MM-YYYY
   const dmyMatch = dateStr.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
   if (dmyMatch) {
@@ -69,13 +69,13 @@ const parseDate = (dateValue: any): Date => {
     if (year < 100) year += 2000;
     return new Date(year, month, day);
   }
-
+  
   // YYYY-MM-DD
   const ymdMatch = dateStr.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
   if (ymdMatch) {
     return new Date(parseInt(ymdMatch[1]), parseInt(ymdMatch[2]) - 1, parseInt(ymdMatch[3]));
   }
-
+  
   // Try native parse
   const parsed = new Date(dateStr);
   return isNaN(parsed.getTime()) ? new Date() : parsed;
@@ -149,7 +149,7 @@ const commercialBankFormat: BankFormat = {
     // Commercial Bank typically has: Date, Description, Cheque No, Debit, Credit, Balance
     const hasDate = normalized.some(h => h.includes('date') || h.includes('transactiondate'));
     const hasDebitCredit = normalized.some(h => h.includes('debit') || h.includes('withdrawal')) &&
-      normalized.some(h => h.includes('credit') || h.includes('deposit'));
+                          normalized.some(h => h.includes('credit') || h.includes('deposit'));
     const hasBalance = normalized.some(h => h.includes('balance') || h.includes('runningbalance'));
     // Check for Commercial Bank specific keywords
     const rawStr = JSON.stringify(rows.slice(0, 5)).toLowerCase();
@@ -299,20 +299,20 @@ const genericFormat: BankFormat = {
     const descCol = findHeader(headers, 'Description', 'Narration', 'Particulars', 'Details', 'Remarks', 'Transaction Details');
     const refCol = findHeader(headers, 'Reference', 'Ref No', 'Trans Ref', 'Reference No');
     const chequeCol = findHeader(headers, 'Cheque No', 'Chq No', 'Cheque Number', 'Instrument');
-
+    
     // Try debit/credit split columns
     const debitCol = findHeader(headers, 'Debit', 'Withdrawal', 'Dr', 'Debit Amount');
     const creditCol = findHeader(headers, 'Credit', 'Deposit', 'Cr', 'Credit Amount');
-
+    
     // Or combined amount column
     const amountCol = findHeader(headers, 'Amount', 'Transaction Amount', 'Cr/Dr');
     const typeCol = findHeader(headers, 'Type', 'Transaction Type', 'Dr/Cr', 'Cr/Dr');
-
+    
     const balanceCol = findHeader(headers, 'Balance', 'Running Balance', 'Closing Balance', 'Available Balance');
 
     return rows.map((row, idx) => {
       let debit = 0, credit = 0;
-
+      
       if (debitCol && creditCol) {
         debit = cleanAmount(row[debitCol]);
         credit = cleanAmount(row[creditCol]);
@@ -366,13 +366,9 @@ export const parseBankStatement = async (file: File, forceBankId?: string): Prom
   const data = await file.arrayBuffer();
   const workbook = XLSX.read(data);
   const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-  // --- SMART HEADER DETECTION ---
-  // Many Sri Lankan bank statements have metadata rows (bank name, account info)
-  // before the actual column headers. We need to find the real header row.
-  const allRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-
-  if (allRows.length === 0) {
+  const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+  
+  if (jsonData.length === 0) {
     return {
       transactions: [],
       bankName: 'Unknown',
@@ -386,88 +382,15 @@ export const parseBankStatement = async (file: File, forceBankId?: string): Prom
     };
   }
 
-  // Keywords that indicate a header row
-  const headerKeywords = ['date', 'description', 'debit', 'credit', 'balance', 'amount',
-    'narration', 'particulars', 'withdrawal', 'deposit', 'transaction', 'reference',
-    'trans date', 'value date', 'txn date', 'cheque', 'instrument', 'dr', 'cr'];
-
-  // Find the header row by checking which row has the most header-like keywords
-  let bestHeaderRow = 0;
-  let bestScore = 0;
-  const maxScanRows = Math.min(allRows.length, 20); // Only scan first 20 rows
-
-  for (let i = 0; i < maxScanRows; i++) {
-    const row = allRows[i];
-    if (!row || !Array.isArray(row)) continue;
-
-    const cellTexts = row.map(cell => String(cell || '').toLowerCase().trim()).filter(Boolean);
-    let score = 0;
-
-    for (const keyword of headerKeywords) {
-      if (cellTexts.some(text => text.includes(keyword))) {
-        score++;
-      }
-    }
-
-    // Need at least 2 keyword matches to be considered a header row
-    if (score > bestScore && score >= 2) {
-      bestScore = score;
-      bestHeaderRow = i;
-    }
-  }
-
-  // Now parse with the detected header row
-  const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { range: bestHeaderRow });
-
-  if (jsonData.length === 0) {
-    return {
-      transactions: [],
-      bankName: 'Unknown',
-      accountNumber: '',
-      statementPeriod: '',
-      openingBalance: 0,
-      closingBalance: 0,
-      totalDebits: 0,
-      totalCredits: 0,
-      parseWarnings: ['No data found after header row detection'],
-    };
-  }
-
   const headers = Object.keys(jsonData[0] || {});
   const warnings: string[] = [];
-
-  if (bestHeaderRow > 0) {
-    warnings.push(`Header row detected at row ${bestHeaderRow + 1} (skipped ${bestHeaderRow} metadata rows)`);
-  }
 
   // Auto-detect or use forced bank
   let format: BankFormat;
   if (forceBankId) {
     format = BANK_FORMATS.find(f => f.id === forceBankId) || genericFormat;
   } else {
-    // Also check metadata rows above header for bank name detection
-    const metaText = allRows.slice(0, bestHeaderRow).map(r =>
-      (r || []).map((c: any) => String(c || '')).join(' ')
-    ).join(' ').toLowerCase();
-
-    // Try bank detection with both headers and metadata
-    format = BANK_FORMATS.find(f => f.id !== 'generic' && f.detect(headers, jsonData)) || genericFormat;
-
-    // If generic, also try detecting from metadata rows
-    if (format.id === 'generic' && metaText) {
-      if (metaText.includes('sampath')) {
-        format = sampathBankFormat;
-      } else if (metaText.includes('commercial bank') || metaText.includes('combank')) {
-        format = commercialBankFormat;
-      } else if (metaText.includes('hatton') || metaText.includes('hnb')) {
-        format = hnbFormat;
-      } else if (metaText.includes('bank of ceylon') || metaText.includes('boc')) {
-        format = bocFormat;
-      } else if (metaText.includes("people's bank") || metaText.includes('peoples bank')) {
-        format = peoplesBankFormat;
-      }
-    }
-
+    format = BANK_FORMATS.find(f => f.detect(headers, jsonData)) || genericFormat;
     if (format.id === 'generic') {
       warnings.push('Could not auto-detect bank format, using generic parser');
     }
@@ -488,7 +411,7 @@ export const parseBankStatement = async (file: File, forceBankId?: string): Prom
   const statementPeriod = `${periodStart.toLocaleDateString('en-GB')} - ${periodEnd.toLocaleDateString('en-GB')}`;
 
   if (transactions.length === 0) {
-    warnings.push(`No valid transactions parsed. Detected ${headers.length} columns: ${headers.join(', ')}`);
+    warnings.push('No valid transactions parsed from file');
   }
 
   return {
@@ -509,32 +432,21 @@ export const detectBankFormat = async (file: File): Promise<{ bankId: string; ba
   const data = await file.arrayBuffer();
   const workbook = XLSX.read(data);
   const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-  // Read as raw array to check both metadata and header rows
-  const allRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-  const fullText = allRows.slice(0, 15).map(r => (r || []).map((c: any) => String(c || '')).join(' ')).join(' ').toLowerCase();
-
-  // Check metadata rows for bank name
-  if (fullText.includes('sampath')) return { bankId: 'sampath_bank', bankName: 'Sampath Bank PLC', confidence: 90 };
-  if (fullText.includes('commercial bank') || fullText.includes('combank')) return { bankId: 'commercial_bank', bankName: 'Commercial Bank of Ceylon', confidence: 90 };
-  if (fullText.includes('hatton') || fullText.includes('hnb')) return { bankId: 'hnb', bankName: 'Hatton National Bank', confidence: 90 };
-  if (fullText.includes('bank of ceylon') || fullText.includes('boc')) return { bankId: 'boc', bankName: 'Bank of Ceylon', confidence: 90 };
-  if (fullText.includes("people's bank") || fullText.includes('peoples bank')) return { bankId: 'peoples_bank', bankName: "People's Bank", confidence: 90 };
-
-  // Fallback: try header-based detection
   const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { range: 0 });
+  
   if (jsonData.length === 0) {
     return { bankId: 'generic', bankName: 'Generic', confidence: 0 };
   }
-
+  
   const headers = Object.keys(jsonData[0] || {});
+  
   for (const format of BANK_FORMATS) {
     if (format.id === 'generic') continue;
     if (format.detect(headers, jsonData)) {
       return { bankId: format.id, bankName: format.name, confidence: 85 };
     }
   }
-
+  
   return { bankId: 'generic', bankName: 'Generic / Other Bank', confidence: 50 };
 };
 
@@ -570,7 +482,7 @@ export const extractAdmissionNumbers = (
     for (const prefix of prefixes) {
       const pattern1 = new RegExp(`${prefix}\\s*[-_]?\\s*(\\d{4,6})`, 'gi');
       const matches1 = Array.from(normalized.matchAll(pattern1));
-
+      
       if (matches1.length > 0) {
         matches1.forEach(match => {
           const id = `${prefix}${match[1]}`;

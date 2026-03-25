@@ -1572,6 +1572,42 @@ export async function createSPHARInvoice({
       throw invoiceError;
     }
 
+    // ========== AUTO GL POSTING if no journalEntryId was provided ==========
+    if (!journalEntryId && totalAmount > 0) {
+      try {
+        const { resolveCustomerARAccounts } = await import('@/hooks/useCustomerCategories');
+        const resolved = await resolveCustomerARAccounts(customerId, companyId);
+
+        if (resolved.arAccountId && resolved.revenueAccountId) {
+          const { postARInvoiceToGL } = await import('@/lib/gl-posting-utils');
+          const glResult = await postARInvoiceToGL({
+            invoiceNumber: invoiceNumber,
+            invoiceDate: format(new Date(), 'yyyy-MM-dd'),
+            totalAmount: totalAmount,
+            tradeReceivableId: resolved.arAccountId,
+            salesRevenueId: resolved.revenueAccountId,
+            companyId: companyId,
+            businessUnitCode: 'SPH',
+            customerName: customerName,
+            sourceModule: 'special_hire',
+          });
+          if (glResult.success && glResult.journalEntryId) {
+            await (supabase as any)
+              .from('ar_invoices')
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq('id', invoice.id);
+            console.log('[SPH AR] GL posted for AR Invoice:', invoiceNumber);
+          } else {
+            console.warn('[SPH AR] GL posting failed:', glResult.error);
+          }
+        } else {
+          console.warn('[SPH AR] Missing GL accounts for AR posting:', resolved.missingAccounts);
+        }
+      } catch (glErr) {
+        console.warn('[SPH AR] GL posting error:', glErr);
+      }
+    }
+
     // Link AR Invoice to quotation
     const { error: linkError } = await supabase
       .from('special_hire_quotations')

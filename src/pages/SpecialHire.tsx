@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AdminApprovalInterface } from '../components/special-hire/AdminApprovalInterface';
-import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield, TrendingDown, Calendar, CalendarDays, ChevronDown, Users, Workflow, Table2, Route } from 'lucide-react';
+import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield, TrendingDown, Calendar, CalendarDays, ChevronDown, Users, Workflow, Table2 } from 'lucide-react';
 import { SpecialHireSpreadsheet } from "@/components/special-hire/spreadsheet/SpecialHireSpreadsheet";
 import { SpecialHireFlowDiagram } from "@/components/special-hire/SpecialHireFlowDiagram";
 import { CostCalculator } from "@/components/special-hire/CostCalculator";
@@ -21,7 +21,6 @@ import { SubmissionsList } from "@/components/special-hire/SubmissionsList";
 import { SpecialHireQRGenerator } from "@/components/special-hire/SpecialHireQRGenerator";
 import { RateCoverageMaps } from "@/components/special-hire/RateCoverageMaps";
 import { ReferralAgentsManagement } from "@/components/special-hire/ReferralAgentsManagement";
-import { GoogleMapsDistanceCalculator } from "@/components/special-hire/GoogleMapsDistanceCalculator";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -478,11 +477,6 @@ export default function SpecialHire() {
               <span>Calc</span>
             </TabsTrigger>
 
-            <TabsTrigger value="distance" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
-              <Route className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Distance</span>
-            </TabsTrigger>
-
             <TabsTrigger value="referral-agents" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
               <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>Referrals</span>
@@ -566,10 +560,6 @@ export default function SpecialHire() {
 
         <TabsContent value="calculator" className="space-y-6">
           <EnhancedCostCalculator preselectedQuotationId={selectedCalculatorQuotationId} />
-        </TabsContent>
-
-        <TabsContent value="distance" className="space-y-6">
-          <GoogleMapsDistanceCalculator />
         </TabsContent>
 
         {/* Referral Agents content */}
