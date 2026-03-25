@@ -202,6 +202,7 @@ export async function postARInvoiceToGL(params: {
   companyId: string;
   businessUnitCode?: string;
   customerName?: string;
+  sourceModule?: string;
 }): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
   return createAndPostJournalEntry({
     entry_date: params.invoiceDate,
@@ -209,6 +210,7 @@ export async function postARInvoiceToGL(params: {
     reference: params.invoiceNumber,
     company_id: params.companyId,
     business_unit_code: params.businessUnitCode,
+    source_module: params.sourceModule,
     lines: [
       {
         account_id: params.tradeReceivableId,
