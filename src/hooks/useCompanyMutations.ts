@@ -302,28 +302,111 @@ export const useCompanyCreateAPInvoice = () => {
       tax_amount?: number;
       wht_amount?: number;
       notes?: string;
+      lines?: Array<{
+        description: string;
+        quantity?: number;
+        unit_price: number;
+        line_total: number;
+        account_id?: string;
+        tax_code?: string;
+      }>;
     }) => {
       if (!companyId) {
         throw new Error("No company selected");
       }
 
+      // Resolve effective company for consolidated GL
+      const effectiveCompanyId = companyContext?.getEffectiveCompanyId?.() || companyId;
+      const businessUnitCode = companyContext?.getBusinessUnitCode?.() || null;
+
+      const { lines, ...headerData } = invoice;
+
       const { data, error } = await supabase
         .from("ap_invoices")
         .insert([{
-          ...invoice,
+          ...headerData,
           balance: invoice.total_amount - (invoice.wht_amount || 0),
           status: "unpaid",
-          company_id: companyId,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
         }])
         .select()
         .single();
       
       if (error) throw error;
+
+      // Create invoice lines if provided
+      if (lines?.length) {
+        const lineData = lines.map(line => ({
+          invoice_id: data.id,
+          description: line.description,
+          quantity: line.quantity || 1,
+          unit_price: line.unit_price,
+          line_total: line.line_total,
+          account_id: line.account_id || null,
+          tax_code: line.tax_code || null,
+          company_id: effectiveCompanyId,
+        }));
+        await supabase.from("ap_invoice_lines").insert(lineData);
+      }
+
+      // ========== AUTO GL POSTING: DR Expense, CR Trade Payable ==========
+      try {
+        const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
+        const resolved = await resolveVendorAPAccounts(invoice.vendor_id, effectiveCompanyId);
+
+        const tradePayableId = resolved.apAccountId;
+        const defaultExpenseAccountId = resolved.expenseAccountId;
+
+        if (tradePayableId && defaultExpenseAccountId && invoice.total_amount > 0) {
+          const { postAPInvoiceToGL } = await import("@/lib/gl-posting-utils");
+
+          // Fetch vendor name for JE description
+          const { data: vendorData } = await supabase
+            .from("vendors")
+            .select("vendor_name")
+            .eq("id", invoice.vendor_id)
+            .single();
+
+          // Build per-line expense entries using 3-tier resolution: line > category > global
+          const expenseLines = (lines || []).map(line => ({
+            accountId: line.account_id || defaultExpenseAccountId,
+            amount: line.line_total || 0,
+            description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
+          }));
+
+          const glResult = await postAPInvoiceToGL({
+            invoiceNumber: invoice.invoice_number,
+            invoiceDate: invoice.invoice_date,
+            totalAmount: invoice.total_amount,
+            expenseAccountId: defaultExpenseAccountId,
+            tradePayableId,
+            companyId: effectiveCompanyId,
+            businessUnitCode: businessUnitCode || undefined,
+            vendorName: vendorData?.vendor_name,
+            expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
+          });
+
+          if (glResult.success && glResult.journalEntryId) {
+            await (supabase as any)
+              .from("ap_invoices")
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq("id", data.id);
+          } else if (!glResult.success) {
+            console.warn("AP Invoice GL auto-posting failed:", glResult.error);
+          }
+        }
+      } catch (glError) {
+        console.warn("AP Invoice GL auto-posting error:", glError);
+      }
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ap-invoices", companyId] });
       queryClient.invalidateQueries({ queryKey: ["ap-summary", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       toast.success("Vendor invoice recorded successfully");
     },
     onError: (error) => {
