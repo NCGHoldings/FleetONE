@@ -23,15 +23,14 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
+          APP_DIR: ${{ secrets.VPS_APP_DIR }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: GH_PAT
+          envs: GH_PAT,APP_DIR
           script: |
             set -e
-            APP_DIR="${{ secrets.VPS_APP_DIR }}"
-            GH_PAT="${{ secrets.GH_PAT }}"
 
             echo "📦 Navigating to app directory..."
             cd "$APP_DIR"
