@@ -39,7 +39,7 @@ jobs:
             npm install --legacy-peer-deps
 
             echo "🔨 Building application..."
-            npm run build
+            NODE_OPTIONS=--max-old-space-size=6144 npm run build
 
             echo "🔄 Reloading Nginx..."
             sudo systemctl reload nginx
