@@ -995,12 +995,6 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <br />
               Exceeding per hour will be charged Rs {rateCard.overtime_rate_lkr_per_hour?.toLocaleString() || "1500.00"}
               <br />
-              {rateCard.overnight_charge_lkr_per_day > 0 && (
-                <>
-                  Overnight charge per day: Rs {rateCard.overnight_charge_lkr_per_day.toLocaleString()}
-                  <br />
-                </>
-              )}
             </>
           ) : (
             <>
@@ -1128,6 +1122,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             • Google Maps mileage may differ from the actual mileage, and customers must rely on the verified mileage recorded at the start of the hire.
             <br />
             • Alcohol consumption is strictly prohibited on the bus, and any violation may result in immediate termination of service without refund.
+            <br />
+            • Please take a photo of the bus odometer at the start and at the end of the trip to record the actual kilometers traveled. If the actual kilometers exceed the quoted kilometers, you will need to pay the additional charges to NCG.
             <br />
             <br />
           </div>

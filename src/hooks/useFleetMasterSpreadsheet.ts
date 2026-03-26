@@ -282,32 +282,51 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
       }
 
       const busIds = activeRoster.map(r => r.bus_id!);
+      
+      // Get ALL existing trips for this date to avoid duplicates
       const { data: existingTrips } = await supabase
         .from("daily_trips")
         .select("bus_id, trip_no")
         .eq("trip_date", dateStr)
         .in("bus_id", busIds);
 
-      const existingSet = new Set((existingTrips || []).map(t => `${t.bus_id}_${t.trip_no}`));
+      // Track which buses already have trips for this date
+      const existingBusTrips = new Set((existingTrips || []).map(t => t.bus_id));
+
+      // Find the max trip counter for this date prefix to avoid collisions
+      const datePrefix = dateStr.replace(/-/g, ''); // e.g. "20260322"
+      const { data: maxTripData } = await supabase
+        .from("daily_trips")
+        .select("trip_no")
+        .ilike("trip_no", `${datePrefix}-%`)
+        .order("trip_no", { ascending: false })
+        .limit(1);
+
+      let tripCounter = 1;
+      if (maxTripData && maxTripData.length > 0) {
+        const match = maxTripData[0].trip_no.match(/-(\d+)$/);
+        if (match) {
+          tripCounter = parseInt(match[1], 10) + 1;
+        }
+      }
 
       const tripsToInsert: any[] = [];
-      let tripCounter = 1;
 
       for (const row of activeRoster) {
-        for (let seq = 1; seq <= row.trips_per_day; seq++) {
-          const tripNo = String(tripCounter).padStart(4, '0');
-          const key = `${row.bus_id}_${tripNo}`;
+        // Skip buses that already have trips for this date
+        if (existingBusTrips.has(row.bus_id!)) continue;
 
-          if (!existingSet.has(key)) {
-            tripsToInsert.push({
-              bus_id: row.bus_id,
-              route_id: row.route_id,
-              trip_date: dateStr,
-              trip_no: tripNo,
-              notes: JSON.stringify({ driver: row.default_driver || null, conductor: row.default_conductor || null }),
-              data_source: 'manual' as const,
-            });
-          }
+        for (let seq = 1; seq <= row.trips_per_day; seq++) {
+          const tripNo = `${datePrefix}-${String(tripCounter).padStart(4, '0')}`;
+
+          tripsToInsert.push({
+            bus_id: row.bus_id,
+            route_id: row.route_id,
+            trip_date: dateStr,
+            trip_no: tripNo,
+            notes: JSON.stringify({ driver: row.default_driver || null, conductor: row.default_conductor || null }),
+            data_source: 'manual' as const,
+          });
           tripCounter++;
         }
       }

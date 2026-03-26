@@ -187,6 +187,9 @@ function installErrorHandler() {
     // Ignore errors from extensions or other origins
     if (event.filename && !event.filename.includes(window.location.origin)) return;
 
+    // Suppress native browser crash logs for handled errors
+    event.preventDefault();
+
     logIssue({
       title: `JS Error: ${(event.message || 'Unknown error').substring(0, 100)}`,
       description: `An uncaught JavaScript error occurred. File: ${event.filename || 'unknown'}, Line: ${event.lineno || '?'}`,
@@ -200,6 +203,9 @@ function installErrorHandler() {
 
   // Unhandled promise rejections
   window.addEventListener('unhandledrejection', (event) => {
+    // Suppress native browser crash logs for unhandled promises
+    event.preventDefault();
+    
     const reason = event.reason?.message || event.reason?.toString?.() || 'Unknown rejection';
     // Skip Supabase fetch errors (already caught by fetch interceptor)
     if (reason.includes('FetchError') || reason.includes('NetworkError') || reason.includes('Failed to fetch')) return;

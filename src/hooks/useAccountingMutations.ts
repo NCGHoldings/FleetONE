@@ -463,6 +463,8 @@ export const useCreateARReceipt = () => {
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
+        write_off_amount?: number;
+        write_off_account_id?: string;
       }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
@@ -499,6 +501,7 @@ export const useCreateARReceipt = () => {
             receipt_id: data.id,
             invoice_id: alloc.invoice_id,
             allocated_amount: alloc.allocated_amount,
+            write_off_amount: alloc.write_off_amount || 0,
             company_id: effectiveCompanyId,
           }]);
           
@@ -509,7 +512,8 @@ export const useCreateARReceipt = () => {
             .single();
           
           if (invoice) {
-            const newPaid = (invoice.paid_amount || 0) + alloc.allocated_amount;
+            const totalCredit = alloc.allocated_amount + (alloc.write_off_amount || 0);
+            const newPaid = (invoice.paid_amount || 0) + totalCredit;
             const newBalance = invoice.total_amount - newPaid;
             
             await supabase
@@ -592,12 +596,17 @@ export const useCreateARReceipt = () => {
             toast.warning("GL posting skipped: 'Customer Advance' account not found in Chart of Accounts.");
           }
         } else if (tradeReceivableId) {
+          const totalWriteOff = receipt.allocations?.reduce((sum, a) => sum + (a.write_off_amount || 0), 0) || 0;
+          const writeOffAccountId = receipt.allocations?.find(a => a.write_off_amount && a.write_off_amount > 0)?.write_off_account_id || undefined;
+
           glResult = await postARReceiptToGL({
             receiptNumber: receipt.receipt_number,
             receiptDate: receipt.receipt_date,
             amount: receipt.amount,
+            writeOffAmount: totalWriteOff > 0 ? totalWriteOff : undefined,
             bankAccountId: bankGLAccountId,
             tradeReceivableId: tradeReceivableId,
+            writeOffAccountId: writeOffAccountId,
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
             customerName: customerName,
@@ -861,6 +870,8 @@ export const useCreateAPPayment = () => {
         invoice_id: string;
         allocated_amount: number;
         wht_deducted?: number;
+        write_off_amount?: number;
+        write_off_account_id?: string;
       }>;
       direct_lines?: Array<{
         account_id: string;
@@ -923,6 +934,7 @@ export const useCreateAPPayment = () => {
             invoice_id: alloc.invoice_id,
             allocated_amount: alloc.allocated_amount,
             wht_deducted: alloc.wht_deducted || 0,
+            write_off_amount: alloc.write_off_amount || 0,
             company_id: effectiveCompanyId,
           }]);
           
@@ -933,7 +945,7 @@ export const useCreateAPPayment = () => {
             .single();
           
           if (invoice) {
-            const totalPaid = alloc.allocated_amount + (alloc.wht_deducted || 0);
+            const totalPaid = alloc.allocated_amount + (alloc.wht_deducted || 0) + (alloc.write_off_amount || 0);
             const newPaid = (invoice.paid_amount || 0) + totalPaid;
             const newBalance = invoice.total_amount - newPaid;
             
@@ -1070,6 +1082,10 @@ export const useCreateAPPayment = () => {
         
         const tradePayableId = payableAccounts?.[0]?.id || null;
 
+        // Calculate total write-offs
+        const totalWriteOff = payment.allocations?.reduce((sum, a) => sum + (a.write_off_amount || 0), 0) || 0;
+        const writeOffAccountId = payment.allocations?.find(a => a.write_off_amount && a.write_off_amount > 0)?.write_off_account_id || undefined;
+
         // Find WHT Payable account if needed
         let whtPayableId: string | null = null;
         if (totalWhtDeducted > 0) {
@@ -1093,9 +1109,11 @@ export const useCreateAPPayment = () => {
             paymentDate: payment.payment_date,
             amount: payment.amount,
             whtAmount: totalWhtDeducted > 0 ? totalWhtDeducted : undefined,
+            writeOffAmount: totalWriteOff > 0 ? totalWriteOff : undefined,
             bankAccountId: bankGLAccountId,
             tradePayableId: tradePayableId,
             whtPayableId: totalWhtDeducted > 0 ? whtPayableId || undefined : undefined,
+            writeOffAccountId: writeOffAccountId,
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
             vendorName: vendorName,
@@ -1685,85 +1703,105 @@ export const useApproveAPInvoice = () => {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      // Update approval status
-      const { error } = await supabase.from("ap_invoices").update({ approval_status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
-      if (error) throw error;
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId || '') ? getBusinessUnitCode() : undefined;
 
-      // ========== DOUBLE-POSTING GUARD: Skip GL if already posted at creation ==========
-      try {
-        const effectiveCompanyId = getEffectiveCompanyId();
-        const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId || '') ? getBusinessUnitCode() : undefined;
+      // 1. Fetch invoice details
+      const { data: invoice } = await (supabase as any)
+        .from("ap_invoices")
+        .select("invoice_number, invoice_date, total_amount, vendor_id, journal_entry_id, vendors(vendor_name)")
+        .eq("id", id)
+        .single();
 
-        // Fetch invoice details including journal_entry_id for guard check
-        const { data: invoice } = await (supabase as any)
-          .from("ap_invoices")
-          .select("invoice_number, invoice_date, total_amount, vendor_id, journal_entry_id, vendors(vendor_name)")
-          .eq("id", id)
-          .single();
+      if (!invoice) throw new Error("Invoice not found");
 
-        // Guard: if already posted to GL at creation time, skip
-        if (invoice?.journal_entry_id) {
-          console.log("AP Invoice already posted to GL (journal_entry_id exists), skipping on approval.");
-          return;
+      // 2. Guard against double-posting
+      if (invoice.journal_entry_id) {
+        console.log("AP Invoice already posted to GL (journal_entry_id exists), skipping GL on approval.");
+        
+        // Just update approval status if already posted
+        const { error: updErr } = await supabase.from("ap_invoices").update({ approval_status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
+        if (updErr) throw updErr;
+        return;
+      }
+
+      // 3. Resolve GL Accounts FIRST (Block approval if missing)
+      let defaultExpenseAccountId: string | null = null;
+      let tradePayableId: string | null = null;
+      let vendorData = invoice.vendors as any;
+
+      if (invoice.total_amount > 0) {
+        const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
+        const resolved = await resolveVendorAPAccounts(invoice.vendor_id, effectiveCompanyId);
+
+        if (resolved.missingAccounts.length > 0 && resolved.missingAccounts.length >= 2) {
+            // Throw error immediately if critical accounts are missing
+            throw new Error(`Missing GL Configuration: \n- ${resolved.missingAccounts.join('\n- ')}\nPlease configure these in Settings to approve invoices.`);
         }
 
-        // Legacy invoice without GL posting — post now using vendor category resolution
-        if (invoice && invoice.total_amount > 0) {
-          const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
-          const resolved = await resolveVendorAPAccounts(invoice.vendor_id, effectiveCompanyId);
-          
-          const tradePayableId = resolved.apAccountId;
-          const defaultExpenseAccountId = resolved.expenseAccountId;
+        if (!resolved.apAccountId || !resolved.expenseAccountId) {
+            throw new Error(`Missing GL Accounts for AP Invoice posting. Verify Trade Payable and Default Expense are configured.`);
+        }
 
-          if (tradePayableId && defaultExpenseAccountId) {
-            // Fetch invoice lines with per-line account_id
-            const { data: invoiceLines } = await (supabase as any)
-              .from("ap_invoice_lines")
-              .select("account_id, line_total, description")
-              .eq("invoice_id", id);
+        tradePayableId = resolved.apAccountId;
+        defaultExpenseAccountId = resolved.expenseAccountId;
+      }
 
-            const { postAPInvoiceToGL } = await import("@/lib/gl-posting-utils");
-            const vendorData = invoice.vendors as any;
+      // 4. Update approval status since safety checks passed
+      const { error: approvalErr } = await supabase.from("ap_invoices").update({ approval_status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
+      if (approvalErr) throw approvalErr;
 
-            // Build per-line expense entries using 3-tier: line > category > global
-            const expenseLines = (invoiceLines || []).map((line: any) => ({
-              accountId: line.account_id || defaultExpenseAccountId,
-              amount: line.line_total || 0,
-              description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
-            }));
+      // 5. Build lines and Post to GL
+      try {
+        if (invoice.total_amount > 0 && tradePayableId && defaultExpenseAccountId) {
+          const { data: invoiceLines } = await (supabase as any)
+            .from("ap_invoice_lines")
+            .select("account_id, line_total, description")
+            .eq("invoice_id", id);
 
-            const glResult = await postAPInvoiceToGL({
-              invoiceNumber: invoice.invoice_number,
-              invoiceDate: invoice.invoice_date,
-              totalAmount: invoice.total_amount,
-              expenseAccountId: defaultExpenseAccountId,
-              tradePayableId,
-              companyId: effectiveCompanyId,
-              businessUnitCode,
-              vendorName: vendorData?.vendor_name,
-              expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
-            });
-            if (glResult.success && glResult.journalEntryId) {
-              await (supabase as any)
-                .from("ap_invoices")
-                .update({ journal_entry_id: glResult.journalEntryId })
-                .eq("id", id);
-            } else if (!glResult.success) {
-              console.warn("AP Invoice GL posting failed:", glResult.error);
-            }
+          const { postAPInvoiceToGL } = await import("@/lib/gl-posting-utils");
+
+          const expenseLines = (invoiceLines || []).map((line: any) => ({
+            accountId: line.account_id || defaultExpenseAccountId,
+            amount: line.line_total || 0,
+            description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
+          }));
+
+          const glResult = await postAPInvoiceToGL({
+            invoiceNumber: invoice.invoice_number,
+            invoiceDate: invoice.invoice_date,
+            totalAmount: invoice.total_amount,
+            expenseAccountId: defaultExpenseAccountId,
+            tradePayableId,
+            companyId: effectiveCompanyId,
+            businessUnitCode,
+            vendorName: vendorData?.vendor_name,
+            expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
+          });
+
+          if (glResult.success && glResult.journalEntryId) {
+            await (supabase as any)
+              .from("ap_invoices")
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq("id", id);
+          } else if (!glResult.success) {
+            throw new Error(`GL Posting Failed: ${glResult.error}`);
           }
         }
-      } catch (glError) {
-        console.warn("AP Invoice GL posting error:", glError);
+      } catch (glError: any) {
+        // If GL fails, we should ideally rollback the approval, but since this is an async side-effect,
+        // we'll revert the invoice back to 'pending' to allow retry.
+        await supabase.from("ap_invoices").update({ approval_status: "pending", approved_at: null }).eq("id", id);
+        throw new Error(`Failed to post to General Ledger. Invoice approval reverted. Reason: ${glError.message || glError}`);
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       toast.success("Invoice approved & posted to GL");
     },
-    onError: (error) => toast.error(`Failed: ${error.message}`),
+    onError: (error) => toast.error(error.message, { duration: 6000 }),
   });
 };
 

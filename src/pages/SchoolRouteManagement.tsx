@@ -250,7 +250,6 @@ export default function SchoolRouteManagement() {
             <EnhancedRouteCard
               key={route.routeId}
               route={route}
-              onAddExpense={addRouteExpense}
               onAddStaff={addStaffCost}
               onUpdateRoute={updateRouteInfo}
               onViewStudents={handleViewStudents}

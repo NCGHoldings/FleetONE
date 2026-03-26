@@ -60,7 +60,7 @@ export interface ExpenseRequest {
   petty_cash_fund_id: string | null;
   iou_id: string | null;
   receipt_attachment_url: string | null;
-  additional_docs: string[];
+  additional_docs: any;
   notes: string | null;
   status: string;
   created_by: string | null;
@@ -131,16 +131,22 @@ export const useExpenseRequests = (filters?: {
   });
 };
 
+import { useGenerateNumber } from "@/hooks/useNumbering";
+
 export const useCreateExpenseRequest = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
+  const generateNumber = useGenerateNumber();
 
   return useMutation({
     mutationFn: async (data: Partial<ExpenseRequest>) => {
+      // Use the Guardian for atomic number generation, fallback to timestamp ONLY if RPC fails
+      const requestNumber = await generateNumber("expense_request");
+
       const { data: result, error } = await (supabase as any)
         .from("expense_requests")
         .insert([{
-          request_number: "", // Trigger will auto-generate
+          request_number: requestNumber,
           request_date: data.request_date,
           business_unit_code: data.business_unit_code || "SBO",
           company_id: selectedCompanyId,
@@ -163,6 +169,7 @@ export const useCreateExpenseRequest = () => {
           receipt_attachment_url: data.receipt_attachment_url || null,
           receipt_ocr_data: data.receipt_ocr_data || null,
           ocr_fields_modified: data.ocr_fields_modified || null,
+          additional_docs: data.additional_docs || null,
         }])
         .select()
         .single();

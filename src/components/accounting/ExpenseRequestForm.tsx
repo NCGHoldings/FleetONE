@@ -47,9 +47,10 @@ interface ExpenseRequestFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultBusinessUnit?: string;
+  defaultSchoolRouteId?: string;
 }
 
-export const ExpenseRequestForm = ({ open, onOpenChange, defaultBusinessUnit }: ExpenseRequestFormProps) => {
+export const ExpenseRequestForm = ({ open, onOpenChange, defaultBusinessUnit, defaultSchoolRouteId }: ExpenseRequestFormProps) => {
   const createExpense = useCreateExpenseRequest();
   const { data: vendors } = useVendors();
   const { data: pettyCashFunds } = usePettyCashFunds();
@@ -117,6 +118,7 @@ export const ExpenseRequestForm = ({ open, onOpenChange, defaultBusinessUnit }: 
       receipt_attachment_url: receiptImageUrl || undefined,
       receipt_ocr_data: ocrApplied ? { modified_fields: ocrModifiedFields } : undefined,
       ocr_fields_modified: ocrModifiedFields.length > 0 ? ocrModifiedFields : undefined,
+      additional_docs: defaultSchoolRouteId ? { school_route_id: defaultSchoolRouteId } : undefined,
     } as any);
 
     // Auto-create bank transaction when payment method is "bank" and bank account is selected

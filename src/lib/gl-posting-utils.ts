@@ -239,32 +239,56 @@ export async function postARReceiptToGL(params: {
   receiptNumber: string;
   receiptDate: string;
   amount: number;
+  whtAmount?: number;
+  writeOffAmount?: number;
   bankAccountId: string;
   tradeReceivableId: string;
+  whtAccountId?: string;
+  writeOffAccountId?: string;
   companyId: string;
   businessUnitCode?: string;
   customerName?: string;
 }): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
+  const lines: JournalEntryLine[] = [
+    {
+      account_id: params.bankAccountId,
+      description: `Bank Receipt - ${params.receiptNumber}`,
+      debit: params.amount,
+      credit: 0,
+    },
+    {
+      account_id: params.tradeReceivableId,
+      description: `Reduce Receivable - ${params.receiptNumber}`,
+      debit: 0,
+      credit: params.amount + (params.whtAmount || 0) + (params.writeOffAmount || 0),
+    },
+  ];
+
+  if (params.whtAmount && params.whtAmount > 0 && params.whtAccountId) {
+    lines.push({
+      account_id: params.whtAccountId,
+      description: `WHT Deducted - ${params.receiptNumber}`,
+      debit: params.whtAmount,
+      credit: 0,
+    });
+  }
+
+  if (params.writeOffAmount && params.writeOffAmount > 0 && params.writeOffAccountId) {
+    lines.push({
+      account_id: params.writeOffAccountId,
+      description: `Receipt Write-Off / Discount - ${params.receiptNumber}`,
+      debit: params.writeOffAmount,
+      credit: 0,
+    });
+  }
+
   return createAndPostJournalEntry({
     entry_date: params.receiptDate,
     description: `AR Receipt: ${params.receiptNumber}${params.customerName ? ` from ${params.customerName}` : ""}`,
     reference: params.receiptNumber,
     company_id: params.companyId,
     business_unit_code: params.businessUnitCode,
-    lines: [
-      {
-        account_id: params.bankAccountId,
-        description: `Bank Receipt - ${params.receiptNumber}`,
-        debit: params.amount,
-        credit: 0,
-      },
-      {
-        account_id: params.tradeReceivableId,
-        description: `Reduce Receivable - ${params.receiptNumber}`,
-        debit: 0,
-        credit: params.amount,
-      },
-    ],
+    lines,
   });
 }
 
@@ -426,9 +450,11 @@ export async function postAPPaymentToGL(params: {
   paymentDate: string;
   amount: number;
   whtAmount?: number;
+  writeOffAmount?: number;
   bankAccountId: string;
   tradePayableId: string;
   whtPayableId?: string;
+  writeOffAccountId?: string;
   companyId: string;
   businessUnitCode?: string;
   vendorName?: string;
@@ -437,7 +463,7 @@ export async function postAPPaymentToGL(params: {
     {
       account_id: params.tradePayableId,
       description: `Settle Payable - ${params.paymentNumber}`,
-      debit: params.amount + (params.whtAmount || 0),
+      debit: params.amount + (params.whtAmount || 0) + (params.writeOffAmount || 0),
       credit: 0,
     },
     {
@@ -455,6 +481,16 @@ export async function postAPPaymentToGL(params: {
       description: `WHT Deducted - ${params.paymentNumber}`,
       debit: 0,
       credit: params.whtAmount,
+    });
+  }
+
+  // Add Write-Off / Discount line if applicable
+  if (params.writeOffAmount && params.writeOffAmount > 0 && params.writeOffAccountId) {
+    lines.push({
+      account_id: params.writeOffAccountId,
+      description: `Payment Write-Off - ${params.paymentNumber}`,
+      debit: 0,
+      credit: params.writeOffAmount,
     });
   }
 

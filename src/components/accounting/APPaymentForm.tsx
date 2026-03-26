@@ -46,9 +46,11 @@ interface InvoiceAllocation {
   invoice_number: string;
   due_date: string;
   balance: number;
+  balanced_amount?: number;
   wht_amount: number;
   allocated_amount: number;
   wht_deducted: number;
+  write_off_amount: number;
   selected: boolean;
 }
 
@@ -101,6 +103,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const [includeBankFee, setIncludeBankFee] = useState(false);
   const [bankFeeAmount, setBankFeeAmount] = useState(0);
   const [bankFeeType, setBankFeeType] = useState("bank_charge");
+  const [globalWriteOffAccountId, setGlobalWriteOffAccountId] = useState("");
 
   const { data: vendorBankAccounts } = useVendorBankAccounts(selectedVendorId || undefined);
 
@@ -200,6 +203,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
           wht_amount: inv.wht_amount || 0,
           allocated_amount: 0,
           wht_deducted: 0,
+          write_off_amount: 0,
           selected: false,
         }))
       );
@@ -244,7 +248,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     );
   };
 
-  const updateAllocation = (invoiceId: string, field: "allocated_amount" | "wht_deducted", value: number) => {
+  const updateAllocation = (invoiceId: string, field: "allocated_amount" | "wht_deducted" | "write_off_amount", value: number) => {
     setAllocations(
       allocations.map((alloc) => {
         if (alloc.invoice_id === invoiceId) {
@@ -350,6 +354,8 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
           invoice_id: a.invoice_id,
           allocated_amount: a.allocated_amount,
           wht_deducted: a.wht_deducted,
+          write_off_amount: a.write_off_amount,
+          write_off_account_id: globalWriteOffAccountId || undefined,
         })),
         direct_lines: isDirectPayment
           ? directLines.filter((l) => l.account_id && l.line_total > 0).map((l) => ({
@@ -893,6 +899,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                           <th className="px-3 py-2 text-left text-sm font-medium">Invoice #</th>
                           <th className="px-3 py-2 text-left text-sm font-medium">Due Date</th>
                           <th className="px-3 py-2 text-right text-sm font-medium">Balance</th>
+                          <th className="px-3 py-2 text-right text-sm font-medium w-32">Write-off</th>
                           <th className="px-3 py-2 text-right text-sm font-medium w-32">WHT Deducted</th>
                           <th className="px-3 py-2 text-right text-sm font-medium w-36">Pay Amount</th>
                         </tr>
@@ -915,6 +922,17 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                               </td>
                               <td className="px-3 py-2 text-right">
                                 <CurrencyDisplay amount={alloc.balance} />
+                              </td>
+                              <td className="px-3 py-2">
+                                <Input
+                                  type="number"
+                                  value={alloc.write_off_amount}
+                                  onChange={(e) => updateAllocation(alloc.invoice_id, "write_off_amount", parseFloat(e.target.value) || 0)}
+                                  className="h-8 text-right"
+                                  min={0}
+                                  step="0.01"
+                                  placeholder="0.00"
+                                />
                               </td>
                               <td className="px-3 py-2">
                                 <Input
@@ -952,7 +970,27 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
 
                 {/* Totals */}
                 <div className="flex justify-end gap-6">
-                  <div className="bg-muted/50 p-4 rounded-lg">
+                  {(allocations.some(a => a.write_off_amount > 0)) && (
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-4">
+                          <span className="text-muted-foreground whitespace-nowrap">Write-off Account:</span>
+                          <SearchableAccountSelector
+                            value={globalWriteOffAccountId}
+                            onChange={setGlobalWriteOffAccountId}
+                            placeholder="Select Discount/Write-off GL"
+                          />
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-muted-foreground">Total Write-off:</span>
+                          <span className="text-lg font-semibold text-primary">
+                            <CurrencyDisplay amount={allocations.reduce((sum, a) => sum + a.write_off_amount, 0)} />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="bg-muted/50 p-4 rounded-lg flex items-center">
                     <div className="flex items-center gap-4">
                       <span className="text-muted-foreground">WHT Deducted:</span>
                       <span className="text-lg font-semibold text-orange-600">

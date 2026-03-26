@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, CheckCircle } from "lucide-react";
+import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 
 const receiptSchema = z.object({
   receipt_number: z.string().min(1, "Receipt number is required"),
@@ -37,6 +38,7 @@ interface InvoiceAllocation {
   due_date: string;
   balance: number;
   allocated_amount: number;
+  write_off_amount: number;
   selected: boolean;
 }
 
@@ -56,6 +58,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const [allocations, setAllocations] = useState<InvoiceAllocation[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(preselectedCustomerId || "");
   const [isAdvance, setIsAdvance] = useState(isAdvanceMode);
+  const [globalWriteOffAccountId, setGlobalWriteOffAccountId] = useState("");
 
   const form = useForm<ReceiptFormData>({
     resolver: zodResolver(receiptSchema),
@@ -95,7 +98,8 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
           due_date: inv.due_date,
           balance: inv.balance || 0,
           allocated_amount: 0,
-          selected: false,
+          write_off_amount: 0,
+          selected: boolean,
         }))
       );
     } else {
@@ -123,12 +127,16 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
     );
   };
 
-  const updateAllocation = (invoiceId: string, amount: number) => {
+  const updateAllocation = (invoiceId: string, field: "allocated_amount" | "write_off_amount", value: number) => {
     setAllocations(
       allocations.map((alloc) => {
         if (alloc.invoice_id === invoiceId) {
-          const validAmount = Math.min(Math.max(0, amount), alloc.balance);
-          return { ...alloc, allocated_amount: validAmount, selected: validAmount > 0 };
+          const updated = { ...alloc, [field]: value };
+          if (field === "allocated_amount") {
+            updated.allocated_amount = Math.min(Math.max(0, value), alloc.balance);
+            updated.selected = updated.allocated_amount > 0;
+          }
+          return updated;
         }
         return alloc;
       })
@@ -183,6 +191,8 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
         allocations: selectedAllocations.map((a) => ({
           invoice_id: a.invoice_id,
           allocated_amount: a.allocated_amount,
+          write_off_amount: a.write_off_amount,
+          write_off_account_id: globalWriteOffAccountId || undefined,
         })),
       });
       onOpenChange(false);
@@ -411,6 +421,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                           <th className="px-3 py-2 text-left text-sm font-medium">Invoice #</th>
                           <th className="px-3 py-2 text-left text-sm font-medium">Due Date</th>
                           <th className="px-3 py-2 text-right text-sm font-medium">Balance</th>
+                          <th className="px-3 py-2 text-right text-sm font-medium w-36">Write-off</th>
                           <th className="px-3 py-2 text-right text-sm font-medium w-36">Allocate</th>
                         </tr>
                       </thead>
@@ -436,8 +447,19 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                               <td className="px-3 py-2">
                                 <Input
                                   type="number"
+                                  value={alloc.write_off_amount}
+                                  onChange={(e) => updateAllocation(alloc.invoice_id, "write_off_amount", parseFloat(e.target.value) || 0)}
+                                  className="h-8 text-right"
+                                  min={0}
+                                  step="0.01"
+                                  placeholder="0.00"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <Input
+                                  type="number"
                                   value={alloc.allocated_amount}
-                                  onChange={(e) => updateAllocation(alloc.invoice_id, parseFloat(e.target.value) || 0)}
+                                  onChange={(e) => updateAllocation(alloc.invoice_id, "allocated_amount", parseFloat(e.target.value) || 0)}
                                   className="h-8 text-right"
                                   max={alloc.balance}
                                   min={0}
@@ -456,9 +478,28 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                   </p>
                 )}
 
-                {/* Total */}
-                <div className="flex justify-end">
-                  <div className="bg-muted p-4 rounded-lg">
+                <div className="flex justify-end gap-6">
+                  {(allocations.some(a => a.write_off_amount > 0)) && (
+                    <div className="bg-muted p-4 rounded-lg">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-4">
+                          <span className="text-muted-foreground whitespace-nowrap">Write-off Account:</span>
+                          <SearchableAccountSelector
+                            value={globalWriteOffAccountId}
+                            onChange={setGlobalWriteOffAccountId}
+                            placeholder="Select Discount/Write-off GL"
+                          />
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-muted-foreground">Total Write-off:</span>
+                          <span className="text-lg font-semibold text-primary">
+                            <CurrencyDisplay amount={allocations.reduce((sum, a) => sum + a.write_off_amount, 0)} />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="bg-muted p-4 rounded-lg flex items-center">
                     <div className="flex items-center gap-4">
                       <span className="font-semibold">Total Receipt Amount:</span>
                       <span className="text-2xl font-bold text-primary">

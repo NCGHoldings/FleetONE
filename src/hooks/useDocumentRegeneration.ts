@@ -130,7 +130,7 @@ export const useDocumentRegeneration = () => {
 
       // Create invoice data with fresh signatures
       const invoiceData: InvoiceData = {
-        invoiceNo: `UPDATED-${existingDoc.payment_type.toUpperCase()}-${Date.now()}`,
+        invoiceNo: `UPDATED-${existingDoc.payment_type.toUpperCase()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
         invoiceType: existingDoc.payment_type as 'advance' | 'balance',
         quotationNo: quotationData.quotation_no,
         customerName: quotationData.customer_name,
@@ -175,7 +175,7 @@ export const useDocumentRegeneration = () => {
       // Generate new PDF with updated signatures
       const pdfBlob = await generateInvoicePDF(invoiceData);
 
-      const newFileName = `UPDATED-${existingDoc.document_type}-${quotationData.quotation_no}-${Date.now()}.pdf`;
+      const newFileName = `UPDATED-${existingDoc.document_type}-${quotationData.quotation_no}-${Math.random().toString(36).substring(2, 8).toUpperCase()}.pdf`;
       const { storagePath, fileSize } = await uploadPdfToStorage(pdfBlob, newFileName);
 
       const { error: updateError } = await supabase

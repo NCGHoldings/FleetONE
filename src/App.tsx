@@ -11,6 +11,8 @@ import { PageAccessGuard } from "./components/auth/PageAccessGuard";
 import { SeasonalThemeProvider } from "./components/seasonal/SeasonalThemeProvider";
 import { CompanyProvider } from "./contexts/CompanyContext";
 import { ThemeProvider } from "next-themes";
+import { SystemErrorBoundary } from "./components/safety/SystemErrorBoundary";
+import { toast } from "sonner";
 
 // Pages
 import Auth from "./pages/Auth";
@@ -88,7 +90,26 @@ import SystemIssueTracker from "./pages/SystemIssueTracker";
 import PublicYutongReport from "./pages/PublicYutongReport";
 import PublicYutongSpreadsheet from "./pages/PublicYutongSpreadsheet";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+  queryCache: new (await import("@tanstack/react-query")).QueryCache({
+    onError: (error) => {
+      console.error("[Query System Error]:", error);
+      toast.error("Network issue detected. We are recovering your connection.");
+    },
+  }),
+  mutationCache: new (await import("@tanstack/react-query")).MutationCache({
+    onError: (error) => {
+      console.error("[Mutation System Error]:", error);
+      toast.error(error.message || "Failed to save records. Please try again.");
+    },
+  }),
+});
 
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="light" storageKey="ncg-theme">
@@ -99,9 +120,10 @@ const App = () => (
           <Sonner />
           <AuthProvider>
             <SeasonalThemeProvider>
-              <BrowserRouter>
-          <Routes>
-            {/* Public routes */}
+              <SystemErrorBoundary>
+                <BrowserRouter>
+                  <Routes>
+                    {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/accept-invite" element={<AcceptInvite />} />
@@ -827,9 +849,10 @@ const App = () => (
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-          </BrowserRouter>
-        </SeasonalThemeProvider>
-        </AuthProvider>
+                </BrowserRouter>
+              </SystemErrorBoundary>
+            </SeasonalThemeProvider>
+          </AuthProvider>
         </TooltipProvider>
       </CompanyProvider>
     </QueryClientProvider>

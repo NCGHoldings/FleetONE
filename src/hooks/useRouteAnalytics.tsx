@@ -217,6 +217,14 @@ export function useRouteAnalytics(branchId?: string) {
       .select("amount")
       .eq("route_id", routeId);
 
+    // Get AP Invoices tagged directly to this route
+    const { data: apInvoices } = await supabase
+      .from("ap_invoices")
+      .select("total_amount")
+      .eq("school_route_id", routeId)
+      .neq("status", "draft")
+      .neq("status", "cancelled");
+
     // Get staff costs
     const { data: staffCosts } = await supabase
       .from("route_staff_costs")
@@ -224,7 +232,12 @@ export function useRouteAnalytics(branchId?: string) {
       .eq("route_id", routeId)
       .eq("is_active", true);
 
-    const totalExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+    const totalRouteExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+    const totalAPInvoices = apInvoices?.reduce((sum, i) => sum + Number(i.total_amount), 0) || 0;
+    
+    // Total generalized expenses includes both native module expenses and external Finance invoices
+    const totalExpenses = totalRouteExpenses + totalAPInvoices;
+    
     const totalStaffCosts = staffCosts?.reduce((sum, s) => sum + Number(s.monthly_salary), 0) || 0;
 
     return { 

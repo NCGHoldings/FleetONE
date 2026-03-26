@@ -16,7 +16,7 @@ import {
   Phone,
   User
 } from "lucide-react";
-import { RouteExpenseModal } from "./RouteExpenseModal";
+import { ExpenseRequestForm } from "@/components/accounting/ExpenseRequestForm";
 import { RouteStaffModal } from "./RouteStaffModal";
 
 interface RouteCardProps {
@@ -35,7 +35,6 @@ interface RouteCardProps {
     profitMargin: number;
     students: any[];
   };
-  onAddExpense: (routeId: string, expense: any) => Promise<void>;
   onAddStaff: (routeId: string, staff: any) => Promise<void>;
   onUpdateRoute: (routeId: string, updates: any) => Promise<void>;
   onViewStudents: (routeId: string, students: any[]) => void;
@@ -43,7 +42,6 @@ interface RouteCardProps {
 
 export function EnhancedRouteCard({ 
   route, 
-  onAddExpense, 
   onAddStaff, 
   onUpdateRoute, 
   onViewStudents 
@@ -232,12 +230,11 @@ export function EnhancedRouteCard({
       </Card>
 
       {/* Modals */}
-      <RouteExpenseModal
+      <ExpenseRequestForm
         open={expenseModalOpen}
         onOpenChange={setExpenseModalOpen}
-        routeId={route.routeId}
-        routeName={route.routeName}
-        onAddExpense={(expense) => onAddExpense(route.routeId, expense)}
+        defaultBusinessUnit="SBO"
+        defaultSchoolRouteId={route.routeId}
       />
 
       <RouteStaffModal

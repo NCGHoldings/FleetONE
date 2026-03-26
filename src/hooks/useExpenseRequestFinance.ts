@@ -31,6 +31,7 @@ export interface ExpenseRequestForGL {
   paymentMethod: string; // cash, bank, petty_cash, iou, to_be_paid
   pettyCashFundId?: string;
   iouId?: string;
+  additionalDocs?: any;
 }
 
 // Helper function to update COA balances after journal entry creation
@@ -355,6 +356,7 @@ export function usePostExpenseRequestToGL() {
             reference: expense.requestNumber,
             notes: expense.description,
             journal_entry_id: journalEntry.id,
+            school_route_id: expense.additionalDocs?.school_route_id,
           })
           .select()
           .single();

@@ -149,9 +149,11 @@ export const useFinanceApproval = () => {
         .eq('id', paymentData.quotation.id);
     }
 
-    // Step 2b: Create AR Invoice if advance/full payment and customer exists
-    if (customerId && (isAdvance || isFullPayment) && !arInvoiceId) {
-      console.log('[SPH Finance] Creating AR Invoice...');
+    // Step 2b: Create AR Invoice if full or balance payment and customer exists
+    // ADVANCE payments should NOT create an AR Invoice for the full amount yet.
+    // The AR Invoice will be generated later when the trip is completed (Balance Invoice) or here if missing.
+    if (customerId && (isFullPayment || isBalance) && !arInvoiceId) {
+      console.log('[SPH Finance] Creating AR Invoice for Full/Balance Payment...');
       
       const totalAmount = (paymentData.quotation.gross_revenue || 0) +
         (paymentData.quotation.fuel_cost_fuel_only || 0) +
@@ -178,12 +180,12 @@ export const useFinanceApproval = () => {
       if (!arResult) {
         console.error('[SPH Finance] ❌ Failed to create AR Invoice');
         toast.error('Failed to create AR Invoice. Check Finance Settings.');
-        return;
+        // Don't return, allow advance processing to continue
+      } else {
+        arInvoiceId = arResult.invoiceId;
+        console.log('[SPH Finance] ✅ AR Invoice created:', arResult.invoiceNumber);
+        toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
       }
-      
-      arInvoiceId = arResult.invoiceId;
-      console.log('[SPH Finance] ✅ AR Invoice created:', arResult.invoiceNumber);
-      toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
     }
 
     // Step 2c: Post GL Entry

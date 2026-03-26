@@ -437,11 +437,29 @@ export function useGenerateBulkARInvoices() {
       const branchCode = branchData?.branch_code || "SBS";
       const branchName = branchData?.branch_name || "School Bus";
 
+      // --- FIX: Get max invoice number for this prefix to avoid collisions across different branches ---
+      const invoicePrefixMatch = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}`;
+      const { data: maxInvData } = await supabase
+        .from("school_ar_invoices")
+        .select("invoice_number")
+        .ilike("invoice_number", `${invoicePrefixMatch}-%`)
+        .order("invoice_number", { ascending: false })
+        .limit(1);
+
+      let startInvoiceCounter = 1;
+      if (maxInvData && maxInvData.length > 0) {
+        const match = maxInvData[0].invoice_number.match(/-(\d+)$/);
+        if (match) {
+          startInvoiceCounter = parseInt(match[1], 10) + 1;
+        }
+      }
+      // ------------------------------------------------------------------------------------------------
+
       // Only proceed with finance integration if auto-post is enabled and accounts are configured
       if (!settings.auto_post_invoices || !settings.trade_receivable_account_id || !settings.sbs_collection_account_id) {
         // Create basic school invoices without finance integration
         const invoicePromises = students.map(async (student, index) => {
-          const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(index + 1).padStart(5, "0")}`;
+          const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(startInvoiceCounter + index).padStart(5, "0")}`;
           // Net of existing credit balance
           const rawAmount = student.current_amount_due || student.fixed_monthly_amount || 0;
           const credit = student.payment_balance > 0 ? student.payment_balance : 0;
@@ -506,15 +524,17 @@ export function useGenerateBulkARInvoices() {
       for (const chunk of chunks) {
         // Process each chunk in parallel
         await Promise.all(chunk.map(async (student, indexInChunk) => {
-          const globalIndex = processedCount + indexInChunk + 1;
+          // Use the startInvoiceCounter so that numbers don't collide across branches
+          const invoiceCounter = startInvoiceCounter + processedCount + indexInChunk;
+          
           // Net of existing credit balance
           const rawAmount = student.current_amount_due || student.fixed_monthly_amount || 0;
           const credit = student.payment_balance > 0 ? student.payment_balance : 0;
           const amount = Math.max(0, rawAmount - credit);
           
           // Generate unique identifiers for this student
-          const uniqueSuffix = `${String(globalIndex).padStart(5, "0")}-${student.id.substring(0, 4).toUpperCase()}`;
-          const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(globalIndex).padStart(5, "0")}`;
+          const uniqueSuffix = `${String(invoiceCounter).padStart(5, "0")}-${student.id.substring(0, 4).toUpperCase()}`;
+          const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(invoiceCounter).padStart(5, "0")}`;
           const entryNumber = `SBS-JE-${format(invoiceMonth, "yyyyMM")}-${uniqueSuffix}`;
           
           // 1. Create individual Journal Entry for this student

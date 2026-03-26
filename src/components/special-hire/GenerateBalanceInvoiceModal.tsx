@@ -386,22 +386,57 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             console.log('[SPH GL] ✅ Invoice posted:', invoiceGLResult.entry_number);
             toast.success(`Invoice GL Entry: ${invoiceGLResult.entry_number}`);
 
-            // Update AR Invoice with full invoice amount (if AR Invoice exists)
-            // This handles adjustments that change the total
+            // Update or Create AR Invoice with full invoice amount
             const { data: quotationRecord } = await supabase
               .from('special_hire_quotations')
-              .select('ar_invoice_id')
+              .select('ar_invoice_id, finance_customer_id')
               .eq('id', quotationData.id)
               .single();
 
-            if (quotationRecord?.ar_invoice_id) {
+            let arInvoiceId = quotationRecord?.ar_invoice_id;
+            const financeCustomerId = quotationRecord?.finance_customer_id;
+
+            if (arInvoiceId) {
               await updateSPHARInvoiceOnInvoiceSent({
-                arInvoiceId: quotationRecord.ar_invoice_id,
+                arInvoiceId: arInvoiceId,
                 quotationId: quotationData.id,
                 totalAmount: fullInvoiceAmount,
                 journalEntryId: invoiceGLResult.id,
               });
               console.log('[SPH AR] ✅ AR Invoice updated with invoice amount');
+            } else {
+              // Create the missing AR Invoice
+              console.log('[SPH AR] Creating missing AR Invoice for Sent Invoice');
+              const { createSPHARInvoice, createOrGetSPHCustomer } = await import('@/hooks/useSpecialHireFinance');
+              
+              let customerId = financeCustomerId;
+              if (!customerId) {
+                customerId = await createOrGetSPHCustomer({
+                  customerName: quotationData.customer_name,
+                  customerPhone: quotationData.customer_phone,
+                  customerEmail: quotationData.customer_email,
+                  companyId: NCG_HOLDING_ID,
+                });
+              }
+
+              if (customerId) {
+                const dueDate = format(new Date(), 'yyyy-MM-dd');
+                const arResult = await createSPHARInvoice({
+                  quotationId: quotationData.id,
+                  quotationNo: quotationData.quotation_no,
+                  customerId,
+                  customerName: quotationData.customer_name,
+                  totalAmount: fullInvoiceAmount,
+                  advanceAmount: quotationData.advance_paid,
+                  dueDate,
+                  companyId: NCG_HOLDING_ID,
+                  journalEntryId: invoiceGLResult.id, // Pass journalEntryId to skip double GL posting
+                });
+                
+                if (arResult) {
+                  console.log('[SPH AR] ✅ AR Invoice created:', arResult.invoiceNumber);
+                }
+              }
             }
           }
           

@@ -3,9 +3,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { 
   Users, 
   CreditCard, 
@@ -26,7 +37,8 @@ import {
   Settings,
   Filter,
   Search,
-  RefreshCw
+  RefreshCw,
+  Plus
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -36,6 +48,7 @@ interface Branch {
   branch_code: string;
   address?: string;
   contact_phone?: string;
+  contact_email?: string;
   manager_name?: string;
   is_total_branch: boolean;
   is_active: boolean;
@@ -49,10 +62,22 @@ interface BranchStats {
   overduePayments: number;
 }
 
+const initialFormState = {
+  branch_name: "",
+  branch_code: "",
+  address: "",
+  contact_phone: "",
+  contact_email: "",
+  manager_name: "",
+};
+
 export default function SchoolBusService() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchStats, setBranchStats] = useState<Record<string, BranchStats>>({});
   const [loading, setLoading] = useState(true);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [formData, setFormData] = useState(initialFormState);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -136,6 +161,76 @@ export default function SchoolBusService() {
     }
   };
 
+  const handleFormChange = (field: string, value: string) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      // Auto-generate branch code from name (first 3 uppercase chars)
+      if (field === "branch_name") {
+        updated.branch_code = value
+          .replace(/[^a-zA-Z]/g, "")
+          .substring(0, 3)
+          .toUpperCase();
+      }
+      return updated;
+    });
+  };
+
+  const handleCreateBranch = async () => {
+    if (!formData.branch_name.trim()) {
+      toast({ title: "Validation Error", description: "Branch name is required", variant: "destructive" });
+      return;
+    }
+    if (!formData.branch_code.trim()) {
+      toast({ title: "Validation Error", description: "Branch code is required", variant: "destructive" });
+      return;
+    }
+
+    // Check for duplicate branch code
+    const existing = branches.find(
+      b => b.branch_code.toLowerCase() === formData.branch_code.trim().toLowerCase()
+    );
+    if (existing) {
+      toast({ title: "Duplicate Code", description: `Branch code "${formData.branch_code}" already exists for "${existing.branch_name}"`, variant: "destructive" });
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const { error } = await supabase.from("school_branches").insert({
+        branch_name: formData.branch_name.trim(),
+        branch_code: formData.branch_code.trim().toUpperCase(),
+        address: formData.address.trim() || null,
+        contact_phone: formData.contact_phone.trim() || null,
+        contact_email: formData.contact_email.trim() || null,
+        manager_name: formData.manager_name.trim() || null,
+        is_active: true,
+        is_total_branch: false,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Branch Created",
+        description: `"${formData.branch_name}" branch has been created successfully.`,
+      });
+
+      setFormData(initialFormState);
+      setCreateDialogOpen(false);
+      // Refresh the branch list
+      setLoading(true);
+      await fetchBranches();
+    } catch (error: any) {
+      console.error("Error creating branch:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create branch",
+        variant: "destructive",
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -172,6 +267,106 @@ export default function SchoolBusService() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Branch
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[520px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <School className="h-5 w-5 text-primary" />
+                  Create New Branch
+                </DialogTitle>
+                <DialogDescription>
+                  Add a new branch to the School Bus Service. It will have all the same features as existing branches.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="branch_name">Branch Name <span className="text-red-500">*</span></Label>
+                    <Input
+                      id="branch_name"
+                      placeholder="e.g. Colombo"
+                      value={formData.branch_name}
+                      onChange={(e) => handleFormChange("branch_name", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="branch_code">Branch Code <span className="text-red-500">*</span></Label>
+                    <Input
+                      id="branch_code"
+                      placeholder="e.g. COL"
+                      value={formData.branch_code}
+                      onChange={(e) => handleFormChange("branch_code", e.target.value)}
+                      maxLength={5}
+                      className="uppercase"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input
+                    id="address"
+                    placeholder="Branch address"
+                    value={formData.address}
+                    onChange={(e) => handleFormChange("address", e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="contact_phone">Contact Phone</Label>
+                    <Input
+                      id="contact_phone"
+                      placeholder="e.g. 011-2345678"
+                      value={formData.contact_phone}
+                      onChange={(e) => handleFormChange("contact_phone", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contact_email">Contact Email</Label>
+                    <Input
+                      id="contact_email"
+                      type="email"
+                      placeholder="branch@example.com"
+                      value={formData.contact_email}
+                      onChange={(e) => handleFormChange("contact_email", e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="manager_name">Manager Name</Label>
+                  <Input
+                    id="manager_name"
+                    placeholder="Branch manager's name"
+                    value={formData.manager_name}
+                    onChange={(e) => handleFormChange("manager_name", e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={creating}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateBranch} disabled={creating}>
+                  {creating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Branch
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Button onClick={() => navigate("/school-bus/import")}>
             Import Students
           </Button>

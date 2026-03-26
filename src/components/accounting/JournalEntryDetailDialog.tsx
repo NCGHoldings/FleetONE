@@ -5,6 +5,8 @@ import { Separator } from "@/components/ui/separator";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
 import { useJournalEntryLines } from "@/hooks/useAccountingData";
+import { useReverseJournalEntry } from "@/hooks/useAccountingMutations";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -23,6 +25,7 @@ interface JournalEntryDetailDialogProps {
 
 export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalEntryDetailDialogProps) => {
   const { data: lines, isLoading } = useJournalEntryLines(entry?.id);
+  const reverseEntry = useReverseJournalEntry();
 
   if (!entry) return null;
 
@@ -47,6 +50,24 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
               {entry.status?.toUpperCase()}
             </Badge>
           </DialogTitle>
+          {entry.status === "posted" && (
+            <div className="absolute right-12 top-4">
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => {
+                  if (window.confirm("Are you sure you want to reverse this Journal Entry? This will create an exact opposite entry to zero out the balances.")) {
+                    reverseEntry.mutate(entry.id, {
+                      onSuccess: () => onOpenChange(false)
+                    });
+                  }
+                }}
+                disabled={reverseEntry.isPending}
+              >
+                {reverseEntry.isPending ? "Reversing..." : "Reverse Entry"}
+              </Button>
+            </div>
+          )}
         </DialogHeader>
 
         <div className="space-y-6">

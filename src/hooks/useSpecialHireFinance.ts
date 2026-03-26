@@ -1755,18 +1755,20 @@ export async function createSPHARReceipt({
       throw receiptError;
     }
 
-    // Create receipt allocation
-    const { error: allocError } = await supabase
-      .from('ar_receipt_allocations')
-      .insert({
-        receipt_id: receipt.id,
-        invoice_id: arInvoiceId,
-        allocated_amount: paymentAmount,
-        company_id: companyId,
-      });
+    // Create receipt allocation only if there's an invoice to allocate to
+    if (arInvoiceId) {
+      const { error: allocError } = await supabase
+        .from('ar_receipt_allocations')
+        .insert({
+          receipt_id: receipt.id,
+          invoice_id: arInvoiceId,
+          allocated_amount: paymentAmount,
+          company_id: companyId,
+        });
 
-    if (allocError) {
-      console.error('[SPH AR] Error creating receipt allocation:', allocError);
+      if (allocError) {
+        console.error('[SPH AR] Error creating receipt allocation:', allocError);
+      }
     }
 
     // Link receipt to payment
