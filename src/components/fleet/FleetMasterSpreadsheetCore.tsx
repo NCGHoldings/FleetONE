@@ -4,13 +4,18 @@ import {
 } from "@/components/ui/table";
 import { ExpandedFleetRow } from '@/hooks/useFleetMasterSpreadsheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { formatLKR } from "@/lib/accounting-utils";
+import { cn } from "@/lib/utils";
 
 interface Props {
   rows: ExpandedFleetRow[];
   loading: boolean;
   onUpdate: (rosterId: string, field: string, value: any) => void;
+  editMode?: 'master' | 'daily';
+  availableRoutes?: any[];
 }
 
 const BUS_TYPE_OPTIONS = ['XL', 'Normal', 'Semi', 'A/C', 'Super Luxury'];
@@ -19,7 +24,7 @@ const REMARK_OPTIONS = ['Running', 'Repair', 'Hire', 'Accident', 'Stopped', 'Sol
 
 const TOTAL_COLUMNS = 25;
 
-export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
+export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode = 'master', availableRoutes = [] }: Props) {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -81,6 +86,18 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
     }
   };
 
+  // Determine if a field is allowed to be edited based on the current edit mode
+  const isEditable = (field: string) => {
+    if (editMode === 'master') return true;
+    
+    // In Daily mode, only allow editing trip-specific fields and select string fields
+    const dailyEditable = [
+      'route_label', 'route_id', 'remark', 'default_driver', 'default_conductor',
+      'odometer_start', 'odometer_end', 'fuel_liters'
+    ];
+    return dailyEditable.includes(field);
+  };
+
   const renderEditableCell = (row: ExpandedFleetRow, field: string, value: any, type: 'text' | 'number' = 'text') => {
     const cellKey = `${row.id}-${row.trip_sequence}-${field}`;
     if (row.trip_sequence > 1 && !['trip_no', 'odometer_start', 'odometer_end', 'fuel_liters'].includes(field)) {
@@ -101,6 +118,17 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
       );
     }
 
+    if (!isEditable(field)) {
+      return (
+        <span
+          className="px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed"
+          title={String(value ?? '') + " (Master Edit Only)"}
+        >
+          {value || '-'}
+        </span>
+      );
+    }
+
     return (
       <span
         className="cursor-pointer hover:bg-accent/50 px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center"
@@ -116,6 +144,18 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
     if (row.trip_sequence > 1) {
       return <span className="text-muted-foreground text-sm">↑</span>;
     }
+    
+    if (!isEditable(field)) {
+      return (
+        <span
+          className="px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed"
+          title={String(value ?? '') + " (Master Edit Only)"}
+        >
+          {value || '-'}
+        </span>
+      );
+    }
+
     return (
       <Select
         value={value || ''}
@@ -124,7 +164,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
           onUpdate(row.id, field, v);
         }}
       >
-        <SelectTrigger className="h-9 text-sm border-0 bg-transparent px-2 focus:ring-0 shadow-none">
+        <SelectTrigger className="h-9 text-sm border-0 bg-transparent px-2 focus:ring-0 shadow-none hover:bg-accent/50">
           <SelectValue placeholder="-" />
         </SelectTrigger>
         <SelectContent>
@@ -135,6 +175,80 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
       </Select>
     );
   };
+
+  const [openRouteComboboxFor, setOpenRouteComboboxFor] = useState<string | null>(null);
+
+  const renderRouteCell = (row: ExpandedFleetRow) => {
+    if (row.trip_sequence > 1) {
+      return <span className="text-muted-foreground text-sm">↑</span>;
+    }
+
+    if (!isEditable('route_label')) {
+      return (
+        <span
+          className="px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed"
+          title={String(row.route_label ?? '') + " (Master Edit Only)"}
+        >
+          {row.route_label || '-'}
+        </span>
+      );
+    }
+
+    const rowKey = `${row.id}-route`;
+    const isOpen = openRouteComboboxFor === rowKey;
+
+    return (
+      <Popover open={isOpen} onOpenChange={(open) => setOpenRouteComboboxFor(open ? rowKey : null)}>
+        <PopoverTrigger asChild>
+          <button
+            className={cn(
+              "flex w-full items-center justify-between rounded px-3 py-2 text-sm min-h-[36px] hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary",
+              !row.route_label && "text-muted-foreground"
+            )}
+            onClick={() => {
+              if (isOpen) setOpenRouteComboboxFor(null);
+            }}
+          >
+            <span className="truncate pr-2">
+              {row.route_label || "Select route..."}
+            </span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[300px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search route..." />
+            <CommandList>
+              <CommandEmpty>No route found.</CommandEmpty>
+              <CommandGroup>
+                {availableRoutes.map((routeItem) => (
+                  <CommandItem
+                    key={routeItem.id}
+                    value={routeItem.route_name}
+                    onSelect={(currentValue) => {
+                      saveScrollPosition();
+                      // We save route_name as route_label
+                      onUpdate(row.id, 'route_label', currentValue);
+                      setOpenRouteComboboxFor(null);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        row.route_label === routeItem.route_name ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {routeItem.route_name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
 
   const getPerformanceColor = (perf: number, hasFuel: boolean) => {
     if (!hasFuel) return '';
@@ -230,16 +344,16 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate }: Props) {
                       {isSubRow ? '' : globalIndex}
                     </TableCell>
                     <TableCell className="text-sm font-semibold py-2 min-h-[40px]">{isSubRow ? '' : row.bus_no}</TableCell>
-                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'route_label', row.route_label)}</TableCell>
+                    <TableCell className="text-sm py-1 min-h-[40px] p-0">{renderRouteCell(row)}</TableCell>
                     <TableCell className="text-sm font-mono text-center py-2 min-h-[40px]">{row.trip_sequence}</TableCell>
                     <TableCell className="text-sm py-1 min-h-[40px]">{renderDropdownCell(row, 'bus_type', row.bus_type || '', BUS_TYPE_OPTIONS)}</TableCell>
                     <TableCell className="text-sm py-1 min-h-[40px]">{renderDropdownCell(row, 'permit_type', row.permit_type || '', PERMIT_TYPE_OPTIONS)}</TableCell>
                     <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'trips_per_day', row.trips_per_day, 'number')}</TableCell>
                     <TableCell className="text-sm py-1 min-h-[40px]">{renderDropdownCell(row, 'remark', row.remark || '', REMARK_OPTIONS)}</TableCell>
-                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'default_driver', row.default_driver)}</TableCell>
-                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'default_conductor', row.default_conductor)}</TableCell>
-                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'turn_01_time', row.turn_01_time)}</TableCell>
-                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'turn_02_time', row.turn_02_time)}</TableCell>
+                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'default_driver', editMode === 'daily' ? row.driver_name : row.default_driver)}</TableCell>
+                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'default_conductor', editMode === 'daily' ? row.conductor_name : row.default_conductor)}</TableCell>
+                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'turn_01_time', editMode === 'daily' ? row.daily_turn_01_time : row.turn_01_time)}</TableCell>
+                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'turn_02_time', editMode === 'daily' ? row.daily_turn_02_time : row.turn_02_time)}</TableCell>
                     {/* Meter / Fuel cells */}
                     <TableCell className="text-sm text-muted-foreground py-2 min-h-[40px]">{isSubRow ? '' : row.bus_model || '-'}</TableCell>
                     <TableCell className="text-sm text-right font-mono py-1 min-h-[40px]">

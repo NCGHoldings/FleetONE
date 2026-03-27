@@ -66,8 +66,8 @@ export function useBusProfitability(startDate: Date, endDate: Date) {
         .select(`
           bus_id,
           income,
-          km_run,
-          buses:bus_id(bus_no, category)
+          distance_km,
+          buses:bus_id(bus_no, bus_categories(name))
         `)
         .gte('trip_date', start)
         .lte('trip_date', end)
@@ -101,7 +101,7 @@ export function useBusProfitability(startDate: Date, endDate: Date) {
           body_wash,
           legal_court,
           other,
-          buses:bus_id(bus_no, category)
+          buses:bus_id(bus_no, bus_categories(name))
         `)
         .gte('expense_date', start)
         .lte('expense_date', end);
@@ -120,7 +120,7 @@ export function useBusProfitability(startDate: Date, endDate: Date) {
           busMap.set(busId, {
             busId,
             busNo: trip.buses?.bus_no || 'Unknown',
-            category: trip.buses?.category || 'Unknown',
+            category: trip.buses?.bus_categories?.name || 'Unknown',
             totalRevenue: 0,
             totalExpenses: 0,
             fuelCost: 0,
@@ -139,7 +139,7 @@ export function useBusProfitability(startDate: Date, endDate: Date) {
 
         const bus = busMap.get(busId)!;
         bus.totalRevenue += trip.income || 0;
-        bus.totalKm += trip.km_run || 0;
+        bus.totalKm += trip.distance_km || 0;
         bus.tripCount += 1;
       });
 
@@ -152,7 +152,7 @@ export function useBusProfitability(startDate: Date, endDate: Date) {
           busMap.set(busId, {
             busId,
             busNo: exp.buses?.bus_no || 'Unknown',
-            category: exp.buses?.category || 'Unknown',
+            category: exp.buses?.bus_categories?.name || 'Unknown',
             totalRevenue: 0,
             totalExpenses: 0,
             fuelCost: 0,
@@ -237,7 +237,7 @@ export function useRouteProfitability(startDate: Date, endDate: Date) {
           bus_id,
           route_id,
           income,
-          km_run,
+          distance_km,
           routes:route_id(route_name)
         `)
         .gte('trip_date', start)
@@ -324,7 +324,7 @@ export function useRouteProfitability(startDate: Date, endDate: Date) {
 
         const route = routeMap.get(routeId)!;
         route.totalRevenue += trip.income || 0;
-        route.totalKm += trip.km_run || 0;
+        route.totalKm += trip.distance_km || 0;
         route.tripCount += 1;
 
         // Allocate expenses proportionally from the bus

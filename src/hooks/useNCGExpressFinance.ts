@@ -46,6 +46,7 @@ export interface NCGExpressFinanceSettings {
   legal_court_expense_account_id: string | null;
   other_expense_account_id: string | null;
   expense_cash_account_id: string | null;
+  fuel_card_payable_account_id: string | null;
   // Automation
   auto_post_revenue: boolean;
   auto_post_expenses: boolean;
@@ -190,8 +191,10 @@ export async function postTripRevenueToGL(
     const routeName = trip.route_name || trip.routes?.route_name || 'Unknown Route';
     const tripDate = format(new Date(trip.trip_date), 'yyyy-MM-dd');
 
-    // Create journal entry
-    const entryNumber = `${settings.revenue_prefix}-${busNo}-${tripDate}`;
+    // Create journal entry — include trip_no/short ID to prevent duplicate entry_number collisions
+    // when multiple trips exist for the same bus on the same date
+    const tripSuffix = trip.trip_no || trip.id.substring(0, 6);
+    const entryNumber = `${settings.revenue_prefix}-${busNo}-${tripDate}-${tripSuffix}`;
 
     const { data: journalEntry, error: jeError } = await supabase
       .from('journal_entries')
@@ -280,6 +283,9 @@ export async function postExpensesToGL(
     }
 
     // Map expense categories to account IDs
+    // Card-paid expenses: fuel is paid via fuel card, NOT cash
+    const CARD_PAID_FIELDS: Set<keyof DailyExpenseForGL> = new Set(['fuel_cost']);
+
     const expenseMapping: { field: keyof DailyExpenseForGL; accountField: keyof NCGExpressFinanceSettings; label: string }[] = [
       { field: 'fuel_cost', accountField: 'fuel_expense_account_id', label: 'Fuel/Diesel' },
       { field: 'repair', accountField: 'repair_expense_account_id', label: 'Repairs' },
@@ -305,7 +311,10 @@ export async function postExpensesToGL(
     ];
 
     // Build expense lines (only non-zero amounts)
+    // Separate into cash-paid and card-paid (fuel) for correct GL credit split
     const expenseLines: { accountId: string; amount: number; label: string }[] = [];
+    let totalCashExpenses = 0;
+    let totalCardExpenses = 0;
     let totalExpenses = 0;
 
     for (const mapping of expenseMapping) {
@@ -315,6 +324,11 @@ export async function postExpensesToGL(
       if (amount > 0 && accountId) {
         expenseLines.push({ accountId, amount, label: mapping.label });
         totalExpenses += amount;
+        if (CARD_PAID_FIELDS.has(mapping.field) && settings.fuel_card_payable_account_id) {
+          totalCardExpenses += amount;
+        } else {
+          totalCashExpenses += amount;
+        }
       }
     }
 
@@ -358,17 +372,31 @@ export async function postExpensesToGL(
       expense_id: expense.id,
     }));
 
-    // Add the credit line for cash with bus metadata
-    jeLines.push({
-      journal_entry_id: journalEntry.id,
-      account_id: settings.expense_cash_account_id,
-      debit: 0,
-      credit: totalExpenses,
-      description: `Cash paid for expenses - Bus ${busNo}`,
-      company_id: NCG_EXPRESS_COMPANY_ID,
-      bus_id: expense.bus_id || null,
-      expense_id: expense.id,
-    });
+    // Add credit lines — split fuel card vs cash
+    if (totalCashExpenses > 0) {
+      jeLines.push({
+        journal_entry_id: journalEntry.id,
+        account_id: settings.expense_cash_account_id,
+        debit: 0,
+        credit: totalCashExpenses,
+        description: `Cash paid for expenses - Bus ${busNo}`,
+        company_id: NCG_EXPRESS_COMPANY_ID,
+        bus_id: expense.bus_id || null,
+        expense_id: expense.id,
+      });
+    }
+    if (totalCardExpenses > 0 && settings.fuel_card_payable_account_id) {
+      jeLines.push({
+        journal_entry_id: journalEntry.id,
+        account_id: settings.fuel_card_payable_account_id,
+        debit: 0,
+        credit: totalCardExpenses,
+        description: `Fuel card payable - Bus ${busNo}`,
+        company_id: NCG_EXPRESS_COMPANY_ID,
+        bus_id: expense.bus_id || null,
+        expense_id: expense.id,
+      });
+    }
 
     const { error: linesError } = await supabase
       .from('journal_entry_lines')
@@ -380,7 +408,12 @@ export async function postExpensesToGL(
     for (const line of expenseLines) {
       await updateAccountBalance(line.accountId, line.amount, true);
     }
-    await updateAccountBalance(settings.expense_cash_account_id, totalExpenses, false);
+    if (totalCashExpenses > 0) {
+      await updateAccountBalance(settings.expense_cash_account_id, totalCashExpenses, false);
+    }
+    if (totalCardExpenses > 0 && settings.fuel_card_payable_account_id) {
+      await updateAccountBalance(settings.fuel_card_payable_account_id, totalCardExpenses, false);
+    }
 
     // Link expense to journal entry
     const { error: updateError } = await supabase
@@ -588,6 +621,7 @@ export async function autoPostTripIfEnabled(tripId: string): Promise<void> {
       legal_court_expense_account_id: settingsData.legal_court_expense_account_id,
       other_expense_account_id: settingsData.other_expense_account_id,
       expense_cash_account_id: settingsData.expense_cash_account_id,
+      fuel_card_payable_account_id: settingsData.fuel_card_payable_account_id || null,
       auto_post_revenue: settingsData.auto_post_revenue ?? false,
       auto_post_expenses: settingsData.auto_post_expenses ?? false,
       revenue_prefix: settingsData.revenue_prefix || 'NCGE-REV',
@@ -671,6 +705,7 @@ export async function autoPostExpenseIfEnabled(busId: string, expenseDate: strin
       legal_court_expense_account_id: settingsData.legal_court_expense_account_id,
       other_expense_account_id: settingsData.other_expense_account_id,
       expense_cash_account_id: settingsData.expense_cash_account_id,
+      fuel_card_payable_account_id: settingsData.fuel_card_payable_account_id || null,
       auto_post_revenue: settingsData.auto_post_revenue ?? false,
       auto_post_expenses: settingsData.auto_post_expenses ?? false,
       revenue_prefix: settingsData.revenue_prefix || 'NCGE-REV',

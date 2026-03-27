@@ -585,7 +585,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
               <Checkbox 
                 id="auto-create"
                 checked={autoCreateMissing}
-                onCheckedChange={(checked) => setAutoCreateMissing(checked as boolean)}
+                onCheckedChange={(checked) => setAutoCreateMissing(!!checked)}
               />
               <div className="flex-1">
                 <label htmlFor="auto-create" className="text-sm font-medium cursor-pointer">

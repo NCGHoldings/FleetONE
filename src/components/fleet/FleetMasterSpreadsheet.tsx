@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useFleetMasterSpreadsheet } from '@/hooks/useFleetMasterSpreadsheet';
+import { useFleetMasterSpreadsheet, EditMode } from '@/hooks/useFleetMasterSpreadsheet';
 import { FleetMasterSpreadsheetCore } from './FleetMasterSpreadsheetCore';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, RefreshCw, Plus, FileSpreadsheet, Rocket, Bus, Upload } from 'lucide-react';
+import { CalendarIcon, RefreshCw, Plus, FileSpreadsheet, Rocket, Bus, Upload, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { formatLKR } from '@/lib/accounting-utils';
@@ -17,7 +17,19 @@ import { FleetExcelImport } from './FleetExcelImport';
 
 export function FleetMasterSpreadsheet() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const { expandedRows, loading, kpis, updateField, confirmAndCreateTrips, addRosterEntry, bulkAddAllBuses, refetch } = useFleetMasterSpreadsheet(selectedDate);
+  const [editMode, setEditMode] = useState<EditMode>('master');
+  
+  const { 
+    expandedRows, 
+    availableRoutes,
+    loading, 
+    kpis, 
+    updateField, 
+    confirmAndCreateTrips, 
+    addRosterEntry, 
+    bulkAddAllBuses, 
+    refetch 
+  } = useFleetMasterSpreadsheet(selectedDate, editMode);
   const [bulkAdding, setBulkAdding] = useState(false);
   const [showAddBus, setShowAddBus] = useState(false);
   const [availableBuses, setAvailableBuses] = useState<any[]>([]);
@@ -46,6 +58,11 @@ export function FleetMasterSpreadsheet() {
     await confirmAndCreateTrips();
     setCreating(false);
   };
+
+  const tripsCreatedCount = expandedRows.filter(r => r.trip_id).length;
+  const tripsTotalCount = expandedRows.length;
+  const isAllTripsCreated = tripsTotalCount > 0 && tripsCreatedCount === tripsTotalCount;
+  const isPartialTripsCreated = tripsTotalCount > 0 && tripsCreatedCount > 0 && tripsCreatedCount < tripsTotalCount;
 
   const exportToExcel = () => {
     const data = expandedRows.map((r, i) => ({
@@ -138,6 +155,27 @@ export function FleetMasterSpreadsheet() {
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-1" /> Refresh
           </Button>
+
+          <div className="flex bg-muted p-1 rounded-md ml-2 border">
+            <button
+              onClick={() => setEditMode('master')}
+              className={cn(
+                "px-3 py-1 text-sm font-medium rounded-sm transition-colors",
+                editMode === 'master' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Master Roster
+            </button>
+            <button
+              onClick={() => setEditMode('daily')}
+              className={cn(
+                "px-3 py-1 text-sm font-medium rounded-sm transition-colors",
+                editMode === 'daily' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Today Only
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -161,19 +199,44 @@ export function FleetMasterSpreadsheet() {
             <Bus className="h-4 w-4 mr-1" /> {bulkAdding ? 'Adding...' : 'Bulk Add All'}
           </Button>
 
-          <Button size="sm" onClick={handleCreateTrips} disabled={creating} className="bg-green-600 hover:bg-green-700 text-white">
-            <Rocket className="h-4 w-4 mr-1" />
-            {creating ? 'Creating...' : 'Create Trips'}
+          <Button 
+            size="sm" 
+            onClick={handleCreateTrips} 
+            disabled={creating || isAllTripsCreated} 
+            className={cn(
+               isAllTripsCreated 
+                 ? "bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800" 
+                 : isPartialTripsCreated
+                   ? "bg-amber-500 hover:bg-amber-600 text-white"
+                   : "bg-green-600 hover:bg-green-700 text-white"
+            )}
+          >
+            {isAllTripsCreated ? (
+              <><CheckCircle2 className="h-4 w-4 mr-1" /> Generated ({tripsCreatedCount}/{tripsTotalCount})</>
+            ) : isPartialTripsCreated ? (
+              <><Rocket className="h-4 w-4 mr-1" /> {creating ? 'Creating...' : `Create Remaining (${tripsTotalCount - tripsCreatedCount})`}</>
+            ) : (
+              <><Rocket className="h-4 w-4 mr-1" /> {creating ? 'Creating...' : 'Create Trips'}</>
+            )}
           </Button>
         </div>
       </div>
 
       {/* Spreadsheet */}
-      <FleetMasterSpreadsheetCore
-        rows={expandedRows}
-        loading={loading}
-        onUpdate={updateField}
-      />
+      <div className={cn("transition-colors rounded-md overflow-hidden", editMode === 'daily' ? 'ring-2 ring-primary/20' : '')}>
+        {editMode === 'daily' && (
+          <div className="bg-primary/10 text-primary px-3 py-1.5 text-xs font-semibold flex items-center">
+            Editing Mode: Changes will only apply to {format(selectedDate, 'MMM do')} daily trips.
+          </div>
+        )}
+        <FleetMasterSpreadsheetCore
+          rows={expandedRows}
+          loading={loading}
+          onUpdate={updateField}
+          editMode={editMode}
+          availableRoutes={availableRoutes}
+        />
+      </div>
 
       {/* Add Bus Dialog */}
       <Dialog open={showAddBus} onOpenChange={setShowAddBus}>

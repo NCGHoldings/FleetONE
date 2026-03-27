@@ -140,10 +140,18 @@ export const useCompanyCreateARInvoice = () => {
         await supabase.from("ar_invoice_lines").insert(lineData);
       }
 
-      // ========== AUTO GL POSTING: DR Trade Receivable, CR Sales Revenue ==========
+      // ========== AUTO GL POSTING: DR Trade Receivable, CR Sales Revenue, CR Output VAT ==========
       try {
         const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
         const resolved = await resolveCustomerARAccounts(invoice.customer_id, effectiveCompanyId);
+
+        // Fetch tax_payable_account_id for VAT separation
+        const { data: glSettings } = await (supabase as any)
+          .from("gl_settings")
+          .select("tax_payable_account_id")
+          .eq("company_id", effectiveCompanyId)
+          .maybeSingle();
+        const taxPayableId = glSettings?.tax_payable_account_id || null;
 
         if (resolved.missingAccounts.length > 0 && invoice.total_amount > 0) {
           console.error("AR GL missing accounts:", resolved.missingAccounts);
@@ -152,12 +160,15 @@ export const useCompanyCreateARInvoice = () => {
 
         if (resolved.arAccountId && resolved.revenueAccountId && invoice.total_amount > 0) {
           const { postARInvoiceToGL } = await import("@/lib/gl-posting-utils");
+          const taxAmount = invoice.tax_amount || 0;
           const glResult = await postARInvoiceToGL({
             invoiceNumber: invoice.invoice_number,
             invoiceDate: invoice.invoice_date,
             totalAmount: invoice.total_amount,
+            taxAmount: taxAmount > 0 ? taxAmount : undefined,
             tradeReceivableId: resolved.arAccountId,
             salesRevenueId: resolved.revenueAccountId,
+            taxPayableId: taxPayableId || undefined,
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
             sourceModule: 'manual_ar',

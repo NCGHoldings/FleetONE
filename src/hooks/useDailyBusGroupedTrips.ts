@@ -163,6 +163,7 @@ export function useDailyBusGroupedTrips(
           notes,
           gl_posted,
           journal_entry_id,
+          route_label,
           buses:bus_id(bus_no),
           routes:route_id(route_name, route_no, gl_code)
         `)
@@ -268,7 +269,7 @@ export function useDailyBusGroupedTrips(
           trip_no: trip.trip_no,
           trip_date: trip.trip_date,
           route_id: trip.route_id,
-          route_name: trip.routes?.route_name || 'N/A',
+          route_name: trip.routes?.route_name || trip.route_label || 'N/A',
           route_gl_code: trip.routes?.gl_code || trip.routes?.route_no || (trip.route_id ? trip.route_id.substring(0, 8) : 'N/A'),
           driver_name: notes.driver || 'N/A',
           conductor_name: notes.conductor || 'N/A',

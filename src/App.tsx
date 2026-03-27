@@ -89,6 +89,7 @@ import WhatsAppHub from "./pages/WhatsAppHub";
 import SystemIssueTracker from "./pages/SystemIssueTracker";
 import PublicYutongReport from "./pages/PublicYutongReport";
 import PublicYutongSpreadsheet from "./pages/PublicYutongSpreadsheet";
+import RouteManagement from "./pages/RouteManagement";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -275,6 +276,18 @@ const App = () => (
                   <PageAccessGuard pageId="fleet_management">
                     <AppLayout>
                       <FleetManagement />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/routes" 
+              element={
+                <ProtectedRoute>
+                  <PageAccessGuard pageId="route_permits">
+                    <AppLayout>
+                      <RouteManagement />
                     </AppLayout>
                   </PageAccessGuard>
                 </ProtectedRoute>

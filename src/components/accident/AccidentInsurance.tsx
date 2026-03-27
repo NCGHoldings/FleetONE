@@ -415,7 +415,7 @@ export function AccidentInsurance() {
       accessorKey: "salvage",
       header: "Salvage",
       cell: ({ row }) => {
-        const salvage = row.getValue("salvage") as boolean;
+        const salvage = !!row.getValue("salvage");
         return (
           <Badge variant={salvage ? "secondary" : "outline"}>
             {salvage ? "Yes" : "No"}
@@ -427,7 +427,7 @@ export function AccidentInsurance() {
       accessorKey: "accident_mark",
       header: "Accident Mark",
       cell: ({ row }) => {
-        const mark = row.getValue("accident_mark") as boolean;
+        const mark = !!row.getValue("accident_mark");
         return (
           <Badge variant={mark ? "destructive" : "outline"}>
             {mark ? "Yes" : "No"}

@@ -288,7 +288,7 @@ export function ExportModal({ open, onClose, dateRange: initialRange }: ExportMo
                 <Checkbox
                   id="summary"
                   checked={includeSummary}
-                  onCheckedChange={(checked) => setIncludeSummary(checked as boolean)}
+                  onCheckedChange={(checked) => setIncludeSummary(!!checked)}
                 />
                 <Label htmlFor="summary" className="cursor-pointer">
                   Summary totals
@@ -298,7 +298,7 @@ export function ExportModal({ open, onClose, dateRange: initialRange }: ExportMo
                 <Checkbox
                   id="breakdown"
                   checked={includeBreakdown}
-                  onCheckedChange={(checked) => setIncludeBreakdown(checked as boolean)}
+                  onCheckedChange={(checked) => setIncludeBreakdown(!!checked)}
                 />
                 <Label htmlFor="breakdown" className="cursor-pointer">
                   Daily breakdown
@@ -308,7 +308,7 @@ export function ExportModal({ open, onClose, dateRange: initialRange }: ExportMo
                 <Checkbox
                   id="other-income"
                   checked={includeOtherIncome}
-                  onCheckedChange={(checked) => setIncludeOtherIncome(checked as boolean)}
+                  onCheckedChange={(checked) => setIncludeOtherIncome(!!checked)}
                 />
                 <Label htmlFor="other-income" className="cursor-pointer">
                   Other income details

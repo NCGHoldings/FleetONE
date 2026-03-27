@@ -1,4 +1,4 @@
-import { BarChart3, Bus, Calendar, Settings, Users, Wrench, Shield, MessageSquare, FileText, MapPin, UserCheck, DollarSign, Lightbulb, Star, ChevronDown, Truck, TrendingUp, AlertTriangle, Package, Settings2, GraduationCap, ShoppingCart, FileSpreadsheet, Home, Sparkles, BookOpen, Upload, Clock, Activity, Monitor, Car, Megaphone, CheckSquare, FolderKanban, Share2, Store } from "lucide-react";
+import { Map, BarChart3, Bus, Calendar, Settings, Users, Wrench, Shield, MessageSquare, FileText, MapPin, UserCheck, DollarSign, Lightbulb, Star, ChevronDown, Truck, TrendingUp, AlertTriangle, Package, Settings2, GraduationCap, ShoppingCart, FileSpreadsheet, Home, Sparkles, BookOpen, Upload, Clock, Activity, Monitor, Car, Megaphone, CheckSquare, FolderKanban, Share2, Store } from "lucide-react";
 import { useExternalSystem } from "./ExternalSystemContext";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -80,6 +80,11 @@ const governanceItems = [{
   icon: Sparkles
 }];
 const operationsItems = [{
+  id: "route_dictionary",
+  title: "Route Dictionary",
+  url: "/routes",
+  icon: Map
+}, {
   id: "route_permits",
   title: "Route Permits",
   url: "/permits",

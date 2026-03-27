@@ -576,7 +576,7 @@ export function GLExportModal({
                         <Checkbox
                           id={`bus-${busNo}`}
                           checked={selectedBuses.includes(busNo)}
-                          onCheckedChange={(checked) => handleBusToggle(busNo, checked as boolean)}
+                          onCheckedChange={(checked) => handleBusToggle(busNo, !!checked)}
                         />
                         <Label htmlFor={`bus-${busNo}`} className="font-normal cursor-pointer">
                           {busNo}

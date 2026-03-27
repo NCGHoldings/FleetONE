@@ -164,7 +164,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                   id="overview"
                   checked={includeOverview}
                   onCheckedChange={(checked) => {
-                    const isChecked = checked as boolean;
+                    const isChecked = !!checked;
                     setIncludeOverview(isChecked);
                     if (!isChecked) {
                       setIncludeKPIs(false);
@@ -184,7 +184,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                     id="kpis"
                     checked={includeKPIs}
                     disabled={!includeOverview}
-                    onCheckedChange={(checked) => setIncludeKPIs(checked as boolean)}
+                    onCheckedChange={(checked) => setIncludeKPIs(!!checked)}
                   />
                   <Label htmlFor="kpis" className="cursor-pointer text-sm">
                     KPI Summary Cards
@@ -195,7 +195,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                     id="insights"
                     checked={includeInsights}
                     disabled={!includeOverview}
-                    onCheckedChange={(checked) => setIncludeInsights(checked as boolean)}
+                    onCheckedChange={(checked) => setIncludeInsights(!!checked)}
                   />
                   <Label htmlFor="insights" className="cursor-pointer text-sm">
                     Insights Panel
@@ -206,7 +206,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                     id="sales-trend"
                     checked={includeSalesTrend}
                     disabled={!includeOverview}
-                    onCheckedChange={(checked) => setIncludeSalesTrend(checked as boolean)}
+                    onCheckedChange={(checked) => setIncludeSalesTrend(!!checked)}
                   />
                   <Label htmlFor="sales-trend" className="cursor-pointer text-sm">
                     Sales Trend Chart
@@ -217,7 +217,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                     id="category-dist"
                     checked={includeCategoryDistribution}
                     disabled={!includeOverview}
-                    onCheckedChange={(checked) => setIncludeCategoryDistribution(checked as boolean)}
+                    onCheckedChange={(checked) => setIncludeCategoryDistribution(!!checked)}
                   />
                   <Label htmlFor="category-dist" className="cursor-pointer text-sm">
                     Category Distribution & Comparison Charts
@@ -233,7 +233,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                   id="detailed"
                   checked={includeDetailedAnalytics}
                   onCheckedChange={(checked) => {
-                    const isChecked = checked as boolean;
+                    const isChecked = !!checked;
                     setIncludeDetailedAnalytics(isChecked);
                     if (!isChecked) {
                       setIncludeMonthlyTrend(false);
@@ -253,7 +253,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                     id="monthly-trend"
                     checked={includeMonthlyTrend}
                     disabled={!includeDetailedAnalytics}
-                    onCheckedChange={(checked) => setIncludeMonthlyTrend(checked as boolean)}
+                    onCheckedChange={(checked) => setIncludeMonthlyTrend(!!checked)}
                   />
                   <Label htmlFor="monthly-trend" className="cursor-pointer text-sm">
                     Monthly Trend Chart
@@ -264,7 +264,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                     id="day-of-week"
                     checked={includeDayOfWeek}
                     disabled={!includeDetailedAnalytics}
-                    onCheckedChange={(checked) => setIncludeDayOfWeek(checked as boolean)}
+                    onCheckedChange={(checked) => setIncludeDayOfWeek(!!checked)}
                   />
                   <Label htmlFor="day-of-week" className="cursor-pointer text-sm">
                     Day-of-Week Performance Chart
@@ -275,7 +275,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                     id="tyre-breakdown"
                     checked={includeTyreBreakdown}
                     disabled={!includeDetailedAnalytics}
-                    onCheckedChange={(checked) => setIncludeTyreBreakdown(checked as boolean)}
+                    onCheckedChange={(checked) => setIncludeTyreBreakdown(!!checked)}
                   />
                   <Label htmlFor="tyre-breakdown" className="cursor-pointer text-sm">
                     Tyre Sales Breakdown Chart
@@ -286,7 +286,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                     id="category-trends"
                     checked={includeCategoryTrends}
                     disabled={!includeDetailedAnalytics}
-                    onCheckedChange={(checked) => setIncludeCategoryTrends(checked as boolean)}
+                    onCheckedChange={(checked) => setIncludeCategoryTrends(!!checked)}
                   />
                   <Label htmlFor="category-trends" className="cursor-pointer text-sm">
                     Individual Category Trend Charts (LSS Outside, LSS Inside, Tyre, Breakdown)
@@ -302,7 +302,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                   id="performance"
                   checked={includePerformance}
                   onCheckedChange={(checked) => {
-                    const isChecked = checked as boolean;
+                    const isChecked = !!checked;
                     setIncludePerformance(isChecked);
                     if (!isChecked) {
                       setIncludeBestWorst(false);
@@ -320,7 +320,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                     id="best-worst"
                     checked={includeBestWorst}
                     disabled={!includePerformance}
-                    onCheckedChange={(checked) => setIncludeBestWorst(checked as boolean)}
+                    onCheckedChange={(checked) => setIncludeBestWorst(!!checked)}
                   />
                   <Label htmlFor="best-worst" className="cursor-pointer text-sm">
                     Best/Worst Day Analysis
@@ -331,7 +331,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                     id="category-comparison"
                     checked={includeCategoryComparison}
                     disabled={!includePerformance}
-                    onCheckedChange={(checked) => setIncludeCategoryComparison(checked as boolean)}
+                    onCheckedChange={(checked) => setIncludeCategoryComparison(!!checked)}
                   />
                   <Label htmlFor="category-comparison" className="cursor-pointer text-sm">
                     Category Comparison Chart
@@ -346,7 +346,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                 <Checkbox
                   id="data-table"
                   checked={includeDataTable}
-                  onCheckedChange={(checked) => setIncludeDataTable(checked as boolean)}
+                  onCheckedChange={(checked) => setIncludeDataTable(!!checked)}
                 />
                 <Label htmlFor="data-table" className="text-base font-semibold cursor-pointer">
                   Raw Data Table

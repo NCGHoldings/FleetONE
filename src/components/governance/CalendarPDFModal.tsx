@@ -198,7 +198,7 @@ export const CalendarPDFModal = ({ open, onOpenChange, currentDate, filters }: C
                 <Checkbox 
                   id="holidays" 
                   checked={includeHolidays} 
-                  onCheckedChange={(checked) => setIncludeHolidays(checked as boolean)}
+                  onCheckedChange={(checked) => setIncludeHolidays(!!checked)}
                 />
                 <Label htmlFor="holidays" className="text-sm cursor-pointer">
                   Include holidays 🏖️
@@ -209,7 +209,7 @@ export const CalendarPDFModal = ({ open, onOpenChange, currentDate, filters }: C
                 <Checkbox 
                   id="companyNames" 
                   checked={showCompanyNames} 
-                  onCheckedChange={(checked) => setShowCompanyNames(checked as boolean)}
+                  onCheckedChange={(checked) => setShowCompanyNames(!!checked)}
                 />
                 <Label htmlFor="companyNames" className="text-sm cursor-pointer">
                   Show company/SBU names
@@ -220,7 +220,7 @@ export const CalendarPDFModal = ({ open, onOpenChange, currentDate, filters }: C
                 <Checkbox 
                   id="legend" 
                   checked={includeLegend} 
-                  onCheckedChange={(checked) => setIncludeLegend(checked as boolean)}
+                  onCheckedChange={(checked) => setIncludeLegend(!!checked)}
                 />
                 <Label htmlFor="legend" className="text-sm cursor-pointer">
                   Include status legend

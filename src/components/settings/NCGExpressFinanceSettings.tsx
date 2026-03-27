@@ -55,6 +55,7 @@ interface NCGExpressSettings {
   legal_court_expense_account_id: string | null;
   other_expense_account_id: string | null;
   expense_cash_account_id: string | null;
+  fuel_card_payable_account_id: string | null;
   // Auto-posting
   auto_post_revenue: boolean;
   auto_post_expenses: boolean;
@@ -88,6 +89,7 @@ const defaultSettings: NCGExpressSettings = {
   legal_court_expense_account_id: null,
   other_expense_account_id: null,
   expense_cash_account_id: null,
+  fuel_card_payable_account_id: null,
   auto_post_revenue: false,
   auto_post_expenses: false,
   revenue_prefix: 'NCGE-REV',
@@ -264,14 +266,22 @@ export function NCGExpressFinanceSettings() {
               Map each daily bus expense category to the appropriate GL expense account. All COA accounts are available — search by code (e.g. 500) or name.
             </p>
 
-            {/* Cash/Bank for expenses */}
-            <div className="mb-6">
+            {/* Cash/Bank and Fuel Card for expenses */}
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
               {renderAccountSelect(
                 'Expense Cash/Bank Account (CR)',
                 'expense_cash_account_id',
                 'Select cash account for expense payments',
                 true
               )}
+              {renderAccountSelect(
+                'Fuel Card Payable Account (CR)',
+                'fuel_card_payable_account_id',
+                'Select fuel card payable (liability) account'
+              )}
+              <p className="text-xs text-muted-foreground md:col-span-2">
+                Fuel expenses will credit the Fuel Card Payable account (not Cash). Leave blank to credit all expenses to Cash.
+              </p>
             </div>
 
             {/* Expense categories grid */}

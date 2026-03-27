@@ -293,7 +293,7 @@ export function PaymentReminderModal({ open, onOpenChange, branchId, students }:
                   <div key={student.id} className="flex items-center space-x-2 p-2 hover:bg-muted rounded">
                     <Checkbox
                       checked={selectedStudents.includes(student.id)}
-                      onCheckedChange={(checked) => handleStudentSelect(student.id, checked as boolean)}
+                      onCheckedChange={(checked) => handleStudentSelect(student.id, !!checked)}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">

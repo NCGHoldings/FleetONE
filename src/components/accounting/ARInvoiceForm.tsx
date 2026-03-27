@@ -236,7 +236,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit AR Invoice" : "Create AR Invoice"}</DialogTitle>
         </DialogHeader>
@@ -340,17 +340,17 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                 </Button>
               </div>
 
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full">
+              <div className="border rounded-lg overflow-x-auto">
+                <table className="w-full min-w-[700px]">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-3 py-2 text-left text-sm font-medium w-48">GL Account</th>
-                      <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
-                      <th className="px-3 py-2 text-center text-sm font-medium w-20">Qty</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium w-28">Unit Price</th>
-                      <th className="px-3 py-2 text-center text-sm font-medium w-28">Tax Code</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium w-28">Line Total</th>
-                      <th className="px-3 py-2 w-10"></th>
+                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 180 }}>GL Account</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ minWidth: 200 }}>Description</th>
+                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 80 }}>Qty</th>
+                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 120 }}>Unit Price</th>
+                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 120 }}>Tax Code</th>
+                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 120 }}>Line Total</th>
+                      <th className="px-3 py-2" style={{ width: 40 }}></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -362,15 +362,21 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                             onValueChange={(val) => updateLine(line.id, "account_id", val)}
                             placeholder="Select GL account"
                             accountTypes={["revenue", "income"]}
-                            className="h-8 text-xs"
+                            className="h-9 text-sm"
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <Input
+                          <Textarea
                             value={line.description}
                             onChange={(e) => updateLine(line.id, "description", e.target.value)}
                             placeholder="Item description"
-                            className="h-8"
+                            className="min-h-[36px] resize-none overflow-hidden text-sm py-2"
+                            rows={1}
+                            onInput={(e) => {
+                              const target = e.target as HTMLTextAreaElement;
+                              target.style.height = 'auto';
+                              target.style.height = target.scrollHeight + 'px';
+                            }}
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -378,7 +384,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                             type="number"
                             value={line.quantity}
                             onChange={(e) => updateLine(line.id, "quantity", parseFloat(e.target.value) || 0)}
-                            className="h-8 text-center"
+                            className="h-9 text-center"
                             min={1}
                           />
                         </td>
@@ -387,7 +393,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                             type="number"
                             value={line.unit_price}
                             onChange={(e) => updateLine(line.id, "unit_price", parseFloat(e.target.value) || 0)}
-                            className="h-8 text-right"
+                            className="h-9 text-right"
                             min={0}
                             step="0.01"
                           />
@@ -397,7 +403,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                             value={line.tax_code || "_none"}
                             onValueChange={(val) => handleTaxCodeChange(line.id, val === "_none" ? "" : val)}
                           >
-                            <SelectTrigger className="h-8">
+                            <SelectTrigger className="h-9">
                               <SelectValue placeholder="None" />
                             </SelectTrigger>
                             <SelectContent>

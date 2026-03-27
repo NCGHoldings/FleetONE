@@ -199,13 +199,44 @@ export async function postARInvoiceToGL(params: {
   invoiceNumber: string;
   invoiceDate: string;
   totalAmount: number;
+  taxAmount?: number;
   tradeReceivableId: string;
   salesRevenueId: string;
+  taxPayableId?: string;
   companyId: string;
   businessUnitCode?: string;
   customerName?: string;
   sourceModule?: string;
 }): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
+  const hasTax = (params.taxAmount || 0) > 0 && !!params.taxPayableId;
+  const netRevenue = hasTax ? params.totalAmount - (params.taxAmount || 0) : params.totalAmount;
+  const taxAmount = hasTax ? (params.taxAmount || 0) : 0;
+
+  const lines: JournalEntryLine[] = [
+    {
+      account_id: params.tradeReceivableId,
+      description: `Trade Receivable - ${params.invoiceNumber}`,
+      debit: params.totalAmount,
+      credit: 0,
+    },
+    {
+      account_id: params.salesRevenueId,
+      description: `Sales Revenue - ${params.invoiceNumber}`,
+      debit: 0,
+      credit: netRevenue,
+    },
+  ];
+
+  // Add tax line if VAT/tax exists
+  if (hasTax && params.taxPayableId) {
+    lines.push({
+      account_id: params.taxPayableId,
+      description: `Output VAT/Tax - ${params.invoiceNumber}`,
+      debit: 0,
+      credit: taxAmount,
+    });
+  }
+
   return createAndPostJournalEntry({
     entry_date: params.invoiceDate,
     description: `AR Invoice: ${params.invoiceNumber}${params.customerName ? ` - ${params.customerName}` : ""}`,
@@ -213,20 +244,7 @@ export async function postARInvoiceToGL(params: {
     company_id: params.companyId,
     business_unit_code: params.businessUnitCode,
     source_module: params.sourceModule,
-    lines: [
-      {
-        account_id: params.tradeReceivableId,
-        description: `Trade Receivable - ${params.invoiceNumber}`,
-        debit: params.totalAmount,
-        credit: 0,
-      },
-      {
-        account_id: params.salesRevenueId,
-        description: `Sales Revenue - ${params.invoiceNumber}`,
-        debit: 0,
-        credit: params.totalAmount,
-      },
-    ],
+    lines,
   });
 }
 
@@ -380,35 +398,43 @@ export async function postAPInvoiceToGL(params: {
   totalAmount: number;
   expenseAccountId: string; // fallback default
   tradePayableId: string;
+  inputTaxAccountId?: string | null; // Input Tax / VAT Receivable GL account
   companyId: string;
   businessUnitCode?: string;
   vendorName?: string;
-  expenseLines?: Array<{ accountId: string; amount: number; description?: string }>;
+  expenseLines?: Array<{ accountId: string; amount: number; taxAmount?: number; description?: string }>;
   sourceModule?: string;
 }): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
   const debitLines: JournalEntryLine[] = [];
+  let totalTaxAmount = 0;
 
   if (params.expenseLines && params.expenseLines.length > 0) {
-    // Group by accountId and sum amounts for multi-line posting
-    const grouped = new Map<string, { amount: number; description: string }>();
+    // Group by accountId and sum NET amounts (line_total - tax_amount)
+    const grouped = new Map<string, { netAmount: number; description: string }>();
     for (const line of params.expenseLines) {
+      const lineTax = line.taxAmount || 0;
+      const lineNet = line.amount - lineTax; // Net = line_total - tax
+      totalTaxAmount += lineTax;
+
       const existing = grouped.get(line.accountId);
       if (existing) {
-        existing.amount += line.amount;
+        existing.netAmount += lineNet;
       } else {
         grouped.set(line.accountId, {
-          amount: line.amount,
+          netAmount: lineNet,
           description: line.description || `Expense/Purchase - ${params.invoiceNumber}`,
         });
       }
     }
     for (const [accountId, data] of grouped) {
-      debitLines.push({
-        account_id: accountId,
-        description: data.description,
-        debit: data.amount,
-        credit: 0,
-      });
+      if (data.netAmount > 0) {
+        debitLines.push({
+          account_id: accountId,
+          description: data.description,
+          debit: Math.round(data.netAmount * 100) / 100,
+          credit: 0,
+        });
+      }
     }
   } else {
     // Fallback: single debit to default expense account
@@ -419,6 +445,25 @@ export async function postAPInvoiceToGL(params: {
       credit: 0,
     });
   }
+
+  // Add Input Tax debit line if tax exists AND input_tax_account is configured
+  if (totalTaxAmount > 0 && params.inputTaxAccountId) {
+    debitLines.push({
+      account_id: params.inputTaxAccountId,
+      description: `Input Tax (VAT/NBT) - ${params.invoiceNumber}`,
+      debit: Math.round(totalTaxAmount * 100) / 100,
+      credit: 0,
+    });
+  } else if (totalTaxAmount > 0 && !params.inputTaxAccountId) {
+    // No Input Tax account configured — add tax back to the first expense line
+    // so the journal still balances (legacy behavior)
+    if (debitLines.length > 0) {
+      debitLines[0].debit = Math.round((debitLines[0].debit + totalTaxAmount) * 100) / 100;
+    }
+  }
+
+  // Credit must equal the actual sum of debits to guarantee balance
+  const actualDebitTotal = Math.round(debitLines.reduce((sum, l) => sum + l.debit, 0) * 100) / 100;
 
   return createAndPostJournalEntry({
     entry_date: params.invoiceDate,
@@ -433,7 +478,7 @@ export async function postAPInvoiceToGL(params: {
         account_id: params.tradePayableId,
         description: `Trade Payable - ${params.invoiceNumber}`,
         debit: 0,
-        credit: params.totalAmount,
+        credit: actualDebitTotal,
       },
     ],
   });

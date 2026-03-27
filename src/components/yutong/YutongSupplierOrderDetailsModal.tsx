@@ -37,7 +37,7 @@ export function YutongSupplierOrderDetailsModal({
     milestone: supplierOrder.current_milestone,
     milestone_completed: false,
     progress_notes: '',
-    quality_check_passed: undefined as boolean | undefined,
+    quality_check_passed: undefined as undefined | boolean,
     issues_identified: '',
     estimated_next_milestone_date: '',
   });

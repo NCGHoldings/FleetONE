@@ -272,7 +272,6 @@ export const useReverseJournalEntry = () => {
         .from("journal_entries")
         .update({ 
           status: "void" as const,
-          notes: "Reversed",
         })
         .eq("id", entryId);
       
@@ -392,39 +391,82 @@ export const useCreateARInvoice = () => {
         await supabase.from("ar_invoice_lines").insert(lineData);
       }
 
-      // ========== AUTO GL POSTING: DR Trade Receivable, CR Sales Revenue ==========
+      // ========== AUTO GL POSTING: DR Trade Receivable, CR Sales Revenue, CR Output VAT ==========
       try {
+        console.log('[AR GL] Starting GL posting for AR invoice:', data.id, 'company:', effectiveCompanyId, 'customer:', invoice.customer_id);
+        
         const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
-        const resolved = await resolveCustomerARAccounts(invoice.customer_id, effectiveCompanyId);
+        
+        // Always fetch gl_settings for tax_payable_account_id
+        const { data: glSettings } = await (supabase as any)
+          .from("gl_settings")
+          .select("trade_receivable_account_id, sales_revenue_account_id, tax_payable_account_id")
+          .eq("company_id", effectiveCompanyId)
+          .maybeSingle();
+
+        // Handle missing customer_id — fall directly to gl_settings
+        let resolved;
+        if (invoice.customer_id) {
+          resolved = await resolveCustomerARAccounts(invoice.customer_id, effectiveCompanyId);
+        } else {
+          // No customer — use gl_settings directly
+          resolved = {
+            arAccountId: glSettings?.trade_receivable_account_id || null,
+            revenueAccountId: glSettings?.sales_revenue_account_id || null,
+            advanceAccountId: null,
+            source: "global" as const,
+            missingAccounts: [] as string[],
+          };
+          if (!resolved.arAccountId) resolved.missingAccounts.push("Trade Receivable");
+          if (!resolved.revenueAccountId) resolved.missingAccounts.push("Sales Revenue");
+        }
+
+        const taxPayableId = glSettings?.tax_payable_account_id || null;
+        const taxAmount = invoice.tax_amount || 0;
+
+        console.log('[AR GL] Resolved accounts:', { 
+          arAccountId: resolved.arAccountId, 
+          revenueAccountId: resolved.revenueAccountId,
+          taxPayableId, taxAmount,
+          source: resolved.source, 
+          missing: resolved.missingAccounts 
+        });
 
         if (resolved.missingAccounts.length > 0 && invoice.total_amount > 0) {
           console.error("AR GL missing accounts:", resolved.missingAccounts);
           toast.error(`GL Config Missing: ${resolved.missingAccounts.join("; ")}. Configure in Settings → Core GL or Customer Categories.`, { duration: 8000 });
-          // Invoice is created but flagged — don't block completely
         }
 
         if (resolved.arAccountId && resolved.revenueAccountId && invoice.total_amount > 0) {
           const { postARInvoiceToGL } = await import("@/lib/gl-posting-utils");
+          console.log('[AR GL] Calling postARInvoiceToGL with:', { invoiceNumber: invoice.invoice_number, totalAmount: invoice.total_amount, taxAmount });
           const glResult = await postARInvoiceToGL({
             invoiceNumber: invoice.invoice_number,
             invoiceDate: invoice.invoice_date,
             totalAmount: invoice.total_amount,
+            taxAmount: taxAmount > 0 ? taxAmount : undefined,
             tradeReceivableId: resolved.arAccountId,
             salesRevenueId: resolved.revenueAccountId,
+            taxPayableId: taxPayableId || undefined,
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
             sourceModule: 'manual_ar',
           });
+          console.log('[AR GL] GL Result:', glResult);
           if (glResult.success && glResult.journalEntryId) {
             await (supabase as any)
               .from("ar_invoices")
               .update({ journal_entry_id: glResult.journalEntryId })
               .eq("id", data.id);
           } else if (!glResult.success) {
+            console.error('[AR GL] GL posting failed:', glResult.error);
             toast.error(`AR Invoice created but GL posting failed: ${glResult.error}. Check Settings → Core GL.`, { duration: 8000 });
           }
+        } else {
+          console.warn('[AR GL] Skipping GL post: arAccountId=', resolved.arAccountId, 'revenueAccountId=', resolved.revenueAccountId, 'totalAmount=', invoice.total_amount);
         }
       } catch (glError: any) {
+        console.error('[AR GL] Exception in GL posting:', glError);
         toast.error(`AR Invoice created but GL posting error: ${glError?.message || 'Unknown'}`, { duration: 8000 });
       }
       
@@ -1756,14 +1798,24 @@ export const useApproveAPInvoice = () => {
         if (invoice.total_amount > 0 && tradePayableId && defaultExpenseAccountId) {
           const { data: invoiceLines } = await (supabase as any)
             .from("ap_invoice_lines")
-            .select("account_id, line_total, description")
+            .select("account_id, line_total, tax_amount, description")
             .eq("invoice_id", id);
+
+          // Resolve Input Tax account from gl_settings
+          const { data: glSettings } = await (supabase as any)
+            .from("gl_settings")
+            .select("input_tax_account_id")
+            .eq("company_id", effectiveCompanyId)
+            .maybeSingle();
+
+          const inputTaxAccountId = glSettings?.input_tax_account_id || null;
 
           const { postAPInvoiceToGL } = await import("@/lib/gl-posting-utils");
 
           const expenseLines = (invoiceLines || []).map((line: any) => ({
             accountId: line.account_id || defaultExpenseAccountId,
             amount: line.line_total || 0,
+            taxAmount: line.tax_amount || 0,
             description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
           }));
 
@@ -1773,6 +1825,7 @@ export const useApproveAPInvoice = () => {
             totalAmount: invoice.total_amount,
             expenseAccountId: defaultExpenseAccountId,
             tradePayableId,
+            inputTaxAccountId,
             companyId: effectiveCompanyId,
             businessUnitCode,
             vendorName: vendorData?.vendor_name,

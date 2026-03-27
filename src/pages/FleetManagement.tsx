@@ -465,7 +465,7 @@ const FleetManagementComponent = () => {
 
             const allTrips = await supabase
               .from('daily_trips')
-              .select('income, trip_date, route_id, routes(route_name)')
+              .select('income, trip_date, route_id, route_label, routes(route_name)')
               .eq('bus_id', bus.id)
               .not('income', 'is', null);
 
@@ -516,6 +516,7 @@ const FleetManagementComponent = () => {
                       income: trip.income || 0,
                       trip_date: trip.trip_date,
                       route_id: trip.route_id || '',
+                      route_label: trip.route_label || '',
                       routes: { route_name: `Route-${trip.route_id?.slice(0, 8) || 'Unknown'}` }
                     }));
                 }
@@ -543,7 +544,7 @@ const FleetManagementComponent = () => {
             const avgDailyRevenue = runningDays > 0 ? totalRevenue / runningDays : 0;
 
             // Get most common route
-            const routeNames = allTrips.data?.map(trip => trip.routes?.route_name).filter(Boolean) || [];
+            const routeNames = allTrips.data?.map(trip => trip.routes?.route_name || trip.route_label).filter(Boolean) || [];
             const mostCommonRoute = routeNames.length > 0 
               ? routeNames.sort((a, b) => 
                   routeNames.filter(v => v === a).length - routeNames.filter(v => v === b).length

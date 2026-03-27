@@ -323,7 +323,7 @@ const HolidayManagement = () => {
               <Checkbox
                 id="is_mercantile"
                 checked={formData.is_mercantile}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_mercantile: checked as boolean })}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_mercantile: !!checked })}
               />
               <Label htmlFor="is_mercantile" className="cursor-pointer">
                 Mercantile Holiday (Banks/Offices closed)
@@ -333,7 +333,7 @@ const HolidayManagement = () => {
               <Checkbox
                 id="is_recurring"
                 checked={formData.is_recurring}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_recurring: checked as boolean })}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_recurring: !!checked })}
               />
               <Label htmlFor="is_recurring" className="cursor-pointer">
                 Recurring (appears every year)

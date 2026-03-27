@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users, BookOpen, TrendingUp, Route, Table2 } from "lucide-react";
+import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users, BookOpen, TrendingUp, Route, Table2, Wallet, Landmark, Search } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useDailyBusGroupedTrips } from "@/hooks/useDailyBusGroupedTrips";
@@ -15,6 +15,7 @@ import { FleetDailySummary } from "@/components/trips/FleetDailySummary";
 import { DailyBreakdownView } from "@/components/trips/DailyBreakdownView";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import { ImportFromAllocationModal } from "@/components/trips/ImportFromAllocationModal";
 import { GLExportModal } from "@/components/trips/GLExportModal";
 import { RouteGLCodesAdmin } from "@/components/trips/RouteGLCodesAdmin";
@@ -22,6 +23,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { BulkGLPostingDialog } from "@/components/ncg-express/BulkGLPostingDialog";
 import { BusProfitabilityReport } from "@/components/ncg-express/BusProfitabilityReport";
 import { RouteProfitabilityReport } from "@/components/ncg-express/RouteProfitabilityReport";
+import { CashierSettlementDashboard } from "@/components/ncg-express/CashierSettlementDashboard";
+import { BankDepositDashboard } from "@/components/ncg-express/BankDepositDashboard";
 import { FleetMasterSpreadsheet } from "@/components/fleet/FleetMasterSpreadsheet";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
@@ -33,11 +36,12 @@ export default function DailyTrips() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [dateMode, setDateMode] = useState<"single" | "range">("single");
   const [viewMode, setViewMode] = useState<"table" | "cards" | "crew">(isMobile ? "cards" : "table");
-  const [mainTab, setMainTab] = useState<"trips" | "bus-pl" | "route-pl" | "fleet-sheet">("trips");
+  const [mainTab, setMainTab] = useState<"trips" | "bus-pl" | "route-pl" | "fleet-sheet" | "cash-settlement" | "bank-deposit">("trips");
   const [showImportModal, setShowImportModal] = useState(false);
   const [showGLExportModal, setShowGLExportModal] = useState(false);
   const [showRouteGLAdmin, setShowRouteGLAdmin] = useState(false);
   const [showBulkGLPostingDialog, setShowBulkGLPostingDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   
   // Validate and prepare date range for hook
   const validDateRange = dateMode === "range" && dateRange?.from && dateRange?.to
@@ -78,6 +82,26 @@ export default function DailyTrips() {
     refetchCrew();
   };
 
+  const filteredBusSummaries = busSummaries.filter(summary => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      summary.bus_no?.toLowerCase().includes(q) ||
+      summary.driver_name?.toLowerCase().includes(q) ||
+      summary.conductor_name?.toLowerCase().includes(q) ||
+      summary.route_name?.toLowerCase().includes(q)
+    );
+  });
+
+  const filteredCrewGroups = crewGroups.filter(crew => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      crew.staff_name?.toLowerCase().includes(q) ||
+      crew.role?.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -109,6 +133,14 @@ export default function DailyTrips() {
                 <TabsTrigger value="route-pl" className="gap-2">
                   <Route className="h-4 w-4" />
                   Route P&L
+                </TabsTrigger>
+                <TabsTrigger value="cash-settlement" className="gap-2">
+                  <Wallet className="h-4 w-4" />
+                  Cashier Sett.
+                </TabsTrigger>
+                <TabsTrigger value="bank-deposit" className="gap-2">
+                  <Landmark className="h-4 w-4" />
+                  Bank Deposit
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -324,18 +356,31 @@ export default function DailyTrips() {
                 )}
 
                 {/* Bus Summaries / Crew View */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">
-                    {viewMode === "crew" ? "Crew Consolidated View" : "Bus Operations"}
-                  </h3>
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h3 className="text-lg font-semibold">
+                      {viewMode === "crew" ? "Crew Consolidated View" : "Bus Operations"}
+                    </h3>
+                    
+                    <div className="relative w-full sm:w-72">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Search bus, name, route..."
+                        className="pl-8"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                  </div>
                   
                   {viewMode === "crew" ? (
-                    <CrewConsolidatedView crewGroups={crewGroups} onRefresh={handleRefetch} />
+                    <CrewConsolidatedView crewGroups={filteredCrewGroups} onRefresh={handleRefetch} />
                   ) : viewMode === "table" ? (
-                    <BusDailySummaryTable summaries={busSummaries} onRefresh={handleRefetch} />
+                    <BusDailySummaryTable summaries={filteredBusSummaries} onRefresh={handleRefetch} />
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {busSummaries.map((summary) => (
+                      {filteredBusSummaries.map((summary) => (
                         <BusDailyCard key={summary.bus_id} summary={summary} onRefresh={handleRefetch} />
                       ))}
                     </div>
@@ -349,15 +394,23 @@ export default function DailyTrips() {
         <div className="container mx-auto p-4">
           <FleetMasterSpreadsheet />
         </div>
+      ) : mainTab === "cash-settlement" ? (
+        <div className="container mx-auto p-4">
+          <CashierSettlementDashboard date={selectedDate} />
+        </div>
+      ) : mainTab === "bank-deposit" ? (
+        <div className="container mx-auto p-4">
+          <BankDepositDashboard date={selectedDate} />
+        </div>
       ) : mainTab === "bus-pl" ? (
         <div className="container mx-auto p-4">
           <BusProfitabilityReport />
         </div>
-      ) : (
+      ) : mainTab === "route-pl" ? (
         <div className="container mx-auto p-4">
           <RouteProfitabilityReport />
         </div>
-      )}
+      ) : null}
 
       <ImportFromAllocationModal
         isOpen={showImportModal}

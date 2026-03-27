@@ -86,6 +86,7 @@ export default function QuickTripsEntry() {
           other_expenses,
           income_details,
           other_expenses_details,
+          route_label,
           buses:bus_id(bus_no),
           routes:route_id(route_name)
         `)
@@ -99,7 +100,7 @@ export default function QuickTripsEntry() {
         trip_no: trip.trip_no || `T${trip.id.slice(0, 4)}`,
         bus_id: trip.bus_id,
         bus_no: trip.buses?.bus_no || 'N/A',
-        route: trip.routes?.route_name,
+        route: trip.routes?.route_name || trip.route_label,
         income_details: trip.income_details,
         other_expenses_details: trip.other_expenses_details,
         income: trip.income || 0,

@@ -47,9 +47,12 @@ export interface ExpandedFleetRow extends FleetRosterRow {
   performance: number;
 }
 
-export function useFleetMasterSpreadsheet(selectedDate: Date) {
+export type EditMode = 'master' | 'daily';
+
+export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode = 'master') {
   const [roster, setRoster] = useState<FleetRosterRow[]>([]);
   const [expandedRows, setExpandedRows] = useState<ExpandedFleetRow[]>([]);
+  const [availableRoutes, setAvailableRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -66,6 +69,12 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
         .order("sort_order", { ascending: true });
 
       if (rosterError) throw rosterError;
+
+      const { data: routesData } = await supabase
+        .from("routes")
+        .select("id, route_no, route_name")
+        .eq("is_active", true);
+      setAvailableRoutes(routesData || []);
 
       const rosterRows: FleetRosterRow[] = (rosterData || []).map((r: any) => ({
         id: r.id,
@@ -150,11 +159,15 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
           // Extract driver/conductor from trip notes JSON if available
           let tripDriver = row.default_driver;
           let tripConductor = row.default_conductor;
+          let tripTurn01 = row.turn_01_time;
+          let tripTurn02 = row.turn_02_time;
           if (matchedTrip?.notes) {
             try {
               const parsed = typeof matchedTrip.notes === 'string' ? JSON.parse(matchedTrip.notes) : matchedTrip.notes;
               if (parsed.driver) tripDriver = parsed.driver;
               if (parsed.conductor) tripConductor = parsed.conductor;
+              if (parsed.turn_01_time) tripTurn01 = parsed.turn_01_time;
+              if (parsed.turn_02_time) tripTurn02 = parsed.turn_02_time;
             } catch {
               // Legacy string format — ignore
             }
@@ -180,6 +193,8 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
             net_income: passengerIncome + luggageIncome - tripExpenses,
             driver_name: tripDriver,
             conductor_name: tripConductor,
+            daily_turn_01_time: tripTurn01,
+            daily_turn_02_time: tripTurn02,
             _isExpanded: row.trips_per_day > 1,
             start_meter: startMeter,
             end_meter: endMeter,
@@ -249,6 +264,74 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
         return;
       }
 
+      if (editMode === 'daily') {
+        const row = expandedRows.find(r => r.id === rosterId);
+        if (!row?.trip_id) {
+          toast({ title: "No trip generated", description: "You must click 'Create Trips' for today before you can override daily values.", variant: "destructive" });
+          return;
+        }
+
+        const dailyUpdatePayload: Record<string, any> = {};
+        
+        // Map master roster fields to daily_trips fields
+        if (field === 'route_label') dailyUpdatePayload.route_label = value;
+        if (field === 'route_id') dailyUpdatePayload.route_id = value;
+        if (field === 'remark') {
+          // You might store remark in `notes` or another field if available, but for now we'll update status if there's a status field
+          // Or just store it in notes. Let's append to notes.
+        }
+
+        // For driver/conductor/turn times, update the 'notes' JSON
+        if (field === 'default_driver' || field === 'default_conductor' || field === 'turn_01_time' || field === 'turn_02_time') {
+          if (!row.trip_id) {
+            toast({ title: "No trip", description: "Create trips first before overriding crew or times", variant: "destructive" });
+            return;
+          }
+          
+          try {
+            // First fetch existing notes from the database for this trip
+            const { data: tripData } = await supabase
+              .from("daily_trips")
+              .select("notes")
+              .eq("id", row.trip_id)
+              .single();
+              
+            let currentNotes: Record<string, any> = {};
+            if (tripData?.notes) {
+              currentNotes = typeof tripData.notes === 'string' ? JSON.parse(tripData.notes) : tripData.notes;
+            }
+            
+            if (field === 'default_driver') currentNotes['driver'] = value;
+            if (field === 'default_conductor') currentNotes['conductor'] = value;
+            if (field === 'turn_01_time') currentNotes['turn_01_time'] = value;
+            if (field === 'turn_02_time') currentNotes['turn_02_time'] = value;
+            
+            dailyUpdatePayload.notes = JSON.stringify(currentNotes);
+          } catch (e) {
+            console.error("Error formatting notes JSON:", e);
+            dailyUpdatePayload.notes = JSON.stringify({
+              driver: field === 'default_driver' ? value : row.driver_name,
+              conductor: field === 'default_conductor' ? value : row.conductor_name,
+              turn_01_time: field === 'turn_01_time' ? value : row.daily_turn_01_time,
+              turn_02_time: field === 'turn_02_time' ? value : row.daily_turn_02_time
+            });
+          }
+        }
+
+        if (Object.keys(dailyUpdatePayload).length > 0) {
+          const { error } = await supabase
+            .from("daily_trips")
+            .update(dailyUpdatePayload)
+            .eq("id", row.trip_id);
+
+          if (error) throw error;
+          
+          await fetchRoster(true);
+          return;
+        }
+      }
+
+      // If EditMode is Master, or we're editing a field that only belongs on the Master (like bus_type)
       const numericFields = ['trips_per_day', 'day_target', 'sort_order'];
       const finalValue = numericFields.includes(field) ? Number(value) || 0 : value;
 
@@ -322,9 +405,15 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
           tripsToInsert.push({
             bus_id: row.bus_id,
             route_id: row.route_id,
+            route_label: row.route_label,
             trip_date: dateStr,
             trip_no: tripNo,
-            notes: JSON.stringify({ driver: row.default_driver || null, conductor: row.default_conductor || null }),
+            notes: JSON.stringify({ 
+              driver: row.default_driver || null, 
+              conductor: row.default_conductor || null,
+              turn_01_time: row.turn_01_time || null,
+              turn_02_time: row.turn_02_time || null
+            }),
             data_source: 'manual' as const,
           });
           tripCounter++;
@@ -355,6 +444,9 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
         bus_id: busId,
         route_label: bus?.route || '',
         sort_order: roster.length + 1,
+        is_active: true,
+        trips_per_day: 1,
+        remark: 'Running'
       });
 
       if (error) throw error;
@@ -424,6 +516,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date) {
   return {
     roster,
     expandedRows,
+    availableRoutes,
     loading,
     kpis,
     updateField,
