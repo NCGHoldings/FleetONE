@@ -226,9 +226,16 @@ export const PurchaseOrderForm = ({ open, onOpenChange }: PurchaseOrderFormProps
                           </Select>
                         </td>
                         <td className="p-2">
-                          <Input
+                          <Textarea
                             value={line.description}
                             onChange={(e) => updateLine(line.id, "description", e.target.value)}
+                            className="min-h-[36px] resize-none overflow-hidden py-2"
+                            rows={1}
+                            onInput={(e) => {
+                              const target = e.target as HTMLTextAreaElement;
+                              target.style.height = 'auto';
+                              target.style.height = target.scrollHeight + 'px';
+                            }}
                           />
                         </td>
                         <td className="p-2">

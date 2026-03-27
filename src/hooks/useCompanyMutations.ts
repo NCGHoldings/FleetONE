@@ -379,10 +379,20 @@ export const useCompanyCreateAPInvoice = () => {
             .eq("id", invoice.vendor_id)
             .single();
 
-          // Build per-line expense entries using 3-tier resolution: line > category > global
+          // Resolve Input Tax account from gl_settings
+          const { data: glSettings } = await (supabase as any)
+            .from("gl_settings")
+            .select("input_tax_account_id")
+            .eq("company_id", effectiveCompanyId)
+            .maybeSingle();
+
+          const inputTaxAccountId = glSettings?.input_tax_account_id || null;
+
+          // Build per-line expense entries WITH tax amounts
           const expenseLines = (lines || []).map(line => ({
             accountId: line.account_id || defaultExpenseAccountId,
             amount: line.line_total || 0,
+            taxAmount: (line as any).tax_amount || 0,
             description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
           }));
 
@@ -392,6 +402,7 @@ export const useCompanyCreateAPInvoice = () => {
             totalAmount: invoice.total_amount,
             expenseAccountId: defaultExpenseAccountId,
             tradePayableId,
+            inputTaxAccountId,
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
             vendorName: vendorData?.vendor_name,

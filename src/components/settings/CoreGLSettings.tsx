@@ -26,6 +26,11 @@ interface CoreGLSettingsData {
   default_expense_account_id: string | null;
   customer_advance_account_id: string | null;
   wht_payable_account_id: string | null;
+  // Tax accounts
+  input_tax_account_id: string | null;      // Input VAT (AP side - asset)
+  tax_payable_account_id: string | null;     // Output VAT (AR side - liability)
+  // Banking
+  bank_account_id: string | null;            // Default bank for receipts/payments
 }
 
 const defaultSettings: CoreGLSettingsData = {
@@ -35,6 +40,9 @@ const defaultSettings: CoreGLSettingsData = {
   default_expense_account_id: null,
   customer_advance_account_id: null,
   wht_payable_account_id: null,
+  input_tax_account_id: null,
+  tax_payable_account_id: null,
+  bank_account_id: null,
 };
 
 export function CoreGLSettings() {
@@ -196,6 +204,12 @@ export function CoreGLSettings() {
                 'Select Customer Advance Account',
                 'Account to credit for advance receipts before invoicing'
               )}
+              {renderAccountSelect(
+                'Output VAT / Tax Payable (Liability)',
+                'tax_payable_account_id',
+                'Select Output Tax Account',
+                'CR when VAT is charged on AR Invoices (e.g. 18% VAT on sales)'
+              )}
             </div>
           </div>
 
@@ -224,6 +238,29 @@ export function CoreGLSettings() {
                 'wht_payable_account_id',
                 'Select WHT Payable Account',
                 'Account to credit when Withholding Tax is deducted from payments'
+              )}
+              {renderAccountSelect(
+                'Input VAT / Tax Receivable (Asset)',
+                'input_tax_account_id',
+                'Select Input Tax Account',
+                'DR when VAT is paid on AP Invoices (e.g. 18% VAT on purchases)'
+              )}
+            </div>
+          </div>
+
+          <Separator />
+
+          <div>
+            <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-blue-500" />
+              Banking
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {renderAccountSelect(
+                'Default Bank / Cash Account (Asset)',
+                'bank_account_id',
+                'Select Bank Account',
+                'Default bank account for AR Receipts and AP Payments'
               )}
             </div>
           </div>

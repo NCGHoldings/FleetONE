@@ -165,6 +165,11 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
   };
 
   const handleTaxCodeChange = (lineId: string, taxCode: string) => {
+    if (!taxCode) {
+      updateLine(lineId, "tax_code", undefined);
+      updateLine(lineId, "tax_rate", 0);
+      return;
+    }
     const tax = taxCodes?.find((t) => t.tax_code === taxCode);
     if (tax) {
       updateLine(lineId, "tax_code", taxCode);

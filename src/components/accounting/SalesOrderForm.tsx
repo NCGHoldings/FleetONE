@@ -235,10 +235,17 @@ export const SalesOrderForm = ({ onSuccess }: SalesOrderFormProps) => {
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Input
+                      <Textarea
                         value={line.description}
                         onChange={(e) => updateLine(index, "description", e.target.value)}
                         placeholder="Description"
+                        className="min-h-[36px] resize-none overflow-hidden py-2"
+                        rows={1}
+                        onInput={(e) => {
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = 'auto';
+                          target.style.height = target.scrollHeight + 'px';
+                        }}
                       />
                     </TableCell>
                     <TableCell>

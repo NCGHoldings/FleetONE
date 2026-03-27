@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AdminApprovalInterface } from '../components/special-hire/AdminApprovalInterface';
-import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield, TrendingDown, Calendar, CalendarDays, ChevronDown, Users, Workflow, Table2 } from 'lucide-react';
+import { DistanceDebugTool } from '../components/special-hire/DistanceDebugTool';
+import { ERPChatBot } from '../components/ai/ERPChatBot';
+import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield, TrendingDown, Calendar, CalendarDays, ChevronDown, Users, Workflow, Table2, Bot, Navigation } from 'lucide-react';
 import { SpecialHireSpreadsheet } from "@/components/special-hire/spreadsheet/SpecialHireSpreadsheet";
 import { SpecialHireFlowDiagram } from "@/components/special-hire/SpecialHireFlowDiagram";
 import { CostCalculator } from "@/components/special-hire/CostCalculator";
@@ -501,6 +503,16 @@ export default function SpecialHire() {
               </TabsTrigger>
             )}
 
+            <TabsTrigger value="distance-tool" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+              <Navigation className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Distance</span>
+            </TabsTrigger>
+
+            <TabsTrigger value="ai-bot" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+              <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>AI Bot</span>
+            </TabsTrigger>
+
             {isOperationsUser && (
               <>
                 <TabsTrigger value="bus-types" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
@@ -569,6 +581,14 @@ export default function SpecialHire() {
 
         <TabsContent value="spreadsheet" className="space-y-6">
           <SpecialHireSpreadsheet />
+        </TabsContent>
+
+        <TabsContent value="distance-tool" className="space-y-6">
+          <DistanceDebugTool />
+        </TabsContent>
+
+        <TabsContent value="ai-bot" className="space-y-6">
+          <ERPChatBot />
         </TabsContent>
 
         {/* System Flow Diagram - Admin only */}

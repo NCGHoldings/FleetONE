@@ -219,7 +219,17 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Line description" {...field} />
+                          <Textarea 
+                            placeholder="Line description" 
+                            {...field} 
+                            className="min-h-[36px] resize-none overflow-hidden text-sm py-2"
+                            rows={1}
+                            onInput={(e) => {
+                              const target = e.target as HTMLTextAreaElement;
+                              target.style.height = 'auto';
+                              target.style.height = target.scrollHeight + 'px';
+                            }}
+                          />
                         </FormControl>
                       </FormItem>
                     )}
