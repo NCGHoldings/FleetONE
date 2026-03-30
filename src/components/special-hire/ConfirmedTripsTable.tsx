@@ -1699,7 +1699,7 @@ export function ConfirmedTripsTable() {
                       </div>
                       {doc.payment_type === 'balance' && (
                         <p className="text-xs text-muted-foreground">
-                          Customer copy - No signatures required
+                          Final Invoice
                         </p>
                       )}
                       <p className="text-sm text-muted-foreground">
