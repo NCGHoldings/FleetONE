@@ -1050,19 +1050,19 @@ export function ConfirmedTripsTable() {
               <p className="text-muted-foreground mt-2">Loading trips...</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto max-h-[calc(100vh-320px)] relative border rounded-md">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                   <TableRow className="bg-muted/30">
-                    <TableHead className="font-semibold">Quotation</TableHead>
-                    <TableHead className="font-semibold">Customer Details</TableHead>
-                    <TableHead className="font-semibold">Trip Information</TableHead>
-                    <TableHead className="font-semibold">Vehicle Assignment</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
-                    <TableHead className="font-semibold">Payment</TableHead>
-                    <TableHead className="font-semibold">Workflow</TableHead>
-                    <TableHead className="font-semibold">Financial</TableHead>
-                    <TableHead className="font-semibold text-center">Actions</TableHead>
+                    <TableHead className="font-semibold min-w-[120px]">Quotation</TableHead>
+                    <TableHead className="font-semibold min-w-[150px]">Customer Details</TableHead>
+                    <TableHead className="font-semibold min-w-[140px]">Trip Information</TableHead>
+                    <TableHead className="font-semibold min-w-[120px]">Vehicle Assignment</TableHead>
+                    <TableHead className="font-semibold min-w-[100px]">Status</TableHead>
+                    <TableHead className="font-semibold min-w-[120px]">Payment</TableHead>
+                    <TableHead className="font-semibold min-w-[140px]">Workflow</TableHead>
+                    <TableHead className="font-semibold min-w-[140px]">Financial</TableHead>
+                    <TableHead className="font-semibold text-center min-w-[80px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
