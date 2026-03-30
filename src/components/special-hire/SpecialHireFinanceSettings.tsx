@@ -111,19 +111,10 @@ export function SpecialHireFinanceSettings() {
   const revenueAccounts = chartOfAccounts?.filter((a) => a.account_type === "revenue") || [];
   const expenseAccounts = chartOfAccounts?.filter((a) => a.account_type === "expense") || [];
   
-  // Specific filtered lists
-  const receivableAccounts = assetAccounts.filter(
-    (a) => a.account_name?.toLowerCase().includes("receivable")
-  );
-  const bankCashAccounts = assetAccounts.filter(
-    (a) => a.account_name?.toLowerCase().includes("cash") || 
-           a.account_name?.toLowerCase().includes("bank") ||
-           a.account_code?.startsWith("13")
-  );
-  const advanceAccounts = liabilityAccounts.filter(
-    (a) => a.account_name?.toLowerCase().includes("advance") ||
-           a.account_name?.toLowerCase().includes("deposit")
-  );
+  // Pass ALL accounts of correct type — no name filtering that hides saved values
+  const receivableAccounts = assetAccounts;
+  const bankCashAccounts = assetAccounts;
+  const advanceAccounts = liabilityAccounts;
 
   // Check if core accounts are configured
   const isCoreConfigured = 
