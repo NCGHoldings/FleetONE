@@ -70,8 +70,8 @@ export function LightVehicleCustomerDetailModal({
 
       if (relatedError) throw relatedError;
 
-      setDirectQuotations(direct || []);
-      setRelatedQuotations(related || []);
+      setDirectQuotations((direct || []) as any);
+      setRelatedQuotations((related || []) as any);
     } catch (error) {
       console.error("Error loading customer details:", error);
     } finally {

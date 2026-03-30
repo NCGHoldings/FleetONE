@@ -61,7 +61,7 @@ export function LightVehicleQuotationRepeatModal({
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
     
     // Get the count of quotations created today
-    const { count } = await supabase
+    const { count } = await (supabase as any)
       .from('lightvehicle_quotations')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', today.toISOString().slice(0, 10));
@@ -78,7 +78,7 @@ export function LightVehicleQuotationRepeatModal({
     setLoading(true);
     try {
       // Fetch the COMPLETE quotation data from database to get ALL fields
-      const { data: fullQuotation, error: fetchError } = await supabase
+      const { data: fullQuotation, error: fetchError } = await (supabase as any)
         .from('lightvehicle_quotations')
         .select('*')
         .eq('id', quotation.id)
@@ -89,7 +89,7 @@ export function LightVehicleQuotationRepeatModal({
       }
 
       // Fetch add-ons for this quotation
-      const { data: addOns } = await supabase
+      const { data: addOns } = await (supabase as any)
         .from('lightvehicle_quotation_addons')
         .select('*')
         .eq('quotation_id', quotation.id);
@@ -163,7 +163,7 @@ export function LightVehicleQuotationRepeatModal({
           referral_agent_id: fullQuotation.referral_agent_id,
         };
 
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('lightvehicle_quotations')
           .insert(duplicateData)
           .select()
@@ -186,12 +186,12 @@ export function LightVehicleQuotationRepeatModal({
             notes: addon.notes,
           }));
           
-          await supabase.from('lightvehicle_quotation_addons').insert(addOnsCopy);
+          await (supabase as any).from('lightvehicle_quotation_addons').insert(addOnsCopy);
         }
       }
 
       // Copy signatures from original quotation to each new quotation
-      const { data: originalSignatures } = await supabase
+      const { data: originalSignatures } = await (supabase as any)
         .from('lightvehicle_quotation_signatures')
         .select('*')
         .eq('quotation_id', quotation.id);
@@ -208,7 +208,7 @@ export function LightVehicleQuotationRepeatModal({
             signed_at: sig.signed_at,
           }));
 
-          await supabase.from('lightvehicle_quotation_signatures').insert(signaturesCopy);
+          await (supabase as any).from('lightvehicle_quotation_signatures').insert(signaturesCopy);
         }
       }
 
