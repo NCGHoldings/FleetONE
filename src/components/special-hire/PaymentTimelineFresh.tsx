@@ -14,7 +14,7 @@ interface Payment {
   created_at: string;
   payment_date?: string;
   payment_method?: string;
-  reference_number?: string;
+  reference_no?: string;
 }
 
 interface PaymentTimelineFreshProps {
