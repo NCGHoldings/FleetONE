@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { sanitizeHTML } from '@/lib/sanitize';
+import { PaymentTimelineFresh } from './PaymentTimelineFresh';
 import { 
   fetchSpecialHireFinanceSettings,
   postInvoiceToGLStandalone,
