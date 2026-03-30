@@ -113,7 +113,7 @@ export function LightVehicleBusModelsAdmin() {
     try {
       setLoading(true);
       console.log('Loading bus models...');
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('lightvehicle_bus_models')
         .select('*')
         .order('bus_name');
@@ -121,7 +121,7 @@ export function LightVehicleBusModelsAdmin() {
       console.log('Bus models query result:', { data, error });
 
       if (error) throw error;
-      setBusModels((data || []).map(model => ({
+      setBusModels((data || []).map((model: any) => ({
         ...model,
         capacity: model.capacity?.toString() || ''
       })));

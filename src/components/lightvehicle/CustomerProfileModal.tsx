@@ -85,7 +85,7 @@ export default function CustomerProfileModal({ customer, open, onOpenChange }: C
 
       if (purchaseError) throw purchaseError;
 
-      const formattedPurchases: PurchaseHistory[] = (purchases || []).map(p => ({
+      const formattedPurchases: PurchaseHistory[] = (purchases as any[] || []).map((p: any) => ({
         id: p.id,
         quotation_number: p.quotation_no || 'N/A',
         purchase_date: p.created_at,
@@ -93,7 +93,7 @@ export default function CustomerProfileModal({ customer, open, onOpenChange }: C
         status: p.status || 'draft',
         bus_model: p.lightvehicle_bus_models ? 
           `${p.lightvehicle_bus_models.bus_name} ${p.lightvehicle_bus_models.model_name}` : 
-          p.bus_model || 'N/A', // Fallback to plain text bus_model column
+          p.bus_model || 'N/A',
         quantity: p.quantity || 1,
       }));
 
