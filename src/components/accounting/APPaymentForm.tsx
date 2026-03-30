@@ -977,7 +977,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                           <span className="text-muted-foreground whitespace-nowrap">Write-off Account:</span>
                           <SearchableAccountSelector
                             value={globalWriteOffAccountId}
-                            onChange={setGlobalWriteOffAccountId}
+                            onValueChange={setGlobalWriteOffAccountId}
                             placeholder="Select Discount/Write-off GL"
                           />
                         </div>

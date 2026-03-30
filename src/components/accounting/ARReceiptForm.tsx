@@ -486,7 +486,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                           <span className="text-muted-foreground whitespace-nowrap">Write-off Account:</span>
                           <SearchableAccountSelector
                             value={globalWriteOffAccountId}
-                            onChange={setGlobalWriteOffAccountId}
+                            onValueChange={setGlobalWriteOffAccountId}
                             placeholder="Select Discount/Write-off GL"
                           />
                         </div>
