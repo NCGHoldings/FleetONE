@@ -82,6 +82,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [invoiceStatus, setInvoiceStatus] = useState<'draft' | 'sent_to_customer' | 'payment_pending' | 'paid'>('draft');
   const [companyLogo, setCompanyLogo] = useState<string>('');
+  const [freshTotalPaid, setFreshTotalPaid] = useState<number | null>(null);
   
   // This modal is specifically for customer-facing balance invoices
   const isCustomerInvoice = true;
