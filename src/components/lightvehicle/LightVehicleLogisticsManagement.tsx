@@ -39,7 +39,7 @@ export function LightVehicleLogisticsManagement() {
       setLoading(true);
       const result = await getShipments();
       if (result.success) {
-        setShipments(result.data || []);
+        setShipments((result.data || []) as any);
       }
     } catch (error) {
       console.error('Error loading shipments:', error);

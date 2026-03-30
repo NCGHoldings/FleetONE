@@ -54,7 +54,7 @@ export function LightVehicleSupplierOrderDetailsModal({
       setLoading(true);
       const result = await getProductionUpdates(supplierOrder.id);
       if (result.success) {
-        setProductionUpdates(result.data || []);
+        setProductionUpdates((result.data || []) as any);
       }
     } catch (error) {
       console.error('Error loading production updates:', error);

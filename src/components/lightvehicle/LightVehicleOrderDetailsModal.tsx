@@ -34,7 +34,7 @@ export function LightVehicleOrderDetailsModal({ order, open, onClose, onRefresh 
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Order Details - {order.order_no}</DialogTitle>
+          <DialogTitle>Order Details - {(order as any).order_no}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -46,15 +46,15 @@ export function LightVehicleOrderDetailsModal({ order, open, onClose, onRefresh 
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Order Number</label>
-                <p className="font-mono">{order.order_no}</p>
+                <p className="font-mono">{(order as any).order_no}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Order Date</label>
-                <p>{format(new Date(order.order_date), 'MMM dd, yyyy')}</p>
+                <p>{format(new Date((order as any).order_date), 'MMM dd, yyyy')}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Bus Model</label>
-                <p className="font-medium">{order.bus_model}</p>
+                <p className="font-medium">{(order as any).bus_model}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Quantity</label>
@@ -81,19 +81,19 @@ export function LightVehicleOrderDetailsModal({ order, open, onClose, onRefresh 
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Engine Type</label>
-                <p>{order.engine_type || 'Not specified'}</p>
+                <p>{(order as any).engine_type || 'Not specified'}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Gearbox Type</label>
-                <p>{order.gearbox_type || 'Not specified'}</p>
+                <p>{(order as any).gearbox_type || 'Not specified'}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Seating Capacity</label>
-                <p>{order.seating_capacity || 'Not specified'}</p>
+                <p>{(order as any).seating_capacity || 'Not specified'}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Color Scheme</label>
-                <p>{order.color_scheme || 'Not specified'}</p>
+                <p>{(order as any).color_scheme || 'Not specified'}</p>
               </div>
             </CardContent>
           </Card>

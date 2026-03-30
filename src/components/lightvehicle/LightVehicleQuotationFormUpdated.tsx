@@ -180,7 +180,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel, initialData }: L
         isSuperAdmin = !!roleData;
       }
 
-      let query = supabase
+      let query = (supabase as any)
         .from('lightvehicle_bus_models')
         .select('*')
         .eq('is_active', true)
@@ -203,7 +203,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel, initialData }: L
         return;
       }
 
-      setBusModels(data || []);
+      setBusModels((data || []) as any);
     } catch (error) {
       console.error('Error loading bus models:', error);
       toast({

@@ -53,12 +53,12 @@ export function LightVehicleOrderCard({ order, onViewDetails, compact = false }:
     return (
       <div className="bg-muted/50 rounded-lg p-3 border border-border/50">
         <div className="flex items-center justify-between mb-2">
-          <span className="font-mono text-sm font-medium">{order.order_no}</span>
+          <span className="font-mono text-sm font-medium">{(order as any).order_no}</span>
           <Badge className={phaseColors[order.current_phase] || 'bg-muted text-muted-foreground'} variant="secondary">
             {phaseLabels[order.current_phase] || order.current_phase}
           </Badge>
         </div>
-        <div className="text-sm text-muted-foreground mb-2">{order.bus_model}</div>
+        <div className="text-sm text-muted-foreground mb-2">{(order as any).bus_model}</div>
         <div className="flex items-center justify-between">
           <Progress value={paymentPercentage} className="h-2 flex-1 mr-2" />
           <span className="text-xs text-muted-foreground">{Math.round(paymentPercentage)}%</span>
@@ -73,7 +73,7 @@ export function LightVehicleOrderCard({ order, onViewDetails, compact = false }:
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
           <div>
-            <h3 className="font-mono font-semibold text-lg">{order.order_no}</h3>
+            <h3 className="font-mono font-semibold text-lg">{(order as any).order_no}</h3>
             <Badge className={phaseColors[order.current_phase] || 'bg-muted'} variant="secondary">
               {phaseLabels[order.current_phase] || order.current_phase}
             </Badge>
@@ -100,11 +100,11 @@ export function LightVehicleOrderCard({ order, onViewDetails, compact = false }:
           )}
           <div className="flex items-center gap-2 text-muted-foreground">
             <Bus className="h-4 w-4" />
-            <span>{order.bus_model} × {order.quantity}</span>
+            <span>{(order as any).bus_model} × {order.quantity}</span>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
             <Calendar className="h-4 w-4" />
-            <span>{format(new Date(order.order_date), 'MMM dd, yyyy')}</span>
+            <span>{format(new Date((order as any).order_date), 'MMM dd, yyyy')}</span>
           </div>
         </div>
 

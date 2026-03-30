@@ -61,7 +61,7 @@ export function LightVehicleRecordCommissionPaymentModal({
   const loadPendingCommissions = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('lightvehicle_referral_commission_payments')
         .select(`
           id,
@@ -78,7 +78,7 @@ export function LightVehicleRecordCommissionPaymentModal({
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setPendingCommissions(data || []);
+      setPendingCommissions((data || []) as any);
     } catch (error) {
       console.error('Error loading pending commissions:', error);
     } finally {

@@ -60,7 +60,7 @@ export function LightVehicleShipmentDetailsModal({
       setLoading(true);
       const result = await getShippingDocuments(shipment.id);
       if (result.success) {
-        setDocuments(result.data || []);
+        setDocuments((result.data || []) as any);
       }
     } catch (error) {
       console.error('Error loading documents:', error);
@@ -74,7 +74,7 @@ export function LightVehicleShipmentDetailsModal({
       setLoading(true);
       const result = await getShipmentTracking(shipment.id);
       if (result.success) {
-        setTracking(result.data || []);
+        setTracking((result.data || []) as any);
       }
     } catch (error) {
       console.error('Error loading tracking:', error);

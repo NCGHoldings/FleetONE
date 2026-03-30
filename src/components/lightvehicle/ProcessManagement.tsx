@@ -170,7 +170,7 @@ export function ProcessManagement({ order, onUpdate }: ProcessManagementProps) {
       if (!data || data.length === 0) {
         await initializeDefaultTasks();
       } else {
-        setTasks(data);
+        setTasks(data as any);
       }
     } catch (error: any) {
       console.error('Error loading tasks:', error);
