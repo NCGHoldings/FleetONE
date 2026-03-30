@@ -220,7 +220,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const balanceDue = data.balanceAmount != null ? data.balanceAmount : Math.max(0, priceAfterDiscount - totalPaid);
     const itemDetail = data.itemDetail || `${data.pickupLocation} to ${data.dropLocation}`;
     // Use real trip distance from quotation, fallback to actual km traveled if post-trip done, or totalKm
-    const mileage = data.actualKmTraveled || data.tripDistance || data.totalKm || (data.numberOfBuses * 100);
+    const mileage = data.actualKmTraveled || data.tripDistance || data.totalKm || 0;
 
     return `
       <div id="invoice-root" style="font-family: Arial, sans-serif; margin: 0; padding: 15px 15px 25px 15px; background: #fff; color: #000; width: 100%; max-width: 210mm; box-sizing: border-box; position: relative;">
