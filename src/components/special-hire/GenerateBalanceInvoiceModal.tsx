@@ -232,12 +232,12 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       document_type: 'invoice',
       forCustomer: options?.forCustomer ?? isCustomerInvoice,
       hasAdjustments: hasRealAdjustment,
-      extraKm: hasRealAdjustment ? adjustmentData.extra_km : undefined,
-      extraKmChargePerKm: hasRealAdjustment ? adjustmentData.extra_km_rate : undefined,
-      extraKmTotalCharge: hasRealAdjustment ? adjustmentData.extra_km_total_charge : undefined,
-      additionalExpenses: hasRealAdjustment ? adjustmentData.additional_expenses : undefined,
-      totalAdditionalExpenses: hasRealAdjustment ? adjustmentData.total_additional_expenses : undefined,
-      adjustmentNotes: hasRealAdjustment ? adjustmentData.adjustment_notes : undefined,
+      extraKm: hasRealAdjustment ? effectiveAdjustment.extra_km : undefined,
+      extraKmChargePerKm: hasRealAdjustment ? effectiveAdjustment.extra_km_rate : undefined,
+      extraKmTotalCharge: hasRealAdjustment ? effectiveAdjustment.extra_km_total_charge : undefined,
+      additionalExpenses: hasRealAdjustment ? effectiveAdjustment.additional_expenses : undefined,
+      totalAdditionalExpenses: hasRealAdjustment ? effectiveAdjustment.total_additional_expenses : undefined,
+      adjustmentNotes: hasRealAdjustment ? effectiveAdjustment.adjustment_notes : undefined,
     };
   };
 
