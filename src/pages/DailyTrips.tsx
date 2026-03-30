@@ -87,9 +87,9 @@ export default function DailyTrips() {
     const q = searchQuery.toLowerCase();
     return (
       summary.bus_no?.toLowerCase().includes(q) ||
-      summary.driver_name?.toLowerCase().includes(q) ||
-      summary.conductor_name?.toLowerCase().includes(q) ||
-      summary.route_name?.toLowerCase().includes(q)
+      summary.drivers?.some(d => d.toLowerCase().includes(q)) ||
+      summary.conductors?.some(c => c.toLowerCase().includes(q)) ||
+      summary.routes?.some(r => r.toLowerCase().includes(q))
     );
   });
 
@@ -97,8 +97,8 @@ export default function DailyTrips() {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
-      crew.staff_name?.toLowerCase().includes(q) ||
-      crew.role?.toLowerCase().includes(q)
+      crew.driver_name?.toLowerCase().includes(q) ||
+      crew.conductor_name?.toLowerCase().includes(q)
     );
   });
 
