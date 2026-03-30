@@ -48,7 +48,7 @@ export function LightVehicleImageManager({
   const loadImages = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('lightvehicle_bus_model_images')
         .select('*')
         .eq('bus_model_id', busModelId)
@@ -91,7 +91,7 @@ export function LightVehicleImageManager({
     try {
       // Update all items in database
       for (const item of updatedItems) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('lightvehicle_bus_model_images')
           .update({ display_order: item.display_order })
           .eq('id', item.id);
@@ -117,13 +117,13 @@ export function LightVehicleImageManager({
   const handleSetPrimary = async (imageId: string) => {
     try {
       // First, unset all other primary flags
-      await supabase
+      await (supabase as any)
         .from('lightvehicle_bus_model_images')
         .update({ is_primary: false })
         .eq('bus_model_id', busModelId);
 
       // Then set the selected image as primary
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('lightvehicle_bus_model_images')
         .update({ is_primary: true })
         .eq('id', imageId);
@@ -148,7 +148,7 @@ export function LightVehicleImageManager({
 
   const handleUpdateCaption = async (imageId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('lightvehicle_bus_model_images')
         .update({ caption: captionValue || null })
         .eq('id', imageId);
@@ -182,14 +182,14 @@ export function LightVehicleImageManager({
       const fileName = urlParts[urlParts.length - 1];
 
       // Delete from storage
-      const { error: storageError } = await supabase.storage
+      const { error: storageError } = await (supabase as any).storage
         .from('lightvehicle-bus-models')
         .remove([fileName]);
 
       if (storageError) throw storageError;
 
       // Delete from database
-      const { error: dbError } = await supabase
+      const { error: dbError } = await (supabase as any)
         .from('lightvehicle_bus_model_images')
         .delete()
         .eq('id', imageId);
