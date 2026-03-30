@@ -83,21 +83,45 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const [invoiceStatus, setInvoiceStatus] = useState<'draft' | 'sent_to_customer' | 'payment_pending' | 'paid'>('draft');
   const [companyLogo, setCompanyLogo] = useState<string>('');
   const [freshTotalPaid, setFreshTotalPaid] = useState<number | null>(null);
+  const [freshAdjustmentData, setFreshAdjustmentData] = useState<any>(null);
   
   // This modal is specifically for customer-facing balance invoices
   const isCustomerInvoice = true;
 
-  const hasRealAdjustment = !!(adjustmentData.id && (
-    (adjustmentData.extra_km_total_charge || 0) > 0 || 
-    (adjustmentData.total_additional_expenses || 0) > 0
+  // Use fresh adjustment data (from DB) over stale props
+  const effectiveAdjustment = freshAdjustmentData || adjustmentData;
+
+  const hasRealAdjustment = !!(effectiveAdjustment.id && (
+    (effectiveAdjustment.extra_km_total_charge || 0) > 0 || 
+    (effectiveAdjustment.total_additional_expenses || 0) > 0
   ));
 
   useEffect(() => {
     fetchCompanyLogo();
     if (open && quotationData.id) {
       checkExistingInvoice();
+      fetchFreshAdjustmentData();
     }
   }, [open, quotationData.id]);
+
+  const fetchFreshAdjustmentData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('special_hire_trip_adjustments')
+        .select('*')
+        .eq('quotation_id', quotationData.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      if (data) {
+        setFreshAdjustmentData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching fresh adjustment data:', error);
+    }
+  };
 
   // Auto-save draft when modal opens (ensures document is always recorded)
   useEffect(() => {
