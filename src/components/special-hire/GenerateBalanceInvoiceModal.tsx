@@ -43,6 +43,9 @@ interface GenerateBalanceInvoiceModalProps {
     fuel_cost_fuel_only?: number;
     commission_pass_through_amount?: number;
     discount_amount_lkr?: number;
+    total_additional_charges?: number;
+    percentage_adjustment?: number;
+    total_paid?: number;
     advance_paid: number;
     balance_due: number;
     driver_name?: string;
@@ -141,26 +144,36 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
   // Compute the real total from line items (not stale original_quotation_amount)
   const computedTotalAmount = () => {
-    return (quotationData.gross_revenue || 0) +
+    const base = (quotationData.gross_revenue || 0) +
       (quotationData.fuel_cost_fuel_only || 0) +
-      (quotationData.commission_pass_through_amount || 0) -
+      (quotationData.commission_pass_through_amount || 0) +
+      (quotationData.total_additional_charges || 0) -
       (quotationData.discount_amount_lkr || 0);
+    const adjPct = quotationData.percentage_adjustment || 0;
+    return Math.round(base + base * (adjPct / 100));
   };
 
   const calculateFinalBalance = () => {
     const totalAmount = computedTotalAmount();
     const adjustmentTotal = (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0);
-    // Use actual total_paid from quotation (sum of all approved payments) not just advance_paid
-    const actualTotalPaid = (quotationData as any).total_paid ?? quotationData.advance_paid ?? 0;
+    const actualTotalPaid = quotationData.total_paid ?? quotationData.advance_paid ?? 0;
     const balance = (totalAmount + adjustmentTotal) - actualTotalPaid;
     return balance <= 0 ? 0 : balance;
+  };
+
+  const calculateOverpaidCredit = () => {
+    const totalAmount = computedTotalAmount();
+    const adjustmentTotal = (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0);
+    const actualTotalPaid = quotationData.total_paid ?? quotationData.advance_paid ?? 0;
+    const balance = (totalAmount + adjustmentTotal) - actualTotalPaid;
+    return balance < 0 ? Math.abs(balance) : 0;
   };
 
   const generateInvoiceData = (options?: { forCustomer?: boolean }): InvoiceData => {
     const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
     const finalBalance = calculateFinalBalance();
     const totalAmount = computedTotalAmount();
-    const actualTotalPaid = (quotationData as any).total_paid ?? quotationData.advance_paid ?? 0;
+    const actualTotalPaid = quotationData.total_paid ?? quotationData.advance_paid ?? 0;
 
     return {
       invoiceNo,
@@ -393,7 +406,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
         
         if (settings?.auto_post_invoices && !existingJE) {
           // Post GROSS invoice amount (before discount) — discount is posted separately
-          const fullInvoiceAmount = quotationData.original_quotation_amount + 
+          const fullInvoiceAmount = computedTotalAmount() + 
             (adjustmentData.extra_km_total_charge || 0) + 
             (adjustmentData.total_additional_expenses || 0);
           const discountAmount = quotationData.discount_amount_lkr || 0;
@@ -613,8 +626,12 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             <CardContent className="space-y-2">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <div className="text-muted-foreground">Original Balance Due</div>
-                  <div className="font-semibold">LKR {quotationData.balance_due.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Total Payable</div>
+                  <div className="font-semibold">LKR {computedTotalAmount().toLocaleString()}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Total Paid (All Payments)</div>
+                  <div className="font-semibold text-green-600">LKR {(quotationData.total_paid ?? quotationData.advance_paid ?? 0).toLocaleString()}</div>
                 </div>
                 {adjustmentData.extra_km_total_charge && adjustmentData.extra_km_total_charge > 0 && (
                   <div>
@@ -643,6 +660,14 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
                   LKR {finalBalance.toLocaleString()}
                 </div>
               </div>
+              {calculateOverpaidCredit() > 0 && (
+                <div className="flex justify-between items-center text-green-600">
+                  <div className="text-sm font-medium">Overpaid Credit</div>
+                  <div className="text-sm font-bold">
+                    LKR {calculateOverpaidCredit().toLocaleString()}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
