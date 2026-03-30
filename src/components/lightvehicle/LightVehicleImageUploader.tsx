@@ -48,7 +48,7 @@ export function LightVehicleImageUploader({
 
     try {
       // Get current max display_order
-      const { data: existingImages } = await supabase
+      const { data: existingImages } = await (supabase as any)
         .from('lightvehicle_bus_model_images')
         .select('display_order')
         .eq('bus_model_id', busModelId)
@@ -72,7 +72,7 @@ export function LightVehicleImageUploader({
         const fileName = `${busModelId}-${Date.now()}-${i}.${fileExt}`;
         const filePath = `${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await (supabase as any).storage
           .from('lightvehicle-bus-models')
           .upload(filePath, file);
 
@@ -87,7 +87,7 @@ export function LightVehicleImageUploader({
           .getPublicUrl(filePath);
 
         // Check if this is the first image for this model
-        const { data: imageCount } = await supabase
+        const { data: imageCount } = await (supabase as any)
           .from('lightvehicle_bus_model_images')
           .select('id', { count: 'exact', head: true })
           .eq('bus_model_id', busModelId);
@@ -95,7 +95,7 @@ export function LightVehicleImageUploader({
         const isPrimary = !imageCount || imageCount.length === 0;
 
         // Insert into database
-        const { error: dbError } = await supabase
+        const { error: dbError } = await (supabase as any)
           .from('lightvehicle_bus_model_images')
           .insert({
             bus_model_id: busModelId,
