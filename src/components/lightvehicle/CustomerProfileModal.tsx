@@ -65,7 +65,7 @@ export default function CustomerProfileModal({ customer, open, onOpenChange }: C
 
     try {
       // Load purchase history
-      const { data: purchases, error: purchaseError } = await supabase
+      const { data: purchases, error: purchaseError } = await (supabase as any)
         .from('lightvehicle_quotations')
         .select(`
           id,
