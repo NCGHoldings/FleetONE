@@ -148,7 +148,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel, initialData }: L
 
   const loadCustomizationOptions = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("lightvehicle_customization_options")
         .select("*")
         .eq("is_active", true)
@@ -171,7 +171,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel, initialData }: L
       // Check super_admin role via database
       let isSuperAdmin = false;
       if (user?.id) {
-        const { data: roleData } = await supabase
+        const { data: roleData } = await (supabase as any)
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
@@ -216,7 +216,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel, initialData }: L
 
   const loadCustomers = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('lightvehicle_customers')
         .select('*')
         .eq('is_active', true)
@@ -235,7 +235,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel, initialData }: L
 
   const loadResponsiblePersons = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("lightvehicle_responsible_persons")
         .select("*")
         .eq("is_active", true)
@@ -257,7 +257,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel, initialData }: L
 
   const loadReferralAgents = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('referral_agents')
         .select('id, agent_name')
         .eq('status', 'active')
@@ -364,7 +364,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel, initialData }: L
         customer_category_id: data.customer_category_id || null,
       };
 
-      const { data: quotation, error } = await supabase
+      const { data: quotation, error } = await (supabase as any)
         .from('lightvehicle_quotations')
         .insert([quotationData as any])
         .select()
@@ -386,7 +386,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel, initialData }: L
           notes: addon.notes,
         }));
 
-        const { error: addOnError } = await supabase
+        const { error: addOnError } = await (supabase as any)
           .from('lightvehicle_quotation_addons')
           .insert(addOnInserts);
 

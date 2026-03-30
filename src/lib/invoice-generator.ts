@@ -216,7 +216,8 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const priceAfterDiscount = adjustedSubTotal - discount;
     const previousAdvance = data.advanceAmount || 0; // kept for reference
     const totalPaid = data.paidAmount || 0;
-    const balanceDue = priceAfterDiscount - totalPaid;
+    // Use explicit balanceAmount when provided (balance invoices), else compute
+    const balanceDue = data.balanceAmount != null ? data.balanceAmount : Math.max(0, priceAfterDiscount - totalPaid);
     const itemDetail = data.itemDetail || `${data.pickupLocation} to ${data.dropLocation}`;
     // Use real trip distance from quotation, fallback to actual km traveled if post-trip done, or totalKm
     const mileage = data.actualKmTraveled || data.tripDistance || data.totalKm || (data.numberOfBuses * 100);

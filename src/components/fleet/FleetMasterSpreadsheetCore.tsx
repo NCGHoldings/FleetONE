@@ -352,8 +352,8 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                     <TableCell className="text-sm py-1 min-h-[40px]">{renderDropdownCell(row, 'remark', row.remark || '', REMARK_OPTIONS)}</TableCell>
                     <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'default_driver', editMode === 'daily' ? row.driver_name : row.default_driver)}</TableCell>
                     <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'default_conductor', editMode === 'daily' ? row.conductor_name : row.default_conductor)}</TableCell>
-                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'turn_01_time', editMode === 'daily' ? row.daily_turn_01_time : row.turn_01_time)}</TableCell>
-                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'turn_02_time', editMode === 'daily' ? row.daily_turn_02_time : row.turn_02_time)}</TableCell>
+                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'turn_01_time', editMode === 'daily' ? (row as any).daily_turn_01_time ?? row.turn_01_time : row.turn_01_time)}</TableCell>
+                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'turn_02_time', editMode === 'daily' ? (row as any).daily_turn_02_time ?? row.turn_02_time : row.turn_02_time)}</TableCell>
                     {/* Meter / Fuel cells */}
                     <TableCell className="text-sm text-muted-foreground py-2 min-h-[40px]">{isSubRow ? '' : row.bus_model || '-'}</TableCell>
                     <TableCell className="text-sm text-right font-mono py-1 min-h-[40px]">

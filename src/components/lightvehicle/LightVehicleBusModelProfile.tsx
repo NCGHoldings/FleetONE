@@ -60,7 +60,7 @@ export function LightVehicleBusModelProfile({ busModel, isOpen, onClose }: Light
     
     try {
       setLoadingImages(true);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('lightvehicle_bus_model_images')
         .select('*')
         .eq('bus_model_id', busModel.id)

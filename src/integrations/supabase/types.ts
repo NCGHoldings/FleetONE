@@ -875,6 +875,7 @@ export type Database = {
           invoice_id: string | null
           payment_id: string | null
           wht_deducted: number | null
+          write_off_amount: number | null
         }
         Insert: {
           allocated_amount: number
@@ -884,6 +885,7 @@ export type Database = {
           invoice_id?: string | null
           payment_id?: string | null
           wht_deducted?: number | null
+          write_off_amount?: number | null
         }
         Update: {
           allocated_amount?: number
@@ -893,6 +895,7 @@ export type Database = {
           invoice_id?: string | null
           payment_id?: string | null
           wht_deducted?: number | null
+          write_off_amount?: number | null
         }
         Relationships: [
           {
@@ -1898,6 +1901,7 @@ export type Database = {
           id: string
           invoice_id: string | null
           receipt_id: string | null
+          write_off_amount: number | null
         }
         Insert: {
           allocated_amount: number
@@ -1906,6 +1910,7 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           receipt_id?: string | null
+          write_off_amount?: number | null
         }
         Update: {
           allocated_amount?: number
@@ -1914,6 +1919,7 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           receipt_id?: string | null
+          write_off_amount?: number | null
         }
         Relationships: [
           {
@@ -2862,6 +2868,56 @@ export type Database = {
             columns: ["gl_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_deposits: {
+        Row: {
+          amount: number
+          bank_account_gl: string
+          created_at: string | null
+          deposit_date: string
+          deposited_by: string | null
+          id: string
+          notes: string | null
+          offset_expenses: Json | null
+          reference_no: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          bank_account_gl: string
+          created_at?: string | null
+          deposit_date: string
+          deposited_by?: string | null
+          id?: string
+          notes?: string | null
+          offset_expenses?: Json | null
+          reference_no?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          bank_account_gl?: string
+          created_at?: string | null
+          deposit_date?: string
+          deposited_by?: string | null
+          id?: string
+          notes?: string | null
+          offset_expenses?: Json | null
+          reference_no?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_deposits_deposited_by_fkey"
+            columns: ["deposited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -6123,6 +6179,66 @@ export type Database = {
           },
         ]
       }
+      daily_cash_settlements: {
+        Row: {
+          actual_cash: number
+          bus_id: string | null
+          cashier_id: string | null
+          created_at: string | null
+          expected_cash: number
+          id: string
+          notes: string | null
+          overage: number
+          settlement_date: string
+          shortage: number
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_cash?: number
+          bus_id?: string | null
+          cashier_id?: string | null
+          created_at?: string | null
+          expected_cash?: number
+          id?: string
+          notes?: string | null
+          overage?: number
+          settlement_date: string
+          shortage?: number
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_cash?: number
+          bus_id?: string | null
+          cashier_id?: string | null
+          created_at?: string | null
+          expected_cash?: number
+          id?: string
+          notes?: string | null
+          overage?: number
+          settlement_date?: string
+          shortage?: number
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_cash_settlements_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_cash_settlements_cashier_id_fkey"
+            columns: ["cashier_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_trips: {
         Row: {
           audit_log: Json | null
@@ -6153,6 +6269,7 @@ export type Database = {
           other_expenses_details: Json | null
           performance_score: number | null
           route_id: string | null
+          route_label: string | null
           start_time: string | null
           status: Database["public"]["Enums"]["trip_status"] | null
           total_expenses: number | null
@@ -6190,6 +6307,7 @@ export type Database = {
           other_expenses_details?: Json | null
           performance_score?: number | null
           route_id?: string | null
+          route_label?: string | null
           start_time?: string | null
           status?: Database["public"]["Enums"]["trip_status"] | null
           total_expenses?: number | null
@@ -6227,6 +6345,7 @@ export type Database = {
           other_expenses_details?: Json | null
           performance_score?: number | null
           route_id?: string | null
+          route_label?: string | null
           start_time?: string | null
           status?: Database["public"]["Enums"]["trip_status"] | null
           total_expenses?: number | null
@@ -13234,6 +13353,7 @@ export type Database = {
           expense_cash_account_id: string | null
           expense_prefix: string | null
           food_expense_account_id: string | null
+          fuel_card_payable_account_id: string | null
           fuel_expense_account_id: string | null
           highway_expense_account_id: string | null
           id: string
@@ -13269,6 +13389,7 @@ export type Database = {
           expense_cash_account_id?: string | null
           expense_prefix?: string | null
           food_expense_account_id?: string | null
+          fuel_card_payable_account_id?: string | null
           fuel_expense_account_id?: string | null
           highway_expense_account_id?: string | null
           id?: string
@@ -13304,6 +13425,7 @@ export type Database = {
           expense_cash_account_id?: string | null
           expense_prefix?: string | null
           food_expense_account_id?: string | null
+          fuel_card_payable_account_id?: string | null
           fuel_expense_account_id?: string | null
           highway_expense_account_id?: string | null
           id?: string
@@ -13373,6 +13495,13 @@ export type Database = {
           {
             foreignKeyName: "ncg_express_finance_settings_food_expense_account_id_fkey"
             columns: ["food_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_fuel_card_payable_account_id_fkey"
+            columns: ["fuel_card_payable_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]

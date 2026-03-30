@@ -53,7 +53,7 @@ export function LightVehicleCustomerDetailModal({
       setLoading(true);
 
       // Get direct quotations for this customer
-      const { data: direct, error: directError } = await supabase
+      const { data: direct, error: directError } = await (supabase as any)
         .from("lightvehicle_quotations")
         .select("*")
         .eq("customer_name", customerName)
@@ -62,7 +62,7 @@ export function LightVehicleCustomerDetailModal({
       if (directError) throw directError;
 
       // Get related quotations (sub-customers linked to this customer)
-      const { data: related, error: relatedError } = await supabase
+      const { data: related, error: relatedError } = await (supabase as any)
         .from("lightvehicle_quotations")
         .select("*")
         .eq("main_customer_name", customerName)
@@ -70,8 +70,8 @@ export function LightVehicleCustomerDetailModal({
 
       if (relatedError) throw relatedError;
 
-      setDirectQuotations(direct || []);
-      setRelatedQuotations(related || []);
+      setDirectQuotations((direct || []) as any);
+      setRelatedQuotations((related || []) as any);
     } catch (error) {
       console.error("Error loading customer details:", error);
     } finally {

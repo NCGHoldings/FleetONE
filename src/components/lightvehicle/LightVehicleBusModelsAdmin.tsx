@@ -113,7 +113,7 @@ export function LightVehicleBusModelsAdmin() {
     try {
       setLoading(true);
       console.log('Loading bus models...');
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('lightvehicle_bus_models')
         .select('*')
         .order('bus_name');
@@ -121,7 +121,7 @@ export function LightVehicleBusModelsAdmin() {
       console.log('Bus models query result:', { data, error });
 
       if (error) throw error;
-      setBusModels((data || []).map(model => ({
+      setBusModels((data || []).map((model: any) => ({
         ...model,
         capacity: model.capacity?.toString() || ''
       })));
@@ -129,7 +129,7 @@ export function LightVehicleBusModelsAdmin() {
       // Load image counts and primary images for each model
       if (data && data.length > 0) {
         const imageCountsPromises = data.map(async (model) => {
-          const { data: images } = await supabase
+          const { data: images } = await (supabase as any)
             .from('lightvehicle_bus_model_images')
             .select('id, image_url, is_primary')
             .eq('bus_model_id', model.id);
@@ -177,7 +177,7 @@ export function LightVehicleBusModelsAdmin() {
       const fileName = `${modelId}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await (supabase as any).storage
         .from('lightvehicle-bus-models')
         .upload(filePath, file);
 
@@ -187,7 +187,7 @@ export function LightVehicleBusModelsAdmin() {
         .from('lightvehicle-bus-models')
         .getPublicUrl(filePath);
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('lightvehicle_bus_models')
         .update({ image_url: publicUrl })
         .eq('id', modelId);
@@ -244,7 +244,7 @@ export function LightVehicleBusModelsAdmin() {
       };
 
       if (editingModel) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('lightvehicle_bus_models')
           .update(dbData)
           .eq('id', editingModel.id);
@@ -252,7 +252,7 @@ export function LightVehicleBusModelsAdmin() {
         if (error) throw error;
         toast({ title: "Success", description: "Bus model updated successfully" });
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('lightvehicle_bus_models')
           .insert([dbData]);
 
@@ -350,7 +350,7 @@ export function LightVehicleBusModelsAdmin() {
         luggage_capacity: model.luggage_capacity || null
       };
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('lightvehicle_bus_models')
         .insert([dbData]);
 
@@ -370,7 +370,7 @@ export function LightVehicleBusModelsAdmin() {
     if (!confirm('Are you sure you want to delete this bus model?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('lightvehicle_bus_models')
         .delete()
         .eq('id', id);
