@@ -14,6 +14,7 @@ import {
   updateSPHARInvoiceOnPayment,
   createSPHARReceipt,
   checkPaymentDocument,
+  applyAdvanceToInvoiceStandalone,
 } from '@/hooks/useSpecialHireFinance';
 import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
 
