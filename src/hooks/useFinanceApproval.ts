@@ -14,6 +14,7 @@ import {
   updateSPHARInvoiceOnPayment,
   createSPHARReceipt,
   checkPaymentDocument,
+  applyAdvanceToInvoiceStandalone,
 } from '@/hooks/useSpecialHireFinance';
 import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
 
@@ -227,7 +228,39 @@ export const useFinanceApproval = () => {
       }
     }
 
-    // Step 2d: Create AR Receipt
+    // Step 2d: Apply advance against AR Invoice (JE #4)
+    if (isBalance && arInvoiceId) {
+      try {
+        const { data: advancePayments } = await supabase
+          .from('special_hire_payments')
+          .select('amount')
+          .eq('quotation_id', paymentData.quotation.id)
+          .eq('payment_type', 'advance')
+          .eq('status', 'approved');
+        
+        const totalAdvance = (advancePayments || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+        
+        if (totalAdvance > 0) {
+          const arInvoiceNo = `SPH-INV-${paymentData.quotation.quotation_no}`;
+          const applyResult = await applyAdvanceToInvoiceStandalone({
+            invoiceNo: arInvoiceNo,
+            quotationNo: paymentData.quotation.quotation_no,
+            customerName: paymentData.quotation.customer_name,
+            advanceAmount: totalAdvance,
+            settings,
+            effectiveCompanyId: NCG_HOLDING_ID,
+          });
+          if (applyResult) {
+            console.log('[SPH Finance] ✅ Advance applied to invoice:', applyResult.entry_number);
+            toast.success(`Advance Applied: ${applyResult.entry_number}`);
+          }
+        }
+      } catch (err) {
+        console.error('[SPH Finance] ⚠️ Advance application failed (non-critical):', err);
+      }
+    }
+
+    // Step 2e: Create AR Receipt
     if (arInvoiceId && customerId) {
       if (isBalance) {
         await updateSPHARInvoiceOnPayment({
