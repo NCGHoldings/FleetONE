@@ -713,6 +713,7 @@ export const useCompanyCreateAccount = () => {
   const queryClient = useQueryClient();
   const companyContext = useCompanyOptional();
   const companyId = companyContext?.selectedCompanyId;
+  const effectiveCompanyId = companyContext?.getEffectiveCompanyId?.() || companyId;
   
   return useMutation({
     mutationFn: async (account: {
@@ -731,7 +732,7 @@ export const useCompanyCreateAccount = () => {
       account_level?: number;
       gl_code?: string;
     }) => {
-      if (!companyId) {
+      if (!effectiveCompanyId) {
         throw new Error("No company selected");
       }
 
@@ -747,7 +748,7 @@ export const useCompanyCreateAccount = () => {
           description: account.description,
           is_active: true,
           current_balance: 0,
-          company_id: companyId,
+          company_id: effectiveCompanyId,
           // Level fields for tree structure
           level1: account.level1,
           level2: account.level2,
@@ -764,8 +765,8 @@ export const useCompanyCreateAccount = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", companyId] });
-      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts-all", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", effectiveCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts-all", effectiveCompanyId] });
       toast.success("Account created successfully");
     },
     onError: (error) => {
@@ -779,6 +780,7 @@ export const useCompanyUpdateAccount = () => {
   const queryClient = useQueryClient();
   const companyContext = useCompanyOptional();
   const companyId = companyContext?.selectedCompanyId;
+  const effectiveCompanyId = companyContext?.getEffectiveCompanyId?.() || companyId;
   
   return useMutation({
     mutationFn: async (account: {
@@ -791,7 +793,7 @@ export const useCompanyUpdateAccount = () => {
       is_active?: boolean;
       description?: string;
     }) => {
-      if (!companyId) {
+      if (!effectiveCompanyId) {
         throw new Error("No company selected");
       }
 
@@ -800,7 +802,7 @@ export const useCompanyUpdateAccount = () => {
         .from("chart_of_accounts")
         .update(updates as any)
         .eq("id", id)
-        .eq("company_id", companyId)
+        .eq("company_id", effectiveCompanyId)
         .select()
         .single();
       
@@ -808,8 +810,8 @@ export const useCompanyUpdateAccount = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", companyId] });
-      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts-all", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", effectiveCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts-all", effectiveCompanyId] });
       toast.success("Account updated successfully");
     },
     onError: (error) => {

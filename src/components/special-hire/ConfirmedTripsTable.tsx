@@ -203,12 +203,47 @@ export function ConfirmedTripsTable() {
     return filtered;
   }, [quotations, searchQuery, statusFilter, paymentFilter, dateFilter, documentFilter, documentsData]);
 
-  // Load adjustments for all visible trips
+  // Load adjustments for all visible trips (Batched to prevent N+1 queries)
   useEffect(() => {
-    if (filteredTrips.length > 0) {
-      filteredTrips.forEach(trip => loadAdjustmentData(trip.id));
-    }
-  }, [filteredTrips]);
+    const loadAllAdjustments = async () => {
+      if (filteredTrips.length === 0) return;
+      
+      try {
+        const tripIds = filteredTrips.map(t => t.id);
+        const chunks = [];
+        for (let i = 0; i < tripIds.length; i += 100) {
+          chunks.push(tripIds.slice(i, i + 100));
+        }
+        
+        const newAdjustmentsData: Record<string, any> = { ...adjustmentsData };
+        
+        for (const chunk of chunks) {
+          const { data, error } = await supabase
+            .from('special_hire_trip_adjustments')
+            .select('*')
+            .in('quotation_id', chunk)
+            .order('created_at', { ascending: false });
+            
+          if (error) throw error;
+          
+          if (data) {
+            data.forEach(adj => {
+              if (!newAdjustmentsData[adj.quotation_id]) {
+                newAdjustmentsData[adj.quotation_id] = adj;
+              }
+            });
+          }
+        }
+        
+        setAdjustmentsData(newAdjustmentsData);
+      } catch (error) {
+        console.error('Error batch loading adjustment data:', error);
+      }
+    };
+    
+    loadAllAdjustments();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredTrips.length]);
 
   const calculateTotalAmount = (quotation: QuotationWithPayments) => {
     const hireAll = quotation.gross_revenue || 0;
@@ -379,9 +414,22 @@ export function ConfirmedTripsTable() {
         document_type: paymentData.paymentType === 'advance' ? 'sales_receipt' as const : 'invoice' as const,
       };
 
+      console.log('🚀 Triggering run-in-background document generation for:', draftInvoiceData.invoiceNo);
       generateAndStoreDraftDocument(draftInvoiceData, tripForDoc.id, paymentIdForDoc)
-        .then(result => { if (!result.success) console.error('Background doc gen failed:', result.error); })
-        .catch(err => console.error('Background doc gen error:', err));
+        .then(result => { 
+          if (!result.success) {
+            console.error('❌ Background doc gen failed:', result.error);
+            toast.error(`Document generation failed: ${result.error?.message || 'Unknown error'}`);
+          } else {
+            console.log('✅ Background doc gen SUCCESS! Reloading document status for UI...');
+            // Reload the document status for this trip so the UI updates with the new preview badge
+            loadDocumentStatus(tripForDoc.id);
+          }
+        })
+        .catch(err => {
+          console.error('❌ Background doc gen PROMISE error:', err);
+          toast.error(`Document generation error: ${err.message || 'Unknown error'}`);
+        });
     } catch (error) {
       console.error('Error confirming payment:', error);
       toast.error('Failed to confirm payment. Please try again.');
@@ -506,7 +554,7 @@ export function ConfirmedTripsTable() {
     }));
   };
 
-  // Load document statuses for all confirmed quotations - force reload to avoid stale cache
+  // Load document statuses for all confirmed quotations (BATCHED to prevent N+1 queries)
   useEffect(() => {
     const loadAllDocuments = async () => {
       const confirmedQuotations = quotations.filter(q => q.status === 'confirmed');
@@ -514,15 +562,64 @@ export function ConfirmedTripsTable() {
       
       setDocumentsLoading(true);
       
-      // Force reload ALL confirmed quotations to ensure fresh data
-      const loadPromises = confirmedQuotations.map(q => loadDocumentStatus(q.id));
-      await Promise.all(loadPromises);
-      
-      setDocumentsLoading(false);
+      try {
+        const tripIds = confirmedQuotations.map(t => t.id);
+        const chunks = [];
+        for (let i = 0; i < tripIds.length; i += 100) {
+          chunks.push(tripIds.slice(i, i + 100));
+        }
+        
+        const newDocumentsData: Record<string, any[]> = {};
+        
+        for (const chunk of chunks) {
+          const { data: documents, error } = await supabase
+            .from('document_storage')
+            .select(`
+              id,
+              quotation_id,
+              document_type,
+              payment_type,
+              document_status,
+              document_data,
+              file_name,
+              generated_at,
+              email_status,
+              ready_to_send,
+              email_sent_at,
+              document_approvals (
+                id,
+                approval_type,
+                approver_name,
+                signature_data,
+                approval_date,
+                user_id
+              )
+            `)
+            .in('quotation_id', chunk);
+            
+          if (error) throw error;
+          
+          if (documents) {
+            documents.forEach(doc => {
+              if (!newDocumentsData[doc.quotation_id]) {
+                newDocumentsData[doc.quotation_id] = [];
+              }
+              newDocumentsData[doc.quotation_id].push(doc);
+            });
+          }
+        }
+        
+        setDocumentsData(newDocumentsData);
+      } catch (error) {
+        console.error('Error batch loading documents:', error);
+      } finally {
+        setDocumentsLoading(false);
+      }
     };
     
     loadAllDocuments();
-  }, [quotations]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quotations.length]);
 
   // Subscribe to realtime changes for documents and signatures
   useEffect(() => {

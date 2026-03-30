@@ -99,7 +99,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
           balance: inv.balance || 0,
           allocated_amount: 0,
           write_off_amount: 0,
-          selected: boolean,
+          selected: false,
         }))
       );
     } else {

@@ -21,22 +21,24 @@ export const ChartOfAccountsView = () => {
   const [viewMode, setViewMode] = useState<"tree" | "table">("tree");
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
-  const { selectedCompanyId, selectedCompany } = useCompany();
+  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId, isSubCompanyOfNCGHolding } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const isConsolidated = selectedCompanyId ? isSubCompanyOfNCGHolding(selectedCompanyId) : false;
 
   const { data: accounts, isLoading, refetch } = useQuery({
-    queryKey: ["chart-of-accounts", selectedCompanyId],
+    queryKey: ["chart-of-accounts", effectiveCompanyId],
     queryFn: async () => {
-      if (!selectedCompanyId) return [];
+      if (!effectiveCompanyId) return [];
       const { data, error } = await supabase
         .from("chart_of_accounts")
         .select("*")
-        .eq("company_id", selectedCompanyId)
+        .eq("company_id", effectiveCompanyId)
         .order("account_code");
       
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 
   const filteredAccounts = useMemo(() => {
@@ -126,11 +128,11 @@ export const ChartOfAccountsView = () => {
           <div>
             <h2 className="text-2xl font-bold">Chart of Accounts</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              {selectedCompany?.name} - No accounts configured
+              {selectedCompany?.name}{isConsolidated ? ' (Consolidated — NCG Holding COA)' : ''} - No accounts configured
             </p>
           </div>
           <div className="flex gap-2">
-            <ChartOfAccountsUpload onUploadComplete={refetch} companyId={selectedCompanyId} />
+            <ChartOfAccountsUpload onUploadComplete={refetch} companyId={effectiveCompanyId!} />
           </div>
         </div>
         <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg">
@@ -140,7 +142,7 @@ export const ChartOfAccountsView = () => {
             {selectedCompany?.name} doesn't have a Chart of Accounts yet. 
             Upload an Excel file to initialize the account structure.
           </p>
-          <ChartOfAccountsUpload onUploadComplete={refetch} companyId={selectedCompanyId} />
+          <ChartOfAccountsUpload onUploadComplete={refetch} companyId={effectiveCompanyId!} />
         </div>
       </Card>
     );
@@ -152,11 +154,11 @@ export const ChartOfAccountsView = () => {
         <div>
           <h2 className="text-2xl font-bold">Chart of Accounts</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {selectedCompany?.name} - {accounts?.length || 0} accounts
+            {selectedCompany?.name}{isConsolidated ? ' (Consolidated — NCG Holding COA)' : ''} - {accounts?.length || 0} accounts
           </p>
         </div>
         <div className="flex gap-2">
-          <ChartOfAccountsUpload onUploadComplete={refetch} companyId={selectedCompanyId} />
+          <ChartOfAccountsUpload onUploadComplete={refetch} companyId={effectiveCompanyId!} />
           <Dialog open={showAccountForm} onOpenChange={setShowAccountForm}>
             <DialogTrigger asChild>
               <Button>

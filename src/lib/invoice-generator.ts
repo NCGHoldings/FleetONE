@@ -101,7 +101,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
   if (isAdvanceInvoice || isSalesReceipt) {
     // Use Sales Receipt format for advance payments with fixed padding
     return `
-      <div style="font-family: Arial, sans-serif; font-size: 14px; margin: 0; padding: 20px; width: 210mm; min-height: 297mm; background: white; color: black; box-sizing: border-box; position: relative;">
+      <div id="invoice-root" style="font-family: Arial, sans-serif; font-size: 14px; margin: 0; padding: 20px; width: 210mm; min-height: 297mm; background: white; color: black; box-sizing: border-box; position: relative;">
         ${isDraft ? '<div class="draft-watermark"><div class="draft-text">DRAFT</div></div>' : ''}
         <style>
           ${draftWatermarkStyles}
@@ -222,7 +222,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const mileage = data.actualKmTraveled || data.tripDistance || data.totalKm || (data.numberOfBuses * 100);
 
     return `
-      <div style="font-family: Arial, sans-serif; margin: 0; padding: 15px 15px 25px 15px; background: #fff; color: #000; width: 100%; max-width: 210mm; box-sizing: border-box; position: relative;">
+      <div id="invoice-root" style="font-family: Arial, sans-serif; margin: 0; padding: 15px 15px 25px 15px; background: #fff; color: #000; width: 100%; max-width: 210mm; box-sizing: border-box; position: relative;">
         ${isDraft ? '<div class="draft-watermark"><div class="draft-text">DRAFT</div></div>' : ''}
         <style>
           ${draftWatermarkStyles}

@@ -117,11 +117,15 @@ export const useDocumentManagement = () => {
         ...signatureMap
       };
 
+      console.log('🔄 Calling generateInvoicePDF...', invoiceData.invoiceNo);
       const pdfBlob = await generateInvoicePDF(draftInvoiceData);
+      console.log('✅ PDF Blob generated successfully. Size:', pdfBlob.size);
 
       // Upload to Supabase Storage instead of storing base64 in DB
       const fileName = `DRAFT-${invoiceData.document_type}-${invoiceData.quotationNo}-${Date.now()}.pdf`;
+      console.log('☁️ Uploading PDF to storage...', fileName);
       const { storagePath, fileSize } = await uploadPdfToStorage(pdfBlob, fileName);
+      console.log('✅ Storage upload success:', storagePath);
       
       const { data, error } = await supabase
         .from('document_storage')
@@ -145,11 +149,12 @@ export const useDocumentManagement = () => {
         throw error;
       }
 
+      console.log('✅ Document insertion successful:', data);
       toast.success(`Draft ${invoiceData.document_type === 'sales_receipt' ? 'sales receipt' : 'invoice'} generated and stored.`);
       return { success: true, document: data };
     } catch (error) {
-      console.error('Error generating draft document:', error);
-      toast.error('Failed to generate draft document.');
+      console.error('🚨 Error generating draft document! Full trace:', error);
+      toast.error(`Failed to generate draft document: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return { success: false, error };
     } finally {
       setIsLoading(false);

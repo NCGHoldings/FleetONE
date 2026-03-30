@@ -222,54 +222,65 @@ export function useYutongOrderInvoiceManagement() {
       console.log('✅ Document record created:', document.id);
       
       // Step 6: Auto-create AR Invoice (draft) at generation time
-      console.log('💰 Step 6: Creating draft AR Invoice...');
-      try {
-        const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
-        
-        // Get order details for customer info
-        const { data: orderDetails } = await supabase
-          .from('yutong_orders')
-          .select('*, yutong_quotations(customer_name, customer_category_id, customer_phone, customer_email)')
-          .eq('id', orderId)
-          .single();
-        
-        if (settings && orderDetails?.finance_customer_id) {
-          const invoiceAmount = fullInvoiceData.invoice_category === 'proforma_invoice'
-            ? fullInvoiceData.proforma_amount || fullInvoiceData.total
-            : fullInvoiceData.total;
+      // ⚠️ SKIP for Proforma Invoices — Proforma is for bank/leasing reference only,
+      //    not a real sale. AR + JE should only be created for Customer or Tax invoices.
+      const invoiceCategoryForAR = fullInvoiceData.invoice_category || 'direct_invoice';
+      if (invoiceCategoryForAR === 'proforma_invoice') {
+        console.log('ℹ️ Step 6: Skipping AR Invoice — Proforma invoices do not create AR or JE entries.');
+      } else {
+        console.log('💰 Step 6: Creating draft AR Invoice...');
+        try {
+          const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
           
-          const isTax = fullInvoiceData.invoice_category === 'tax_invoice' || fullInvoiceData.is_tax_invoice;
-          const taxAmt = isTax ? (fullInvoiceData.vat_amount || invoiceAmount - invoiceAmount / 1.18) : undefined;
+          // Get order details for customer info
+          const { data: orderDetails } = await supabase
+            .from('yutong_orders')
+            .select('*, yutong_quotations(customer_name, customer_category_id, customer_phone, customer_email)')
+            .eq('id', orderId)
+            .single();
           
-          const arResult = await createVehicleARInvoice({
-            module: 'yutong',
-            orderId,
-            orderNo: orderDetails.order_no,
-            customerId: orderDetails.finance_customer_id,
-            totalAmount: invoiceAmount,
-            advanceAmount: 0,
-            companyId: NCG_HOLDING_ID,
-            settings,
-            customerCategoryId: (orderDetails as any)?.customer_category_id
-              || orderDetails?.yutong_quotations?.customer_category_id,
-            invoiceNo,
-            taxAmount: taxAmt,
-            status: 'draft',
-          });
-          
-          if (arResult) {
-            await updateOrderFinanceLinks({
-              module: 'yutong',
-              orderId,
-              arInvoiceId: arResult.invoiceId,
-            });
-            console.log(`✅ Draft AR Invoice created: ${arResult.invoiceNumber}`);
+          if (settings && orderDetails?.finance_customer_id) {
+            // ✅ Duplicate AR prevention — only one AR invoice per order
+            if (orderDetails?.ar_invoice_id) {
+              console.log('ℹ️ AR Invoice already exists for this order — skipping duplicate creation.');
+            } else {
+              const invoiceAmount = fullInvoiceData.total;
+              
+              // Both Customer Invoice and Tax Invoice are real sales with VAT
+              const isTax = fullInvoiceData.invoice_category === 'tax_invoice' || fullInvoiceData.invoice_category === 'direct_invoice' || fullInvoiceData.is_tax_invoice;
+              const taxAmt = isTax ? (fullInvoiceData.vat_amount || invoiceAmount - invoiceAmount / 1.18) : undefined;
+              
+              const arResult = await createVehicleARInvoice({
+                module: 'yutong',
+                orderId,
+                orderNo: orderDetails.order_no,
+                customerId: orderDetails.finance_customer_id,
+                totalAmount: invoiceAmount,
+                advanceAmount: 0,
+                companyId: NCG_HOLDING_ID,
+                settings,
+                customerCategoryId: (orderDetails as any)?.customer_category_id
+                  || orderDetails?.yutong_quotations?.customer_category_id,
+                invoiceNo,
+                taxAmount: taxAmt,
+                status: 'draft',
+              });
+              
+              if (arResult) {
+                await updateOrderFinanceLinks({
+                  module: 'yutong',
+                  orderId,
+                  arInvoiceId: arResult.invoiceId,
+                });
+                console.log(`✅ Draft AR Invoice created: ${arResult.invoiceNumber}`);
+              }
+            }
+          } else {
+            console.warn('⚠️ Skipping AR auto-creation: missing settings or finance customer');
           }
-        } else {
-          console.warn('⚠️ Skipping AR auto-creation: missing settings or finance customer');
+        } catch (arError) {
+          console.warn('⚠️ AR Invoice auto-creation failed (non-blocking):', arError);
         }
-      } catch (arError) {
-        console.warn('⚠️ AR Invoice auto-creation failed (non-blocking):', arError);
       }
       
       console.log('🎉 Invoice generation completed successfully!');
@@ -385,143 +396,152 @@ export function useYutongOrderInvoiceManagement() {
 
       // ==========================================
       // FINANCE INTEGRATION - PROPER ACCOUNTING
+      // ⚠️ SKIP entirely for Proforma Invoices
       // ==========================================
-      const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
-
-      // Ensure finance_customer_id exists before proceeding
-      if (settings && !orderDetails?.finance_customer_id && orderDetails?.yutong_quotations?.customer_name) {
-        console.log('[Yutong] Resolving finance customer prior to GL posting...');
-        const { createVehicleCustomer } = await import('@/hooks/useVehicleSalesFinance');
-        const newCustomerId = await createVehicleCustomer({
-          module: 'yutong',
-          companyId: NCG_HOLDING_ID,
-          customerName: orderDetails.yutong_quotations.customer_name,
-          customerPhone: orderDetails.yutong_quotations.customer_phone || undefined,
-          customerEmail: orderDetails.yutong_quotations.customer_email || undefined,
-          customerCategoryId: orderDetails.yutong_quotations.customer_category_id || undefined,
-        });
-
-        if (newCustomerId) {
-          await supabase
-            .from('yutong_orders')
-            .update({ finance_customer_id: newCustomerId })
-            .eq('id', invoice.order_id);
-            
-          orderDetails.finance_customer_id = newCustomerId;
-          console.log('[Yutong] Resolved and linked finance customer:', newCustomerId);
-        }
-      }
+      const approvalCategory = invoiceData.invoice_category || invoice.invoice_category || 'direct_invoice';
       
-      if (settings && orderDetails?.finance_customer_id) {
-        const customerName = orderDetails?.yutong_quotations?.customer_name || 'Unknown';
-        const orderNo = orderDetails?.order_no;
-        const invoiceAmount = invoice.invoice_amount;
-        const totalPaid = orderDetails?.total_paid || 0;
+      if (approvalCategory === 'proforma_invoice') {
+        console.log('[Yutong] Proforma invoice approved — skipping AR/JE creation (Proforma is not a real sale).');
+      } else {
+        const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
 
-        // Check if AR Invoice already exists
-        let arInvoiceId = orderDetails?.ar_invoice_id;
-        
-        const isTax = invoiceData.invoice_category === 'tax_invoice' || 
-                      invoiceData.is_tax_invoice || 
-                      (invoiceData.tax_rate && invoiceData.tax_rate > 0) || 
-                      (invoiceData.vat_amount && invoiceData.vat_amount > 0);
-        const taxRateVal = invoiceData.tax_rate || 18;
-        const taxAmt = isTax ? (invoiceData.vat_amount || invoiceAmount - invoiceAmount / (1 + taxRateVal / 100)) : undefined;
-        
-        if (arInvoiceId) {
-          // Update existing draft AR invoice to approved status
-          await supabase
-            .from('ar_invoices')
-            .update({
-              status: totalPaid >= invoiceAmount ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid',
-              paid_amount: totalPaid,
-              balance: invoiceAmount - totalPaid,
-              tax_amount: taxAmt || null,
-              subtotal: taxAmt ? invoiceAmount - taxAmt : null,
-            })
-            .eq('id', arInvoiceId);
-          console.log('[Yutong] Updated existing AR Invoice to approved status');
-        } else if (settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
-          // Create AR Invoice if none exists
-          const arResult = await createVehicleARInvoice({
+        // Ensure finance_customer_id exists before proceeding
+        if (settings && !orderDetails?.finance_customer_id && orderDetails?.yutong_quotations?.customer_name) {
+          console.log('[Yutong] Resolving finance customer prior to GL posting...');
+          const { createVehicleCustomer } = await import('@/hooks/useVehicleSalesFinance');
+          const newCustomerId = await createVehicleCustomer({
             module: 'yutong',
-            orderId: invoice.order_id,
-            orderNo,
-            customerId: orderDetails.finance_customer_id,
-            totalAmount: invoiceAmount,
-            advanceAmount: totalPaid,
             companyId: NCG_HOLDING_ID,
-            settings,
-            customerCategoryId: (orderDetails as any)?.customer_category_id 
-              || orderDetails?.yutong_quotations?.customer_category_id,
-            invoiceNo: invoice.invoice_no,
-            taxAmount: taxAmt,
+            customerName: orderDetails.yutong_quotations.customer_name,
+            customerPhone: orderDetails.yutong_quotations.customer_phone || undefined,
+            customerEmail: orderDetails.yutong_quotations.customer_email || undefined,
+            customerCategoryId: orderDetails.yutong_quotations.customer_category_id || undefined,
           });
 
-          if (arResult) {
-            arInvoiceId = arResult.invoiceId;
-            await updateOrderFinanceLinks({
+          if (newCustomerId) {
+            await supabase
+              .from('yutong_orders')
+              .update({ finance_customer_id: newCustomerId })
+              .eq('id', invoice.order_id);
+              
+            orderDetails.finance_customer_id = newCustomerId;
+            console.log('[Yutong] Resolved and linked finance customer:', newCustomerId);
+          }
+        }
+        
+        if (settings && orderDetails?.finance_customer_id) {
+          const customerName = orderDetails?.yutong_quotations?.customer_name || 'Unknown';
+          const orderNo = orderDetails?.order_no;
+          const invoiceAmount = invoice.invoice_amount;
+          const totalPaid = orderDetails?.total_paid || 0;
+
+          // Check if AR Invoice already exists (duplicate prevention)
+          let arInvoiceId = orderDetails?.ar_invoice_id;
+          
+          // Both Customer Invoice and Tax Invoice are real sales — both get VAT split JE
+          const isTax = invoiceData.invoice_category === 'tax_invoice' || 
+                        invoiceData.invoice_category === 'direct_invoice' ||
+                        invoiceData.is_tax_invoice || 
+                        (invoiceData.tax_rate && invoiceData.tax_rate > 0) || 
+                        (invoiceData.vat_amount && invoiceData.vat_amount > 0);
+          const taxRateVal = invoiceData.tax_rate || 18;
+          const taxAmt = isTax ? (invoiceData.vat_amount || invoiceAmount - invoiceAmount / (1 + taxRateVal / 100)) : undefined;
+          
+          if (arInvoiceId) {
+            // Update existing draft AR invoice to approved status
+            await supabase
+              .from('ar_invoices')
+              .update({
+                status: totalPaid >= invoiceAmount ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid',
+                paid_amount: totalPaid,
+                balance: invoiceAmount - totalPaid,
+                tax_amount: taxAmt || null,
+                subtotal: taxAmt ? invoiceAmount - taxAmt : null,
+              })
+              .eq('id', arInvoiceId);
+            console.log('[Yutong] Updated existing AR Invoice to approved status');
+          } else if (settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
+            // Create AR Invoice if none exists (one per order only)
+            const arResult = await createVehicleARInvoice({
               module: 'yutong',
               orderId: invoice.order_id,
-              arInvoiceId: arResult.invoiceId,
+              orderNo,
+              customerId: orderDetails.finance_customer_id,
+              totalAmount: invoiceAmount,
+              advanceAmount: totalPaid,
+              companyId: NCG_HOLDING_ID,
+              settings,
+              customerCategoryId: (orderDetails as any)?.customer_category_id 
+                || orderDetails?.yutong_quotations?.customer_category_id,
+              invoiceNo: invoice.invoice_no,
+              taxAmount: taxAmt,
             });
-            toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
-          }
-        }
 
-        // Post Revenue Recognition GL (with VAT split for tax invoices)
-        // GUARD: Skip if AR invoice already has GL posted at creation time
-        let skipRevenueGL = false;
-        if (arInvoiceId) {
-          const { data: arCheck } = await (supabase as any)
-            .from('ar_invoices')
-            .select('journal_entry_id')
-            .eq('id', arInvoiceId)
-            .single();
-          if (arCheck?.journal_entry_id) {
-            console.log('[Yutong] AR Invoice already has GL posted (journal_entry_id exists), skipping revenue GL on approval.');
-            skipRevenueGL = true;
-          }
-        }
-
-        if (!skipRevenueGL && settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
-          const revenueGLResult = await postVehicleInvoiceToGL({
-            module: 'yutong',
-            orderNo,
-            customerName,
-            customerId: orderDetails.finance_customer_id,
-            invoiceAmount,
-            settings,
-            effectiveCompanyId: NCG_HOLDING_ID,
-            isTaxInvoice: isTax,
-            taxRate: taxRateVal,
-            invoiceNo: invoice.invoice_no,
-          });
-
-          if (revenueGLResult) {
-            console.log(`[Yutong] Revenue GL posted: ${revenueGLResult.entryNumber}`);
+            if (arResult) {
+              arInvoiceId = arResult.invoiceId;
+              await updateOrderFinanceLinks({
+                module: 'yutong',
+                orderId: invoice.order_id,
+                arInvoiceId: arResult.invoiceId,
+              });
+              toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
+            }
           }
 
-          // Apply advances against receivable
-          if (totalPaid > 0 && settings.customer_advance_account_id) {
-            const advanceResult = await applyAdvanceToReceivable({
+          // Post Revenue Recognition GL (with VAT split for tax invoices)
+          // GUARD: Skip if AR invoice already has GL posted at creation time
+          let skipRevenueGL = false;
+          if (arInvoiceId) {
+            const { data: arCheck } = await (supabase as any)
+              .from('ar_invoices')
+              .select('journal_entry_id')
+              .eq('id', arInvoiceId)
+              .single();
+            if (arCheck?.journal_entry_id) {
+              console.log('[Yutong] AR Invoice already has GL posted (journal_entry_id exists), skipping revenue GL on approval.');
+              skipRevenueGL = true;
+            }
+          }
+
+          if (!skipRevenueGL && settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
+            const revenueGLResult = await postVehicleInvoiceToGL({
               module: 'yutong',
               orderNo,
               customerName,
-              advanceAmount: totalPaid,
+              customerId: orderDetails.finance_customer_id,
+              invoiceAmount,
               settings,
               effectiveCompanyId: NCG_HOLDING_ID,
+              isTaxInvoice: isTax,
+              taxRate: taxRateVal,
+              invoiceNo: invoice.invoice_no,
             });
 
-            if (advanceResult) {
-              console.log(`[Yutong] Advance applied GL: ${advanceResult.entryNumber}`);
+            if (revenueGLResult) {
+              console.log(`[Yutong] Revenue GL posted: ${revenueGLResult.entryNumber}`);
+            }
+
+            // Apply advances against receivable
+            if (totalPaid > 0 && settings.customer_advance_account_id) {
+              const advanceResult = await applyAdvanceToReceivable({
+                module: 'yutong',
+                orderNo,
+                customerName,
+                advanceAmount: totalPaid,
+                settings,
+                effectiveCompanyId: NCG_HOLDING_ID,
+              });
+
+              if (advanceResult) {
+                console.log(`[Yutong] Advance applied GL: ${advanceResult.entryNumber}`);
+              }
             }
           }
+        } else if (!settings) {
+          console.warn('[Yutong] Finance settings not configured - skipping AR/GL integration');
+        } else if (!orderDetails?.finance_customer_id) {
+          console.warn('[Yutong] No finance customer linked - skipping AR/GL integration');
         }
-      } else if (!settings) {
-        console.warn('[Yutong] Finance settings not configured - skipping AR/GL integration');
-      } else if (!orderDetails?.finance_customer_id) {
-        console.warn('[Yutong] No finance customer linked - skipping AR/GL integration');
       }
       
       toast.success('Invoice approved successfully');

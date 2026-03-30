@@ -125,7 +125,8 @@ const deriveLevelFields = (
 };
 
 export const AccountForm = ({ onSuccess }: AccountFormProps) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
   const createAccount = useCompanyCreateAccount();
 
   const form = useForm<AccountFormData>({
@@ -140,21 +141,21 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
     },
   });
 
-  // Fetch ALL accounts for parent selection (with level info)
+  // Fetch ALL accounts for parent selection (with level info) — use effective (parent) company
   const { data: parentAccounts } = useQuery({
-    queryKey: ["chart-of-accounts-all", selectedCompanyId],
+    queryKey: ["chart-of-accounts-all", effectiveCompanyId],
     queryFn: async () => {
-      if (!selectedCompanyId) return [];
+      if (!effectiveCompanyId) return [];
       const { data, error } = await supabase
         .from("chart_of_accounts")
         .select("id, account_code, account_name, level1, level2, level3, level4, level5, account_level")
-        .eq("company_id", selectedCompanyId)
+        .eq("company_id", effectiveCompanyId)
         .order("account_code");
       
       if (error) throw error;
       return data as ParentAccount[];
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 
   const onSubmit = (data: AccountFormData) => {
