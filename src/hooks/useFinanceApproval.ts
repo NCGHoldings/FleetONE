@@ -338,13 +338,73 @@ export const useFinanceApproval = () => {
 
     await Promise.allSettled(parallelOperations);
 
-    // STEP 4: Document regeneration (fire-and-forget within background)
+    // STEP 4: Document regeneration — create if missing, then upgrade to approved
     try {
-      const { data: draftDocuments } = await supabase
+      let { data: draftDocuments } = await supabase
         .from('document_storage')
         .select('*')
         .eq('payment_id', paymentId)
         .eq('document_status', 'draft');
+
+      // If no draft document exists (Issue 3 fix), create one now
+      if (!draftDocuments || draftDocuments.length === 0) {
+        console.log('[SPH Finance] ⚠️ No draft document found — creating one before approval...');
+        const { uploadPdfToStorage: uploadPdf } = await import('@/lib/document-storage-helpers');
+        const { generateInvoicePDF: genPdf } = await import('@/lib/invoice-generator');
+
+        const calcTotal = (q: any) => (q.gross_revenue || 0) + (q.fuel_cost_fuel_only || 0) + (q.commission_pass_through_amount || 0) + (q.total_additional_charges || 0) - (q.discount_amount_lkr || 0);
+
+        const fallbackData: InvoiceData = {
+          invoiceNo: `DRAFT-${paymentId}`,
+          invoiceType: paymentData.payment_type as 'advance' | 'balance',
+          quotationNo: paymentData.quotation.quotation_no,
+          customerName: paymentData.quotation.customer_name,
+          customerPhone: paymentData.quotation.customer_phone || '',
+          customerEmail: paymentData.quotation.customer_email,
+          companyName: paymentData.quotation.company_name,
+          pickupLocation: paymentData.quotation.pickup_location,
+          dropLocation: paymentData.quotation.drop_location,
+          pickupDate: new Date(paymentData.quotation.pickup_datetime),
+          dropDate: new Date(paymentData.quotation.drop_datetime || paymentData.quotation.pickup_datetime),
+          busType: 'Standard Bus',
+          numberOfBuses: paymentData.quotation.number_of_buses,
+          numberOfPassengers: paymentData.quotation.number_of_passengers,
+          totalAmount: calcTotal(paymentData.quotation),
+          advanceAmount: paymentData.quotation.advance_paid || 0,
+          paidAmount: paymentData.amount,
+          vehicleNo: paymentData.quotation.assigned_bus_no,
+          driverName: paymentData.quotation.assigned_driver_name,
+          conductorName: paymentData.quotation.assigned_conductor_name,
+          invoice_status: 'draft',
+          document_type: paymentData.payment_type === 'advance' ? 'sales_receipt' : 'invoice',
+        };
+
+        const pdfBlob = await genPdf(fallbackData);
+        const fileName = `DRAFT-${fallbackData.document_type}-${paymentData.quotation.quotation_no}-${Date.now()}.pdf`;
+        const { storagePath, fileSize } = await uploadPdf(pdfBlob, fileName);
+
+        const { data: newDoc } = await supabase
+          .from('document_storage')
+          .insert({
+            quotation_id: paymentData.quotation.id,
+            payment_id: paymentId,
+            document_type: fallbackData.document_type as 'sales_receipt' | 'invoice',
+            payment_type: paymentData.payment_type as 'advance' | 'balance' | 'full',
+            document_status: 'draft',
+            document_data: '',
+            file_name: fileName,
+            file_size: fileSize,
+            generated_by: user?.id,
+            storage_path: storagePath,
+          })
+          .select()
+          .single();
+
+        if (newDoc) {
+          draftDocuments = [newDoc];
+          console.log('[SPH Finance] ✅ Fallback draft document created');
+        }
+      }
 
       const { data: approvedPaymentsList } = await supabase
         .from('special_hire_payments')
@@ -533,6 +593,37 @@ export const useFinanceApproval = () => {
       };
 
       const pdfBlob = await generateInvoicePDF(invoiceData);
+
+      // Store in document_storage if not already there (Issue 5 fix)
+      const { data: existingDoc } = await supabase
+        .from('document_storage')
+        .select('id')
+        .eq('payment_id', paymentId)
+        .maybeSingle();
+
+      if (!existingDoc) {
+        const { uploadPdfToStorage } = await import('@/lib/document-storage-helpers');
+        const fileName = `APPROVED-${paymentData.quotation.quotation_no}-${paymentData.payment_type}-${Date.now()}.pdf`;
+        const { storagePath, fileSize } = await uploadPdfToStorage(pdfBlob, fileName);
+
+        await supabase
+          .from('document_storage')
+          .insert({
+            quotation_id: paymentData.quotation.id,
+            payment_id: paymentId,
+            document_type: invoiceData.document_type as 'sales_receipt' | 'invoice',
+            payment_type: paymentData.payment_type as 'advance' | 'balance' | 'full',
+            document_status: 'approved',
+            document_data: '',
+            file_name: fileName,
+            file_size: fileSize,
+            generated_by: user?.id,
+            storage_path: storagePath,
+          });
+        console.log('[SPH Finance] ✅ Approved document stored in document_storage');
+      }
+
+      // Also download for user
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
@@ -542,7 +633,7 @@ export const useFinanceApproval = () => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success('Invoice downloaded successfully!');
+      toast.success('Invoice generated and stored successfully!');
       return { success: true };
     } catch (error) {
       console.error('Error generating invoice:', error);

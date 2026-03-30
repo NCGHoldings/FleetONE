@@ -135,15 +135,28 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
     }
   };
 
+  // Compute the real total from line items (not stale original_quotation_amount)
+  const computedTotalAmount = () => {
+    return (quotationData.gross_revenue || 0) +
+      (quotationData.fuel_cost_fuel_only || 0) +
+      (quotationData.commission_pass_through_amount || 0) -
+      (quotationData.discount_amount_lkr || 0);
+  };
+
   const calculateFinalBalance = () => {
-    const baseBalance = quotationData.balance_due;
+    const totalAmount = computedTotalAmount();
     const adjustmentTotal = (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0);
-    return baseBalance + adjustmentTotal;
+    // Use actual total_paid from quotation (sum of all approved payments) not just advance_paid
+    const actualTotalPaid = (quotationData as any).total_paid ?? quotationData.advance_paid ?? 0;
+    const balance = (totalAmount + adjustmentTotal) - actualTotalPaid;
+    return balance <= 0 ? 0 : balance;
   };
 
   const generateInvoiceData = (options?: { forCustomer?: boolean }): InvoiceData => {
     const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
     const finalBalance = calculateFinalBalance();
+    const totalAmount = computedTotalAmount();
+    const actualTotalPaid = (quotationData as any).total_paid ?? quotationData.advance_paid ?? 0;
 
     return {
       invoiceNo,
@@ -160,10 +173,10 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       busType: quotationData.bus_type,
       numberOfBuses: quotationData.number_of_buses,
       numberOfPassengers: quotationData.number_of_passengers,
-      totalAmount: quotationData.original_quotation_amount,
+      totalAmount: totalAmount,
       advanceAmount: quotationData.advance_paid,
       balanceAmount: finalBalance,
-      paidAmount: quotationData.advance_paid,
+      paidAmount: actualTotalPaid,
       companyLogo,
       vehicleNo: quotationData.bus_no,
       driverName: quotationData.driver_name,
