@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { sanitizeHTML } from '@/lib/sanitize';
+import { PaymentTimelineFresh } from './PaymentTimelineFresh';
 import { 
   fetchSpecialHireFinanceSettings,
   postInvoiceToGLStandalone,
@@ -81,6 +82,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [invoiceStatus, setInvoiceStatus] = useState<'draft' | 'sent_to_customer' | 'payment_pending' | 'paid'>('draft');
   const [companyLogo, setCompanyLogo] = useState<string>('');
+  const [freshTotalPaid, setFreshTotalPaid] = useState<number | null>(null);
   
   // This modal is specifically for customer-facing balance invoices
   const isCustomerInvoice = true;
@@ -153,10 +155,12 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
     return Math.round(base + base * (adjPct / 100));
   };
 
+  const getActualTotalPaid = () => freshTotalPaid ?? quotationData.total_paid ?? quotationData.advance_paid ?? 0;
+
   const calculateFinalBalance = () => {
     const totalAmount = computedTotalAmount();
     const adjustmentTotal = (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0);
-    const actualTotalPaid = quotationData.total_paid ?? quotationData.advance_paid ?? 0;
+    const actualTotalPaid = getActualTotalPaid();
     const balance = (totalAmount + adjustmentTotal) - actualTotalPaid;
     return balance <= 0 ? 0 : balance;
   };
@@ -164,7 +168,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const calculateOverpaidCredit = () => {
     const totalAmount = computedTotalAmount();
     const adjustmentTotal = (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0);
-    const actualTotalPaid = quotationData.total_paid ?? quotationData.advance_paid ?? 0;
+    const actualTotalPaid = getActualTotalPaid();
     const balance = (totalAmount + adjustmentTotal) - actualTotalPaid;
     return balance < 0 ? Math.abs(balance) : 0;
   };
@@ -618,6 +622,13 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             </AlertDescription>
           </Alert>
 
+          {/* Payment Timeline - fresh from DB */}
+          <PaymentTimelineFresh
+            quotationId={quotationData.id}
+            totalPayable={computedTotalAmount() + (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0)}
+            onTotalPaidFetched={(total) => setFreshTotalPaid(total)}
+          />
+
           {/* Financial Summary */}
           <Card>
             <CardHeader>
@@ -631,7 +642,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
                 </div>
                 <div>
                   <div className="text-muted-foreground">Total Paid (All Payments)</div>
-                  <div className="font-semibold text-green-600">LKR {(quotationData.total_paid ?? quotationData.advance_paid ?? 0).toLocaleString()}</div>
+                  <div className="font-semibold text-green-600">LKR {getActualTotalPaid().toLocaleString()}</div>
                 </div>
                 {adjustmentData.extra_km_total_charge && adjustmentData.extra_km_total_charge > 0 && (
                   <div>

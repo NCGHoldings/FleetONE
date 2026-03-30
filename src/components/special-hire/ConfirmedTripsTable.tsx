@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +29,7 @@ import { GenerateBalanceInvoiceModal } from './GenerateBalanceInvoiceModal';
 import { VehicleAssignmentModal } from './VehicleAssignmentModal';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { resolveBusType, calculateTotalKm, getTripDistance } from '@/lib/special-hire-invoice-helpers';
+import { PaymentTimelineFresh } from './PaymentTimelineFresh';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SignatureWorkflowIndicator } from './SignatureWorkflowIndicator';
@@ -64,6 +66,7 @@ export function ConfirmedTripsTable() {
   const [adjustmentsData, setAdjustmentsData] = useState<Record<string, any>>({});
   const [balanceInvoiceModalOpen, setBalanceInvoiceModalOpen] = useState(false);
   const [selectedAdjustment, setSelectedAdjustment] = useState<any | null>(null);
+  const [paymentHistoryModalOpen, setPaymentHistoryModalOpen] = useState(false);
   const [vehicleAssignmentModalOpen, setVehicleAssignmentModalOpen] = useState(false);
   
   const [loading, setLoading] = useState(false);
@@ -1281,6 +1284,18 @@ export function ConfirmedTripsTable() {
                                     ))}
                                   </>
                                 )}
+                                {/* Payment History */}
+                                {approvedPayments.length > 0 && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedTrip(trip);
+                                      setPaymentHistoryModalOpen(true);
+                                    }}
+                                  >
+                                    <DollarSign className="w-4 h-4 mr-2" />
+                                    Payment History
+                                  </DropdownMenuItem>
+                                )}
 
                                 <DropdownMenuSeparator />
 
@@ -1945,6 +1960,24 @@ export function ConfirmedTripsTable() {
             refetch();
           }}
         />
+      )}
+
+      {/* Payment History Dialog */}
+      {paymentHistoryModalOpen && selectedTrip && (
+        <Dialog open={paymentHistoryModalOpen} onOpenChange={setPaymentHistoryModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Payment History - {selectedTrip.quotation_no}
+              </DialogTitle>
+            </DialogHeader>
+            <PaymentTimelineFresh
+              quotationId={selectedTrip.id}
+              totalPayable={calculateTotalAmount(selectedTrip)}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
