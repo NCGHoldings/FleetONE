@@ -1,119 +1,57 @@
 
 
-# Fix Special Hire GL Posting: Wrong Revenue Account, Settings Display, JE Flow
+# Fix Invoice: Bus Type, Mileage from Quotation + Page 2 Signature Layout
 
-## Root Cause Analysis
+## Problems Found
 
-### Issue 1: Wrong Revenue Account on JE (RENTAL INCOME - LIGHT VEHICLES instead of TRANSPORT INCOME - SPECIAL HIRES)
-**Root cause confirmed via DB**: `createSPHARInvoice` (line 1578) calls `resolveCustomerARAccounts()` which resolves revenue via:
-1. Customer category → `revenue_account_id: NULL` (External Customer category has no revenue mapping)
-2. Global `gl_settings.sales_revenue_account_id` → `RENTAL INCOME - LIGHT VEHICLES` (41102001)
+1. **Bus Type hardcoded as "Standard Bus"** -- All 8 places that build `InvoiceData` use `busType: 'Standard Bus'` instead of fetching from the `bus_types` table via `bus_type_id`
+2. **Mileage showing wrong value (100)** -- The mileage calculation `data.actualKmTraveled || data.tripDistance || data.totalKm || (numberOfBuses * 100)` falls through to the fallback because `tripDistance` and `totalKm` are computed using wrong column names (`km_parking` / `km_return` which don't exist -- actual columns are `km_parking_to_pickup` / `km_drop_to_parking`)
+3. **Signature section splits across pages** -- The CSS `page-break-before: always` on `.page-break` div doesn't work in html2canvas (it renders everything as one continuous image). The signature block bleeds between pages instead of cleanly starting on page 2
 
-The SPH finance settings correctly maps `revenue_external_account_id` → `TRANSPORT INCOME - SPECIAL HIRES EXTERNAL` (41103003), but `createSPHARInvoice` never reads it — it uses the generic category resolver instead.
-
-**Fix**: Change `createSPHARInvoice` to use SPH finance settings for revenue/receivable accounts instead of `resolveCustomerARAccounts`.
-
-### Issue 2: Settings Dropdowns Show Empty Despite DB Having Values
-The settings ARE saved in the DB correctly. The `SearchableFinanceAccountSelector` receives account lists filtered by type (e.g., only accounts with "receivable" in the name). If the saved account doesn't match the filter criteria, the selector shows placeholder even though the value is set internally.
-
-Additionally, the `useSpecialHireFinanceSettings` hook fetches with JOINs to `chart_of_accounts`, and the loaded values include the account details. But the component doesn't use these joined account details for display — it relies on the separate `useChartOfAccounts` call and matching by ID within the filtered subset.
-
-**Fix**: Pass ALL accounts of the correct type (not pre-filtered subsets) to the selectors, and ensure the currently-selected account is always included in the list even if it doesn't match the name filter.
-
-### Issue 3: Full Payment Should Follow AR Flow (per user choice)
-Currently `postFullPaymentToGLStandalone` posts `DR Bank / CR Revenue` directly. User confirmed it should follow the AR flow: `DR Bank / CR Customer Advance`, then create AR Invoice with proper revenue recognition.
-
-**Fix**: Route full payments through the same advance flow: `DR Bank / CR Customer Advance`.
-
-### Issue 4: Double/Conflicting JE on Balance Payment
-When balance payment is approved:
-1. `createSPHARInvoice` auto-posts GL (DR Receivable / CR Revenue) — JE #1
-2. `postBalancePaymentToGLStandalone` posts GL (DR Bank / CR Receivable) — JE #2
-3. `updateSPHARInvoiceOnPayment` overwrites AR invoice's `journal_entry_id` with JE #2
-
-This means JE #1 (revenue recognition) becomes orphaned. The AR invoice should keep its own JE, and the payment JE should be separate.
-
-**Fix**: Don't overwrite AR invoice's journal_entry_id when updating on payment. Link payment JE to the payment record only.
+## DB Reality
+- Quotation QUO-2026-1724 has: `bus_type_name = 'Super Luxury - A/C (49 Seats)'`, `km_trip = 529.3`, `km_parking_to_pickup = 131.4`, `km_drop_to_parking = 407.2`
+- But invoice shows: `Bus Type = Standard Bus`, `Mileage = 100`
 
 ## Changes
 
-### File 1: `src/hooks/useSpecialHireFinance.ts` — createSPHARInvoice (lines 1575-1609)
+### File 1: `src/lib/invoice-generator.ts`
 
-Replace `resolveCustomerARAccounts` with SPH finance settings lookup:
-```
-// Instead of:
-const { resolveCustomerARAccounts } = await import(...)
-const resolved = await resolveCustomerARAccounts(customerId, companyId)
+**Mileage calculation (line 223)**: Priority should be:
+1. `actualKmTraveled` (post-trip adjustment)
+2. `tripDistance` (quotation km_trip)
+3. `totalKm` (sum of all legs)
+4. Remove the `numberOfBuses * 100` fallback -- show 0 if nothing available
 
-// Use:
-const sphSettings = await fetchSpecialHireFinanceSettings(companyId)
-const tradeReceivableId = sphSettings?.trade_receivable_account_id
-const revenueAccountId = sphSettings?.revenue_external_account_id // or internal based on customer type
-```
+**Page layout (lines 225-473)**: Split into two explicit `[data-pdf-page]` containers instead of relying on CSS page-break:
+- Page 1: Header + invoice details + item table + summary + payment info + T&C + "Page 1 of 2" footer
+- Page 2: Company mini-header + signature table + note + "Page 2 of 2" footer
 
-This ensures SPH invoices always use SPH-mapped accounts (TRANSPORT INCOME - SPECIAL HIRES), not global gl_settings.
+**PDF generation (lines 500-590)**: Update to render each `[data-pdf-page]` as a separate canvas/page (same pattern used in quotation PDF generation), instead of one big image split by height.
 
-### File 2: `src/hooks/useSpecialHireFinance.ts` — postFullPaymentToGLStandalone (lines 151-225)
+### File 2: `src/components/special-hire/ConfirmedTripsTable.tsx`
 
-Change from `DR Bank / CR Revenue` to `DR Bank / CR Customer Advance` (same as advance flow). This follows the AR flow the user approved.
+**Line 849**: Replace `busType: 'Standard Bus'` with actual bus type name from quotation. Need to join `bus_types` table in the query or pass `bus_type_name` through.
 
-### File 3: `src/hooks/useSpecialHireFinance.ts` — updateSPHARInvoiceOnPayment (lines 1663-1673)
+**Line 860-861**: Fix column names -- use `km_parking_to_pickup` and `km_drop_to_parking` instead of non-existent `km_parking` and `km_return`.
 
-Stop overwriting `journal_entry_id` on the AR invoice when processing payment. The AR invoice should retain its original revenue-recognition JE. Payment JE links to the payment record only.
+### Files 3-6: All other places with hardcoded `busType: 'Standard Bus'`
 
-### File 4: `src/hooks/useFinanceApproval.ts` — performBackgroundIntegration (lines 155-189)
+Update these files to resolve bus type from quotation's `bus_type_id`:
+- `src/hooks/useDocumentRegeneration.ts` (line 144)
+- `src/hooks/useDocumentManagement.ts` (lines 244, 387)
+- `src/hooks/useFinanceApproval.ts` (lines 369, 443, 582)
+- `src/components/special-hire/DocumentViewer.tsx` (line 399)
+- `src/components/special-hire/EnhancedDocumentViewer.tsx` (line 257)
 
-For full payments, also create AR Invoice (same as balance flow). Currently full payments skip AR Invoice creation at line 155.
+Each of these already queries quotation data -- add a join to `bus_types` to get the name, or add `bus_type_id` and resolve separately.
 
-### File 5: `src/components/special-hire/SpecialHireFinanceSettings.tsx` — Account selectors (lines 109-126)
+### Mileage Logic (all files)
 
-Change the selector account lists to include ALL accounts of the correct type, not pre-filtered subsets. Ensure the currently selected account is always visible:
-- Revenue selectors: pass `revenueAccounts` (all revenue type) ✅ already correct
-- Receivable: pass `assetAccounts` directly (not filtered by name containing "receivable")
-- Bank/Cash: pass `assetAccounts` directly
-- Advance: pass `liabilityAccounts` directly
-
-### File 6: Fix build errors
-
-Add `// @ts-nocheck` to:
-- `src/hooks/useLightVehicleAfterSalesManagement.ts`
-- `src/hooks/useLightVehicleDeliveryManagement.ts`
-- `src/hooks/useBankDeposits.ts`
-- `src/hooks/useFleetMasterSpreadsheet.ts`
-- `src/components/yutong/YutongOrderInvoiceGenerator.tsx`
-
-## Accounting Flow Diagram (Corrected)
-
-```text
-SPECIAL HIRE PAYMENT FLOWS (After Fix)
-
-1. ADVANCE PAYMENT (approved):
-   JE: DR Bank/Cash          | CR Customer Advance (Liability)
-   → Creates Finance Customer
-   → NO AR Invoice yet
-
-2. FULL PAYMENT (approved) — NOW FOLLOWS AR FLOW:
-   JE: DR Bank/Cash          | CR Customer Advance (Liability)
-   → Creates Finance Customer
-   → Creates AR Invoice (total amount)
-     AR Invoice auto-GL: DR Trade Receivable | CR SPH Revenue
-   → Apply advance: DR Customer Advance | CR Trade Receivable
-
-3. BALANCE PAYMENT (approved):
-   JE: DR Bank/Cash          | CR Trade Receivable
-   → Creates AR Invoice if missing (total amount)
-     AR Invoice auto-GL: DR Trade Receivable | CR SPH Revenue  
-   → Apply advance: DR Customer Advance | CR Trade Receivable
-
-KEY FIX: SPH Revenue Account Resolution
-  BEFORE: resolveCustomerARAccounts → customer category → gl_settings → RENTAL INCOME LIGHT VEHICLES ❌
-  AFTER:  fetchSpecialHireFinanceSettings → revenue_external_account_id → TRANSPORT INCOME SPECIAL HIRES ✅
-```
+Replace all instances of `totalKm: (quotation as any).km_parking + (quotation as any).km_trip + (quotation as any).km_return` with the correct column names: `km_parking_to_pickup + km_trip + km_drop_to_parking`.
 
 ## Summary
-- Fix revenue account: SPH invoices use SPH settings, not global gl_settings
-- Fix settings display: Remove aggressive name filtering on account selectors
-- Fix full payment: Follow AR flow (DR Bank / CR Advance) instead of direct revenue
-- Fix JE linking: Don't overwrite AR invoice JE with payment JE
-- Fix build errors: Add ts-nocheck to 5 hook/component files
+
+- Bus type: resolve from `bus_types.name` via `bus_type_id` join instead of hardcoding "Standard Bus"
+- Mileage: fix column names (`km_parking_to_pickup`, `km_drop_to_parking`) and remove bad fallback
+- Signature page: use `[data-pdf-page]` multi-page rendering so signatures appear cleanly on page 2
 
