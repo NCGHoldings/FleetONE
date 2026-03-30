@@ -1,114 +1,52 @@
 
 
-# Fix Missing "Apply Advance" Journal Entry in Special Hire GL Flow
+# Fix: Final Invoice Not Including Post-Trip Adjustment Data
 
-## Problem
+## Root Cause
 
-When a Special Hire trip has advance + balance payments, the system creates 3 JEs but is **missing the 4th critical entry** that clears the Customer Advance liability against Trade Receivable.
-
-**Current (broken) for QUO-0693 (41,923 total):**
-
-```text
-JE #1 (Advance):     DR Bank 20,961.50        / CR Customer Advance 20,961.50  ✅
-JE #2 (AR Invoice):  DR Trade Receivable 41,923 / CR Revenue 41,923             ✅
-JE #3 (Balance):     DR Bank 20,961.50        / CR Trade Receivable 20,961.50   ✅
-JE #4 (Apply Adv):   DR Customer Advance 20,961.50 / CR Trade Receivable 20,961.50  ❌ MISSING
-
-Result: Customer Advances stuck at 20,961.50 CR (should be 0)
-        Trade Receivable stuck at 20,961.50 DR (should be 0)
+When the user clicks "Generate Final Invoice", the code does:
+```
+const adj = adjustmentsData[trip.id];
+setSelectedAdjustment(adj || null);
 ```
 
-**Root cause:** The advance application code exists in `GenerateBalanceInvoiceModal.tsx` line 499-517 but only runs inside `handleEmailToCustomer`. Meanwhile, the balance payment GL posting happens in `useFinanceApproval.ts` line 216-228 during payment approval -- which never triggers advance application.
+But `adjustmentsData` is **only populated after specific user actions** (saving a post-trip adjustment, generating an invoice). It is **never loaded on initial page load**. So when a user navigates to the page and directly clicks "Generate Final Invoice", `adjustmentsData[trip.id]` is `undefined`, `selectedAdjustment` becomes `null`, and the invoice renders with zero adjustments -- making the 6,900 payment appear as "Overpaid Credit" instead of a legitimate post-trip charge.
 
-The advance application must fire when the **AR Invoice is created** (at balance payment approval time), not when the email is sent.
+## Fix
 
-## Correct Full Accounting Sequence
+### 1. Fetch adjustment data fresh inside the modal (not rely on parent props)
 
-```text
-1. Advance Payment Approved:
-   DR Bank           / CR Customer Advance     (cash received, liability created)
+**File: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`**
 
-2. Balance Payment Approved → AR Invoice Created:
-   DR Trade Receivable / CR Revenue             (revenue recognized)
-   DR Customer Advance / CR Trade Receivable    (apply advance against invoice)  ← ADD THIS
-   DR Bank            / CR Trade Receivable     (balance payment clears remaining)
+Add a `useEffect` that runs when `open` becomes true:
+- Query `special_hire_trip_adjustments` WHERE `quotation_id = quotationData.id` ORDER BY `created_at` DESC LIMIT 1
+- Store result in local `freshAdjustmentData` state
+- Use `freshAdjustmentData` merged with `adjustmentData` props (fresh data takes priority) for all calculations
 
-Final balances: Bank +41,923 | Revenue -41,923 | Advance 0 | Receivable 0  ✅
+This mirrors the same pattern already used for `freshTotalPaid` via `PaymentTimelineFresh`.
+
+### 2. Also load adjustments on initial table render
+
+**File: `src/components/special-hire/ConfirmedTripsTable.tsx`**
+
+Add a `useEffect` that calls `loadAdjustmentData()` for each confirmed trip when quotations load. This ensures `adjustmentsData` is populated even before the user interacts with any modal.
+
+### 3. Fix Financial Summary display
+
+**File: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`**
+
+Line 656 shows "Total Payable" as `computedTotalAmount()` without adjustments. Change to include adjustments:
+```
+LKR {(computedTotalAmount() + adjustmentTotal).toLocaleString()}
 ```
 
-## Changes
+## Expected Result
 
-### File 1: `src/hooks/useFinanceApproval.ts`
-
-After the balance payment GL posting (line 228), add advance application logic:
-
-- Query `special_hire_payments` for this quotation's approved advance payments (where `payment_type = 'advance'` and `status = 'approved'`)
-- Sum their amounts to get `totalAdvancePaid`
-- If `totalAdvancePaid > 0`, call `applyAdvanceToInvoiceStandalone()` to create the missing JE:
-  - DR Customer Advance (Liability decreases)
-  - CR Trade Receivable (Asset decreases)
-- This ensures every balance payment approval that creates an AR Invoice also clears the advance
-
-### File 2: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
-
-- Add a double-posting guard for the advance application in `handleEmailToCustomer` (line 499-517)
-- Before calling `applyAdvanceToInvoiceStandalone()`, check if an `SPH-ADJ-APPLY` JE already exists for this quotation
-- If it exists (was already created during payment approval), skip to prevent duplicate entries
-- Also use `freshTotalPaid` (from PaymentTimeline) instead of stale `quotationData.advance_paid` to get accurate advance amount
-
-### File 3: `src/hooks/useSpecialHireFinance.ts`
-
-- Add a new standalone function `getApprovedAdvanceTotal()` that queries the DB for sum of all approved advance payments for a quotation
-- This ensures both `useFinanceApproval.ts` and `GenerateBalanceInvoiceModal.tsx` use the same source of truth for advance amounts
-
-## Technical Detail
-
-**New code in `useFinanceApproval.ts` after line 228:**
-```typescript
-// After balance GL posted, apply any advance payments against the AR Invoice
-if (isBalance) {
-  const { data: advancePayments } = await supabase
-    .from('special_hire_payments')
-    .select('amount')
-    .eq('quotation_id', paymentData.quotation.id)
-    .eq('payment_type', 'advance')
-    .eq('status', 'approved');
-  
-  const totalAdvance = (advancePayments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
-  
-  if (totalAdvance > 0) {
-    const applyResult = await applyAdvanceToInvoiceStandalone({
-      invoiceNo: arInvoiceNumber,
-      quotationNo: paymentData.quotation.quotation_no,
-      customerName: paymentData.quotation.customer_name,
-      advanceAmount: totalAdvance,
-      settings,
-      effectiveCompanyId: NCG_HOLDING_ID,
-    });
-    // Log and toast
-  }
-}
-```
-
-**Guard in `GenerateBalanceInvoiceModal.tsx` line 499:**
-```typescript
-// Check if advance was already applied (by useFinanceApproval)
-const { data: existingApplyJE } = await supabase
-  .from('journal_entries')
-  .select('id')
-  .ilike('entry_number', `SPH-ADJ-APPLY-${quotationData.quotation_no}%`)
-  .limit(1)
-  .maybeSingle();
-
-if (!existingApplyJE && quotationData.advance_paid > 0) {
-  // ... existing apply advance code
-}
-```
-
-## Summary
-
-- Add advance application JE (DR Customer Advance / CR Trade Receivable) when balance payment is approved
-- Add double-posting guard in email handler so advance isn't applied twice
-- Create helper to query actual advance total from DB
-- Result: all 4 required JEs fire correctly, Customer Advances and Trade Receivable both clear to zero
+For the trip with 148,571 quote + 6,900 post-trip adjustment:
+- Original Quote Amount: 148,571
+- Extra KM Charge: +6,900
+- Adjusted Sub-Total: 155,471
+- Total Paid: 155,471
+- Balance Due: 0
+- No "Overpaid Credit" line
 
