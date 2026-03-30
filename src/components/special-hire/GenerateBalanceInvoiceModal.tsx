@@ -82,12 +82,17 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   // This modal is specifically for customer-facing balance invoices
   const isCustomerInvoice = true;
 
+  const hasRealAdjustment = !!(adjustmentData.id && (
+    (adjustmentData.extra_km_total_charge || 0) > 0 || 
+    (adjustmentData.total_additional_expenses || 0) > 0
+  ));
+
   useEffect(() => {
     fetchCompanyLogo();
-    if (open && quotationData.id && adjustmentData.id) {
+    if (open && quotationData.id) {
       checkExistingInvoice();
     }
-  }, [open, quotationData.id, adjustmentData.id]);
+  }, [open, quotationData.id]);
 
   // Auto-save draft when modal opens (ensures document is always recorded)
   useEffect(() => {
@@ -99,12 +104,11 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       }
     };
     
-    // Small delay to ensure data is loaded
-    if (open && quotationData.id && adjustmentData.id) {
+    if (open && quotationData.id) {
       const timer = setTimeout(autoSaveDraft, 300);
       return () => clearTimeout(timer);
     }
-  }, [open, documentId, quotationData.id, adjustmentData.id]);
+  }, [open, documentId, quotationData.id]);
 
   const fetchCompanyLogo = async () => {
     try {
@@ -184,13 +188,13 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       invoice_status: invoiceStatus === 'draft' ? 'draft' : 'approved',
       document_type: 'invoice',
       forCustomer: options?.forCustomer ?? isCustomerInvoice,
-      hasAdjustments: true,
-      extraKm: adjustmentData.extra_km,
-      extraKmChargePerKm: adjustmentData.extra_km_rate,
-      extraKmTotalCharge: adjustmentData.extra_km_total_charge,
-      additionalExpenses: adjustmentData.additional_expenses,
-      totalAdditionalExpenses: adjustmentData.total_additional_expenses,
-      adjustmentNotes: adjustmentData.adjustment_notes,
+      hasAdjustments: hasRealAdjustment,
+      extraKm: hasRealAdjustment ? adjustmentData.extra_km : undefined,
+      extraKmChargePerKm: hasRealAdjustment ? adjustmentData.extra_km_rate : undefined,
+      extraKmTotalCharge: hasRealAdjustment ? adjustmentData.extra_km_total_charge : undefined,
+      additionalExpenses: hasRealAdjustment ? adjustmentData.additional_expenses : undefined,
+      totalAdditionalExpenses: hasRealAdjustment ? adjustmentData.total_additional_expenses : undefined,
+      adjustmentNotes: hasRealAdjustment ? adjustmentData.adjustment_notes : undefined,
     };
   };
 
@@ -243,11 +247,13 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
         if (error) throw error;
         setDocumentId(data.id);
 
-        // Link invoice to adjustment
-        await supabase
-          .from('special_hire_trip_adjustments')
-          .update({ balance_invoice_document_id: data.id })
-          .eq('id', adjustmentData.id);
+        if (adjustmentData.id) {
+          // Link invoice to adjustment if adjustment exists
+          await supabase
+            .from('special_hire_trip_adjustments')
+            .update({ balance_invoice_document_id: data.id })
+            .eq('id', adjustmentData.id);
+        }
       }
 
       setInvoiceStatus('draft');
@@ -546,10 +552,12 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             <div>
               <DialogTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5" />
-                Final Balance Invoice
+                Final Invoice - {quotationData.quotation_no}
               </DialogTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Customer-facing invoice showing final balance due (signatures not required)
+                {hasRealAdjustment 
+                  ? 'Invoice with post-trip adjustments showing final balance due'
+                  : 'Final invoice for completed trip (no adjustments)'}
               </p>
             </div>
             {getStatusBadge()}
@@ -568,14 +576,14 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             </Alert>
           )}
 
-          {/* Customer Invoice Info Alert */}
+          {/* Invoice Info Alert */}
           <Alert className="border-primary/50 bg-primary/5">
             <Info className="h-4 w-4" />
-            <AlertTitle>Customer-Facing Invoice</AlertTitle>
+            <AlertTitle>Final Invoice</AlertTitle>
             <AlertDescription>
-              This invoice is sent to the customer showing the final balance due. 
-              Signatures are not included as this is for customer reference only.
-              Internal approved invoices with signatures are generated after payment confirmation.
+              {hasRealAdjustment 
+                ? 'This invoice includes post-trip adjustments (extra KM, additional expenses) and shows the final balance due.'
+                : 'This is the final invoice for the completed trip based on the original quotation amounts.'}
             </AlertDescription>
           </Alert>
 

@@ -27,6 +27,7 @@ import { PostTripAdjustmentModal } from './PostTripAdjustmentModal';
 import { GenerateBalanceInvoiceModal } from './GenerateBalanceInvoiceModal';
 import { VehicleAssignmentModal } from './VehicleAssignmentModal';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
+import { resolveBusType, calculateTotalKm, getTripDistance } from '@/lib/special-hire-invoice-helpers';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SignatureWorkflowIndicator } from './SignatureWorkflowIndicator';
@@ -401,7 +402,7 @@ export function ConfirmedTripsTable() {
         dropLocation: tripForDoc.drop_location,
         pickupDate: new Date(tripForDoc.pickup_datetime),
         dropDate: new Date(tripForDoc.drop_datetime || tripForDoc.pickup_datetime),
-        busType: 'Standard Bus',
+        busType: resolveBusType(tripForDoc),
         numberOfBuses: tripForDoc.number_of_buses,
         numberOfPassengers: tripForDoc.number_of_passengers,
         totalAmount: calculateTotalAmount(tripForDoc),
@@ -1247,20 +1248,45 @@ export function ConfirmedTripsTable() {
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                {/* Operations actions */}
+                              <DropdownMenuContent align="end" className="w-56">
+                                {/* === PAYMENT === */}
+                                {isOperationsUser && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedTrip(trip);
+                                      setPaymentModalOpen(true);
+                                    }}
+                                  >
+                                    <CreditCard className="w-4 h-4 mr-2" />
+                                    Confirm Payment
+                                  </DropdownMenuItem>
+                                )}
+
+                                {isFinanceUser && pendingFinancePayments.length > 0 && (
+                                  <>
+                                    {pendingFinancePayments.map((payment) => (
+                                      <DropdownMenuItem
+                                        key={payment.id}
+                                        onClick={() => {
+                                          setSelectedFinancePayment({
+                                            ...payment,
+                                            quotation: trip
+                                          });
+                                          setFinanceApprovalModalOpen(true);
+                                        }}
+                                      >
+                                        <FileCheck className="w-4 h-4 mr-2" />
+                                        Approve Payment (LKR {payment.amount.toLocaleString()})
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </>
+                                )}
+
+                                <DropdownMenuSeparator />
+
+                                {/* === OPERATIONS === */}
                                 {isOperationsUser && (
                                   <>
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        setSelectedTrip(trip);
-                                        setPaymentModalOpen(true);
-                                      }}
-                                    >
-                                      <CreditCard className="w-4 h-4 mr-2" />
-                                      Confirm Payment
-                                    </DropdownMenuItem>
-                                    
                                     <DropdownMenuItem
                                       onClick={() => {
                                         setSelectedTrip(trip);
@@ -1297,89 +1323,44 @@ export function ConfirmedTripsTable() {
                                         )}
                                       </DropdownMenuItem>
                                     )}
-                                    
-                                    <DropdownMenuSeparator />
                                   </>
                                 )}
 
-                                {/* Finance actions */}
-                                {isFinanceUser && pendingFinancePayments.length > 0 && (
-                                  <>
-                                    {pendingFinancePayments.map((payment) => (
-                                      <DropdownMenuItem
-                                        key={payment.id}
-                                        onClick={() => {
-                                          setSelectedFinancePayment({
-                                            ...payment,
-                                            quotation: trip
-                                          });
-                                          setFinanceApprovalModalOpen(true);
-                                        }}
-                                      >
-                                        <FileCheck className="w-4 h-4 mr-2" />
-                                        Approve Payment (LKR {payment.amount.toLocaleString()})
-                                      </DropdownMenuItem>
-                                    ))}
-                                    <DropdownMenuSeparator />
-                                  </>
-                                )}
+                                <DropdownMenuSeparator />
 
-                                {/* Re-generate receipts/invoices for approved payments */}
+                                {/* === DOCUMENTS === */}
+                                <DropdownMenuItem
+                                  onClick={async () => {
+                                    await loadDocuments(trip.id);
+                                    setSelectedTrip(trip);
+                                    setDocumentsModalOpen(true);
+                                  }}
+                                >
+                                  <FileCheck className="w-4 h-4 mr-2" />
+                                  View Documents
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem onClick={() => viewInvoice(trip)}>
+                                  <Receipt className="w-4 h-4 mr-2" />
+                                  View Invoice
+                                </DropdownMenuItem>
+
+                                {/* Generate Final Invoice - works WITH or WITHOUT adjustment */}
                                 {approvedPayments.length > 0 && (
-                                  <>
-                                    {approvedPayments.filter(p => p.payment_type === 'advance').map(p => (
-                                      <DropdownMenuItem
-                                        key={`receipt-${p.id}`}
-                                        onClick={() => generateApprovedInvoice(p.id)}
-                                        disabled={financeLoading}
-                                      >
-                                        <RotateCcw className="w-4 h-4 mr-2" />
-                                        Re-generate Sales Receipt
-                                      </DropdownMenuItem>
-                                    ))}
-                                    {approvedPayments.filter(p => p.payment_type === 'balance' || p.payment_type === 'full').map(p => (
-                                      <DropdownMenuItem
-                                        key={`invoice-${p.id}`}
-                                        onClick={() => generateApprovedInvoice(p.id)}
-                                        disabled={financeLoading}
-                                      >
-                                      <RotateCcw className="w-4 h-4 mr-2" />
-                                        Re-generate Final Invoice
-                                      </DropdownMenuItem>
-                                    ))}
-
-                                    {/* Retry AR Integration for approved payments missing AR link */}
-                                    {isFinanceUser && !trip.ar_invoice_id && approvedPayments.length > 0 && (
-                                      <DropdownMenuItem
-                                        onClick={async () => {
-                                          const firstPayment = approvedPayments[0];
-                                          const result = await retryARIntegration(firstPayment.id);
-                                          if (result.success) {
-                                            refetch();
-                                          }
-                                        }}
-                                        disabled={financeLoading}
-                                      >
-                                        <RefreshCw className="w-4 h-4 mr-2" />
-                                        Retry AR Integration
-                                      </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuSeparator />
-                                  </>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedTrip(trip);
+                                      const adj = adjustmentsData[trip.id];
+                                      setSelectedAdjustment(adj || null);
+                                      setBalanceInvoiceModalOpen(true);
+                                    }}
+                                  >
+                                    <FileText className="w-4 h-4 mr-2 text-orange-600" />
+                                    Generate Final Invoice
+                                  </DropdownMenuItem>
                                 )}
 
-                <DropdownMenuItem
-                  onClick={async () => {
-                    await loadDocuments(trip.id);
-                    setSelectedTrip(trip);
-                    setDocumentsModalOpen(true);
-                  }}
-                >
-                  <FileCheck className="w-4 h-4 mr-2" />
-                  View Documents
-                </DropdownMenuItem>
-
-                                {/* Show View Balance Invoice if adjustment exists and invoice was generated */}
+                                {/* View existing Balance Invoice */}
                                 {adjustmentsData[trip.id]?.balance_invoice_document_id && (
                                   <DropdownMenuItem
                                     onClick={async () => {
@@ -1406,11 +1387,51 @@ export function ConfirmedTripsTable() {
                                     View Balance Invoice
                                   </DropdownMenuItem>
                                 )}
-                                
-                                <DropdownMenuItem onClick={() => viewInvoice(trip)}>
-                                  <Receipt className="w-4 h-4 mr-2" />
-                                  View Invoice
-                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator />
+
+                                {/* === REGENERATE === */}
+                                {approvedPayments.length > 0 && (
+                                  <>
+                                    {approvedPayments.filter(p => p.payment_type === 'advance').map(p => (
+                                      <DropdownMenuItem
+                                        key={`receipt-${p.id}`}
+                                        onClick={() => generateApprovedInvoice(p.id)}
+                                        disabled={financeLoading}
+                                      >
+                                        <RotateCcw className="w-4 h-4 mr-2" />
+                                        Re-generate Sales Receipt
+                                      </DropdownMenuItem>
+                                    ))}
+                                    {approvedPayments.filter(p => p.payment_type === 'balance' || p.payment_type === 'full').map(p => (
+                                      <DropdownMenuItem
+                                        key={`invoice-${p.id}`}
+                                        onClick={() => generateApprovedInvoice(p.id)}
+                                        disabled={financeLoading}
+                                      >
+                                        <RotateCcw className="w-4 h-4 mr-2" />
+                                        Re-generate Final Invoice
+                                      </DropdownMenuItem>
+                                    ))}
+
+                                    {/* Retry AR Integration */}
+                                    {isFinanceUser && !trip.ar_invoice_id && (
+                                      <DropdownMenuItem
+                                        onClick={async () => {
+                                          const firstPayment = approvedPayments[0];
+                                          const result = await retryARIntegration(firstPayment.id);
+                                          if (result.success) {
+                                            refetch();
+                                          }
+                                        }}
+                                        disabled={financeLoading}
+                                      >
+                                        <RefreshCw className="w-4 h-4 mr-2" />
+                                        Retry AR Integration
+                                      </DropdownMenuItem>
+                                    )}
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -1478,7 +1499,7 @@ export function ConfirmedTripsTable() {
         />
       )}
 
-      {balanceInvoiceModalOpen && selectedTrip && selectedAdjustment && (
+      {balanceInvoiceModalOpen && selectedTrip && (
         <GenerateBalanceInvoiceModal
           open={balanceInvoiceModalOpen}
           onOpenChange={(open) => {
@@ -1498,32 +1519,31 @@ export function ConfirmedTripsTable() {
             drop_location: selectedTrip.drop_location,
             pickup_datetime: selectedTrip.pickup_datetime,
             drop_datetime: selectedTrip.drop_datetime,
-            bus_type: 'Standard Bus',
+            bus_type: resolveBusType(selectedTrip),
             number_of_buses: selectedTrip.number_of_buses,
             number_of_passengers: selectedTrip.number_of_passengers,
-            original_quotation_amount: selectedAdjustment.original_quotation_amount || 0,
+            original_quotation_amount: selectedAdjustment?.original_quotation_amount || calculateTotalAmount(selectedTrip),
             gross_revenue: selectedTrip.gross_revenue,
             fuel_cost_fuel_only: selectedTrip.fuel_cost_fuel_only,
             commission_pass_through_amount: selectedTrip.commission_pass_through_amount,
             discount_amount_lkr: selectedTrip.discount_amount_lkr,
             advance_paid: selectedTrip.advance_paid || 0,
-            balance_due: selectedAdjustment.balance_due || (selectedTrip.balance_due || 0),
+            balance_due: selectedAdjustment?.balance_due || (selectedTrip.balance_due || 0),
             driver_name: selectedTrip.assigned_driver_name,
             conductor_name: selectedTrip.assigned_conductor_name,
             bus_no: selectedTrip.assigned_bus_no,
           }}
           adjustmentData={{
-            id: selectedAdjustment.id,
-            extra_km: selectedAdjustment.extra_km || 0,
-            extra_km_rate: selectedAdjustment.extra_km_charge_per_km || 0,
-            extra_km_total_charge: selectedAdjustment.extra_km_total_charge || 0,
-            additional_expenses: selectedAdjustment.additional_expenses || [],
-            total_additional_expenses: selectedAdjustment.total_additional_expenses || 0,
-            adjustment_notes: selectedAdjustment.notes || '',
+            id: selectedAdjustment?.id || '',
+            extra_km: selectedAdjustment?.extra_km || 0,
+            extra_km_rate: selectedAdjustment?.extra_km_charge_per_km || 0,
+            extra_km_total_charge: selectedAdjustment?.extra_km_total_charge || 0,
+            additional_expenses: selectedAdjustment?.additional_expenses || [],
+            total_additional_expenses: selectedAdjustment?.total_additional_expenses || 0,
+            adjustment_notes: selectedAdjustment?.notes || '',
           }}
           onInvoiceGenerated={async () => {
             try {
-              // Wait for each operation to complete sequentially
               await loadDocumentStatus(selectedTrip.id);
               const docsResult = await getDocumentsByQuotation(selectedTrip.id);
               if (docsResult.success) {
@@ -1532,11 +1552,10 @@ export function ConfirmedTripsTable() {
               await loadAdjustmentData(selectedTrip.id);
               await refetch();
               
-              // Close modal after all refreshes complete
               setBalanceInvoiceModalOpen(false);
               setSelectedAdjustment(null);
               
-              toast.success('Final Balance Invoice generated and visible in documents');
+              toast.success('Final Invoice generated and visible in documents');
             } catch (error) {
               console.error('Error refreshing documents:', error);
               toast.error('Document saved but refresh failed. Please reload the page.');
@@ -1680,7 +1699,7 @@ export function ConfirmedTripsTable() {
                       </div>
                       {doc.payment_type === 'balance' && (
                         <p className="text-xs text-muted-foreground">
-                          Customer copy - No signatures required
+                          Final Invoice
                         </p>
                       )}
                       <p className="text-sm text-muted-foreground">
