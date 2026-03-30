@@ -280,7 +280,7 @@ export function LightVehicleShipmentGroupManagement() {
       {/* Order Details Modal */}
       {selectedOrder && (
         <EnhancedLightVehicleOrderDetailsModal
-          order={selectedOrder}
+          orderId={selectedOrder?.id}
           open={!!selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onRefresh={loadShipments}

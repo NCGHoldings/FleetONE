@@ -91,6 +91,8 @@ export const LightVehicleInvoiceGenerator: React.FC<LightVehicleInvoiceGenerator
     }
 
     const invoiceData: LightVehicleInvoiceData = {
+      invoiceType: 'standard',
+      totalAmount: quotation.total_price,
       invoiceNo: '', // Will be generated automatically
       quotationNo: quotation.quotation_no,
       customerName: quotation.customer_name,
@@ -124,6 +126,8 @@ export const LightVehicleInvoiceGenerator: React.FC<LightVehicleInvoiceGenerator
 
   const getInvoiceDataFromDocument = (document: LightVehicleStoredDocument): LightVehicleInvoiceData => {
     return {
+      invoiceType: 'standard',
+      totalAmount: quotation?.total_price ?? 0,
       invoiceNo: document.id, // Temporary, will be replaced with actual invoice number
       quotationNo: quotation?.quotation_no || '',
       customerName: quotation?.customer_name || '',
