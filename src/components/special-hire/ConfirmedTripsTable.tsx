@@ -1499,7 +1499,7 @@ export function ConfirmedTripsTable() {
         />
       )}
 
-      {balanceInvoiceModalOpen && selectedTrip && selectedAdjustment && (
+      {balanceInvoiceModalOpen && selectedTrip && (
         <GenerateBalanceInvoiceModal
           open={balanceInvoiceModalOpen}
           onOpenChange={(open) => {
@@ -1522,29 +1522,28 @@ export function ConfirmedTripsTable() {
             bus_type: resolveBusType(selectedTrip),
             number_of_buses: selectedTrip.number_of_buses,
             number_of_passengers: selectedTrip.number_of_passengers,
-            original_quotation_amount: selectedAdjustment.original_quotation_amount || 0,
+            original_quotation_amount: selectedAdjustment?.original_quotation_amount || calculateTotalAmount(selectedTrip),
             gross_revenue: selectedTrip.gross_revenue,
             fuel_cost_fuel_only: selectedTrip.fuel_cost_fuel_only,
             commission_pass_through_amount: selectedTrip.commission_pass_through_amount,
             discount_amount_lkr: selectedTrip.discount_amount_lkr,
             advance_paid: selectedTrip.advance_paid || 0,
-            balance_due: selectedAdjustment.balance_due || (selectedTrip.balance_due || 0),
+            balance_due: selectedAdjustment?.balance_due || (selectedTrip.balance_due || 0),
             driver_name: selectedTrip.assigned_driver_name,
             conductor_name: selectedTrip.assigned_conductor_name,
             bus_no: selectedTrip.assigned_bus_no,
           }}
           adjustmentData={{
-            id: selectedAdjustment.id,
-            extra_km: selectedAdjustment.extra_km || 0,
-            extra_km_rate: selectedAdjustment.extra_km_charge_per_km || 0,
-            extra_km_total_charge: selectedAdjustment.extra_km_total_charge || 0,
-            additional_expenses: selectedAdjustment.additional_expenses || [],
-            total_additional_expenses: selectedAdjustment.total_additional_expenses || 0,
-            adjustment_notes: selectedAdjustment.notes || '',
+            id: selectedAdjustment?.id || '',
+            extra_km: selectedAdjustment?.extra_km || 0,
+            extra_km_rate: selectedAdjustment?.extra_km_charge_per_km || 0,
+            extra_km_total_charge: selectedAdjustment?.extra_km_total_charge || 0,
+            additional_expenses: selectedAdjustment?.additional_expenses || [],
+            total_additional_expenses: selectedAdjustment?.total_additional_expenses || 0,
+            adjustment_notes: selectedAdjustment?.notes || '',
           }}
           onInvoiceGenerated={async () => {
             try {
-              // Wait for each operation to complete sequentially
               await loadDocumentStatus(selectedTrip.id);
               const docsResult = await getDocumentsByQuotation(selectedTrip.id);
               if (docsResult.success) {
@@ -1553,11 +1552,10 @@ export function ConfirmedTripsTable() {
               await loadAdjustmentData(selectedTrip.id);
               await refetch();
               
-              // Close modal after all refreshes complete
               setBalanceInvoiceModalOpen(false);
               setSelectedAdjustment(null);
               
-              toast.success('Final Balance Invoice generated and visible in documents');
+              toast.success('Final Invoice generated and visible in documents');
             } catch (error) {
               console.error('Error refreshing documents:', error);
               toast.error('Document saved but refresh failed. Please reload the page.');
