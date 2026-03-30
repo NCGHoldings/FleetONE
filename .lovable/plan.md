@@ -1,114 +1,139 @@
 
 
-# Special Hire: Complete A-to-Z Flow Diagram & Fine-Tuning
+# Fix Final Invoice Settlement Calculation: Single Source of Truth
 
-## Current State Summary
+## Root Cause
 
-From code analysis, here's what EXISTS and what's MISSING:
+The Final Invoice (`GenerateBalanceInvoiceModal`) has **three disconnected calculation problems**:
 
-### What Works (Done)
-1. **Sales Receipt** on advance payment → Draft created → Finance approval → Approved with signatures
-2. **Generate Final Invoice** (with or without adjustment) → Preview, Download, Email
-3. **Post-Trip Adjustment** → Record extra KM/expenses → Finalize
-4. **GL posting** on email send (invoice sent triggers DR Receivable / CR Revenue)
-5. **Re-generate** Sales Receipt and Final Invoice from dropdown
+### Problem 1: `total_paid` not passed from table to modal
+`ConfirmedTripsTable.tsx` line 1588-1612 passes `quotationData` to the modal but **never includes `total_paid`**. The modal tries `(quotationData as any).total_paid` which is `undefined`, so it falls back to `advance_paid` (first payment only).
 
-### What's Mixed Up / Missing
+**DB reality for QUO-2025-0558-v1.4:**
+- `total_paid` = 81,962.50 (two approved payments: 40,962.50 + 41,000)
+- `advance_paid` = 40,962.50 (only first payment)
+- Quotation total = 73,400 + 775 + 0 + 7,750 - 0 = **81,925**
+- Correct balance = 81,925 - 81,962.50 = **-37.50 (overpaid)**
+- But invoice shows: Total Paid = 40,962.50, Balance Due = 33,212.50
 
-**Problem 1: "Invoice without signature" concept doesn't exist as a separate action**
-The user wants an option to generate a quick invoice (without signatures) to send to the customer as a payment reminder — BEFORE finance approval, BEFORE post-trip adjustment. Currently the only way to send something is the Final Invoice modal, which auto-saves as "balance" type and triggers GL posting on email. This is wrong for a simple reminder.
+### Problem 2: `computedTotalAmount()` excludes `total_additional_charges`
+The modal's `computedTotalAmount()` (line 143-148) calculates:
+```
+gross_revenue + fuel_cost_fuel_only + commission - discount
+= 73,400 + 775 + 0 - 0 = 74,175
+```
+But the DB quotation has `total_additional_charges = 7,750` which is **not included**. The correct total is **81,925**.
 
-**Problem 2: Final Invoice always triggers GL posting on email**
-If user just wants to send a reminder invoice (no GL needed), the current flow posts to GL anyway. GL should only post when the FINAL invoice is sent (after all adjustments are done).
+### Problem 3: `percentage_adjustment` not applied
+Both `calculateTotalAmount()` in `ConfirmedTripsTable` and `calculateFinalTotal()` in `PaymentConfirmationModal` apply `percentage_adjustment`, but the modal's `computedTotalAmount()` ignores it entirely.
 
-**Problem 3: No "Send Sales Receipt" to customer option**
-After finance approves advance payment, the approved Sales Receipt exists but there's no button to email it to the customer as confirmation.
+## Fix: Single Settlement Formula
 
-**Problem 4: Flow is unclear — too many overlapping document options**
-"View Invoice", "View Documents", "Generate Final Invoice", "View Balance Invoice" — confusing.
+```
+PAYABLE = gross_revenue + fuel + commission + additional_charges - discount
+        + (percentage_adjustment % of base)
+        + post_trip_adjustment_amount (extra KM + additional expenses)
 
-## Correct Business Flow (All Scenarios)
+PAID    = SUM of all approved payments (from useRealtimeSpecialHire calculated total_paid)
 
-```text
-SCENARIO A: Customer pays ADVANCE before trip
-  1. Confirm Advance Payment → Draft Sales Receipt created
-  2. Finance Approves → Sales Receipt gets signatures → GL posted
-  3. Trip happens
-  4a. No extra charges → Generate Final Invoice (same amounts) → Email → GL posted
-  4b. Extra charges → Post-Trip Adjustment → Generate Final Invoice (with extras) → Email → GL posted
-
-SCENARIO B: Customer pays FULL before trip  
-  1. Confirm Full Payment → Draft Invoice created
-  2. Finance Approves → Invoice gets signatures → GL posted
-  3. Trip happens
-  4a. No extra → Done (settled)
-  4b. Extra charges → Post-Trip Adjustment → Generate Supplementary Invoice → Email → GL posted
-
-SCENARIO C: Customer pays NOTHING before trip
-  1. Trip happens (no payment yet)
-  2. Option: Send Payment Reminder (invoice without signatures, NO GL)
-  3. Customer pays → Confirm Payment → Draft document created
-  4. Finance Approves → GL posted
-  5. If adjustment needed → Post-Trip Adjustment → Final Invoice
-
-SCENARIO D: Customer pays ADVANCE, then BALANCE after trip
-  1. Confirm Advance → Sales Receipt → Finance Approval
-  2. Trip happens  
-  3. Confirm Balance Payment → Draft Invoice created
-  4. Finance Approves → GL posted
-  5. If adjustment → Post-Trip Adjustment → Supplementary Invoice
+BALANCE = PAYABLE - PAID
+        → if <= 0: show 0 with "Overpaid Credit: LKR X"
+        → if > 0: show balance due
 ```
 
-## Plan: What to Build/Fix
+## Changes
 
-### 1. Create comprehensive Mermaid flow diagram
-Create a detailed `.mmd` diagram showing ALL scenarios with clear markers for what's ✅ done and what's ❌ missing.
+### File 1: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
 
-### 2. Add "Send Payment Reminder" action (NEW)
-- New dropdown item: "Send Payment Reminder" — available when customer has unpaid balance and no final invoice sent yet
-- Generates a simple invoice PDF (without signatures, without "DRAFT" watermark) using existing `generateInvoicePDF`
-- Has "Download" and "Email to Customer" buttons
-- Does NOT trigger GL posting (it's just a reminder, not a financial event)
-- Stores as document_type = 'payment_reminder' in document_storage
+**1a. Add `total_paid` and `total_additional_charges` to interface** (line 27-51)
+```typescript
+quotationData: {
+  // ... existing fields ...
+  total_additional_charges?: number;  // ADD
+  percentage_adjustment?: number;     // ADD
+  total_paid?: number;                // ADD (replaces unsafe cast)
+}
+```
 
-### 3. Add "Email Sales Receipt" action
-- After finance approval, add dropdown item to email the approved Sales Receipt PDF to customer
-- Uses existing document from storage, no regeneration needed
+**1b. Fix `computedTotalAmount()`** (line 143-148)
+Include `total_additional_charges` and `percentage_adjustment`:
+```typescript
+const computedTotalAmount = () => {
+  const base = (quotationData.gross_revenue || 0) +
+    (quotationData.fuel_cost_fuel_only || 0) +
+    (quotationData.commission_pass_through_amount || 0) +
+    (quotationData.total_additional_charges || 0) -   // ADD THIS
+    (quotationData.discount_amount_lkr || 0);
+  const adjPct = quotationData.percentage_adjustment || 0;
+  return Math.round(base + base * (adjPct / 100));
+};
+```
 
-### 4. Fix Final Invoice GL posting guard
-- Only post GL when invoice is the FIRST final invoice sent (check if GL already posted for this quotation's invoice)
-- Prevent double GL posting if user re-sends the same final invoice
+**1c. Fix `calculateFinalBalance()`** (line 150-157)
+Use typed `total_paid` instead of unsafe cast:
+```typescript
+const calculateFinalBalance = () => {
+  const totalAmount = computedTotalAmount();
+  const adjustmentTotal = (adjustmentData.extra_km_total_charge || 0) + 
+                          (adjustmentData.total_additional_expenses || 0);
+  const actualTotalPaid = quotationData.total_paid ?? quotationData.advance_paid ?? 0;
+  const balance = (totalAmount + adjustmentTotal) - actualTotalPaid;
+  return balance <= 0 ? 0 : balance;
+};
+```
 
-### 5. Simplify dropdown menu labels
-Current confusing labels → Clear labels:
-- "View Invoice" → Remove (redundant with "View Documents")
-- "Generate Final Invoice" → Keep (clear purpose)
-- "View Balance Invoice" → "View Final Invoice" (rename)
-- Add "Send Payment Reminder" (new)
-- Add "Email Sales Receipt" (new)
+**1d. Add overpayment credit display** (line 608-646 in Financial Summary card)
+When `calculateFinalBalance() === 0` and actual paid > payable, show:
+```
+Balance Due: LKR 0
+Overpaid Credit: LKR 37.50
+```
 
-### Files to Change
+**1e. Fix GL posting amount** (line 396-398)
+Use `computedTotalAmount()` instead of `original_quotation_amount`:
+```typescript
+const fullInvoiceAmount = computedTotalAmount() + 
+  (adjustmentData.extra_km_total_charge || 0) + 
+  (adjustmentData.total_additional_expenses || 0);
+```
 
-**File 1: `src/components/special-hire/ConfirmedTripsTable.tsx`**
-- Add "Send Payment Reminder" dropdown item
-- Add "Email Sales Receipt" dropdown item  
-- Remove redundant "View Invoice" item
-- Rename "View Balance Invoice" → "View Final Invoice"
-- Add helper to email existing document
+### File 2: `src/components/special-hire/ConfirmedTripsTable.tsx`
 
-**File 2: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`**
-- Add GL posting guard (check if already posted before posting again)
-- This is the Final Invoice modal — no other changes needed
+**2a. Pass missing fields to GenerateBalanceInvoiceModal** (line 1588-1612)
+Add these to the `quotationData` prop:
+```typescript
+total_paid: selectedTrip.total_paid || 0,
+total_additional_charges: selectedTrip.total_additional_charges,
+percentage_adjustment: (selectedTrip as any).percentage_adjustment,
+```
 
-**File 3: Create Mermaid diagram** (`/mnt/documents/special-hire-complete-flow.mmd`)
-- All 4 scenarios with decision points
-- Mark done vs missing items
+### File 3: `src/lib/invoice-generator.ts`
+
+**3a. Fix invoice HTML "Total Paid" line** (line 358-360)
+Already uses `data.paidAmount` correctly. No change needed -- the fix flows from the modal passing the right value.
+
+**3b. Add overpaid credit row** after Balance Due row (line 362-364)
+When `balanceDue === 0` and `totalPaid > priceAfterDiscount`:
+```html
+<tr>
+  <td>Overpaid Credit</td>
+  <td>LKR ${(totalPaid - priceAfterDiscount).toLocaleString()}.00</td>
+</tr>
+```
+
+## Correct Numbers After Fix (QUO-2025-0558-v1.4)
+
+```
+Payable:  73,400 + 775 + 0 + 7,750 - 0 = 81,925
+Paid:     40,962.50 + 41,000 = 81,962.50
+Balance:  81,925 - 81,962.50 = -37.50
+Display:  Balance Due: LKR 0 | Overpaid Credit: LKR 37.50
+```
 
 ## Summary
-- Build complete flow diagram marking done/missing
-- Add "Send Payment Reminder" (invoice without signatures, no GL) for unpaid customers
-- Add "Email Sales Receipt" for sending approved receipt to customer
-- Fix GL double-posting guard on Final Invoice
-- Clean up dropdown labels for clarity
-- No changes to existing GL/AR logic — only adding guards and new lightweight actions
+- Pass `total_paid`, `total_additional_charges`, `percentage_adjustment` from table to modal
+- Fix `computedTotalAmount()` to include all cost components (was missing 7,750 additional charges)
+- Show overpaid credit line when customer pays more than payable
+- Use only approved payments for calculations (per user preference)
+- No GL/AR logic changes needed
 
