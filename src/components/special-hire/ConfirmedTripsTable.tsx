@@ -1340,11 +1340,6 @@ export function ConfirmedTripsTable() {
                                   View Documents
                                 </DropdownMenuItem>
 
-                                <DropdownMenuItem onClick={() => viewInvoice(trip)}>
-                                  <Receipt className="w-4 h-4 mr-2" />
-                                  View Invoice
-                                </DropdownMenuItem>
-
                                 {/* Generate Final Invoice - works WITH or WITHOUT adjustment */}
                                 {approvedPayments.length > 0 && (
                                   <DropdownMenuItem
@@ -1360,7 +1355,7 @@ export function ConfirmedTripsTable() {
                                   </DropdownMenuItem>
                                 )}
 
-                                {/* View existing Balance Invoice */}
+                                {/* View existing Final Invoice */}
                                 {adjustmentsData[trip.id]?.balance_invoice_document_id && (
                                   <DropdownMenuItem
                                     onClick={async () => {
@@ -1375,22 +1370,104 @@ export function ConfirmedTripsTable() {
                                           setSelectedTrip(trip);
                                           setDocumentViewerOpen(true);
                                         } else {
-                                          toast.error('Balance invoice document not found');
+                                          toast.error('Final invoice document not found');
                                         }
                                       } catch (error) {
-                                        console.error('Error loading balance invoice:', error);
-                                        toast.error('Failed to load balance invoice');
+                                        console.error('Error loading final invoice:', error);
+                                        toast.error('Failed to load final invoice');
                                       }
                                     }}
                                   >
                                     <Receipt className="w-4 h-4 mr-2 text-orange-600" />
-                                    View Balance Invoice
+                                    View Final Invoice
+                                  </DropdownMenuItem>
+                                )}
+
+                                {/* Send Payment Reminder - invoice without signatures, NO GL */}
+                                {trip.balance_due > 0 && (
+                                  <DropdownMenuItem
+                                    onClick={async () => {
+                                      try {
+                                        const reminderData: InvoiceData = {
+                                          invoiceNo: `REM-${trip.quotation_no}`,
+                                          invoiceType: 'balance',
+                                          quotationNo: trip.quotation_no,
+                                          customerName: trip.customer_name,
+                                          customerPhone: trip.customer_phone || '',
+                                          customerEmail: trip.customer_email,
+                                          companyName: trip.company_name,
+                                          pickupLocation: trip.pickup_location,
+                                          dropLocation: trip.drop_location,
+                                          pickupDate: new Date(trip.pickup_datetime),
+                                          dropDate: new Date(trip.drop_datetime || trip.pickup_datetime),
+                                          busType: resolveBusType(trip),
+                                          numberOfBuses: trip.number_of_buses,
+                                          numberOfPassengers: trip.number_of_passengers,
+                                          totalAmount: totalAmount,
+                                          advanceAmount: trip.advance_paid || 0,
+                                          balanceAmount: trip.balance_due,
+                                          paidAmount: trip.total_paid || 0,
+                                          companyLogo,
+                                          vehicleNo: trip.assigned_bus_no,
+                                          driverName: trip.assigned_driver_name,
+                                          conductorName: trip.assigned_conductor_name,
+                                          invoice_status: 'approved',
+                                          document_type: 'invoice',
+                                          forCustomer: true,
+                                        };
+
+                                        const pdfBlob = await generateInvoicePDF(reminderData);
+                                        const blobUrl = URL.createObjectURL(pdfBlob);
+                                        const link = document.createElement('a');
+                                        link.href = blobUrl;
+                                        link.download = `Payment-Reminder-${trip.quotation_no}.pdf`;
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                        URL.revokeObjectURL(blobUrl);
+
+                                        toast.success('Payment reminder downloaded successfully.');
+                                      } catch (error) {
+                                        console.error('Error generating payment reminder:', error);
+                                        toast.error('Failed to generate payment reminder');
+                                      }
+                                    }}
+                                  >
+                                    <Mail className="w-4 h-4 mr-2 text-blue-600" />
+                                    Send Payment Reminder
+                                  </DropdownMenuItem>
+                                )}
+
+                                {/* Email Sales Receipt - open approved receipt */}
+                                {approvedPayments.filter(p => p.payment_type === 'advance').length > 0 && (
+                                  <DropdownMenuItem
+                                    onClick={async () => {
+                                      try {
+                                        const tripDocs = documentsData[trip.id] || [];
+                                        const salesReceipt = tripDocs.find(
+                                          (d: any) => d.document_type === 'sales_receipt' && d.document_status === 'approved'
+                                        );
+                                        if (salesReceipt) {
+                                          setCurrentDocument(salesReceipt);
+                                          setSelectedTrip(trip);
+                                          setDocumentViewerOpen(true);
+                                        } else {
+                                          toast.error('No approved Sales Receipt found. Ensure finance has approved the payment.');
+                                        }
+                                      } catch (error) {
+                                        console.error('Error opening sales receipt:', error);
+                                        toast.error('Failed to open sales receipt');
+                                      }
+                                    }}
+                                  >
+                                    <Mail className="w-4 h-4 mr-2 text-green-600" />
+                                    Email Sales Receipt
                                   </DropdownMenuItem>
                                 )}
 
                                 <DropdownMenuSeparator />
 
-                                {/* === REGENERATE === */}
+                                {/* === FINANCE / REGENERATE === */}
                                 {approvedPayments.length > 0 && (
                                   <>
                                     {approvedPayments.filter(p => p.payment_type === 'advance').map(p => (

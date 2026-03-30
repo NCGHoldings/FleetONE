@@ -368,12 +368,30 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
       // ========================
       // GL & AR POSTING INTEGRATION - Post invoice to General Ledger and update AR
+      // Guard: Check if GL was already posted for this quotation's final invoice
       // ========================
       try {
-        console.log('[SPH GL] Invoice sent - attempting GL & AR update...');
+        console.log('[SPH GL] Invoice sent - checking if GL already posted...');
+        
+        // Check for existing GL entry for this invoice to prevent double-posting
+        const invoiceNoForCheck = `INV-${quotationData.quotation_no}-BAL`;
+        const { data: existingJE } = await supabase
+          .from('journal_entries')
+          .select('id, entry_number')
+          .ilike('description', `%${invoiceNoForCheck}%`)
+          .limit(1)
+          .maybeSingle();
+        
+        if (existingJE) {
+          console.log('[SPH GL] ⚠️ GL already posted for this invoice:', existingJE.entry_number, '— skipping to prevent double-posting');
+          toast.info(`GL already posted: ${existingJE.entry_number}`);
+        } else {
+          console.log('[SPH GL] No existing GL found — proceeding with GL & AR posting...');
+        }
+
         const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
         
-        if (settings?.auto_post_invoices) {
+        if (settings?.auto_post_invoices && !existingJE) {
           // Post GROSS invoice amount (before discount) — discount is posted separately
           const fullInvoiceAmount = quotationData.original_quotation_amount + 
             (adjustmentData.extra_km_total_charge || 0) + 
