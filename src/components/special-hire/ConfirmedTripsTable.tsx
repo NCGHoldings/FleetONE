@@ -846,7 +846,7 @@ export function ConfirmedTripsTable() {
         dropLocation: quotation.drop_location,
         pickupDate: new Date(quotation.pickup_datetime),
         dropDate: new Date(quotation.drop_datetime || quotation.pickup_datetime),
-        busType: 'Standard Bus',
+        busType: (() => { try { const fd = typeof (quotation as any).bus_fleet_details === 'string' ? JSON.parse((quotation as any).bus_fleet_details) : (quotation as any).bus_fleet_details; return fd?.buses?.[0]?.bus_type_name || (quotation as any).bus_types?.name || 'Standard Bus'; } catch { return 'Standard Bus'; } })(),
         numberOfBuses: quotation.number_of_buses,
         numberOfPassengers: quotation.number_of_passengers,
         totalAmount: calculateTotalAmount(quotation),
@@ -858,7 +858,7 @@ export function ConfirmedTripsTable() {
         conductorName: quotation.assigned_conductor_name,
         // Real trip distance from quotation
         tripDistance: (quotation as any).km_trip || (quotation as any).total_distance_km,
-        totalKm: (quotation as any).km_parking + (quotation as any).km_trip + (quotation as any).km_return,
+        totalKm: ((quotation as any).km_parking_to_pickup || 0) + ((quotation as any).km_trip || 0) + ((quotation as any).km_drop_to_parking || 0),
         // Include adjustment data if available
         hasAdjustments: !!adjustment,
         originalQuotedKm: adjustment?.original_quoted_km,

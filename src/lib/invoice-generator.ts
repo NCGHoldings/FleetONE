@@ -220,38 +220,16 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const balanceDue = data.balanceAmount != null ? data.balanceAmount : Math.max(0, priceAfterDiscount - totalPaid);
     const itemDetail = data.itemDetail || `${data.pickupLocation} to ${data.dropLocation}`;
     // Use real trip distance from quotation, fallback to actual km traveled if post-trip done, or totalKm
-    const mileage = data.actualKmTraveled || data.tripDistance || data.totalKm || (data.numberOfBuses * 100);
+    const mileage = data.actualKmTraveled || data.tripDistance || data.totalKm || 0;
 
     return `
-      <div id="invoice-root" style="font-family: Arial, sans-serif; margin: 0; padding: 15px 15px 25px 15px; background: #fff; color: #000; width: 100%; max-width: 210mm; box-sizing: border-box; position: relative;">
-        ${isDraft ? '<div class="draft-watermark"><div class="draft-text">DRAFT</div></div>' : ''}
-        <style>
-          ${draftWatermarkStyles}
-          @media print {
-            .invoice-container { width: 210mm !important; max-width: none !important; }
-            .page-break { page-break-before: always; }
-            .signature-section { page-break-inside: avoid; }
-            .keep-together { page-break-inside: avoid; }
-          }
-          .adjustments-section {
-            margin: 20px 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-            border: 2px solid #3b82f6;
-            border-radius: 8px;
-          }
-          .adjustment-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px;
-            margin: 8px 0;
-            background: white;
-            border-radius: 4px;
-          }
-        </style>
+      <div id="invoice-root" style="font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; width: 210mm; box-sizing: border-box;">
+        ${isDraft ? `<style>${draftWatermarkStyles}</style>` : ''}
         
-        <div class="invoice-container" style="width: 100%; max-width: 800px; margin: auto; border: 1px solid #ddd; padding: 15px; box-sizing: border-box;">
-          <!-- Header -->
+        <!-- PAGE 1 -->
+        <div data-pdf-page="1" style="position: relative; width: 210mm; min-height: 297mm; padding: 15px 15px 25px 15px; box-sizing: border-box; background: #fff;">
+          ${isDraft ? '<div class="draft-watermark"><div class="draft-text">DRAFT</div></div>' : ''}
+          
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
             <img src="${companyLogo}" alt="NCG Express Logo" style="height: 70px;">
             <div style="text-align: right; font-size: 14px;">
@@ -263,7 +241,6 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
 
           <h2 style="text-align: center; text-decoration: underline; margin-bottom: 12px;">${documentTitle}${isDraft ? ' - DRAFT' : ''}</h2>
 
-          <!-- Invoice Info -->
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 14px;">
             <tr>
               <td style="padding: 5px; vertical-align: top; width: 20%; font-weight: bold;">Customer Code</td>
@@ -307,7 +284,6 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             </tr>
           </table>
 
-          <!-- Item Table -->
           <table style="width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px;">
             <tr>
               <th style="border: 1px solid #ddd; padding: 6px; text-align: center; background: #f1f1f1; width: 25%;">Description</th>
@@ -323,7 +299,6 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             </tr>
           </table>
 
-          <!-- Summary -->
           <table style="width: 100%; max-width: 300px; float: right; border-collapse: collapse; margin-top: 12px; font-size: 14px;">
             <tr>
               <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Original Quote Amount</td>
@@ -395,8 +370,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           </div>
           ` : ''}
 
-          <!-- Payment Info & Terms - Keep Together on Page 1 -->
-          <div class="keep-together" style="margin-top: 20px; font-size: 13px; clear: both;">
+          <div style="margin-top: 20px; font-size: 13px; clear: both;">
             <strong>Payment Info</strong><br>
             Account No: <b>193414017578</b><br>
             Account Name: <b>NCG Express (Pvt) Limited</b><br>
@@ -405,20 +379,25 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             1. Cheques are to be drawn in favour of <b>NCG EXPRESS (PVT) LIMITED</b> and A/C payee only.
           </div>
 
-          <!-- Footer for Page 1 -->
           <div style="margin-top: 15px; padding-top: 10px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
             ${!data.forCustomer ? 'Page 1 of 2<br>' : ''}
             NCG Express Transport Management System
           </div>
+        </div>
 
-          ${!data.forCustomer ? `
-          <!-- Page Break Before Signatures -->
-          <div class="page-break"></div>
+        ${!data.forCustomer ? `
+        <!-- PAGE 2 -->
+        <div data-pdf-page="2" style="position: relative; width: 210mm; min-height: 297mm; padding: 15px 15px 25px 15px; box-sizing: border-box; background: #fff;">
 
-          <!-- Signature Section on Page 2 -->
-          <div style="margin-top: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #000;">
+            <img src="${companyLogo}" alt="NCG Express Logo" style="height: 50px;">
+            <div style="text-align: right; font-size: 13px;">
+              <strong>${documentTitle} - ${data.invoiceNo}</strong><br>
+              <span style="font-size: 12px; color: #555;">${data.quotationNo} | ${currentDate}</span>
+            </div>
+          </div>
 
-            <table class="signature-section" style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px;">
+          <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px;">
             <tr style="background: #f0f0f0;">
               <th style="border: 1px solid #000; padding: 8px; text-align: center;">Prepared By</th>
               <th style="border: 1px solid #000; padding: 8px; text-align: center;">Checked By</th>
@@ -455,19 +434,16 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             </tr>
           </table>
 
-          <!-- Note -->
           <div style="margin-top: 12px; font-size: 12px; text-align: center; color: #555; font-style: italic;">
             "This is a computer-generated invoice and does not require a physical signature."
           </div>
 
-            <!-- Footer for Page 2 -->
-            <div style="margin-top: 20px; padding-top: 15px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
-              Page 2 of 2<br>
-              NCG Express Transport Management System
-            </div>
+          <div style="margin-top: 20px; padding-top: 15px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
+            Page 2 of 2<br>
+            NCG Express Transport Management System
           </div>
-          ` : ''}
         </div>
+        ` : ''}
       </div>
     `;
   }
@@ -476,28 +452,9 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
 export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
   console.log('Starting PDF generation for:', data.invoiceType);
   
-  // Create a temporary offscreen container and sanitize HTML
   const tempDiv = document.createElement('div');
   const rawHtml = generateInvoiceHTML(data);
-  let contentHtml = rawHtml;
-
-  // If a full HTML document was returned, extract the main invoice container
-  const containerMatch = rawHtml.match(/<div class=\"invoice-container\">[\s\S]*?<\/div>/);
-  if (containerMatch) {
-    contentHtml = `<div id="invoice-root">${containerMatch[0]}</div>`;
-  } else {
-    // Strip doctype and html/head/body wrappers just in case
-    const stripped = rawHtml
-      .replace(/<!DOCTYPE[^>]*>/gi, '')
-      .replace(/<html[^>]*>/gi, '')
-      .replace(/<\/html>/gi, '')
-      .replace(/<head>[\s\S]*?<\/head>/gi, '')
-      .replace(/<body[^>]*>/gi, '')
-      .replace(/<\/body>/gi, '');
-    contentHtml = `<div id="invoice-root">${stripped}</div>`;
-  }
-
-  tempDiv.innerHTML = contentHtml;
+  tempDiv.innerHTML = rawHtml;
   tempDiv.style.position = 'absolute';
   tempDiv.style.left = '-9999px';
   tempDiv.style.top = '-9999px';
@@ -506,74 +463,79 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
   document.body.appendChild(tempDiv);
 
   try {
-    console.log('Converting HTML to canvas...');
+    await new Promise(resolve => setTimeout(resolve, 200));
     
-    // Wait a bit for any async content to load
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-  // Convert HTML to canvas with improved settings and error handling
-  const rootEl = tempDiv.querySelector('#invoice-root') as HTMLElement | null;
-  if (!rootEl) {
-    throw new Error('Invoice root element not found');
-  }
-
-  const canvas = await html2canvas(rootEl, {
-    scale: 1.5,
-    useCORS: true,
-    allowTaint: false, // avoid PNG signature issues
-    backgroundColor: '#ffffff',
-    scrollX: 0,
-    scrollY: 0,
-    foreignObjectRendering: false,
-    removeContainer: true,
-    logging: false,
-    onclone: (clonedDoc) => {
-      const images = clonedDoc.querySelectorAll('img');
-      images.forEach((img) => {
-        if (!img.complete || img.naturalHeight === 0) {
-          img.remove();
-        }
-      });
-    },
-  });
-
-    console.log('Canvas created, generating PDF...');
-    
-    // Create PDF with proper margins
+    // Find all [data-pdf-page] containers for multi-page rendering
+    const pages = tempDiv.querySelectorAll('[data-pdf-page]') as NodeListOf<HTMLElement>;
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const imgWidth = 210; // A4 width in mm
-    const pageHeight = 297; // A4 height in mm
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    
-  // Convert canvas to JPEG data URL only (avoid PNG signature errors)
-  let imgData: string;
-  try {
-    imgData = canvas.toDataURL('image/jpeg', 0.85);
-  } catch (error) {
-    console.error('Failed to convert canvas to JPEG:', error);
-    throw new Error('Failed to generate image (JPEG) for PDF');
-  }
-    
-    // Handle content that exceeds A4 page height
-    if (imgHeight > pageHeight) {
-      // If content is taller than A4, add multiple pages
-      let heightLeft = imgHeight;
-      let position = 0;
-      
-      // Add first page
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      
-      // Add additional pages if needed
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+    const imgWidth = 210;
+
+    if (pages.length > 0) {
+      // Multi-page rendering: each [data-pdf-page] becomes a separate PDF page
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        const canvas = await html2canvas(page, {
+          scale: 1.5,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          scrollX: 0,
+          scrollY: 0,
+          foreignObjectRendering: false,
+          logging: false,
+          onclone: (clonedDoc) => {
+            const style = clonedDoc.createElement('style');
+            style.textContent = '* { letter-spacing: normal !important; word-spacing: normal !important; }';
+            clonedDoc.head.appendChild(style);
+            clonedDoc.querySelectorAll('img').forEach((img) => {
+              if (!img.complete || img.naturalHeight === 0) img.remove();
+            });
+          },
+        });
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.85);
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
       }
     } else {
-      // Content fits on one page - add image with no margins for clean rendering
-      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+      // Fallback: single-page rendering (sales receipts etc.)
+      const rootEl = tempDiv.querySelector('#invoice-root') as HTMLElement || tempDiv;
+      const canvas = await html2canvas(rootEl, {
+        scale: 1.5,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0,
+        foreignObjectRendering: false,
+        logging: false,
+        onclone: (clonedDoc) => {
+          clonedDoc.querySelectorAll('img').forEach((img) => {
+            if (!img.complete || img.naturalHeight === 0) img.remove();
+          });
+        },
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pageHeight = 297;
+
+      if (imgHeight > pageHeight) {
+        let heightLeft = imgHeight;
+        let position = 0;
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+        while (heightLeft > 0) {
+          position = heightLeft - imgHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
+      } else {
+        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+      }
     }
     
     console.log('PDF generation completed successfully');
@@ -582,7 +544,6 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
     console.error('PDF generation failed:', error);
     throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
   } finally {
-    // Clean up
     if (document.body.contains(tempDiv)) {
       document.body.removeChild(tempDiv);
     }
