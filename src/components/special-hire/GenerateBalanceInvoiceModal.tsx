@@ -52,6 +52,8 @@ interface GenerateBalanceInvoiceModalProps {
     driver_name?: string;
     conductor_name?: string;
     bus_no?: string;
+    tripDistance?: number;
+    totalKm?: number;
   };
   adjustmentData: {
     id: string;
