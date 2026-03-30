@@ -33,7 +33,7 @@ export function LightVehicleShipmentVehicleView() {
     setIsLoading(true);
     try {
       // Fetch shipments
-      const { data: shipmentData, error: shipmentError } = await supabase
+      const { data: shipmentData, error: shipmentError } = await (supabase as any)
         .from('lightvehicle_shipment_groups')
         .select('id, shipment_no, shipment_name, status, expected_arrival_date')
         .order('created_at', { ascending: false });

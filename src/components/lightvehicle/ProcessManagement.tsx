@@ -204,7 +204,7 @@ export function ProcessManagement({ order, onUpdate }: ProcessManagementProps) {
         .select();
 
       if (error) throw error;
-      setTasks(data || []);
+      setTasks((data || []) as any);
     } catch (error: any) {
       console.error('Error initializing tasks:', error);
     }
@@ -292,7 +292,7 @@ export function ProcessManagement({ order, onUpdate }: ProcessManagementProps) {
         toast.success('Task updated successfully');
       } else {
         // Create new task
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('lightvehicle_order_tasks')
           .insert({
             order_id: order.id,

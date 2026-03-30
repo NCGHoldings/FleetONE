@@ -58,7 +58,7 @@ export function SpreadsheetInvoicePanel({ orderId, orderNo, invoiceCount }: Spre
 
             // Get documents for each invoice
             const invoicesWithDocs: InvoiceRecord[] = [];
-            for (const rec of (records || [])) {
+            for (const rec of (records || []) as any[]) {
                 const { data: docs } = await supabase
                     .from('lightvehicle_invoice_documents')
                     .select('id, file_name, file_path, document_status')

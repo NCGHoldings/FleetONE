@@ -158,7 +158,7 @@ export function ProcessManagement({ order, onUpdate }: ProcessManagementProps) {
   const loadTasks = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('sinotruck_order_tasks')
         .select('*')
         .eq('order_id', order.id)
@@ -170,7 +170,7 @@ export function ProcessManagement({ order, onUpdate }: ProcessManagementProps) {
       if (!data || data.length === 0) {
         await initializeDefaultTasks();
       } else {
-        setTasks(data);
+        setTasks(data as any);
       }
     } catch (error: any) {
       console.error('Error loading tasks:', error);
@@ -198,13 +198,13 @@ export function ProcessManagement({ order, onUpdate }: ProcessManagementProps) {
         });
       });
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('sinotruck_order_tasks')
         .insert(allTasks)
         .select();
 
       if (error) throw error;
-      setTasks(data || []);
+      setTasks((data || []) as any);
     } catch (error: any) {
       console.error('Error initializing tasks:', error);
     }
@@ -283,7 +283,7 @@ export function ProcessManagement({ order, onUpdate }: ProcessManagementProps) {
           updateData.completed_by = user?.id;
         }
 
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('sinotruck_order_tasks')
           .update(updateData)
           .eq('id', editingTask.id);
@@ -292,7 +292,7 @@ export function ProcessManagement({ order, onUpdate }: ProcessManagementProps) {
         toast.success('Task updated successfully');
       } else {
         // Create new task
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('sinotruck_order_tasks')
           .insert({
             order_id: order.id,
@@ -322,7 +322,7 @@ export function ProcessManagement({ order, onUpdate }: ProcessManagementProps) {
     if (!confirm('Are you sure you want to delete this task?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('sinotruck_order_tasks')
         .delete()
         .eq('id', taskId);
@@ -341,7 +341,7 @@ export function ProcessManagement({ order, onUpdate }: ProcessManagementProps) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('sinotruck_order_tasks')
         .update({
           status: 'completed',
@@ -362,7 +362,7 @@ export function ProcessManagement({ order, onUpdate }: ProcessManagementProps) {
 
   const handleStartTask = async (task: Task) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('sinotruck_order_tasks')
         .update({ status: 'in_progress' })
         .eq('id', task.id);
