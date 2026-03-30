@@ -254,7 +254,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         dropLocation: quotationData.drop_location,
         pickupDate: new Date(quotationData.pickup_datetime),
         dropDate: new Date(quotationData.drop_datetime || quotationData.pickup_datetime),
-        busType: 'Standard Bus',
+        busType: (() => { try { const fd = typeof quotationData.bus_fleet_details === 'string' ? JSON.parse(quotationData.bus_fleet_details) : quotationData.bus_fleet_details; return fd?.buses?.[0]?.bus_type_name || 'Standard Bus'; } catch { return 'Standard Bus'; } })(),
         numberOfBuses: quotationData.number_of_buses,
         numberOfPassengers: quotationData.number_of_passengers,
         totalAmount: calculateTotalAmount(quotationData),
