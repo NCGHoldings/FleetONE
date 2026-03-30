@@ -83,21 +83,45 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const [invoiceStatus, setInvoiceStatus] = useState<'draft' | 'sent_to_customer' | 'payment_pending' | 'paid'>('draft');
   const [companyLogo, setCompanyLogo] = useState<string>('');
   const [freshTotalPaid, setFreshTotalPaid] = useState<number | null>(null);
+  const [freshAdjustmentData, setFreshAdjustmentData] = useState<any>(null);
   
   // This modal is specifically for customer-facing balance invoices
   const isCustomerInvoice = true;
 
-  const hasRealAdjustment = !!(adjustmentData.id && (
-    (adjustmentData.extra_km_total_charge || 0) > 0 || 
-    (adjustmentData.total_additional_expenses || 0) > 0
+  // Use fresh adjustment data (from DB) over stale props
+  const effectiveAdjustment = freshAdjustmentData || adjustmentData;
+
+  const hasRealAdjustment = !!(effectiveAdjustment.id && (
+    (effectiveAdjustment.extra_km_total_charge || 0) > 0 || 
+    (effectiveAdjustment.total_additional_expenses || 0) > 0
   ));
 
   useEffect(() => {
     fetchCompanyLogo();
     if (open && quotationData.id) {
       checkExistingInvoice();
+      fetchFreshAdjustmentData();
     }
   }, [open, quotationData.id]);
+
+  const fetchFreshAdjustmentData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('special_hire_trip_adjustments')
+        .select('*')
+        .eq('quotation_id', quotationData.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      if (data) {
+        setFreshAdjustmentData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching fresh adjustment data:', error);
+    }
+  };
 
   // Auto-save draft when modal opens (ensures document is always recorded)
   useEffect(() => {
@@ -161,7 +185,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
   const calculateFinalBalance = () => {
     const totalAmount = computedTotalAmount();
-    const adjustmentTotal = (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0);
+    const adjustmentTotal = (effectiveAdjustment.extra_km_total_charge || 0) + (effectiveAdjustment.total_additional_expenses || 0);
     const actualTotalPaid = getActualTotalPaid();
     const balance = (totalAmount + adjustmentTotal) - actualTotalPaid;
     return balance <= 0 ? 0 : balance;
@@ -169,7 +193,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
   const calculateOverpaidCredit = () => {
     const totalAmount = computedTotalAmount();
-    const adjustmentTotal = (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0);
+    const adjustmentTotal = (effectiveAdjustment.extra_km_total_charge || 0) + (effectiveAdjustment.total_additional_expenses || 0);
     const actualTotalPaid = getActualTotalPaid();
     const balance = (totalAmount + adjustmentTotal) - actualTotalPaid;
     return balance < 0 ? Math.abs(balance) : 0;
@@ -208,12 +232,12 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       document_type: 'invoice',
       forCustomer: options?.forCustomer ?? isCustomerInvoice,
       hasAdjustments: hasRealAdjustment,
-      extraKm: hasRealAdjustment ? adjustmentData.extra_km : undefined,
-      extraKmChargePerKm: hasRealAdjustment ? adjustmentData.extra_km_rate : undefined,
-      extraKmTotalCharge: hasRealAdjustment ? adjustmentData.extra_km_total_charge : undefined,
-      additionalExpenses: hasRealAdjustment ? adjustmentData.additional_expenses : undefined,
-      totalAdditionalExpenses: hasRealAdjustment ? adjustmentData.total_additional_expenses : undefined,
-      adjustmentNotes: hasRealAdjustment ? adjustmentData.adjustment_notes : undefined,
+      extraKm: hasRealAdjustment ? effectiveAdjustment.extra_km : undefined,
+      extraKmChargePerKm: hasRealAdjustment ? effectiveAdjustment.extra_km_rate : undefined,
+      extraKmTotalCharge: hasRealAdjustment ? effectiveAdjustment.extra_km_total_charge : undefined,
+      additionalExpenses: hasRealAdjustment ? effectiveAdjustment.additional_expenses : undefined,
+      totalAdditionalExpenses: hasRealAdjustment ? effectiveAdjustment.total_additional_expenses : undefined,
+      adjustmentNotes: hasRealAdjustment ? effectiveAdjustment.adjustment_notes : undefined,
     };
   };
 
@@ -266,12 +290,12 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
         if (error) throw error;
         setDocumentId(data.id);
 
-        if (adjustmentData.id) {
+        if (effectiveAdjustment.id) {
           // Link invoice to adjustment if adjustment exists
           await supabase
             .from('special_hire_trip_adjustments')
             .update({ balance_invoice_document_id: data.id })
-            .eq('id', adjustmentData.id);
+            .eq('id', effectiveAdjustment.id);
         }
       }
 
@@ -413,8 +437,8 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
         if (settings?.auto_post_invoices && !existingJE) {
           // Post GROSS invoice amount (before discount) — discount is posted separately
           const fullInvoiceAmount = computedTotalAmount() + 
-            (adjustmentData.extra_km_total_charge || 0) + 
-            (adjustmentData.total_additional_expenses || 0);
+            (effectiveAdjustment.extra_km_total_charge || 0) + 
+            (effectiveAdjustment.total_additional_expenses || 0);
           const discountAmount = quotationData.discount_amount_lkr || 0;
           
           const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
@@ -640,7 +664,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
           {/* Payment Timeline - fresh from DB */}
           <PaymentTimelineFresh
             quotationId={quotationData.id}
-            totalPayable={computedTotalAmount() + (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0)}
+            totalPayable={computedTotalAmount() + (effectiveAdjustment.extra_km_total_charge || 0) + (effectiveAdjustment.total_additional_expenses || 0)}
             onTotalPaidFetched={(total) => setFreshTotalPaid(total)}
           />
 
@@ -652,29 +676,29 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             <CardContent className="space-y-2">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <div className="text-muted-foreground">Total Payable</div>
-                  <div className="font-semibold">LKR {computedTotalAmount().toLocaleString()}</div>
+                  <div className="text-muted-foreground">Total Payable (incl. adjustments)</div>
+                  <div className="font-semibold">LKR {(computedTotalAmount() + (effectiveAdjustment.extra_km_total_charge || 0) + (effectiveAdjustment.total_additional_expenses || 0)).toLocaleString()}</div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Total Paid (All Payments)</div>
                   <div className="font-semibold text-green-600">LKR {getActualTotalPaid().toLocaleString()}</div>
                 </div>
-                {adjustmentData.extra_km_total_charge && adjustmentData.extra_km_total_charge > 0 && (
+                {effectiveAdjustment.extra_km_total_charge && effectiveAdjustment.extra_km_total_charge > 0 && (
                   <div>
                     <div className="text-muted-foreground">Extra Kilometers</div>
                     <div className="font-semibold text-orange-600">
-                      + LKR {adjustmentData.extra_km_total_charge.toLocaleString()}
+                      + LKR {effectiveAdjustment.extra_km_total_charge.toLocaleString()}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      ({adjustmentData.extra_km} km × LKR {adjustmentData.extra_km_rate})
+                      ({effectiveAdjustment.extra_km} km × LKR {effectiveAdjustment.extra_km_rate})
                     </div>
                   </div>
                 )}
-                {adjustmentData.total_additional_expenses && adjustmentData.total_additional_expenses > 0 && (
+                {effectiveAdjustment.total_additional_expenses && effectiveAdjustment.total_additional_expenses > 0 && (
                   <div>
                     <div className="text-muted-foreground">Additional Expenses</div>
                     <div className="font-semibold text-orange-600">
-                      + LKR {adjustmentData.total_additional_expenses.toLocaleString()}
+                      + LKR {effectiveAdjustment.total_additional_expenses.toLocaleString()}
                     </div>
                   </div>
                 )}
