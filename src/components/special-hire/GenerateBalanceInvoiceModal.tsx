@@ -576,14 +576,14 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             </Alert>
           )}
 
-          {/* Customer Invoice Info Alert */}
+          {/* Invoice Info Alert */}
           <Alert className="border-primary/50 bg-primary/5">
             <Info className="h-4 w-4" />
-            <AlertTitle>Customer-Facing Invoice</AlertTitle>
+            <AlertTitle>Final Invoice</AlertTitle>
             <AlertDescription>
-              This invoice is sent to the customer showing the final balance due. 
-              Signatures are not included as this is for customer reference only.
-              Internal approved invoices with signatures are generated after payment confirmation.
+              {hasRealAdjustment 
+                ? 'This invoice includes post-trip adjustments (extra KM, additional expenses) and shows the final balance due.'
+                : 'This is the final invoice for the completed trip based on the original quotation amounts.'}
             </AlertDescription>
           </Alert>
 
