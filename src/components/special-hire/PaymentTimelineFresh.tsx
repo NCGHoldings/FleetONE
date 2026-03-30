@@ -45,12 +45,12 @@ export function PaymentTimelineFresh({
     try {
       const { data, error } = await supabase
         .from('special_hire_payments')
-        .select('id, amount, payment_type, status, created_at, payment_date, payment_method, reference_number')
+        .select('id, amount, payment_type, status, created_at, payment_method, reference_number')
         .eq('quotation_id', quotationId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      const fetched = data || [];
+      const fetched = (data || []) as unknown as Payment[];
       setPayments(fetched);
 
       // Notify parent with fresh total
@@ -134,7 +134,7 @@ export function PaymentTimelineFresh({
                   <div className="flex items-center gap-2 mt-0.5">
                     {getStatusBadge(payment.status)}
                     <span className="text-xs text-muted-foreground">
-                      {format(new Date(payment.payment_date || payment.created_at), 'MMM dd, HH:mm')}
+                      {format(new Date(payment.created_at), 'MMM dd, HH:mm')}
                     </span>
                     {payment.payment_method && (
                       <span className="text-xs text-muted-foreground">
