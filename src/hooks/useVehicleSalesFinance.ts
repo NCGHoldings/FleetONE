@@ -530,7 +530,7 @@ export async function resolveItemCategoryRevenueAccount(
 const MODULE_CATEGORY_MAP: Record<VehicleModule, string> = {
   yutong: 'Yutong Sales',
   sinotruck: 'Sinotruk Sales',
-  light_vehicle: 'Light Vehicle Sales',
+  lightvehicle: 'Light Vehicle Sales',
 };
 
 /**
