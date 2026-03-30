@@ -1636,6 +1636,8 @@ export function ConfirmedTripsTable() {
             driver_name: selectedTrip.assigned_driver_name,
             conductor_name: selectedTrip.assigned_conductor_name,
             bus_no: selectedTrip.assigned_bus_no,
+            tripDistance: getTripDistance(selectedTrip),
+            totalKm: calculateTotalKm(selectedTrip),
           }}
           adjustmentData={{
             id: selectedAdjustment?.id || '',
