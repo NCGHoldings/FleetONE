@@ -1,93 +1,105 @@
 
 
-# Fix AR/AP Auto GL Posting Across All Modules + Full Flow Diagram
+# Fix Special Hire Trip Page: Document Generation, Balance Invoice & Full Flow
 
-## Current State Analysis
+## Problems Found
 
-After thorough code review, here is the complete status of every invoice creation point in the system:
+From code analysis and DB data:
 
-### AR Invoice Creation Points
+### Issue 1: First-time document generation fails silently
+When a payment is confirmed (line 418), `generateAndStoreDraftDocument` runs fire-and-forget in background. If it fails (e.g., PDF generation error, storage upload error), user sees "Payment confirmed!" but no document appears. The only indication is a console error.
 
-| Source | File | GL at Create? | GL at Approve? | Category Resolution? | Status |
-|--------|------|:---:|:---:|:---:|--------|
-| Manual AR (Accounting module) | `useAccountingMutations.ts` L395-428 | YES | N/A | YES (customer category) | OK |
-| School Bus bulk AR | `useSchoolBusFinance.ts` L627-650 | YES (separate JE) | N/A | Uses branch settings | OK |
-| School Bus backfill AR | `useSchoolBusFinance.ts` L1152-1169 | NO | N/A | NO | MISSING |
-| Special Hire AR | `useSpecialHireFinance.ts` L1550-1568 | Passed from caller | N/A | NO (uses SPH settings) | PARTIAL |
-| Vehicle Sales AR (YUT/SNT/LTV) | `useVehicleSalesFinance.ts` L272-291 | NO | YES (at approval) | YES (at approval) | OK per user choice |
-| `useCompanyMutations.ts` AR | L85-148 | NO | N/A | NO | MISSING |
+### Issue 2: Balance invoice shows wrong balance when fully paid
+The `calculateFinalBalance()` in `GenerateBalanceInvoiceModal.tsx` (line 138-142) calculates:
+```
+balance_due + adjustments
+```
+But `balance_due` from DB is the **original** balance (total - advance), not accounting for subsequent balance payments. DB example: `sudaraka perera` — total_paid=134,980 vs customer_total=134,976 → balance_due=-4, yet if accessed before trigger updates, it shows stale positive balance. The invoice generator also uses `paidAmount = advanceAmount` (line 166) instead of actual `total_paid`.
 
-### AP Invoice Creation Points
+### Issue 3: Sales receipt and final invoice not showing after finance approval
+The `performBackgroundIntegration` (line 101 in useFinanceApproval.ts) regenerates draft→approved documents but only for existing `document_storage` rows with `payment_id` match. If the initial draft generation failed (Issue 1), there's nothing to regenerate, so no document appears.
 
-| Source | File | GL at Create? | Category Resolution? | Status |
-|--------|------|:---:|:---:|--------|
-| Manual AP (Accounting module) | `useAccountingMutations.ts` L765-813 | YES | YES (vendor category) | OK |
-| Manual AP Approval | `useAccountingMutations.ts` L1685-1751 | GUARD (skip if exists) | YES (vendor category) | OK |
-| Fuel Expense AP | `useFuelExpenseFinance.ts` L242-258 | YES (linked JE from expense) | Uses fuel settings | OK |
-| Maintenance AP | `useMaintenanceFinance.ts` L311-332 | YES (linked JE from maint) | Uses maintenance settings | OK |
-| Expense Request AP | `useExpenseRequestFinance.ts` L337-360 | YES (linked JE from expense) | Uses expense mappings | OK |
-| Leasing AP | `useLeasingFinance.ts` L156-175 | NO | Uses leasing settings | MISSING |
-| `useCompanyMutations.ts` AP | L243-285 | NO | NO | MISSING |
+### Issue 4: Invoice balance calculation uses wrong `totalAmount`
+In `generateInvoiceData()` (line 163): `totalAmount: quotationData.original_quotation_amount` — but this field comes from `selectedAdjustment.original_quotation_amount` which may be 0 or stale. Meanwhile, the actual total should be `gross_revenue + fuel + commission + additional - discount`.
 
-### Key Gaps to Fix
+### Issue 5: Missing "Generate Document" action for trips without documents
+If a trip has approved payments but no documents (due to Issue 1), there's no easy way to create them except "Re-generate Sales Receipt/Final Invoice" in dropdown — but these call `generateApprovedInvoice` which just downloads a PDF, doesn't store it.
 
-1. **`useCompanyMutations.ts` - `useCompanyCreateARInvoice`**: No GL posting, no category resolution. This is a legacy hook -- need to add GL posting matching `useAccountingMutations.ts` pattern.
-2. **`useCompanyMutations.ts` - `useCompanyCreateAPInvoice`**: No GL posting, no category resolution. Same fix needed.
-3. **Leasing AP Invoice** (`useLeasingFinance.ts` L156-175): Creates AP invoice without `journal_entry_id` link. The GL is posted separately on payment, but the invoice itself has no JE at creation.
-4. **School Bus Backfill AR** (`useSchoolBusFinance.ts` L1152-1169): Creates AR invoices without GL posting (backfill scenario -- acceptable since these are historical).
+### Issue 6: Pre-existing build errors
+Multiple TS errors in lightvehicle, fleet, and accounting components (unrelated to special hire). Need to fix to ensure deployment.
 
 ## Plan
 
-### File 1: `src/hooks/useCompanyMutations.ts`
+### File 1: `src/hooks/useDocumentManagement.ts`
+**Add `generateDocumentForPayment` method** — a reliable document creation method that:
+- Takes a `paymentId` and creates a proper sales_receipt (advance) or invoice (balance/full) document
+- Checks for existing document first (no duplicates)
+- Uses proper error handling (not fire-and-forget)
+- Fetches fresh payment + quotation data from DB
+- Computes `totalAmount` correctly using the standard formula
+- Uses actual `total_paid` from approved payments for balance calculation
 
-**`useCompanyCreateARInvoice` (lines 85-148)**: Add auto GL posting after insert, same pattern as `useAccountingMutations.ts`:
-- Import `resolveCustomerARAccounts` from `useCustomerCategories`
-- After line insert, resolve customer category for AR/revenue accounts
-- Fall back to `gl_settings.trade_receivable_account_id` / `sales_revenue_account_id`
-- Call `postARInvoiceToGL()` from `gl-posting-utils.ts`
-- Link `journal_entry_id` back to `ar_invoices` record
-- Add `journal-entries` and `chart-of-accounts` to `onSuccess` invalidation
+### File 2: `src/components/special-hire/ConfirmedTripsTable.tsx`
+- **Fix fire-and-forget document generation** (lines 391-432): Make `generateAndStoreDraftDocument` awaited with proper error recovery. If it fails, show actionable error toast instead of success.
+- **Add "Generate Document" dropdown item** for approved payments that have no document in `document_storage`
+- **Fix balance calculation in `calculateTotalAmount`**: Include post-trip adjustment total from `special_hire_trip_adjustments` data
+- **Fix `viewInvoice` balance data** (line 852): Use actual `total_paid` from DB, not just `advance_paid`
 
-**`useCompanyCreateAPInvoice` (lines 243-285)**: Add auto GL posting after insert:
-- Import `resolveVendorAPAccounts` from `useVendorCategories`
-- After insert, resolve vendor category for AP/expense accounts
-- Call `postAPInvoiceToGL()` from `gl-posting-utils.ts`
-- Link `journal_entry_id` back to `ap_invoices` record
-- Add `journal-entries` and `chart-of-accounts` to `onSuccess` invalidation
+### File 3: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
+- **Fix `calculateFinalBalance`** (line 138): Use actual total amount minus total paid, not stale `balance_due`
+- **Fix `generateInvoiceData`** (line 163): Calculate `totalAmount` properly: `gross_revenue + fuel + commission + additional_charges - discount`
+- **Fix `paidAmount`** (line 166): Fetch and use actual `total_paid` from all approved payments instead of just `advance_paid`
+- **Handle fully-paid scenario**: If total_paid >= totalAmount, show "Settled" instead of a positive balance
 
-### File 2: `src/hooks/useLeasingFinance.ts`
+### File 4: `src/hooks/useFinanceApproval.ts`
+- **Fix `performBackgroundIntegration`** (line 341-421): If no draft document exists for the payment, create one instead of silently skipping
+- **Fix `generateApprovedInvoice`** (line 487-553): Store the generated document in `document_storage` instead of just downloading it
 
-**`createLeasingAPInvoice` (lines 130-211)**: The GL JE is already created separately in `postLeasingPaymentToGL`. However, the AP invoice created here does not link a JE. This is by design (leasing GL posts at payment time, not at invoice creation). No change needed -- the leasing payment flow handles GL correctly.
+### File 5: `src/lib/invoice-generator.ts`
+- **Fix balance calculation** (line 219): Use `balanceAmount` field when explicitly provided (for balance invoices), falling back to computed `priceAfterDiscount - totalPaid`
+- Ensure negative balances display as "Overpaid" or "0.00" instead of negative numbers
 
-### File 3: Update Flow Diagram
+### File 6: Fix pre-existing build errors
+- `src/components/accounting/APPaymentForm.tsx` — Fix `SearchableAccountSelector` prop name
+- `src/components/accounting/ARReceiptForm.tsx` — Same fix
+- `src/components/fleet/FleetMasterSpreadsheetCore.tsx` — Fix property names
+- Lightvehicle files — Add type assertions for Supabase query results
 
-Create/update `src/components/accounting/InvoiceGLFlowDiagram.tsx` with a comprehensive flow showing all modules and their GL posting behavior.
-
-### File 4: Generate Mermaid Diagram
-
-Create a comprehensive Mermaid diagram at `/mnt/documents/gl-posting-flow.mmd` showing:
+### Deliverable: Full flow diagram
+Generate Mermaid diagram at `/mnt/documents/special-hire-document-flow.mmd` showing:
 
 ```text
-Organization Structure:
-  NCG Holding (Parent)
-    ├── SBO (School Bus) ─── AR: GL at bulk create
-    ├── YUT (Yutong) ────── AR: GL at approval
-    ├── SNT (Sinotruck) ──── AR: GL at approval
-    ├── LTV (Light Vehicle) ─ AR: GL at approval
-    ├── SPH (Special Hire) ── AR: GL at create (via caller)
-    └── FLEET (Leasing) ──── AP: GL at payment
-  NCG Express (Standalone)
-    └── NCGE ─────────────── Revenue/Expense GL at posting
+SPECIAL HIRE DOCUMENT FLOW (A-to-Z)
 
-Manual AR/AP Flow:
-  Create Invoice → Resolve Category (3-tier) → Post GL → Link JE
-  Approve Invoice → Check journal_entry_id → Skip if exists
+1. Quotation Confirmed
+   |
+2. Payment Confirmed (Advance/Balance/Full)
+   |→ Create draft document (sales_receipt for advance, invoice for balance/full)
+   |→ Auto-add Prepared By signature
+   |→ Store in document_storage
+   |
+3. Finance Approval
+   |→ Update payment status → approved
+   |→ Background: Create/Get Customer → Create AR Invoice → Post GL → Create AR Receipt
+   |→ Auto-add Checked By signature
+   |→ Regenerate document as APPROVED (remove DRAFT watermark)
+   |   ↳ If no document exists: CREATE one first, then approve
+   |
+4. Balance Invoice (Post-Trip)
+   |→ Finalize post-trip adjustments
+   |→ Generate balance invoice with adjustments
+   |→ Balance = (grossRevenue + fuel + commission + additional - discount + adjustments) - totalPaid
+   |→ Email to customer (forCustomer=true, no signatures)
+   |→ Post GL: DR Receivable / CR Revenue
+   |
+5. Document Actions
+   |→ View Documents: Shows all docs for quotation
+   |→ Regenerate: Re-creates PDF with latest data/signatures
+   |→ Re-generate Sales Receipt / Final Invoice: Creates + stores if missing
 ```
 
-## Summary of Changes
-
-- Fix 2 legacy hooks in `useCompanyMutations.ts` to auto-post GL with category resolution
-- Build comprehensive Mermaid flow diagram covering all companies and modules
-- Update the InvoiceGLFlowDiagram component with complete cross-module status
-- All other modules (manual AR/AP, fuel, maintenance, expense, vehicle sales, special hire, school bus) are already correctly posting GL
+## Summary
+- Fix 6 files to make document generation reliable, balance calculations correct, and missing documents recoverable
+- Fix pre-existing build errors for deployment
+- Generate comprehensive flow diagram
 
