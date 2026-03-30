@@ -290,12 +290,12 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
         if (error) throw error;
         setDocumentId(data.id);
 
-        if (adjustmentData.id) {
+        if (effectiveAdjustment.id) {
           // Link invoice to adjustment if adjustment exists
           await supabase
             .from('special_hire_trip_adjustments')
             .update({ balance_invoice_document_id: data.id })
-            .eq('id', adjustmentData.id);
+            .eq('id', effectiveAdjustment.id);
         }
       }
 
