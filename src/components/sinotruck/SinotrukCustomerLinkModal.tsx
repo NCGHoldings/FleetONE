@@ -42,7 +42,7 @@ export function SinotrukCustomerLinkModal({
       setLoading(true);
 
       // Get all unique customer names from quotations
-      const { data: quotations, error } = await supabase
+      const { data: quotations, error } = await (supabase as any)
         .from("sinotruck_quotations")
         .select("customer_name, company_name, is_sub_customer, main_customer_name")
         .order("customer_name");
