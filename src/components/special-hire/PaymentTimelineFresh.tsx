@@ -14,7 +14,7 @@ interface Payment {
   created_at: string;
   payment_date?: string;
   payment_method?: string;
-  reference_number?: string;
+  reference_no?: string;
 }
 
 interface PaymentTimelineFreshProps {
@@ -45,7 +45,7 @@ export function PaymentTimelineFresh({
     try {
       const { data, error } = await supabase
         .from('special_hire_payments')
-        .select('id, amount, payment_type, status, created_at, payment_method, reference_number')
+        .select('id, amount, payment_type, status, created_at, payment_method, reference_no')
         .eq('quotation_id', quotationId)
         .order('created_at', { ascending: true });
 

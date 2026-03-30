@@ -801,7 +801,16 @@ export function ConfirmedTripsTable() {
     if (result.success) {
       setFinanceApprovalModalOpen(false);
       setSelectedFinancePayment(null);
-      refetch();
+      // Refresh both quotation data and document statuses
+      await refetch();
+      // Also reload document statuses for all visible quotations
+      if (selectedFinancePayment?.quotation_id) {
+        try {
+          await getDocumentsByQuotation(selectedFinancePayment.quotation_id);
+        } catch (e) {
+          console.log('Document refresh after approval:', e);
+        }
+      }
     }
   };
 
