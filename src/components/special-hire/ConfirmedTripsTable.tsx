@@ -846,7 +846,7 @@ export function ConfirmedTripsTable() {
         dropLocation: quotation.drop_location,
         pickupDate: new Date(quotation.pickup_datetime),
         dropDate: new Date(quotation.drop_datetime || quotation.pickup_datetime),
-        busType: (() => { try { const fd = typeof quotation.bus_fleet_details === 'string' ? JSON.parse(quotation.bus_fleet_details) : quotation.bus_fleet_details; return fd?.buses?.[0]?.bus_type_name || (quotation as any).bus_types?.name || 'Standard Bus'; } catch { return 'Standard Bus'; } })(),
+        busType: (() => { try { const fd = typeof (quotation as any).bus_fleet_details === 'string' ? JSON.parse((quotation as any).bus_fleet_details) : (quotation as any).bus_fleet_details; return fd?.buses?.[0]?.bus_type_name || (quotation as any).bus_types?.name || 'Standard Bus'; } catch { return 'Standard Bus'; } })(),
         numberOfBuses: quotation.number_of_buses,
         numberOfPassengers: quotation.number_of_passengers,
         totalAmount: calculateTotalAmount(quotation),
