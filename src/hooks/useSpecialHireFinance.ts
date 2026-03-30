@@ -148,8 +148,8 @@ export async function postAdvancePaymentToGLStandalone({
   return journalEntry;
 }
 
-// Standalone function to post FULL payment to GL (direct revenue recognition)
-// DR Bank/Cash (Asset) | CR Special Hire Revenue (Revenue)
+// Standalone function to post FULL payment to GL (follows AR flow: DR Bank / CR Customer Advance)
+// Full payments now go through the same advance flow, then AR Invoice handles revenue recognition
 export async function postFullPaymentToGLStandalone({
   quotationNo,
   customerName,
@@ -163,16 +163,14 @@ export async function postFullPaymentToGLStandalone({
   settings: any;
   effectiveCompanyId: string;
 }) {
-  const revenueAccountId = settings?.revenue_external_account_id;
-  
-  if (!settings?.default_bank_account_id || !revenueAccountId) {
+  if (!settings?.default_bank_account_id || !settings?.customer_advance_account_id) {
     console.warn("GL accounts not configured for Special Hire full payments");
     return null;
   }
 
   const entryNumber = `SPH-FULL-${quotationNo}-${Date.now().toString(36).toUpperCase()}`;
 
-  // Create journal entry
+  // Create journal entry — same as advance: DR Bank / CR Customer Advance
   const { data: journalEntry, error: jeError } = await supabase
     .from("journal_entries")
     .insert({
@@ -192,9 +190,8 @@ export async function postFullPaymentToGLStandalone({
 
   if (jeError) throw jeError;
 
-  // Create journal entry lines
   // DR Bank/Cash (Asset increases with Debit)
-  // CR Special Hire Revenue (Revenue increases with Credit)
+  // CR Customer Advance (Liability increases with Credit) — revenue recognized later via AR Invoice
   const { error: linesError } = await supabase
     .from("journal_entry_lines")
     .insert([
@@ -208,8 +205,8 @@ export async function postFullPaymentToGLStandalone({
       },
       {
         journal_entry_id: journalEntry.id,
-        account_id: revenueAccountId,
-        description: `Revenue - Special Hire ${quotationNo}`,
+        account_id: settings.customer_advance_account_id,
+        description: `Customer advance - Full payment ${quotationNo}`,
         debit: 0,
         credit: amount,
         company_id: effectiveCompanyId,
@@ -1572,20 +1569,22 @@ export async function createSPHARInvoice({
       throw invoiceError;
     }
 
-    // ========== AUTO GL POSTING if no journalEntryId was provided ==========
+    // ========== AUTO GL POSTING using SPH Finance Settings ==========
     if (!journalEntryId && totalAmount > 0) {
       try {
-        const { resolveCustomerARAccounts } = await import('@/hooks/useCustomerCategories');
-        const resolved = await resolveCustomerARAccounts(customerId, companyId);
+        // Use SPH-specific finance settings instead of generic category resolver
+        const sphSettings = await fetchSpecialHireFinanceSettings(companyId);
+        const tradeReceivableId = sphSettings?.trade_receivable_account_id;
+        const revenueAccountId = sphSettings?.revenue_external_account_id || sphSettings?.revenue_internal_account_id;
 
-        if (resolved.arAccountId && resolved.revenueAccountId) {
+        if (tradeReceivableId && revenueAccountId) {
           const { postARInvoiceToGL } = await import('@/lib/gl-posting-utils');
           const glResult = await postARInvoiceToGL({
             invoiceNumber: invoiceNumber,
             invoiceDate: format(new Date(), 'yyyy-MM-dd'),
             totalAmount: totalAmount,
-            tradeReceivableId: resolved.arAccountId,
-            salesRevenueId: resolved.revenueAccountId,
+            tradeReceivableId: tradeReceivableId,
+            salesRevenueId: revenueAccountId,
             companyId: companyId,
             businessUnitCode: 'SPH',
             customerName: customerName,
@@ -1596,12 +1595,12 @@ export async function createSPHARInvoice({
               .from('ar_invoices')
               .update({ journal_entry_id: glResult.journalEntryId })
               .eq('id', invoice.id);
-            console.log('[SPH AR] GL posted for AR Invoice:', invoiceNumber);
+            console.log('[SPH AR] GL posted for AR Invoice:', invoiceNumber, '→ Revenue:', revenueAccountId);
           } else {
             console.warn('[SPH AR] GL posting failed:', glResult.error);
           }
         } else {
-          console.warn('[SPH AR] Missing GL accounts for AR posting:', resolved.missingAccounts);
+          console.warn('[SPH AR] Missing SPH GL accounts. Receivable:', tradeReceivableId, 'Revenue:', revenueAccountId);
         }
       } catch (glErr) {
         console.warn('[SPH AR] GL posting error:', glErr);
@@ -1660,14 +1659,13 @@ export async function updateSPHARInvoiceOnPayment({
     const newBalance = invoice.total_amount - newPaidAmount;
     const newStatus = newBalance <= 0 ? 'paid' : (newPaidAmount > 0 ? 'partial' : 'unpaid');
 
-    // Update AR Invoice
+    // Update AR Invoice — do NOT overwrite journal_entry_id (keep revenue-recognition JE)
     const { error: updateError } = await supabase
       .from('ar_invoices')
       .update({
         paid_amount: newPaidAmount,
         balance: newBalance,
         status: newStatus,
-        journal_entry_id: journalEntryId || invoice.journal_entry_id,
         updated_at: new Date().toISOString(),
       })
       .eq('id', arInvoiceId);
