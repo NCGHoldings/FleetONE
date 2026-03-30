@@ -1467,7 +1467,7 @@ export function ConfirmedTripsTable() {
 
                                 <DropdownMenuSeparator />
 
-                                {/* === REGENERATE === */}
+                                {/* === FINANCE / REGENERATE === */}
                                 {approvedPayments.length > 0 && (
                                   <>
                                     {approvedPayments.filter(p => p.payment_type === 'advance').map(p => (
