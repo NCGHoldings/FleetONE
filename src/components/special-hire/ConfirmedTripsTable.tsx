@@ -1971,6 +1971,24 @@ export function ConfirmedTripsTable() {
           }}
         />
       )}
+
+      {/* Payment History Dialog */}
+      {paymentHistoryModalOpen && selectedTrip && (
+        <Dialog open={paymentHistoryModalOpen} onOpenChange={setPaymentHistoryModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Payment History - {selectedTrip.quotation_no}
+              </DialogTitle>
+            </DialogHeader>
+            <PaymentTimelineFresh
+              quotationId={selectedTrip.id}
+              totalPayable={calculateTotalAmount(selectedTrip)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
