@@ -205,7 +205,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
     const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
     const finalBalance = calculateFinalBalance();
     const totalAmount = computedTotalAmount();
-    const actualTotalPaid = quotationData.total_paid ?? quotationData.advance_paid ?? 0;
+    const actualTotalPaid = freshTotalPaid ?? quotationData.total_paid ?? quotationData.advance_paid ?? 0;
 
     return {
       invoiceNo,
@@ -226,6 +226,8 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       advanceAmount: quotationData.advance_paid,
       balanceAmount: finalBalance,
       paidAmount: actualTotalPaid,
+      tripDistance: quotationData.tripDistance,
+      totalKm: quotationData.totalKm,
       companyLogo,
       vehicleNo: quotationData.bus_no,
       driverName: quotationData.driver_name,
