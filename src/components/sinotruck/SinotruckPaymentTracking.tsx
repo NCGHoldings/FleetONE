@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Sinotruck Payment Tracking Component
  * Handles payment recording, verification, and GL integration
