@@ -1248,20 +1248,45 @@ export function ConfirmedTripsTable() {
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                {/* Operations actions */}
+                              <DropdownMenuContent align="end" className="w-56">
+                                {/* === PAYMENT === */}
+                                {isOperationsUser && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedTrip(trip);
+                                      setPaymentModalOpen(true);
+                                    }}
+                                  >
+                                    <CreditCard className="w-4 h-4 mr-2" />
+                                    Confirm Payment
+                                  </DropdownMenuItem>
+                                )}
+
+                                {isFinanceUser && pendingFinancePayments.length > 0 && (
+                                  <>
+                                    {pendingFinancePayments.map((payment) => (
+                                      <DropdownMenuItem
+                                        key={payment.id}
+                                        onClick={() => {
+                                          setSelectedFinancePayment({
+                                            ...payment,
+                                            quotation: trip
+                                          });
+                                          setFinanceApprovalModalOpen(true);
+                                        }}
+                                      >
+                                        <FileCheck className="w-4 h-4 mr-2" />
+                                        Approve Payment (LKR {payment.amount.toLocaleString()})
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </>
+                                )}
+
+                                <DropdownMenuSeparator />
+
+                                {/* === OPERATIONS === */}
                                 {isOperationsUser && (
                                   <>
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        setSelectedTrip(trip);
-                                        setPaymentModalOpen(true);
-                                      }}
-                                    >
-                                      <CreditCard className="w-4 h-4 mr-2" />
-                                      Confirm Payment
-                                    </DropdownMenuItem>
-                                    
                                     <DropdownMenuItem
                                       onClick={() => {
                                         setSelectedTrip(trip);
@@ -1298,89 +1323,44 @@ export function ConfirmedTripsTable() {
                                         )}
                                       </DropdownMenuItem>
                                     )}
-                                    
-                                    <DropdownMenuSeparator />
                                   </>
                                 )}
 
-                                {/* Finance actions */}
-                                {isFinanceUser && pendingFinancePayments.length > 0 && (
-                                  <>
-                                    {pendingFinancePayments.map((payment) => (
-                                      <DropdownMenuItem
-                                        key={payment.id}
-                                        onClick={() => {
-                                          setSelectedFinancePayment({
-                                            ...payment,
-                                            quotation: trip
-                                          });
-                                          setFinanceApprovalModalOpen(true);
-                                        }}
-                                      >
-                                        <FileCheck className="w-4 h-4 mr-2" />
-                                        Approve Payment (LKR {payment.amount.toLocaleString()})
-                                      </DropdownMenuItem>
-                                    ))}
-                                    <DropdownMenuSeparator />
-                                  </>
-                                )}
+                                <DropdownMenuSeparator />
 
-                                {/* Re-generate receipts/invoices for approved payments */}
+                                {/* === DOCUMENTS === */}
+                                <DropdownMenuItem
+                                  onClick={async () => {
+                                    await loadDocuments(trip.id);
+                                    setSelectedTrip(trip);
+                                    setDocumentsModalOpen(true);
+                                  }}
+                                >
+                                  <FileCheck className="w-4 h-4 mr-2" />
+                                  View Documents
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem onClick={() => viewInvoice(trip)}>
+                                  <Receipt className="w-4 h-4 mr-2" />
+                                  View Invoice
+                                </DropdownMenuItem>
+
+                                {/* Generate Final Invoice - works WITH or WITHOUT adjustment */}
                                 {approvedPayments.length > 0 && (
-                                  <>
-                                    {approvedPayments.filter(p => p.payment_type === 'advance').map(p => (
-                                      <DropdownMenuItem
-                                        key={`receipt-${p.id}`}
-                                        onClick={() => generateApprovedInvoice(p.id)}
-                                        disabled={financeLoading}
-                                      >
-                                        <RotateCcw className="w-4 h-4 mr-2" />
-                                        Re-generate Sales Receipt
-                                      </DropdownMenuItem>
-                                    ))}
-                                    {approvedPayments.filter(p => p.payment_type === 'balance' || p.payment_type === 'full').map(p => (
-                                      <DropdownMenuItem
-                                        key={`invoice-${p.id}`}
-                                        onClick={() => generateApprovedInvoice(p.id)}
-                                        disabled={financeLoading}
-                                      >
-                                      <RotateCcw className="w-4 h-4 mr-2" />
-                                        Re-generate Final Invoice
-                                      </DropdownMenuItem>
-                                    ))}
-
-                                    {/* Retry AR Integration for approved payments missing AR link */}
-                                    {isFinanceUser && !trip.ar_invoice_id && approvedPayments.length > 0 && (
-                                      <DropdownMenuItem
-                                        onClick={async () => {
-                                          const firstPayment = approvedPayments[0];
-                                          const result = await retryARIntegration(firstPayment.id);
-                                          if (result.success) {
-                                            refetch();
-                                          }
-                                        }}
-                                        disabled={financeLoading}
-                                      >
-                                        <RefreshCw className="w-4 h-4 mr-2" />
-                                        Retry AR Integration
-                                      </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuSeparator />
-                                  </>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedTrip(trip);
+                                      const adj = adjustmentsData[trip.id];
+                                      setSelectedAdjustment(adj || null);
+                                      setBalanceInvoiceModalOpen(true);
+                                    }}
+                                  >
+                                    <FileText className="w-4 h-4 mr-2 text-orange-600" />
+                                    Generate Final Invoice
+                                  </DropdownMenuItem>
                                 )}
 
-                <DropdownMenuItem
-                  onClick={async () => {
-                    await loadDocuments(trip.id);
-                    setSelectedTrip(trip);
-                    setDocumentsModalOpen(true);
-                  }}
-                >
-                  <FileCheck className="w-4 h-4 mr-2" />
-                  View Documents
-                </DropdownMenuItem>
-
-                                {/* Show View Balance Invoice if adjustment exists and invoice was generated */}
+                                {/* View existing Balance Invoice */}
                                 {adjustmentsData[trip.id]?.balance_invoice_document_id && (
                                   <DropdownMenuItem
                                     onClick={async () => {
@@ -1407,11 +1387,51 @@ export function ConfirmedTripsTable() {
                                     View Balance Invoice
                                   </DropdownMenuItem>
                                 )}
-                                
-                                <DropdownMenuItem onClick={() => viewInvoice(trip)}>
-                                  <Receipt className="w-4 h-4 mr-2" />
-                                  View Invoice
-                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator />
+
+                                {/* === REGENERATE === */}
+                                {approvedPayments.length > 0 && (
+                                  <>
+                                    {approvedPayments.filter(p => p.payment_type === 'advance').map(p => (
+                                      <DropdownMenuItem
+                                        key={`receipt-${p.id}`}
+                                        onClick={() => generateApprovedInvoice(p.id)}
+                                        disabled={financeLoading}
+                                      >
+                                        <RotateCcw className="w-4 h-4 mr-2" />
+                                        Re-generate Sales Receipt
+                                      </DropdownMenuItem>
+                                    ))}
+                                    {approvedPayments.filter(p => p.payment_type === 'balance' || p.payment_type === 'full').map(p => (
+                                      <DropdownMenuItem
+                                        key={`invoice-${p.id}`}
+                                        onClick={() => generateApprovedInvoice(p.id)}
+                                        disabled={financeLoading}
+                                      >
+                                        <RotateCcw className="w-4 h-4 mr-2" />
+                                        Re-generate Final Invoice
+                                      </DropdownMenuItem>
+                                    ))}
+
+                                    {/* Retry AR Integration */}
+                                    {isFinanceUser && !trip.ar_invoice_id && (
+                                      <DropdownMenuItem
+                                        onClick={async () => {
+                                          const firstPayment = approvedPayments[0];
+                                          const result = await retryARIntegration(firstPayment.id);
+                                          if (result.success) {
+                                            refetch();
+                                          }
+                                        }}
+                                        disabled={financeLoading}
+                                      >
+                                        <RefreshCw className="w-4 h-4 mr-2" />
+                                        Retry AR Integration
+                                      </DropdownMenuItem>
+                                    )}
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
