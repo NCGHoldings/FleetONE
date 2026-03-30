@@ -1,100 +1,82 @@
 
+# Fix Special Hire Finance Approval Capture First
 
-# Fix Final Invoice: Fresh Payment Data + Payment Timeline Monitor
+## What I found
 
-## Root Cause
+There are 2 separate bugs causing what you see:
 
-The Final Invoice modal receives `total_paid` as a **prop from the parent table**. If the user opens the modal before the realtime subscription refreshes (common after confirming a payment), the prop contains **stale data** -- e.g., only the balance payment (20,200) instead of the cumulative total (40,367.50).
+1. Payment History / approved total shows `0`
+- `src/components/special-hire/PaymentTimelineFresh.tsx` is querying `reference_number`
+- Actual DB column is `reference_no`
+- Because of that query error, the component fails, shows `0 payments`, and sends `0` back to the Final Invoice modal
 
-**DB confirms the data IS correct:**
-- QUO-2025-0741-v1.3: `total_paid = 40,367.50` (advance 20,167.50 + balance 20,200)
-- But invoice generated with `Total Paid: 20,200` -- only the last payment
+2. Sales Receipt stays looking like draft / not moving correctly after finance approval
+- Finance approval updates `document_status` to `approved`
+- But several places still rely on incomplete/stale document data and `invoice_status` remains `draft`
+- DB confirms approved records exist, but UI flow is not consistently reading the right status source
 
-The modal must **fetch fresh payment data directly from DB** when it opens, not rely on props.
+## Implementation plan
 
-## Changes
+### 1. Fix the broken payment timeline query
+Update `src/components/special-hire/PaymentTimelineFresh.tsx`:
+- Replace `reference_number` with `reference_no`
+- Align the local type too
+- Keep approved total based only on `status === 'approved'`
 
-### 1. Fetch fresh cumulative payments when modal opens
+This should immediately fix:
+- approved amount showing `0`
+- payment history modal showing no payments
+- fresh total passed into Final Invoice modal
 
-**File: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`**
+### 2. Make document approval status use `document_status` as the source of truth
+Audit and fix Special Hire document status checks so approved Sales Receipts are treated as approved when:
+- `document_status === 'approved'`
+- not `invoice_status`
 
-Add a `useEffect` that runs when `open` becomes true:
-- Query `special_hire_payments` WHERE `quotation_id = id` AND `status = 'approved'`
-- SUM all payment amounts → `freshTotalPaid`
-- Use `freshTotalPaid` instead of `quotationData.total_paid` in all calculations
+Focus files:
+- `src/components/special-hire/ConfirmedTripsTable.tsx`
+- `src/components/special-hire/DocumentReadyIndicator.tsx`
+- `src/components/special-hire/SignatureWorkflowIndicator.tsx`
+- any document list/view logic that still behaves as if draft remains active
 
-This eliminates the stale-prop problem entirely. The modal always works with real-time DB data.
+### 3. Refresh document state immediately after finance approval
+In `src/components/special-hire/ConfirmedTripsTable.tsx`:
+- after `approvePayment(...)` succeeds, reload both:
+  - quotations/payment data via `refetch()`
+  - document status via `loadDocumentStatus(...)` for the related quotation
+- make sure the selected finance payment carries quotation id if needed, or fetch it before refresh
 
-### 2. Add Payment Timeline component to the Final Invoice modal
+This removes the UI lag where payment is approved but the row still looks old.
 
-**File: `src/components/special-hire/PaymentTimeline.tsx`** (NEW)
+### 4. Make approved Sales Receipt preview/load pick the latest approved document correctly
+Review document selection logic in:
+- `src/components/special-hire/FinanceApprovalModal.tsx`
+- `src/hooks/useDocumentManagement.ts`
+- `src/components/special-hire/DocumentViewer.tsx`
 
-A small reusable component showing the full payment history for a quotation:
+Adjust so:
+- approved payment → approved document is preferred
+- draft document is only fallback before finance approval
+- preview buttons open the correct approved Sales Receipt after finance approval
 
-```text
-┌─────────────────────────────────────────────┐
-│ Payment History                             │
-├─────────────────────────────────────────────┤
-│ ● Advance  │ LKR 20,167.50 │ ✅ Approved  │
-│   Mar 30, 18:03                             │
-│ ● Balance  │ LKR 20,200.00 │ ✅ Approved  │
-│   Mar 30, 18:06                             │
-├─────────────────────────────────────────────┤
-│ Total Paid: LKR 40,367.50                  │
-│ Total Payable: LKR 40,335.00               │
-│ Overpaid Credit: LKR 32.50                 │
-└─────────────────────────────────────────────┘
-```
+### 5. Clean up the mixed draft flags
+Right now DB records often become:
+- `document_status = approved`
+- `invoice_status = draft`
 
-- Fetches directly from `special_hire_payments` table
-- Shows each payment: type, amount, status (color-coded), date
-- Shows running total and balance status
-- Reusable -- can be embedded in the Final Invoice modal AND in the trip row actions
+That mismatch is confusing. Standardize the UI to ignore `invoice_status` for Special Hire stored documents, or update approval/regeneration flow to keep both statuses aligned for consistency.
 
-### 3. Show Payment Timeline in Final Invoice modal
+## Expected result after fix
 
-**File: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`**
+For a finance-approved sales receipt:
+- Payment History shows the actual approved payments
+- Approved amount no longer shows `0`
+- Sales Receipt row stops behaving like draft
+- Documents modal / preview opens the approved receipt correctly
+- Final Invoice flow reads the real paid amount
 
-Add `<PaymentTimeline quotationId={quotationData.id} />` above the Financial Summary card. This gives the user immediate visibility into all payments before generating the invoice.
-
-### 4. Add "View Payment History" action to trip dropdown
-
-**File: `src/components/special-hire/ConfirmedTripsTable.tsx`**
-
-Add a new dropdown item under the Finance section: "Payment History" -- opens a small dialog with the `<PaymentTimeline>` component for that trip. This lets users monitor payment flows for any trip at any time.
-
-## Technical Detail
-
-**Fresh data fetch in modal (replaces stale props):**
-```typescript
-const [freshTotalPaid, setFreshTotalPaid] = useState<number | null>(null);
-
-useEffect(() => {
-  if (open && quotationData.id) {
-    supabase
-      .from('special_hire_payments')
-      .select('amount, status, payment_type')
-      .eq('quotation_id', quotationData.id)
-      .eq('status', 'approved')
-      .then(({ data }) => {
-        const total = (data || []).reduce((sum, p) => sum + (p.amount || 0), 0);
-        setFreshTotalPaid(total);
-      });
-  }
-}, [open, quotationData.id]);
-
-// In calculations, use:
-const actualTotalPaid = freshTotalPaid ?? quotationData.total_paid ?? quotationData.advance_paid ?? 0;
-```
-
-**Files to change:**
-1. `src/components/special-hire/GenerateBalanceInvoiceModal.tsx` -- fetch fresh payments on open, embed timeline
-2. `src/components/special-hire/PaymentTimeline.tsx` -- NEW component
-3. `src/components/special-hire/ConfirmedTripsTable.tsx` -- add "Payment History" dropdown action
-
-## Summary
-- Fix stale data: modal fetches fresh cumulative payments from DB on open (not from props)
-- Add Payment Timeline: visual audit trail showing every payment, status, and running total
-- Add "Payment History" dropdown action: users can monitor any trip's payment flow anytime
-- Overpaid credit display continues to work correctly with fresh data
+## Technical notes
+- Confirmed from DB schema: `special_hire_payments.reference_no` exists, `reference_number` does not
+- Confirmed from logs: current 400/42703 error is exactly from that wrong column
+- Confirmed from DB data: finance-approved documents already exist, so this is mainly a UI/status-source issue, not a missing approval write
 
