@@ -452,28 +452,9 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
 export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
   console.log('Starting PDF generation for:', data.invoiceType);
   
-  // Create a temporary offscreen container and sanitize HTML
   const tempDiv = document.createElement('div');
   const rawHtml = generateInvoiceHTML(data);
-  let contentHtml = rawHtml;
-
-  // If a full HTML document was returned, extract the main invoice container
-  const containerMatch = rawHtml.match(/<div class=\"invoice-container\">[\s\S]*?<\/div>/);
-  if (containerMatch) {
-    contentHtml = `<div id="invoice-root">${containerMatch[0]}</div>`;
-  } else {
-    // Strip doctype and html/head/body wrappers just in case
-    const stripped = rawHtml
-      .replace(/<!DOCTYPE[^>]*>/gi, '')
-      .replace(/<html[^>]*>/gi, '')
-      .replace(/<\/html>/gi, '')
-      .replace(/<head>[\s\S]*?<\/head>/gi, '')
-      .replace(/<body[^>]*>/gi, '')
-      .replace(/<\/body>/gi, '');
-    contentHtml = `<div id="invoice-root">${stripped}</div>`;
-  }
-
-  tempDiv.innerHTML = contentHtml;
+  tempDiv.innerHTML = rawHtml;
   tempDiv.style.position = 'absolute';
   tempDiv.style.left = '-9999px';
   tempDiv.style.top = '-9999px';
@@ -482,74 +463,79 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
   document.body.appendChild(tempDiv);
 
   try {
-    console.log('Converting HTML to canvas...');
+    await new Promise(resolve => setTimeout(resolve, 200));
     
-    // Wait a bit for any async content to load
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-  // Convert HTML to canvas with improved settings and error handling
-  const rootEl = tempDiv.querySelector('#invoice-root') as HTMLElement | null;
-  if (!rootEl) {
-    throw new Error('Invoice root element not found');
-  }
-
-  const canvas = await html2canvas(rootEl, {
-    scale: 1.5,
-    useCORS: true,
-    allowTaint: false, // avoid PNG signature issues
-    backgroundColor: '#ffffff',
-    scrollX: 0,
-    scrollY: 0,
-    foreignObjectRendering: false,
-    removeContainer: true,
-    logging: false,
-    onclone: (clonedDoc) => {
-      const images = clonedDoc.querySelectorAll('img');
-      images.forEach((img) => {
-        if (!img.complete || img.naturalHeight === 0) {
-          img.remove();
-        }
-      });
-    },
-  });
-
-    console.log('Canvas created, generating PDF...');
-    
-    // Create PDF with proper margins
+    // Find all [data-pdf-page] containers for multi-page rendering
+    const pages = tempDiv.querySelectorAll('[data-pdf-page]') as NodeListOf<HTMLElement>;
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const imgWidth = 210; // A4 width in mm
-    const pageHeight = 297; // A4 height in mm
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    
-  // Convert canvas to JPEG data URL only (avoid PNG signature errors)
-  let imgData: string;
-  try {
-    imgData = canvas.toDataURL('image/jpeg', 0.85);
-  } catch (error) {
-    console.error('Failed to convert canvas to JPEG:', error);
-    throw new Error('Failed to generate image (JPEG) for PDF');
-  }
-    
-    // Handle content that exceeds A4 page height
-    if (imgHeight > pageHeight) {
-      // If content is taller than A4, add multiple pages
-      let heightLeft = imgHeight;
-      let position = 0;
-      
-      // Add first page
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      
-      // Add additional pages if needed
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+    const imgWidth = 210;
+
+    if (pages.length > 0) {
+      // Multi-page rendering: each [data-pdf-page] becomes a separate PDF page
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        const canvas = await html2canvas(page, {
+          scale: 1.5,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          scrollX: 0,
+          scrollY: 0,
+          foreignObjectRendering: false,
+          logging: false,
+          onclone: (clonedDoc) => {
+            const style = clonedDoc.createElement('style');
+            style.textContent = '* { letter-spacing: normal !important; word-spacing: normal !important; }';
+            clonedDoc.head.appendChild(style);
+            clonedDoc.querySelectorAll('img').forEach((img) => {
+              if (!img.complete || img.naturalHeight === 0) img.remove();
+            });
+          },
+        });
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.85);
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
       }
     } else {
-      // Content fits on one page - add image with no margins for clean rendering
-      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+      // Fallback: single-page rendering (sales receipts etc.)
+      const rootEl = tempDiv.querySelector('#invoice-root') as HTMLElement || tempDiv;
+      const canvas = await html2canvas(rootEl, {
+        scale: 1.5,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0,
+        foreignObjectRendering: false,
+        logging: false,
+        onclone: (clonedDoc) => {
+          clonedDoc.querySelectorAll('img').forEach((img) => {
+            if (!img.complete || img.naturalHeight === 0) img.remove();
+          });
+        },
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pageHeight = 297;
+
+      if (imgHeight > pageHeight) {
+        let heightLeft = imgHeight;
+        let position = 0;
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+        while (heightLeft > 0) {
+          position = heightLeft - imgHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
+      } else {
+        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+      }
     }
     
     console.log('PDF generation completed successfully');
@@ -558,7 +544,6 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
     console.error('PDF generation failed:', error);
     throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
   } finally {
-    // Clean up
     if (document.body.contains(tempDiv)) {
       document.body.removeChild(tempDiv);
     }
