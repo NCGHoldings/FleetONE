@@ -185,7 +185,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
   const calculateFinalBalance = () => {
     const totalAmount = computedTotalAmount();
-    const adjustmentTotal = (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0);
+    const adjustmentTotal = (effectiveAdjustment.extra_km_total_charge || 0) + (effectiveAdjustment.total_additional_expenses || 0);
     const actualTotalPaid = getActualTotalPaid();
     const balance = (totalAmount + adjustmentTotal) - actualTotalPaid;
     return balance <= 0 ? 0 : balance;
@@ -193,7 +193,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
   const calculateOverpaidCredit = () => {
     const totalAmount = computedTotalAmount();
-    const adjustmentTotal = (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0);
+    const adjustmentTotal = (effectiveAdjustment.extra_km_total_charge || 0) + (effectiveAdjustment.total_additional_expenses || 0);
     const actualTotalPaid = getActualTotalPaid();
     const balance = (totalAmount + adjustmentTotal) - actualTotalPaid;
     return balance < 0 ? Math.abs(balance) : 0;
