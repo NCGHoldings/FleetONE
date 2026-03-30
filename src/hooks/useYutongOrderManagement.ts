@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { fetchVehicleFinanceSettings, postVehiclePaymentToGL, NCG_HOLDING_ID } from '@/hooks/useVehicleSalesFinance';
 
 export interface YutongOrder {
   id: string;
@@ -297,6 +298,50 @@ export const useYutongOrderManagement = () => {
             payment_reference: paymentData.payment_reference 
           })
           .eq('id', paymentData.payment_schedule_id);
+      }
+
+      // ==========================================
+      // FINANCE INTEGRATION: POST PAYMENT TO GL
+      // ==========================================
+      try {
+        const { data: orderDetails } = await supabase
+          .from('yutong_orders')
+          .select('*, yutong_quotations(customer_name)')
+          .eq('id', paymentData.order_id)
+          .single();
+
+        if (orderDetails) {
+          const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
+          
+          if (settings) {
+            // Determine if it's an advance or balance
+            // If total_paid (before this payment) is 0, it's an advance.
+            // If there's an AR Invoice linked to this order, it might be a balance payment.
+            // For now, vehicle payments before invoice are considered "advance".
+            const isBalance = !!orderDetails.ar_invoice_id;
+            const paymentType = isBalance ? 'balance' : 'advance';
+            
+            const customerName = orderDetails.yutong_quotations?.customer_name || 'Unknown';
+            
+            const glResult = await postVehiclePaymentToGL({
+              module: 'yutong',
+              orderNo: orderDetails.order_no,
+              customerName,
+              amount: paymentData.payment_amount,
+              paymentType,
+              paymentMethod: paymentData.payment_method,
+              settings,
+              effectiveCompanyId: NCG_HOLDING_ID,
+            });
+
+            if (glResult) {
+              console.log('[Yutong Finance] Payment successfully posted to GL:', glResult.entryNumber);
+            }
+          }
+        }
+      } catch (financeError) {
+        console.warn('[Yutong Finance] Failed to auto-post payment to GL:', financeError);
+        // We don't throw here to avoid failing the payment recording
       }
 
       toast.success('Customer payment recorded successfully');

@@ -39,6 +39,9 @@ export interface SinotruckOrderInvoiceData {
   is_tax_invoice?: boolean;
   customer_vat_number?: string;
   tax_rate?: number;
+  vat_amount?: number;
+  customer_commitment?: number;
+  leasing_amount?: number;
   supplier_tin?: string;
   supplier_name?: string;
   supplier_address?: string;

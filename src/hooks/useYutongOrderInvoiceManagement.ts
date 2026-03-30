@@ -52,7 +52,7 @@ export function useYutongOrderInvoiceManagement() {
   const generateAndStoreDraftInvoice = async (
     invoiceData: YutongOrderInvoiceData,
     orderId: string,
-    quotationId: string
+    quotationId: string | null
   ): Promise<{ success: boolean; invoice?: any; document?: any; error?: any }> => {
     console.log('🚀 Starting invoice generation process...');
     console.log('📋 Invoice Data:', invoiceData);
@@ -167,25 +167,30 @@ export function useYutongOrderInvoiceManagement() {
       
       // Create invoice record with proforma fields
       console.log('💾 Step 4: Creating invoice record...');
+      const insertData: any = {
+        invoice_no: invoiceNo,
+        order_id: orderId,
+        invoice_date: fullInvoiceData.invoice_date,
+        invoice_amount: fullInvoiceData.invoice_category === 'proforma_invoice' 
+          ? fullInvoiceData.proforma_amount || fullInvoiceData.total 
+          : fullInvoiceData.total,
+        status: 'draft',
+        // Proforma invoice fields
+        invoice_category: fullInvoiceData.invoice_category || 'direct_invoice',
+        proforma_amount_percentage: fullInvoiceData.proforma_amount_percentage,
+        proforma_amount: fullInvoiceData.proforma_amount,
+        finance_company_name: fullInvoiceData.finance_company_name,
+        finance_company_address: fullInvoiceData.finance_company_address,
+        proforma_purpose: fullInvoiceData.proforma_purpose
+      };
+      
+      if (quotationId) {
+        insertData.quotation_id = quotationId;
+      }
+
       const { data: invoice, error: invoiceError } = await supabase
         .from('yutong_invoice_records')
-        .insert({
-          invoice_no: invoiceNo,
-          order_id: orderId,
-          quotation_id: quotationId,
-          invoice_date: fullInvoiceData.invoice_date,
-          invoice_amount: fullInvoiceData.invoice_category === 'proforma_invoice' 
-            ? fullInvoiceData.proforma_amount || fullInvoiceData.total 
-            : fullInvoiceData.total,
-          status: 'draft',
-          // Proforma invoice fields
-          invoice_category: fullInvoiceData.invoice_category || 'direct_invoice',
-          proforma_amount_percentage: fullInvoiceData.proforma_amount_percentage,
-          proforma_amount: fullInvoiceData.proforma_amount,
-          finance_company_name: fullInvoiceData.finance_company_name,
-          finance_company_address: fullInvoiceData.finance_company_address,
-          proforma_purpose: fullInvoiceData.proforma_purpose
-        })
+        .insert(insertData)
         .select()
         .single();
       
@@ -224,7 +229,7 @@ export function useYutongOrderInvoiceManagement() {
         // Get order details for customer info
         const { data: orderDetails } = await supabase
           .from('yutong_orders')
-          .select('*, yutong_quotations(customer_name, customer_category_id)')
+          .select('*, yutong_quotations(customer_name, customer_category_id, customer_phone, customer_email)')
           .eq('id', orderId)
           .single();
         
@@ -324,7 +329,7 @@ export function useYutongOrderInvoiceManagement() {
       // Get order details for finance integration
       const { data: orderDetails, error: orderError } = await supabase
         .from('yutong_orders')
-        .select('*, yutong_quotations(customer_name, customer_category_id)')
+        .select('*, yutong_quotations(customer_name, customer_category_id, customer_phone, customer_email)')
         .eq('id', invoice.order_id)
         .single();
 
@@ -382,6 +387,30 @@ export function useYutongOrderInvoiceManagement() {
       // FINANCE INTEGRATION - PROPER ACCOUNTING
       // ==========================================
       const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
+
+      // Ensure finance_customer_id exists before proceeding
+      if (settings && !orderDetails?.finance_customer_id && orderDetails?.yutong_quotations?.customer_name) {
+        console.log('[Yutong] Resolving finance customer prior to GL posting...');
+        const { createVehicleCustomer } = await import('@/hooks/useVehicleSalesFinance');
+        const newCustomerId = await createVehicleCustomer({
+          module: 'yutong',
+          companyId: NCG_HOLDING_ID,
+          customerName: orderDetails.yutong_quotations.customer_name,
+          customerPhone: orderDetails.yutong_quotations.customer_phone || undefined,
+          customerEmail: orderDetails.yutong_quotations.customer_email || undefined,
+          customerCategoryId: orderDetails.yutong_quotations.customer_category_id || undefined,
+        });
+
+        if (newCustomerId) {
+          await supabase
+            .from('yutong_orders')
+            .update({ finance_customer_id: newCustomerId })
+            .eq('id', invoice.order_id);
+            
+          orderDetails.finance_customer_id = newCustomerId;
+          console.log('[Yutong] Resolved and linked finance customer:', newCustomerId);
+        }
+      }
       
       if (settings && orderDetails?.finance_customer_id) {
         const customerName = orderDetails?.yutong_quotations?.customer_name || 'Unknown';
@@ -392,7 +421,10 @@ export function useYutongOrderInvoiceManagement() {
         // Check if AR Invoice already exists
         let arInvoiceId = orderDetails?.ar_invoice_id;
         
-        const isTax = invoiceData.invoice_category === 'tax_invoice' || invoiceData.is_tax_invoice;
+        const isTax = invoiceData.invoice_category === 'tax_invoice' || 
+                      invoiceData.is_tax_invoice || 
+                      (invoiceData.tax_rate && invoiceData.tax_rate > 0) || 
+                      (invoiceData.vat_amount && invoiceData.vat_amount > 0);
         const taxRateVal = invoiceData.tax_rate || 18;
         const taxAmt = isTax ? (invoiceData.vat_amount || invoiceAmount - invoiceAmount / (1 + taxRateVal / 100)) : undefined;
         

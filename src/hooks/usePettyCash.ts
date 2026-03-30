@@ -300,13 +300,17 @@ export const useCreatePettyCashTransaction = () => {
 
   return useMutation({
     mutationFn: async (data: Partial<PettyCashTransaction>) => {
+      const amount = data.amount || 0;
+      const txnType = data.transaction_type || "disbursement";
+
+      // 1. Insert the transaction
       const { data: result, error } = await supabase
         .from("petty_cash_transactions")
         .insert({
           petty_cash_fund_id: data.petty_cash_fund_id!,
-          transaction_type: data.transaction_type || "disbursement",
+          transaction_type: txnType,
           expense_request_id: data.expense_request_id,
-          amount: data.amount || 0,
+          amount,
           balance_after: 0,
           receipt_number: data.receipt_number,
           description: data.description,
@@ -324,13 +328,177 @@ export const useCreatePettyCashTransaction = () => {
         .single();
 
       if (error) throw error;
+
+      // 2. Get the fund's GL account for journal entry
+      const { data: fund } = await supabase
+        .from("petty_cash_funds")
+        .select("gl_account_id, current_balance, fund_name")
+        .eq("id", data.petty_cash_fund_id!)
+        .single();
+
+      // 3. Update fund balance
+      if (fund) {
+        const newBalance = txnType === "disbursement"
+          ? (fund.current_balance || 0) - amount
+          : (fund.current_balance || 0) + amount;
+
+        await supabase
+          .from("petty_cash_funds")
+          .update({ current_balance: newBalance, updated_at: new Date().toISOString() })
+          .eq("id", data.petty_cash_fund_id!);
+      }
+
+      // 4. Auto-create GL Journal Entry if fund has a GL account linked
+      if (fund?.gl_account_id && amount > 0) {
+        try {
+          const fundGLAccountId = fund.gl_account_id;
+          // For disbursement: the expense/debit account is either the transaction's gl_account_id or the fund GL
+          // For replenishment: we need a bank/cash account to credit
+          let debitAccountId: string;
+          let creditAccountId: string;
+          let jeDescription: string;
+
+          if (txnType === "disbursement") {
+            // DR: Expense account (from transaction or fallback to a general expense)
+            debitAccountId = data.gl_account_id || "";
+            creditAccountId = fundGLAccountId;
+            jeDescription = `Petty Cash Disbursement: ${data.description || data.expense_category || "Expense"} (${fund.fund_name})`;
+
+            // If no specific GL account on the transaction, try to find one by expense category
+            if (!debitAccountId && data.expense_category) {
+              const { data: catAccount } = await supabase
+                .from("chart_of_accounts")
+                .select("id")
+                .eq("company_id", selectedCompanyId!)
+                .eq("account_type", "expense")
+                .ilike("account_name", `%${data.expense_category}%`)
+                .limit(1)
+                .maybeSingle();
+              debitAccountId = catAccount?.id || "";
+            }
+
+            // Final fallback: use gl_settings default_expense_account_id
+            if (!debitAccountId) {
+              const { data: glSettings } = await supabase
+                .from("gl_settings" as any)
+                .select("default_expense_account_id")
+                .eq("company_id", selectedCompanyId!)
+                .maybeSingle();
+              debitAccountId = (glSettings as any)?.default_expense_account_id || "";
+            }
+          } else {
+            // Replenishment: DR Petty Cash Fund / CR Bank
+            debitAccountId = fundGLAccountId;
+            jeDescription = `Petty Cash Replenishment: ${fund.fund_name}`;
+
+            // Try to find bank account from gl_settings
+            const { data: glSettings } = await supabase
+              .from("gl_settings" as any)
+              .select("bank_account_id")
+              .eq("company_id", selectedCompanyId!)
+              .maybeSingle();
+            creditAccountId = (glSettings as any)?.bank_account_id || "";
+
+            // Fallback: find any bank account in COA
+            if (!creditAccountId) {
+              const { data: bankAcct } = await supabase
+                .from("chart_of_accounts")
+                .select("id")
+                .eq("company_id", selectedCompanyId!)
+                .eq("account_type", "asset")
+                .ilike("account_name", "%bank%")
+                .limit(1)
+                .maybeSingle();
+              creditAccountId = bankAcct?.id || "";
+            }
+          }
+
+          // Only create JE if we have both accounts
+          if (debitAccountId && creditAccountId) {
+            const entryNumber = `PC-${Date.now()}`;
+
+            const { data: je, error: jeError } = await supabase
+              .from("journal_entries")
+              .insert({
+                entry_number: entryNumber,
+                entry_date: new Date().toISOString().split("T")[0],
+                description: jeDescription,
+                reference: result.receipt_number || result.voucher_number || `PC-TXN-${result.id?.slice(0, 8)}`,
+                total_debit: amount,
+                total_credit: amount,
+                status: "posted",
+                company_id: selectedCompanyId,
+                posted_at: new Date().toISOString(),
+              })
+              .select()
+              .single();
+
+            if (!jeError && je) {
+              // Create journal lines
+              await supabase.from("journal_entry_lines").insert([
+                {
+                  journal_entry_id: je.id,
+                  account_id: debitAccountId,
+                  description: `${txnType === "disbursement" ? "Expense" : "Fund top-up"}: ${data.description || data.expense_category || fund.fund_name}`,
+                  debit: amount,
+                  credit: 0,
+                  company_id: selectedCompanyId,
+                },
+                {
+                  journal_entry_id: je.id,
+                  account_id: creditAccountId,
+                  description: `${txnType === "disbursement" ? "Petty cash payment" : "Bank transfer"}: ${fund.fund_name}`,
+                  debit: 0,
+                  credit: amount,
+                  company_id: selectedCompanyId,
+                },
+              ]);
+
+              // Update COA balances
+              for (const acctId of [debitAccountId, creditAccountId]) {
+                const { data: acct } = await supabase
+                  .from("chart_of_accounts")
+                  .select("current_balance, account_type")
+                  .eq("id", acctId)
+                  .single();
+
+                if (acct) {
+                  const isDebit = acctId === debitAccountId;
+                  const isDebitNormal = ["asset", "expense"].includes(acct.account_type || "");
+                  const adjustment = isDebit
+                    ? (isDebitNormal ? amount : -amount)
+                    : (isDebitNormal ? -amount : amount);
+
+                  await supabase
+                    .from("chart_of_accounts")
+                    .update({ current_balance: (acct.current_balance || 0) + adjustment, updated_at: new Date().toISOString() })
+                    .eq("id", acctId);
+                }
+              }
+
+              // Link JE to transaction
+              await supabase
+                .from("petty_cash_transactions")
+                .update({ journal_entry_id: je.id })
+                .eq("id", result.id);
+            }
+          } else {
+            console.warn("Petty cash GL posting skipped: missing debit or credit account", { debitAccountId, creditAccountId });
+          }
+        } catch (glErr) {
+          console.error("Petty cash GL auto-post failed (transaction still saved):", glErr);
+        }
+      }
+
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["petty-cash-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["petty-cash-all-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });
-      toast({ title: "Transaction Recorded", description: "The petty cash transaction has been recorded." });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      toast({ title: "Transaction Recorded", description: "The petty cash transaction has been recorded and posted to GL." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -455,11 +623,133 @@ export const useCreateIOU = () => {
         .single();
 
       if (error) throw error;
+
+      // Auto-create GL Journal Entry: DR Staff Advance / CR Cash or Bank
+      const amount = data.amount || 0;
+      if (amount > 0 && selectedCompanyId) {
+        try {
+          // Find a staff advance / cash advance account
+          let debitAccountId = "";
+          const { data: advanceAcct } = await supabase
+            .from("chart_of_accounts")
+            .select("id")
+            .eq("company_id", selectedCompanyId)
+            .eq("account_type", "asset")
+            .or("account_name.ilike.%advance%,account_name.ilike.%iou%,account_name.ilike.%staff receivable%")
+            .limit(1)
+            .maybeSingle();
+          debitAccountId = advanceAcct?.id || "";
+
+          // Fallback: use customer_advance_account_id from gl_settings
+          if (!debitAccountId) {
+            const { data: glSettings } = await supabase
+              .from("gl_settings" as any)
+              .select("customer_advance_account_id")
+              .eq("company_id", selectedCompanyId)
+              .maybeSingle();
+            debitAccountId = (glSettings as any)?.customer_advance_account_id || "";
+          }
+
+          // Find credit account (cash or bank)
+          let creditAccountId = "";
+          const { data: glSettings2 } = await supabase
+            .from("gl_settings" as any)
+            .select("bank_account_id")
+            .eq("company_id", selectedCompanyId)
+            .maybeSingle();
+          creditAccountId = (glSettings2 as any)?.bank_account_id || "";
+
+          if (!creditAccountId) {
+            const { data: cashAcct } = await supabase
+              .from("chart_of_accounts")
+              .select("id")
+              .eq("company_id", selectedCompanyId)
+              .eq("account_type", "asset")
+              .or("account_name.ilike.%cash%,account_name.ilike.%bank%")
+              .limit(1)
+              .maybeSingle();
+            creditAccountId = cashAcct?.id || "";
+          }
+
+          if (debitAccountId && creditAccountId) {
+            const entryNumber = `IOU-${Date.now()}`;
+            const { data: je, error: jeError } = await supabase
+              .from("journal_entries")
+              .insert({
+                entry_number: entryNumber,
+                entry_date: data.issued_date || new Date().toISOString().split("T")[0],
+                description: `IOU Issued: ${data.purpose || "Staff Advance"} (${result.iou_number || result.id?.slice(0, 8)})`,
+                reference: result.iou_number || `IOU-${result.id?.slice(0, 8)}`,
+                total_debit: amount,
+                total_credit: amount,
+                status: "posted",
+                company_id: selectedCompanyId,
+                posted_at: new Date().toISOString(),
+              })
+              .select()
+              .single();
+
+            if (!jeError && je) {
+              await supabase.from("journal_entry_lines").insert([
+                {
+                  journal_entry_id: je.id,
+                  account_id: debitAccountId,
+                  description: `Staff advance: ${data.purpose || "IOU"}`,
+                  debit: amount,
+                  credit: 0,
+                  company_id: selectedCompanyId,
+                },
+                {
+                  journal_entry_id: je.id,
+                  account_id: creditAccountId,
+                  description: `Cash/Bank disbursement for IOU`,
+                  debit: 0,
+                  credit: amount,
+                  company_id: selectedCompanyId,
+                },
+              ]);
+
+              // Update COA balances
+              for (const acctId of [debitAccountId, creditAccountId]) {
+                const { data: acct } = await supabase
+                  .from("chart_of_accounts")
+                  .select("current_balance, account_type")
+                  .eq("id", acctId)
+                  .single();
+                if (acct) {
+                  const isDebit = acctId === debitAccountId;
+                  const isDebitNormal = ["asset", "expense"].includes(acct.account_type || "");
+                  const adjustment = isDebit
+                    ? (isDebitNormal ? amount : -amount)
+                    : (isDebitNormal ? -amount : amount);
+                  await supabase
+                    .from("chart_of_accounts")
+                    .update({ current_balance: (acct.current_balance || 0) + adjustment, updated_at: new Date().toISOString() })
+                    .eq("id", acctId);
+                }
+              }
+
+              // Link JE to IOU
+              await supabase
+                .from("iou_records")
+                .update({ journal_entry_id: je.id })
+                .eq("id", result.id);
+            }
+          } else {
+            console.warn("IOU GL posting skipped: missing advance or cash/bank account");
+          }
+        } catch (glErr) {
+          console.error("IOU GL auto-post failed (IOU still saved):", glErr);
+        }
+      }
+
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["iou-records"] });
-      toast({ title: "IOU Created", description: "The IOU record has been created successfully." });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      toast({ title: "IOU Created", description: "The IOU record has been created and posted to GL." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -469,6 +759,7 @@ export const useCreateIOU = () => {
 
 export const useUpdateIOU = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
 
   return useMutation({
     mutationFn: async ({ id, ...data }: Partial<IOURecord> & { id: string }) => {
@@ -480,11 +771,137 @@ export const useUpdateIOU = () => {
         .single();
 
       if (error) throw error;
+
+      // Auto-create GL reversal when IOU is settled
+      // Settlement reverses the advance: DR Cash/Bank / CR Staff Advance
+      if (data.status === "settled" && selectedCompanyId) {
+        try {
+          // Get the original IOU to know the amount
+          const settledAmount = (result as any).amount || data.settled_amount || 0;
+
+          if (settledAmount > 0) {
+            // Find staff advance account (same resolution as creation)
+            let advanceAccountId = "";
+            
+            // Try gl_settings first (most reliable)
+            const { data: glSettings } = await supabase
+              .from("gl_settings" as any)
+              .select("customer_advance_account_id, bank_account_id")
+              .eq("company_id", selectedCompanyId)
+              .maybeSingle();
+            
+            advanceAccountId = (glSettings as any)?.customer_advance_account_id || "";
+            
+            // Fallback: search COA
+            if (!advanceAccountId) {
+              const { data: advAcct } = await supabase
+                .from("chart_of_accounts")
+                .select("id")
+                .eq("company_id", selectedCompanyId)
+                .eq("account_type", "asset")
+                .or("account_name.ilike.%advance%,account_name.ilike.%iou%,account_name.ilike.%receivable%,account_name.ilike.%prepaid%")
+                .limit(1)
+                .maybeSingle();
+              advanceAccountId = advAcct?.id || "";
+            }
+
+            // Find cash/bank account
+            let cashAccountId = (glSettings as any)?.bank_account_id || "";
+            if (!cashAccountId) {
+              const { data: cashAcct } = await supabase
+                .from("chart_of_accounts")
+                .select("id")
+                .eq("company_id", selectedCompanyId)
+                .eq("account_type", "asset")
+                .or("account_name.ilike.%cash%,account_name.ilike.%bank%")
+                .limit(1)
+                .maybeSingle();
+              cashAccountId = cashAcct?.id || "";
+            }
+
+            if (advanceAccountId && cashAccountId) {
+              const entryNumber = `IOU-SETTLE-${Date.now()}`;
+              const iouRef = (result as any).iou_number || `IOU-${id.slice(0, 8)}`;
+
+              const { data: je, error: jeError } = await supabase
+                .from("journal_entries")
+                .insert({
+                  entry_number: entryNumber,
+                  entry_date: new Date().toISOString().split("T")[0],
+                  description: `IOU Settlement: ${(result as any).purpose || "Staff Advance"} (${iouRef})`,
+                  reference: iouRef,
+                  total_debit: settledAmount,
+                  total_credit: settledAmount,
+                  status: "posted",
+                  company_id: selectedCompanyId,
+                  posted_at: new Date().toISOString(),
+                })
+                .select()
+                .single();
+
+              if (!jeError && je) {
+                // Settlement reversal: DR Cash/Bank (money comes back), CR Staff Advance (clear the advance)
+                await supabase.from("journal_entry_lines").insert([
+                  {
+                    journal_entry_id: je.id,
+                    account_id: cashAccountId,
+                    description: `IOU settlement received: ${iouRef}`,
+                    debit: settledAmount,
+                    credit: 0,
+                    company_id: selectedCompanyId,
+                  },
+                  {
+                    journal_entry_id: je.id,
+                    account_id: advanceAccountId,
+                    description: `Staff advance cleared: ${iouRef}`,
+                    debit: 0,
+                    credit: settledAmount,
+                    company_id: selectedCompanyId,
+                  },
+                ]);
+
+                // Update COA balances
+                for (const acctId of [cashAccountId, advanceAccountId]) {
+                  const { data: acct } = await supabase
+                    .from("chart_of_accounts")
+                    .select("current_balance, account_type")
+                    .eq("id", acctId)
+                    .single();
+                  if (acct) {
+                    const isDebit = acctId === cashAccountId;
+                    const isDebitNormal = ["asset", "expense"].includes(acct.account_type || "");
+                    const adjustment = isDebit
+                      ? (isDebitNormal ? settledAmount : -settledAmount)
+                      : (isDebitNormal ? -settledAmount : settledAmount);
+                    await supabase
+                      .from("chart_of_accounts")
+                      .update({ current_balance: (acct.current_balance || 0) + adjustment, updated_at: new Date().toISOString() })
+                      .eq("id", acctId);
+                  }
+                }
+
+                // Update IOU with journal entry link
+                await supabase
+                  .from("iou_records")
+                  .update({ journal_entry_id: je.id })
+                  .eq("id", id);
+              }
+            } else {
+              console.warn("IOU settlement GL posting skipped: missing advance or cash/bank account", { advanceAccountId, cashAccountId });
+            }
+          }
+        } catch (glErr) {
+          console.error("IOU settlement GL auto-post failed (IOU still updated):", glErr);
+        }
+      }
+
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["iou-records"] });
-      toast({ title: "IOU Updated", description: "The IOU record has been updated." });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      toast({ title: "IOU Updated", description: "The IOU record has been updated and posted to GL." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });

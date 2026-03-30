@@ -11,11 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCreateVendor, useUpdateVendor } from "@/hooks/useAccountingMutations";
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { useVendorBankAccounts, useSaveVendorBankAccounts } from "@/hooks/useVendorBankAccounts";
+import { useActiveVendorCategories } from "@/hooks/useVendorCategories";
 import { Loader2, Plus, Trash2, Star } from "lucide-react";
 
 const formSchema = z.object({
   vendor_code: z.string().min(1, "Vendor code is required"),
   vendor_name: z.string().min(1, "Vendor name is required"),
+  vendor_category_id: z.string().min(1, "Vendor category is required"),
   contact_email: z.string().email().optional().or(z.literal("")),
   contact_phone: z.string().optional(),
   address: z.string().optional(),
@@ -51,6 +53,7 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
   const generateNumber = useGenerateNumber();
   const saveBankAccounts = useSaveVendorBankAccounts();
   const { data: existingBankAccounts } = useVendorBankAccounts(vendor?.id);
+  const { data: categories } = useActiveVendorCategories();
   const isEditing = !!vendor;
   const [isGenerating, setIsGenerating] = useState(!isEditing);
   const [bankAccounts, setBankAccounts] = useState<BankAccountRow[]>([]);
@@ -85,6 +88,7 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
     defaultValues: {
       vendor_code: vendor?.vendor_code || "",
       vendor_name: vendor?.vendor_name || "",
+      vendor_category_id: vendor?.vendor_category_id || "",
       contact_email: vendor?.contact_email || "",
       contact_phone: vendor?.contact_phone || "",
       address: vendor?.address || "",
@@ -146,6 +150,7 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
     const payload = {
       vendor_code: data.vendor_code,
       vendor_name: data.vendor_name,
+      vendor_category_id: data.vendor_category_id,
       contact_email: data.contact_email || undefined,
       contact_phone: data.contact_phone,
       address: data.address,
@@ -237,6 +242,49 @@ export const VendorForm = ({ vendor, onSuccess }: VendorFormProps) => {
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="vendor_category_id"
+          render={({ field }) => {
+            const selectedCategory = categories?.find(c => c.id === field.value);
+            return (
+            <FormItem>
+              <FormLabel>Vendor Category <span className="text-red-500">*</span></FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || ""}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {categories?.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.category_code} - {cat.category_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                {selectedCategory ? (
+                  <div className="flex gap-4 mt-2 text-xs">
+                    <span className="flex items-center gap-1">
+                      <span className="font-medium text-foreground">AP Account:</span>
+                      {selectedCategory.ap_account_id ? <span className="text-emerald-600">Mapped ✅</span> : <span className="text-amber-600">Global Default ⚠️</span>}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="font-medium text-foreground">Expense Account:</span>
+                      {selectedCategory.expense_account_id ? <span className="text-emerald-600">Mapped ✅</span> : <span className="text-amber-600">Global Default ⚠️</span>}
+                    </span>
+                  </div>
+                ) : (
+                  "Determines which GL accounts are used for this vendor's AP postings"
+                )}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}}
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <FormField

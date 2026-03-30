@@ -8,6 +8,7 @@ import { Search, Eye, Download, Mail, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SinotruckQuotationViewModal } from './SinotruckQuotationViewModal';
 import { SinotruckInvoiceGenerator } from './SinotruckInvoiceGenerator';
 import { SinotruckEditQuotationModal } from './SinotruckEditQuotationModal';
@@ -112,6 +113,23 @@ export const SinotruckQuotationsList = ({ onRefresh }: SinotruckQuotationsListPr
 
   const handleSendEmail = (quotation: any) => {
     toast.info("Email functionality coming soon");
+  };
+
+  const handleStatusUpdate = async (id: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('sinotruck_quotations')
+        .update({ status: newStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success(`Quotation marked as ${newStatus}`);
+      loadQuotations();
+      onRefresh();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update quotation status");
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -235,6 +253,20 @@ export const SinotruckQuotationsList = ({ onRefresh }: SinotruckQuotationsListPr
                       >
                         <Mail className="w-4 h-4" />
                       </Button>
+                      <Select
+                        value={quotation.status}
+                        onValueChange={(value) => handleStatusUpdate(quotation.id, value)}
+                      >
+                        <SelectTrigger className="w-28 h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="draft">Draft</SelectItem>
+                          <SelectItem value="sent">Sent</SelectItem>
+                          <SelectItem value="confirmed">Confirmed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <Button
                         size="sm"
                         variant="ghost"

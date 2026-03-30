@@ -22,6 +22,7 @@ import {
   createVehicleCustomer,
   postVehiclePaymentToGL,
   updateOrderFinanceLinks,
+  createVehicleARReceipt,
   NCG_HOLDING_ID,
 } from '@/hooks/useVehicleSalesFinance';
 
@@ -53,6 +54,8 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   // Payment proof upload state
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
   
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
@@ -182,6 +185,8 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   };
 
   const handleRecordPayment = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       const amount = parseFloat(paymentForm.amount);
       if (isNaN(amount) || amount <= 0) {
@@ -265,6 +270,8 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     } catch (error: any) {
       console.error('Error recording payment:', error);
       toast.error(`Failed to record payment: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -274,6 +281,8 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
    * AR Invoice is created when SYSTEM INVOICE is approved, NOT at payment time
    */
   const handleVerifyPayment = async (paymentId: string) => {
+    if (verifyingId === paymentId) return;
+    setVerifyingId(paymentId);
     try {
       const payment = payments.find(p => p.id === paymentId);
       if (!payment) {
@@ -331,17 +340,21 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         }
       }
 
-      // 2. Post to GL ONLY (DR Bank | CR Customer Advance)
-      //    AR Invoice is NOT created here - it's created when system invoice is approved
+      // 2. Determine Payment Type & Post to GL
+      const arInvoiceId = orderDetails?.finance_ar_invoice_id;
+      const paymentType = arInvoiceId ? 'balance' : 'advance';
+      
       let journalEntryId: string | undefined;
+      let arReceiptId: string | undefined;
+      
       if (settings.auto_post_on_verify) {
-        // All payments before invoice are treated as advance (Liability)
+        // If pre-invoice -> advance (Liability). If post-invoice -> balance (Trade Receivable).
         const glResult = await postVehiclePaymentToGL({
           module: 'yutong',
           orderNo,
           customerName,
           amount: payment.payment_amount,
-          paymentType: 'advance', // Always advance until invoice is generated
+          paymentType,
           paymentMethod: payment.payment_method,
           settings,
           effectiveCompanyId: NCG_HOLDING_ID,
@@ -349,14 +362,35 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
 
         if (glResult) {
           journalEntryId = glResult.journalEntryId;
-          toast.success(`GL Entry posted: ${glResult.entryNumber} (DR Bank / CR Customer Advance)`);
+          const label = arInvoiceId ? 'Trade Receivable' : 'Customer Advance';
+          toast.success(`GL Entry posted: ${glResult.entryNumber} (DR Bank / CR ${label})`);
+          
+          // If AR invoice exists, also create an AR Receipt immediately to reduce balance
+          if (arInvoiceId) {
+            const receiptResult = await createVehicleARReceipt({
+              module: 'yutong',
+              paymentId: payment.id,
+              invoiceId: arInvoiceId,
+              customerId: customerId,
+              amount: payment.payment_amount,
+              paymentMethod: payment.payment_method,
+              paymentDate: payment.payment_date,
+              settings,
+              effectiveCompanyId: NCG_HOLDING_ID,
+            });
+            if (receiptResult) {
+              arReceiptId = receiptResult.receiptId;
+              toast.success(`AR Receipt Created: ${receiptResult.receiptNumber}`);
+            }
+          }
         } else {
           toast.error('Failed to post GL entry. Check Finance Settings.');
+          setVerifyingId(null);
           return;
         }
       }
 
-      // 3. Update payment status with GL link (NO AR Receipt - invoice not created yet)
+      // 3. Update payment status with GL link and AR Receipt link
       const { error } = await supabase
         .from('yutong_customer_payments')
         .update({
@@ -364,7 +398,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           verified_at: new Date().toISOString(),
           verified_by: user.id,
           journal_entry_id: journalEntryId,
-          // ar_receipt_id is NOT set here - AR Receipt requires AR Invoice first
+          ar_receipt_id: arReceiptId || null,
         })
         .eq('id', paymentId);
 
@@ -382,6 +416,8 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     } catch (error: any) {
       console.error('Error verifying payment:', error);
       toast.error('Failed to verify payment');
+    } finally {
+      setVerifyingId(null);
     }
   };
 
@@ -691,9 +727,14 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                               size="sm"
                               variant="outline"
                               onClick={() => handleVerifyPayment(payment.id)}
+                              disabled={verifyingId === payment.id}
                             >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Verify
+                              {verifyingId === payment.id ? (
+                                <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                              )}
+                              {verifyingId === payment.id ? 'Verifying...' : 'Verify'}
                             </Button>
                           )}
                           
@@ -851,9 +892,13 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
             <Button variant="outline" onClick={() => setIsRecordModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRecordPayment} disabled={isUploading}>
-              <DollarSign className="h-4 w-4 mr-2" />
-              {isUploading ? 'Uploading...' : 'Record Payment'}
+            <Button onClick={handleRecordPayment} disabled={isUploading || isSubmitting}>
+              {isSubmitting ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <DollarSign className="h-4 w-4 mr-2" />
+              )}
+              {isSubmitting ? 'Recording...' : isUploading ? 'Uploading...' : 'Record Payment'}
             </Button>
           </DialogFooter>
         </DialogContent>

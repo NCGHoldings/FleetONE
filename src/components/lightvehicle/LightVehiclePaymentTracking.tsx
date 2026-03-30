@@ -290,7 +290,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
           orderNo,
           customerId,
           totalAmount: orderDetails?.total_amount || 0,
-          advanceAmount: payment.amount,
+          advanceAmount: 0, // Passed as 0 here because step 4 (AR Receipt) will allocate the payment amount cleanly to prevent double-counting.
           companyId: NCG_HOLDING_ID,
           settings,
         });
@@ -308,10 +308,12 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
 
       // 3. Post to GL
       let journalEntryId: string | undefined;
+      let arReceiptId: string | undefined;
+
       if (settings.auto_post_on_verify) {
-        const paymentType = payment.payment_schedule_id ? 
-          (schedules.find(s => s.id === payment.payment_schedule_id)?.milestone_name?.toLowerCase().includes('advance') ? 'advance' : 'balance') :
-          'advance';
+        // If an invoice exists (or was just created), this payment acts as a receipt against Trade Receivables.
+        // Otherwise, it's an advance liability.
+        const paymentType = invoiceId ? 'balance' : 'advance';
 
         const glResult = await postVehiclePaymentToGL({
           module: 'lightvehicle',
@@ -326,27 +328,32 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
 
         if (glResult) {
           journalEntryId = glResult.journalEntryId;
-          toast.success(`GL Entry posted: ${glResult.entryNumber}`);
-        }
-      }
+          const label = invoiceId ? 'Trade Receivable' : 'Customer Advance';
+          toast.success(`GL Entry posted: ${glResult.entryNumber} (DR Bank / CR ${label})`);
 
-      // 4. Create AR Receipt
-      let receiptId: string | undefined;
-      if (customerId) {
-        const receiptResult = await createVehicleARReceipt({
-          module: 'lightvehicle',
-          paymentId,
-          invoiceId,
-          customerId,
-          amount: payment.amount,
-          paymentMethod: payment.payment_method,
-          paymentDate: payment.payment_date,
-          settings,
-          effectiveCompanyId: NCG_HOLDING_ID,
-        });
+          // 4. Create AR Receipt (if invoice exists, this automatically increments the paid_amount correctly)
+          if (invoiceId && customerId) {
+            const receiptResult = await createVehicleARReceipt({
+              module: 'lightvehicle',
+              paymentId,
+              invoiceId,
+              customerId,
+              amount: payment.amount,
+              paymentMethod: payment.payment_method,
+              paymentDate: payment.payment_date,
+              settings,
+              effectiveCompanyId: NCG_HOLDING_ID,
+            });
 
-        if (receiptResult) {
-          receiptId = receiptResult.receiptId;
+            if (receiptResult) {
+              arReceiptId = receiptResult.receiptId;
+              toast.success(`AR Receipt Created: ${receiptResult.receiptNumber}`);
+            }
+          }
+        } else {
+          toast.error('Failed to post GL entry. Check Finance Settings.');
+          setVerifyingPayment(null);
+          return;
         }
       }
 
@@ -360,7 +367,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
           verified_at: new Date().toISOString(),
           verified_by: user.id,
           journal_entry_id: journalEntryId,
-          ar_receipt_id: receiptId,
+          ar_receipt_id: arReceiptId || null,
         })
         .eq('id', paymentId);
 

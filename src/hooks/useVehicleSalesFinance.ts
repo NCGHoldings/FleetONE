@@ -296,11 +296,13 @@ export async function createVehicleARInvoice({
     }
 
     // ========== AUTO GL POSTING at creation: DR Trade Receivable, CR Sales Revenue ==========
-    try {
-      const { resolveCustomerARAccounts } = await import('@/hooks/useCustomerCategories');
-      const resolved = await resolveCustomerARAccounts(customerId, companyId);
-
-      if (resolved.arAccountId && resolved.revenueAccountId && totalAmount > 0) {
+    // We only post to GL if the invoice is NOT a draft. Draft invoices shouldn't hit the ledger yet.
+    if (arStatus !== 'draft') {
+      try {
+        const { resolveCustomerARAccounts } = await import('@/hooks/useCustomerCategories');
+        const resolved = await resolveCustomerARAccounts(customerId, companyId);
+  
+        if (resolved.arAccountId && resolved.revenueAccountId && totalAmount > 0) {
         const { postARInvoiceToGL } = await import('@/lib/gl-posting-utils');
         const glResult = await postARInvoiceToGL({
           invoiceNumber: invoice.invoice_number,
@@ -329,6 +331,7 @@ export async function createVehicleARInvoice({
     } catch (glErr) {
       console.warn(`[${module.toUpperCase()} Finance] GL posting error:`, glErr);
     }
+    } // End of arStatus !== 'draft' check
 
     console.log(`[${module.toUpperCase()} Finance] Created AR Invoice:`, invoice?.invoice_number);
     return invoice ? { invoiceId: invoice.id, invoiceNumber: invoice.invoice_number } : null;

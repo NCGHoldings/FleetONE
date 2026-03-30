@@ -82,6 +82,33 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
         .single();
       
       if (quotData) setQuotation(quotData);
+    } else {
+      // Fetch order to get customer_id
+      const { data: orderData } = await supabase
+        .from('yutong_orders')
+        .select('customer_id')
+        .eq('id', order.id)
+        .single();
+
+      if (orderData?.customer_id) {
+        const { data: custData } = await supabase
+          .from('yutong_customers')
+          .select('*')
+          .eq('id', orderData.customer_id)
+          .single();
+
+        if (custData) {
+          setQuotation({
+            quotation_no: `N/A`,
+            customer_name: custData.name,
+            customer_phone: custData.phone,
+            customer_email: custData.email,
+            company_name: custData.company_name,
+            customer_address: custData.address,
+            attention_to: custData.name,
+          });
+        }
+      }
     }
     
     // Load invoices and documents
@@ -101,7 +128,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     const warnings: string[] = [];
     
     if (!quotation) {
-      errors.push('Quotation not found. Please link this order to a quotation.');
+      errors.push('Customer details not found. Please ensure the order has a linked customer or quotation.');
       return { errors, warnings, canGenerate: false, customerAddress: null };
     }
     
@@ -126,9 +153,14 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
       }
     }
     
-    // Check required fields
+    // Check required fields - relax for proforma
     if (!customerAddress) {
-      errors.push('Customer address is required. Please edit the quotation or customer profile to add the address.');
+      if (defaultInvoiceType === 'proforma_invoice') {
+        warnings.push('Customer address is missing - will use "TBA".');
+        customerAddress = 'TBA';
+      } else {
+        errors.push('Customer address is required for this invoice type. Please edit the customer profile to add the address.');
+      }
     }
     
     if (!quotation.customer_name?.trim()) {
@@ -165,9 +197,9 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
       return;
     }
 
-    if (!order.quotation_id) {
-      console.error('❌ No quotation linked to this order');
-      toast.error('No quotation linked to this order');
+    if (!quotation) {
+      console.error('❌ No customer details linked to this order');
+      toast.error('No customer details linked to this order');
       return;
     }
 
@@ -266,7 +298,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     const result = await generateAndStoreDraftInvoice(
       invoiceData,
       order.id,
-      order.quotation_id!
+      order.quotation_id || null
     );
     
     console.log('📊 Invoice generation result:', result);

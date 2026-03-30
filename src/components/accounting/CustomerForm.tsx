@@ -23,7 +23,7 @@ const formSchema = z.object({
   payment_terms: z.number().optional(),
   tax_id: z.string().optional(),
   is_active: z.boolean(),
-  customer_category_id: z.string().optional(),
+  customer_category_id: z.string().min(1, "Customer category is required"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -188,17 +188,18 @@ export const CustomerForm = ({ customer, onSuccess }: CustomerFormProps) => {
         <FormField
           control={form.control}
           name="customer_category_id"
-          render={({ field }) => (
+          render={({ field }) => {
+            const selectedCategory = categories?.find(c => c.id === field.value);
+            return (
             <FormItem>
-              <FormLabel>Customer Category</FormLabel>
+              <FormLabel>Customer Category <span className="text-red-500">*</span></FormLabel>
               <Select onValueChange={field.onChange} value={field.value || ""}>
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select category (optional)" />
+                    <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="">No Category (use global defaults)</SelectItem>
                   {categories?.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
                       {cat.category_code} - {cat.category_name}
@@ -207,11 +208,24 @@ export const CustomerForm = ({ customer, onSuccess }: CustomerFormProps) => {
                 </SelectContent>
               </Select>
               <FormDescription>
-                Determines which GL accounts are used for this customer's AR postings
+                {selectedCategory ? (
+                  <div className="flex gap-4 mt-2 text-xs">
+                    <span className="flex items-center gap-1">
+                      <span className="font-medium text-foreground">AR Account:</span>
+                      {selectedCategory.ar_account_id ? <span className="text-emerald-600">Mapped ✅</span> : <span className="text-amber-600">Global Default ⚠️</span>}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="font-medium text-foreground">Revenue Account:</span>
+                      {selectedCategory.revenue_account_id ? <span className="text-emerald-600">Mapped ✅</span> : <span className="text-amber-600">Global Default ⚠️</span>}
+                    </span>
+                  </div>
+                ) : (
+                  "Determines which GL accounts are used for this customer's AR postings"
+                )}
               </FormDescription>
               <FormMessage />
             </FormItem>
-          )}
+          )}}
         />
 
         <div className="grid grid-cols-3 gap-4">

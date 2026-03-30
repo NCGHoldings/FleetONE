@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { fetchVehicleFinanceSettings, postVehiclePaymentToGL, NCG_HOLDING_ID } from '@/hooks/useVehicleSalesFinance';
 
 export interface LightVehicleOrder {
   id: string;
@@ -327,6 +328,38 @@ export const useLightVehicleOrderManagement = () => {
             payment_reference: paymentData.payment_reference 
           })
           .eq('id', paymentData.payment_schedule_id);
+      }
+
+      // ==========================================
+      // FINANCE INTEGRATION: POST PAYMENT TO GL
+      // ==========================================
+      try {
+          const { data: orderDetails } = await supabase
+              .from('lightvehicle_orders')
+              .select(`*, lightvehicle_quotations(customer_name)`)
+              .eq('id', paymentData.order_id)
+              .single();
+
+          if (orderDetails) {
+              const settings = await fetchVehicleFinanceSettings('lightvehicle', NCG_HOLDING_ID);
+              
+              if (settings) {
+                  const description = `ADVANCE PAYMENT FOR LIGHT VEHICLE ORDER ${orderDetails.order_number} - ${orderDetails.lightvehicle_quotations?.customer_name || 'CUSTOMER'}`;
+                  
+                  await postVehiclePaymentToGL(
+                      paymentData.payment_amount,
+                      description,
+                      'advance',
+                      NCG_HOLDING_ID,
+                      settings,
+                      paymentData.order_id,
+                      'lightvehicle'
+                  );
+              }
+          }
+      } catch (glError) {
+          console.error('Error posting Light Vehicle payment to GL:', glError);
+          toast.error('Payment recorded but GL posting failed.');
       }
 
       toast.success('Customer payment recorded successfully');
