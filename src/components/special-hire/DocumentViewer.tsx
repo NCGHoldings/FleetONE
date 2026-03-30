@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Eye, Download, X, FileText, Settings, RefreshCw } from 'lucide-react';
+import { Eye, Download, X, FileText, Settings, RefreshCw, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DocumentSignatureManager } from './DocumentSignatureManager';
@@ -9,6 +9,7 @@ import { EnhancedPDFViewer } from './EnhancedPDFViewer';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
+import { getDocumentAsBase64 } from '@/lib/document-storage-helpers';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -26,6 +27,7 @@ interface DocumentViewerProps {
     file_size?: number;
     generated_at: string;
     document_data: string; // base64 encoded PDF
+    storage_path?: string | null; // storage bucket path
   };
   onDownload?: () => void;
   onSignatureUpdated?: () => void;
@@ -49,19 +51,42 @@ const MemoizedPreviewContent = React.memo(({
   handleDownload: () => void;
   pdfViewerDownloadRef: React.MutableRefObject<(() => void) | null>;
 }) => {
-  const displayData = currentDocument.document_data || document.document_data;
+  const [storageData, setStorageData] = useState<string | null>(null);
+  const [storageLoading, setStorageLoading] = useState(false);
+  const [storageFailed, setStorageFailed] = useState(false);
+
+  const displayData = currentDocument.document_data || document.document_data || storageData;
+  const storagePath = currentDocument.storage_path || document.storage_path;
+
+  // Fetch from storage if no document_data but storage_path exists
+  useEffect(() => {
+    if (!displayData && storagePath && !storageLoading && !storageFailed) {
+      setStorageLoading(true);
+      getDocumentAsBase64(storagePath)
+        .then((base64) => {
+          setStorageData(base64);
+        })
+        .catch((err) => {
+          console.error('Failed to fetch document from storage:', err);
+          setStorageFailed(true);
+        })
+        .finally(() => setStorageLoading(false));
+    }
+  }, [displayData, storagePath, storageLoading, storageFailed]);
+
+  const effectiveData = displayData || storageData;
 
   const pdfUrl = useMemo(() => {
     try {
-      if (!displayData) return '';
-      const arr = toUint8FromAny(displayData);
+      if (!effectiveData) return '';
+      const arr = toUint8FromAny(effectiveData);
       if (!arr) return '';
       return createPdfBlobUrl(arr);
     } catch (error) {
       console.error('Error creating PDF URL:', error);
       return '';
     }
-  }, [displayData]);
+  }, [effectiveData]);
 
   // Cleanup blob URL on unmount or when it changes
   useEffect(() => {
@@ -78,7 +103,18 @@ const MemoizedPreviewContent = React.memo(({
     console.log('Canvas annotations saved:', canvasData);
   }, []);
 
-  if (!document.document_data) {
+  if (storageLoading) {
+    return (
+      <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+          <p>Loading document from storage...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!effectiveData && !storagePath) {
     return (
       <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
         <div className="text-center">

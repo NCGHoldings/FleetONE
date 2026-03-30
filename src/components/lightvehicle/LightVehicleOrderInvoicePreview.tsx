@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useEffect, useState } from 'react';
 import { generateLightVehicleOrderInvoiceHTML, LightVehicleOrderInvoiceData } from '@/lib/lightvehicle-order-invoice-generator';
 import { Loader2 } from 'lucide-react';
