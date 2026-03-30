@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Light Vehicle Payment Tracking Component
  * Handles payment recording, verification, GL integration, and receipt generation

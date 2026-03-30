@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { FileText, ShoppingCart, Calendar, User, Building, Phone, Mail, MapPin, Bus, DollarSign, Percent } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';

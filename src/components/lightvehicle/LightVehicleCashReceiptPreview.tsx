@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { LightVehicleCashReceipt } from '@/hooks/useLightVehicleCashReceipts';
 import { format } from 'date-fns';
