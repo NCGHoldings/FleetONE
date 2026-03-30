@@ -1,55 +1,44 @@
 
 
-# Fix Trips Table: Sticky Header, Fixed Height & Usability
+# Fix Document Preview: Load PDF from Storage When document_data is Empty
 
 ## Problem
-The trips table scrolls freely with the page — no frozen header, no fixed viewport. With 100+ trips, users lose track of columns and the table feels unmanageable.
 
-## Solution
+Documents are now stored in Supabase Storage (bucket `generated-documents`) with a `storage_path` reference in the `document_storage` table. However, the `DocumentViewer` component only checks `document.document_data` (the old base64 column) — which is now empty for new documents. This causes "Document data not available" even though the PDF exists in storage.
 
-### 1. Add sticky table header + fixed-height scrollable container
+The console confirms: storage upload succeeds, document record is inserted with `storage_path`, but `document_data` is null.
 
-**File: `src/components/special-hire/ConfirmedTripsTable.tsx`** (lines 1044-1067)
+## Root Cause
 
-Replace the current `overflow-x-auto` wrapper with a fixed-height, dual-axis scrollable container with a sticky header:
+1. **DocumentViewer.tsx line 81**: `if (!document.document_data)` returns the "not available" message — never attempts to fetch from storage
+2. **ConfirmedTripsTable.tsx queries** select `document_data` but NOT `storage_path` — so even if the viewer tried, it wouldn't have the path
+3. **FinanceApprovalModal.tsx** same issue — queries don't include `storage_path`
 
-```tsx
-<div className="overflow-auto max-h-[600px] relative">
-  <Table>
-    <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
-      ...
-    </TableHeader>
+## Fix
+
+### File 1: `src/components/special-hire/DocumentViewer.tsx`
+
+- Add `storage_path?: string | null` to the document interface
+- In the `MemoizedPreviewContent` component, when `document_data` is empty but `storage_path` exists, fetch the PDF from storage using `getDocumentAsBase64()` and use that
+- Add a loading state while fetching from storage
+- Remove the early "not available" return when `storage_path` is present
+
+### File 2: `src/components/special-hire/ConfirmedTripsTable.tsx`
+
+- Add `storage_path` to both document queries (lines 519-538 and 577-597) so the field is available when opening the viewer
+
+### File 3: `src/components/special-hire/FinanceApprovalModal.tsx`
+
+- Add `storage_path` to the document query so finance approval document viewing also works
+
+## Technical Detail
+
+The viewer will use this logic:
+```
+if document_data exists → use it directly (legacy)
+else if storage_path exists → fetch from storage via getDocumentAsBase64()
+else → show "not available"
 ```
 
-- Set `max-h-[600px]` so the table body scrolls vertically within a viewport
-- Make `TableHeader` sticky with `sticky top-0 z-10` and solid background so it stays visible during scroll
-- Add `shadow-sm` to visually separate header from scrolling body
-
-### 2. Update `table.tsx` base component
-
-**File: `src/components/ui/table.tsx`**
-
-Update the `Table` wrapper to remove the outer `overflow-auto` div (which conflicts with the sticky header), making the parent container in ConfirmedTripsTable the scroll controller instead. The Table component will just render a `<table>` directly.
-
-### 3. Add minimum column widths
-
-Add `min-w-[...]` to each `TableHead` to prevent columns from collapsing on narrow viewports:
-- Quotation: `min-w-[120px]`
-- Customer: `min-w-[150px]`
-- Trip Info: `min-w-[140px]`
-- Vehicle: `min-w-[120px]`
-- Status: `min-w-[100px]`
-- Payment: `min-w-[120px]`
-- Workflow: `min-w-[140px]`
-- Financial: `min-w-[140px]`
-- Actions: `min-w-[80px]`
-
-### 4. Fix build errors (lightvehicle)
-
-Apply `as any` type assertions to all failing lightvehicle files to clear the 30+ TS errors. These are pre-existing issues unrelated to special hire but blocking deployment.
-
-## Technical Notes
-- The sticky header requires the scroll container to be the direct parent of the table, not the Table component's built-in wrapper
-- `z-10` ensures header stays above row content during scroll
-- `bg-background` uses the theme token so it works in both light and dark mode
+This is the same pattern already used in `useDocumentManagement.ts` line 538-542 for email sending.
 
