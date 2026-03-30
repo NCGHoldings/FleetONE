@@ -57,7 +57,7 @@ export function LightVehicleSpreadsheetCore({ orders, loading, onUpdate, onRefre
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
 
   const quickActions = useSpreadsheetQuickActions(onRefresh);
-  const { getCashReceiptsForOrder } = useLightVehicleCashReceipts();
+  const { fetchReceiptsForOrder: getCashReceiptsForOrder } = useLightVehicleCashReceipts();
 
   const handleViewReceipt = useCallback(async (receiptId: string) => {
     const { data, error } = await (await import('@/integrations/supabase/client')).supabase
@@ -528,8 +528,8 @@ export function LightVehicleSpreadsheetCore({ orders, loading, onUpdate, onRefre
 
       {/* Cash Receipt View Modal */}
       <LightVehicleCashReceiptModal
-        isOpen={receiptModalOpen}
-        onClose={() => { setReceiptModalOpen(false); setViewReceipt(null); }}
+        open={receiptModalOpen}
+        onOpenChange={(open: boolean) => { if (!open) { setReceiptModalOpen(false); setViewReceipt(null); } }}
         receipt={viewReceipt}
         onRefresh={onRefresh}
       />
