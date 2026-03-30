@@ -156,11 +156,31 @@ export const useFinanceApproval = () => {
     if (customerId && (isFullPayment || isBalance) && !arInvoiceId) {
       console.log('[SPH Finance] Creating AR Invoice for Full/Balance Payment...');
       
-      const totalAmount = (paymentData.quotation.gross_revenue || 0) +
+      // Base quotation amount
+      let totalAmount = (paymentData.quotation.gross_revenue || 0) +
         (paymentData.quotation.fuel_cost_fuel_only || 0) +
         (paymentData.quotation.commission_pass_through_amount || 0) +
         (paymentData.quotation.total_additional_charges || 0) -
         (paymentData.quotation.discount_amount_lkr || 0);
+
+      // Include post-trip adjustment amounts if any
+      try {
+        const { data: adjustment } = await supabase
+          .from('special_hire_trip_adjustments')
+          .select('extra_km_total_charge, total_additional_expenses')
+          .eq('quotation_id', paymentData.quotation.id)
+          .maybeSingle();
+        
+        if (adjustment) {
+          const adjustmentTotal = (adjustment.extra_km_total_charge || 0) + (adjustment.total_additional_expenses || 0);
+          if (adjustmentTotal > 0) {
+            totalAmount += adjustmentTotal;
+            console.log('[SPH Finance] Including post-trip adjustment in AR Invoice:', adjustmentTotal, 'New total:', totalAmount);
+          }
+        }
+      } catch (err) {
+        console.warn('[SPH Finance] Could not fetch adjustment data:', err);
+      }
 
       const dueDate = format(
         new Date(paymentData.quotation.pickup_datetime || new Date()),
