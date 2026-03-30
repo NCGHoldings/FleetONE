@@ -496,23 +496,36 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             }
           }
           
-          // 2. Apply advance if customer paid advance
+          // 2. Apply advance if customer paid advance (with double-posting guard)
           // DR Customer Advance (Liability) | CR Trade Receivable
-          if (quotationData.advance_paid > 0) {
-            console.log('[SPH GL] Applying advance to invoice:', quotationData.advance_paid);
-            
-            const advanceGLResult = await applyAdvanceToInvoiceStandalone({
-              invoiceNo,
-              quotationNo: quotationData.quotation_no,
-              customerName: quotationData.customer_name,
-              advanceAmount: quotationData.advance_paid,
-              settings,
-              effectiveCompanyId: NCG_HOLDING_ID,
-            });
-            
-            if (advanceGLResult) {
-              console.log('[SPH GL] ✅ Advance applied:', advanceGLResult.entry_number);
-              toast.success(`Advance Applied: ${advanceGLResult.entry_number}`);
+          const advanceAmount = freshTotalPaid > 0 ? freshTotalPaid : (quotationData.advance_paid || 0);
+          if (advanceAmount > 0) {
+            // Check if advance was already applied by useFinanceApproval
+            const { data: existingApplyJE } = await supabase
+              .from('journal_entries')
+              .select('id')
+              .ilike('entry_number', `SPH-ADJ-APPLY-${quotationData.quotation_no}%`)
+              .limit(1)
+              .maybeSingle();
+
+            if (!existingApplyJE) {
+              console.log('[SPH GL] Applying advance to invoice:', advanceAmount);
+              
+              const advanceGLResult = await applyAdvanceToInvoiceStandalone({
+                invoiceNo,
+                quotationNo: quotationData.quotation_no,
+                customerName: quotationData.customer_name,
+                advanceAmount,
+                settings,
+                effectiveCompanyId: NCG_HOLDING_ID,
+              });
+              
+              if (advanceGLResult) {
+                console.log('[SPH GL] ✅ Advance applied:', advanceGLResult.entry_number);
+                toast.success(`Advance Applied: ${advanceGLResult.entry_number}`);
+              }
+            } else {
+              console.log('[SPH GL] ⏭️ Advance already applied, skipping duplicate');
             }
           }
 
