@@ -1,140 +1,114 @@
 
 
-# Special Hire: Full System Flow Audit & Structural Fixes
+# Special Hire: Complete A-to-Z Flow Diagram & Fine-Tuning
 
-## Current System Flow (As-Is)
+## Current State Summary
 
-```text
-QUOTATION PHASE
-  Customer Request → Create Quotation → Confirm Quotation
-                                              |
-PAYMENT PHASE                                 v
-  ┌─────────────────────────────────────────────────────────┐
-  │ Confirm Payment (Operations)                            │
-  │   → Choose: Advance / Balance / Full                    │
-  │   → Creates payment record (status: pending_finance)    │
-  │   → Fire-and-forget: Generate DRAFT document            │
-  │     (sales_receipt for advance, invoice for balance/full)│
-  └─────────────────────────────────────────────────────────┘
-                         |
-  ┌─────────────────────────────────────────────────────────┐
-  │ Finance Approval                                        │
-  │   → Approves payment → Background integration:          │
-  │     1. Create Finance Customer                          │
-  │     2. Create AR Invoice (full/balance only)            │
-  │     3. Post GL Entry                                    │
-  │     4. Create AR Receipt                                │
-  │     5. Regenerate document as APPROVED with signatures  │
-  └─────────────────────────────────────────────────────────┘
-                         |
-POST-TRIP (OPTIONAL)     v
-  ┌─────────────────────────────────────────────────────────┐
-  │ Post-Trip Adjustment (if trip exceeded quotation)       │
-  │   → Record extra KM, additional expenses                │
-  │   → Finalize adjustment                                 │
-  │   → Generate Balance Invoice (customer-facing, no sigs) │
-  │   → Email to customer → GL posting on send              │
-  └─────────────────────────────────────────────────────────┘
-```
+From code analysis, here's what EXISTS and what's MISSING:
 
-## Issues Found
+### What Works (Done)
+1. **Sales Receipt** on advance payment → Draft created → Finance approval → Approved with signatures
+2. **Generate Final Invoice** (with or without adjustment) → Preview, Download, Email
+3. **Post-Trip Adjustment** → Record extra KM/expenses → Finalize
+4. **GL posting** on email send (invoice sent triggers DR Receivable / CR Revenue)
+5. **Re-generate** Sales Receipt and Final Invoice from dropdown
 
-### Issue 1: No "Generate Final Invoice" option without Post-Trip Adjustment
-Currently, the Balance Invoice (final invoice) can ONLY be created via `GenerateBalanceInvoiceModal`, which REQUIRES a finalized post-trip adjustment. If the trip completed exactly as quoted (no extra KM, no additional expenses), there is no way to generate a final invoice for the customer.
+### What's Mixed Up / Missing
 
-**Fix**: Add a "Generate Final Invoice" action that works without post-trip adjustment. When no adjustment exists, create the final invoice using original quotation amounts.
+**Problem 1: "Invoice without signature" concept doesn't exist as a separate action**
+The user wants an option to generate a quick invoice (without signatures) to send to the customer as a payment reminder — BEFORE finance approval, BEFORE post-trip adjustment. Currently the only way to send something is the Final Invoice modal, which auto-saves as "balance" type and triggers GL posting on email. This is wrong for a simple reminder.
 
-### Issue 2: Final Invoice missing signatures
-The `GenerateBalanceInvoiceModal` explicitly says "Customer copy - No signatures required" and never includes signatures. But the user wants final invoices to have the same signature flow as sales receipts (Prepared By, Checked By, Approved By).
+**Problem 2: Final Invoice always triggers GL posting on email**
+If user just wants to send a reminder invoice (no GL needed), the current flow posts to GL anyway. GL should only post when the FINAL invoice is sent (after all adjustments are done).
 
-**Fix**: Add signature support to the final invoice flow, same as the sales receipt.
+**Problem 3: No "Send Sales Receipt" to customer option**
+After finance approves advance payment, the approved Sales Receipt exists but there's no button to email it to the customer as confirmation.
 
-### Issue 3: `busType: 'Standard Bus'` still hardcoded in 2 places
-- `ConfirmedTripsTable.tsx` line 404 (draft document on payment confirm)
-- `ConfirmedTripsTable.tsx` line 1501 (GenerateBalanceInvoiceModal props)
+**Problem 4: Flow is unclear — too many overlapping document options**
+"View Invoice", "View Documents", "Generate Final Invoice", "View Balance Invoice" — confusing.
 
-**Fix**: Use the `resolveBusType` helper from `special-hire-invoice-helpers.ts`.
-
-### Issue 4: Document flow is confusing for users
-The dropdown has too many overlapping options: "View Invoice", "View Documents", "View Balance Invoice", "Re-generate Sales Receipt", "Re-generate Final Invoice". Users don't know which to use when.
-
-**Fix**: Consolidate the document actions into a clearer structure.
-
-## Changes
-
-### File 1: `src/components/special-hire/ConfirmedTripsTable.tsx`
-
-1. **Fix busType on draft document creation (line 404)**: Replace `'Standard Bus'` with `resolveBusType(tripForDoc)`.
-
-2. **Fix busType on GenerateBalanceInvoiceModal props (line 1501)**: Replace `'Standard Bus'` with resolved bus type.
-
-3. **Add "Generate Final Invoice" menu item**: For trips with approved payments but NO post-trip adjustment, add a new dropdown item that opens `GenerateBalanceInvoiceModal` with zero adjustment data. This allows creating a final invoice for trips that completed exactly as quoted.
-
-4. **Clean up dropdown actions**: Reorganize into logical groups:
-   - Payment section: Confirm Payment
-   - Operations: Update Status, Advance Details, Post-Trip Adjustment, Vehicle Assignment
-   - Documents: View Documents, Generate Final Invoice (when no adjustment & no final invoice exists)
-   - Finance: Approve Payment, Re-generate Sales Receipt/Final Invoice, Retry AR
-
-### File 2: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
-
-1. **Make adjustment data optional**: Currently the modal requires adjustment data. Change so it works with zero/empty adjustments (trip completed as quoted).
-
-2. **Add signature support**: Include signature fields (preparedBy, checkedBy, approvedBy) in `generateInvoiceData()`. Fetch existing document approvals from `document_approvals` table and embed in the generated PDF, same as sales receipt flow.
-
-3. **Fix the "Customer copy - no signatures" messaging**: Change to support both internal (with signatures) and customer-facing (without signatures) modes, controlled by a toggle or the document status.
-
-### File 3: `src/hooks/useFinanceApproval.ts`
-
-1. **Fix busType fallback on line 369**: Already partially fixed but still falls back to `'Standard Bus'`. Add `bus_types` join to the quotation query (line 70) so `bus_types.name` is available.
-
-## Correct Flow Diagram (After Fix)
+## Correct Business Flow (All Scenarios)
 
 ```text
-SPECIAL HIRE - COMPLETE DOCUMENT FLOW
+SCENARIO A: Customer pays ADVANCE before trip
+  1. Confirm Advance Payment → Draft Sales Receipt created
+  2. Finance Approves → Sales Receipt gets signatures → GL posted
+  3. Trip happens
+  4a. No extra charges → Generate Final Invoice (same amounts) → Email → GL posted
+  4b. Extra charges → Post-Trip Adjustment → Generate Final Invoice (with extras) → Email → GL posted
 
-1. QUOTATION
-   └→ Create → Confirm → Quotation PDF generated
+SCENARIO B: Customer pays FULL before trip  
+  1. Confirm Full Payment → Draft Invoice created
+  2. Finance Approves → Invoice gets signatures → GL posted
+  3. Trip happens
+  4a. No extra → Done (settled)
+  4b. Extra charges → Post-Trip Adjustment → Generate Supplementary Invoice → Email → GL posted
 
-2. PAYMENT CONFIRMATION (Operations)
-   ├→ Advance Payment
-   │   └→ Draft Sales Receipt created (with bus type + mileage from quotation)
-   ├→ Full Payment
-   │   └→ Draft Invoice created
-   └→ Balance Payment
-       └→ Draft Invoice created
+SCENARIO C: Customer pays NOTHING before trip
+  1. Trip happens (no payment yet)
+  2. Option: Send Payment Reminder (invoice without signatures, NO GL)
+  3. Customer pays → Confirm Payment → Draft document created
+  4. Finance Approves → GL posted
+  5. If adjustment needed → Post-Trip Adjustment → Final Invoice
 
-3. FINANCE APPROVAL
-   └→ Approve Payment
-       ├→ GL: DR Bank / CR Customer Advance (advance/full)
-       │   OR DR Bank / CR Trade Receivable (balance)
-       ├→ AR Invoice created (full/balance only)
-       ├→ AR Receipt created
-       └→ Document upgraded: DRAFT → APPROVED (with signatures)
-
-4. POST-TRIP ADJUSTMENT (OPTIONAL - only if trip exceeded quotation)
-   ├→ Record extra KM + additional expenses
-   ├→ Finalize adjustment
-   └→ Generate Final Invoice (with adjustment details)
-
-5. FINAL INVOICE (NEW - works with OR without adjustment)
-   ├→ If adjustment exists: Shows original + extras + balance
-   ├→ If no adjustment: Shows original quotation amounts
-   ├→ Includes signatures (Prepared/Checked/Approved)
-   ├→ Download PDF
-   ├→ Email to Customer → Triggers GL posting
-   └→ GL: DR Trade Receivable / CR SPH Revenue
-
-6. DOCUMENT MANAGEMENT
-   ├→ View Documents: All docs for quotation
-   ├→ Regenerate: Re-create any existing document
-   └→ Each document: View / Approve / Regenerate
+SCENARIO D: Customer pays ADVANCE, then BALANCE after trip
+  1. Confirm Advance → Sales Receipt → Finance Approval
+  2. Trip happens  
+  3. Confirm Balance Payment → Draft Invoice created
+  4. Finance Approves → GL posted
+  5. If adjustment → Post-Trip Adjustment → Supplementary Invoice
 ```
+
+## Plan: What to Build/Fix
+
+### 1. Create comprehensive Mermaid flow diagram
+Create a detailed `.mmd` diagram showing ALL scenarios with clear markers for what's ✅ done and what's ❌ missing.
+
+### 2. Add "Send Payment Reminder" action (NEW)
+- New dropdown item: "Send Payment Reminder" — available when customer has unpaid balance and no final invoice sent yet
+- Generates a simple invoice PDF (without signatures, without "DRAFT" watermark) using existing `generateInvoicePDF`
+- Has "Download" and "Email to Customer" buttons
+- Does NOT trigger GL posting (it's just a reminder, not a financial event)
+- Stores as document_type = 'payment_reminder' in document_storage
+
+### 3. Add "Email Sales Receipt" action
+- After finance approval, add dropdown item to email the approved Sales Receipt PDF to customer
+- Uses existing document from storage, no regeneration needed
+
+### 4. Fix Final Invoice GL posting guard
+- Only post GL when invoice is the FIRST final invoice sent (check if GL already posted for this quotation's invoice)
+- Prevent double GL posting if user re-sends the same final invoice
+
+### 5. Simplify dropdown menu labels
+Current confusing labels → Clear labels:
+- "View Invoice" → Remove (redundant with "View Documents")
+- "Generate Final Invoice" → Keep (clear purpose)
+- "View Balance Invoice" → "View Final Invoice" (rename)
+- Add "Send Payment Reminder" (new)
+- Add "Email Sales Receipt" (new)
+
+### Files to Change
+
+**File 1: `src/components/special-hire/ConfirmedTripsTable.tsx`**
+- Add "Send Payment Reminder" dropdown item
+- Add "Email Sales Receipt" dropdown item  
+- Remove redundant "View Invoice" item
+- Rename "View Balance Invoice" → "View Final Invoice"
+- Add helper to email existing document
+
+**File 2: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`**
+- Add GL posting guard (check if already posted before posting again)
+- This is the Final Invoice modal — no other changes needed
+
+**File 3: Create Mermaid diagram** (`/mnt/documents/special-hire-complete-flow.mmd`)
+- All 4 scenarios with decision points
+- Mark done vs missing items
 
 ## Summary
-- Allow final invoice generation WITHOUT requiring post-trip adjustment
-- Add signature support to final invoices (matching sales receipts)
-- Fix 2 remaining hardcoded `'Standard Bus'` values
-- Reorganize dropdown menu for better usability
-- No changes to GL/AR posting logic (already correct from previous fixes)
+- Build complete flow diagram marking done/missing
+- Add "Send Payment Reminder" (invoice without signatures, no GL) for unpaid customers
+- Add "Email Sales Receipt" for sending approved receipt to customer
+- Fix GL double-posting guard on Final Invoice
+- Clean up dropdown labels for clarity
+- No changes to existing GL/AR logic — only adding guards and new lightweight actions
 
