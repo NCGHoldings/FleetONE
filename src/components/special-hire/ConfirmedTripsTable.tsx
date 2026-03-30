@@ -28,6 +28,7 @@ import { GenerateBalanceInvoiceModal } from './GenerateBalanceInvoiceModal';
 import { VehicleAssignmentModal } from './VehicleAssignmentModal';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { resolveBusType, calculateTotalKm, getTripDistance } from '@/lib/special-hire-invoice-helpers';
+import { PaymentTimelineFresh } from './PaymentTimelineFresh';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SignatureWorkflowIndicator } from './SignatureWorkflowIndicator';
@@ -1281,6 +1282,18 @@ export function ConfirmedTripsTable() {
                                       </DropdownMenuItem>
                                     ))}
                                   </>
+                                )}
+                                {/* Payment History */}
+                                {approvedPayments.length > 0 && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedTrip(trip);
+                                      setPaymentHistoryModalOpen(true);
+                                    }}
+                                  >
+                                    <DollarSign className="w-4 h-4 mr-2" />
+                                    Payment History
+                                  </DropdownMenuItem>
                                 )}
 
                                 <DropdownMenuSeparator />
