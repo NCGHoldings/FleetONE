@@ -207,11 +207,13 @@ export async function postARInvoiceToGL(params: {
   businessUnitCode?: string;
   customerName?: string;
   sourceModule?: string;
+  /** Optional: per-line revenue accounts for category-based splitting */
+  revenueLines?: Array<{ accountId: string; amount: number; description?: string }>;
 }): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
   const hasTax = (params.taxAmount || 0) > 0 && !!params.taxPayableId;
-  const netRevenue = hasTax ? params.totalAmount - (params.taxAmount || 0) : params.totalAmount;
   const taxAmount = hasTax ? (params.taxAmount || 0) : 0;
 
+  // DR Trade Receivable (full gross amount)
   const lines: JournalEntryLine[] = [
     {
       account_id: params.tradeReceivableId,
@@ -219,13 +221,43 @@ export async function postARInvoiceToGL(params: {
       debit: params.totalAmount,
       credit: 0,
     },
-    {
+  ];
+
+  // CR Revenue — either multi-line (category-based) or single-line (fallback)
+  if (params.revenueLines && params.revenueLines.length > 0) {
+    // Group by accountId and sum amounts
+    const grouped = new Map<string, { amount: number; description: string }>();
+    for (const rl of params.revenueLines) {
+      const existing = grouped.get(rl.accountId);
+      if (existing) {
+        existing.amount += rl.amount;
+      } else {
+        grouped.set(rl.accountId, {
+          amount: rl.amount,
+          description: rl.description || `Revenue - ${params.invoiceNumber}`,
+        });
+      }
+    }
+    for (const [accountId, data] of grouped) {
+      if (data.amount > 0) {
+        lines.push({
+          account_id: accountId,
+          description: data.description,
+          debit: 0,
+          credit: Math.round(data.amount * 100) / 100,
+        });
+      }
+    }
+  } else {
+    // Single-line fallback: all revenue to one account
+    const netRevenue = hasTax ? params.totalAmount - taxAmount : params.totalAmount;
+    lines.push({
       account_id: params.salesRevenueId,
       description: `Sales Revenue - ${params.invoiceNumber}`,
       debit: 0,
       credit: netRevenue,
-    },
-  ];
+    });
+  }
 
   // Add tax line if VAT/tax exists
   if (hasTax && params.taxPayableId) {

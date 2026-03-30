@@ -439,7 +439,22 @@ export const useCreateARInvoice = () => {
 
         if (resolved.arAccountId && resolved.revenueAccountId && invoice.total_amount > 0) {
           const { postARInvoiceToGL } = await import("@/lib/gl-posting-utils");
-          console.log('[AR GL] Calling postARInvoiceToGL with:', { invoiceNumber: invoice.invoice_number, totalAmount: invoice.total_amount, taxAmount });
+
+          // Build revenueLines from invoice line items if they have distinct account_ids
+          let revenueLines: Array<{ accountId: string; amount: number; description?: string }> | undefined;
+          if (lines && lines.length > 0) {
+            const linesWithAccounts = lines.filter(l => l.account_id);
+            if (linesWithAccounts.length > 0) {
+              const hasTax = (invoice.tax_amount || 0) > 0;
+              revenueLines = linesWithAccounts.map(l => ({
+                accountId: l.account_id!,
+                amount: hasTax ? l.line_total - (l.line_total * (invoice.tax_amount || 0) / invoice.total_amount) : l.line_total,
+                description: `${l.description} - ${invoice.invoice_number}`,
+              }));
+            }
+          }
+
+          console.log('[AR GL] Calling postARInvoiceToGL with:', { invoiceNumber: invoice.invoice_number, totalAmount: invoice.total_amount, taxAmount, revenueLines: revenueLines?.length || 0 });
           const glResult = await postARInvoiceToGL({
             invoiceNumber: invoice.invoice_number,
             invoiceDate: invoice.invoice_date,
@@ -451,6 +466,7 @@ export const useCreateARInvoice = () => {
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
             sourceModule: 'manual_ar',
+            revenueLines,
           });
           console.log('[AR GL] GL Result:', glResult);
           if (glResult.success && glResult.journalEntryId) {

@@ -499,7 +499,43 @@ export async function postVehiclePaymentToGL({
 }
 
 /**
+ * Resolve the sales_account_id from item_categories by category name and company.
+ * Returns the linked COA account ID, or null if not found/not linked.
+ */
+export async function resolveItemCategoryRevenueAccount(
+  categoryName: string,
+  companyId: string
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('item_categories')
+      .select('sales_account_id')
+      .eq('category_name', categoryName)
+      .eq('company_id', companyId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[CategoryRevenue] Lookup error:', error.message);
+      return null;
+    }
+    return data?.sales_account_id || null;
+  } catch (err) {
+    console.warn('[CategoryRevenue] Exception:', err);
+    return null;
+  }
+}
+
+// Map module to default item category name
+const MODULE_CATEGORY_MAP: Record<VehicleModule, string> = {
+  yutong: 'Yutong Sales',
+  sinotruck: 'Sinotruk Sales',
+  light_vehicle: 'Light Vehicle Sales',
+};
+
+/**
  * Post invoice to GL (Revenue Recognition)
+ * Now supports dynamic item-category-based revenue routing.
  */
 export async function postVehicleInvoiceToGL({
   module,
@@ -512,6 +548,7 @@ export async function postVehicleInvoiceToGL({
   isTaxInvoice,
   taxRate,
   invoiceNo,
+  itemCategoryName,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -523,25 +560,42 @@ export async function postVehicleInvoiceToGL({
   isTaxInvoice?: boolean;
   taxRate?: number;
   invoiceNo?: string;
+  itemCategoryName?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
 
-    // Resolve GL accounts via 3-tier hierarchy (customer → category → global)
+    // Resolve GL accounts via 4-tier hierarchy:
+    // 1. Item Category → 2. Customer Category → 3. Customer Direct → 4. Global Settings
     let tradeReceivableId = settings.trade_receivable_account_id;
     let salesRevenueId = settings.sales_revenue_account_id;
 
+    // Tier 1: Item Category Resolution (highest priority for revenue)
+    const effectiveCategoryName = itemCategoryName || MODULE_CATEGORY_MAP[module];
+    if (effectiveCategoryName) {
+      const categoryRevenueId = await resolveItemCategoryRevenueAccount(
+        effectiveCategoryName,
+        effectiveCompanyId
+      );
+      if (categoryRevenueId) {
+        salesRevenueId = categoryRevenueId;
+        console.log(`[${module.toUpperCase()} Finance] Revenue resolved via item category: ${effectiveCategoryName}`);
+      }
+    }
+
+    // Tier 2/3: Customer Category/Direct Resolution (for trade receivable)
     if (customerId) {
       try {
         const { resolveCustomerARAccounts } = await import('@/hooks/useCustomerCategories');
         const resolved = await resolveCustomerARAccounts(customerId, effectiveCompanyId);
         if (resolved.arAccountId) tradeReceivableId = resolved.arAccountId;
-        if (resolved.revenueAccountId) salesRevenueId = resolved.revenueAccountId;
-        console.log(`[${module.toUpperCase()} Finance] GL resolution source: ${resolved.source}`, {
-          tradeReceivableId, salesRevenueId
+        // Only override revenue if item category didn't resolve it
+        if (!effectiveCategoryName && resolved.revenueAccountId) salesRevenueId = resolved.revenueAccountId;
+        console.log(`[${module.toUpperCase()} Finance] GL resolution complete`, {
+          tradeReceivableId, salesRevenueId, source: resolved.source
         });
       } catch (err) {
-        console.warn(`[${module.toUpperCase()} Finance] Category resolution failed, using settings fallback`, err);
+        console.warn(`[${module.toUpperCase()} Finance] Customer resolution failed, using current fallback`, err);
       }
     }
 
