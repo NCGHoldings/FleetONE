@@ -622,6 +622,13 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             </AlertDescription>
           </Alert>
 
+          {/* Payment Timeline - fresh from DB */}
+          <PaymentTimelineFresh
+            quotationId={quotationData.id}
+            totalPayable={computedTotalAmount() + (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0)}
+            onTotalPaidFetched={(total) => setFreshTotalPaid(total)}
+          />
+
           {/* Financial Summary */}
           <Card>
             <CardHeader>
@@ -635,7 +642,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
                 </div>
                 <div>
                   <div className="text-muted-foreground">Total Paid (All Payments)</div>
-                  <div className="font-semibold text-green-600">LKR {(quotationData.total_paid ?? quotationData.advance_paid ?? 0).toLocaleString()}</div>
+                  <div className="font-semibold text-green-600">LKR {getActualTotalPaid().toLocaleString()}</div>
                 </div>
                 {adjustmentData.extra_km_total_charge && adjustmentData.extra_km_total_charge > 0 && (
                   <div>
