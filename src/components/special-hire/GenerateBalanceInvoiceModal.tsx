@@ -173,7 +173,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
     const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
     const finalBalance = calculateFinalBalance();
     const totalAmount = computedTotalAmount();
-    const actualTotalPaid = (quotationData as any).total_paid ?? quotationData.advance_paid ?? 0;
+    const actualTotalPaid = quotationData.total_paid ?? quotationData.advance_paid ?? 0;
 
     return {
       invoiceNo,
@@ -626,8 +626,12 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             <CardContent className="space-y-2">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <div className="text-muted-foreground">Original Balance Due</div>
-                  <div className="font-semibold">LKR {quotationData.balance_due.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Total Payable</div>
+                  <div className="font-semibold">LKR {computedTotalAmount().toLocaleString()}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Total Paid (All Payments)</div>
+                  <div className="font-semibold text-green-600">LKR {(quotationData.total_paid ?? quotationData.advance_paid ?? 0).toLocaleString()}</div>
                 </div>
                 {adjustmentData.extra_km_total_charge && adjustmentData.extra_km_total_charge > 0 && (
                   <div>
@@ -656,6 +660,14 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
                   LKR {finalBalance.toLocaleString()}
                 </div>
               </div>
+              {calculateOverpaidCredit() > 0 && (
+                <div className="flex justify-between items-center text-green-600">
+                  <div className="text-sm font-medium">Overpaid Credit</div>
+                  <div className="text-sm font-bold">
+                    LKR {calculateOverpaidCredit().toLocaleString()}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -362,6 +362,11 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
               <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; background: #e8f5e9;">Balance Due</td>
               <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; background: #e8f5e9;">${balanceDue.toLocaleString()}.00</td>
             </tr>
+            ${balanceDue === 0 && totalPaid > priceAfterDiscount ? `
+            <tr>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; color: #16a34a;">Overpaid Credit</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; color: #16a34a;">${(totalPaid - priceAfterDiscount).toLocaleString()}.00</td>
+            </tr>` : ''}
           </table>
           ${data.hasAdjustments && data.adjustmentNotes ? `
           <div style="clear: both; margin-top: 15px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
