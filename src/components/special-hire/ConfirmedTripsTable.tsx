@@ -27,6 +27,7 @@ import { PostTripAdjustmentModal } from './PostTripAdjustmentModal';
 import { GenerateBalanceInvoiceModal } from './GenerateBalanceInvoiceModal';
 import { VehicleAssignmentModal } from './VehicleAssignmentModal';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
+import { resolveBusType, calculateTotalKm, getTripDistance } from '@/lib/special-hire-invoice-helpers';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SignatureWorkflowIndicator } from './SignatureWorkflowIndicator';
@@ -401,7 +402,7 @@ export function ConfirmedTripsTable() {
         dropLocation: tripForDoc.drop_location,
         pickupDate: new Date(tripForDoc.pickup_datetime),
         dropDate: new Date(tripForDoc.drop_datetime || tripForDoc.pickup_datetime),
-        busType: 'Standard Bus',
+        busType: resolveBusType(tripForDoc),
         numberOfBuses: tripForDoc.number_of_buses,
         numberOfPassengers: tripForDoc.number_of_passengers,
         totalAmount: calculateTotalAmount(tripForDoc),
@@ -1498,7 +1499,7 @@ export function ConfirmedTripsTable() {
             drop_location: selectedTrip.drop_location,
             pickup_datetime: selectedTrip.pickup_datetime,
             drop_datetime: selectedTrip.drop_datetime,
-            bus_type: 'Standard Bus',
+            bus_type: resolveBusType(selectedTrip),
             number_of_buses: selectedTrip.number_of_buses,
             number_of_passengers: selectedTrip.number_of_passengers,
             original_quotation_amount: selectedAdjustment.original_quotation_amount || 0,
