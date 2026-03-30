@@ -664,7 +664,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
           {/* Payment Timeline - fresh from DB */}
           <PaymentTimelineFresh
             quotationId={quotationData.id}
-            totalPayable={computedTotalAmount() + (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0)}
+            totalPayable={computedTotalAmount() + (effectiveAdjustment.extra_km_total_charge || 0) + (effectiveAdjustment.total_additional_expenses || 0)}
             onTotalPaidFetched={(total) => setFreshTotalPaid(total)}
           />
 
@@ -676,29 +676,29 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             <CardContent className="space-y-2">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <div className="text-muted-foreground">Total Payable</div>
-                  <div className="font-semibold">LKR {computedTotalAmount().toLocaleString()}</div>
+                  <div className="text-muted-foreground">Total Payable (incl. adjustments)</div>
+                  <div className="font-semibold">LKR {(computedTotalAmount() + (effectiveAdjustment.extra_km_total_charge || 0) + (effectiveAdjustment.total_additional_expenses || 0)).toLocaleString()}</div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Total Paid (All Payments)</div>
                   <div className="font-semibold text-green-600">LKR {getActualTotalPaid().toLocaleString()}</div>
                 </div>
-                {adjustmentData.extra_km_total_charge && adjustmentData.extra_km_total_charge > 0 && (
+                {effectiveAdjustment.extra_km_total_charge && effectiveAdjustment.extra_km_total_charge > 0 && (
                   <div>
                     <div className="text-muted-foreground">Extra Kilometers</div>
                     <div className="font-semibold text-orange-600">
-                      + LKR {adjustmentData.extra_km_total_charge.toLocaleString()}
+                      + LKR {effectiveAdjustment.extra_km_total_charge.toLocaleString()}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      ({adjustmentData.extra_km} km × LKR {adjustmentData.extra_km_rate})
+                      ({effectiveAdjustment.extra_km} km × LKR {effectiveAdjustment.extra_km_rate})
                     </div>
                   </div>
                 )}
-                {adjustmentData.total_additional_expenses && adjustmentData.total_additional_expenses > 0 && (
+                {effectiveAdjustment.total_additional_expenses && effectiveAdjustment.total_additional_expenses > 0 && (
                   <div>
                     <div className="text-muted-foreground">Additional Expenses</div>
                     <div className="font-semibold text-orange-600">
-                      + LKR {adjustmentData.total_additional_expenses.toLocaleString()}
+                      + LKR {effectiveAdjustment.total_additional_expenses.toLocaleString()}
                     </div>
                   </div>
                 )}
