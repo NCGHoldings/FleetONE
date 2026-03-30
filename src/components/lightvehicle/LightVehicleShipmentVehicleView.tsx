@@ -43,7 +43,7 @@ export function LightVehicleShipmentVehicleView() {
       // Fetch vehicles for each shipment
       const shipmentsWithVehicles = await Promise.all(
         (shipmentData || []).map(async (shipment: any) => {
-          const { data: vehicles } = await supabase
+          const { data: vehicles } = await (supabase as any)
             .from('lightvehicle_vehicle_records')
             .select('id, model, engine_no, chassis_no, customer_name, is_matched, color')
             .eq('shipment_group_id', shipment.id);

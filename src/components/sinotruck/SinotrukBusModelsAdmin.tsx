@@ -113,7 +113,7 @@ export function SinotrukBusModelsAdmin() {
     try {
       setLoading(true);
       console.log('Loading bus models...');
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('sinotruck_bus_models')
         .select('*')
         .order('bus_name');
@@ -129,7 +129,7 @@ export function SinotrukBusModelsAdmin() {
       // Load image counts and primary images for each model
       if (data && data.length > 0) {
         const imageCountsPromises = data.map(async (model) => {
-          const { data: images } = await supabase
+          const { data: images } = await (supabase as any)
             .from('sinotruck_bus_model_images')
             .select('id, image_url, is_primary')
             .eq('bus_model_id', model.id);
@@ -187,7 +187,7 @@ export function SinotrukBusModelsAdmin() {
         .from('sinotruck-bus-models')
         .getPublicUrl(filePath);
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('sinotruck_bus_models')
         .update({ image_url: publicUrl })
         .eq('id', modelId);
@@ -244,7 +244,7 @@ export function SinotrukBusModelsAdmin() {
       };
 
       if (editingModel) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('sinotruck_bus_models')
           .update(dbData)
           .eq('id', editingModel.id);
@@ -252,7 +252,7 @@ export function SinotrukBusModelsAdmin() {
         if (error) throw error;
         toast({ title: "Success", description: "Bus model updated successfully" });
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('sinotruck_bus_models')
           .insert([dbData]);
 
@@ -350,7 +350,7 @@ export function SinotrukBusModelsAdmin() {
         luggage_capacity: model.luggage_capacity || null
       };
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('sinotruck_bus_models')
         .insert([dbData]);
 
@@ -370,7 +370,7 @@ export function SinotrukBusModelsAdmin() {
     if (!confirm('Are you sure you want to delete this bus model?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('sinotruck_bus_models')
         .delete()
         .eq('id', id);

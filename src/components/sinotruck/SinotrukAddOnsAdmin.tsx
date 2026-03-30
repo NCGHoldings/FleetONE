@@ -103,7 +103,7 @@ export function SinotrukAddOnsAdmin() {
 
   const loadBusModels = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('sinotruck_bus_models')
         .select('id, bus_name, model_name')
         .eq('is_active', true)

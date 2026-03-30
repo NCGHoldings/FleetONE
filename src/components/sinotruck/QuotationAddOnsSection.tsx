@@ -91,7 +91,7 @@ export function QuotationAddOnsSection({ quotationId, onAddOnsChange }: Quotatio
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('sinotruck_quotation_addons')
         .select(`
           *,
@@ -161,7 +161,7 @@ export function QuotationAddOnsSection({ quotationId, onAddOnsChange }: Quotatio
         notes: values.notes,
       };
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('sinotruck_quotation_addons')
         .insert([addOnData]);
 
@@ -188,7 +188,7 @@ export function QuotationAddOnsSection({ quotationId, onAddOnsChange }: Quotatio
     if (!confirm('Are you sure you want to remove this add-on from the quotation?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('sinotruck_quotation_addons')
         .delete()
         .eq('id', id);

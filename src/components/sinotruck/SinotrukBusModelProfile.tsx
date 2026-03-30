@@ -60,7 +60,7 @@ export function SinotrukBusModelProfile({ busModel, isOpen, onClose }: SinotrukB
     
     try {
       setLoadingImages(true);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('sinotruck_bus_model_images')
         .select('*')
         .eq('bus_model_id', busModel.id)
