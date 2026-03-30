@@ -1,52 +1,66 @@
 
 
-# Fix: Final Invoice Not Including Post-Trip Adjustment Data
+# Fix Final Invoice: Mileage, Bus Type & Stale Paid Amount
 
-## Root Cause
+## Problems in Screenshot
 
-When the user clicks "Generate Final Invoice", the code does:
+1. **Mileage: 0** — `generateInvoiceData()` (line 202-242) never sets `tripDistance` or `totalKm`, so the template defaults to `0`
+2. **Bus Type: Standard Bus** — Parent passes `resolveBusType(selectedTrip)` but if `bus_fleet_details` isn't in the Supabase query, it falls back to "Standard Bus"
+3. **Overpaid Credit: 6,900** — Line 206 uses stale `quotationData.total_paid` instead of `freshTotalPaid` for `paidAmount`, so the PDF renders with wrong paid total even though the modal UI shows correct fresh data
+
+## About the Existing Trip
+
+The old invoice PDF was already generated and stored with wrong data. After the code fix, you can either:
+- **Regenerate** the existing invoice (click "Generate Final Invoice" again — it will overwrite)
+- **Create a new trip** to test fresh
+
+Both will work after the fix. No need to delete anything.
+
+## Changes
+
+### File 1: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
+
+**Fix `generateInvoiceData()` (line 202-242):**
+
+1. Add `tripDistance` and `totalKm` to the props interface (add to `quotationData` type)
+2. Pass them through to the returned `InvoiceData`:
+   ```
+   tripDistance: quotationData.tripDistance,
+   totalKm: quotationData.totalKm,
+   ```
+3. Fix `paidAmount` to use fresh data:
+   ```
+   paidAmount: freshTotalPaid ?? quotationData.total_paid ?? quotationData.advance_paid ?? 0,
+   ```
+   (Currently line 206 ignores `freshTotalPaid`)
+
+### File 2: `src/components/special-hire/ConfirmedTripsTable.tsx`
+
+**Pass mileage data when opening the modal (around line 1612-1638):**
+
+Add to the `quotationData` prop:
 ```
-const adj = adjustmentsData[trip.id];
-setSelectedAdjustment(adj || null);
+tripDistance: getTripDistance(selectedTrip),
+totalKm: calculateTotalKm(selectedTrip),
 ```
 
-But `adjustmentsData` is **only populated after specific user actions** (saving a post-trip adjustment, generating an invoice). It is **never loaded on initial page load**. So when a user navigates to the page and directly clicks "Generate Final Invoice", `adjustmentsData[trip.id]` is `undefined`, `selectedAdjustment` becomes `null`, and the invoice renders with zero adjustments -- making the 6,900 payment appear as "Overpaid Credit" instead of a legitimate post-trip charge.
+Import `getTripDistance, calculateTotalKm` from `@/lib/special-hire-invoice-helpers`.
 
-## Fix
+Also ensure the Supabase query for confirmed trips includes `bus_fleet_details` and `bus_types(name)` join so `resolveBusType()` has data to work with.
 
-### 1. Fetch adjustment data fresh inside the modal (not rely on parent props)
+### File 3: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx` (props)
 
-**File: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`**
-
-Add a `useEffect` that runs when `open` becomes true:
-- Query `special_hire_trip_adjustments` WHERE `quotation_id = quotationData.id` ORDER BY `created_at` DESC LIMIT 1
-- Store result in local `freshAdjustmentData` state
-- Use `freshAdjustmentData` merged with `adjustmentData` props (fresh data takes priority) for all calculations
-
-This mirrors the same pattern already used for `freshTotalPaid` via `PaymentTimelineFresh`.
-
-### 2. Also load adjustments on initial table render
-
-**File: `src/components/special-hire/ConfirmedTripsTable.tsx`**
-
-Add a `useEffect` that calls `loadAdjustmentData()` for each confirmed trip when quotations load. This ensures `adjustmentsData` is populated even before the user interacts with any modal.
-
-### 3. Fix Financial Summary display
-
-**File: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`**
-
-Line 656 shows "Total Payable" as `computedTotalAmount()` without adjustments. Change to include adjustments:
+Add to the `quotationData` interface:
 ```
-LKR {(computedTotalAmount() + adjustmentTotal).toLocaleString()}
+tripDistance?: number;
+totalKm?: number;
 ```
 
 ## Expected Result
 
-For the trip with 148,571 quote + 6,900 post-trip adjustment:
-- Original Quote Amount: 148,571
-- Extra KM Charge: +6,900
-- Adjusted Sub-Total: 155,471
-- Total Paid: 155,471
-- Balance Due: 0
-- No "Overpaid Credit" line
+After fix + regenerate:
+- Mileage: shows actual KM from quotation (e.g., 345)
+- Bus Type: resolved from `bus_fleet_details` or `bus_types` join
+- Total Paid: uses fresh DB total (155,471)
+- Overpaid Credit: disappears (155,471 - 155,471 = 0)
 
