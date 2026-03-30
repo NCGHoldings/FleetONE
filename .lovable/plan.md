@@ -1,57 +1,140 @@
 
 
-# Fix Invoice: Bus Type, Mileage from Quotation + Page 2 Signature Layout
+# Special Hire: Full System Flow Audit & Structural Fixes
 
-## Problems Found
+## Current System Flow (As-Is)
 
-1. **Bus Type hardcoded as "Standard Bus"** -- All 8 places that build `InvoiceData` use `busType: 'Standard Bus'` instead of fetching from the `bus_types` table via `bus_type_id`
-2. **Mileage showing wrong value (100)** -- The mileage calculation `data.actualKmTraveled || data.tripDistance || data.totalKm || (numberOfBuses * 100)` falls through to the fallback because `tripDistance` and `totalKm` are computed using wrong column names (`km_parking` / `km_return` which don't exist -- actual columns are `km_parking_to_pickup` / `km_drop_to_parking`)
-3. **Signature section splits across pages** -- The CSS `page-break-before: always` on `.page-break` div doesn't work in html2canvas (it renders everything as one continuous image). The signature block bleeds between pages instead of cleanly starting on page 2
+```text
+QUOTATION PHASE
+  Customer Request → Create Quotation → Confirm Quotation
+                                              |
+PAYMENT PHASE                                 v
+  ┌─────────────────────────────────────────────────────────┐
+  │ Confirm Payment (Operations)                            │
+  │   → Choose: Advance / Balance / Full                    │
+  │   → Creates payment record (status: pending_finance)    │
+  │   → Fire-and-forget: Generate DRAFT document            │
+  │     (sales_receipt for advance, invoice for balance/full)│
+  └─────────────────────────────────────────────────────────┘
+                         |
+  ┌─────────────────────────────────────────────────────────┐
+  │ Finance Approval                                        │
+  │   → Approves payment → Background integration:          │
+  │     1. Create Finance Customer                          │
+  │     2. Create AR Invoice (full/balance only)            │
+  │     3. Post GL Entry                                    │
+  │     4. Create AR Receipt                                │
+  │     5. Regenerate document as APPROVED with signatures  │
+  └─────────────────────────────────────────────────────────┘
+                         |
+POST-TRIP (OPTIONAL)     v
+  ┌─────────────────────────────────────────────────────────┐
+  │ Post-Trip Adjustment (if trip exceeded quotation)       │
+  │   → Record extra KM, additional expenses                │
+  │   → Finalize adjustment                                 │
+  │   → Generate Balance Invoice (customer-facing, no sigs) │
+  │   → Email to customer → GL posting on send              │
+  └─────────────────────────────────────────────────────────┘
+```
 
-## DB Reality
-- Quotation QUO-2026-1724 has: `bus_type_name = 'Super Luxury - A/C (49 Seats)'`, `km_trip = 529.3`, `km_parking_to_pickup = 131.4`, `km_drop_to_parking = 407.2`
-- But invoice shows: `Bus Type = Standard Bus`, `Mileage = 100`
+## Issues Found
+
+### Issue 1: No "Generate Final Invoice" option without Post-Trip Adjustment
+Currently, the Balance Invoice (final invoice) can ONLY be created via `GenerateBalanceInvoiceModal`, which REQUIRES a finalized post-trip adjustment. If the trip completed exactly as quoted (no extra KM, no additional expenses), there is no way to generate a final invoice for the customer.
+
+**Fix**: Add a "Generate Final Invoice" action that works without post-trip adjustment. When no adjustment exists, create the final invoice using original quotation amounts.
+
+### Issue 2: Final Invoice missing signatures
+The `GenerateBalanceInvoiceModal` explicitly says "Customer copy - No signatures required" and never includes signatures. But the user wants final invoices to have the same signature flow as sales receipts (Prepared By, Checked By, Approved By).
+
+**Fix**: Add signature support to the final invoice flow, same as the sales receipt.
+
+### Issue 3: `busType: 'Standard Bus'` still hardcoded in 2 places
+- `ConfirmedTripsTable.tsx` line 404 (draft document on payment confirm)
+- `ConfirmedTripsTable.tsx` line 1501 (GenerateBalanceInvoiceModal props)
+
+**Fix**: Use the `resolveBusType` helper from `special-hire-invoice-helpers.ts`.
+
+### Issue 4: Document flow is confusing for users
+The dropdown has too many overlapping options: "View Invoice", "View Documents", "View Balance Invoice", "Re-generate Sales Receipt", "Re-generate Final Invoice". Users don't know which to use when.
+
+**Fix**: Consolidate the document actions into a clearer structure.
 
 ## Changes
 
-### File 1: `src/lib/invoice-generator.ts`
+### File 1: `src/components/special-hire/ConfirmedTripsTable.tsx`
 
-**Mileage calculation (line 223)**: Priority should be:
-1. `actualKmTraveled` (post-trip adjustment)
-2. `tripDistance` (quotation km_trip)
-3. `totalKm` (sum of all legs)
-4. Remove the `numberOfBuses * 100` fallback -- show 0 if nothing available
+1. **Fix busType on draft document creation (line 404)**: Replace `'Standard Bus'` with `resolveBusType(tripForDoc)`.
 
-**Page layout (lines 225-473)**: Split into two explicit `[data-pdf-page]` containers instead of relying on CSS page-break:
-- Page 1: Header + invoice details + item table + summary + payment info + T&C + "Page 1 of 2" footer
-- Page 2: Company mini-header + signature table + note + "Page 2 of 2" footer
+2. **Fix busType on GenerateBalanceInvoiceModal props (line 1501)**: Replace `'Standard Bus'` with resolved bus type.
 
-**PDF generation (lines 500-590)**: Update to render each `[data-pdf-page]` as a separate canvas/page (same pattern used in quotation PDF generation), instead of one big image split by height.
+3. **Add "Generate Final Invoice" menu item**: For trips with approved payments but NO post-trip adjustment, add a new dropdown item that opens `GenerateBalanceInvoiceModal` with zero adjustment data. This allows creating a final invoice for trips that completed exactly as quoted.
 
-### File 2: `src/components/special-hire/ConfirmedTripsTable.tsx`
+4. **Clean up dropdown actions**: Reorganize into logical groups:
+   - Payment section: Confirm Payment
+   - Operations: Update Status, Advance Details, Post-Trip Adjustment, Vehicle Assignment
+   - Documents: View Documents, Generate Final Invoice (when no adjustment & no final invoice exists)
+   - Finance: Approve Payment, Re-generate Sales Receipt/Final Invoice, Retry AR
 
-**Line 849**: Replace `busType: 'Standard Bus'` with actual bus type name from quotation. Need to join `bus_types` table in the query or pass `bus_type_name` through.
+### File 2: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
 
-**Line 860-861**: Fix column names -- use `km_parking_to_pickup` and `km_drop_to_parking` instead of non-existent `km_parking` and `km_return`.
+1. **Make adjustment data optional**: Currently the modal requires adjustment data. Change so it works with zero/empty adjustments (trip completed as quoted).
 
-### Files 3-6: All other places with hardcoded `busType: 'Standard Bus'`
+2. **Add signature support**: Include signature fields (preparedBy, checkedBy, approvedBy) in `generateInvoiceData()`. Fetch existing document approvals from `document_approvals` table and embed in the generated PDF, same as sales receipt flow.
 
-Update these files to resolve bus type from quotation's `bus_type_id`:
-- `src/hooks/useDocumentRegeneration.ts` (line 144)
-- `src/hooks/useDocumentManagement.ts` (lines 244, 387)
-- `src/hooks/useFinanceApproval.ts` (lines 369, 443, 582)
-- `src/components/special-hire/DocumentViewer.tsx` (line 399)
-- `src/components/special-hire/EnhancedDocumentViewer.tsx` (line 257)
+3. **Fix the "Customer copy - no signatures" messaging**: Change to support both internal (with signatures) and customer-facing (without signatures) modes, controlled by a toggle or the document status.
 
-Each of these already queries quotation data -- add a join to `bus_types` to get the name, or add `bus_type_id` and resolve separately.
+### File 3: `src/hooks/useFinanceApproval.ts`
 
-### Mileage Logic (all files)
+1. **Fix busType fallback on line 369**: Already partially fixed but still falls back to `'Standard Bus'`. Add `bus_types` join to the quotation query (line 70) so `bus_types.name` is available.
 
-Replace all instances of `totalKm: (quotation as any).km_parking + (quotation as any).km_trip + (quotation as any).km_return` with the correct column names: `km_parking_to_pickup + km_trip + km_drop_to_parking`.
+## Correct Flow Diagram (After Fix)
+
+```text
+SPECIAL HIRE - COMPLETE DOCUMENT FLOW
+
+1. QUOTATION
+   └→ Create → Confirm → Quotation PDF generated
+
+2. PAYMENT CONFIRMATION (Operations)
+   ├→ Advance Payment
+   │   └→ Draft Sales Receipt created (with bus type + mileage from quotation)
+   ├→ Full Payment
+   │   └→ Draft Invoice created
+   └→ Balance Payment
+       └→ Draft Invoice created
+
+3. FINANCE APPROVAL
+   └→ Approve Payment
+       ├→ GL: DR Bank / CR Customer Advance (advance/full)
+       │   OR DR Bank / CR Trade Receivable (balance)
+       ├→ AR Invoice created (full/balance only)
+       ├→ AR Receipt created
+       └→ Document upgraded: DRAFT → APPROVED (with signatures)
+
+4. POST-TRIP ADJUSTMENT (OPTIONAL - only if trip exceeded quotation)
+   ├→ Record extra KM + additional expenses
+   ├→ Finalize adjustment
+   └→ Generate Final Invoice (with adjustment details)
+
+5. FINAL INVOICE (NEW - works with OR without adjustment)
+   ├→ If adjustment exists: Shows original + extras + balance
+   ├→ If no adjustment: Shows original quotation amounts
+   ├→ Includes signatures (Prepared/Checked/Approved)
+   ├→ Download PDF
+   ├→ Email to Customer → Triggers GL posting
+   └→ GL: DR Trade Receivable / CR SPH Revenue
+
+6. DOCUMENT MANAGEMENT
+   ├→ View Documents: All docs for quotation
+   ├→ Regenerate: Re-create any existing document
+   └→ Each document: View / Approve / Regenerate
+```
 
 ## Summary
-
-- Bus type: resolve from `bus_types.name` via `bus_type_id` join instead of hardcoding "Standard Bus"
-- Mileage: fix column names (`km_parking_to_pickup`, `km_drop_to_parking`) and remove bad fallback
-- Signature page: use `[data-pdf-page]` multi-page rendering so signatures appear cleanly on page 2
+- Allow final invoice generation WITHOUT requiring post-trip adjustment
+- Add signature support to final invoices (matching sales receipts)
+- Fix 2 remaining hardcoded `'Standard Bus'` values
+- Reorganize dropdown menu for better usability
+- No changes to GL/AR posting logic (already correct from previous fixes)
 
