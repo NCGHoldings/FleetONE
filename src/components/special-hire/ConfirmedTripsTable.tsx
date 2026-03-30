@@ -64,6 +64,7 @@ export function ConfirmedTripsTable() {
   const [adjustmentsData, setAdjustmentsData] = useState<Record<string, any>>({});
   const [balanceInvoiceModalOpen, setBalanceInvoiceModalOpen] = useState(false);
   const [selectedAdjustment, setSelectedAdjustment] = useState<any | null>(null);
+  const [paymentHistoryModalOpen, setPaymentHistoryModalOpen] = useState(false);
   const [vehicleAssignmentModalOpen, setVehicleAssignmentModalOpen] = useState(false);
   
   const [loading, setLoading] = useState(false);
