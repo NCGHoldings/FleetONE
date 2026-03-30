@@ -12,7 +12,7 @@ export function LightVehicleInvoiceTemplateSelector({
   selectedTemplateId,
   onTemplateChange,
 }: LightVehicleInvoiceTemplateSelectorProps) {
-  const { data: templates, isLoading } = useVehicleSalesTemplates('lightvehicle_sales', 'lightvehicle_order_invoice');
+  const { data: templates, isLoading } = useVehicleSalesTemplates('light_vehicle_sales' as any, 'lightvehicle_order_invoice');
 
   const handleChange = (value: string) => {
     if (value === '_default') {

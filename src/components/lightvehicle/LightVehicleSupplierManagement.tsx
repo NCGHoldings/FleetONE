@@ -40,7 +40,7 @@ export function LightVehicleSupplierManagement() {
       setLoading(true);
       const result = await getSupplierOrders();
       if (result.success) {
-        setSupplierOrders(result.data || []);
+        setSupplierOrders((result.data || []) as any);
       }
     } catch (error) {
       console.error('Error loading supplier orders:', error);

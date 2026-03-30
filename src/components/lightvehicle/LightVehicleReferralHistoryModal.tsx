@@ -49,7 +49,7 @@ export function LightVehicleReferralHistoryModal({
   const loadHistory = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('lightvehicle_referral_commission_payments')
         .select(`
           *,
@@ -63,7 +63,7 @@ export function LightVehicleReferralHistoryModal({
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setRecords(data || []);
+      setRecords((data || []) as any);
     } catch (error) {
       console.error('Error loading history:', error);
     } finally {

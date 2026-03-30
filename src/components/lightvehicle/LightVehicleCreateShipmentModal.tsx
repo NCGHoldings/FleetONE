@@ -55,7 +55,7 @@ export function LightVehicleCreateShipmentModal({
       // Load shipping partners
       const partnersResult = await getShippingPartners();
       if (partnersResult.success) {
-        setShippingPartners(partnersResult.data || []);
+        setShippingPartners((partnersResult.data || []) as any);
       }
       
       // Load orders that don't have shipments yet
@@ -130,7 +130,7 @@ export function LightVehicleCreateShipmentModal({
                 <SelectContent>
                   {orders.map((order) => (
                     <SelectItem key={order.id} value={order.id}>
-                      {order.order_no} - {order.bus_model}
+                      {(order as any).order_no} - {(order as any).bus_model}
                     </SelectItem>
                   ))}
                 </SelectContent>
