@@ -48,8 +48,13 @@ export function SinotrukOrderInvoiceGenerator({ order, onRefresh }: SinotrukOrde
   const [invoices, setInvoices] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [quotation, setQuotation] = useState<any>(null);
-   const [defaultInvoiceType, setDefaultInvoiceType] = useState<'direct_invoice' | 'proforma_invoice' | 'tax_invoice'>('direct_invoice');
+  const [defaultInvoiceType, setDefaultInvoiceType] = useState<'direct_invoice' | 'proforma_invoice' | 'tax_invoice'>('direct_invoice');
   const [loadingInvoices, setLoadingInvoices] = useState(true);
+  const [orderData, setOrderData] = useState(order);
+
+  useEffect(() => {
+    setOrderData(order);
+  }, [order]);
 
   const {
     isLoading,
@@ -59,12 +64,12 @@ export function SinotrukOrderInvoiceGenerator({ order, onRefresh }: SinotrukOrde
   } = useSinotrukOrderInvoiceManagement();
 
   const vehicleDetailsComplete = !!(
-    order.engine_number &&
-    order.chassis_number &&
-    order.year_of_manufacture &&
-    order.fuel_type &&
-    order.engine_capacity != null &&
-    order.color_scheme
+    orderData.engine_number &&
+    orderData.chassis_number &&
+    orderData.year_of_manufacture &&
+    orderData.fuel_type &&
+    orderData.engine_capacity != null &&
+    orderData.color_scheme
   );
 
   useEffect(() => {
@@ -520,17 +525,23 @@ export function SinotrukOrderInvoiceGenerator({ order, onRefresh }: SinotrukOrde
         onClose={() => setShowVehicleDataModal(false)}
         orderId={order.id}
         existingData={{
-          engine_number: order.engine_number,
-          chassis_number: order.chassis_number,
-          year_of_manufacture: order.year_of_manufacture,
-          country_of_origin: order.country_of_origin,
-          vehicle_condition: order.vehicle_condition,
-          fuel_type: order.fuel_type,
-          engine_capacity: order.engine_capacity,
-          color_scheme: order.color_scheme
+          engine_number: orderData.engine_number,
+          chassis_number: orderData.chassis_number,
+          year_of_manufacture: orderData.year_of_manufacture,
+          country_of_origin: orderData.country_of_origin,
+          vehicle_condition: orderData.vehicle_condition,
+          fuel_type: orderData.fuel_type,
+          engine_capacity: orderData.engine_capacity,
+          color_scheme: orderData.color_scheme
         }}
-        onSuccess={() => {
+        onSuccess={async () => {
           setShowVehicleDataModal(false);
+          const { data: updated } = await supabase
+            .from('sinotruk_orders')
+            .select('*')
+            .eq('id', order.id)
+            .single();
+          if (updated) setOrderData(prev => ({ ...prev, ...updated }));
           if (onRefresh) onRefresh();
           loadData();
         }}
