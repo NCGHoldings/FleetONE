@@ -497,8 +497,8 @@ export function SinotrukVehicleDataUpload({ onUploadComplete }: Props) {
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
+                );
+              })}
           </Table>
         </CardContent>
       </Card>
