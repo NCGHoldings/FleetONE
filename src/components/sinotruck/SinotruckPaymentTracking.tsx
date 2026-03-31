@@ -357,6 +357,8 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
     });
     setSelectedSchedule(null);
     setPaymentProofFile(null);
+    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+    setPaymentProofPreview(null);
   };
 
   const getStatusBadge = (status: string) => {
