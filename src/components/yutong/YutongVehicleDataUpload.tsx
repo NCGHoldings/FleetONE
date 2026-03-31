@@ -544,7 +544,8 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
