@@ -1,42 +1,53 @@
 
 
-# Fix: Payment Image Preview + Cash Receipt Checkmark/Cross Icons
+# Fix: Yutong Payment Type Detection + AR Invoice Balance Updates
 
-## Two Issues
+## Root Cause Analysis
 
-### Issue 1: Payment proof image not previewed when adding payment
-When a user selects a payment proof image file, only the filename is shown as a badge. No image thumbnail preview is displayed.
+**Bug 1 — Wrong field name (Critical)**: `YutongPaymentTracking.tsx` line 346 and `SinotrukPaymentTracking.tsx` line 347 use `orderDetails?.finance_ar_invoice_id` but the actual database column is `ar_invoice_id`. This means `arInvoiceId` is ALWAYS `undefined`, so every payment is posted as `'advance'` (DR Bank / CR Customer Advance) — even payments made AFTER the AR invoice exists.
 
-**Fix**: After selecting a file, create an object URL preview and show a small thumbnail image below the file input. This gives visual confirmation that the correct image was selected.
+**Bug 2 — No AR Receipt for post-invoice payments**: Because of Bug 1, the code never enters the `if (arInvoiceId)` branch that creates AR Receipts and updates `ar_invoices.paid_amount`. That's why the AR Invoice shows only LKR 1,000,000 paid (the amount applied at approval time) instead of LKR 6,000,000.
 
-**Files**: `YutongPaymentTracking.tsx`, `SinotrukPaymentTracking.tsx`, `SinotruckPaymentTracking.tsx`, `LightVehiclePaymentTracking.tsx`
+**Bug 3 — Stale orderDetails**: When verifying a payment, the code reads `orderDetails` from local state which may be stale (loaded at modal open). It should re-fetch the order to get the latest `ar_invoice_id` before deciding payment type.
 
-Changes per file:
-- Add a `useState` for `paymentProofPreview` (string URL)
-- On file select: create `URL.createObjectURL(file)` and set preview state
-- On modal close: revoke the object URL
-- Render a thumbnail `<img>` below the file input when preview exists
+## Fix Plan
 
-### Issue 2: Cash receipt shows "CASH: TRUE/FALSE" text instead of visual icons
-The MODE OF PAYMENT section displays raw text like `CASH: TRUE` / `CASH: FALSE`. Should use ✓ and ✗ symbols instead.
+### File 1: `src/components/yutong/YutongPaymentTracking.tsx`
+- **Line 346**: Change `orderDetails?.finance_ar_invoice_id` → `orderDetails?.ar_invoice_id`
+- **Before the payment type check**: Re-fetch the order from Supabase to get the latest `ar_invoice_id` (in case invoice was approved after the modal loaded)
 
-**Fix**: In all 3 cash receipt preview files, change the display from:
+### File 2: `src/components/sinotruck/SinotrukPaymentTracking.tsx`
+- **Line 347**: Change `orderDetails?.finance_ar_invoice_id` → `orderDetails?.ar_invoice_id`
+- Same re-fetch pattern
+
+### File 3: `src/components/sinotruck/SinotruckPaymentTracking.tsx`
+- Already uses correct field (`ar_invoice_id`) — no change needed, but add re-fetch for consistency
+
+### File 4: `src/components/lightvehicle/LightVehiclePaymentTracking.tsx`
+- Already uses correct field — add re-fetch for consistency
+
+## What This Fixes
+
+After fix:
+- Payment verified BEFORE invoice → `advance` (DR Bank / CR Customer Advance) ✓
+- Payment verified AFTER invoice approval → `balance` (DR Bank / CR Trade Receivable) + AR Receipt created + AR Invoice `paid_amount` updated ✓
+- AR Invoice balance reflects ALL verified payments, not just the ones known at approval time
+
+## Technical Detail
+
+The re-fetch adds ~3 lines before the payment type decision:
+
+```text
+// Re-fetch order to get latest ar_invoice_id
+const { data: freshOrder } = await supabase
+  .from('yutong_orders')
+  .select('ar_invoice_id, finance_customer_id')
+  .eq('id', selectedOrderId)
+  .single();
+
+const arInvoiceId = freshOrder?.ar_invoice_id;
+const paymentType = arInvoiceId ? 'balance' : 'advance';
 ```
-CASH: TRUE  →  CASH: ✓
-CASH: FALSE →  CASH: ✗
-```
 
-Same for CHEQUE and BANK fields.
-
-**Files**: 
-- `src/components/yutong/YutongCashReceiptPreview.tsx` (lines 163-171)
-- `src/components/sinotruck/SinotrukCashReceiptPreview.tsx` (lines 163-171)
-- `src/components/sinotruck/SinotruckCashReceiptPreview.tsx` (lines 198-206)
-
-Changes per file: Replace `'TRUE' : 'FALSE'` with `'✓' : '✗'` in the 3 payment method spans.
-
-## Summary
-- 7 files modified total
-- Payment form gets image thumbnail preview
-- Cash receipt gets clean ✓/✗ icons instead of TRUE/FALSE text
+This ensures even if the invoice was approved in another tab/session, the payment verify always checks the latest state.
 
