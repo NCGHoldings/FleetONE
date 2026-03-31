@@ -115,7 +115,7 @@ export function LightVehicleVehicleDataUpload({ onUploadComplete }: Props) {
         return;
       }
 
-      const fileHeaders = (jsonData[0] as string[]).map(h => String(h || '').trim()).filter(h => h);
+      const fileHeaders = (jsonData[0] as string[]).map(h => String(h || '').trim());
       const dataRows = jsonData.slice(1).filter(row => row.some(cell => cell !== null && cell !== ''));
 
       setFile(acceptedFile);
@@ -451,7 +451,7 @@ export function LightVehicleVehicleDataUpload({ onUploadComplete }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {columnMappings.map((mapping, idx) => (
+              {columnMappings.filter(m => m.excelColumn).map((mapping, idx) => (
                 <TableRow key={idx}>
                   <TableCell className="font-medium">{mapping.excelColumn}</TableCell>
                   <TableCell>
