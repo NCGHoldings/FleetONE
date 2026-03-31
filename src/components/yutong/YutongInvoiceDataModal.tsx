@@ -136,7 +136,7 @@ export function YutongInvoiceDataModal({
                 id="year_of_manufacture"
                 type="number"
                 value={formData.year_of_manufacture}
-                onChange={(e) => setFormData({ ...formData, year_of_manufacture: parseInt(e.target.value) })}
+                onChange={(e) => setFormData({ ...formData, year_of_manufacture: parseInt(e.target.value) || 0 })}
                 min="2020"
                 max="2030"
                 required
