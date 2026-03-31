@@ -179,7 +179,7 @@ export function YutongInvoiceDataModal({
                 id="engine_capacity"
                 type="number"
                 value={formData.engine_capacity}
-                onChange={(e) => setFormData({ ...formData, engine_capacity: parseInt(e.target.value) })}
+                onChange={(e) => setFormData({ ...formData, engine_capacity: parseInt(e.target.value) || 0 })}
                 placeholder="e.g., 9500"
                 required
               />

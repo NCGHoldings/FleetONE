@@ -365,17 +365,23 @@ export function SinotruckOrderInvoiceGenerator({ order, onRefresh }: SinotruckOr
         onClose={() => setShowVehicleDataModal(false)}
         orderId={order.id}
         existingData={{
-          engine_number: order.engine_number,
-          chassis_number: order.chassis_number,
-          year_of_manufacture: order.year_of_manufacture,
-          country_of_origin: order.country_of_origin,
-          vehicle_condition: order.vehicle_condition,
-          fuel_type: order.fuel_type,
-          engine_capacity: order.engine_capacity,
-          color_scheme: order.color_scheme
+          engine_number: orderData.engine_number,
+          chassis_number: orderData.chassis_number,
+          year_of_manufacture: orderData.year_of_manufacture,
+          country_of_origin: orderData.country_of_origin,
+          vehicle_condition: orderData.vehicle_condition,
+          fuel_type: orderData.fuel_type,
+          engine_capacity: orderData.engine_capacity,
+          color_scheme: orderData.color_scheme
         }}
-        onSuccess={() => {
+        onSuccess={async () => {
           setShowVehicleDataModal(false);
+          const { data: updated } = await supabase
+            .from('sinotruck_orders')
+            .select('*')
+            .eq('id', order.id)
+            .single();
+          if (updated) setOrderData(prev => ({ ...prev, ...updated }));
           if (onRefresh) onRefresh();
           loadData();
         }}
