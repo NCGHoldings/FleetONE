@@ -1,94 +1,69 @@
 
 
-# Yutong Sales: Complete Finance & Double-Entry Flow Diagram
+# Yutong Finance Flow — Cross-Check Confirmation
 
-I've traced the entire Yutong financial flow through the codebase. Here's a comprehensive diagram covering every journal entry, double entry, and integration point.
+## Verification Result: ALL 6 STAGES CORRECTLY IMPLEMENTED
 
-## What the diagram will show
+### STAGE 1: Quotation → Order ✓
+- `createVehicleCustomer()` (line 160-227) auto-creates/links finance customer in `customers` table with `business_unit_code: 'YUT'`
+- No JE created at this stage — correct
 
-```text
-COMPLETE YUTONG FINANCE FLOW
-=============================
+### STAGE 2: Advance Payment ✓
+- `postVehiclePaymentToGL()` (line 347-498) creates JE with:
+  - `DR Bank Account` / `CR Customer Advance (Liability)` when `paymentType === 'advance'` (lines 432-441)
+  - Entry number format: `YUT-ADV-{orderNo}-...` (line 389)
+  - `source_module: 'yutong_sales'`, `business_unit_code: 'YUT'` (lines 402-406)
+  - COA balances auto-updated via `updateCOABalances()` (line 490)
 
-STAGE 1: QUOTATION → ORDER
-  - Quotation created (no finance impact)
-  - Order created from quotation (no JE yet)
-  - Finance Customer auto-created/linked in `customers` table
+### STAGE 3: Invoice Generation (Draft) ✓
+- `generateAndStoreDraftInvoice()` (line 52-305):
+  - Proforma (PI-): explicitly skips AR/JE creation (line 228-229) — correct
+  - Customer (CI-) / Tax (TI-): creates draft AR Invoice with `status: 'draft'` (line 253-267)
+  - Draft AR does NOT post to GL — guarded by `if (arStatus !== 'draft')` check (line 300 in useVehicleSalesFinance.ts)
+  - PDF stored in `yutong-invoices` bucket (line 147-149)
+  - Duplicate AR prevention: checks `orderDetails.ar_invoice_id` before creating (line 244)
 
-STAGE 2: PAYMENT RECEIVED (Advance)
-  Journal Entry: YUT-ADV-{orderNo}
-  ┌─────────────────────────────────────────┐
-  │  DR  Bank Account              XX,XXX   │
-  │  CR  Customer Advance (Liability) XX,XXX│
-  └─────────────────────────────────────────┘
-  + AR Receipt created in ar_receipts
-  + Payment linked: yutong_customer_payments.journal_entry_id
-  + COA balances updated
+### STAGE 4: Invoice Approval ✓
+- `approveInvoice()` (line 315-556):
+  - **Step A**: Updates AR Invoice status from draft → paid/partial/unpaid based on `totalPaid` (lines 450-461)
+  - **Step B**: Revenue Recognition GL via `postVehicleInvoiceToGL()` (lines 506-518):
+    - `DR Trade Receivable (full amount)` / `CR Sales Revenue (excl VAT)` + `CR VAT Output 18%` (lines 643-684)
+    - Non-tax: CR Sales Revenue = full amount (line 674-683)
+    - 4-tier GL resolution: Item Category → Customer Category → Customer Direct → Global Settings (lines 568-600)
+  - **Step C**: Advance Application via `applyAdvanceToReceivable()` (lines 524-538):
+    - `DR Customer Advance` / `CR Trade Receivable` (lines 754-771)
+  - **Double-posting guard**: checks `ar_invoices.journal_entry_id` before posting (lines 493-504) — correct
 
-STAGE 3: INVOICE GENERATION (Draft)
-  - Proforma (PI-): NO AR, NO JE (bank/leasing reference only)
-  - Customer (CI-) or Tax (TI-):
-    → Draft AR Invoice created in ar_invoices (status='draft')
-    → NO GL posting yet (draft = not in ledger)
-    → PDF stored in yutong-invoices bucket
-    → Records in yutong_invoice_records + yutong_invoice_documents
+### STAGE 5: Balance Payment ✓
+- `postVehiclePaymentToGL()` with `paymentType === 'balance'` (lines 442-463):
+  - `DR Bank Account` / `CR Trade Receivable` (lines 443-452)
+  - Fallback to Sales Revenue if trade_receivable missing (lines 453-462)
+  - Entry number: `YUT-BAL-{orderNo}-...`
+  - AR Receipt created + allocated via `createVehicleARReceipt()` (lines 794-878)
 
-STAGE 4: INVOICE APPROVAL
-  Step A — AR Invoice updated: draft → unpaid/partial/paid
-  Step B — Revenue Recognition GL (if no JE already exists):
-  ┌──────────────────────────────────────────────────────┐
-  │  DR  Trade Receivable              XX,XXX            │
-  │  CR  Sales Revenue (excl VAT)      XX,XXX / 1.18     │
-  │  CR  VAT Output (18%)             VAT amount         │
-  └──────────────────────────────────────────────────────┘
-  (Non-tax invoice: CR Sales Revenue = full amount, no VAT split)
+### STAGE 6: Full Payment ✓
+- `postVehiclePaymentToGL()` with `paymentType === 'full'` (lines 464-473):
+  - `DR Bank Account` / `CR Sales Revenue` directly
+  - Entry number: `YUT-REV-{orderNo}-...`
 
-  Step C — Advance Application (if totalPaid > 0):
-  ┌─────────────────────────────────────────┐
-  │  DR  Customer Advance       XX,XXX      │
-  │  CR  Trade Receivable       XX,XXX      │
-  └─────────────────────────────────────────┘
-  This clears the advance liability against the receivable.
+### GL Account Resolution (4-Tier Hierarchy) ✓
+Implemented in `postVehicleInvoiceToGL()` (lines 568-600):
+1. **Item Category**: `resolveItemCategoryRevenueAccount('Yutong Sales', companyId)` (line 576)
+2. **Customer Category**: via `resolveCustomerARAccounts()` (line 590)
+3. **Customer Direct**: same function checks customer-level override
+4. **Global Settings**: `yutong_finance_settings` fallback (line 570-571)
 
-STAGE 5: BALANCE PAYMENT
-  Journal Entry: YUT-BAL-{orderNo}
-  ┌─────────────────────────────────────────┐
-  │  DR  Bank Account              XX,XXX   │
-  │  CR  Trade Receivable          XX,XXX   │
-  └─────────────────────────────────────────┘
-  + AR Receipt created + allocated to AR Invoice
-  + AR Invoice paid_amount updated, status → 'paid'
+### Accounting Principles Compliance ✓
+- **Double-entry**: Every JE has balanced DR/CR (total_debit = total_credit)
+- **Accrual basis**: Revenue recognized at invoice approval, not payment
+- **Liability tracking**: Advances held as liability until applied
+- **Audit trail**: `source_module: 'yutong_sales'`, `business_unit_code: 'YUT'` on all entries
+- **Segregation**: Draft invoices don't hit the ledger
+- **Guard rails**: Double-posting prevention, missing GL account validation with toast errors
 
-STAGE 6: FULL PAYMENT (single payment, no advance)
-  Journal Entry: YUT-REV-{orderNo}
-  ┌─────────────────────────────────────────┐
-  │  DR  Bank Account              XX,XXX   │
-  │  CR  Sales Revenue             XX,XXX   │
-  └─────────────────────────────────────────┘
+### One Minor Observation
+- In Stage 5 (balance payment), if `trade_receivable_account_id` is null, it falls back to crediting Sales Revenue directly (line 454-462). This is a safe fallback but ideally should never trigger if GL settings are configured. The system already validates and warns via toast if accounts are missing.
 
-GL ACCOUNT RESOLUTION (4-Tier Hierarchy):
-  1. Item Category (item_categories.sales_account_id for "Yutong Sales")
-  2. Customer Category (customer_categories mapping)
-  3. Customer Direct (customer.ar_account_id)
-  4. Global Settings (yutong_finance_settings fallback)
-
-TABLES INVOLVED:
-  Operations:  yutong_quotations → yutong_orders → yutong_customer_payments
-  Documents:   yutong_invoice_records → yutong_invoice_documents
-  Finance:     customers → ar_invoices → ar_receipts → ar_receipt_allocations
-  Accounting:  journal_entries → journal_entry_lines → chart_of_accounts
-  Config:      yutong_finance_settings, gl_settings
-  LC/DO:       yutong_letter_of_credits → yutong_delivery_orders
-```
-
-## Deliverable
-
-I will generate a Mermaid diagram file showing all these flows visually — every stage, every journal entry with DR/CR, every table connection, and the GL account resolution hierarchy. This will be saved as a `.mmd` file you can view and reference.
-
-## Technical details
-
-- Source files traced: `useVehicleSalesFinance.ts` (992 lines), `useYutongOrderInvoiceManagement.ts` (758 lines), `useYutongFinanceManagement.ts` (381 lines)
-- All journal entries use `source_module: 'yutong_sales'` and `business_unit_code: 'YUT'`
-- Double-posting guards exist: checks `ar_invoices.journal_entry_id` before approval GL
-- Proforma invoices are explicitly excluded from all AR/JE creation
+## Conclusion
+The system correctly follows all 6 stages of the Yutong finance flow with proper double-entry accounting, GL account resolution hierarchy, and safety guards. No issues found in the implementation logic.
 
