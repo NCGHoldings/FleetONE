@@ -16,14 +16,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-const NCG_TEST_ID = 'a0000000-0000-0000-0000-000000000001';
+const NCG_TEST_ID = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020';
 
 const TEST_SUB_COMPANY_IDS = [
-  'a0000000-0000-0000-0000-000000000002',
-  'a0000000-0000-0000-0000-000000000003',
-  'a0000000-0000-0000-0000-000000000004',
-  'a0000000-0000-0000-0000-000000000005',
-  'a0000000-0000-0000-0000-000000000006',
+  'efc37802-e6bf-4426-ab69-fcac84c953b1',
+  '0fba4a2f-598b-47e8-b863-283d00380b06',
+  'fe7439e7-3dde-47fd-8052-10b9eaf7abe8',
+  'bfd054c7-2403-4972-9a8a-2599a777a801',
+  'ac957087-0224-4149-b231-7aa9e6a3aea1',
 ];
 
 const ALL_TEST_IDS = [NCG_TEST_ID, ...TEST_SUB_COMPANY_IDS];
