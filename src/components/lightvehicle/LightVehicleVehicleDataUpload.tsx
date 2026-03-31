@@ -499,6 +499,7 @@ export function LightVehicleVehicleDataUpload({ onUploadComplete }: Props) {
                 </TableRow>
                 );
               })}
+            </TableBody>
           </Table>
         </CardContent>
       </Card>

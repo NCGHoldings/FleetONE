@@ -499,6 +499,7 @@ export function SinotrukVehicleDataUpload({ onUploadComplete }: Props) {
                 </TableRow>
                 );
               })}
+            </TableBody>
           </Table>
         </CardContent>
       </Card>
