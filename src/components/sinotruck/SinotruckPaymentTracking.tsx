@@ -275,9 +275,7 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
       // 3. Post to GL
       let journalEntryId: string | undefined;
       if (settings.auto_post_on_verify) {
-        const paymentType = payment.payment_schedule_id ? 
-          (schedules.find(s => s.id === payment.payment_schedule_id)?.milestone_name?.toLowerCase().includes('advance') ? 'advance' : 'balance') :
-          'advance';
+        const paymentType = invoiceId ? 'balance' : 'advance';
 
         const glResult = await postVehiclePaymentToGL({
           module: 'sinotruck',
