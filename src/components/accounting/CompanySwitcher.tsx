@@ -1,4 +1,4 @@
-import { Building2, ChevronDown, Check, Bus, Car, Truck, Briefcase, Building } from "lucide-react";
+import { Building2, ChevronDown, Check, Bus, Car, Truck, Briefcase, Building, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
