@@ -187,13 +187,27 @@ export const useFinanceApproval = () => {
         'yyyy-MM-dd'
       );
 
+      // Query actual advance payments to pass correct advance amount (not balance payment amount)
+      let actualAdvanceAmount = 0;
+      try {
+        const { data: advPmts } = await supabase
+          .from('special_hire_payments')
+          .select('amount')
+          .eq('quotation_id', paymentData.quotation.id)
+          .eq('payment_type', 'advance')
+          .eq('status', 'approved');
+        actualAdvanceAmount = (advPmts || []).reduce((s, p) => s + (p.amount || 0), 0);
+      } catch (err) {
+        console.warn('[SPH Finance] Could not fetch advance payments:', err);
+      }
+
       const arResult = await createSPHARInvoice({
         quotationId: paymentData.quotation.id,
         quotationNo: paymentData.quotation.quotation_no,
         customerId,
         customerName: paymentData.quotation.customer_name,
         totalAmount,
-        advanceAmount: paymentData.amount,
+        advanceAmount: actualAdvanceAmount,
         dueDate,
         companyId: NCG_HOLDING_ID,
       });

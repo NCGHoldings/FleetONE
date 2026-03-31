@@ -152,15 +152,17 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
   const checkExistingInvoice = async () => {
     try {
-      // Check if invoice already exists for this adjustment
-      const { data: existingInvoice, error } = await supabase
+      // Check if invoice already exists — use order+limit to handle duplicates gracefully
+      const { data: existingInvoices, error } = await supabase
         .from('document_storage')
         .select('id, invoice_status, document_status, document_data')
         .eq('quotation_id', quotationData.id)
         .eq('document_type', 'invoice')
         .eq('payment_type', 'balance')
-        .maybeSingle();
+        .order('created_at', { ascending: false })
+        .limit(1);
 
+      const existingInvoice = existingInvoices?.[0];
       if (existingInvoice && !error) {
         setDocumentId(existingInvoice.id);
         // Use document_status as primary source of truth, fallback to invoice_status
@@ -526,7 +528,21 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
           
           // 2. Apply advance if customer paid advance (with double-posting guard)
           // DR Customer Advance (Liability) | CR Trade Receivable
-          const advanceAmount = freshTotalPaid > 0 ? freshTotalPaid : (quotationData.advance_paid || 0);
+          // Query ONLY advance payments (not balance) to get correct advance-only amount
+          let advanceAmount = quotationData.advance_paid || 0;
+          try {
+            const { data: advPmts } = await supabase
+              .from('special_hire_payments')
+              .select('amount')
+              .eq('quotation_id', quotationData.id)
+              .eq('payment_type', 'advance')
+              .eq('status', 'approved');
+            if (advPmts && advPmts.length > 0) {
+              advanceAmount = advPmts.reduce((s, p) => s + (p.amount || 0), 0);
+            }
+          } catch (err) {
+            console.warn('[SPH GL] Could not fetch advance payments, using fallback:', err);
+          }
           if (advanceAmount > 0) {
             // Check if advance was already applied by useFinanceApproval
             const { data: existingApplyJE } = await supabase
