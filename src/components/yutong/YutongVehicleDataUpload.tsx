@@ -522,7 +522,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
                   <TableCell>
                     <Select
                       value={mapping.mappedTo || 'skip'}
-                      onValueChange={(v) => updateMapping(idx, v)}
+                      onValueChange={(v) => updateMapping(originalIdx, v)}
                     >
                       <SelectTrigger className="w-[200px]">
                         <SelectValue />
