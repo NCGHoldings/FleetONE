@@ -528,7 +528,21 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
           
           // 2. Apply advance if customer paid advance (with double-posting guard)
           // DR Customer Advance (Liability) | CR Trade Receivable
-          const advanceAmount = freshTotalPaid > 0 ? freshTotalPaid : (quotationData.advance_paid || 0);
+          // Query ONLY advance payments (not balance) to get correct advance-only amount
+          let advanceAmount = quotationData.advance_paid || 0;
+          try {
+            const { data: advPmts } = await supabase
+              .from('special_hire_payments')
+              .select('amount')
+              .eq('quotation_id', quotationData.id)
+              .eq('payment_type', 'advance')
+              .eq('status', 'approved');
+            if (advPmts && advPmts.length > 0) {
+              advanceAmount = advPmts.reduce((s, p) => s + (p.amount || 0), 0);
+            }
+          } catch (err) {
+            console.warn('[SPH GL] Could not fetch advance payments, using fallback:', err);
+          }
           if (advanceAmount > 0) {
             // Check if advance was already applied by useFinanceApproval
             const { data: existingApplyJE } = await supabase
