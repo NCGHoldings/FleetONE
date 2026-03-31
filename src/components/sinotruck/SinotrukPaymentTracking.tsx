@@ -344,14 +344,23 @@ export function SinotrukPaymentTracking({ orderId, onRefresh }: SinotrukPaymentT
       }
 
       // 2. Re-fetch order to get latest ar_invoice_id (may have been approved after modal opened)
-      const { data: freshOrder } = await supabase
+      const { data: freshOrder, error: freshError } = await supabase
         .from('sinotruck_orders')
         .select('ar_invoice_id, finance_customer_id')
         .eq('id', selectedOrderId!)
         .single();
 
-      const arInvoiceId = freshOrder?.ar_invoice_id || orderDetails?.ar_invoice_id;
+      if (freshError || !freshOrder) {
+        toast.error('Failed to load latest order state. Please try again.');
+        setVerifyingId(null);
+        return;
+      }
+
+      const arInvoiceId = freshOrder.ar_invoice_id;
       const paymentType = arInvoiceId ? 'balance' : 'advance';
+      if (freshOrder.finance_customer_id) {
+        customerId = freshOrder.finance_customer_id;
+      }
       
       let journalEntryId: string | undefined;
       let arReceiptId: string | undefined;

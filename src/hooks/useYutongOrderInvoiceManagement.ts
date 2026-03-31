@@ -519,6 +519,17 @@ export function useYutongOrderInvoiceManagement() {
 
             if (revenueGLResult) {
               console.log(`[Yutong] Revenue GL posted: ${revenueGLResult.entryNumber}`);
+              // Persist journal_entry_id back to ar_invoices so future receipts link correctly
+              if (arInvoiceId) {
+                await supabase
+                  .from('ar_invoices')
+                  .update({ journal_entry_id: revenueGLResult.journalEntryId })
+                  .eq('id', arInvoiceId);
+                console.log('[Yutong] Persisted journal_entry_id to AR Invoice:', arInvoiceId);
+              }
+            } else {
+              console.error('[Yutong] Revenue GL posting FAILED - invoice approval incomplete on finance side');
+              toast.error('Warning: Invoice approved but GL posting failed. Check Finance Settings.');
             }
 
             // Apply advances against receivable
