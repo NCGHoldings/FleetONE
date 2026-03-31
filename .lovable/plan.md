@@ -1,114 +1,73 @@
 
-Issue confirmed
 
-I cross-checked the exact Yutong case for L H W K C Yasantha.
+# Recommendation: Separate Test Company (Safest Approach)
 
-Verified state now:
-- Order: `YTO-2026-0020`
-- Operational side on `yutong_orders`: `total_paid = 6,001,000`, `balance_due = 32,249,000`
-- Linked AR invoice: `49406124-472a-47c6-93da-91304b1b559b`
-- Accounting side on `ar_invoices`: `paid_amount = 1,000,000`, `balance = 37,250,000`
-- 3 verified payments exist: `1,000,000 + 5,000,000 + 1,000`
-- All 3 payments have journal entries, but all are still posted as `YUT ADVANCE`
-- There are no `ar_receipts` and no `ar_receipt_allocations` for this invoice/order
+## Why This Is Best
 
-Conclusion:
-You are correct. The operation side is updating, but the finance/AR side is not staying in sync.
+Your system already isolates everything by `company_id`. Instead of modifying every table with tags or building complex toggles, we simply create a **mirror test company** with the same COA. This means:
 
-Root causes found
-1. `YutongPaymentTracking.tsx` still allows a silent fallback to stale order state when deciding payment type.
-2. Post-invoice payments are not being reliably converted into:
-   - balance receipts
-   - AR receipt records
-   - AR allocations
-   - AR invoice paid/balance updates
-3. The approved tax invoice is also incomplete on the finance side:
-   - `ar_invoices.journal_entry_id` is still `null`
-   - the full invoice revenue JE was not persisted back to the AR invoice
-   - so later receipts are not landing on a fully linked finance document
+- **Zero risk to live data** — test and live are completely separate database records
+- **No schema changes** — no new columns on any existing table
+- **Existing company switcher** works as the toggle — just switch to "NCG Test" to test, switch back to "NCG Holding" for live
+- **Clear test data** = one button that deletes all transactions for the test company, keeping COA intact
 
-Implementation plan
+## What Gets Created
 
-1. Fix payment verification authority in `src/components/yutong/YutongPaymentTracking.tsx`
-- Re-fetch the order and use that fresh result as the only source for `ar_invoice_id`
-- Remove silent fallback to stale `orderDetails.ar_invoice_id`
-- If fresh finance state cannot be loaded, block verification instead of posting a wrong advance entry
-- Use fresh `finance_customer_id` too
-- If `ar_invoice_id` exists:
-  - force payment type = `balance`
-  - create AR receipt
-  - create AR allocation
-  - save `ar_receipt_id` back to `yutong_customer_payments`
-- Only use `advance` if there is truly no AR invoice
-
-2. Harden shared AR receipt logic in `src/hooks/useVehicleSalesFinance.ts`
-- Make `createVehicleARReceipt()` fail loudly if:
-  - receipt insert fails
-  - allocation insert fails
-  - AR invoice update fails
-- Do not silently continue on partial finance failure
-- Set receipt metadata correctly for invoice-linked receipts (`is_advance = false`)
-- Ensure invoice `paid_amount`, `balance`, and `status` are updated only after successful allocation
-
-3. Fix invoice approval finance link in `src/hooks/useYutongOrderInvoiceManagement.ts`
-- On non-proforma approval:
-  - create/update AR invoice
-  - post the full invoice revenue-recognition JE for the full invoice amount
-  - persist returned `journal_entry_id` onto `ar_invoices`
-- Do not let approval look “successful” if the finance posting failed
-- Keep advance application separate from invoice recognition:
-  - invoice JE = full invoice amount
-  - advance application JE = only already received advances
-
-4. Repair the existing broken Yasantha records
-- Reconcile order `YTO-2026-0020`
-- Create the missing AR receipts/allocations for the later verified payments made after invoice approval
-- Update AR invoice totals from:
-  - `paid_amount = 1,000,000`
-  - `balance = 37,250,000`
-  to:
-  - `paid_amount = 6,001,000`
-  - `balance = 32,249,000`
-- Review the later “advance” journal entries and correct them if needed so accounting matches reality
-
-5. Add a safety check so this cannot repeat
-- Flag verified Yutong payments where:
-  - order has `ar_invoice_id`
-  - but payment has no `ar_receipt_id`
-- Flag approved Yutong AR invoices where `journal_entry_id` is still null
-
-Files to modify
-- `src/components/yutong/YutongPaymentTracking.tsx`
-- `src/hooks/useVehicleSalesFinance.ts`
-- `src/hooks/useYutongOrderInvoiceManagement.ts`
-
-Expected result
-- Yasantha’s accounting invoice will match the operational payment total
-- First payment before invoice stays as advance
-- Later payments after invoice approval reduce AR correctly
-- Approved tax/customer invoices always carry the full invoice JE
-- Operation and Finance stay synchronized
-
-Technical details
 ```text
-Correct accounting flow
-
-Before invoice approval:
-  DR Bank
-  CR Customer Advance
-
-At invoice approval:
-  DR Trade Receivable      full invoice amount
-  CR Sales Revenue / VAT
-
-Apply earlier advances:
-  DR Customer Advance
-  CR Trade Receivable
-
-Later payments:
-  DR Bank
-  CR Trade Receivable
-  + AR Receipt
-  + AR Allocation
-  + AR Invoice paid_amount/balance update
+EXISTING (LIVE)                    NEW (TEST)
+─────────────────                  ─────────────────
+NCG Holding (Pvt) Ltd              NCG Test Environment
+├── School Bus Operations          ├── Test School Bus
+├── Yutong Sales                   ├── Test Yutong
+├── Sinotruck Sales                ├── Test Sinotruck
+├── Special Hire                   ├── Test Special Hire
+└── Light Vehicle Sales            └── Test Light Vehicle
 ```
+
+## Implementation Steps
+
+### 1. Create test companies (DB migration)
+- Insert "NCG Test Environment" as parent with `business_unit_type: 'test'`
+- Insert 5 sub-companies mirroring the live ones, each with same `business_unit_type` but prefixed "Test"
+- Copy all COA records from NCG Holding to the test parent company
+- Copy GL settings from NCG Holding to the test parent
+
+### 2. Add visual indicator in UI
+- In `CompanySwitcher.tsx`: Add a 🧪 icon and orange/yellow badge for test companies
+- In the main layout or accounting page header: Show a prominent **"TEST MODE"** banner when any test company is selected
+- This prevents confusion between test and live
+
+### 3. Add "Clear Test Data" button
+- New component in Settings or Accounting page
+- Only visible when a test company is selected
+- Clears all finance transactions for the test company:
+  - `journal_entries`, `journal_entry_lines`
+  - `ar_invoices`, `ar_receipts`, `ar_receipt_allocations`
+  - `ap_invoices`, `ap_payments`, `ap_payment_allocations`
+  - `bank_transactions`, `cashbook_entries`
+  - `customers`, `vendors` (test ones only)
+  - Yutong/Sinotruck/LV orders and payments (test company linked)
+- Resets COA balances to zero
+- Does **NOT** delete COA accounts or GL settings
+
+### 4. Protect live data
+- The "Clear Test Data" button checks `business_unit_type = 'test'` on the parent company before allowing any deletion
+- If someone tries to clear data on a non-test company, it refuses
+
+## Files to Create/Modify
+
+1. **Migration SQL** — Create test companies + copy COA + copy GL settings
+2. `src/components/accounting/CompanySwitcher.tsx` — Add test company icon/styling
+3. `src/components/accounting/TestModeBanner.tsx` — New banner component
+4. `src/components/settings/ClearTestDataButton.tsx` — New clear data component
+5. `src/contexts/CompanyContext.tsx` — Add `isTestCompany` helper flag
+
+## How You Use It
+
+1. Open Finance & Accounting
+2. Click company switcher → select "NCG Test Environment" or any "Test" sub-company
+3. Orange "TEST MODE" banner appears at top
+4. Do all your testing — create orders, payments, invoices, JEs
+5. When done testing, click "Clear Test Data" to wipe everything
+6. Switch back to "NCG Holding" for real/live work — completely untouched
+
