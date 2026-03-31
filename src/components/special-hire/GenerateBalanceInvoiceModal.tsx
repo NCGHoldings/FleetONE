@@ -152,15 +152,17 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
   const checkExistingInvoice = async () => {
     try {
-      // Check if invoice already exists for this adjustment
-      const { data: existingInvoice, error } = await supabase
+      // Check if invoice already exists — use order+limit to handle duplicates gracefully
+      const { data: existingInvoices, error } = await supabase
         .from('document_storage')
         .select('id, invoice_status, document_status, document_data')
         .eq('quotation_id', quotationData.id)
         .eq('document_type', 'invoice')
         .eq('payment_type', 'balance')
-        .maybeSingle();
+        .order('created_at', { ascending: false })
+        .limit(1);
 
+      const existingInvoice = existingInvoices?.[0];
       if (existingInvoice && !error) {
         setDocumentId(existingInvoice.id);
         // Use document_status as primary source of truth, fallback to invoice_status
