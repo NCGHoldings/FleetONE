@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 // NCG Express: Standalone company with its own GL
 export const NCG_HOLDING_ID = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020';
 export const NCG_EXPRESS_ID = '7ece7595-8b7b-46de-8bfc-c1e8e0da7513';
+export const NCG_TEST_ID = 'a0000000-0000-0000-0000-000000000001';
 
 // Company type matching database structure
 export interface Company {
@@ -42,6 +43,8 @@ interface CompanyContextType {
   isNCGHoldingOrSubCompany: (companyId: string) => boolean; // NCG Holding or any of its sub-companies
   getEffectiveCompanyId: () => string | null; // Returns parent for sub-companies, otherwise selected
   getBusinessUnitCode: () => string | null; // Returns short_code for sub-companies, null for parent
+  // Test mode
+  isTestCompany: boolean; // True when selected company has business_unit_type = 'test'
   // Access control
   hasCompanyAccess: (companyId: string) => boolean;
   allowedCompanyIds: string[];
@@ -243,6 +246,18 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
     return null; // NCG Express and parent companies don't have business unit codes
   };
 
+  // Test mode detection
+  const isTestCompany = useMemo(() => {
+    if (!selectedCompany) return false;
+    if (selectedCompany.business_unit_type === 'test') return true;
+    // Check if parent is a test company
+    if (selectedCompany.parent_company_id) {
+      const parent = allCompanies.find(c => c.id === selectedCompany.parent_company_id);
+      return parent?.business_unit_type === 'test';
+    }
+    return false;
+  }, [selectedCompany, allCompanies]);
+
   // Set company and persist to localStorage
   const setSelectedCompanyId = (id: string | null) => {
     const previousCompanyId = selectedCompanyId;
@@ -312,6 +327,7 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
         isNCGHoldingOrSubCompany,
         getEffectiveCompanyId,
         getBusinessUnitCode,
+        isTestCompany,
         hasCompanyAccess,
         allowedCompanyIds,
       }}

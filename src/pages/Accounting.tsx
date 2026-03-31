@@ -83,6 +83,7 @@ import { DataImportWizard } from "@/components/accounting/DataImportWizard";
 import { AdvanceAllocationForm } from "@/components/accounting/AdvanceAllocationForm";
 // Multi-company
 import { CompanySwitcher } from "@/components/accounting/CompanySwitcher";
+import { TestModeBanner } from "@/components/accounting/TestModeBanner";
 // Settings Components
 import { CompanySettingsView } from "@/components/accounting/settings/CompanySettingsView";
 import { DocumentTemplateManager } from "@/components/accounting/settings/DocumentTemplateManager";
@@ -180,6 +181,8 @@ const Accounting = () => {
             </div>
             <CompanySwitcher />
           </div>
+
+          <TestModeBanner />
 
           {/* Module Navigation */}
           <div className="flex flex-wrap gap-2 pb-2 border-b">
