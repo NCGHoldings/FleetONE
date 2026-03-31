@@ -246,6 +246,18 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
     return null; // NCG Express and parent companies don't have business unit codes
   };
 
+  // Test mode detection
+  const isTestCompany = useMemo(() => {
+    if (!selectedCompany) return false;
+    if (selectedCompany.business_unit_type === 'test') return true;
+    // Check if parent is a test company
+    if (selectedCompany.parent_company_id) {
+      const parent = allCompanies.find(c => c.id === selectedCompany.parent_company_id);
+      return parent?.business_unit_type === 'test';
+    }
+    return false;
+  }, [selectedCompany, allCompanies]);
+
   // Set company and persist to localStorage
   const setSelectedCompanyId = (id: string | null) => {
     const previousCompanyId = selectedCompanyId;
