@@ -407,6 +407,8 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
     });
     setSelectedSchedule(null);
     setPaymentProofFile(null);
+    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+    setPaymentProofPreview(null);
   };
 
   const getStatusBadge = (status: string) => {
