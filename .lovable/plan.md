@@ -1,50 +1,59 @@
 
 
-# Swap Live & Test Labels — Analysis & Recommendation
+# Swap Environments: Empty → LIVE, Data-Filled → TEST
 
-## Your Understanding is Correct ✓
+## Current State (Problem)
+- **NCG Holding** (`f40b0a9d...`) — has 167 JEs, 59 AR invoices, 34 customers = DATA
+- **NCG Test Environment** (`a0000000...`) — has 0 JEs, 0 invoices, 0 customers = EMPTY
+- You want the empty one as LIVE and the data one as TEST
 
-Yes — when you select **Test Yutong** and create an advance payment, it saves with the test company_id. When you select **Yutong Sales** (live), payments save with the live company_id. They are completely isolated. The company switcher IS your toggle between test and live.
+## What Needs to Happen
 
-## The Problem with Swapping Names
-
-You want to rename the empty one to "Live" and keep the data-filled one as "Test". However, the live company ID (`f40b0a9d...`) is **hardcoded in 22 files** across the entire codebase for GL consolidation, finance settings, and accounting logic. Swapping IDs would be extremely risky and could break the entire finance system.
-
-## Recommended Approach Instead
-
-Keep the structure as-is, but **clear the live data** so it becomes your fresh "Real/Live" database:
+We swap the **names and types** in the database, and update the **hardcoded IDs** in code so the system treats the empty database as the main production environment.
 
 ```text
-CURRENT STATE                      AFTER FIX
-─────────────                      ─────────
-NCG Holding (has data)     →       NCG Holding - LIVE (clean, COA only)
-NCG Test Environment (empty) →     NCG Test Environment (keep for testing)
+BEFORE                                    AFTER
+──────                                    ─────
+f40b0a9d = NCG Holding (LIVE, has data)   f40b0a9d = NCG Test Environment (TEST, has data)
+a0000000 = NCG Test (TEST, empty)         a0000000 = NCG Holding (Pvt) Ltd (LIVE, empty)
 ```
 
-### Steps
+## Implementation
 
-1. **Clear all transaction data from NCG Holding** (the live one)
-   - Delete: journal entries, AR/AP invoices, receipts, payments, customers, vendors, bank transactions, Yutong/Sinotruck/LV orders & payments
-   - Keep: Chart of Accounts (structure + codes), GL settings, company structure
-   - Reset COA balances to zero
+### 1. Database migration — Swap names and types
 
-2. **Add a "LIVE" visual indicator** to the company switcher
-   - Live companies show a green "LIVE" badge
-   - Test companies keep the orange "TEST" badge
-   - This makes it crystal clear which environment you're in
+**Rename NCG Holding → Test:**
+- `NCG Holding (Pvt) Ltd` → `NCG Test Environment`
+- `business_unit_type` → `test`
+- Sub-companies: `Yutong Sales` → `Test Yutong`, etc., all set to `business_unit_type = 'test'`
 
-3. **Add a "LIVE MODE" banner** (green) when working in the live environment
-   - Similar to the TEST MODE orange banner but green
-   - Shows: "🟢 LIVE MODE — This is your production environment"
+**Rename NCG Test → Live:**
+- `NCG Test Environment` → `NCG Holding (Pvt) Ltd`
+- `business_unit_type` → `holding`
+- Sub-companies: `Test Yutong` → `Yutong Sales`, etc., with correct `business_unit_type` (yutong, school_bus, etc.)
 
-### Result
+### 2. Update hardcoded IDs in code (4 files)
 
-- **NCG Holding** = your clean LIVE database (empty transactions, full COA)
-- **NCG Test Environment** = your test sandbox (create test data freely, clear anytime)
-- Visual badges make it impossible to confuse them
+Change `NCG_HOLDING_ID` from `f40b0a9d...` to `a0000000...0001` and `NCG_TEST_ID` from `a0000000...0001` to `f40b0a9d...` in:
+- `src/contexts/CompanyContext.tsx`
+- `src/hooks/useVehicleSalesFinance.ts`
+- `src/hooks/useLeasingFinance.ts`
+- `src/components/settings/LeasingFinanceSettings.tsx`
 
-### Files to modify
-- `src/components/accounting/CompanySwitcher.tsx` — add LIVE badge
-- `src/components/accounting/TestModeBanner.tsx` — add live mode banner variant
-- Data clearing via SQL (one-time operation to wipe live transactions)
+### 3. Update TestModeBanner.tsx test IDs
+
+Swap the hardcoded test company IDs to point to the old NCG Holding sub-company IDs (which are now test).
+
+### 4. Update CompanySwitcher.tsx if needed
+
+Ensure badges still work correctly with the swapped types.
+
+## Result
+- **LIVE** = `a0000000...` = empty, clean COA, ready for real use
+- **TEST** = `f40b0a9d...` = has all your old data for testing/reference
+- All GL consolidation, finance logic, and hardcoded references point to the new live ID
+- Visual badges (LIVE/TEST) work correctly based on `business_unit_type`
+
+## Risk
+Moderate — we are changing the core holding ID that all finance logic depends on. But since it's defined as a constant in 4 files and imported everywhere else, updating those 4 constants cleanly propagates the change.
 
