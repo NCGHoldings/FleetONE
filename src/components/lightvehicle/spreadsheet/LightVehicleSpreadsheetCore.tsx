@@ -477,7 +477,7 @@ export function LightVehicleSpreadsheetCore({ orders, loading, onUpdate, onRefre
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Total Amount</Label>
-                <Input type="number" min={0} value={addForm.total_amount} onChange={(e) => setAddForm(p => ({ ...p, total_amount: Number(e.target.value) || 0 }))} />
+                <CurrencyInput value={addForm.total_amount} onValueChange={(v) => setAddForm(p => ({ ...p, total_amount: v }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
