@@ -800,10 +800,9 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             <div>
               <Label>Payment Amount (LKR) *</Label>
-              <Input
-                type="number"
+               <CurrencyInput
                 value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                onValueChange={(num) => setPaymentForm({ ...paymentForm, amount: num.toString() })}
                 placeholder="Enter amount"
               />
             </div>
