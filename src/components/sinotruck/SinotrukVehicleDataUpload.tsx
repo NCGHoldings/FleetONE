@@ -33,23 +33,28 @@ const FIELD_OPTIONS = [
 
 // Detect if a row is a section header (e.g. "C9 Customers and Exstock - 37+1+1 = 9")
 function isSectionHeaderRow(row: any[], mappedFields: Record<number, string | null>): boolean {
-  // If most mapped fields (engine, chassis, model) are empty, it's likely a header
-  let mappedCellsEmpty = 0;
-  let mappedCellsTotal = 0;
-  
+  const requiredFields = ['model', 'engine_no', 'chassis_no'];
+  const fieldToIdx: Record<string, number> = {};
   for (const [idxStr, field] of Object.entries(mappedFields)) {
     if (!field || field === 'skip') continue;
-    if (['engine_no', 'chassis_no', 'model', 'seat_config', 'color'].includes(field)) {
-      mappedCellsTotal++;
-      const val = row[parseInt(idxStr)];
-      if (val === null || val === undefined || String(val).trim() === '') {
-        mappedCellsEmpty++;
-      }
+    if (requiredFields.includes(field) && !(field in fieldToIdx)) {
+      fieldToIdx[field] = parseInt(idxStr);
     }
   }
-  
-  // If 3+ important fields are empty, likely a header row
-  return mappedCellsTotal >= 3 && mappedCellsEmpty >= 3;
+  const checkedFields = Object.keys(fieldToIdx);
+  if (checkedFields.length === 0) return false;
+  let emptyCount = 0;
+  for (const field of checkedFields) {
+    const val = row[fieldToIdx[field]];
+    if (val === null || val === undefined || String(val).trim() === '') {
+      emptyCount++;
+    }
+  }
+  if (emptyCount === checkedFields.length) {
+    const firstCell = String(row[0] || '').trim();
+    return firstCell.length > 0 && isNaN(Number(firstCell));
+  }
+  return false;
 }
 
 export function SinotrukVehicleDataUpload({ onUploadComplete }: Props) {
@@ -415,7 +420,7 @@ export function SinotrukVehicleDataUpload({ onUploadComplete }: Props) {
                     {shipments.map(s => (
                       <SelectItem key={s.id} value={s.id}>
                         <span className="flex items-center gap-2">
-                          <Ship className="h-3 w-3" /> {s.shipment_nohipment_name}
+                          <Ship className="h-3 w-3" /> {s.shipment_no} - {s.shipment_name}
                         </span>
                       </SelectItem>
                     ))}
@@ -451,8 +456,10 @@ export function SinotrukVehicleDataUpload({ onUploadComplete }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {columnMappings.filter(m => m.excelColumn).map((mapping, idx) => (
-                <TableRow key={idx}>
+              {columnMappings.map((mapping, originalIdx) => {
+                if (!mapping.excelColumn) return null;
+                return (
+                <TableRow key={originalIdx}>
                   <TableCell className="font-medium">{mapping.excelColumn}</TableCell>
                   <TableCell>
                     {mapping.autoDetected ? (
@@ -468,7 +475,7 @@ export function SinotrukVehicleDataUpload({ onUploadComplete }: Props) {
                   <TableCell>
                     <Select
                       value={mapping.mappedTo || 'skip'}
-                      onValueChange={(v) => updateMapping(idx, v)}
+                      onValueChange={(v) => updateMapping(originalIdx, v)}
                     >
                       <SelectTrigger className="w-[200px]">
                         <SelectValue />
@@ -490,7 +497,8 @@ export function SinotrukVehicleDataUpload({ onUploadComplete }: Props) {
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
