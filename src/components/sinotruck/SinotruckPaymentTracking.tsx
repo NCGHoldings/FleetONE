@@ -507,6 +507,12 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {payment.payment_slip_url && (
+                              <DropdownMenuItem onClick={() => window.open(payment.payment_slip_url, '_blank')}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Payment Proof
+                              </DropdownMenuItem>
+                            )}
                             {(payment.status === 'pending' || payment.status === 'received') && (
                               <DropdownMenuItem
                                 onClick={() => handleVerifyPayment(payment.id)}

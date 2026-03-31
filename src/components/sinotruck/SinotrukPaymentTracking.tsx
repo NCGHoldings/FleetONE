@@ -724,6 +724,16 @@ export function SinotrukPaymentTracking({ orderId, onRefresh }: SinotrukPaymentT
                       <TableCell>{getStatusBadge(payment.status)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
+                          {payment.payment_slip_url && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => window.open(payment.payment_slip_url, '_blank')}
+                              title="View Payment Proof"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
                           {payment.status === 'pending' && (
                             <Button
                               size="sm"
