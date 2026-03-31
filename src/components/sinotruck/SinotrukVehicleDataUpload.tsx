@@ -451,7 +451,7 @@ export function SinotrukVehicleDataUpload({ onUploadComplete }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {columnMappings.map((mapping, idx) => (
+              {columnMappings.filter(m => m.excelColumn).map((mapping, idx) => (
                 <TableRow key={idx}>
                   <TableCell className="font-medium">{mapping.excelColumn}</TableCell>
                   <TableCell>
