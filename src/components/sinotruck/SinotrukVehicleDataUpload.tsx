@@ -420,7 +420,7 @@ export function SinotrukVehicleDataUpload({ onUploadComplete }: Props) {
                     {shipments.map(s => (
                       <SelectItem key={s.id} value={s.id}>
                         <span className="flex items-center gap-2">
-                          <Ship className="h-3 w-3" /> {s.shipment_nohipment_name}
+                          <Ship className="h-3 w-3" /> {s.shipment_no} - {s.shipment_name}
                         </span>
                       </SelectItem>
                     ))}
