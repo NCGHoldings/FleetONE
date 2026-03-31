@@ -1,59 +1,31 @@
 
 
-# Swap Environments: Empty → LIVE, Data-Filled → TEST
+# Global Test Mode Banner in Header
 
-## Current State (Problem)
-- **NCG Holding** (`f40b0a9d...`) — has 167 JEs, 59 AR invoices, 34 customers = DATA
-- **NCG Test Environment** (`a0000000...`) — has 0 JEs, 0 invoices, 0 customers = EMPTY
-- You want the empty one as LIVE and the data one as TEST
+## What Changes
 
-## What Needs to Happen
-
-We swap the **names and types** in the database, and update the **hardcoded IDs** in code so the system treats the empty database as the main production environment.
-
-```text
-BEFORE                                    AFTER
-──────                                    ─────
-f40b0a9d = NCG Holding (LIVE, has data)   f40b0a9d = NCG Test Environment (TEST, has data)
-a0000000 = NCG Test (TEST, empty)         a0000000 = NCG Holding (Pvt) Ltd (LIVE, empty)
-```
+1. **LIVE banner** — stays only in Finance & Accounting section (no change needed)
+2. **TEST banner** — moves to the global `Header.tsx` so it shows on every page (Operations, Dashboard, etc.)
+3. **Fix runtime error** — add a safe wrapper so the Header doesn't crash if CompanyContext isn't ready
 
 ## Implementation
 
-### 1. Database migration — Swap names and types
+### 1. Header.tsx — Add test mode indicator
+- Import `useCompany` (with a try/catch safe hook or direct since CompanyProvider wraps the app)
+- Check `isTestCompany` — if true, render an orange "🧪 TEST MODE" strip below the header bar (or inline)
+- If not test company, show nothing (LIVE banner stays only in Accounting)
 
-**Rename NCG Holding → Test:**
-- `NCG Holding (Pvt) Ltd` → `NCG Test Environment`
-- `business_unit_type` → `test`
-- Sub-companies: `Yutong Sales` → `Test Yutong`, etc., all set to `business_unit_type = 'test'`
+### 2. TestModeBanner.tsx — Remove LIVE banner display, keep only TEST banner with Clear Data button
+- Remove the `if (!isTestCompany)` block that renders the green LIVE banner — that stays only in Accounting page
+- OR: Keep the LIVE banner in Accounting but the component is only used there anyway
 
-**Rename NCG Test → Live:**
-- `NCG Test Environment` → `NCG Holding (Pvt) Ltd`
-- `business_unit_type` → `holding`
-- Sub-companies: `Test Yutong` → `Yutong Sales`, etc., with correct `business_unit_type` (yutong, school_bus, etc.)
+### 3. AppLayout.tsx — Add global test banner
+- Import a lightweight `GlobalTestBanner` (or reuse logic) between `<Header />` and `<main>`
+- This banner only renders when `isTestCompany` is true
+- Shows: "🧪 TEST MODE — You are working in the test environment. Data is isolated from live."
 
-### 2. Update hardcoded IDs in code (4 files)
-
-Change `NCG_HOLDING_ID` from `f40b0a9d...` to `a0000000...0001` and `NCG_TEST_ID` from `a0000000...0001` to `f40b0a9d...` in:
-- `src/contexts/CompanyContext.tsx`
-- `src/hooks/useVehicleSalesFinance.ts`
-- `src/hooks/useLeasingFinance.ts`
-- `src/components/settings/LeasingFinanceSettings.tsx`
-
-### 3. Update TestModeBanner.tsx test IDs
-
-Swap the hardcoded test company IDs to point to the old NCG Holding sub-company IDs (which are now test).
-
-### 4. Update CompanySwitcher.tsx if needed
-
-Ensure badges still work correctly with the swapped types.
-
-## Result
-- **LIVE** = `a0000000...` = empty, clean COA, ready for real use
-- **TEST** = `f40b0a9d...` = has all your old data for testing/reference
-- All GL consolidation, finance logic, and hardcoded references point to the new live ID
-- Visual badges (LIVE/TEST) work correctly based on `business_unit_type`
-
-## Risk
-Moderate — we are changing the core holding ID that all finance logic depends on. But since it's defined as a constant in 4 files and imported everywhere else, updating those 4 constants cleanly propagates the change.
+## Files to modify
+- `src/components/layout/AppLayout.tsx` — add global test banner between Header and main content
+- `src/components/layout/Header.tsx` or new `src/components/layout/GlobalTestBanner.tsx` — small component checking `isTestCompany`
+- `src/components/accounting/TestModeBanner.tsx` — keep as-is for Accounting page (LIVE + TEST + Clear Data)
 
