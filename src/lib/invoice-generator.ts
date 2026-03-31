@@ -219,8 +219,8 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     // Use explicit balanceAmount when provided (balance invoices), else compute
     const balanceDue = data.balanceAmount != null ? data.balanceAmount : Math.max(0, priceAfterDiscount - totalPaid);
     const itemDetail = data.itemDetail || `${data.pickupLocation} to ${data.dropLocation}`;
-    // Use real trip distance from quotation, fallback to actual km traveled if post-trip done, or totalKm
-    const mileage = data.actualKmTraveled || data.tripDistance || data.totalKm || 0;
+    // Use original trip distance from quotation first, then totalKm, then actual (post-trip) as fallback
+    const mileage = data.tripDistance || data.totalKm || data.actualKmTraveled || 0;
 
     return `
       <div id="invoice-root" style="font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; width: 210mm; box-sizing: border-box;">
