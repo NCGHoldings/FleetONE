@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 // NCG Holding ID for consolidated GL
-export const NCG_HOLDING_ID = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020';
+export const NCG_HOLDING_ID = 'a0000000-0000-0000-0000-000000000001';
 export const BUSINESS_UNIT_CODE = 'FLEET';
 
 export interface LeasingFinanceSettings {

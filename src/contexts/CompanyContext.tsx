@@ -5,9 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 // Company IDs for consolidated GL architecture
 // NCG Holding: Parent with consolidated GL for all sub-companies
 // NCG Express: Standalone company with its own GL
-export const NCG_HOLDING_ID = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020';
+export const NCG_HOLDING_ID = 'a0000000-0000-0000-0000-000000000001';
 export const NCG_EXPRESS_ID = '7ece7595-8b7b-46de-8bfc-c1e8e0da7513';
-export const NCG_TEST_ID = 'a0000000-0000-0000-0000-000000000001';
+export const NCG_TEST_ID = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020';
 
 // Company type matching database structure
 export interface Company {
