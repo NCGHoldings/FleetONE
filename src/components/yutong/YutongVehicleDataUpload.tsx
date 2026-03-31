@@ -114,7 +114,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
         return;
       }
 
-      const fileHeaders = (jsonData[0] as string[]).map(h => String(h || '').trim()).filter(h => h);
+      const fileHeaders = (jsonData[0] as string[]).map(h => String(h || '').trim());
       const dataRows = jsonData.slice(1).filter(row => row.some(cell => cell !== null && cell !== ''));
 
       setFile(acceptedFile);
