@@ -45,6 +45,7 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
   const [verifyingPayment, setVerifyingPayment] = useState<string | null>(null);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   const [paymentForm, setPaymentForm] = useState({
@@ -356,6 +357,8 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
     });
     setSelectedSchedule(null);
     setPaymentProofFile(null);
+    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+    setPaymentProofPreview(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -659,7 +662,12 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
                 <Input
                   type="file"
                   accept="image/*,.pdf"
-                  onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setPaymentProofFile(file);
+                    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+                    setPaymentProofPreview(file && file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
+                  }}
                   className="flex-1"
                 />
                 {paymentProofFile && (
@@ -669,6 +677,9 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
                   </Badge>
                 )}
               </div>
+              {paymentProofPreview && (
+                <img src={paymentProofPreview} alt="Payment proof preview" className="mt-2 max-h-32 rounded border object-contain" />
+              )}
               <p className="text-xs text-muted-foreground mt-1">Upload bank slip or transfer confirmation</p>
             </div>
 

@@ -49,6 +49,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   const { fetchReceiptsForOrder, createReceipt, isCreating } = useLightVehicleCashReceipts();
@@ -406,6 +407,8 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
     });
     setSelectedSchedule(null);
     setPaymentProofFile(null);
+    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+    setPaymentProofPreview(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -740,7 +743,12 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
                 <Input
                   type="file"
                   accept="image/*,.pdf"
-                  onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setPaymentProofFile(file);
+                    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+                    setPaymentProofPreview(file && file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
+                  }}
                   className="flex-1"
                 />
                 {paymentProofFile && (
@@ -750,6 +758,9 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
                   </Badge>
                 )}
               </div>
+              {paymentProofPreview && (
+                <img src={paymentProofPreview} alt="Payment proof preview" className="mt-2 max-h-32 rounded border object-contain" />
+              )}
               <p className="text-xs text-muted-foreground mt-1">Upload bank slip or transfer confirmation</p>
             </div>
 
