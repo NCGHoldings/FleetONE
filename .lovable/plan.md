@@ -1,62 +1,81 @@
 
+Issue summary
 
-# Fix: Excel Upload Reads Data But Inserts 0 Vehicle Records
+I reviewed the screenshot and the upload code. The file is being read correctly; the failure happens before insert.
 
-## Root Cause
+Do I know what the issue is? Yes.
 
-**Line 117** in all 3 upload components strips empty-name columns from the headers array:
-```js
-const fileHeaders = (jsonData[0] as string[]).map(h => String(h || '').trim()).filter(h => h);
-```
+What is actually wrong
 
-But data rows (`allData`) keep ALL columns including the empty-header ones. This causes a **column index mismatch**:
+1. Every row is being marked as a “section header”, so `handleImport()` filters out all rows before insert.
+2. CSV is already supported by the uploader, but CSV would hit the same bug because the problem is in the shared row-skip logic, not the file type.
+3. There are two frontend mapping bugs making this worse:
+   - blank headers can get false auto-matches
+   - hidden blank-header columns can shift manual mapping updates onto the wrong original column
+
+Why this happens
+
+- In `isSectionHeaderRow()` the code counts optional fields like `seat_config` and `color`, and it also counts duplicate mappings like `VIN NO` + `CHASSIS NO` both mapped to `chassis_no`.
+- On your file, real vehicle rows still have some empty optional columns, so the rule `mappedCellsEmpty >= 3` incorrectly classifies all rows as headers.
+- In the hooks, `autoDetectColumnMapping()` can treat empty headers as a match because `pattern.includes('')` is true.
+- In the mapping table, blank columns are hidden with `.filter(...)`, but the displayed row index is still used for `updateMapping(idx, ...)`, so edits can apply to the wrong source column.
+
+Implementation plan
+
+1. Fix section-header detection in all 3 upload components
+   - Files:
+     - `src/components/yutong/YutongVehicleDataUpload.tsx`
+     - `src/components/sinotruck/SinotrukVehicleDataUpload.tsx`
+     - `src/components/lightvehicle/LightVehicleVehicleDataUpload.tsx`
+   - Change the skip logic to only use unique required vehicle identifiers:
+     - `model`
+     - `engine_no`
+     - `chassis_no`
+   - Ignore optional fields like `color` and `seat_config` for header detection.
+   - Deduplicate repeated mapped targets so two columns mapped to `chassis_no` do not count twice.
+   - Add a lightweight text check so only real section labels like “Customers”, “Exstock”, etc. are skipped.
+
+2. Fix blank-header auto-detection in all 3 management hooks
+   - Files:
+     - `src/hooks/useYutongVehicleDataManagement.ts`
+     - `src/hooks/useSinotrukVehicleDataManagement.ts`
+     - `src/hooks/useLightVehicleVehicleDataManagement.ts`
+   - If a header is blank, force `mappedTo: null`.
+   - Do not run fuzzy matching against empty strings.
+
+3. Fix mapping UI index alignment
+   - In the 3 upload components, keep the original column index when rendering only non-empty headers.
+   - This ensures changing a visible mapping updates the correct source column.
+
+4. Add safer import guardrails
+   - If `validDataCount === 0`, show a clear warning explaining that rows are being treated as headers and must be remapped/reviewed.
+   - Keep import disabled when there are no valid vehicle rows.
+   - Show a clearer validation message if required fields are missing.
+
+5. Small same-file cleanup while touching the upload screens
+   - Correct the shipment display typo (`shipment_nohipment_name`) in the 3 upload components.
+   - This is not the root cause, but it is a visible bug in the same area.
+
+Technical notes
 
 ```text
-Excel columns:    [A, B, "", D, E, "", G]  (7 columns)
-Filtered headers: [A, B, D, E, G]          (5 items)
-Data row:         [1, 2, x, 4, 5, y, 7]    (7 items)
+Current flow:
+file parsed -> mappings built -> headerRowIndices computed -> all rows filtered out -> insert gets 0 records
 
-headers[2] = "D" → but row[2] = "x" (the empty column's data, not D's data)
+Target flow:
+file parsed -> mappings built correctly -> only real section labels skipped -> valid rows inserted
 ```
 
-This misalignment causes `isSectionHeaderRow()` to read wrong column values for engine_no, chassis_no, model — they all appear empty — so **every row is flagged as a section header** and filtered out. Result: 0 records inserted.
+CSV answer
 
-## Fix (3 files, same change)
+- Yes, you can use CSV.
+- The uploader already accepts `.csv`.
+- After this fix, both Excel and CSV should work through the same import flow.
 
-**Replace the header filtering** to preserve original column indices by keeping empty headers in the array (mark them but don't remove them):
+Expected result after fix
 
-### File 1: `src/components/yutong/YutongVehicleDataUpload.tsx` (line 117)
-### File 2: `src/components/sinotruck/SinotrukVehicleDataUpload.tsx` (line 118)
-### File 3: `src/components/lightvehicle/LightVehicleVehicleDataUpload.tsx` (line 118)
-
-Change:
-```js
-const fileHeaders = (jsonData[0] as string[]).map(h => String(h || '').trim()).filter(h => h);
-```
-To:
-```js
-const fileHeaders = (jsonData[0] as string[]).map(h => String(h || '').trim());
-```
-
-This keeps empty column names in the array, preserving 1:1 alignment between `headers[idx]` and `row[idx]`.
-
-Then update the auto-detect mapping call to skip empty headers naturally (they won't match any pattern, so `mappedTo` will be null — which already works correctly).
-
-Additionally, update the UI rendering of column mappings to skip displaying empty-name columns so the mapping step stays clean.
-
-### UI filter for mapping display
-
-In each file's mapping step JSX, filter the display:
-```js
-columnMappings.filter((m, i) => headers[i]).map(...)
-```
-becomes the display filter, while the full array stays intact for data alignment.
-
-## Affected Components
-- `YutongVehicleDataUpload.tsx`
-- `SinotrukVehicleDataUpload.tsx`
-- `LightVehicleVehicleDataUpload.tsx`
-
-## Expected Result
-After fix: uploading any Excel file with empty columns will correctly align data, section header detection will work properly, and all valid vehicle rows will be inserted into the database.
-
+- Your Batch 6/manual file should no longer show “52 section header(s) will be skipped”.
+- The preview rows should stay as real vehicle rows.
+- The import button should show the real vehicle count.
+- Clicking import should insert rows into `yutong_vehicle_records`.
+- The same fix will protect Sinotruck and Light Vehicle uploads too.
