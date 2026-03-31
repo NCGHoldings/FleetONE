@@ -107,7 +107,7 @@ export function SpreadsheetDOPanel({ orderId, displayValue, fetchDOs, createDO, 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label className="text-[10px]">Amount</Label>
-                  <Input type="number" className="h-7 text-xs" value={form.do_amount} onChange={e => setForm(p => ({ ...p, do_amount: Number(e.target.value) }))} />
+                  <CurrencyInput className="h-7 text-xs" value={form.do_amount} onValueChange={v => setForm(p => ({ ...p, do_amount: v }))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px]">Vehicles</Label>
