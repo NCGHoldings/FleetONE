@@ -1,34 +1,42 @@
 
 
-# Fix: Engine Capacity Save + Vehicle Details Refresh After Save
+# Fix: Payment Image Preview + Cash Receipt Checkmark/Cross Icons
 
-## Two Issues Found
+## Two Issues
 
-### Issue 1: Engine capacity `parseInt` can produce `NaN`
-In `YutongInvoiceDataModal.tsx` line 182, `parseInt(e.target.value)` returns `NaN` when the field is cleared mid-edit. `NaN` sent to Supabase causes the update to fail silently or save null.
+### Issue 1: Payment proof image not previewed when adding payment
+When a user selects a payment proof image file, only the filename is shown as a badge. No image thumbnail preview is displayed.
 
-**Fix**: Use `parseInt(e.target.value) || 0` to default to 0 when parsing fails.
+**Fix**: After selecting a file, create an object URL preview and show a small thumbnail image below the file input. This gives visual confirmation that the correct image was selected.
 
-### Issue 2: "Vehicle details incomplete" persists after saving
-The `EnhancedYutongOrderDetailsModal` receives `order` as a static prop. When `YutongInvoiceDataModal` saves and invalidates React Query, the parent list re-fetches, but the modal still holds the stale `order` object. So `vehicleDetailsComplete` stays false.
+**Files**: `YutongPaymentTracking.tsx`, `SinotrukPaymentTracking.tsx`, `SinotruckPaymentTracking.tsx`, `LightVehiclePaymentTracking.tsx`
 
-**Fix**: In `YutongOrderInvoiceGenerator`, after vehicle data modal `onSuccess`:
-- Re-fetch the order directly from Supabase and update a local state copy
-- Use local order state (falling back to prop) for `vehicleDetailsComplete` check
-- This way saving vehicle details immediately reflects in the UI without closing and reopening the modal
+Changes per file:
+- Add a `useState` for `paymentProofPreview` (string URL)
+- On file select: create `URL.createObjectURL(file)` and set preview state
+- On modal close: revoke the object URL
+- Render a thumbnail `<img>` below the file input when preview exists
 
-## Files to modify
+### Issue 2: Cash receipt shows "CASH: TRUE/FALSE" text instead of visual icons
+The MODE OF PAYMENT section displays raw text like `CASH: TRUE` / `CASH: FALSE`. Should use ✓ and ✗ symbols instead.
 
-### 1. `src/components/yutong/YutongInvoiceDataModal.tsx`
-- Line 182: `parseInt(e.target.value)` → `parseInt(e.target.value) || 0`
+**Fix**: In all 3 cash receipt preview files, change the display from:
+```
+CASH: TRUE  →  CASH: ✓
+CASH: FALSE →  CASH: ✗
+```
 
-### 2. `src/components/yutong/YutongOrderInvoiceGenerator.tsx`
-- Add local `orderData` state initialized from `order` prop
-- In `handleVehicleDataSuccess`, re-fetch order from `yutong_orders` by ID and update `orderData`
-- Use `orderData` instead of `order` for `vehicleDetailsComplete` and everywhere else
-- Also pass updated data to `YutongInvoiceDataModal` existingData
+Same for CHEQUE and BANK fields.
 
-### 3. Same pattern for Sinotruck/LightVehicle if they have the same issue
-- `SinotrukOrderInvoiceGenerator.tsx` — same local state refresh pattern
-- `SinotruckOrderInvoiceGenerator.tsx` — same
+**Files**: 
+- `src/components/yutong/YutongCashReceiptPreview.tsx` (lines 163-171)
+- `src/components/sinotruck/SinotrukCashReceiptPreview.tsx` (lines 163-171)
+- `src/components/sinotruck/SinotruckCashReceiptPreview.tsx` (lines 198-206)
+
+Changes per file: Replace `'TRUE' : 'FALSE'` with `'✓' : '✗'` in the 3 payment method spans.
+
+## Summary
+- 7 files modified total
+- Payment form gets image thumbnail preview
+- Cash receipt gets clean ✓/✗ icons instead of TRUE/FALSE text
 
