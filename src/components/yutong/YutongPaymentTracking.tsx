@@ -497,6 +497,8 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     });
     setSelectedSchedule(null);
     setPaymentProofFile(null);
+    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+    setPaymentProofPreview(null);
   };
 
   // Cash Receipt handlers
