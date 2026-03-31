@@ -45,6 +45,7 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
   const [verifyingPayment, setVerifyingPayment] = useState<string | null>(null);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   const [paymentForm, setPaymentForm] = useState({
