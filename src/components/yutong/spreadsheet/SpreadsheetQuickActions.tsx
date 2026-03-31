@@ -211,7 +211,7 @@ export function SpreadsheetPaymentPanel({ orderId, displayValue, paymentMethod, 
             <div className="border-t pt-2 space-y-2">
               <div className="space-y-1">
                 <Label className="text-[10px]">Amount *</Label>
-                <Input type="number" className="h-7 text-xs" placeholder="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} />
+                <CurrencyInput className="h-7 text-xs" placeholder="0" value={form.amount} onValueChange={v => setForm(p => ({ ...p, amount: v.toString() }))} />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
