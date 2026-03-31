@@ -40,36 +40,29 @@ export const TestModeBanner = () => {
     setIsClearing(true);
     try {
       // Delete in dependency order (children first)
-      const tables = [
-        // AR allocations & receipts
-        { table: 'ar_receipt_allocations' as const, col: 'company_id' },
-        { table: 'ar_receipts' as const, col: 'company_id' },
-        // AP allocations & payments
-        { table: 'ap_payment_allocations' as const, col: 'company_id' },
-        { table: 'ap_payment_lines' as const, col: 'company_id' },
-        { table: 'ap_payments' as const, col: 'company_id' },
-        // Invoice lines
-        { table: 'ar_invoice_lines' as const, col: 'company_id' },
-        { table: 'ap_invoice_lines' as const, col: 'company_id' },
-        // Invoices
-        { table: 'ar_invoices' as const, col: 'company_id' },
-        { table: 'ap_invoices' as const, col: 'company_id' },
-        // Journal entries
-        { table: 'journal_entry_lines' as const, col: 'company_id' },
-        { table: 'journal_entries' as const, col: 'company_id' },
-        // Bank
-        { table: 'bank_transactions' as const, col: 'company_id' },
-        { table: 'cashbook_entries' as const, col: 'company_id' },
-        // Customers & Vendors
-        { table: 'customers' as const, col: 'company_id' },
-        { table: 'vendors' as const, col: 'company_id' },
+      const tablesToClear = [
+        'ar_receipt_allocations',
+        'ar_receipts',
+        'ap_payment_allocations',
+        'ap_payment_lines',
+        'ap_payments',
+        'ar_invoice_lines',
+        'ap_invoice_lines',
+        'ar_invoices',
+        'ap_invoices',
+        'journal_entry_lines',
+        'journal_entries',
+        'bank_transactions',
+        'cashbook_entries',
+        'customers',
+        'vendors',
       ];
 
-      for (const { table, col } of tables) {
-        const { error } = await supabase
+      for (const table of tablesToClear) {
+        const { error } = await (supabase as any)
           .from(table)
           .delete()
-          .in(col, ALL_TEST_IDS);
+          .in('company_id', ALL_TEST_IDS);
         if (error) console.warn(`Clear ${table}:`, error.message);
       }
 
