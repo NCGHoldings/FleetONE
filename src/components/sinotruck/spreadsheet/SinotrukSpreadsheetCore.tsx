@@ -473,7 +473,7 @@ export function SinotrukSpreadsheetCore({ orders, loading, onUpdate, onRefresh, 
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Unit Price</Label>
-                <Input type="number" min={0} value={addForm.unit_price} onChange={(e) => setAddForm(p => ({ ...p, unit_price: Number(e.target.value) || 0, total_amount: (Number(e.target.value) || 0) * p.quantity }))} />
+                <CurrencyInput value={addForm.unit_price} onValueChange={(v) => setAddForm(p => ({ ...p, unit_price: v, total_amount: v * p.quantity }))} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Total Amount</Label>
