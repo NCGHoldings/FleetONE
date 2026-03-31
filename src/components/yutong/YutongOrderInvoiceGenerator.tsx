@@ -48,8 +48,13 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
   const [invoices, setInvoices] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [quotation, setQuotation] = useState<any>(null);
-   const [defaultInvoiceType, setDefaultInvoiceType] = useState<'direct_invoice' | 'proforma_invoice' | 'tax_invoice'>('direct_invoice');
+  const [defaultInvoiceType, setDefaultInvoiceType] = useState<'direct_invoice' | 'proforma_invoice' | 'tax_invoice'>('direct_invoice');
   const [loadingInvoices, setLoadingInvoices] = useState(true);
+  const [orderData, setOrderData] = useState(order);
+
+  useEffect(() => {
+    setOrderData(order);
+  }, [order]);
 
   const {
     isLoading,
@@ -59,12 +64,12 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
   } = useYutongOrderInvoiceManagement();
 
   const vehicleDetailsComplete = !!(
-    order.engine_number &&
-    order.chassis_number &&
-    order.year_of_manufacture &&
-    order.fuel_type &&
-    order.engine_capacity != null &&
-    order.color_scheme
+    orderData.engine_number &&
+    orderData.chassis_number &&
+    orderData.year_of_manufacture &&
+    orderData.fuel_type &&
+    orderData.engine_capacity != null &&
+    orderData.color_scheme
   );
 
   useEffect(() => {
