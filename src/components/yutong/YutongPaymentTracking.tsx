@@ -342,8 +342,14 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         }
       }
 
-      // 2. Determine Payment Type & Post to GL
-      const arInvoiceId = orderDetails?.finance_ar_invoice_id;
+      // 2. Re-fetch order to get latest ar_invoice_id (may have been approved after modal opened)
+      const { data: freshOrder } = await supabase
+        .from('yutong_orders')
+        .select('ar_invoice_id, finance_customer_id')
+        .eq('id', selectedOrderId!)
+        .single();
+
+      const arInvoiceId = freshOrder?.ar_invoice_id || orderDetails?.ar_invoice_id;
       const paymentType = arInvoiceId ? 'balance' : 'advance';
       
       let journalEntryId: string | undefined;
