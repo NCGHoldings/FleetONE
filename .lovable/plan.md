@@ -1,53 +1,114 @@
 
+Issue confirmed
 
-# Fix: Yutong Payment Type Detection + AR Invoice Balance Updates
+I cross-checked the exact Yutong case for L H W K C Yasantha.
 
-## Root Cause Analysis
+Verified state now:
+- Order: `YTO-2026-0020`
+- Operational side on `yutong_orders`: `total_paid = 6,001,000`, `balance_due = 32,249,000`
+- Linked AR invoice: `49406124-472a-47c6-93da-91304b1b559b`
+- Accounting side on `ar_invoices`: `paid_amount = 1,000,000`, `balance = 37,250,000`
+- 3 verified payments exist: `1,000,000 + 5,000,000 + 1,000`
+- All 3 payments have journal entries, but all are still posted as `YUT ADVANCE`
+- There are no `ar_receipts` and no `ar_receipt_allocations` for this invoice/order
 
-**Bug 1 — Wrong field name (Critical)**: `YutongPaymentTracking.tsx` line 346 and `SinotrukPaymentTracking.tsx` line 347 use `orderDetails?.finance_ar_invoice_id` but the actual database column is `ar_invoice_id`. This means `arInvoiceId` is ALWAYS `undefined`, so every payment is posted as `'advance'` (DR Bank / CR Customer Advance) — even payments made AFTER the AR invoice exists.
+Conclusion:
+You are correct. The operation side is updating, but the finance/AR side is not staying in sync.
 
-**Bug 2 — No AR Receipt for post-invoice payments**: Because of Bug 1, the code never enters the `if (arInvoiceId)` branch that creates AR Receipts and updates `ar_invoices.paid_amount`. That's why the AR Invoice shows only LKR 1,000,000 paid (the amount applied at approval time) instead of LKR 6,000,000.
+Root causes found
+1. `YutongPaymentTracking.tsx` still allows a silent fallback to stale order state when deciding payment type.
+2. Post-invoice payments are not being reliably converted into:
+   - balance receipts
+   - AR receipt records
+   - AR allocations
+   - AR invoice paid/balance updates
+3. The approved tax invoice is also incomplete on the finance side:
+   - `ar_invoices.journal_entry_id` is still `null`
+   - the full invoice revenue JE was not persisted back to the AR invoice
+   - so later receipts are not landing on a fully linked finance document
 
-**Bug 3 — Stale orderDetails**: When verifying a payment, the code reads `orderDetails` from local state which may be stale (loaded at modal open). It should re-fetch the order to get the latest `ar_invoice_id` before deciding payment type.
+Implementation plan
 
-## Fix Plan
+1. Fix payment verification authority in `src/components/yutong/YutongPaymentTracking.tsx`
+- Re-fetch the order and use that fresh result as the only source for `ar_invoice_id`
+- Remove silent fallback to stale `orderDetails.ar_invoice_id`
+- If fresh finance state cannot be loaded, block verification instead of posting a wrong advance entry
+- Use fresh `finance_customer_id` too
+- If `ar_invoice_id` exists:
+  - force payment type = `balance`
+  - create AR receipt
+  - create AR allocation
+  - save `ar_receipt_id` back to `yutong_customer_payments`
+- Only use `advance` if there is truly no AR invoice
 
-### File 1: `src/components/yutong/YutongPaymentTracking.tsx`
-- **Line 346**: Change `orderDetails?.finance_ar_invoice_id` → `orderDetails?.ar_invoice_id`
-- **Before the payment type check**: Re-fetch the order from Supabase to get the latest `ar_invoice_id` (in case invoice was approved after the modal loaded)
+2. Harden shared AR receipt logic in `src/hooks/useVehicleSalesFinance.ts`
+- Make `createVehicleARReceipt()` fail loudly if:
+  - receipt insert fails
+  - allocation insert fails
+  - AR invoice update fails
+- Do not silently continue on partial finance failure
+- Set receipt metadata correctly for invoice-linked receipts (`is_advance = false`)
+- Ensure invoice `paid_amount`, `balance`, and `status` are updated only after successful allocation
 
-### File 2: `src/components/sinotruck/SinotrukPaymentTracking.tsx`
-- **Line 347**: Change `orderDetails?.finance_ar_invoice_id` → `orderDetails?.ar_invoice_id`
-- Same re-fetch pattern
+3. Fix invoice approval finance link in `src/hooks/useYutongOrderInvoiceManagement.ts`
+- On non-proforma approval:
+  - create/update AR invoice
+  - post the full invoice revenue-recognition JE for the full invoice amount
+  - persist returned `journal_entry_id` onto `ar_invoices`
+- Do not let approval look “successful” if the finance posting failed
+- Keep advance application separate from invoice recognition:
+  - invoice JE = full invoice amount
+  - advance application JE = only already received advances
 
-### File 3: `src/components/sinotruck/SinotruckPaymentTracking.tsx`
-- Already uses correct field (`ar_invoice_id`) — no change needed, but add re-fetch for consistency
+4. Repair the existing broken Yasantha records
+- Reconcile order `YTO-2026-0020`
+- Create the missing AR receipts/allocations for the later verified payments made after invoice approval
+- Update AR invoice totals from:
+  - `paid_amount = 1,000,000`
+  - `balance = 37,250,000`
+  to:
+  - `paid_amount = 6,001,000`
+  - `balance = 32,249,000`
+- Review the later “advance” journal entries and correct them if needed so accounting matches reality
 
-### File 4: `src/components/lightvehicle/LightVehiclePaymentTracking.tsx`
-- Already uses correct field — add re-fetch for consistency
+5. Add a safety check so this cannot repeat
+- Flag verified Yutong payments where:
+  - order has `ar_invoice_id`
+  - but payment has no `ar_receipt_id`
+- Flag approved Yutong AR invoices where `journal_entry_id` is still null
 
-## What This Fixes
+Files to modify
+- `src/components/yutong/YutongPaymentTracking.tsx`
+- `src/hooks/useVehicleSalesFinance.ts`
+- `src/hooks/useYutongOrderInvoiceManagement.ts`
 
-After fix:
-- Payment verified BEFORE invoice → `advance` (DR Bank / CR Customer Advance) ✓
-- Payment verified AFTER invoice approval → `balance` (DR Bank / CR Trade Receivable) + AR Receipt created + AR Invoice `paid_amount` updated ✓
-- AR Invoice balance reflects ALL verified payments, not just the ones known at approval time
+Expected result
+- Yasantha’s accounting invoice will match the operational payment total
+- First payment before invoice stays as advance
+- Later payments after invoice approval reduce AR correctly
+- Approved tax/customer invoices always carry the full invoice JE
+- Operation and Finance stay synchronized
 
-## Technical Detail
-
-The re-fetch adds ~3 lines before the payment type decision:
-
+Technical details
 ```text
-// Re-fetch order to get latest ar_invoice_id
-const { data: freshOrder } = await supabase
-  .from('yutong_orders')
-  .select('ar_invoice_id, finance_customer_id')
-  .eq('id', selectedOrderId)
-  .single();
+Correct accounting flow
 
-const arInvoiceId = freshOrder?.ar_invoice_id;
-const paymentType = arInvoiceId ? 'balance' : 'advance';
+Before invoice approval:
+  DR Bank
+  CR Customer Advance
+
+At invoice approval:
+  DR Trade Receivable      full invoice amount
+  CR Sales Revenue / VAT
+
+Apply earlier advances:
+  DR Customer Advance
+  CR Trade Receivable
+
+Later payments:
+  DR Bank
+  CR Trade Receivable
+  + AR Receipt
+  + AR Allocation
+  + AR Invoice paid_amount/balance update
 ```
-
-This ensures even if the invoice was approved in another tab/session, the payment verify always checks the latest state.
-
