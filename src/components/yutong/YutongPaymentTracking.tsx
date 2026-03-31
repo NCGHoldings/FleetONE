@@ -54,6 +54,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   
   // Payment proof upload state
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
