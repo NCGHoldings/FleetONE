@@ -497,8 +497,8 @@ export function LightVehicleVehicleDataUpload({ onUploadComplete }: Props) {
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
+                );
+              })}
           </Table>
         </CardContent>
       </Card>
