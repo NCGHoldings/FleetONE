@@ -5,6 +5,7 @@ import { Header } from "./Header";
 import { ThemeDecorations } from "../seasonal/ThemeDecorations";
 import { ThemeStyleInjector } from "../seasonal/ThemeStyleInjector";
 import { SystemIssueReportButton } from "../issues/SystemIssueReportButton";
+import { GlobalTestBanner } from "./GlobalTestBanner";
 import { ExternalSystemContext, ExternalSystem } from "./ExternalSystemContext";
 import { ExternalSystemOverlay } from "./ExternalSystemOverlay";
 
