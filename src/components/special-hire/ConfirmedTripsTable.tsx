@@ -1966,7 +1966,7 @@ export function ConfirmedTripsTable() {
           quotationNo={selectedTrip.quotation_no}
           customerName={selectedTrip.customer_name}
           originalAmount={calculateTotalAmount(selectedTrip)}
-          originalKm={(selectedTrip as any).total_distance_km || 0}
+          originalKm={getTripDistance(selectedTrip) || (selectedTrip as any).total_distance_km || 0}
           advancePaid={selectedTrip.advance_paid || 0}
           onAdjustmentSaved={() => {
             loadAdjustmentData(selectedTrip.id);
