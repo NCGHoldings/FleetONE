@@ -120,6 +120,8 @@ export function BulkCommissionManagement() {
         pickup_location: q.pickup_location,
         drop_location: q.drop_location,
         pickup_datetime: q.pickup_datetime,
+        phone_number: q.phone_number || null,
+        email: q.email || null,
         referral_agent_id: q.referral_agent_id,
         referral_commission_pct: q.referral_commission_pct,
         referral_commission_amount: q.referral_commission_amount,
