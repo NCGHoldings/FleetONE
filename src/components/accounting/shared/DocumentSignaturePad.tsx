@@ -87,7 +87,9 @@ export const DocumentSignaturePad = ({
     }
 
     if (signatureData) {
-      onSave(signatureData, signerName || signerLabel);
+      // Avoid passing the role label as the user's name if they left it blank,
+      // which causes duplicate "VERIFIED BY" text underneath the signature image.
+      onSave(signatureData, signerName.trim() || "");
       handleClose();
     }
   };
@@ -313,9 +315,11 @@ export const injectSignaturesIntoHtml = (
 
   // Map each signature role to the label texts it should match
   const roleLabels: Record<string, string[]> = {
+    prepared_by: ["Prepared By", "PREPARED BY", "Prepared by"],
     verified_by: ["Verified By", "VERIFIED BY", "Verified by"],
     approved_by: [
       "Approved By", "APPROVED BY", "Approved by",
+      "Authorized By", "AUTHORIZED BY", "Authorized by",
       "Dept. Head Approval", "DEPT. HEAD APPROVAL", "Dept Head Approval",
       "Dept. Head", "DEPT. HEAD",
     ],
@@ -323,7 +327,11 @@ export const injectSignaturesIntoHtml = (
       "Finance Controller", "FINANCE CONTROLLER", "Finance controller",
       "Financial Controller", "FINANCIAL CONTROLLER",
     ],
-    received_by: ["Received By", "RECEIVED BY", "Received by"],
+    received_by: [
+      "Received By", "RECEIVED BY", "Received by",
+      "Received By (Payee)", "RECEIVED BY (PAYEE)",
+      "Vendor Acknowledgment", "VENDOR ACKNOWLEDGMENT"
+    ],
   };
 
   for (const [role, sig] of Object.entries(signatures)) {
@@ -333,7 +341,10 @@ export const injectSignaturesIntoHtml = (
     if (!labels) continue;
 
     const sigImgTag = `<div style="text-align: center; margin-bottom: 4px;"><img src="${sig.dataUrl}" style="max-height: 55px; max-width: 140px; object-fit: contain; display: inline-block;" alt="Signature" /></div>`;
-    const nameTag = sig.name
+    
+    // Only print the signer's name if they provided one AND it is not identical to the role label (prevents duplicate 'VERIFIED BY' lines)
+    const isSameAsLabel = labels.some(l => sig.name?.trim().toLowerCase() === l.toLowerCase());
+    const nameTag = (sig.name && !isSameAsLabel)
       ? `<div style="text-align: center; font-size: 11px; font-weight: 500; margin-bottom: 2px;">${sig.name}</div>`
       : "";
 

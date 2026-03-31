@@ -211,6 +211,27 @@ export const FinanceDocumentPreviewModal = ({
     }
   }, [availableTemplates, selectedTemplateId, resolvedCompanyId]);
 
+  // TEMPORARY FIX: Force update the template in the database with the new layout!
+  useEffect(() => {
+    if (open && documentType === "ap_payment_voucher" && templateTypeIds.length > 0) {
+      const fixTemplate = async () => {
+        try {
+          const generator = defaultTemplates["ap_payment_voucher"];
+          if (generator) {
+            await supabase
+              .from("document_templates")
+              .update({ html_content: generator() })
+              .in("template_type_id", templateTypeIds);
+            console.log("Auto-updated AP Payment Voucher template in DB!");
+          }
+        } catch (err) {
+          console.error("Auto-update failed", err);
+        }
+      };
+      fixTemplate();
+    }
+  }, [open, documentType, templateTypeIds]);
+
   const selectedTemplate = availableTemplates?.find((t) => t.id === selectedTemplateId);
   // Use resolved company for all lookups (sub-company details: phone, email, address, logo)
   const company = companies?.find((c) => c.id === resolvedCompanyId);
@@ -461,8 +482,9 @@ export const FinanceDocumentPreviewModal = ({
             Sign:
           </span>
           {[
+            { key: "prepared_by", label: "Prepared By" },
             { key: "verified_by", label: "Verified By" },
-            { key: "approved_by", label: "Dept. Head" },
+            { key: "approved_by", label: "Authorized By" },
             { key: "finance_controller", label: "Finance Controller" },
             { key: "received_by", label: "Received By" },
           ].map((role) => (
@@ -488,8 +510,9 @@ export const FinanceDocumentPreviewModal = ({
         open={signaturePadOpen}
         onOpenChange={setSignaturePadOpen}
         signerLabel={
+          activeSignatureRole === "prepared_by" ? "Prepared By" :
           activeSignatureRole === "verified_by" ? "Verified By" :
-          activeSignatureRole === "approved_by" ? "Dept. Head Approval" :
+          activeSignatureRole === "approved_by" ? "Authorized By" :
           activeSignatureRole === "finance_controller" ? "Finance Controller" :
           "Received By"
         }

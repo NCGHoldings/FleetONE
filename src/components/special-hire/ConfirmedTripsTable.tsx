@@ -103,13 +103,24 @@ export function ConfirmedTripsTable() {
     // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(trip => 
-        trip.quotation_no.toLowerCase().includes(query) ||
-        trip.customer_name.toLowerCase().includes(query) ||
-        (trip.company_name && trip.company_name.toLowerCase().includes(query)) ||
-        trip.pickup_location.toLowerCase().includes(query) ||
-        trip.drop_location.toLowerCase().includes(query)
-      );
+      const queryClean = query.replace(/,/g, '');
+      
+      filtered = filtered.filter(trip => {
+        const totalAmountStr = trip.gross_revenue ? trip.gross_revenue.toString().replace(/,/g, '') : '';
+        const paidAmountStr = trip.advance_payment_amount ? trip.advance_payment_amount.toString().replace(/,/g, '') : '';
+        const balanceAmountStr = trip.balance_payment_amount ? trip.balance_payment_amount.toString().replace(/,/g, '') : '';
+        
+        return trip.quotation_no.toLowerCase().includes(query) ||
+          trip.customer_name.toLowerCase().includes(query) ||
+          (trip.company_name && trip.company_name.toLowerCase().includes(query)) ||
+          trip.pickup_location.toLowerCase().includes(query) ||
+          trip.drop_location.toLowerCase().includes(query) ||
+          (trip.phone_number && trip.phone_number.toLowerCase().includes(query)) ||
+          (trip.email && trip.email.toLowerCase().includes(query)) ||
+          totalAmountStr.includes(queryClean) ||
+          paidAmountStr.includes(queryClean) ||
+          balanceAmountStr.includes(queryClean);
+      });
     }
 
     // Apply status filter

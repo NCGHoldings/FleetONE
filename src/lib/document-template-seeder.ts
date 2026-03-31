@@ -278,7 +278,6 @@ const buildFooter = (roles: string[]) => {
         This document is electronically generated and remains valid with the associated digital logs.
       </div>
       <div class="verification">
-        <div class="qr-placeholder">QR VERIFY</div>
         <div class="printed">Printed: {{print_date}}</div>
       </div>
     </div>
@@ -543,71 +542,124 @@ export const generateAPInvoiceTemplate = (): string => `
 // ==================== AP Payment Voucher ====================
 export const generateAPPaymentVoucherTemplate = (): string => `
 <style>${commonStyles}
-  :root { --accent: #7c3aed; --accent-2: #6d28d9; --chip: #faf5ff; }
+  :root { 
+    --ink: #0f172a; 
+    --muted: #64748b; 
+    --divider: #e2e8f0;
+  }
+  .page { margin: 10px auto; max-width: 850px; }
+  .doc-minimal {
+    background: #ffffff;
+    padding: 48px 56px;
+    color: var(--ink);
+    border: 1px solid var(--divider);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  }
+  .flex-between { display: flex; justify-content: space-between; align-items: flex-start; }
+  .divider { border-bottom: 2px solid var(--ink); margin: 28px 0 32px 0; }
+  .light-divider { border-bottom: 1px solid var(--divider); margin: 24px 0; }
+  
+  .meta-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; margin-bottom: 6px; }
+  .meta-value { font-size: 14px; font-weight: 600; color: var(--ink); }
+  
+  .header-title { font-size: 26px; font-weight: 800; letter-spacing: 0.05em; color: var(--ink); margin: 0 0 12px 0; }
+  
+  .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; }
+  
+  .total-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); margin-top: 40px; }
+  .total-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 4px; }
+  .total-amount { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+  
+  .text-xs { font-size: 11px; line-height: 1.6; color: var(--muted); }
+  .text-sm { font-size: 13px; line-height: 1.6; }
 </style>
-<div class="page"><div class="doc">
-  ${buildHeader('Payment Voucher', '{{payment_number}}', '{{payment_date}}', 'AP Payment')}
-
-  <div class="body">
-    <div class="grid">
-      <div class="card">
-        <h3>Payment Details</h3>
-        <div class="kv">
-          <div class="row"><span class="k">Voucher No</span><span class="v">{{payment_number}}</span></div>
-          <div class="row"><span class="k">Date</span><span class="v">{{payment_date}}</span></div>
-          <div class="row"><span class="k">Reference</span><span class="v">{{reference}}</span></div>
+<div class="page"><div class="doc-minimal">
+  <div class="flex-between">
+    <div>
+      <img src="{{ncg_master_logo}}" style="width: 120px !important; height: auto !important; max-height: 40px !important; object-fit: contain !important; margin-bottom: 12px !important; mix-blend-mode: multiply;" />
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">{{sector_name}}</div>
+      <div class="text-xs">{{company_address}}<br>Tel: {{company_phone}} | Email: {{company_email}}<br>VAT No: {{company_tax_id}}</div>
+    </div>
+    <div style="text-align: right;">
+      <h1 class="header-title">PAYMENT VOUCHER</h1>
+      <div style="display: flex; gap: 32px; justify-content: flex-end; margin-top: 24px;">
+        <div style="text-align: left;">
+          <div class="meta-label">Voucher No</div>
+          <div class="meta-value">{{payment_number}}</div>
+        </div>
+        <div style="text-align: left;">
+          <div class="meta-label">Date</div>
+          <div class="meta-value">{{payment_date}}</div>
         </div>
       </div>
-      <div class="card">
-        <h3>Pay To</h3>
-        <div class="kv">
-          <div class="row"><span class="k">Vendor</span><span class="v">{{vendor_name}}</span></div>
-          <div class="row"><span class="k">Address</span><span class="v">{{vendor_address}}</span></div>
-          <div class="row"><span class="k">Vendor Code</span><span class="v">{{vendor_code}}</span></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <h3>Payment Method</h3>
-        <div class="kv">
-          <div class="row"><span class="k">Method</span><span class="v">{{payment_method}}</span></div>
-          <div class="row"><span class="k">Cheque No</span><span class="v">{{cheque_number}}</span></div>
-        </div>
-      </div>
-      <div class="card" style="border-color: rgba(124,58,237,0.3);">
-        <h3>Vendor Bank Details</h3>
-        <div class="kv">
-          <div class="row"><span class="k">Bank</span><span class="v">{{vendor_bank_name}}</span></div>
-          <div class="row"><span class="k">Branch</span><span class="v">{{vendor_bank_branch}}</span></div>
-          <div class="row"><span class="k">Account No</span><span class="v">{{vendor_account_number}}</span></div>
-          <div class="row"><span class="k">Account Holder</span><span class="v">{{vendor_account_holder}}</span></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="payment-summary" style="border-color: rgba(124,58,237,0.2); background: rgba(124,58,237,0.02);">
-      <div class="total-box" style="border-color: var(--accent);">
-        <span class="label">Total Paid</span>
-        <span class="value">{{amount}}</span>
-      </div>
-    </div>
-
-    <div class="amount-words"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
-
-    <div class="notes-section">
-      <div class="label">Invoice Allocations</div>
-    </div>
-    {{allocations}}
-
-    <div class="notes-section">
-      <div class="label">Notes</div>
-      <p>{{notes}}</p>
     </div>
   </div>
 
-  ${buildFooter(['Prepared By', 'Verified By', 'Authorized By', 'Received By (Payee)'])}
+  <div class="divider"></div>
+
+  <div class="details-grid">
+    <div>
+      <div class="meta-label" style="border-bottom: 1px solid var(--divider); padding-bottom: 8px; margin-bottom: 16px; color: var(--ink);">Issued To</div>
+      <div class="meta-value" style="font-size: 15px; margin-bottom: 4px;">{{vendor_name}}</div>
+      <div class="text-sm" style="color: var(--muted);">Code: {{vendor_code}}</div>
+      <div class="text-sm" style="color: var(--muted); margin-top: 4px; max-width: 280px;">{{vendor_address}}</div>
+    </div>
+    <div>
+      <div class="meta-label" style="border-bottom: 1px solid var(--divider); padding-bottom: 8px; margin-bottom: 16px; color: var(--ink);">Payment Information</div>
+      <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin-bottom: 6px;">
+        <span class="text-sm" style="color: var(--muted);">Method:</span>
+        <span class="meta-value" style="font-size: 13px;">{{payment_method}}</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin-bottom: 6px;">
+        <span class="text-sm" style="color: var(--muted);">Ref / Cheque:</span>
+        <span class="meta-value" style="font-size: 13px;">{{cheque_number}}</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px;">
+        <span class="text-sm" style="color: var(--muted);">Internal Ref:</span>
+        <span class="meta-value" style="font-size: 13px;">{{reference}}</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="light-divider" style="margin-top: 32px;"></div>
+
+  <div class="details-grid">
+    <div>
+      <div class="meta-label">Beneficiary Bank Details</div>
+      <div class="text-sm" style="margin-top: 12px;">
+        <strong>{{vendor_bank_name}}</strong>
+      </div>
+      <div class="text-sm" style="color: var(--muted); margin-top: 2px;">Branch: {{vendor_bank_branch}}</div>
+      <div class="text-sm" style="color: var(--muted); margin-top: 2px;">A/C No: <strong style="color: var(--ink);">{{vendor_account_number}}</strong></div>
+    </div>
+  </div>
+
+  <div class="total-row">
+    <div>
+      <div class="meta-label" style="margin-bottom: 4px;">Amount in Words</div>
+      <div style="font-size: 13px; font-style: italic; color: var(--muted); max-width: 400px; line-height: 1.5;">{{amount_in_words}}</div>
+    </div>
+    <div style="text-align: right;">
+      <div class="total-label">Total Paid</div>
+      <div class="total-amount">{{amount}}</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 40px;">
+    <div class="meta-label">Invoice Allocations</div>
+    <div style="margin-top: 16px; font-size: 13px;">
+      {{allocations}}
+    </div>
+  </div>
+
+  <div style="margin-top: 32px;">
+    <div class="meta-label">Remarks</div>
+    <div class="text-sm" style="margin-top: 8px; color: var(--ink);">{{notes}}</div>
+  </div>
+
+  <div style="margin-top: 80px;">
+    ${buildFooter(['Prepared By', 'Verified By', 'Authorized By', 'Received By (Payee)'])}
+  </div>
 </div></div>
 `;
 

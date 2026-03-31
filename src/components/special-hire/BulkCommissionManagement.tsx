@@ -134,11 +134,17 @@ export function BulkCommissionManagement() {
   };
 
   const filteredQuotations = quotations.filter((q) => {
-    const matchesSearch =
-      !searchQuery ||
-      q.quotation_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      q.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (q.company_name && q.company_name.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    const queryClean = query.replace(/,/g, '');
+    const amountStr = q.gross_revenue ? q.gross_revenue.toString().replace(/,/g, '') : '';
+    
+    const matchesSearch = q.quotation_no.toLowerCase().includes(query) ||
+           q.customer_name.toLowerCase().includes(query) ||
+           (q.company_name && q.company_name.toLowerCase().includes(query)) ||
+           (q.phone_number && q.phone_number.toLowerCase().includes(query)) ||
+           (q.email && q.email.toLowerCase().includes(query)) ||
+           amountStr.includes(queryClean);
 
     let matchesAgentFilter = true;
     switch (agentFilter) {

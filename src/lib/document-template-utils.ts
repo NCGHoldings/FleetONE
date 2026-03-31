@@ -156,6 +156,12 @@ export const mapDocumentToPlaceholders = (
   // Raw logo URL for templates that use src="{{company_logo}}" directly (not as <img> tag)
   placeholders['{{company_logo_url}}'] = companyData?.logo_url || '';
   
+  // NCG Master placeholders + Sector specific
+  placeholders['{{sector_name}}'] = companyData?.name || '';
+  placeholders['{{sector_code}}'] = companyData?.short_code || '';
+  placeholders['{{ncg_master_logo}}'] = '/ncg-holdings-logo.png'; // Reference the new logo explicitly
+
+  
   // Use company logo_url for logo_and_html mode when no header image is set
   const companyLogoUrl = companyData?.logo_url;
   

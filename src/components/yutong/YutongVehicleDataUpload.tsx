@@ -141,6 +141,30 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
     }
   }, [processFile]);
 
+  // Special Auto-Load function for Batch 6 Spreadsheet
+  const autoLoadBatch6 = async () => {
+    setIsProcessing(true);
+    try {
+      const response = await fetch('/finance_batch_6.xlsx');
+      if (!response.ok) throw new Error('Finance Batch 6 file not found in public directory');
+      const blob = await response.blob();
+      const file = new File([blob], "FINANCE - BATCH 6.xlsx", {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      });
+      await processFile(file);
+      
+      // Auto-set the shipment name for convenience
+      setIsCreatingShipment(true);
+      setNewShipmentName("Shipment 7");
+      
+      toast.success("Batch 6 Spreadsheet successfully loaded. Please review mappings and click Import.");
+    } catch (error: any) {
+      console.error('Error auto-loading Batch 6:', error);
+      toast.error(error.message || 'Failed to auto-load Batch 6 spreadsheet');
+      setIsProcessing(false);
+    }
+  };
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
@@ -322,6 +346,20 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
                 <p className="text-xs text-muted-foreground">Supports .xlsx, .xls, .csv</p>
               </div>
             )}
+          </div>
+          
+          {/* Quick Action for Batch 6 */}
+          <div className="mt-4 flex flex-col items-center">
+            <div className="text-sm text-muted-foreground mb-2">Or use the fast-track auto importer:</div>
+            <Button 
+              onClick={autoLoadBatch6} 
+              disabled={isProcessing}
+              variant="default"
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white"
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 mr-2" />}
+              Auto-Load BATCH 6 Spreadsheet (Create Shipment 7)
+            </Button>
           </div>
         </CardContent>
       </Card>

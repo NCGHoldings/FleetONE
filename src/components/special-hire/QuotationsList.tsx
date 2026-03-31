@@ -947,9 +947,15 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
 
   const filteredQuotations = quotations.filter(quotation => {
     // Search filter
+    const queryClean = searchTerm.toLowerCase().replace(/,/g, '');
+    const amountStr = quotation.gross_revenue ? quotation.gross_revenue.toString().replace(/,/g, '') : '';
+    
     const matchesSearch = quotation.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       quotation.quotation_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quotation.pickup_location.toLowerCase().includes(searchTerm.toLowerCase());
+      quotation.pickup_location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ((quotation as any).phone_number && (quotation as any).phone_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      ((quotation as any).email && (quotation as any).email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      amountStr.includes(queryClean);
 
     // Status filter
     const matchesStatus = statusFilter === 'all' || quotation.status === statusFilter;
@@ -998,7 +1004,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
-                  placeholder="Search by quotation, customer, or location..."
+                  placeholder="Search by quote, name, location, or amount..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"

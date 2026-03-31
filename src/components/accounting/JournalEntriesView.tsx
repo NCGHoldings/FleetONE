@@ -15,6 +15,8 @@ import { JournalEntryDetailDialog } from "./JournalEntryDetailDialog";
 import { useJournalEntries } from "@/hooks/useAccountingData";
 import { usePostJournalEntry, useRejectJournalEntry, useReverseJournalEntry } from "@/hooks/useAccountingMutations";
 import { useCompany } from "@/contexts/CompanyContext";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Filter } from "lucide-react";
 import { toast } from "sonner";
 
 // Business unit display mapping
@@ -32,6 +34,13 @@ export const JournalEntriesView = () => {
   const [showDetail, setShowDetail] = useState(false);
   const [filterBusinessUnit, setFilterBusinessUnit] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Advanced filters
+  const [dateRange, setDateRange] = useState<{from?: Date, to?: Date} | undefined>();
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [minAmount, setMinAmount] = useState<string>("");
+  const [maxAmount, setMaxAmount] = useState<string>("");
+  const [resetKey, setResetKey] = useState(0);
 
   const { selectedCompany, getSubCompaniesFor, isSubCompany, selectedCompanyId } = useCompany();
   
@@ -45,17 +54,77 @@ export const JournalEntriesView = () => {
   const rejectEntry = useRejectJournalEntry();
   const reverseEntry = useReverseJournalEntry();
 
-  // Filter entries based on search query across multiple fields
+  // Filter entries based on multiple criteria
   const filteredEntries = useMemo(() => {
-    if (!entries || !searchQuery.trim()) return entries || [];
-    const query = searchQuery.toLowerCase();
-    return entries.filter((entry: any) => 
-      entry.entry_number?.toLowerCase().includes(query) ||
-      entry.description?.toLowerCase().includes(query) ||
-      entry.reference?.toLowerCase().includes(query) ||
-      entry.business_unit_code?.toLowerCase().includes(query)
-    );
-  }, [entries, searchQuery]);
+    if (!entries) return [];
+    
+    return entries.filter((entry: any) => {
+      // 1. Search Query
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        
+        // Strip commas for cleaner amount searching (e.g. typing "22112" matches "22,112.00")
+        const cleanDebitStr = entry.total_debit ? entry.total_debit.toString().replace(/,/g, '') : '';
+        const cleanCreditStr = entry.total_credit ? entry.total_credit.toString().replace(/,/g, '') : '';
+        const queryClean = query.replace(/,/g, '');
+
+        const matchesSearch = 
+          entry.entry_number?.toLowerCase().includes(query) ||
+          entry.description?.toLowerCase().includes(query) ||
+          entry.reference?.toLowerCase().includes(query) ||
+          entry.business_unit_code?.toLowerCase().includes(query) ||
+          cleanDebitStr.includes(queryClean) ||
+          cleanCreditStr.includes(queryClean);
+          
+        if (!matchesSearch) return false;
+      }
+
+      // 2. Status
+      if (filterStatus !== "all" && entry.status !== filterStatus) return false;
+
+      // 3. Date Range
+      if (dateRange?.from || dateRange?.to) {
+        const entryDate = new Date(entry.entry_date);
+        entryDate.setHours(0, 0, 0, 0);
+        
+        if (dateRange.from) {
+          const fromDate = new Date(dateRange.from);
+          fromDate.setHours(0, 0, 0, 0);
+          if (entryDate < fromDate) return false;
+        }
+        
+        if (dateRange.to) {
+          const toDate = new Date(dateRange.to);
+          toDate.setHours(23, 59, 59, 999);
+          if (entryDate > toDate) return false;
+        }
+      }
+
+      // 4. Amount Range (checking total_debit as absolute entry value)
+      const amount = entry.total_debit || 0;
+      if (minAmount && !isNaN(Number(minAmount)) && amount < Number(minAmount)) return false;
+      if (maxAmount && !isNaN(Number(maxAmount)) && amount > Number(maxAmount)) return false;
+
+      return true;
+    });
+  }, [entries, searchQuery, filterStatus, dateRange, minAmount, maxAmount]);
+
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setFilterStatus("all");
+    setDateRange(undefined);
+    setMinAmount("");
+    setMaxAmount("");
+    setFilterBusinessUnit("all");
+    setResetKey(prev => prev + 1);
+  };
+
+  const activeFilterCount = 
+    (filterStatus !== "all" ? 1 : 0) + 
+    (dateRange?.from || dateRange?.to ? 1 : 0) + 
+    (minAmount ? 1 : 0) + 
+    (maxAmount ? 1 : 0) +
+    (filterBusinessUnit !== "all" ? 1 : 0);
 
   const handleApprove = (entryId: string) => {
     postEntry.mutate(entryId, {
@@ -227,15 +296,74 @@ export const JournalEntriesView = () => {
         </div>
       </div>
 
-      {/* Search Input */}
-      <div className="relative max-w-sm mb-4">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by entry #, description, reference..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
+      {/* Search and Filters Bar */}
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Main Search */}
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by entry #, amount, desc..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {/* Date Range Filter */}
+          <DateRangePicker 
+            key={resetKey}
+            onDateRangeChange={setDateRange} 
+          />
+
+          {/* Status Filter */}
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="posted">Posted</SelectItem>
+              <SelectItem value="void">Reversed/Void</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Amount Range Filter */}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">Min</span>
+              <Input 
+                type="number" 
+                className="w-24 pl-9 h-10" 
+                value={minAmount} 
+                onChange={(e) => setMinAmount(e.target.value)} 
+              />
+            </div>
+            <span className="text-muted-foreground">-</span>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">Max</span>
+              <Input 
+                type="number" 
+                className="w-24 pl-10 h-10" 
+                value={maxAmount} 
+                onChange={(e) => setMaxAmount(e.target.value)} 
+              />
+            </div>
+          </div>
+
+          {/* Clear Filters */}
+          {activeFilterCount > 0 && (
+            <Button 
+              variant="ghost" 
+              className="text-muted-foreground hover:text-foreground ml-auto md:ml-0 transition-opacity animate-in fade-in"
+              onClick={handleClearFilters}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Clear Filters
+            </Button>
+          )}
+        </div>
       </div>
 
       <DataTable
