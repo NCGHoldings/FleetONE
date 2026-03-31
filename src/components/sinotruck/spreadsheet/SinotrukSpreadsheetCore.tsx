@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -472,11 +473,11 @@ export function SinotrukSpreadsheetCore({ orders, loading, onUpdate, onRefresh, 
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Unit Price</Label>
-                <Input type="number" min={0} value={addForm.unit_price} onChange={(e) => setAddForm(p => ({ ...p, unit_price: Number(e.target.value) || 0, total_amount: (Number(e.target.value) || 0) * p.quantity }))} />
+                <CurrencyInput value={addForm.unit_price} onValueChange={(v) => setAddForm(p => ({ ...p, unit_price: v, total_amount: v * p.quantity }))} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Total Amount</Label>
-                <Input type="number" min={0} value={addForm.total_amount} onChange={(e) => setAddForm(p => ({ ...p, total_amount: Number(e.target.value) || 0 }))} />
+                <CurrencyInput value={addForm.total_amount} onValueChange={(v) => setAddForm(p => ({ ...p, total_amount: v }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

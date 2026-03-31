@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { DollarSign, CheckCircle, Clock, Plus, RefreshCw, MoreHorizontal, FileText, Landmark, Image } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, Plus, RefreshCw, MoreHorizontal, FileText, Landmark, Image, Eye } from 'lucide-react';
 import {
   fetchVehicleFinanceSettings,
   createVehicleCustomer,
@@ -506,6 +507,12 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {payment.payment_slip_url && (
+                              <DropdownMenuItem onClick={() => window.open(payment.payment_slip_url, '_blank')}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Payment Proof
+                              </DropdownMenuItem>
+                            )}
                             {(payment.status === 'pending' || payment.status === 'received') && (
                               <DropdownMenuItem
                                 onClick={() => handleVerifyPayment(payment.id)}
@@ -570,10 +577,9 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
 
             <div className="space-y-2">
               <Label>Payment Amount (LKR) *</Label>
-              <Input
-                type="number"
+               <CurrencyInput
                 value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                onValueChange={(num) => setPaymentForm({ ...paymentForm, amount: num.toString() })}
                 placeholder="Enter amount"
               />
             </div>

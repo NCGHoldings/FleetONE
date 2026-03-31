@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -106,7 +107,7 @@ export function SpreadsheetDOPanel({ orderId, displayValue, fetchDOs, createDO, 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label className="text-[10px]">Amount</Label>
-                  <Input type="number" className="h-7 text-xs" value={form.do_amount} onChange={e => setForm(p => ({ ...p, do_amount: Number(e.target.value) }))} />
+                  <CurrencyInput className="h-7 text-xs" value={form.do_amount} onValueChange={v => setForm(p => ({ ...p, do_amount: v }))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px]">Vehicles</Label>
@@ -210,7 +211,7 @@ export function SpreadsheetPaymentPanel({ orderId, displayValue, paymentMethod, 
             <div className="border-t pt-2 space-y-2">
               <div className="space-y-1">
                 <Label className="text-[10px]">Amount *</Label>
-                <Input type="number" className="h-7 text-xs" placeholder="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} />
+                <CurrencyInput className="h-7 text-xs" placeholder="0" value={form.amount} onValueChange={v => setForm(p => ({ ...p, amount: v.toString() }))} />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
@@ -310,7 +311,7 @@ export function SpreadsheetCRPanel({ orderId, displayValue, fetchCRs, createCR, 
             <div className="border-t pt-2 space-y-2">
               <div className="space-y-1">
                 <Label className="text-[10px]">Amount *</Label>
-                <Input type="number" className="h-7 text-xs" placeholder="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} />
+                <CurrencyInput className="h-7 text-xs" placeholder="0" value={form.amount} onValueChange={v => setForm(p => ({ ...p, amount: v.toString() }))} />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">

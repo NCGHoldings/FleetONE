@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -723,6 +724,16 @@ export function SinotrukPaymentTracking({ orderId, onRefresh }: SinotrukPaymentT
                       <TableCell>{getStatusBadge(payment.status)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
+                          {payment.payment_slip_url && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => window.open(payment.payment_slip_url, '_blank')}
+                              title="View Payment Proof"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
                           {payment.status === 'pending' && (
                             <Button
                               size="sm"
@@ -800,10 +811,9 @@ export function SinotrukPaymentTracking({ orderId, onRefresh }: SinotrukPaymentT
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             <div>
               <Label>Payment Amount (LKR) *</Label>
-              <Input
-                type="number"
+               <CurrencyInput
                 value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                onValueChange={(num) => setPaymentForm({ ...paymentForm, amount: num.toString() })}
                 placeholder="Enter amount"
               />
             </div>
