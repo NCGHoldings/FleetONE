@@ -1,57 +1,34 @@
 
 
-# Fix: Amount Formatting with Thousand Separators + Payment Proof View Button
+# Fix: Engine Capacity Save + Vehicle Details Refresh After Save
 
-## Two Issues
+## Two Issues Found
 
-### Issue 1: Amount inputs don't show thousand separators
-All payment/amount inputs use `type="number"` which displays raw digits (100000) instead of formatted (100,000). This affects every module.
+### Issue 1: Engine capacity `parseInt` can produce `NaN`
+In `YutongInvoiceDataModal.tsx` line 182, `parseInt(e.target.value)` returns `NaN` when the field is cleared mid-edit. `NaN` sent to Supabase causes the update to fail silently or save null.
 
-**Fix**: Create a reusable `CurrencyInput` component that:
-- Displays formatted value with commas (100,000) using `type="text"`
-- Strips non-numeric characters on change, stores raw number
-- Shows "LKR" prefix inside the input for clarity
-- Works as a drop-in replacement for `<Input type="number">`
+**Fix**: Use `parseInt(e.target.value) || 0` to default to 0 when parsing fails.
 
-Then replace `type="number"` amount inputs across all payment forms:
-- `YutongPaymentTracking.tsx` (line 802-807)
-- `SinotruckPaymentTracking.tsx`
-- `SinotrukPaymentTracking.tsx`
-- `LightVehiclePaymentTracking.tsx`
-- `SpreadsheetQuickActions.tsx` (Yutong + Sinotruck)
-- Spreadsheet "Add Order" forms (unit price, total amount)
+### Issue 2: "Vehicle details incomplete" persists after saving
+The `EnhancedYutongOrderDetailsModal` receives `order` as a static prop. When `YutongInvoiceDataModal` saves and invalidates React Query, the parent list re-fetches, but the modal still holds the stale `order` object. So `vehicleDetailsComplete` stays false.
 
-### Issue 2: No "View Payment Proof" button on payment rows
-When a payment has an uploaded proof photo (`payment_slip_url`), there's no way to view it — especially at verify time.
-
-**Fix**: In the Payment History table actions column (all 4 payment tracking files):
-- Add an "eye" icon button next to Verify when `payment.payment_slip_url` exists
-- Clicking opens the image/PDF in a dialog or new tab
-- This lets the user review the proof before clicking Verify
-
-## Files to create
-1. `src/components/ui/currency-input.tsx` — Reusable formatted currency input
+**Fix**: In `YutongOrderInvoiceGenerator`, after vehicle data modal `onSuccess`:
+- Re-fetch the order directly from Supabase and update a local state copy
+- Use local order state (falling back to prop) for `vehicleDetailsComplete` check
+- This way saving vehicle details immediately reflects in the UI without closing and reopening the modal
 
 ## Files to modify
-1. `src/components/yutong/YutongPaymentTracking.tsx` — Replace amount input + add proof view button
-2. `src/components/sinotruck/SinotruckPaymentTracking.tsx` — Same
-3. `src/components/sinotruck/SinotrukPaymentTracking.tsx` — Same
-4. `src/components/lightvehicle/LightVehiclePaymentTracking.tsx` — Same
-5. `src/components/yutong/spreadsheet/SpreadsheetQuickActions.tsx` — Replace amount inputs
-6. `src/components/sinotruck/spreadsheet/SpreadsheetQuickActions.tsx` — Replace amount inputs
-7. `src/components/yutong/spreadsheet/YutongSpreadsheetCore.tsx` — Add order form amounts
-8. `src/components/sinotruck/spreadsheet/SinotrukSpreadsheetCore.tsx` — Add order form amounts
-9. `src/components/lightvehicle/spreadsheet/LightVehicleSpreadsheetCore.tsx` — Add order form amounts
 
-## CurrencyInput component design
+### 1. `src/components/yutong/YutongInvoiceDataModal.tsx`
+- Line 182: `parseInt(e.target.value)` → `parseInt(e.target.value) || 0`
 
-```tsx
-// Usage: <CurrencyInput value={amount} onValueChange={(num) => setAmount(num)} />
-// Displays: "100,000" in the field, returns 100000 as number
-```
+### 2. `src/components/yutong/YutongOrderInvoiceGenerator.tsx`
+- Add local `orderData` state initialized from `order` prop
+- In `handleVehicleDataSuccess`, re-fetch order from `yutong_orders` by ID and update `orderData`
+- Use `orderData` instead of `order` for `vehicleDetailsComplete` and everywhere else
+- Also pass updated data to `YutongInvoiceDataModal` existingData
 
-- `type="text"` with `inputMode="numeric"` for mobile numeric keyboard
-- On every keystroke: strip non-digits, format with `toLocaleString()`, update parent with raw number
-- On blur: ensure clean formatting
-- Supports placeholder, disabled, className like standard Input
+### 3. Same pattern for Sinotruck/LightVehicle if they have the same issue
+- `SinotrukOrderInvoiceGenerator.tsx` — same local state refresh pattern
+- `SinotruckOrderInvoiceGenerator.tsx` — same
 
