@@ -1,28 +1,62 @@
 
 
-# Fix Build Errors: Wrong Property Names in Two Components
+# Fix: Excel Upload Reads Data But Inserts 0 Vehicle Records
 
-## Problem
-Two files reference properties that don't exist on their respective types:
+## Root Cause
 
-**BulkCommissionManagement.tsx** — `ConfirmedQuotation` interface is missing `phone_number` and `email`. These fields aren't fetched from Supabase either.
+**Line 117** in all 3 upload components strips empty-name columns from the headers array:
+```js
+const fileHeaders = (jsonData[0] as string[]).map(h => String(h || '').trim()).filter(h => h);
+```
 
-**ConfirmedTripsTable.tsx** — `QuotationWithPayments` has `customer_phone`/`customer_email` (not `phone_number`/`email`) and `advance_paid`/`balance_due` (not `advance_payment_amount`/`balance_payment_amount`).
+But data rows (`allData`) keep ALL columns including the empty-header ones. This causes a **column index mismatch**:
 
-## About the "0 vehicles" issue
-The "FINANCE - BATCH 6" sheet shows 0 vehicles because 0 records were inserted during import — the file was uploaded and a sheet record was created, but no vehicle rows passed validation. You need to **delete that sheet** and **re-upload** the file with correct column mappings.
+```text
+Excel columns:    [A, B, "", D, E, "", G]  (7 columns)
+Filtered headers: [A, B, D, E, G]          (5 items)
+Data row:         [1, 2, x, 4, 5, y, 7]    (7 items)
 
-## Fix Plan
+headers[2] = "D" → but row[2] = "x" (the empty column's data, not D's data)
+```
 
-### File 1: `src/components/special-hire/BulkCommissionManagement.tsx`
-- Add `phone_number` and `email` to the `ConfirmedQuotation` interface (lines 35-54)
-- Add those fields to the Supabase select query so data is actually fetched
+This misalignment causes `isSectionHeaderRow()` to read wrong column values for engine_no, chassis_no, model — they all appear empty — so **every row is flagged as a section header** and filtered out. Result: 0 records inserted.
 
-### File 2: `src/components/special-hire/ConfirmedTripsTable.tsx`
-- Line 113: Change `trip.advance_payment_amount` → `trip.advance_paid`
-- Line 114: Change `trip.balance_payment_amount` → `trip.balance_due`
-- Line 121: Change `trip.phone_number` → `trip.customer_phone`
-- Line 122: Change `trip.email` → `trip.customer_email`
+## Fix (3 files, same change)
 
-These are straightforward property name corrections — 6 lines total across 2 files.
+**Replace the header filtering** to preserve original column indices by keeping empty headers in the array (mark them but don't remove them):
+
+### File 1: `src/components/yutong/YutongVehicleDataUpload.tsx` (line 117)
+### File 2: `src/components/sinotruck/SinotrukVehicleDataUpload.tsx` (line 118)
+### File 3: `src/components/lightvehicle/LightVehicleVehicleDataUpload.tsx` (line 118)
+
+Change:
+```js
+const fileHeaders = (jsonData[0] as string[]).map(h => String(h || '').trim()).filter(h => h);
+```
+To:
+```js
+const fileHeaders = (jsonData[0] as string[]).map(h => String(h || '').trim());
+```
+
+This keeps empty column names in the array, preserving 1:1 alignment between `headers[idx]` and `row[idx]`.
+
+Then update the auto-detect mapping call to skip empty headers naturally (they won't match any pattern, so `mappedTo` will be null — which already works correctly).
+
+Additionally, update the UI rendering of column mappings to skip displaying empty-name columns so the mapping step stays clean.
+
+### UI filter for mapping display
+
+In each file's mapping step JSX, filter the display:
+```js
+columnMappings.filter((m, i) => headers[i]).map(...)
+```
+becomes the display filter, while the full array stays intact for data alignment.
+
+## Affected Components
+- `YutongVehicleDataUpload.tsx`
+- `SinotrukVehicleDataUpload.tsx`
+- `LightVehicleVehicleDataUpload.tsx`
+
+## Expected Result
+After fix: uploading any Excel file with empty columns will correctly align data, section header detection will work properly, and all valid vehicle rows will be inserted into the database.
 
