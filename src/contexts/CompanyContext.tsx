@@ -327,6 +327,7 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
         isNCGHoldingOrSubCompany,
         getEffectiveCompanyId,
         getBusinessUnitCode,
+        isTestCompany,
         hasCompanyAccess,
         allowedCompanyIds,
       }}
