@@ -1,73 +1,50 @@
 
 
-# Recommendation: Separate Test Company (Safest Approach)
+# Swap Live & Test Labels — Analysis & Recommendation
 
-## Why This Is Best
+## Your Understanding is Correct ✓
 
-Your system already isolates everything by `company_id`. Instead of modifying every table with tags or building complex toggles, we simply create a **mirror test company** with the same COA. This means:
+Yes — when you select **Test Yutong** and create an advance payment, it saves with the test company_id. When you select **Yutong Sales** (live), payments save with the live company_id. They are completely isolated. The company switcher IS your toggle between test and live.
 
-- **Zero risk to live data** — test and live are completely separate database records
-- **No schema changes** — no new columns on any existing table
-- **Existing company switcher** works as the toggle — just switch to "NCG Test" to test, switch back to "NCG Holding" for live
-- **Clear test data** = one button that deletes all transactions for the test company, keeping COA intact
+## The Problem with Swapping Names
 
-## What Gets Created
+You want to rename the empty one to "Live" and keep the data-filled one as "Test". However, the live company ID (`f40b0a9d...`) is **hardcoded in 22 files** across the entire codebase for GL consolidation, finance settings, and accounting logic. Swapping IDs would be extremely risky and could break the entire finance system.
+
+## Recommended Approach Instead
+
+Keep the structure as-is, but **clear the live data** so it becomes your fresh "Real/Live" database:
 
 ```text
-EXISTING (LIVE)                    NEW (TEST)
-─────────────────                  ─────────────────
-NCG Holding (Pvt) Ltd              NCG Test Environment
-├── School Bus Operations          ├── Test School Bus
-├── Yutong Sales                   ├── Test Yutong
-├── Sinotruck Sales                ├── Test Sinotruck
-├── Special Hire                   ├── Test Special Hire
-└── Light Vehicle Sales            └── Test Light Vehicle
+CURRENT STATE                      AFTER FIX
+─────────────                      ─────────
+NCG Holding (has data)     →       NCG Holding - LIVE (clean, COA only)
+NCG Test Environment (empty) →     NCG Test Environment (keep for testing)
 ```
 
-## Implementation Steps
+### Steps
 
-### 1. Create test companies (DB migration)
-- Insert "NCG Test Environment" as parent with `business_unit_type: 'test'`
-- Insert 5 sub-companies mirroring the live ones, each with same `business_unit_type` but prefixed "Test"
-- Copy all COA records from NCG Holding to the test parent company
-- Copy GL settings from NCG Holding to the test parent
+1. **Clear all transaction data from NCG Holding** (the live one)
+   - Delete: journal entries, AR/AP invoices, receipts, payments, customers, vendors, bank transactions, Yutong/Sinotruck/LV orders & payments
+   - Keep: Chart of Accounts (structure + codes), GL settings, company structure
+   - Reset COA balances to zero
 
-### 2. Add visual indicator in UI
-- In `CompanySwitcher.tsx`: Add a 🧪 icon and orange/yellow badge for test companies
-- In the main layout or accounting page header: Show a prominent **"TEST MODE"** banner when any test company is selected
-- This prevents confusion between test and live
+2. **Add a "LIVE" visual indicator** to the company switcher
+   - Live companies show a green "LIVE" badge
+   - Test companies keep the orange "TEST" badge
+   - This makes it crystal clear which environment you're in
 
-### 3. Add "Clear Test Data" button
-- New component in Settings or Accounting page
-- Only visible when a test company is selected
-- Clears all finance transactions for the test company:
-  - `journal_entries`, `journal_entry_lines`
-  - `ar_invoices`, `ar_receipts`, `ar_receipt_allocations`
-  - `ap_invoices`, `ap_payments`, `ap_payment_allocations`
-  - `bank_transactions`, `cashbook_entries`
-  - `customers`, `vendors` (test ones only)
-  - Yutong/Sinotruck/LV orders and payments (test company linked)
-- Resets COA balances to zero
-- Does **NOT** delete COA accounts or GL settings
+3. **Add a "LIVE MODE" banner** (green) when working in the live environment
+   - Similar to the TEST MODE orange banner but green
+   - Shows: "🟢 LIVE MODE — This is your production environment"
 
-### 4. Protect live data
-- The "Clear Test Data" button checks `business_unit_type = 'test'` on the parent company before allowing any deletion
-- If someone tries to clear data on a non-test company, it refuses
+### Result
 
-## Files to Create/Modify
+- **NCG Holding** = your clean LIVE database (empty transactions, full COA)
+- **NCG Test Environment** = your test sandbox (create test data freely, clear anytime)
+- Visual badges make it impossible to confuse them
 
-1. **Migration SQL** — Create test companies + copy COA + copy GL settings
-2. `src/components/accounting/CompanySwitcher.tsx` — Add test company icon/styling
-3. `src/components/accounting/TestModeBanner.tsx` — New banner component
-4. `src/components/settings/ClearTestDataButton.tsx` — New clear data component
-5. `src/contexts/CompanyContext.tsx` — Add `isTestCompany` helper flag
-
-## How You Use It
-
-1. Open Finance & Accounting
-2. Click company switcher → select "NCG Test Environment" or any "Test" sub-company
-3. Orange "TEST MODE" banner appears at top
-4. Do all your testing — create orders, payments, invoices, JEs
-5. When done testing, click "Clear Test Data" to wipe everything
-6. Switch back to "NCG Holding" for real/live work — completely untouched
+### Files to modify
+- `src/components/accounting/CompanySwitcher.tsx` — add LIVE badge
+- `src/components/accounting/TestModeBanner.tsx` — add live mode banner variant
+- Data clearing via SQL (one-time operation to wipe live transactions)
 
