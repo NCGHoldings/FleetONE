@@ -110,16 +110,16 @@ export function ConfirmedTripsTable() {
       
       filtered = filtered.filter(trip => {
         const totalAmountStr = trip.gross_revenue ? trip.gross_revenue.toString().replace(/,/g, '') : '';
-        const paidAmountStr = trip.advance_payment_amount ? trip.advance_payment_amount.toString().replace(/,/g, '') : '';
-        const balanceAmountStr = trip.balance_payment_amount ? trip.balance_payment_amount.toString().replace(/,/g, '') : '';
+        const paidAmountStr = trip.advance_paid ? trip.advance_paid.toString().replace(/,/g, '') : '';
+        const balanceAmountStr = trip.balance_due ? trip.balance_due.toString().replace(/,/g, '') : '';
         
         return trip.quotation_no.toLowerCase().includes(query) ||
           trip.customer_name.toLowerCase().includes(query) ||
           (trip.company_name && trip.company_name.toLowerCase().includes(query)) ||
           trip.pickup_location.toLowerCase().includes(query) ||
           trip.drop_location.toLowerCase().includes(query) ||
-          (trip.phone_number && trip.phone_number.toLowerCase().includes(query)) ||
-          (trip.email && trip.email.toLowerCase().includes(query)) ||
+          (trip.customer_phone && trip.customer_phone.toLowerCase().includes(query)) ||
+          (trip.customer_email && trip.customer_email.toLowerCase().includes(query)) ||
           totalAmountStr.includes(queryClean) ||
           paidAmountStr.includes(queryClean) ||
           balanceAmountStr.includes(queryClean);
