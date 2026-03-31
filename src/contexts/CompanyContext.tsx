@@ -43,6 +43,8 @@ interface CompanyContextType {
   isNCGHoldingOrSubCompany: (companyId: string) => boolean; // NCG Holding or any of its sub-companies
   getEffectiveCompanyId: () => string | null; // Returns parent for sub-companies, otherwise selected
   getBusinessUnitCode: () => string | null; // Returns short_code for sub-companies, null for parent
+  // Test mode
+  isTestCompany: boolean; // True when selected company has business_unit_type = 'test'
   // Access control
   hasCompanyAccess: (companyId: string) => boolean;
   allowedCompanyIds: string[];
