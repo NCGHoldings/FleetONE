@@ -34,7 +34,19 @@ export const TestModeBanner = () => {
   const [isClearing, setIsClearing] = useState(false);
   const queryClient = useQueryClient();
 
-  if (!isTestCompany) return null;
+  // Show LIVE banner for non-test companies
+  if (!isTestCompany) {
+    return (
+      <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-lg px-4 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+          <span className="font-semibold text-sm">🟢 LIVE MODE</span>
+          <span className="text-xs text-emerald-600 dark:text-emerald-500">
+            — This is your production environment. All data is real.
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   const handleClearTestData = async () => {
     setIsClearing(true);

@@ -122,7 +122,7 @@ export const CompanySwitcher = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className={`w-[240px] justify-between ${selectedCompany?.business_unit_type === 'test' ? 'border-amber-500/50 bg-amber-500/5' : ''}`}>
+        <Button variant="outline" className={`w-[260px] justify-between ${selectedCompany?.business_unit_type === 'test' ? 'border-amber-500/50 bg-amber-500/5' : 'border-emerald-500/50 bg-emerald-500/5'}`}>
           <div className="flex items-center gap-2 truncate">
             {getBusinessUnitIcon(selectedCompany?.business_unit_type)}
             <span className="truncate">{selectedCompany?.name || "Select Company"}</span>
