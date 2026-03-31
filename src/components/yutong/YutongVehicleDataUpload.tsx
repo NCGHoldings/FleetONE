@@ -503,8 +503,10 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {columnMappings.filter(m => m.excelColumn).map((mapping, idx) => (
-                <TableRow key={idx}>
+              {columnMappings.map((mapping, originalIdx) => {
+                if (!mapping.excelColumn) return null;
+                return (
+                <TableRow key={originalIdx}>
                   <TableCell className="font-medium">{mapping.excelColumn}</TableCell>
                   <TableCell>
                     {mapping.autoDetected ? (
