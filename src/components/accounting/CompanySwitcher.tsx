@@ -24,6 +24,8 @@ const getBusinessUnitIcon = (type: string | null | undefined) => {
       return <Car className="h-4 w-4 text-purple-500" />;
     case "holding":
       return <Building className="h-4 w-4 text-gray-500" />;
+    case "test":
+      return <FlaskConical className="h-4 w-4 text-amber-500" />;
     default:
       return <Briefcase className="h-4 w-4 text-muted-foreground" />;
   }
