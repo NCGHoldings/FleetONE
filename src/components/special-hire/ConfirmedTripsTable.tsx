@@ -1783,7 +1783,33 @@ export function ConfirmedTripsTable() {
                 </div>
               ) : quotationDocuments.length > 0 ? (
                 <div className="grid gap-4">
-                  {quotationDocuments.map((doc) => (
+                  {(() => {
+                    // Filter to show only latest sales receipt + latest final invoice (hide superseded drafts)
+                    const salesReceipts = quotationDocuments.filter(d => d.document_type === 'sales_receipt');
+                    const balanceInvoices = quotationDocuments.filter(d => d.document_type === 'invoice' && d.payment_type === 'balance');
+                    const otherDocs = quotationDocuments.filter(d => 
+                      d.document_type !== 'sales_receipt' && 
+                      !(d.document_type === 'invoice' && d.payment_type === 'balance')
+                    );
+                    
+                    // Pick latest (prefer approved over draft)
+                    const pickLatest = (docs: typeof quotationDocuments) => {
+                      if (!docs.length) return null;
+                      const approved = docs.filter(d => d.document_status !== 'draft');
+                      if (approved.length) return approved[approved.length - 1];
+                      return docs[docs.length - 1];
+                    };
+                    
+                    const latestReceipt = pickLatest(salesReceipts);
+                    const latestInvoice = pickLatest(balanceInvoices);
+                    const filteredDocs = [
+                      ...(latestReceipt ? [latestReceipt] : []),
+                      ...(latestInvoice ? [latestInvoice] : []),
+                      ...otherDocs,
+                    ];
+                    
+                    return filteredDocs;
+                  })().map((doc) => (
                   <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
                       <div className="flex items-center gap-2">
