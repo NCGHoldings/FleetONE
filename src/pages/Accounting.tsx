@@ -182,6 +182,8 @@ const Accounting = () => {
             <CompanySwitcher />
           </div>
 
+          <TestModeBanner />
+
           {/* Module Navigation */}
           <div className="flex flex-wrap gap-2 pb-2 border-b">
             {moduleButtons.map(({ id, label, icon: Icon }) => (
