@@ -498,6 +498,8 @@ export function SinotrukPaymentTracking({ orderId, onRefresh }: SinotrukPaymentT
     });
     setSelectedSchedule(null);
     setPaymentProofFile(null);
+    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+    setPaymentProofPreview(null);
   };
 
   // Cash Receipt handlers
