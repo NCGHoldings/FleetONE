@@ -37,6 +37,8 @@ interface ConfirmedQuotation {
   quotation_no: string;
   customer_name: string;
   company_name: string | null;
+  phone_number: string | null;
+  email: string | null;
   gross_revenue: number;
   fuel_cost_fuel_only: number;
   total_additional_charges: number;
