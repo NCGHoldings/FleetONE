@@ -49,6 +49,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   const { fetchReceiptsForOrder, createReceipt, isCreating } = useLightVehicleCashReceipts();
