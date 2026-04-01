@@ -754,16 +754,25 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                   </Button>
                 </div>
                 <div className="border rounded-lg overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full table-fixed">
+                    <colgroup>
+                      <col style={{ width: 180 }} />
+                      <col />
+                      <col style={{ width: 90 }} />
+                      <col style={{ width: 150 }} />
+                      <col style={{ width: 80 }} />
+                      <col style={{ width: 130 }} />
+                      <col style={{ width: 40 }} />
+                    </colgroup>
                     <thead className="bg-muted">
                       <tr>
-                        <th className="px-3 py-2 text-left text-sm font-medium w-48">GL Account</th>
+                        <th className="px-3 py-2 text-left text-sm font-medium">GL Account</th>
                         <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
-                        <th className="px-3 py-2 text-right text-sm font-medium w-20">Qty</th>
-                        <th className="px-3 py-2 text-right text-sm font-medium w-28">Unit Price</th>
-                        <th className="px-3 py-2 text-right text-sm font-medium w-20">Tax %</th>
-                        <th className="px-3 py-2 text-right text-sm font-medium w-28">Total</th>
-                        <th className="px-3 py-2 w-10"></th>
+                        <th className="px-3 py-2 text-right text-sm font-medium">Qty</th>
+                        <th className="px-3 py-2 text-right text-sm font-medium">Unit Price</th>
+                        <th className="px-3 py-2 text-right text-sm font-medium">Tax %</th>
+                        <th className="px-3 py-2 text-right text-sm font-medium">Total</th>
+                        <th className="px-3 py-2"></th>
                       </tr>
                     </thead>
                     <tbody>
