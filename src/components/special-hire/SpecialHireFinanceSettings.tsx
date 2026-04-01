@@ -49,6 +49,10 @@ interface SettingsState {
   auto_post_balance_payments: boolean;
   invoice_prefix: string;
   advance_receipt_prefix: string;
+  // Quotation Bank Details
+  quotation_bank_name: string;
+  quotation_account_name: string;
+  quotation_account_no: string;
 }
 
 export function SpecialHireFinanceSettings() {
