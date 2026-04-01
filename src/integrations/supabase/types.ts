@@ -20225,6 +20225,9 @@ export type Database = {
           id: string
           invoice_prefix: string | null
           is_active: boolean | null
+          quotation_account_name: string | null
+          quotation_account_no: string | null
+          quotation_bank_name: string | null
           refund_expense_account_id: string | null
           revenue_external_account_id: string | null
           revenue_internal_account_id: string | null
@@ -20247,6 +20250,9 @@ export type Database = {
           id?: string
           invoice_prefix?: string | null
           is_active?: boolean | null
+          quotation_account_name?: string | null
+          quotation_account_no?: string | null
+          quotation_bank_name?: string | null
           refund_expense_account_id?: string | null
           revenue_external_account_id?: string | null
           revenue_internal_account_id?: string | null
@@ -20269,6 +20275,9 @@ export type Database = {
           id?: string
           invoice_prefix?: string | null
           is_active?: boolean | null
+          quotation_account_name?: string | null
+          quotation_account_no?: string | null
+          quotation_bank_name?: string | null
           refund_expense_account_id?: string | null
           revenue_external_account_id?: string | null
           revenue_internal_account_id?: string | null
@@ -20676,6 +20685,9 @@ export type Database = {
           overtime_charge: number | null
           parent_quotation_id: string | null
           parking_location_id: string | null
+          payment_account_name: string | null
+          payment_account_no: string | null
+          payment_bank_name: string | null
           percentage_adjustment: number | null
           pickup_datetime: string
           pickup_lat: number | null
@@ -20776,6 +20788,9 @@ export type Database = {
           overtime_charge?: number | null
           parent_quotation_id?: string | null
           parking_location_id?: string | null
+          payment_account_name?: string | null
+          payment_account_no?: string | null
+          payment_bank_name?: string | null
           percentage_adjustment?: number | null
           pickup_datetime: string
           pickup_lat?: number | null
@@ -20876,6 +20891,9 @@ export type Database = {
           overtime_charge?: number | null
           parent_quotation_id?: string | null
           parking_location_id?: string | null
+          payment_account_name?: string | null
+          payment_account_no?: string | null
+          payment_bank_name?: string | null
           percentage_adjustment?: number | null
           pickup_datetime?: string
           pickup_lat?: number | null
