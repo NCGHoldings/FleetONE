@@ -39,6 +39,7 @@ interface InvoiceLine {
   tax_rate: number;
   line_total: number;
   account_id?: string;
+  item_category_id?: string;
 }
 
 interface ARInvoiceFormProps {

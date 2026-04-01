@@ -192,12 +192,15 @@ export function CoreGLSettings() {
                 'Select Trade Receivable Account',
                 'Default account to debit when creating AR Invoices'
               )}
-              {renderAccountSelect(
-                'Sales Revenue Account (Revenue)',
-                'sales_revenue_account_id',
-                'Select Sales Revenue Account',
-                'Default account to credit when creating AR Invoices'
-              )}
+              <div className="space-y-2">
+                <Label>Sales Revenue Account (Revenue)</Label>
+                <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/30 p-3">
+                  <p className="text-sm text-muted-foreground">
+                    Revenue accounts are now mapped per <strong>Item Category</strong> in Settings → Module GL Mappings. 
+                    Each AR invoice line selects an Item Category which auto-resolves to the correct revenue GL account.
+                  </p>
+                </div>
+              </div>
               {renderAccountSelect(
                 'Customer Advance Account (Liability)',
                 'customer_advance_account_id',
