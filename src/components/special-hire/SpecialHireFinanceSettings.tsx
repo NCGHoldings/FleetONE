@@ -100,6 +100,9 @@ export function SpecialHireFinanceSettings() {
         auto_post_balance_payments: existingSettings.auto_post_balance_payments || false,
         invoice_prefix: existingSettings.invoice_prefix || "SPH-INV",
         advance_receipt_prefix: existingSettings.advance_receipt_prefix || "SPH-ADV",
+        quotation_bank_name: (existingSettings as any).quotation_bank_name || "Commercial Bank - Nugegoda",
+        quotation_account_name: (existingSettings as any).quotation_account_name || "NCG EXPRESS (PVT) LTD",
+        quotation_account_no: (existingSettings as any).quotation_account_no || "1001077213",
       });
     }
   }, [existingSettings]);
