@@ -212,34 +212,51 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
     return company?.parent_company_id === NCG_HOLDING_ID;
   };
 
+  // Checks if company is a sub-company of NCG Test Environment
+  const isSubCompanyOfNCGTest = (companyId: string): boolean => {
+    const company = allCompanies.find(c => c.id === companyId);
+    return company?.parent_company_id === NCG_TEST_ID;
+  };
+
   // Checks if company is NCG Holding or one of its sub-companies
   // Used to validate School Bus operations should only run under NCG Holding hierarchy
   const isNCGHoldingOrSubCompany = (companyId: string): boolean => {
     return companyId === NCG_HOLDING_ID || isSubCompanyOfNCGHolding(companyId);
   };
 
-  // Returns parent company ID for sub-companies of NCG Holding, otherwise returns selected company ID
+  // Returns parent company ID for sub-companies of NCG Holding or NCG Test, otherwise returns selected company ID
   // This ensures NCG Express remains completely isolated with its own COA/GL
   // While NCG Holding sub-companies share the consolidated NCG Holding COA/GL
+  // And NCG Test sub-companies share the consolidated NCG Test COA/GL
   const getEffectiveCompanyId = (): string | null => {
     if (!selectedCompanyId) return null;
     
-    // Only consolidate for NCG Holding sub-companies
+    // Consolidate for NCG Holding sub-companies
     if (isSubCompanyOfNCGHolding(selectedCompanyId)) {
       return NCG_HOLDING_ID;
+    }
+    
+    // Consolidate for NCG Test sub-companies
+    if (isSubCompanyOfNCGTest(selectedCompanyId)) {
+      return NCG_TEST_ID;
     }
     
     // NCG Express and other standalone companies use their own ID
     return selectedCompanyId;
   };
 
-  // Returns the business unit code (short_code) for NCG Holding sub-companies
+  // Returns the business unit code (short_code) for NCG Holding or NCG Test sub-companies
   // Used for tagging journal entries with business unit identifier (SBO, YUT, etc.)
   const getBusinessUnitCode = (): string | null => {
     if (!selectedCompanyId || !selectedCompany) return null;
     
-    // Only NCG Holding sub-companies have business unit codes
+    // NCG Holding sub-companies have business unit codes
     if (isSubCompanyOfNCGHolding(selectedCompanyId)) {
+      return selectedCompany.short_code || null;
+    }
+    
+    // NCG Test sub-companies also have business unit codes
+    if (isSubCompanyOfNCGTest(selectedCompanyId)) {
       return selectedCompany.short_code || null;
     }
     
