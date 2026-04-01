@@ -1825,8 +1825,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         audit_log: isEditing ? [...(initialData?.audit_log || []), auditEntry].filter(Boolean) : [],
         // Link to submission if created from one
         submission_id: submissionData?.id || null,
-        // Set created_by for new quotations
-        ...(isEditing ? {} : { created_by: userData.user?.id })
+        // Set created_by and bank details for new quotations
+        ...(isEditing ? {} : { 
+          created_by: userData.user?.id,
+          ...bankDetails,
+        })
       };
 
       if (isEditing && initialData) {
