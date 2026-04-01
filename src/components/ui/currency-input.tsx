@@ -16,7 +16,7 @@ interface CurrencyInputProps {
  * Accepts numeric value, displays "100,000", returns raw number on change.
  */
 const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
-  ({ value, onValueChange, placeholder = "0", disabled, className, prefix = "Rs" }, ref) => {
+  ({ value, onValueChange, placeholder = "0", disabled, className, prefix = "Rs", compact = false }, ref) => {
     const [displayValue, setDisplayValue] = React.useState("");
 
     // Sync display value when external value changes
@@ -58,6 +58,24 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
         onValueChange(num);
       }
     };
+
+    if (compact) {
+      return (
+        <input
+          ref={ref}
+          type="text"
+          inputMode="numeric"
+          value={displayValue}
+          onChange={handleChange}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={cn(
+            "flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-sm font-mono tabular-nums text-right ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            className
+          )}
+        />
+      );
+    }
 
     return (
       <div className="relative">

@@ -258,12 +258,11 @@ export const SalesOrderForm = ({ onSuccess }: SalesOrderFormProps) => {
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
+                      <CurrencyInput
                         value={line.unit_price}
-                        onChange={(e) => updateLine(index, "unit_price", parseFloat(e.target.value) || 0)}
+                        onValueChange={(val) => updateLine(index, "unit_price", val)}
+                        placeholder="0"
+                        compact
                       />
                     </TableCell>
                     <TableCell>

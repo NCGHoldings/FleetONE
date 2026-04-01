@@ -463,7 +463,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                             value={line.unit_price}
                             onValueChange={(val) => updateLine(line.id, "unit_price", val)}
                             placeholder="0"
-                            className="h-9 text-right"
+                            compact
                           />
                         </td>
                         <td className="px-3 py-2">

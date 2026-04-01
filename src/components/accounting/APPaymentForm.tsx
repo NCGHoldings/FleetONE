@@ -804,13 +804,11 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                             />
                           </td>
                           <td className="px-2 py-2">
-                            <Input
-                              type="number"
+                            <CurrencyInput
                               value={line.unit_price}
-                              onChange={(e) => updateLine(line.id, "unit_price", parseFloat(e.target.value) || 0)}
-                              className="h-8 text-right"
-                              min={0}
-                              step="0.01"
+                              onValueChange={(val) => updateLine(line.id, "unit_price", val)}
+                              placeholder="0"
+                              compact
                             />
                           </td>
                           <td className="px-2 py-2">
