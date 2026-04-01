@@ -1,34 +1,49 @@
 
 
-# Fix: Tax Codes Not Showing in AR Invoice Dropdown
+# Fix: COA and Item Categories Must Use Parent Company (Consolidated Architecture)
 
-## Root Cause
+## Problem
 
-The `useTaxCodes()` hook in `useAccountingData.ts` queries `tax_codes` table correctly, and there are 7 active tax codes in the database (VAT-STD 18%, VAT-ZERO 0%, VAT-EXEMPT, WHT-5 5%, WHT-10 10%, WHT-14 14%, SSCL-2.5 2.5%). RLS policy allows authenticated users to SELECT.
+When you select a test sub-company (e.g., "Test School Bus"), `getEffectiveCompanyId()` returns the sub-company ID directly instead of the parent "NCG Test Environment" ID. This means:
 
-The likely issue is a **silent query error** — when the query fails, `data` is `undefined` and `taxCodes?.map()` renders nothing. No error is shown to the user.
+- **COA dropdown** only finds 7 stray accounts under Test School Bus instead of the full 224 accounts under NCG Test Environment
+- **Item categories** for test sub-companies point to COA accounts under the TEST parent, but queries filter by the sub-company ID — causing mismatches
+- Same issue would occur for any test sub-company (Test Yutong, Test Sinotruck, etc.)
+
+The LIVE side works correctly because `isSubCompanyOfNCGHolding()` consolidates live sub-companies to NCG Holding. But test sub-companies are NOT consolidated because the function only checks `parent_company_id === NCG_HOLDING_ID`.
 
 ## Fix
 
-### 1. Add error logging to `useTaxCodes` hook
-In `src/hooks/useAccountingData.ts`, add error handling to the tax codes query so failures are visible.
+### 1. Update `getEffectiveCompanyId()` in CompanyContext.tsx
 
-### 2. Filter tax codes for AR invoices — show only output tax (VAT)
-The `tax_codes` table has `is_output_tax` and `is_input_tax` flags. AR invoices should only show **output tax** codes (VAT-STD, VAT-ZERO, VAT-EXEMPT). WHT codes are for AP payments, not AR invoices. Filter to `is_output_tax = true` for the AR form.
+Add a check: if the selected company's parent is `NCG_TEST_ID`, consolidate to `NCG_TEST_ID` — same pattern as NCG Holding consolidation.
 
-### 3. Add retry and staleTime to the query
-Add `retry: 2` and `staleTime: 5 * 60 * 1000` to ensure the query retries on failure and caches properly.
+```text
+getEffectiveCompanyId():
+  if parent === NCG_HOLDING_ID → return NCG_HOLDING_ID
+  if parent === NCG_TEST_ID   → return NCG_TEST_ID    ← NEW
+  else → return selectedCompanyId
+```
 
-### 4. Show loading state in the Tax Code dropdown
-When `taxCodes` is still loading, show "Loading..." instead of an empty dropdown.
+Also add a helper `isSubCompanyOfNCGTest()` and update `getBusinessUnitCode()` to work for test sub-companies too.
+
+### 2. Move item categories from test sub-company IDs to NCG Test Environment parent
+
+Currently 8 categories exist per test sub-company (6 sub-companies × 8 = 48 rows). These should all use `company_id = f40b0a9d...` (NCG Test Environment) instead, since the COA is consolidated there. This is a database update via migration.
+
+### 3. Clean up stray COA entries under test sub-companies
+
+The 7 accounts under Test School Bus, Test Yutong, etc. are duplicates. They should be removed since all COA lives under the parent. This is also a migration cleanup.
 
 ## Files to modify
 
-1. **`src/hooks/useAccountingData.ts`** — Add retry config and console.error logging to `useTaxCodes()`
-2. **`src/components/accounting/ARInvoiceForm.tsx`** — Destructure `isLoading` and `error` from `useTaxCodes()`, show loading state in dropdown, filter to output taxes only
+1. **`src/contexts/CompanyContext.tsx`** — Add `isSubCompanyOfNCGTest()`, update `getEffectiveCompanyId()` and `getBusinessUnitCode()` to handle test hierarchy
+2. **New migration** — Move item_categories to parent test company ID, delete stray COA entries under test sub-companies
 
 ## Result
-- Tax codes will appear in the dropdown (VAT-STD 18%, VAT-ZERO, VAT-EXEMPT)
-- WHT codes won't clutter the AR invoice form (they belong in AP)
-- Any query errors will be visible for debugging
+
+- Selecting "Test School Bus" → COA shows all 224 accounts from NCG Test Environment
+- Item categories resolve correctly to the shared test COA
+- Revenue Account dropdown shows specific accounts (41101001 SALES - YUTONG, 41103001 TRANSPORT INCOME - SCHOOL BUSES, etc.) instead of just "4100 - Sales Revenue"
+- Same consolidated architecture for both LIVE and TEST hierarchies
 
