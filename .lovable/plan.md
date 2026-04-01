@@ -1,39 +1,57 @@
 
 
-# Fix: School Bus Student Overpayment — Wrong Liability Account + JE/AR Consistency
+# Update Special Hire Quotation Bank Account (Future Only)
 
-## Issues Found
-
-1. **Wrong Account Mapping**: The `advance_payments_liability_account_id` in School Bus Finance Settings is mapped to `22501001 INCOME TAX PAYABLE` — this is incorrect. It should be `22303001 CUSTOMER ADVANCES` (exists in your COA).
-
-2. **JE vs AR Amount Mismatch**: When student pays LKR 8,000 on a LKR 7,300 fixed amount:
-   - **AR Invoice** correctly shows LKR 7,300 paid ✓
-   - **JE** correctly posts: DR Bank 8,000 / CR Trade Receivable 7,300 / CR Liability 700 ✓
-   - The JE logic is actually **correct** — it records the full cash received and splits it properly
-   - But the liability account is wrong (Income Tax instead of Customer Advances)
-
-3. **The credit balance logic is sound**: Your system already handles overpayment → credit → next month consumption correctly. The only fix needed is the account mapping.
+## Current State
+- Bank details on the quotation PDF are **hardcoded** in `QuotationPreview.tsx`:
+  - Account No: 1934 1401 7578
+  - Account Name: NCG EXPRESS (PVT) LTD
+  - Bank Name: Sampath Bank, Nugegoda
+- No database table stores quotation-display bank details
+- Past quotations already generated as PDFs are safe — but the live preview of old quotations would also show the new bank if we just change the hardcode
 
 ## What Needs to Happen
 
-### 1. Fix the account mapping via SQL migration
-Update `school_bus_finance_settings` to point `advance_payments_liability_account_id` to `22303001 CUSTOMER ADVANCES` instead of `22501001 INCOME TAX PAYABLE`:
-- LIVE company (`a0000000-0000-0000-0000-000000000001`): map to `ffe5f2b1-c2ad-4598-874d-153852a55646` (22303001 CUSTOMER ADVANCES)
-- TEST company (`f40b0a9d-ae5b-41b3-9188-535ae94c9020`): find corresponding account and map it
+### 1. Add bank detail columns to `special_hire_quotations` table
+Add three columns to store the bank details **at the time of quotation creation** (point-in-time capture, same principle as fuel price):
+- `payment_bank_name` (text)
+- `payment_account_name` (text)  
+- `payment_account_no` (text)
 
-### 2. Reverse the incorrect JE line (existing data)
-The LKR 700 credit currently sitting in `22501001 INCOME TAX PAYABLE` needs to be moved to `22303001 CUSTOMER ADVANCES`. Create a correcting journal entry or update the existing line.
+This ensures past quotations keep their original bank details and future ones use the new bank.
 
-### 3. Verify the AR receipt amount
-The AR receipt created alongside the payment should record only the invoice amount (LKR 7,300), not the full payment (LKR 8,000). Need to verify this in the code — the advance portion is a liability, not revenue.
+### 2. Add a "Quotation Bank Details" section to Special Hire Finance Settings
+Add three new columns to `special_hire_finance_settings`:
+- `quotation_bank_name`
+- `quotation_account_name`
+- `quotation_account_no`
+
+Set default values:
+- Bank: **Commercial Bank**
+- Branch: **Nugegoda**
+- Account No: **1001077213**
+- Account Name: **NCG EXPRESS (PVT) LTD**
+
+Add a UI section in `SpecialHireFinanceSettings.tsx` to manage these.
+
+### 3. Capture bank details when creating a quotation
+When a new Special Hire quotation is created, read the current bank details from `special_hire_finance_settings` and store them on the quotation record (point-in-time snapshot).
+
+### 4. Update QuotationPreview to use stored bank details
+In `QuotationPreview.tsx`, replace the hardcoded bank info with the quotation's stored `payment_bank_name`, `payment_account_name`, `payment_account_no`. Fall back to old Sampath details for existing quotations that don't have the new fields.
+
+### 5. Backfill existing quotations
+Set all existing quotations' bank fields to the old Sampath Bank details so they display correctly.
 
 ## Files to modify
-- **SQL migration** — Update `school_bus_finance_settings.advance_payments_liability_account_id` to correct account, create correcting JE for existing wrong postings
-- No code changes needed — the payment recording logic in `useSchoolBusFinance.ts` is already correct, it just used the wrong account because of the settings mapping
+- **SQL migration** — Add columns to `special_hire_quotations` and `special_hire_finance_settings`, backfill existing data, set new defaults
+- **`src/components/special-hire/SpecialHireFinanceSettings.tsx`** — Add "Quotation Bank Details" section with 3 text fields
+- **`src/components/special-hire/QuotationPreview.tsx`** — Read bank details from quotation props instead of hardcode, with fallback
+- **`src/components/special-hire/SpecialHireForm.tsx`** (or wherever quotation creation happens) — Fetch current bank settings and include in quotation data
 
 ## Result
-- Student overpayments correctly post to `22303001 CUSTOMER ADVANCES` (liability)
-- Next month when credit is consumed: DR Customer Advances / CR Trade Receivable
-- JE totals remain balanced and correct
-- AR invoice amounts remain correct (fixed monthly amount only)
+- All **existing** quotations show: Sampath Bank, 1934 1401 7578 (unchanged)
+- All **future** quotations show: Commercial Bank Nugegoda, 1001077213
+- Bank details are configurable from Settings — no code change needed for future bank changes
+- Point-in-time capture ensures each quotation permanently records its bank details at creation
 
