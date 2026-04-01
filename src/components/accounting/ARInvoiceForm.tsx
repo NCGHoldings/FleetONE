@@ -468,6 +468,15 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                             </SelectContent>
                           </Select>
                         </td>
+                        <td className="px-3 py-2">
+                          <SearchableAccountSelector
+                            value={line.account_id || ""}
+                            onValueChange={(val) => updateLine(line.id, "account_id", val)}
+                            placeholder="Auto from category"
+                            accountTypes={["revenue", "income"]}
+                            className="h-9 text-sm"
+                          />
+                        </td>
                         <td className="px-3 py-2 text-right font-medium">
                           <CurrencyDisplay amount={line.line_total} />
                         </td>
