@@ -394,13 +394,13 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                 <table className="w-full min-w-[850px]">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 170 }}>Item Category</th>
-                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ minWidth: 180 }}>Description</th>
-                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 70 }}>Qty</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 110 }}>Unit Price</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 150 }}>Item Category</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
+                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 80 }}>Qty</th>
+                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 120 }}>Unit Price</th>
                       <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 110 }}>Tax Code</th>
-                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 160 }}>Revenue Account</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 110 }}>Line Total</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 180 }}>Revenue Account</th>
+                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 120 }}>Line Total</th>
                       <th className="px-3 py-2" style={{ width: 40 }}></th>
                     </tr>
                   </thead>
