@@ -203,6 +203,17 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
     }
   };
 
+  const handleCategoryChange = (lineId: string, categoryId: string) => {
+    if (!categoryId || categoryId === "_none") {
+      setLines(lines.map(l => l.id === lineId ? { ...l, item_category_id: undefined, account_id: undefined } : l));
+      return;
+    }
+    const cat = itemCategories?.find(c => c.id === categoryId);
+    if (cat) {
+      setLines(lines.map(l => l.id === lineId ? { ...l, item_category_id: categoryId, account_id: cat.sales_account_id || undefined } : l));
+    }
+  };
+
   const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.unit_price, 0);
   const totalTax = lines.reduce((sum, line) => sum + (line.quantity * line.unit_price * line.tax_rate) / 100, 0);
   const grandTotal = subtotal + totalTax;
