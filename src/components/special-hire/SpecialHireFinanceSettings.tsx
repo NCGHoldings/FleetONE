@@ -463,6 +463,48 @@ export function SpecialHireFinanceSettings() {
                 Preview: {settings.advance_receipt_prefix}-202601-00001
               </p>
             </div>
+
+            <Separator />
+
+            <h3 className="font-semibold flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Quotation Bank Details (Printed on PDF)
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              These bank details will be captured on each new quotation at creation time. Changing them here only affects future quotations.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Bank Name &amp; Branch</Label>
+                <Input
+                  value={settings.quotation_bank_name}
+                  onChange={(e) =>
+                    setSettings({ ...settings, quotation_bank_name: e.target.value })
+                  }
+                  placeholder="Commercial Bank - Nugegoda"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Account Name</Label>
+                <Input
+                  value={settings.quotation_account_name}
+                  onChange={(e) =>
+                    setSettings({ ...settings, quotation_account_name: e.target.value })
+                  }
+                  placeholder="NCG EXPRESS (PVT) LTD"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Account Number</Label>
+                <Input
+                  value={settings.quotation_account_no}
+                  onChange={(e) =>
+                    setSettings({ ...settings, quotation_account_no: e.target.value })
+                  }
+                  placeholder="1001077213"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end">
