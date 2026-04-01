@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useVendors } from "@/hooks/useAccountingData";
 import { useRFQs, useRFQLines, useCreateSupplierQuotation } from "@/hooks/useRFQ";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { CurrencyInput } from "@/components/ui/currency-input";
 
 const formSchema = z.object({
   sq_number: z.string().min(1, "SQ number is required"),
