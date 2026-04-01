@@ -426,17 +426,11 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                           </Select>
                         </td>
                         <td className="px-3 py-2">
-                          <Textarea
+                          <Input
                             value={line.description}
                             onChange={(e) => updateLine(line.id, "description", e.target.value)}
                             placeholder="Item description"
-                            className="min-h-[36px] resize-none overflow-hidden text-sm py-2"
-                            rows={1}
-                            onInput={(e) => {
-                              const target = e.target as HTMLTextAreaElement;
-                              target.style.height = 'auto';
-                              target.style.height = target.scrollHeight + 'px';
-                            }}
+                            className="h-9 text-sm"
                           />
                         </td>
                         <td className="px-3 py-2">
