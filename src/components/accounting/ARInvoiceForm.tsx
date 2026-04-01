@@ -8,6 +8,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCustomers, useTaxCodes } from "@/hooks/useAccountingData";
 import { useQuery } from "@tanstack/react-query";
@@ -393,13 +394,13 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                 <table className="w-full min-w-[850px]">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 170 }}>Item Category</th>
-                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ minWidth: 180 }}>Description</th>
-                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 70 }}>Qty</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 110 }}>Unit Price</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 150 }}>Item Category</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
+                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 80 }}>Qty</th>
+                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 120 }}>Unit Price</th>
                       <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 110 }}>Tax Code</th>
-                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 160 }}>Revenue Account</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 110 }}>Line Total</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 180 }}>Revenue Account</th>
+                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 120 }}>Line Total</th>
                       <th className="px-3 py-2" style={{ width: 40 }}></th>
                     </tr>
                   </thead>
@@ -425,17 +426,11 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                           </Select>
                         </td>
                         <td className="px-3 py-2">
-                          <Textarea
+                          <Input
                             value={line.description}
                             onChange={(e) => updateLine(line.id, "description", e.target.value)}
                             placeholder="Item description"
-                            className="min-h-[36px] resize-none overflow-hidden text-sm py-2"
-                            rows={1}
-                            onInput={(e) => {
-                              const target = e.target as HTMLTextAreaElement;
-                              target.style.height = 'auto';
-                              target.style.height = target.scrollHeight + 'px';
-                            }}
+                            className="h-9 text-sm"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -448,13 +443,11 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <Input
-                            type="number"
+                          <CurrencyInput
                             value={line.unit_price}
-                            onChange={(e) => updateLine(line.id, "unit_price", parseFloat(e.target.value) || 0)}
+                            onValueChange={(val) => updateLine(line.id, "unit_price", val)}
+                            placeholder="0"
                             className="h-9 text-right"
-                            min={0}
-                            step="0.01"
                           />
                         </td>
                         <td className="px-3 py-2">
