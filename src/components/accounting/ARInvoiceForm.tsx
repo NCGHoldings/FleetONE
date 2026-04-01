@@ -15,6 +15,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCreateARInvoice, useUpdateARInvoice } from "@/hooks/useAccountingMutations";
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
