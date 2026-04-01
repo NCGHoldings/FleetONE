@@ -443,13 +443,11 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <Input
-                            type="number"
+                          <CurrencyInput
                             value={line.unit_price}
-                            onChange={(e) => updateLine(line.id, "unit_price", parseFloat(e.target.value) || 0)}
+                            onValueChange={(val) => updateLine(line.id, "unit_price", val)}
+                            placeholder="0"
                             className="h-9 text-right"
-                            min={0}
-                            step="0.01"
                           />
                         </td>
                         <td className="px-3 py-2">
