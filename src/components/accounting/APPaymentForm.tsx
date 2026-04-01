@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen, Landmark, FileText, Plus, Trash2 } from "lucide-react";
