@@ -383,15 +383,16 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
               </div>
 
               <div className="border rounded-lg overflow-x-auto">
-                <table className="w-full min-w-[700px]">
+                <table className="w-full min-w-[850px]">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 180 }}>GL Account</th>
-                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ minWidth: 200 }}>Description</th>
-                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 80 }}>Qty</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 120 }}>Unit Price</th>
-                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 120 }}>Tax Code</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 120 }}>Line Total</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 170 }}>Item Category</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ minWidth: 180 }}>Description</th>
+                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 70 }}>Qty</th>
+                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 110 }}>Unit Price</th>
+                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 110 }}>Tax Code</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 160 }}>Revenue Account</th>
+                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 110 }}>Line Total</th>
                       <th className="px-3 py-2" style={{ width: 40 }}></th>
                     </tr>
                   </thead>
@@ -399,13 +400,22 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                     {lines.map((line) => (
                       <tr key={line.id} className="border-t">
                         <td className="px-3 py-2">
-                          <SearchableAccountSelector
-                            value={line.account_id || ""}
-                            onValueChange={(val) => updateLine(line.id, "account_id", val)}
-                            placeholder="Select GL account"
-                            accountTypes={["revenue", "income"]}
-                            className="h-9 text-sm"
-                          />
+                          <Select
+                            value={line.item_category_id || "_none"}
+                            onValueChange={(val) => handleCategoryChange(line.id, val)}
+                          >
+                            <SelectTrigger className="h-9 text-sm">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="_none">— None —</SelectItem>
+                              {itemCategories?.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  {cat.category_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </td>
                         <td className="px-3 py-2">
                           <Textarea
