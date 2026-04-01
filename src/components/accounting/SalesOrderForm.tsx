@@ -12,6 +12,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useCustomers, useItems } from "@/hooks/useAccountingData";
 import { usePaymentTerms, useCreateSalesOrder } from "@/hooks/useSalesOrders";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { CurrencyInput } from "@/components/ui/currency-input";
 
 const formSchema = z.object({
   so_number: z.string().min(1, "SO number is required"),
