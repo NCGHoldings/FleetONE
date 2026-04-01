@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, addDays } from "date-fns";
 import { Plus, Trash2, Check, ChevronsUpDown, Bus, Route } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
