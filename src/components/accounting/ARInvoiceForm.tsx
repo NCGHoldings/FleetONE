@@ -51,9 +51,32 @@ interface ARInvoiceFormProps {
 export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceFormProps) => {
   const { data: customers } = useCustomers();
   const { data: taxCodes } = useTaxCodes();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
   const createInvoice = useCreateARInvoice();
   const updateInvoice = useUpdateARInvoice();
   const generateNumber = useGenerateNumber();
+
+  // Fetch item categories with their sales_account_id for revenue mapping
+  const { data: itemCategories } = useQuery({
+    queryKey: ["item-categories-for-ar", effectiveCompanyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("item_categories")
+        .select("id, category_name, category_code, sales_account_id")
+        .eq("company_id", effectiveCompanyId)
+        .eq("is_active", true)
+        .order("category_name");
+      if (error) throw error;
+      // Deduplicate by category_name — take the first of each
+      const seen = new Map<string, typeof data[0]>();
+      for (const cat of data || []) {
+        if (!seen.has(cat.category_name)) seen.set(cat.category_name, cat);
+      }
+      return Array.from(seen.values());
+    },
+    enabled: !!effectiveCompanyId,
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [busData, setBusData] = useState<{
     bus_id?: string;
