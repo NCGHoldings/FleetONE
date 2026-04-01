@@ -12,6 +12,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useCustomers, useItems } from "@/hooks/useAccountingData";
 import { usePaymentTerms, useCreateSalesOrder } from "@/hooks/useSalesOrders";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { CurrencyInput } from "@/components/ui/currency-input";
 
 const formSchema = z.object({
   so_number: z.string().min(1, "SO number is required"),
@@ -200,7 +201,7 @@ export const SalesOrderForm = ({ onSuccess }: SalesOrderFormProps) => {
                 <TableHead className="w-[200px]">Item</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="w-[80px]">Qty</TableHead>
-                <TableHead className="w-[100px]">Unit Price</TableHead>
+                <TableHead className="w-[150px]">Unit Price</TableHead>
                 <TableHead className="w-[80px]">Disc %</TableHead>
                 <TableHead className="w-[80px]">Tax %</TableHead>
                 <TableHead className="w-[120px] text-right">Total</TableHead>
@@ -257,12 +258,11 @@ export const SalesOrderForm = ({ onSuccess }: SalesOrderFormProps) => {
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
+                      <CurrencyInput
                         value={line.unit_price}
-                        onChange={(e) => updateLine(index, "unit_price", parseFloat(e.target.value) || 0)}
+                        onValueChange={(val) => updateLine(index, "unit_price", val)}
+                        placeholder="0"
+                        compact
                       />
                     </TableCell>
                     <TableCell>
