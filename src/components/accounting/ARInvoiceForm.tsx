@@ -219,6 +219,12 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
   const grandTotal = subtotal + totalTax;
 
   const onSubmit = async (data: InvoiceFormData) => {
+    // Validate: warn if any line is missing a revenue account
+    const linesWithoutAccount = lines.filter(l => !l.account_id && l.unit_price > 0);
+    if (linesWithoutAccount.length > 0) {
+      toast.warning("Some invoice lines are missing a Revenue Account. Select an Item Category for each line to ensure correct GL posting.", { duration: 6000 });
+    }
+
     const lineData = lines.map((line) => ({
       description: line.description,
       quantity: line.quantity,
