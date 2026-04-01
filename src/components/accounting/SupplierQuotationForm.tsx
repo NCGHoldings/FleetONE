@@ -194,7 +194,7 @@ export const SupplierQuotationForm = ({ onSuccess }: SupplierQuotationFormProps)
                 <TableRow>
                   <TableHead>Item</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="w-[120px]">Unit Price</TableHead>
+                  <TableHead className="w-[150px]">Unit Price</TableHead>
                   <TableHead className="w-[100px]">Lead Time (Days)</TableHead>
                   <TableHead className="text-right">Line Total</TableHead>
                 </TableRow>
