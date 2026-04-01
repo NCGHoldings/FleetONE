@@ -8,6 +8,7 @@ interface CurrencyInputProps {
   disabled?: boolean;
   className?: string;
   prefix?: string;
+  compact?: boolean;
 }
 
 /**
