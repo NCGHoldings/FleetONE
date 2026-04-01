@@ -696,16 +696,25 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
               </div>
 
               <div className="border rounded-lg overflow-x-auto">
-                <table className="w-full min-w-[700px]">
+                <table className="w-full min-w-[800px] table-fixed">
+                  <colgroup>
+                    <col style={{ width: 180 }} />
+                    <col />
+                    <col style={{ width: 90 }} />
+                    <col style={{ width: 150 }} />
+                    <col style={{ width: 120 }} />
+                    <col style={{ width: 130 }} />
+                    <col style={{ width: 40 }} />
+                  </colgroup>
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 180 }}>GL Account</th>
-                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ minWidth: 200 }}>Description</th>
-                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 80 }}>Qty</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 120 }}>Unit Price</th>
-                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 120 }}>Tax Code</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 120 }}>Line Total</th>
-                      <th className="px-3 py-2" style={{ width: 40 }}></th>
+                      <th className="px-3 py-2 text-left text-sm font-medium">GL Account</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
+                      <th className="px-3 py-2 text-center text-sm font-medium">Qty</th>
+                      <th className="px-3 py-2 text-right text-sm font-medium">Unit Price</th>
+                      <th className="px-3 py-2 text-center text-sm font-medium">Tax Code</th>
+                      <th className="px-3 py-2 text-right text-sm font-medium">Line Total</th>
+                      <th className="px-3 py-2"></th>
                     </tr>
                   </thead>
                   <tbody>
