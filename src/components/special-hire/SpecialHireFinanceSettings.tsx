@@ -49,6 +49,10 @@ interface SettingsState {
   auto_post_balance_payments: boolean;
   invoice_prefix: string;
   advance_receipt_prefix: string;
+  // Quotation Bank Details
+  quotation_bank_name: string;
+  quotation_account_name: string;
+  quotation_account_no: string;
 }
 
 export function SpecialHireFinanceSettings() {
@@ -72,6 +76,9 @@ export function SpecialHireFinanceSettings() {
     auto_post_balance_payments: false,
     invoice_prefix: "SPH-INV",
     advance_receipt_prefix: "SPH-ADV",
+    quotation_bank_name: "Commercial Bank - Nugegoda",
+    quotation_account_name: "NCG EXPRESS (PVT) LTD",
+    quotation_account_no: "1001077213",
   });
 
   // Load existing settings
@@ -93,6 +100,9 @@ export function SpecialHireFinanceSettings() {
         auto_post_balance_payments: existingSettings.auto_post_balance_payments || false,
         invoice_prefix: existingSettings.invoice_prefix || "SPH-INV",
         advance_receipt_prefix: existingSettings.advance_receipt_prefix || "SPH-ADV",
+        quotation_bank_name: (existingSettings as any).quotation_bank_name || "Commercial Bank - Nugegoda",
+        quotation_account_name: (existingSettings as any).quotation_account_name || "NCG EXPRESS (PVT) LTD",
+        quotation_account_no: (existingSettings as any).quotation_account_no || "1001077213",
       });
     }
   }, [existingSettings]);
@@ -452,6 +462,48 @@ export function SpecialHireFinanceSettings() {
               <p className="text-xs text-muted-foreground">
                 Preview: {settings.advance_receipt_prefix}-202601-00001
               </p>
+            </div>
+
+            <Separator />
+
+            <h3 className="font-semibold flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Quotation Bank Details (Printed on PDF)
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              These bank details will be captured on each new quotation at creation time. Changing them here only affects future quotations.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Bank Name &amp; Branch</Label>
+                <Input
+                  value={settings.quotation_bank_name}
+                  onChange={(e) =>
+                    setSettings({ ...settings, quotation_bank_name: e.target.value })
+                  }
+                  placeholder="Commercial Bank - Nugegoda"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Account Name</Label>
+                <Input
+                  value={settings.quotation_account_name}
+                  onChange={(e) =>
+                    setSettings({ ...settings, quotation_account_name: e.target.value })
+                  }
+                  placeholder="NCG EXPRESS (PVT) LTD"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Account Number</Label>
+                <Input
+                  value={settings.quotation_account_no}
+                  onChange={(e) =>
+                    setSettings({ ...settings, quotation_account_no: e.target.value })
+                  }
+                  placeholder="1001077213"
+                />
+              </div>
             </div>
           </div>
 
