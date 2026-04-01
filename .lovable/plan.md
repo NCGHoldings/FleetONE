@@ -1,32 +1,23 @@
 
 
-# Fix: AR Invoice Line Item Column Layout
+# Revert Description Field to Textarea + Keep Layout Fixes
 
-## Issues (from screenshots)
+## Problem
 
-1. **Description field** uses auto-expanding `Textarea` — when long text is entered, the row stretches vertically and the field takes too much space
-2. **Qty field** (70px) is too narrow to see the value clearly
-3. **Unit Price field** (110px) — value entered but hard to see; needs better width and formatting
+The Description field was changed from `Textarea` to `Input`, but the user preferred the previous Textarea approach and considers the Input change a regression. The Textarea allowed multi-line descriptions which is needed for invoice line items.
 
 ## Changes
 
 ### File: `src/components/accounting/ARInvoiceForm.tsx`
 
-1. **Description column**: Replace `Textarea` with a regular `Input` field. Invoice line descriptions should be single-line (e.g., "Yutong Bus ZK6122H"). If longer notes are needed, there's already a Notes field at the bottom. Remove the auto-expand `onInput` handler.
+1. **Revert Description field** from `Input` back to `Textarea` with auto-expanding behavior:
+   - Replace `<Input>` at lines 429-434 with `<Textarea>` that has `rows={1}`, auto-expands on input, and uses `min-h-9` styling
+   - Add back the `onInput` handler for auto-height adjustment
 
-2. **Adjust column widths** for better balance:
-   - Item Category: 150px (was 170)
-   - Description: flex/auto (was minWidth 180) — takes remaining space
-   - Qty: 80px (was 70)
-   - Unit Price: 120px (was 110)
-   - Tax Code: 110px (unchanged)
-   - Revenue Account: 180px (was 160)
-   - Line Total: 120px (was 110)
-
-3. **Unit Price**: Use `CurrencyInput` component instead of plain `Input type="number"` for thousand-separator formatting, consistent with the rest of the system.
+2. **Keep all other improvements** — column widths (80px Qty, 120px Unit Price, 180px Revenue Account, 120px Line Total), CurrencyInput for Unit Price — these are all correct and stay as-is.
 
 ### Result
-- Description stays single-line, clean row height
-- Qty and Unit Price are clearly visible with proper width
-- Unit Price shows formatted numbers (e.g., "2,000" instead of "2000")
+- Description field works like before — starts compact, expands when text is long
+- All other column widths and formatting remain improved
+- No other files affected
 
