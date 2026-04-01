@@ -1,57 +1,55 @@
 
 
-# Update Special Hire Quotation Bank Account (Future Only)
+# Fix: Special Hire Finance Settings Missing for LIVE Company
 
-## Current State
-- Bank details on the quotation PDF are **hardcoded** in `QuotationPreview.tsx`:
-  - Account No: 1934 1401 7578
-  - Account Name: NCG EXPRESS (PVT) LTD
-  - Bank Name: Sampath Bank, Nugegoda
-- No database table stores quotation-display bank details
-- Past quotations already generated as PDFs are safe — but the live preview of old quotations would also show the new bank if we just change the hardcode
+## Root Cause
+
+The `special_hire_finance_settings` table only has ONE row — for the **TEST** company (`f40b0a9d...`). The **LIVE** company (`a0000000...`) has **no settings row at all**. When you browse Special Hire on LIVE, `getEffectiveCompanyId()` returns `a0000000...`, the query finds nothing, and the system shows "Finance settings not configured."
+
+This is NOT a network issue — it's a missing database record.
+
+The second error in the console (`Could not find a relationship between 'special_hire_ings' and 'chart_of_accounts'`) is a PostgREST schema cache issue from the new bank detail columns added in the last migration. This resolves by reloading the schema cache.
 
 ## What Needs to Happen
 
-### 1. Add bank detail columns to `special_hire_quotations` table
-Add three columns to store the bank details **at the time of quotation creation** (point-in-time capture, same principle as fuel price):
-- `payment_bank_name` (text)
-- `payment_account_name` (text)  
-- `payment_account_no` (text)
+### 1. SQL Migration — Insert LIVE company finance settings
 
-This ensures past quotations keep their original bank details and future ones use the new bank.
+Create a `special_hire_finance_settings` row for company `a0000000-0000-0000-0000-000000000001` with the correct LIVE COA account IDs:
 
-### 2. Add a "Quotation Bank Details" section to Special Hire Finance Settings
-Add three new columns to `special_hire_finance_settings`:
-- `quotation_bank_name`
-- `quotation_account_name`
-- `quotation_account_no`
+| Setting | Account Code | Account Name | LIVE ID |
+|---------|-------------|--------------|---------|
+| Revenue Internal | 41103002 | TRANSPORT INCOME - SPECIAL HIRES INTERNAL | `51f1c30d-1bb8-4056-b423-82ced47ba3b0` |
+| Revenue External | 41103003 | TRANSPORT INCOME - SPECIAL HIRES EXTERNAL | `d28e31b7-52b9-45ad-85aa-e75e7661bad9` |
+| Trade Receivable | 12201001 | TRADE RECEIVABLE-EXTERNAL | `a1678110-362a-4e45-8014-350e49620b8f` |
+| Customer Advance | 22303001 | CUSTOMER ADVANCES | `ffe5f2b1-c2ad-4598-874d-153852a55646` |
+| Default Bank | 13001004 | COMMERCIAL BANK C/A - 1000516089 | `829019e2-e498-4c6e-a616-2423f047a535` |
+| VAT Output | 22302001 | VAT PAYABLE | `7f4b14be-19ba-453d-ae83-c93f394f60c9` |
+| WHT Payable | 22201007 | WHT PAYABLE | `6fdfcd2d-714e-49cc-9c23-35308247bc79` |
+| Commission Expense | 61301010 | SALES COMMISSION | `54f07249-a254-4d12-8d1d-7f68c6a76230` |
+| Bank details | Commercial Bank - Nugegoda, A/C 1001077213, NCG EXPRESS (PVT) LTD |
 
-Set default values:
-- Bank: **Commercial Bank**
-- Branch: **Nugegoda**
-- Account No: **1001077213**
-- Account Name: **NCG EXPRESS (PVT) LTD**
+Auto-post flags all enabled. Prefixes: `SPH-INV`, `SPH-ADV`.
 
-Add a UI section in `SpecialHireFinanceSettings.tsx` to manage these.
+### 2. Add new SHS bank account to LIVE COA
 
-### 3. Capture bank details when creating a quotation
-When a new Special Hire quotation is created, read the current bank details from `special_hire_finance_settings` and store them on the quotation record (point-in-time snapshot).
+The new Commercial Bank Nugegoda account (`1001077213`) needs a COA entry. Add:
+- Code: `13001011`
+- Name: `COMMERCIAL BANK C/A - 1001077213 (SHS)`
+- Type: Asset
+- Under the existing bank section
 
-### 4. Update QuotationPreview to use stored bank details
-In `QuotationPreview.tsx`, replace the hardcoded bank info with the quotation's stored `payment_bank_name`, `payment_account_name`, `payment_account_no`. Fall back to old Sampath details for existing quotations that don't have the new fields.
+Then update the LIVE finance settings `default_bank_account_id` to point to this new account.
 
-### 5. Backfill existing quotations
-Set all existing quotations' bank fields to the old Sampath Bank details so they display correctly.
+### 3. Notify PostgREST to reload schema cache
+
+Add `notify pgrst, 'reload schema'` at the end of the migration to clear the foreign key relationship cache error.
 
 ## Files to modify
-- **SQL migration** — Add columns to `special_hire_quotations` and `special_hire_finance_settings`, backfill existing data, set new defaults
-- **`src/components/special-hire/SpecialHireFinanceSettings.tsx`** — Add "Quotation Bank Details" section with 3 text fields
-- **`src/components/special-hire/QuotationPreview.tsx`** — Read bank details from quotation props instead of hardcode, with fallback
-- **`src/components/special-hire/SpecialHireForm.tsx`** (or wherever quotation creation happens) — Fetch current bank settings and include in quotation data
+- **SQL migration** — Insert LIVE settings row, add new bank COA entry, reload schema cache
 
 ## Result
-- All **existing** quotations show: Sampath Bank, 1934 1401 7578 (unchanged)
-- All **future** quotations show: Commercial Bank Nugegoda, 1001077213
-- Bank details are configurable from Settings — no code change needed for future bank changes
-- Point-in-time capture ensures each quotation permanently records its bank details at creation
+- Special Hire finance on LIVE works immediately — no more "not configured" message
+- All GL postings use correct LIVE COA accounts
+- New SHS bank account (Commercial Bank 1001077213) is properly tracked in COA
+- Past quotations unaffected (point-in-time bank snapshot already in place)
 
