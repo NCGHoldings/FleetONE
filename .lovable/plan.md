@@ -1,49 +1,32 @@
 
 
-# Fix: COA and Item Categories Must Use Parent Company (Consolidated Architecture)
+# Fix: AR Invoice Line Item Column Layout
 
-## Problem
+## Issues (from screenshots)
 
-When you select a test sub-company (e.g., "Test School Bus"), `getEffectiveCompanyId()` returns the sub-company ID directly instead of the parent "NCG Test Environment" ID. This means:
+1. **Description field** uses auto-expanding `Textarea` — when long text is entered, the row stretches vertically and the field takes too much space
+2. **Qty field** (70px) is too narrow to see the value clearly
+3. **Unit Price field** (110px) — value entered but hard to see; needs better width and formatting
 
-- **COA dropdown** only finds 7 stray accounts under Test School Bus instead of the full 224 accounts under NCG Test Environment
-- **Item categories** for test sub-companies point to COA accounts under the TEST parent, but queries filter by the sub-company ID — causing mismatches
-- Same issue would occur for any test sub-company (Test Yutong, Test Sinotruck, etc.)
+## Changes
 
-The LIVE side works correctly because `isSubCompanyOfNCGHolding()` consolidates live sub-companies to NCG Holding. But test sub-companies are NOT consolidated because the function only checks `parent_company_id === NCG_HOLDING_ID`.
+### File: `src/components/accounting/ARInvoiceForm.tsx`
 
-## Fix
+1. **Description column**: Replace `Textarea` with a regular `Input` field. Invoice line descriptions should be single-line (e.g., "Yutong Bus ZK6122H"). If longer notes are needed, there's already a Notes field at the bottom. Remove the auto-expand `onInput` handler.
 
-### 1. Update `getEffectiveCompanyId()` in CompanyContext.tsx
+2. **Adjust column widths** for better balance:
+   - Item Category: 150px (was 170)
+   - Description: flex/auto (was minWidth 180) — takes remaining space
+   - Qty: 80px (was 70)
+   - Unit Price: 120px (was 110)
+   - Tax Code: 110px (unchanged)
+   - Revenue Account: 180px (was 160)
+   - Line Total: 120px (was 110)
 
-Add a check: if the selected company's parent is `NCG_TEST_ID`, consolidate to `NCG_TEST_ID` — same pattern as NCG Holding consolidation.
+3. **Unit Price**: Use `CurrencyInput` component instead of plain `Input type="number"` for thousand-separator formatting, consistent with the rest of the system.
 
-```text
-getEffectiveCompanyId():
-  if parent === NCG_HOLDING_ID → return NCG_HOLDING_ID
-  if parent === NCG_TEST_ID   → return NCG_TEST_ID    ← NEW
-  else → return selectedCompanyId
-```
-
-Also add a helper `isSubCompanyOfNCGTest()` and update `getBusinessUnitCode()` to work for test sub-companies too.
-
-### 2. Move item categories from test sub-company IDs to NCG Test Environment parent
-
-Currently 8 categories exist per test sub-company (6 sub-companies × 8 = 48 rows). These should all use `company_id = f40b0a9d...` (NCG Test Environment) instead, since the COA is consolidated there. This is a database update via migration.
-
-### 3. Clean up stray COA entries under test sub-companies
-
-The 7 accounts under Test School Bus, Test Yutong, etc. are duplicates. They should be removed since all COA lives under the parent. This is also a migration cleanup.
-
-## Files to modify
-
-1. **`src/contexts/CompanyContext.tsx`** — Add `isSubCompanyOfNCGTest()`, update `getEffectiveCompanyId()` and `getBusinessUnitCode()` to handle test hierarchy
-2. **New migration** — Move item_categories to parent test company ID, delete stray COA entries under test sub-companies
-
-## Result
-
-- Selecting "Test School Bus" → COA shows all 224 accounts from NCG Test Environment
-- Item categories resolve correctly to the shared test COA
-- Revenue Account dropdown shows specific accounts (41101001 SALES - YUTONG, 41103001 TRANSPORT INCOME - SCHOOL BUSES, etc.) instead of just "4100 - Sales Revenue"
-- Same consolidated architecture for both LIVE and TEST hierarchies
+### Result
+- Description stays single-line, clean row height
+- Qty and Unit Price are clearly visible with proper width
+- Unit Price shows formatted numbers (e.g., "2,000" instead of "2000")
 
