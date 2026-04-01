@@ -201,7 +201,7 @@ export const PurchaseOrderForm = ({ open, onOpenChange }: PurchaseOrderFormProps
                       <th className="text-left p-2">Item</th>
                       <th className="text-left p-2">Description</th>
                       <th className="text-right p-2 w-24">Qty</th>
-                      <th className="text-right p-2 w-32">Unit Price</th>
+                      <th className="text-right p-2 w-40">Unit Price</th>
                       <th className="text-right p-2 w-32">Total</th>
                       <th className="p-2 w-12"></th>
                     </tr>
