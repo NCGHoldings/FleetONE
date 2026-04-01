@@ -201,7 +201,7 @@ export const SalesOrderForm = ({ onSuccess }: SalesOrderFormProps) => {
                 <TableHead className="w-[200px]">Item</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="w-[80px]">Qty</TableHead>
-                <TableHead className="w-[100px]">Unit Price</TableHead>
+                <TableHead className="w-[150px]">Unit Price</TableHead>
                 <TableHead className="w-[80px]">Disc %</TableHead>
                 <TableHead className="w-[80px]">Tax %</TableHead>
                 <TableHead className="w-[120px] text-right">Total</TableHead>
