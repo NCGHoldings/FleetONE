@@ -12,6 +12,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useVendors, useItems } from "@/hooks/useAccountingData";
 import { useCreatePurchaseOrder } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { CurrencyInput } from "@/components/ui/currency-input";
 
 const poSchema = z.object({
   po_number: z.string().min(1, "PO number is required"),
