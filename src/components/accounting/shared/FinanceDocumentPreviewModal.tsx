@@ -323,16 +323,16 @@ export const FinanceDocumentPreviewModal = ({
     // Use selected template if available, otherwise use fallback
     if (selectedTemplate) {
       const enrichedDocData = {
-        ...documentData,
-        verified_by: signatures.verified_by.name || documentData?.verified_by || '',
-        verified_by_signature: signatures.verified_by.dataUrl || documentData?.verified_by_signature || '',
-        approved_by: signatures.approved_by.name || documentData?.approved_by || '',
-        approved_by_signature: signatures.approved_by.dataUrl || documentData?.approved_by_signature || '',
-        received_by: signatures.received_by.name || documentData?.received_by || '',
-        received_by_signature: signatures.received_by.dataUrl || documentData?.received_by_signature || '',
-        finance_controller: signatures.finance_controller.name || documentData?.finance_controller || '',
-        finance_controller_signature: signatures.finance_controller.dataUrl || documentData?.finance_controller_signature || '',
-        prepared_by: signatures.verified_by.name || documentData?.prepared_by || '', // Alias
+        ...enrichedDocumentData,
+        verified_by: signatures.verified_by.name || enrichedDocumentData?.verified_by || '',
+        verified_by_signature: signatures.verified_by.dataUrl || enrichedDocumentData?.verified_by_signature || '',
+        approved_by: signatures.approved_by.name || enrichedDocumentData?.approved_by || '',
+        approved_by_signature: signatures.approved_by.dataUrl || enrichedDocumentData?.approved_by_signature || '',
+        received_by: signatures.received_by.name || enrichedDocumentData?.received_by || '',
+        received_by_signature: signatures.received_by.dataUrl || enrichedDocumentData?.received_by_signature || '',
+        finance_controller: signatures.finance_controller.name || enrichedDocumentData?.finance_controller || '',
+        finance_controller_signature: signatures.finance_controller.dataUrl || enrichedDocumentData?.finance_controller_signature || '',
+        prepared_by: signatures.verified_by.name || enrichedDocumentData?.prepared_by || '', // Alias
       };
 
     const placeholders = mapDocumentToPlaceholders(
