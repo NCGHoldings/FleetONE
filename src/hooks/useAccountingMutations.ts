@@ -1895,19 +1895,31 @@ export const useApproveAPPayment = () => {
       const { error } = await supabase.from("ap_payments").update({ approval_status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
 
-      // ========== AUTO GL POSTING: DR Trade Payable, CR Bank ==========
+      // ========== DOUBLE-POSTING GUARD ==========
+      // GL is already posted at creation time (useCreateAPPayment).
+      // Only post here if the payment somehow has no journal_entry_id (legacy fallback).
+      const { data: existingPayment } = await supabase
+        .from("ap_payments")
+        .select("journal_entry_id")
+        .eq("id", id)
+        .single();
+
+      if (existingPayment?.journal_entry_id) {
+        console.log("[AP Approve] GL already posted, skipping duplicate posting for payment", id);
+        return;
+      }
+
+      // ========== FALLBACK GL POSTING for old payments without JE ==========
       try {
         const effectiveCompanyId = getEffectiveCompanyId();
         const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId || '') ? getBusinessUnitCode() : undefined;
 
-        // Fetch payment details
         const { data: payment } = await supabase
           .from("ap_payments")
           .select("payment_number, payment_date, amount, vendors(vendor_name)")
           .eq("id", id)
           .single();
 
-        // Fetch GL settings
         const { data: glSettings } = await (supabase as any)
           .from("gl_settings")
           .select("trade_payable_account_id, bank_account_id")
@@ -1945,7 +1957,6 @@ export const useApproveAPPayment = () => {
           });
 
           if (glResult.success && glResult.journalEntryId) {
-            // Link journal entry back to payment
             await supabase.from("ap_payments")
               .update({ journal_entry_id: glResult.journalEntryId })
               .eq("id", id);
