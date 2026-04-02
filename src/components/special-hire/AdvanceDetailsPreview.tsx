@@ -42,7 +42,7 @@ export default function AdvanceDetailsPreview({ data, onDownload }: AdvanceDetai
     }
   };
 
-  const htmlContent = generateAdvanceDetailsHTML(data, '/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png');
+  const htmlContent = generateAdvanceDetailsHTML(data, '/lovable-uploads/ncg-holdings-logo.png');
 
   return (
     <div className="space-y-4">

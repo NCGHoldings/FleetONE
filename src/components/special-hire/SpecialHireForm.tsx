@@ -1752,7 +1752,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           // Fallback to new Commercial Bank details
           bankDetails = {
             payment_bank_name: 'Commercial Bank - Nugegoda',
-            payment_account_name: 'NCG EXPRESS (PVT) LTD',
+            payment_account_name: 'NCG Holding (Pvt) Ltd',
             payment_account_no: '1001077213',
           };
         }

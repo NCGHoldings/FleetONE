@@ -1050,8 +1050,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         <div data-pdf-section="header-p2" className="flex justify-between items-start mb-4">
           <div className="w-24">
             <img
-              src="/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png"
-              alt="NCG Express Logo"
+               src="/lovable-uploads/ncg-holdings-logo.png"
+              alt="NCG Holdings Logo"
               className="max-w-full h-auto"
             />
           </div>

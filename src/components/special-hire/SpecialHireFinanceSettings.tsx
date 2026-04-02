@@ -491,7 +491,7 @@ export function SpecialHireFinanceSettings() {
                   onChange={(e) =>
                     setSettings({ ...settings, quotation_account_name: e.target.value })
                   }
-                  placeholder="NCG EXPRESS (PVT) LTD"
+                  placeholder="NCG Holding (Pvt) Ltd"
                 />
               </div>
               <div className="space-y-2">

@@ -144,7 +144,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const fetchCompanyLogo = async () => {
     try {
       // Use default logo - company_logo column doesn't exist on profiles
-      setCompanyLogo('/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png');
+      setCompanyLogo('/lovable-uploads/ncg-holdings-logo.png');
     } catch (error) {
       console.error('Error fetching company logo:', error);
     }
