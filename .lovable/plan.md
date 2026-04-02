@@ -1,66 +1,111 @@
 
-## Fix required
-New Special Hire quotations are still saving the old account name because the creation flow is not scoped to the active company’s finance settings, and the database migration/defaults still contain the old value `NCG EXPRESS (PVT) LTD`.
+## Fix: Special Hire document previews are blocked
 
-## Root cause found
-1. `src/components/special-hire/SpecialHireForm.tsx`
-   - On create, it fetches `special_hire_finance_settings` with:
-   - `select(...).limit(1).maybeSingle()`
-   - There is no `.eq("company_id", effectiveCompanyId)`, so it can pick the wrong row.
-2. `src/components/special-hire/SpecialHireQuotationRepeatModal.tsx`
-   - Same issue: it fetches finance settings without filtering by company.
-3. `supabase/migrations/20260401044341_01577e87-92f6-45e2-91ed-ff4bf869a5db.sql`
-   - Still sets `quotation_account_name` default/update to `NCG EXPRESS (PVT) LTD`.
-4. `supabase/migrations/20260401051912_a1414dba-8029-4dbd-9c77-c6f821f60a03.sql`
-   - Seed insert also still contains `NCG EXPRESS (PVT) LTD`.
+### What is happening
+The Sales Receipt, Invoice, and other Special Hire documents are generated correctly, but the preview modal cannot display them because the app blocks the PDF iframe.
 
-## What to change
+Your screenshot matches this exact issue:
+- document modal opens
+- PDF toolbar appears
+- main document area says: "This content is blocked"
 
-### 1. Fix quotation creation to use the correct company settings
-File: `src/components/special-hire/SpecialHireForm.tsx`
-- Import/use company context
-- Get `effectiveCompanyId` via the existing company helper
-- Change the finance settings query to:
-  - filter by `.eq("company_id", effectiveCompanyId)`
-  - then read `quotation_bank_name`, `quotation_account_name`, `quotation_account_no`
-- Keep current fallback values:
-  - Bank: `Commercial Bank - Nugegoda`
-  - Account Name: `NCG Holding (Pvt) Ltd`
-  - Account No: `1001077213`
+### Root cause
+The Special Hire viewer renders PDFs like this:
 
-### 2. Fix repeat quotation flow too
-File: `src/components/special-hire/SpecialHireQuotationRepeatModal.tsx`
-- Apply the same company-scoped finance settings lookup
-- This ensures repeated quotations also save `NCG Holding (Pvt) Ltd`
+```text
+DocumentViewer
+  -> converts base64/storage PDF to blob URL
+  -> passes blob URL into EnhancedPDFViewer
+  -> EnhancedPDFViewer shows it inside <iframe src={pdfUrl}>
+```
 
-### 3. Correct DB defaults/seeds so future rows cannot fall back to old branding
-Files:
-- `supabase/migrations/20260401044341_01577e87-92f6-45e2-91ed-ff4bf869a5db.sql`
-- `supabase/migrations/20260401051912_a1414dba-8029-4dbd-9c77-c6f821f60a03.sql`
+But `index.html` currently has this CSP:
 
-Update old values:
-- `NCG EXPRESS (PVT) LTD` → `NCG Holding (Pvt) Ltd`
+```text
+frame-src 'self' https://www.google.com https://maps.google.com;
+```
 
-This prevents future environments / reset databases from reintroducing the old account name.
+That policy does not allow:
+- `blob:`
+- `data:`
+
+So Chrome blocks the Special Hire PDF preview iframe.
+
+## Files involved
+- `index.html`
+- `src/components/special-hire/DocumentViewer.tsx`
+- `src/components/special-hire/EnhancedPDFViewer.tsx`
+
+## Implementation plan
+
+### 1. Fix CSP so PDF blob previews are allowed
+Update `index.html` Content Security Policy to allow Special Hire document previews rendered from blob URLs.
+
+Change `frame-src` to include:
+- `'self'`
+- `blob:`
+- optionally `data:` for compatibility if any future PDF/image viewer uses data URLs
+- keep Google Maps sources already used in the app
+
+Target result:
+
+```text
+frame-src 'self' blob: data: https://www.google.com https://maps.google.com;
+```
+
+### 2. Keep the current Special Hire document flow unchanged
+Do not change the document generation logic unless needed:
+- `document_storage` remains the source
+- `storage_path` fallback remains
+- `DocumentViewer` still decodes PDF safely
+- `EnhancedPDFViewer` can continue using the iframe-based viewer
+
+This keeps the fix low-risk and avoids damaging quotation / receipt / invoice generation.
+
+### 3. Add a small safety improvement in the viewer
+In `EnhancedPDFViewer.tsx`, add a lightweight fallback state so if iframe loading fails again in future, the user sees a clearer message and can still download the file.
+
+Example behavior:
+- if preview cannot load, show:
+  - “Preview blocked or failed to load”
+  - “Download PDF” button
+- no change to normal successful flow
+
+### 4. Cross-check all Special Hire document entry points
+After the CSP fix, verify the same viewer works from all current Special Hire entry paths:
+- Confirmed Trips table
+- Finance Approval modal
+- any modal opening `DocumentViewer`
+
+Because all of them use the same `DocumentViewer`, one fix should restore:
+- Sales Receipt preview
+- Invoice preview
+- other stored Special Hire PDFs
 
 ## Expected result
-- Newly created quotations will save the bank snapshot with:
-  - Account Name: `NCG Holding (Pvt) Ltd`
-  - Bank Name: `Commercial Bank - Nugegoda`
-  - Account No: `1001077213`
-- Preview will then show the correct value because it already renders from `payment_account_name`
-- Old quotations remain unchanged
+After this fix:
+- Special Hire Sales Receipt preview opens normally
+- Special Hire Invoice preview opens normally
+- PDF area no longer shows “This content is blocked”
+- Download still works
+- No changes to document content, logo, bank details, or approval flow
 
-## Technical note
-The preview component is already correct. The issue is upstream during data capture:
+## Technical details
+The issue is not with:
+- missing document data
+- bad PDF generation
+- bank details
+- quotation save logic
+
+It is a browser security policy issue:
+
 ```text
-Preview reads:
-quotation.payment_account_name
+Current:
+iframe src="blob:..."
 
-Current bug:
-new quotation creation fetches an unscoped finance settings row
-or inherits old DB default/seed value
+Blocked by:
+Content-Security-Policy frame-src missing blob:
 
 Fix:
-scope finance settings by company + update stale migration defaults
+Allow blob: in frame-src
 ```
