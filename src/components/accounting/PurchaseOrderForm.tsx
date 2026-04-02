@@ -12,6 +12,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useVendors, useItems } from "@/hooks/useAccountingData";
 import { useCreatePurchaseOrder } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { CurrencyInput } from "@/components/ui/currency-input";
 
 const poSchema = z.object({
   po_number: z.string().min(1, "PO number is required"),
@@ -200,7 +201,7 @@ export const PurchaseOrderForm = ({ open, onOpenChange }: PurchaseOrderFormProps
                       <th className="text-left p-2">Item</th>
                       <th className="text-left p-2">Description</th>
                       <th className="text-right p-2 w-24">Qty</th>
-                      <th className="text-right p-2 w-32">Unit Price</th>
+                      <th className="text-right p-2 w-40">Unit Price</th>
                       <th className="text-right p-2 w-32">Total</th>
                       <th className="p-2 w-12"></th>
                     </tr>
@@ -247,12 +248,11 @@ export const PurchaseOrderForm = ({ open, onOpenChange }: PurchaseOrderFormProps
                           />
                         </td>
                         <td className="p-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            className="text-right"
+                          <CurrencyInput
                             value={line.unit_price}
-                            onChange={(e) => updateLine(line.id, "unit_price", parseFloat(e.target.value) || 0)}
+                            onValueChange={(val) => updateLine(line.id, "unit_price", val)}
+                            placeholder="0"
+                            compact
                           />
                         </td>
                         <td className="p-2 text-right font-semibold">

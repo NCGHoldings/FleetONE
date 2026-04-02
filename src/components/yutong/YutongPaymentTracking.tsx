@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -53,6 +54,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   
   // Payment proof upload state
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
@@ -340,9 +342,26 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         }
       }
 
-      // 2. Determine Payment Type & Post to GL
-      const arInvoiceId = orderDetails?.finance_ar_invoice_id;
+      // 2. Re-fetch order to get latest ar_invoice_id (may have been approved after modal opened)
+      const { data: freshOrder, error: freshError } = await supabase
+        .from('yutong_orders')
+        .select('ar_invoice_id, finance_customer_id')
+        .eq('id', selectedOrderId!)
+        .single();
+
+      if (freshError || !freshOrder) {
+        toast.error('Failed to load latest order state. Please try again.');
+        setVerifyingId(null);
+        return;
+      }
+
+      // Use fresh data only - no stale fallback
+      const arInvoiceId = freshOrder.ar_invoice_id;
       const paymentType = arInvoiceId ? 'balance' : 'advance';
+      // Also use fresh customer ID if available
+      if (freshOrder.finance_customer_id) {
+        customerId = freshOrder.finance_customer_id;
+      }
       
       let journalEntryId: string | undefined;
       let arReceiptId: string | undefined;
@@ -495,6 +514,8 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     });
     setSelectedSchedule(null);
     setPaymentProofFile(null);
+    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+    setPaymentProofPreview(null);
   };
 
   // Cash Receipt handlers
@@ -722,6 +743,16 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                       <TableCell>{getStatusBadge(payment.status)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
+                          {payment.payment_slip_url && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => window.open(payment.payment_slip_url, '_blank')}
+                              title="View Payment Proof"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
                           {payment.status === 'pending' && (
                             <Button
                               size="sm"
@@ -799,10 +830,9 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             <div>
               <Label>Payment Amount (LKR) *</Label>
-              <Input
-                type="number"
+               <CurrencyInput
                 value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                onValueChange={(num) => setPaymentForm({ ...paymentForm, amount: num.toString() })}
                 placeholder="Enter amount"
               />
             </div>
@@ -866,7 +896,12 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                 <Input
                   type="file"
                   accept="image/*,.pdf"
-                  onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setPaymentProofFile(file);
+                    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+                    setPaymentProofPreview(file && file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
+                  }}
                   className="flex-1"
                 />
                 {paymentProofFile && (
@@ -876,6 +911,9 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                   </Badge>
                 )}
               </div>
+              {paymentProofPreview && (
+                <img src={paymentProofPreview} alt="Payment proof preview" className="mt-2 max-h-32 rounded border object-contain" />
+              )}
               <p className="text-xs text-muted-foreground mt-1">Upload bank slip, receipt photo, or transfer confirmation</p>
             </div>
             <div>

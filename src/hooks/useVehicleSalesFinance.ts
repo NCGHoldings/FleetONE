@@ -17,7 +17,7 @@ export const BUSINESS_UNIT_CODES: Record<VehicleModule, string> = {
 };
 
 // NCG Holding ID for consolidated GL
-export const NCG_HOLDING_ID = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020';
+export const NCG_HOLDING_ID = 'a0000000-0000-0000-0000-000000000001';
 
 export interface VehicleFinanceSettings {
   id: string;
@@ -839,9 +839,9 @@ export async function createVehicleARReceipt({
       return null;
     }
 
-    // If there's an invoice, create allocation
+    // If there's an invoice, create allocation and update invoice balance
     if (invoiceId && receipt) {
-      await supabase
+      const { error: allocError } = await supabase
         .from('ar_receipt_allocations')
         .insert({
           receipt_id: receipt.id,
@@ -850,24 +850,41 @@ export async function createVehicleARReceipt({
           company_id: effectiveCompanyId,
         });
 
+      if (allocError) {
+        console.error(`[${module.toUpperCase()} Finance] AR allocation failed:`, allocError);
+        toast.error('AR Receipt created but allocation failed. Contact admin.');
+        return { receiptId: receipt.id, receiptNumber: receipt.receipt_number };
+      }
+
       // Update invoice paid amount
-      const { data: invoice } = await supabase
+      const { data: invoice, error: invFetchError } = await supabase
         .from('ar_invoices')
         .select('paid_amount, total_amount')
         .eq('id', invoiceId)
         .single();
 
-      if (invoice) {
-        const newPaidAmount = (invoice.paid_amount || 0) + amount;
-        const newBalance = invoice.total_amount - newPaidAmount;
-        await supabase
-          .from('ar_invoices')
-          .update({
-            paid_amount: newPaidAmount,
-            balance: newBalance,
-            status: newBalance <= 0 ? 'paid' : newPaidAmount > 0 ? 'partial' : 'unpaid',
-          })
-          .eq('id', invoiceId);
+      if (invFetchError || !invoice) {
+        console.error(`[${module.toUpperCase()} Finance] Could not fetch AR invoice for balance update:`, invFetchError);
+        toast.error('AR allocation created but invoice balance not updated. Contact admin.');
+        return { receiptId: receipt.id, receiptNumber: receipt.receipt_number };
+      }
+
+      const newPaidAmount = (invoice.paid_amount || 0) + amount;
+      const newBalance = invoice.total_amount - newPaidAmount;
+      const { error: invUpdateError } = await supabase
+        .from('ar_invoices')
+        .update({
+          paid_amount: newPaidAmount,
+          balance: newBalance,
+          status: newBalance <= 0 ? 'paid' : newPaidAmount > 0 ? 'partial' : 'unpaid',
+        })
+        .eq('id', invoiceId);
+
+      if (invUpdateError) {
+        console.error(`[${module.toUpperCase()} Finance] AR invoice balance update failed:`, invUpdateError);
+        toast.error('AR Receipt allocated but invoice balance update failed.');
+      } else {
+        console.log(`[${module.toUpperCase()} Finance] AR Invoice updated: paid=${newPaidAmount}, balance=${newBalance}`);
       }
     }
 

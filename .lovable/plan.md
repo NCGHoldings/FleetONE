@@ -1,77 +1,55 @@
 
 
-# Fix Special Hire: AR Invoice Amount, Duplicate Documents & Clean View
+# Fix: Special Hire Finance Settings Missing for LIVE Company
 
-## Problems Found
+## Root Cause
 
-### 1. Duplicate Final Invoice Documents
-- `checkExistingInvoice()` uses `.maybeSingle()` which **errors silently** when multiple balance invoices exist (e.g., from previous auto-save bugs)
-- Result: `documentId` stays null, auto-save creates ANOTHER new document every time the modal opens
-- DB shows 3 balance invoices + 1 sales receipt for QUO-2025-0035
+The `special_hire_finance_settings` table only has ONE row — for the **TEST** company (`f40b0a9d...`). The **LIVE** company (`a0000000...`) has **no settings row at all**. When you browse Special Hire on LIVE, `getEffectiveCompanyId()` returns `a0000000...`, the query finds nothing, and the system shows "Finance settings not configured."
 
-### 2. AR Invoice paid_amount Wrong (121,408 instead of 115,704)
-- AR Invoice created during balance payment approval with `paid_amount: 55,000` (advance)
-- Then `updateSPHARInvoiceOnPayment` adds balance `60,704` → `paid_amount: 115,704` (correct at this point)
-- But then `handleEmailToCustomer` in `GenerateBalanceInvoiceModal` calls `updateSPHARInvoiceOnInvoiceSent` which recalculates but the advance apply logic also runs, potentially double-counting
-- The `createSPHARInvoice` during balance approval already sets `paid_amount: advanceAmount`, then `updateSPHARInvoiceOnPayment` ADDS the balance payment on top -- but the initial `advanceAmount` passed is the balance payment amount, not the advance. Need to verify the flow in `useFinanceApproval.ts` line 190-196.
+This is NOT a network issue — it's a missing database record.
 
-### 3. View Documents Shows All Drafts
-- Should only show the latest approved/active sales receipt and latest final invoice
-- Currently shows every draft ever created
+The second error in the console (`Could not find a relationship between 'special_hire_ings' and 'chart_of_accounts'`) is a PostgREST schema cache issue from the new bank detail columns added in the last migration. This resolves by reloading the schema cache.
 
-## Fixes
+## What Needs to Happen
 
-### File 1: `GenerateBalanceInvoiceModal.tsx` — Fix duplicate document creation
+### 1. SQL Migration — Insert LIVE company finance settings
 
-**`checkExistingInvoice()`** (line 153-173):
-- Change `.maybeSingle()` to `.order('created_at', { ascending: false }).limit(1)` then take first result
-- This ensures the latest document is found even when duplicates exist
-- Also prevents auto-save from creating new documents when one already exists
+Create a `special_hire_finance_settings` row for company `a0000000-0000-0000-0000-000000000001` with the correct LIVE COA account IDs:
 
-### File 2: `GenerateBalanceInvoiceModal.tsx` — Fix AR paid_amount double-counting
+| Setting | Account Code | Account Name | LIVE ID |
+|---------|-------------|--------------|---------|
+| Revenue Internal | 41103002 | TRANSPORT INCOME - SPECIAL HIRES INTERNAL | `51f1c30d-1bb8-4056-b423-82ced47ba3b0` |
+| Revenue External | 41103003 | TRANSPORT INCOME - SPECIAL HIRES EXTERNAL | `d28e31b7-52b9-45ad-85aa-e75e7661bad9` |
+| Trade Receivable | 12201001 | TRADE RECEIVABLE-EXTERNAL | `a1678110-362a-4e45-8014-350e49620b8f` |
+| Customer Advance | 22303001 | CUSTOMER ADVANCES | `ffe5f2b1-c2ad-4598-874d-153852a55646` |
+| Default Bank | 13001004 | COMMERCIAL BANK C/A - 1000516089 | `829019e2-e498-4c6e-a616-2423f047a535` |
+| VAT Output | 22302001 | VAT PAYABLE | `7f4b14be-19ba-453d-ae83-c93f394f60c9` |
+| WHT Payable | 22201007 | WHT PAYABLE | `6fdfcd2d-714e-49cc-9c23-35308247bc79` |
+| Commission Expense | 61301010 | SALES COMMISSION | `54f07249-a254-4d12-8d1d-7f68c6a76230` |
+| Bank details | Commercial Bank - Nugegoda, A/C 1001077213, NCG EXPRESS (PVT) LTD |
 
-**`handleEmailToCustomer()` GL section** (line 416-558):
-- The advance apply logic on line 529 uses `freshTotalPaid` as advance amount -- this is WRONG because `freshTotalPaid` is the TOTAL paid (advance + balance), not just the advance
-- Fix: query only advance payments from `special_hire_payments` where `payment_type = 'advance'` and `status = 'approved'` to get the correct advance-only amount
-- Also add a guard: before calling `updateSPHARInvoiceOnInvoiceSent`, check if the AR invoice total_amount already matches to avoid unnecessary updates
+Auto-post flags all enabled. Prefixes: `SPH-INV`, `SPH-ADV`.
 
-### File 3: `ConfirmedTripsTable.tsx` — Clean up View Documents
+### 2. Add new SHS bank account to LIVE COA
 
-**Documents modal** — filter documents to show only:
-- The **latest** sales receipt (approved > draft priority)
-- The **latest** final invoice (approved > draft priority)
-- Hide superseded drafts
+The new Commercial Bank Nugegoda account (`1001077213`) needs a COA entry. Add:
+- Code: `13001011`
+- Name: `COMMERCIAL BANK C/A - 1001077213 (SHS)`
+- Type: Asset
+- Under the existing bank section
 
-### File 4: `useFinanceApproval.ts` — Fix AR Invoice creation during balance approval
+Then update the LIVE finance settings `default_bank_account_id` to point to this new account.
 
-**Line 190-196**: When creating the AR Invoice during balance payment approval, the `advanceAmount` parameter is set to `paymentData.amount` (the balance payment amount, not the advance). This causes:
-- `createSPHARInvoice` sets `paid_amount: 60,704` (balance) instead of advance
-- Then `updateSPHARInvoiceOnPayment` adds another `60,704`
-- Result: `paid_amount = 121,408` instead of `115,704`
+### 3. Notify PostgREST to reload schema cache
 
-Fix: Query the actual advance payments to pass as `advanceAmount`:
-```
-const { data: advPmts } = await supabase
-  .from('special_hire_payments')
-  .select('amount')
-  .eq('quotation_id', paymentData.quotation.id)
-  .eq('payment_type', 'advance')
-  .eq('status', 'approved');
-const actualAdvance = (advPmts || []).reduce((s, p) => s + (p.amount || 0), 0);
-```
-Then pass `advanceAmount: actualAdvance` to `createSPHARInvoice`.
+Add `notify pgrst, 'reload schema'` at the end of the migration to clear the foreign key relationship cache error.
 
-## Data Fix
+## Files to modify
+- **SQL migration** — Insert LIVE settings row, add new bank COA entry, reload schema cache
 
-For QUO-2025-0035, after code fix:
-- Delete the 2 duplicate draft documents from `document_storage`
-- Correct the AR invoice `paid_amount` to 115,704 and `balance` to 0
-
-## Summary
-
-- Fix `.maybeSingle()` crash causing infinite document duplication
-- Fix AR `paid_amount` double-counting by passing correct advance amount (not balance payment) to `createSPHARInvoice`
-- Fix advance apply logic using actual advance-only total instead of `freshTotalPaid`
-- Filter View Documents to show only latest sales receipt + latest final invoice
-- Clean up existing bad data for QUO-2025-0035
+## Result
+- Special Hire finance on LIVE works immediately — no more "not configured" message
+- All GL postings use correct LIVE COA accounts
+- New SHS bank account (Commercial Bank 1001077213) is properly tracked in COA
+- Past quotations unaffected (point-in-time bank snapshot already in place)
 

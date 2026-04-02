@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen, Landmark, FileText, Plus, Trash2 } from "lucide-react";
@@ -753,16 +754,25 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                   </Button>
                 </div>
                 <div className="border rounded-lg overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full table-fixed">
+                    <colgroup>
+                      <col style={{ width: 180 }} />
+                      <col />
+                      <col style={{ width: 90 }} />
+                      <col style={{ width: 150 }} />
+                      <col style={{ width: 80 }} />
+                      <col style={{ width: 130 }} />
+                      <col style={{ width: 40 }} />
+                    </colgroup>
                     <thead className="bg-muted">
                       <tr>
-                        <th className="px-3 py-2 text-left text-sm font-medium w-48">GL Account</th>
+                        <th className="px-3 py-2 text-left text-sm font-medium">GL Account</th>
                         <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
-                        <th className="px-3 py-2 text-right text-sm font-medium w-20">Qty</th>
-                        <th className="px-3 py-2 text-right text-sm font-medium w-28">Unit Price</th>
-                        <th className="px-3 py-2 text-right text-sm font-medium w-20">Tax %</th>
-                        <th className="px-3 py-2 text-right text-sm font-medium w-28">Total</th>
-                        <th className="px-3 py-2 w-10"></th>
+                        <th className="px-3 py-2 text-right text-sm font-medium">Qty</th>
+                        <th className="px-3 py-2 text-right text-sm font-medium">Unit Price</th>
+                        <th className="px-3 py-2 text-right text-sm font-medium">Tax %</th>
+                        <th className="px-3 py-2 text-right text-sm font-medium">Total</th>
+                        <th className="px-3 py-2"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -794,13 +804,11 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                             />
                           </td>
                           <td className="px-2 py-2">
-                            <Input
-                              type="number"
+                            <CurrencyInput
                               value={line.unit_price}
-                              onChange={(e) => updateLine(line.id, "unit_price", parseFloat(e.target.value) || 0)}
-                              className="h-8 text-right"
-                              min={0}
-                              step="0.01"
+                              onValueChange={(val) => updateLine(line.id, "unit_price", val)}
+                              placeholder="0"
+                              compact
                             />
                           </td>
                           <td className="px-2 py-2">

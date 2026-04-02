@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useVendors } from "@/hooks/useAccountingData";
 import { useRFQs, useRFQLines, useCreateSupplierQuotation } from "@/hooks/useRFQ";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { CurrencyInput } from "@/components/ui/currency-input";
 
 const formSchema = z.object({
   sq_number: z.string().min(1, "SQ number is required"),
@@ -193,7 +194,7 @@ export const SupplierQuotationForm = ({ onSuccess }: SupplierQuotationFormProps)
                 <TableRow>
                   <TableHead>Item</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="w-[120px]">Unit Price</TableHead>
+                  <TableHead className="w-[150px]">Unit Price</TableHead>
                   <TableHead className="w-[100px]">Lead Time (Days)</TableHead>
                   <TableHead className="text-right">Line Total</TableHead>
                 </TableRow>
@@ -204,13 +205,11 @@ export const SupplierQuotationForm = ({ onSuccess }: SupplierQuotationFormProps)
                     <TableCell className="font-medium">{line.item_name}</TableCell>
                     <TableCell className="text-right">{line.quantity}</TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
+                      <CurrencyInput
                         value={line.unit_price}
-                        onChange={(e) => updateLine(index, "unit_price", parseFloat(e.target.value) || 0)}
-                        placeholder="0.00"
+                        onValueChange={(val) => updateLine(index, "unit_price", val)}
+                        placeholder="0"
+                        compact
                       />
                     </TableCell>
                     <TableCell>

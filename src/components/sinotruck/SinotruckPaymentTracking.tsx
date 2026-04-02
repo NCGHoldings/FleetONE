@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { DollarSign, CheckCircle, Clock, Plus, RefreshCw, MoreHorizontal, FileText, Landmark, Image } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, Plus, RefreshCw, MoreHorizontal, FileText, Landmark, Image, Eye } from 'lucide-react';
 import {
   fetchVehicleFinanceSettings,
   createVehicleCustomer,
@@ -44,6 +45,7 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
   const [verifyingPayment, setVerifyingPayment] = useState<string | null>(null);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   const [paymentForm, setPaymentForm] = useState({
@@ -240,8 +242,21 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
         }
       }
 
-      // 2. Create AR Invoice if not exists
-      let invoiceId = orderDetails?.ar_invoice_id;
+      // 2. Re-fetch order to get latest ar_invoice_id, then create if not exists
+      const { data: freshOrder, error: freshError } = await supabase
+        .from('sinotruck_orders')
+        .select('ar_invoice_id, finance_customer_id')
+        .eq('id', orderId)
+        .single();
+      if (freshError || !freshOrder) {
+        toast.error('Failed to load latest order state. Please try again.');
+        setVerifyingId(null);
+        return;
+      }
+      let invoiceId = freshOrder.ar_invoice_id;
+      if (freshOrder.finance_customer_id) {
+        customerId = freshOrder.finance_customer_id;
+      }
       if (!invoiceId && customerId) {
         const arResult = await createVehicleARInvoice({
           module: 'sinotruck',
@@ -268,9 +283,7 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
       // 3. Post to GL
       let journalEntryId: string | undefined;
       if (settings.auto_post_on_verify) {
-        const paymentType = payment.payment_schedule_id ? 
-          (schedules.find(s => s.id === payment.payment_schedule_id)?.milestone_name?.toLowerCase().includes('advance') ? 'advance' : 'balance') :
-          'advance';
+        const paymentType = invoiceId ? 'balance' : 'advance';
 
         const glResult = await postVehiclePaymentToGL({
           module: 'sinotruck',
@@ -355,6 +368,8 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
     });
     setSelectedSchedule(null);
     setPaymentProofFile(null);
+    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+    setPaymentProofPreview(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -506,6 +521,12 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {payment.payment_slip_url && (
+                              <DropdownMenuItem onClick={() => window.open(payment.payment_slip_url, '_blank')}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Payment Proof
+                              </DropdownMenuItem>
+                            )}
                             {(payment.status === 'pending' || payment.status === 'received') && (
                               <DropdownMenuItem
                                 onClick={() => handleVerifyPayment(payment.id)}
@@ -570,10 +591,9 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
 
             <div className="space-y-2">
               <Label>Payment Amount (LKR) *</Label>
-              <Input
-                type="number"
+               <CurrencyInput
                 value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                onValueChange={(num) => setPaymentForm({ ...paymentForm, amount: num.toString() })}
                 placeholder="Enter amount"
               />
             </div>
@@ -653,7 +673,12 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
                 <Input
                   type="file"
                   accept="image/*,.pdf"
-                  onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setPaymentProofFile(file);
+                    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+                    setPaymentProofPreview(file && file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
+                  }}
                   className="flex-1"
                 />
                 {paymentProofFile && (
@@ -663,6 +688,9 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
                   </Badge>
                 )}
               </div>
+              {paymentProofPreview && (
+                <img src={paymentProofPreview} alt="Payment proof preview" className="mt-2 max-h-32 rounded border object-contain" />
+              )}
               <p className="text-xs text-muted-foreground mt-1">Upload bank slip or transfer confirmation</p>
             </div>
 

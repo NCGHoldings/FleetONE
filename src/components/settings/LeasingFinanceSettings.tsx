@@ -16,7 +16,7 @@ import { Loader2, Save, DollarSign, Building2, CreditCard, Calculator, FileText 
 import { SearchableFinanceAccountSelector } from './SearchableFinanceAccountSelector';
 
 // NCG Holding ID for consolidated GL
-const NCG_HOLDING_ID = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020';
+const NCG_HOLDING_ID = 'a0000000-0000-0000-0000-000000000001';
 
 interface GLAccount {
   id: string;

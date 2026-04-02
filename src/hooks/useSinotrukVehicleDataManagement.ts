@@ -81,14 +81,18 @@ export function useSinotrukVehicleDataManagement() {
   const autoDetectColumnMapping = useCallback((headers: string[]): ColumnMapping[] => {
     return headers.map(header => {
       const normalizedHeader = header.toLowerCase().trim();
+      if (!normalizedHeader) {
+        return { excelColumn: header, mappedTo: null, confidence: 0, autoDetected: false };
+      }
       let bestMatch: { field: string; confidence: number } | null = null;
 
       for (const [field, patterns] of Object.entries(COLUMN_PATTERNS)) {
         for (const pattern of patterns) {
+          if (!pattern) continue;
           if (normalizedHeader === pattern) {
             bestMatch = { field, confidence: 100 };
             break;
-          } else if (normalizedHeader.includes(pattern) || pattern.includes(normalizedHeader)) {
+          } else if (normalizedHeader.includes(pattern) || (pattern.length >= 3 && pattern.includes(normalizedHeader))) {
             const confidence = Math.round((pattern.length / Math.max(normalizedHeader.length, pattern.length)) * 90);
             if (!bestMatch || confidence > bestMatch.confidence) {
               bestMatch = { field, confidence };

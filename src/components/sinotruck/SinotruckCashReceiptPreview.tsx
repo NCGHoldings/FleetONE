@@ -197,13 +197,13 @@ export const SinotruckCashReceiptPreview = forwardRef<HTMLDivElement, SinotruckC
                   <b style={{ fontSize: '12px' }}>MODE OF PAYMENT:</b>
                   <div style={{ marginTop: '5px' }}>
                     <span className={`payment-method-box ${paymentMethods.cash ? 'payment-method-true' : 'payment-method-false'}`}>
-                      CASH: {paymentMethods.cash ? 'TRUE' : 'FALSE'}
+                      CASH: {paymentMethods.cash ? '✓' : '✗'}
                     </span>
                     <span className={`payment-method-box ${paymentMethods.cheque ? 'payment-method-true' : 'payment-method-false'}`}>
-                      CHEQUE: {paymentMethods.cheque ? 'TRUE' : 'FALSE'}
+                      CHEQUE: {paymentMethods.cheque ? '✓' : '✗'}
                     </span>
                     <span className={`payment-method-box ${paymentMethods.bank ? 'payment-method-true' : 'payment-method-false'}`}>
-                      BANK: {paymentMethods.bank ? 'TRUE' : 'FALSE'}
+                      BANK: {paymentMethods.bank ? '✓' : '✗'}
                     </span>
                   </div>
                 </div>

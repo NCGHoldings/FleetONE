@@ -5,8 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 // Company IDs for consolidated GL architecture
 // NCG Holding: Parent with consolidated GL for all sub-companies
 // NCG Express: Standalone company with its own GL
-export const NCG_HOLDING_ID = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020';
+export const NCG_HOLDING_ID = 'a0000000-0000-0000-0000-000000000001';
 export const NCG_EXPRESS_ID = '7ece7595-8b7b-46de-8bfc-c1e8e0da7513';
+export const NCG_TEST_ID = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020';
 
 // Company type matching database structure
 export interface Company {
@@ -42,6 +43,8 @@ interface CompanyContextType {
   isNCGHoldingOrSubCompany: (companyId: string) => boolean; // NCG Holding or any of its sub-companies
   getEffectiveCompanyId: () => string | null; // Returns parent for sub-companies, otherwise selected
   getBusinessUnitCode: () => string | null; // Returns short_code for sub-companies, null for parent
+  // Test mode
+  isTestCompany: boolean; // True when selected company has business_unit_type = 'test'
   // Access control
   hasCompanyAccess: (companyId: string) => boolean;
   allowedCompanyIds: string[];
@@ -209,39 +212,68 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
     return company?.parent_company_id === NCG_HOLDING_ID;
   };
 
+  // Checks if company is a sub-company of NCG Test Environment
+  const isSubCompanyOfNCGTest = (companyId: string): boolean => {
+    const company = allCompanies.find(c => c.id === companyId);
+    return company?.parent_company_id === NCG_TEST_ID;
+  };
+
   // Checks if company is NCG Holding or one of its sub-companies
   // Used to validate School Bus operations should only run under NCG Holding hierarchy
   const isNCGHoldingOrSubCompany = (companyId: string): boolean => {
     return companyId === NCG_HOLDING_ID || isSubCompanyOfNCGHolding(companyId);
   };
 
-  // Returns parent company ID for sub-companies of NCG Holding, otherwise returns selected company ID
+  // Returns parent company ID for sub-companies of NCG Holding or NCG Test, otherwise returns selected company ID
   // This ensures NCG Express remains completely isolated with its own COA/GL
   // While NCG Holding sub-companies share the consolidated NCG Holding COA/GL
+  // And NCG Test sub-companies share the consolidated NCG Test COA/GL
   const getEffectiveCompanyId = (): string | null => {
     if (!selectedCompanyId) return null;
     
-    // Only consolidate for NCG Holding sub-companies
+    // Consolidate for NCG Holding sub-companies
     if (isSubCompanyOfNCGHolding(selectedCompanyId)) {
       return NCG_HOLDING_ID;
+    }
+    
+    // Consolidate for NCG Test sub-companies
+    if (isSubCompanyOfNCGTest(selectedCompanyId)) {
+      return NCG_TEST_ID;
     }
     
     // NCG Express and other standalone companies use their own ID
     return selectedCompanyId;
   };
 
-  // Returns the business unit code (short_code) for NCG Holding sub-companies
+  // Returns the business unit code (short_code) for NCG Holding or NCG Test sub-companies
   // Used for tagging journal entries with business unit identifier (SBO, YUT, etc.)
   const getBusinessUnitCode = (): string | null => {
     if (!selectedCompanyId || !selectedCompany) return null;
     
-    // Only NCG Holding sub-companies have business unit codes
+    // NCG Holding sub-companies have business unit codes
     if (isSubCompanyOfNCGHolding(selectedCompanyId)) {
+      return selectedCompany.short_code || null;
+    }
+    
+    // NCG Test sub-companies also have business unit codes
+    if (isSubCompanyOfNCGTest(selectedCompanyId)) {
       return selectedCompany.short_code || null;
     }
     
     return null; // NCG Express and parent companies don't have business unit codes
   };
+
+  // Test mode detection
+  const isTestCompany = useMemo(() => {
+    if (!selectedCompany) return false;
+    if (selectedCompany.business_unit_type === 'test') return true;
+    // Check if parent is a test company
+    if (selectedCompany.parent_company_id) {
+      const parent = allCompanies.find(c => c.id === selectedCompany.parent_company_id);
+      return parent?.business_unit_type === 'test';
+    }
+    return false;
+  }, [selectedCompany, allCompanies]);
 
   // Set company and persist to localStorage
   const setSelectedCompanyId = (id: string | null) => {
@@ -312,6 +344,7 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
         isNCGHoldingOrSubCompany,
         getEffectiveCompanyId,
         getBusinessUnitCode,
+        isTestCompany,
         hasCompanyAccess,
         allowedCompanyIds,
       }}

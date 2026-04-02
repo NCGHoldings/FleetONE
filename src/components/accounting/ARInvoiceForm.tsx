@@ -8,11 +8,15 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCustomers, useTaxCodes } from "@/hooks/useAccountingData";
+import { useQuery } from "@tanstack/react-query";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useCreateARInvoice, useUpdateARInvoice } from "@/hooks/useAccountingMutations";
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
@@ -37,6 +41,7 @@ interface InvoiceLine {
   tax_rate: number;
   line_total: number;
   account_id?: string;
+  item_category_id?: string;
 }
 
 interface ARInvoiceFormProps {
@@ -48,9 +53,32 @@ interface ARInvoiceFormProps {
 export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceFormProps) => {
   const { data: customers } = useCustomers();
   const { data: taxCodes } = useTaxCodes();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
   const createInvoice = useCreateARInvoice();
   const updateInvoice = useUpdateARInvoice();
   const generateNumber = useGenerateNumber();
+
+  // Fetch item categories with their sales_account_id for revenue mapping
+  const { data: itemCategories } = useQuery({
+    queryKey: ["item-categories-for-ar", effectiveCompanyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("item_categories")
+        .select("id, category_name, category_code, sales_account_id")
+        .eq("company_id", effectiveCompanyId)
+        .eq("is_active", true)
+        .order("category_name");
+      if (error) throw error;
+      // Deduplicate by category_name — take the first of each
+      const seen = new Map<string, typeof data[0]>();
+      for (const cat of data || []) {
+        if (!seen.has(cat.category_name)) seen.set(cat.category_name, cat);
+      }
+      return Array.from(seen.values());
+    },
+    enabled: !!effectiveCompanyId,
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [busData, setBusData] = useState<{
     bus_id?: string;
@@ -177,11 +205,28 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
     }
   };
 
+  const handleCategoryChange = (lineId: string, categoryId: string) => {
+    if (!categoryId || categoryId === "_none") {
+      setLines(lines.map(l => l.id === lineId ? { ...l, item_category_id: undefined, account_id: undefined } : l));
+      return;
+    }
+    const cat = itemCategories?.find(c => c.id === categoryId);
+    if (cat) {
+      setLines(lines.map(l => l.id === lineId ? { ...l, item_category_id: categoryId, account_id: cat.sales_account_id || undefined } : l));
+    }
+  };
+
   const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.unit_price, 0);
   const totalTax = lines.reduce((sum, line) => sum + (line.quantity * line.unit_price * line.tax_rate) / 100, 0);
   const grandTotal = subtotal + totalTax;
 
   const onSubmit = async (data: InvoiceFormData) => {
+    // Validate: warn if any line is missing a revenue account
+    const linesWithoutAccount = lines.filter(l => !l.account_id && l.unit_price > 0);
+    if (linesWithoutAccount.length > 0) {
+      toast.warning("Some invoice lines are missing a Revenue Account. Select an Item Category for each line to ensure correct GL posting.", { duration: 6000 });
+    }
+
     const lineData = lines.map((line) => ({
       description: line.description,
       quantity: line.quantity,
@@ -346,37 +391,57 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
               </div>
 
               <div className="border rounded-lg overflow-x-auto">
-                <table className="w-full min-w-[700px]">
+                <table className="w-full min-w-[900px] table-fixed">
+                  <colgroup>
+                    <col style={{ width: 150 }} />
+                    <col />
+                    <col style={{ width: 90 }} />
+                    <col style={{ width: 150 }} />
+                    <col style={{ width: 110 }} />
+                    <col style={{ width: 180 }} />
+                    <col style={{ width: 130 }} />
+                    <col style={{ width: 40 }} />
+                  </colgroup>
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ width: 180 }}>GL Account</th>
-                      <th className="px-3 py-2 text-left text-sm font-medium" style={{ minWidth: 200 }}>Description</th>
-                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 80 }}>Qty</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 120 }}>Unit Price</th>
-                      <th className="px-3 py-2 text-center text-sm font-medium" style={{ width: 120 }}>Tax Code</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium" style={{ width: 120 }}>Line Total</th>
-                      <th className="px-3 py-2" style={{ width: 40 }}></th>
+                      <th className="px-3 py-2 text-left text-sm font-medium">Item Category</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
+                      <th className="px-3 py-2 text-center text-sm font-medium">Qty</th>
+                      <th className="px-3 py-2 text-right text-sm font-medium">Unit Price</th>
+                      <th className="px-3 py-2 text-center text-sm font-medium">Tax Code</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium">Revenue Account</th>
+                      <th className="px-3 py-2 text-right text-sm font-medium">Line Total</th>
+                      <th className="px-3 py-2"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {lines.map((line) => (
                       <tr key={line.id} className="border-t">
                         <td className="px-3 py-2">
-                          <SearchableAccountSelector
-                            value={line.account_id || ""}
-                            onValueChange={(val) => updateLine(line.id, "account_id", val)}
-                            placeholder="Select GL account"
-                            accountTypes={["revenue", "income"]}
-                            className="h-9 text-sm"
-                          />
+                          <Select
+                            value={line.item_category_id || "_none"}
+                            onValueChange={(val) => handleCategoryChange(line.id, val)}
+                          >
+                            <SelectTrigger className="h-9 text-sm">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="_none">— None —</SelectItem>
+                              {itemCategories?.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  {cat.category_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </td>
                         <td className="px-3 py-2">
                           <Textarea
                             value={line.description}
                             onChange={(e) => updateLine(line.id, "description", e.target.value)}
                             placeholder="Item description"
-                            className="min-h-[36px] resize-none overflow-hidden text-sm py-2"
                             rows={1}
+                            className="min-h-[36px] text-sm resize-none"
                             onInput={(e) => {
                               const target = e.target as HTMLTextAreaElement;
                               target.style.height = 'auto';
@@ -394,13 +459,11 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <Input
-                            type="number"
+                          <CurrencyInput
                             value={line.unit_price}
-                            onChange={(e) => updateLine(line.id, "unit_price", parseFloat(e.target.value) || 0)}
-                            className="h-9 text-right"
-                            min={0}
-                            step="0.01"
+                            onValueChange={(val) => updateLine(line.id, "unit_price", val)}
+                            placeholder="0"
+                            compact
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -420,6 +483,15 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                               ))}
                             </SelectContent>
                           </Select>
+                        </td>
+                        <td className="px-3 py-2">
+                          <SearchableAccountSelector
+                            value={line.account_id || ""}
+                            onValueChange={(val) => updateLine(line.id, "account_id", val)}
+                            placeholder="Auto from category"
+                            accountTypes={["revenue", "income"]}
+                            className="h-9 text-sm"
+                          />
                         </td>
                         <td className="px-3 py-2 text-right font-medium">
                           <CurrencyDisplay amount={line.line_total} />

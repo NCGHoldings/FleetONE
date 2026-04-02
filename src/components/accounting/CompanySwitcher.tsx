@@ -1,4 +1,4 @@
-import { Building2, ChevronDown, Check, Bus, Car, Truck, Briefcase, Building } from "lucide-react";
+import { Building2, ChevronDown, Check, Bus, Car, Truck, Briefcase, Building, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,6 +24,8 @@ const getBusinessUnitIcon = (type: string | null | undefined) => {
       return <Car className="h-4 w-4 text-purple-500" />;
     case "holding":
       return <Building className="h-4 w-4 text-gray-500" />;
+    case "test":
+      return <FlaskConical className="h-4 w-4 text-amber-500" />;
     default:
       return <Briefcase className="h-4 w-4 text-muted-foreground" />;
   }
@@ -120,10 +122,16 @@ export const CompanySwitcher = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="w-[240px] justify-between">
+        <Button variant="outline" className={`w-[260px] justify-between ${selectedCompany?.business_unit_type === 'test' ? 'border-amber-500/50 bg-amber-500/5' : 'border-emerald-500/50 bg-emerald-500/5'}`}>
           <div className="flex items-center gap-2 truncate">
             {getBusinessUnitIcon(selectedCompany?.business_unit_type)}
             <span className="truncate">{selectedCompany?.name || "Select Company"}</span>
+            {selectedCompany?.business_unit_type === 'test' && (
+              <span className="text-[10px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded">TEST</span>
+            )}
+            {selectedCompany?.business_unit_type !== 'test' && selectedCompany && (
+              <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded">LIVE</span>
+            )}
           </div>
           <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>

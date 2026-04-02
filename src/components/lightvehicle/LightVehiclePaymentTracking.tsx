@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -48,6 +49,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   const { fetchReceiptsForOrder, createReceipt, isCreating } = useLightVehicleCashReceipts();
@@ -282,8 +284,21 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
         }
       }
 
-      // 2. Create AR Invoice if not exists
-      let invoiceId = orderDetails?.ar_invoice_id;
+      // 2. Re-fetch order to get latest ar_invoice_id, then create if not exists
+      const { data: freshOrder, error: freshError } = await supabase
+        .from('lightvehicle_orders')
+        .select('ar_invoice_id, finance_customer_id')
+        .eq('id', orderId)
+        .single();
+      if (freshError || !freshOrder) {
+        toast.error('Failed to load latest order state. Please try again.');
+        setVerifyingId(null);
+        return;
+      }
+      let invoiceId = freshOrder.ar_invoice_id;
+      if (freshOrder.finance_customer_id) {
+        customerId = freshOrder.finance_customer_id;
+      }
       if (!invoiceId && customerId) {
         const arResult = await createVehicleARInvoice({
           module: 'lightvehicle',
@@ -405,6 +420,8 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
     });
     setSelectedSchedule(null);
     setPaymentProofFile(null);
+    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+    setPaymentProofPreview(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -558,6 +575,12 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {payment.payment_slip_url && (
+                                <DropdownMenuItem onClick={() => window.open(payment.payment_slip_url, '_blank')}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Payment Proof
+                                </DropdownMenuItem>
+                              )}
                               {(payment.status === 'pending' || payment.status === 'received') && (
                                 <DropdownMenuItem
                                   onClick={() => handleVerifyPayment(payment.id)}
@@ -652,10 +675,9 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
 
             <div className="space-y-2">
               <Label>Payment Amount (LKR) *</Label>
-              <Input
-                type="number"
+               <CurrencyInput
                 value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                onValueChange={(num) => setPaymentForm({ ...paymentForm, amount: num.toString() })}
                 placeholder="Enter amount"
               />
             </div>
@@ -734,7 +756,12 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
                 <Input
                   type="file"
                   accept="image/*,.pdf"
-                  onChange={(e) => setPaymentProofFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setPaymentProofFile(file);
+                    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
+                    setPaymentProofPreview(file && file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
+                  }}
                   className="flex-1"
                 />
                 {paymentProofFile && (
@@ -744,6 +771,9 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
                   </Badge>
                 )}
               </div>
+              {paymentProofPreview && (
+                <img src={paymentProofPreview} alt="Payment proof preview" className="mt-2 max-h-32 rounded border object-contain" />
+              )}
               <p className="text-xs text-muted-foreground mt-1">Upload bank slip or transfer confirmation</p>
             </div>
 
