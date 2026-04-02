@@ -42,6 +42,7 @@ export const APPaymentsView = () => {
   const [feeBankAccountId, setFeeBankAccountId] = useState<string | undefined>();
   const [chequePrintOpen, setChequePrintOpen] = useState(false);
   const [printCheque, setPrintCheque] = useState<any>(null);
+  const [detailPayment, setDetailPayment] = useState<any>(null);
 
   // Get vendor name helper
   const getVendorName = (vendorId: string) => {
