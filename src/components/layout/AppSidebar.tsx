@@ -1,7 +1,8 @@
-import { Map, BarChart3, Bus, Calendar, Settings, Users, Wrench, Shield, MessageSquare, FileText, MapPin, UserCheck, DollarSign, Lightbulb, Star, ChevronDown, Truck, TrendingUp, AlertTriangle, Package, Settings2, GraduationCap, ShoppingCart, FileSpreadsheet, Home, Sparkles, BookOpen, Upload, Clock, Activity, Monitor, Car, Megaphone, CheckSquare, FolderKanban, Share2, Store } from "lucide-react";
+import { Map, BarChart3, Bus, Calendar, Settings, Users, Wrench, Shield, MessageSquare, FileText, MapPin, UserCheck, DollarSign, Lightbulb, Star, ChevronDown, Truck, TrendingUp, AlertTriangle, Package, Settings2, GraduationCap, ShoppingCart, FileSpreadsheet, Home, Sparkles, BookOpen, Upload, Clock, Activity, Monitor, Car, Megaphone, CheckSquare, FolderKanban, Share2, Store, Search, X } from "lucide-react";
 import { useExternalSystem } from "./ExternalSystemContext";
 import { NavLink, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { Input } from "@/components/ui/input";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarTrigger, useSidebar, SidebarHeader } from "@/components/ui/sidebar";
 import { LogoUpload } from "./LogoUpload";
 import { supabase } from "@/integrations/supabase/client";
