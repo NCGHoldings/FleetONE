@@ -1015,18 +1015,18 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         <div data-pdf-section="payment-info">
           <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment{"\u00A0"}Information</div>
            <div className="text-xs leading-tight text-gray-800">
-              Account{"\u00A0"}No.{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_account_no || "1934 1401 7578"}
+              Account{"\u00A0"}No.{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_account_no || "1001077213"}
               <br />
-              Account{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_account_name || "NCG EXPRESS (PVT) LTD"}
+              Account{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_account_name || "NCG Holding (Pvt) Ltd"}
               <br />
-              Bank{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_bank_name || "Sampath Bank, Nugegoda"}
+              Bank{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_bank_name || "Commercial Bank - Nugegoda"}
           </div>
         </div>
 
         {/* Footer for Page 1 */}
         <div data-pdf-section="footer-p1" className="mt-4 text-xs text-gray-500 border-t border-gray-200 pt-2 text-center" style={{ whiteSpace: "pre-wrap" }}>
           For{"\u00A0"}more{"\u00A0"}information{"\u00A0"}call{"\u00A0"}<strong>074{"\u00A0"}289{"\u00A0"}3612</strong>
-          <br />©{"\u00A0"}2025{"\u00A0"}NCG{"\u00A0"}Express.{"\u00A0"}All{"\u00A0"}Rights{"\u00A0"}Reserved.
+          <br />©{"\u00A0"}2025{"\u00A0"}NCG{"\u00A0"}Holding{"\u00A0"}(Pvt){"\u00A0"}Ltd.{"\u00A0"}All{"\u00A0"}Rights{"\u00A0"}Reserved.
         </div>
       </div>
 
