@@ -92,7 +92,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       const { data, error } = await supabase
         .from('bank_accounts')
         .select('id, account_name, bank_name, account_number')
-        .eq('company_id', NCG_HOLDING_ID)
+        .in('company_id', [NCG_HOLDING_ID, 'a0000000-0000-0000-0000-000000000003'])
         .eq('is_active', true)
         .order('bank_name');
       if (error) throw error;
