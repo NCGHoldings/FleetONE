@@ -16,7 +16,7 @@ export function LightVehicleCashReceiptPreview({
   receipt,
   companyName = 'NCG FLEET MANAGEMENT',
   companyAddress = '157 Y, Kebelalowita, Weniwelkola, Polgasowita',
-  companyPhone = '+94 11 XXX XXXX',
+  companyPhone = '+94 77 766 5501',
   responsiblePersonPhone,
   responsiblePersonEmail
 }: LightVehicleCashReceiptPreviewProps) {
