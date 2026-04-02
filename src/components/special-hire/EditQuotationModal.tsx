@@ -51,7 +51,7 @@ export function EditQuotationModal({ quotation, onClose, onUpdate }: Props) {
       // Create versioned quotation number
       const versionedQuotationNo = `${baseQuotationNo}-v${nextVersion}`;
 
-      // Create new version with the form data
+      // Create new version with the form data, preserving original bank snapshot
       const newVersionData = {
         ...quotationData,
         parent_quotation_id: quotation.parent_quotation_id || quotation.id,
@@ -60,7 +60,11 @@ export function EditQuotationModal({ quotation, onClose, onUpdate }: Props) {
         edit_reason: editConfig.reason,
         is_active_version: true,
         created_by: user.id,
-        quotation_no: versionedQuotationNo
+        quotation_no: versionedQuotationNo,
+        // Preserve the original quotation's bank snapshot for historical accuracy
+        payment_bank_name: quotation.payment_bank_name || null,
+        payment_account_name: quotation.payment_account_name || null,
+        payment_account_no: quotation.payment_account_no || null,
       };
 
       // Mark current version as inactive
