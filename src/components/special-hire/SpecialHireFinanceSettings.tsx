@@ -77,7 +77,7 @@ export function SpecialHireFinanceSettings() {
     invoice_prefix: "SPH-INV",
     advance_receipt_prefix: "SPH-ADV",
     quotation_bank_name: "Commercial Bank - Nugegoda",
-    quotation_account_name: "NCG EXPRESS (PVT) LTD",
+    quotation_account_name: "NCG Holding (Pvt) Ltd",
     quotation_account_no: "1001077213",
   });
 
