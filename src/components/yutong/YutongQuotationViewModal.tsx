@@ -48,6 +48,7 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('preview');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showVAT, setShowVAT] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
