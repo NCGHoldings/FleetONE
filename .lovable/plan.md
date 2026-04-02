@@ -1,45 +1,37 @@
 
 
-# Link Company Phone/Email to All Document Templates
+# Fix: Logo Missing + Old Template Appearing in Document Previews
 
-## Problem
-1. The Payment Voucher shows "Tel: | Email:" with **empty values** because the company records in the database don't have phone/email saved yet
-2. Several document generators (Sinotruck invoice, Light Vehicle invoice, cash receipts) have **hardcoded** phone/email (`+94 11 234 5678`, `info@ncgholdings.lk`) instead of pulling from company data
-3. The Edit Company form already supports phone/email — data just needs to be entered and all documents need to use it
+## Root Causes
 
-## What needs to happen
+### 1. Logo not rendering
+The `{{ncg_master_logo}}` placeholder falls back to `/ncg-holdings-logo.png` — a relative path. Inside an iframe using `srcDoc`, this path needs to resolve against the app origin. The issue is intermittent because:
+- If `companyData.logo_url` is set (Supabase storage URL), it works when network is good but fails on slow connections
+- If `companyData.logo_url` is empty, the fallback `/ncg-holdings-logo.png` may not resolve inside `srcDoc` iframes consistently
 
-### 1. SQL Migration — Populate company phone/email for LIVE companies
-Insert the actual NCG Holdings contact details (phone, email, address) into the companies table for the LIVE parent company and sub-companies so all templates immediately show real values.
+**Fix**: Convert the fallback to an absolute URL using `window.location.origin + '/ncg-holdings-logo.png'` so it always resolves correctly inside iframes.
 
-### 2. Replace hardcoded contact info in document generators
+**File: `src/lib/document-template-utils.ts`** (line 162)
+- Change: `companyData?.logo_url || '/ncg-holdings-logo.png'`
+- To: `companyData?.logo_url || \`\${window.location.origin}/ncg-holdings-logo.png\``
+- Apply the same fix to all other fallback references to `/ncg-holdings-logo.png` in this file
 
-**Files with hardcoded values to fix:**
+### 2. Old template appearing / template flickering
+**File: `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx`** (lines 244-263)
 
-| File | Current Hardcoded Value | Fix |
-|------|------------------------|-----|
-| `src/lib/sinotruck-order-invoice-generator.ts` | `Tel: +94 11 234 5678 \| info@ncgholdings.lk` | Accept company data as parameter, use `data.companyPhone` / `data.companyEmail` |
-| `src/lib/lightvehicle-order-invoice-generator.ts` | `Tel: +94 11 XXX XXXX \| Email: sales@ncgholdings.lk` | Same — use passed-in company data |
-| `src/components/lightvehicle/LightVehicleCashReceiptPreview.tsx` | `info@ncgholdings.lk` fallback | Use company email from context |
-| `src/components/sinotruck/SinotruckCashReceiptPreview.tsx` | `info@ncgholdings.lk` hardcoded | Use company email from context |
-| `src/components/lightvehicle/LightVehicleQuotationPreview.tsx` | `info@ncgholdings.lk` fallback | Use company email |
+There is a "TEMPORARY FIX" `useEffect` that **overwrites the AP Payment Voucher template in the database every time the modal opens**. This:
+- Creates a race condition: template renders with old DB content, then gets overwritten async
+- Silently destroys any customized templates
+- Can show stale content if the update hasn't completed before render
 
-### 3. Template-based documents (already working)
-The AP Payment Voucher, AR Invoice, Journal Voucher, etc. already use `{{company_phone}}` and `{{company_email}}` placeholders via `document-template-utils.ts` — these will automatically show the correct values once the company records have phone/email populated in the database.
-
-### 4. No changes needed to Edit Company form
-The form already saves phone and email to the `companies` table. Users can update contact details anytime and all future documents will reflect the changes.
+**Fix**: Remove this entire `useEffect` block. Template updates should only happen via "Replace All Templates" in Settings — not on every modal open.
 
 ## Files to modify
-- **SQL migration** — Update LIVE company records with real phone/email/address
-- `src/lib/sinotruck-order-invoice-generator.ts` — Replace hardcoded footer
-- `src/lib/lightvehicle-order-invoice-generator.ts` — Replace hardcoded header/footer
-- `src/components/lightvehicle/LightVehicleCashReceiptPreview.tsx` — Use company data
-- `src/components/sinotruck/SinotruckCashReceiptPreview.tsx` — Use company data
-- `src/components/lightvehicle/LightVehicleQuotationPreview.tsx` — Use company data
+- `src/lib/document-template-utils.ts` — Use absolute URL for logo fallback
+- `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx` — Remove the auto-overwrite useEffect
 
 ## Result
-- All documents pull phone/email from the company record — no more hardcoded values
-- Editing company details in Settings immediately reflects on all future documents
-- LIVE companies show real contact details right away
+- Logo always renders regardless of network timing
+- Templates stay consistent — no more random overwrites on modal open
+- "Replace All Templates" in Settings remains the proper way to update templates
 
