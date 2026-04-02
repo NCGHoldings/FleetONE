@@ -576,7 +576,7 @@ export const generateAPPaymentVoucherTemplate = (): string => `
 <div class="page"><div class="doc-minimal">
   <div class="flex-between">
     <div>
-      <img src="{{ncg_master_logo}}" style="width: 180px !important; height: auto !important; max-height: 60px !important; object-fit: contain !important; margin-bottom: 12px !important; mix-blend-mode: multiply;" />
+      <img src="{{ncg_master_logo}}" style="width: 220px !important; height: auto !important; max-height: 75px !important; object-fit: contain !important; margin-bottom: 12px !important; mix-blend-mode: multiply;" />
       <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">{{sector_name}}</div>
       <div class="text-xs">{{company_address}}<br>Tel: {{company_phone}} | Email: {{company_email}}<br>VAT No: {{company_tax_id}}</div>
     </div>
