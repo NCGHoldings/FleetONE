@@ -241,26 +241,7 @@ export const FinanceDocumentPreviewModal = ({
     }
   }, [availableTemplates, selectedTemplateId, resolvedCompanyId]);
 
-  // TEMPORARY FIX: Force update the template in the database with the new layout!
-  useEffect(() => {
-    if (open && documentType === "ap_payment_voucher" && templateTypeIds.length > 0) {
-      const fixTemplate = async () => {
-        try {
-          const generator = defaultTemplates["ap_payment_voucher"];
-          if (generator) {
-            await supabase
-              .from("document_templates")
-              .update({ html_content: generator() })
-              .in("template_type_id", templateTypeIds);
-            console.log("Auto-updated AP Payment Voucher template in DB!");
-          }
-        } catch (err) {
-          console.error("Auto-update failed", err);
-        }
-      };
-      fixTemplate();
-    }
-  }, [open, documentType, templateTypeIds]);
+
 
   const selectedTemplate = availableTemplates?.find((t) => t.id === selectedTemplateId);
   // Use resolved company for all lookups (sub-company details: phone, email, address, logo)
