@@ -204,7 +204,7 @@ serve(async (req: Request) => {
 
           } catch (invErr) {
             console.error(`Error processing invoice ${invoice.id}:`, invErr);
-            results.errors.push(`Invoice ${invoice.id}: ${invErr.message}`);
+            results.errors.push(`Invoice ${invoice.id}: ${(invErr as Error).message}`);
           }
         }
 
