@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 type StatusType = 
   | "draft" | "posted" | "void" | "approved" | "rejected" | "pending" | "unpaid"
   | "open" | "closed" | "paid" | "partial" | "overdue" | "cancelled"
-  | "active" | "inactive" | "reconciled" | "unreconciled";
+  | "active" | "inactive" | "reconciled" | "unreconciled" | "reversed";
 
 interface StatusBadgeProps {
   status: string;

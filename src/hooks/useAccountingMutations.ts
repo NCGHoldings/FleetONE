@@ -267,20 +267,10 @@ export const useReverseJournalEntry = () => {
         }
       }
       
-      // Mark original entry as reversed (use 'void' since 'reversed' is not in the enum)
-      const { error: statusError } = await supabase
-        .from("journal_entries")
-        .update({ 
-          status: "void" as const,
-        })
-        .eq("id", entryId);
-      
-      if (statusError) throw statusError;
-      
       // Generate reversal entry number
       const reversalEntryNumber = `REV-${entry.entry_number}`;
       
-      // Create reversing entry
+      // Create reversing entry with is_reversal flag and link to original
       const { data: reversalEntry, error: reversalError } = await supabase
         .from("journal_entries")
         .insert([{
@@ -293,11 +283,26 @@ export const useReverseJournalEntry = () => {
           status: "posted",
           posted_at: new Date().toISOString(),
           company_id: selectedCompanyId,
+          source_module: entry.source_module,
+          business_unit_code: entry.business_unit_code,
+          is_reversal: true,
+          reversed_entry_id: entryId,
         }])
         .select()
         .single();
       
       if (reversalError) throw reversalError;
+
+      // Mark original entry as reversed and link back to reversal entry (bidirectional)
+      const { error: statusError } = await supabase
+        .from("journal_entries")
+        .update({ 
+          status: "reversed",
+          reversed_entry_id: reversalEntry.id,
+        })
+        .eq("id", entryId);
+      
+      if (statusError) throw statusError;
       
       // Create reversed lines (swap debit/credit)
       const reversedLines = entry.journal_entry_lines.map((line: any) => ({

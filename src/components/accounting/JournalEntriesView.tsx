@@ -325,7 +325,8 @@ export const JournalEntriesView = () => {
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="draft">Draft</SelectItem>
               <SelectItem value="posted">Posted</SelectItem>
-              <SelectItem value="void">Reversed/Void</SelectItem>
+              <SelectItem value="reversed">Reversed</SelectItem>
+              <SelectItem value="void">Void</SelectItem>
             </SelectContent>
           </Select>
 
