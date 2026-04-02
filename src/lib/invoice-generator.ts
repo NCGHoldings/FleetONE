@@ -110,7 +110,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <img src="${companyLogo}" alt="Company Logo" style="width: 150px;">
           <div style="text-align: right; font-size: 13px;">
-            <b>NCG EXPRESS (PRIVATE) LIMITED</b><br>
+             <b>NCG Holding (Pvt) Ltd</b><br>
             157/1, Kebellaowita, Wenwellkola, Polgasowita<br>
             0777556322
           </div>
