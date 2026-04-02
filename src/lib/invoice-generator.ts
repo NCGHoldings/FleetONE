@@ -231,9 +231,9 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           ${isDraft ? '<div class="draft-watermark"><div class="draft-text">DRAFT</div></div>' : ''}
           
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-            <img src="${companyLogo}" alt="NCG Express Logo" style="height: 70px;">
+             <img src="${companyLogo}" alt="NCG Holdings Logo" style="height: 70px;">
             <div style="text-align: right; font-size: 14px;">
-              <strong>NCG EXPRESS (PRIVATE) LIMITED</strong><br>
+              <strong>NCG Holding (Pvt) Ltd</strong><br>
               157, Kebellawovita, Wenivelkola, Polgasovita<br>
               0777556322
             </div>
