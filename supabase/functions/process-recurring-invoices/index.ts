@@ -122,13 +122,13 @@ serve(async (req: Request) => {
       } catch (err) {
         console.error(`Error processing recurring invoice ${recurring.id}:`, err);
         results.failed++;
-        results.errors.push(`${recurring.id}: ${err.message}`);
+        results.errors.push(`${recurring.id}: ${(err as Error).message}`);
 
         // Log the failure
         await supabase.from('recurring_invoice_log').insert({
           recurring_invoice_id: recurring.id,
           success: false,
-          error_message: err.message,
+          error_message: (err as Error).message,
           company_id: recurring.company_id
         });
       }
@@ -148,7 +148,7 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('Error in process-recurring-invoices:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

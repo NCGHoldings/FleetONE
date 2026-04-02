@@ -88,7 +88,7 @@ serve(async (req: Request) => {
       } catch (taskErr) {
         console.error(`Error executing task ${task.id}:`, taskErr);
         results.failed++;
-        results.errors.push(`${task.name}: ${taskErr.message}`);
+        results.errors.push(`${task.name}: ${(taskErr as Error).message}`);
 
         // Update task with error status
         await supabase
@@ -96,7 +96,7 @@ serve(async (req: Request) => {
           .update({
             last_run: now.toISOString(),
             last_status: 'failed',
-            last_error: taskErr.message
+            last_error: (taskErr as Error).message
           })
           .eq('id', task.id);
       }
@@ -116,7 +116,7 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('Error in run-scheduled-tasks:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

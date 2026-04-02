@@ -204,7 +204,7 @@ serve(async (req: Request) => {
 
           } catch (invErr) {
             console.error(`Error processing invoice ${invoice.id}:`, invErr);
-            results.errors.push(`Invoice ${invoice.id}: ${invErr.message}`);
+            results.errors.push(`Invoice ${invoice.id}: ${(invErr as Error).message}`);
           }
         }
 
@@ -213,7 +213,7 @@ serve(async (req: Request) => {
       } catch (ruleErr) {
         console.error(`Error processing rule ${rule.id}:`, ruleErr);
         results.failed++;
-        results.errors.push(`Rule ${rule.id}: ${ruleErr.message}`);
+        results.errors.push(`Rule ${rule.id}: ${(ruleErr as Error).message}`);
       }
     }
 
@@ -231,7 +231,7 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('Error in process-payment-reminders:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
