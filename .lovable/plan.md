@@ -1,35 +1,29 @@
 
 
-# Fix: Professional Logo in Document Previews
+# Fix: Show Vendor Bank Details in AP Payment Voucher
 
 ## Problem
-1. The Payment Voucher and other document previews show "NCG Holding (Pvt) Ltd" as plain text instead of using the professional logo
-2. The `{{ncg_master_logo}}` placeholder points to `/ncg-holdings-logo.png` which may be low quality or rendering too small (120px, max-height 40px)
-3. Sub-companies don't inherit the parent company's logo when their own `logo_url` is empty
-4. The user uploaded a cleaner NCG Holdings logo that should be used
+The Payment Voucher "BENEFICIARY BANK DETAILS" section shows empty because:
+1. The `vendor_bank_accounts` join on `ap_payments` only works via FK (`vendor_bank_account_id`) — if null, no bank data comes through
+2. Many payments were created before vendor bank accounts were added, so `vendor_bank_account_id` is null
+3. Even though the vendor has bank accounts (e.g., Peoples Bank for Chairman Sri Lanka Handi Craft Board), the voucher shows blank
 
-## Changes
+## Fix
 
-### 1. Copy uploaded logo to project
-- Copy `user-uploads://images-2.png` to `public/ncg-holdings-logo.png` (replace the existing file with the professional version)
-
-### 2. Fix logo size in AP Payment Voucher template
-**File: `src/lib/document-template-seeder.ts`**
-- Change logo styling from `width: 120px; max-height: 40px` to `width: 180px; max-height: 60px` so the logo is clearly visible and professional
-
-### 3. Sub-company logo inheritance
+### 1. Enrich payment data in preview modal
 **File: `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx`**
-- When resolving the company for the preview, if the resolved company has no `logo_url`, look up its parent company and use the parent's `logo_url`
-- This ensures all sub-companies (Yutong, Sinotruck, Special Hire, etc.) show the NCG Holdings logo
 
-### 4. Fallback logo in placeholder mapping
-**File: `src/lib/document-template-utils.ts`**
-- Update `{{ncg_master_logo}}` to also check `companyData?.logo_url` before falling back to `/ncg-holdings-logo.png`
-- This way if a company has a custom logo uploaded via settings, it takes priority
+When `documentType === 'ap_payment_voucher'` and `documentData.vendor_bank_accounts` is null/empty but `documentData.vendor_id` exists:
+- Fetch the vendor's default bank account from `vendor_bank_accounts` table (where `is_default = true` or first account)
+- Merge it into `documentData.vendor_bank_accounts` before passing to the template resolver
 
-## Result
-- All document previews show the professional NCG Holdings logo
-- Sub-companies inherit parent logo automatically
-- Logo renders at a visible, professional size
-- Past documents unaffected (templates re-render on view)
+### 2. Also add account holder name to template
+**File: `src/lib/document-template-seeder.ts`**
+
+Add `{{vendor_account_holder}}` below the A/C No line so the voucher shows who the account belongs to.
+
+### Result
+- Payment vouchers show the vendor's bank name, branch, account number, and holder name
+- Works for both old payments (fallback to vendor's default bank) and new payments (uses selected bank account)
+- No changes to existing payment data needed
 
