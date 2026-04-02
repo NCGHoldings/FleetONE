@@ -162,6 +162,36 @@ export const FinanceDocumentPreviewModal = ({
     enabled: !!documentData?.id && (documentType === "ar_invoice" || documentType === "ap_invoice"),
   });
 
+  // Fetch vendor's default bank account as fallback when payment has no vendor_bank_account_id
+  const vendorIdForBankFallback = documentType === 'ap_payment_voucher' && !documentData?.vendor_bank_accounts && documentData?.vendor_id
+    ? documentData.vendor_id
+    : undefined;
+
+  const { data: fallbackVendorBank } = useQuery({
+    queryKey: ["vendor-bank-fallback", vendorIdForBankFallback],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendor_bank_accounts")
+        .select("*")
+        .eq("vendor_id", vendorIdForBankFallback!)
+        .order("is_default", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!vendorIdForBankFallback,
+  });
+
+  // Enrich documentData with fallback vendor bank if needed
+  const enrichedDocumentData = useMemo(() => {
+    if (!documentData) return documentData;
+    if (documentType === 'ap_payment_voucher' && !documentData.vendor_bank_accounts && fallbackVendorBank) {
+      return { ...documentData, vendor_bank_accounts: fallbackVendorBank };
+    }
+    return documentData;
+  }, [documentData, documentType, fallbackVendorBank]);
+
   // Fetch allocations for receipts/payments
   const { data: allocations } = useQuery({
     queryKey: ["doc-allocations", documentType, documentData?.id],
@@ -269,7 +299,7 @@ export const FinanceDocumentPreviewModal = ({
     const defaultHtml = templateGenerator();
     const placeholders = mapDocumentToPlaceholders(
       documentType,
-      documentData,
+      enrichedDocumentData,
       company,
       lineItems || [],
       allocations || [],
@@ -293,16 +323,16 @@ export const FinanceDocumentPreviewModal = ({
     // Use selected template if available, otherwise use fallback
     if (selectedTemplate) {
       const enrichedDocData = {
-        ...documentData,
-        verified_by: signatures.verified_by.name || documentData?.verified_by || '',
-        verified_by_signature: signatures.verified_by.dataUrl || documentData?.verified_by_signature || '',
-        approved_by: signatures.approved_by.name || documentData?.approved_by || '',
-        approved_by_signature: signatures.approved_by.dataUrl || documentData?.approved_by_signature || '',
-        received_by: signatures.received_by.name || documentData?.received_by || '',
-        received_by_signature: signatures.received_by.dataUrl || documentData?.received_by_signature || '',
-        finance_controller: signatures.finance_controller.name || documentData?.finance_controller || '',
-        finance_controller_signature: signatures.finance_controller.dataUrl || documentData?.finance_controller_signature || '',
-        prepared_by: signatures.verified_by.name || documentData?.prepared_by || '', // Alias
+        ...enrichedDocumentData,
+        verified_by: signatures.verified_by.name || enrichedDocumentData?.verified_by || '',
+        verified_by_signature: signatures.verified_by.dataUrl || enrichedDocumentData?.verified_by_signature || '',
+        approved_by: signatures.approved_by.name || enrichedDocumentData?.approved_by || '',
+        approved_by_signature: signatures.approved_by.dataUrl || enrichedDocumentData?.approved_by_signature || '',
+        received_by: signatures.received_by.name || enrichedDocumentData?.received_by || '',
+        received_by_signature: signatures.received_by.dataUrl || enrichedDocumentData?.received_by_signature || '',
+        finance_controller: signatures.finance_controller.name || enrichedDocumentData?.finance_controller || '',
+        finance_controller_signature: signatures.finance_controller.dataUrl || enrichedDocumentData?.finance_controller_signature || '',
+        prepared_by: signatures.verified_by.name || enrichedDocumentData?.prepared_by || '', // Alias
       };
 
     const placeholders = mapDocumentToPlaceholders(
