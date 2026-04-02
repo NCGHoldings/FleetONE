@@ -297,7 +297,7 @@ export const useReverseJournalEntry = () => {
       const { error: statusError } = await supabase
         .from("journal_entries")
         .update({ 
-          status: "reversed",
+          status: "reversed" as any,
           reversed_entry_id: reversalEntry.id,
         })
         .eq("id", entryId);

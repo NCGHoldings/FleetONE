@@ -29,6 +29,7 @@ const statusConfig: Record<StatusType, { variant: "default" | "secondary" | "des
   inactive: { variant: "secondary", label: "Inactive" },
   reconciled: { variant: "default", label: "Reconciled" },
   unreconciled: { variant: "outline", label: "Unreconciled" },
+  reversed: { variant: "outline", label: "Reversed" },
 };
 
 export const StatusBadge = ({ status, className }: StatusBadgeProps) => {
