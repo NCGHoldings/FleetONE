@@ -309,6 +309,60 @@ export const ARReceiptsView = () => {
           businessUnitCode={selectedReceipt?.business_unit_code}
         />
       )}
+
+      {/* Receipt Detail Dialog */}
+      <Dialog open={!!detailReceipt} onOpenChange={(open) => { if (!open) setDetailReceipt(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Receipt Details</DialogTitle>
+            <DialogDescription>
+              {detailReceipt?.receipt_number}
+            </DialogDescription>
+          </DialogHeader>
+          {detailReceipt && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Receipt #</p>
+                  <p className="font-mono font-medium">{detailReceipt.receipt_number}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">{format(new Date(detailReceipt.receipt_date), "MMM dd, yyyy")}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Customer</p>
+                  <p className="font-medium">{getCustomerName(detailReceipt.customer_id)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Method</p>
+                  <p className="font-medium">{getPaymentMethodLabel(detailReceipt.payment_method)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Amount</p>
+                  <p className="font-bold text-lg"><CurrencyDisplay amount={detailReceipt.amount} /></p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Reference</p>
+                  <p className="font-medium">{detailReceipt.reference || "-"}</p>
+                </div>
+              </div>
+
+              {detailReceipt.notes && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Notes</p>
+                    <p className="text-sm">{detailReceipt.notes}</p>
+                  </div>
+                </>
+              )}
+
+              <RelatedJournalEntries sourceId={detailReceipt.id} sourceType="ar_receipt" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
