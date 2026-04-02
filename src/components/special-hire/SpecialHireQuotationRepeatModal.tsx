@@ -184,6 +184,8 @@ export function SpecialHireQuotationRepeatModal({
             user_email: user.email,
             source_quotation_no: fullQuotation.quotation_no
           }],
+          // Use current bank details, not old snapshot
+          ...bankSnapshot,
         };
 
         // Insert WITHOUT quotation_no - let database sequence generate it
