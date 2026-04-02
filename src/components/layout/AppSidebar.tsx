@@ -353,6 +353,38 @@ export function AppSidebar() {
   const visibleNSP = nspItems.filter(i => hasAccess(i.id));
   const visibleGovernance = governanceItems.filter(i => hasAccess(i.id));
   const visibleMarketing = marketingItems.filter(i => hasAccess(i.id));
+
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const allGroupedItems = useMemo(() => [
+    { group: "Main", items: visibleMain },
+    { group: "Operations", items: visibleOperations },
+    { group: "Business", items: visibleBusiness },
+    { group: "Marketing", items: visibleMarketing },
+    { group: "Yutong Sales", items: visibleYutong },
+    { group: "Sinotruck", items: visibleSinotruck },
+    { group: "Light Vehicle", items: visibleLightVehicle },
+    { group: "Finance", items: visibleFinance },
+    { group: "NCG Spare Parts", items: visibleNSP },
+    { group: "Governance", items: visibleGovernance },
+  ], [visibleMain, visibleOperations, visibleBusiness, visibleMarketing, visibleYutong, visibleSinotruck, visibleLightVehicle, visibleFinance, visibleNSP, visibleGovernance]);
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    const results: { group: string; item: typeof mainItems[0] }[] = [];
+    allGroupedItems.forEach(({ group, items }) => {
+      items.forEach(item => {
+        if (item.title.toLowerCase().includes(q) || group.toLowerCase().includes(q)) {
+          results.push({ group, item });
+        }
+      });
+    });
+    return results;
+  }, [searchQuery, allGroupedItems]);
+
+  const isSearching = searchQuery.trim().length > 0;
+
   return <Sidebar className={collapsed ? "w-16" : "w-64"} collapsible="icon">
       <SidebarHeader className="border-b border-border/50 p-4 bg-gradient-to-r from-sidebar-background to-sidebar-accent/30">
         <div className="flex items-center justify-center">
@@ -364,6 +396,58 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="py-4">
+        {/* Search modules */}
+        {!collapsed && (
+          <div className="px-3 pb-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search modules..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 text-sm pl-8 pr-7 bg-sidebar-accent/30 border-sidebar-border"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Search results */}
+        {isSearching ? (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2">
+              {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {searchResults.map(({ group, item }) => (
+                  <SidebarMenuItem key={`${group}-${item.id}`}>
+                    <SidebarMenuButton asChild>
+                      <NavLink to={item.url} className={getNavCls} onClick={() => setSearchQuery("")}>
+                        <item.icon className="w-5 h-5 transition-all duration-300" />
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm">{item.title}</span>
+                          <span className="text-[10px] text-muted-foreground leading-tight">{group}</span>
+                        </div>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+                {searchResults.length === 0 && (
+                  <div className="px-3 py-4 text-sm text-muted-foreground text-center">No modules found</div>
+                )}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : (
+        <>
         {/* External Systems Quick Access */}
         <SidebarGroup>
           <SidebarGroupContent>
