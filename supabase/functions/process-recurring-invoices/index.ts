@@ -128,7 +128,7 @@ serve(async (req: Request) => {
         await supabase.from('recurring_invoice_log').insert({
           recurring_invoice_id: recurring.id,
           success: false,
-          error_message: err.message,
+          error_message: (err as Error).message,
           company_id: recurring.company_id
         });
       }
