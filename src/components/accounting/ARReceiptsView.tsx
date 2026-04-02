@@ -256,7 +256,10 @@ export const ARReceiptsView = () => {
                   </TableCell>
                   <TableCell>{getStatusBadge(receipt)}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
+                     <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => setDetailReceipt(receipt)} title="View Details">
+                        <FileText className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleViewReceipt(receipt)}>
                         <Eye className="h-4 w-4" />
                       </Button>
