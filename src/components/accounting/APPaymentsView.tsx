@@ -314,6 +314,9 @@ export const APPaymentsView = () => {
                   <TableCell>{getStatusBadge(payment)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => setDetailPayment(payment)} title="View Details">
+                        <FileText className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleViewPayment(payment)}>
                         <Eye className="h-4 w-4" />
                       </Button>
