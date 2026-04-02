@@ -1,50 +1,65 @@
 
 
-# Improve Journal Entry Reversal Flow
+# Add Related Journal Entries to AR/AP Invoice, Receipt & Payment Detail Views
 
-## Current Issues
-1. Original JE is marked as **"void"** — loses its identity as a reversed entry
-2. The `is_reversal` and `reversed_entry_id` columns exist in the database but are **never populated**
-3. No visual link between original and its reversal entry
-4. Confirmation exists (`window.confirm`) but should use a proper styled dialog
+## What to build
+A reusable "Related Journal Entries" section that appears inside the detail dialogs for AR Invoices, AP Invoices, AR Receipts, and AP Payments. When you open any of these records, you'll see all linked JEs — the invoice's own JE, plus receipts/payments JEs linked to that invoice.
 
-## Plan
+## How it works
 
-### 1. Add "reversed" to status enum (Migration)
-Add `'reversed'` to the `journal_entry_status` enum so original entries show "REVERSED" badge instead of "VOID".
+### New reusable component: `RelatedJournalEntries.tsx`
+Create `src/components/accounting/shared/RelatedJournalEntries.tsx`
 
-### 2. Update `useReverseJournalEntry` mutation
-**File: `src/hooks/useAccountingMutations.ts`**
+Props: `{ sourceId: string; sourceType: "ar_invoice" | "ap_invoice" | "ar_receipt" | "ap_payment" }`
 
-- Set original entry status to `'reversed'` instead of `'void'`
-- Set `is_reversal: true` and `reversed_entry_id: entryId` on the new reversal entry
-- Set `source_module` on reversal entry matching original's `source_module`
-- After creating reversal, update the original entry's `reversed_entry_id` to point back to the reversal entry (bidirectional link)
+Fetches related JEs based on source type:
+- **AR Invoice**: Fetch the invoice's own `journal_entry_id`, plus all `ar_receipts` for that invoice → their `journal_entry_id`s → fetch all those journal entries with lines
+- **AP Invoice**: Same pattern — invoice JE + all `ap_payments` allocated to it → their JEs
+- **AR Receipt**: Fetch the receipt's own `journal_entry_id`
+- **AP Payment**: Fetch the payment's own `journal_entry_id`
 
-### 3. Enhance the Detail Dialog UI
-**File: `src/components/accounting/JournalEntryDetailDialog.tsx`**
+Renders a compact table per JE showing: entry number, date, status badge, and a mini debit/credit lines table. Clicking a JE opens the full `JournalEntryDetailDialog`.
 
-- Replace `window.confirm` with a proper `AlertDialog` component (confirmation with description text)
-- Show "Reverse Entry" button only for `posted` entries (already done)
-- When viewing a **reversed** entry: show an info banner — "This entry was reversed by REV-xxx" with a clickable link
-- When viewing a **reversal** entry: show an info banner — "This is a reversal of JE-xxx"  
-- Add `reversed` to status badge variant mapping (e.g., orange/warning color)
+### Integrate into 4 existing views
 
-### 4. Update JournalEntriesView status filter
-**File: `src/components/accounting/JournalEntriesView.tsx`**
+**1. `AccountsReceivableView.tsx`** (Invoice Detail Dialog, ~line 438)
+- After the Notes section, add `<RelatedJournalEntries sourceId={viewInvoice.id} sourceType="ar_invoice" />`
 
-Add "reversed" to the status filter dropdown so users can filter reversed entries.
+**2. `AccountsPayableView.tsx`** (Invoice Detail Dialog)
+- Same placement in the AP invoice detail dialog
 
-## Files to modify
-- **Migration**: Add `'reversed'` to enum
-- `src/hooks/useAccountingMutations.ts` — Populate `is_reversal`, `reversed_entry_id`, use `'reversed'` status
-- `src/components/accounting/JournalEntryDetailDialog.tsx` — AlertDialog confirmation, reversal info banners
-- `src/components/accounting/JournalEntriesView.tsx` — Add "reversed" to status filter
+**3. `ARReceiptsView.tsx`** (Receipt row action or detail)
+- Add a detail dialog (currently missing) or enhance existing Eye button to show receipt details + `<RelatedJournalEntries sourceId={receipt.id} sourceType="ar_receipt" />`
 
-## Result
-- Original JE shows **"REVERSED"** badge (not void)
-- Reversal JE shows **"POSTED"** with `is_reversal = true`
-- Both entries link to each other with info banners
-- Proper styled confirmation dialog before reversing
-- Full audit trail preserved — nothing hidden
+**4. `APPaymentsView.tsx`** (Payment row action or detail)
+- Same — add `<RelatedJournalEntries sourceId={payment.id} sourceType="ap_payment" />`
+
+## Component design
+
+```text
+┌─────────────────────────────────────┐
+│ 📋 Related Journal Entries          │
+├─────────────────────────────────────┤
+│ JE-20260402-22D2  │ Apr 02  │ POSTED│
+│   DR Trade Receivable    500,000    │
+│   CR Sales Revenue       500,000    │
+├─────────────────────────────────────┤
+│ JE-20260405-A1B2  │ Apr 05  │ POSTED│
+│   DR Bank (Sampath)      500,000    │
+│   CR Trade Receivable    500,000    │
+│   (Receipt: REC-2026-001)           │
+└─────────────────────────────────────┘
+```
+
+Each JE row is clickable → opens `JournalEntryDetailDialog` for full details including reversal links.
+
+## Files to create/modify
+- **Create**: `src/components/accounting/shared/RelatedJournalEntries.tsx` — reusable component
+- **Modify**: `src/components/accounting/AccountsReceivableView.tsx` — add to invoice detail dialog
+- **Modify**: `src/components/accounting/AccountsPayableView.tsx` — add to invoice detail dialog
+- **Modify**: `src/components/accounting/ARReceiptsView.tsx` — add detail dialog with JE section
+- **Modify**: `src/components/accounting/APPaymentsView.tsx` — add detail dialog with JE section
+
+## No database changes needed
+All data already exists — `journal_entry_id` is on all 4 tables, and `journal_entries` + `journal_entry_lines` have the line details.
 
