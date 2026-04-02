@@ -395,7 +395,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         <div data-pdf-page="2" style="position: relative; width: 210mm; min-height: 297mm; padding: 15px 15px 25px 15px; box-sizing: border-box; background: #fff;">
 
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #000;">
-            <img src="${companyLogo}" alt="NCG Express Logo" style="height: 50px;">
+            <img src="${companyLogo}" alt="NCG Holdings Logo" style="height: 50px;">
             <div style="text-align: right; font-size: 13px;">
               <strong>${documentTitle} - ${data.invoiceNo}</strong><br>
               <span style="font-size: 12px; color: #555;">${data.quotationNo} | ${currentDate}</span>
