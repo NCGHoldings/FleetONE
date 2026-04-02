@@ -299,7 +299,7 @@ export const FinanceDocumentPreviewModal = ({
     const defaultHtml = templateGenerator();
     const placeholders = mapDocumentToPlaceholders(
       documentType,
-      documentData,
+      enrichedDocumentData,
       company,
       lineItems || [],
       allocations || [],
