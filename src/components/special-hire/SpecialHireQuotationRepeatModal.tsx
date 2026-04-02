@@ -13,6 +13,8 @@ import { Copy, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useCompany } from '@/contexts/CompanyContext';
+import { buildSpecialHireQuotationBankSnapshot, SPECIAL_HIRE_QUOTATION_BANK_DEFAULTS } from '@/lib/special-hire-bank-details';
 
 interface SpecialHireQuotation {
   id: string;
@@ -42,6 +44,8 @@ export function SpecialHireQuotationRepeatModal({
   const [numberOfCopies, setNumberOfCopies] = useState(1);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId?.() || selectedCompanyId;
 
   const handleRepeat = async () => {
     if (!quotation || !user) return;
@@ -60,16 +64,17 @@ export function SpecialHireQuotationRepeatModal({
       }
 
       // Fetch current bank details for new quotations (don't copy old bank snapshot)
-      const { data: finSettings } = await supabase
-        .from('special_hire_finance_settings')
-        .select('quotation_bank_name, quotation_account_name, quotation_account_no')
-        .limit(1)
-        .maybeSingle();
-      const bankSnapshot = {
-        payment_bank_name: (finSettings as any)?.quotation_bank_name || 'Commercial Bank - Nugegoda',
-        payment_account_name: (finSettings as any)?.quotation_account_name || 'NCG Holding (Pvt) Ltd',
-        payment_account_no: (finSettings as any)?.quotation_account_no || '1001077213',
-      };
+      let bankSnapshot = { ...SPECIAL_HIRE_QUOTATION_BANK_DEFAULTS };
+      if (effectiveCompanyId) {
+        const { data: finSettings } = await supabase
+          .from('special_hire_finance_settings')
+          .select('quotation_bank_name, quotation_account_name, quotation_account_no')
+          .eq('company_id', effectiveCompanyId)
+          .limit(1)
+          .maybeSingle();
+
+        bankSnapshot = buildSpecialHireQuotationBankSnapshot(finSettings);
+      }
 
       // Create quotations one by one to get unique quotation numbers from DB sequence
       const createdQuotationNos: string[] = [];
