@@ -96,7 +96,7 @@ serve(async (req: Request) => {
           .update({
             last_run: now.toISOString(),
             last_status: 'failed',
-            last_error: taskErr.message
+            last_error: (taskErr as Error).message
           })
           .eq('id', task.id);
       }
