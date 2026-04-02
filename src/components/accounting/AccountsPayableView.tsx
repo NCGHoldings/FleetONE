@@ -465,6 +465,8 @@ export const AccountsPayableView = () => {
                 </>
               )}
 
+              <RelatedJournalEntries sourceId={viewInvoice.id} sourceType="ap_invoice" />
+
               <div className="pt-4 flex gap-2">
                 <Button 
                   variant="outline"
