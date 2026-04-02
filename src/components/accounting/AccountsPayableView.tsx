@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
+import { RelatedJournalEntries } from "./shared/RelatedJournalEntries";
 import { Input } from "@/components/ui/input";
 
 export const AccountsPayableView = () => {
@@ -463,6 +464,8 @@ export const AccountsPayableView = () => {
                   </div>
                 </>
               )}
+
+              <RelatedJournalEntries sourceId={viewInvoice.id} sourceType="ap_invoice" />
 
               <div className="pt-4 flex gap-2">
                 <Button 

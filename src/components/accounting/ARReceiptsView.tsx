@@ -5,14 +5,23 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, DollarSign, TrendingUp, Wallet, Eye, Printer, ArrowRightLeft, Landmark } from "lucide-react";
+import { Plus, Search, DollarSign, TrendingUp, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText } from "lucide-react";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
 import { useARReceipts, useCustomers } from "@/hooks/useAccountingData";
 import { useBankFees } from "@/hooks/useBankFees";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { ARReceiptForm } from "./ARReceiptForm";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
+import { RelatedJournalEntries } from "./shared/RelatedJournalEntries";
 import { BankFeeForm } from "./BankFeeForm";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 
 export const ARReceiptsView = () => {
   const { data: receipts, isLoading } = useARReceipts();
@@ -30,6 +39,7 @@ export const ARReceiptsView = () => {
   const [bankFeeOpen, setBankFeeOpen] = useState(false);
   const [feeReceiptId, setFeeReceiptId] = useState<string | undefined>();
   const [feeBankAccountId, setFeeBankAccountId] = useState<string | undefined>();
+  const [detailReceipt, setDetailReceipt] = useState<any>(null);
 
   const getCustomerName = (customerId: string) => {
     const customer = customers?.find(c => c.id === customerId);
@@ -246,7 +256,10 @@ export const ARReceiptsView = () => {
                   </TableCell>
                   <TableCell>{getStatusBadge(receipt)}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
+                     <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => setDetailReceipt(receipt)} title="View Details">
+                        <FileText className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleViewReceipt(receipt)}>
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -296,6 +309,60 @@ export const ARReceiptsView = () => {
           businessUnitCode={selectedReceipt?.business_unit_code}
         />
       )}
+
+      {/* Receipt Detail Dialog */}
+      <Dialog open={!!detailReceipt} onOpenChange={(open) => { if (!open) setDetailReceipt(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Receipt Details</DialogTitle>
+            <DialogDescription>
+              {detailReceipt?.receipt_number}
+            </DialogDescription>
+          </DialogHeader>
+          {detailReceipt && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Receipt #</p>
+                  <p className="font-mono font-medium">{detailReceipt.receipt_number}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">{format(new Date(detailReceipt.receipt_date), "MMM dd, yyyy")}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Customer</p>
+                  <p className="font-medium">{getCustomerName(detailReceipt.customer_id)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Method</p>
+                  <p className="font-medium">{getPaymentMethodLabel(detailReceipt.payment_method)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Amount</p>
+                  <p className="font-bold text-lg"><CurrencyDisplay amount={detailReceipt.amount} /></p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Reference</p>
+                  <p className="font-medium">{detailReceipt.reference || "-"}</p>
+                </div>
+              </div>
+
+              {detailReceipt.notes && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Notes</p>
+                    <p className="text-sm">{detailReceipt.notes}</p>
+                  </div>
+                </>
+              )}
+
+              <RelatedJournalEntries sourceId={detailReceipt.id} sourceType="ar_receipt" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
