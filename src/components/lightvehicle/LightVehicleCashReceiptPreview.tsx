@@ -16,7 +16,7 @@ export function LightVehicleCashReceiptPreview({
   receipt,
   companyName = 'NCG FLEET MANAGEMENT',
   companyAddress = '157 Y, Kebelalowita, Weniwelkola, Polgasowita',
-  companyPhone = '+94 11 XXX XXXX',
+  companyPhone = '+94 77 766 5501',
   responsiblePersonPhone,
   responsiblePersonEmail
 }: LightVehicleCashReceiptPreviewProps) {
@@ -24,7 +24,7 @@ export function LightVehicleCashReceiptPreview({
     return `Rs ${amount.toLocaleString()}`;
   };
 
-  const footerPhone = responsiblePersonPhone || '+94 77 123 4567';
+  const footerPhone = responsiblePersonPhone || companyPhone;
   const footerEmail = responsiblePersonEmail || 'info@ncgholdings.lk';
 
   const html = `
