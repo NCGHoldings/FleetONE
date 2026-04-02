@@ -122,7 +122,7 @@ serve(async (req: Request) => {
       } catch (err) {
         console.error(`Error processing recurring invoice ${recurring.id}:`, err);
         results.failed++;
-        results.errors.push(`${recurring.id}: ${err.message}`);
+        results.errors.push(`${recurring.id}: ${(err as Error).message}`);
 
         // Log the failure
         await supabase.from('recurring_invoice_log').insert({
