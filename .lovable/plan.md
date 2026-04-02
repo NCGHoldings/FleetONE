@@ -1,52 +1,50 @@
 
 
-# Fix: AP Payment Creates Duplicate Journal Entries
+# Improve Journal Entry Reversal Flow
 
-## Problem Found
+## Current Issues
+1. Original JE is marked as **"void"** — loses its identity as a reversed entry
+2. The `is_reversal` and `reversed_entry_id` columns exist in the database but are **never populated**
+3. No visual link between original and its reversal entry
+4. Confirmation exists (`window.confirm`) but should use a proper styled dialog
 
-Every AP payment creates **two journal entries** instead of one:
+## Plan
 
-| Payment | JE #1 (on Create) | JE #2 (on Approve) |
-|---------|-------------------|---------------------|
-| PAY-2026-25554 (24K) | JE-22D2 — DR Trade Payable LOCAL / CR **Sampath** ✓ | JE-0CC1 — DR Trade Payable INTERNAL / CR **Seylan** ✗ |
-| PAY-2026-25556 (200K) | JE-H7PO — DR Trade Payable LOCAL / CR **Seylan** ✓ | JE-1J8C — DR Trade Payable INTERNAL / CR **Seylan** ✗ |
-| PAY-2026-25559 (5M) | JE-JR6X — DR Trade Payable LOCAL / CR **Sampath** ✓ | JE-PNBI — DR Trade Payable INTERNAL / CR **Seylan** ✗ (voided) |
+### 1. Add "reversed" to status enum (Migration)
+Add `'reversed'` to the `journal_entry_status` enum so original entries show "REVERSED" badge instead of "VOID".
 
-### Root Cause
+### 2. Update `useReverseJournalEntry` mutation
+**File: `src/hooks/useAccountingMutations.ts`**
 
-Two separate GL posting paths fire for the same payment:
+- Set original entry status to `'reversed'` instead of `'void'`
+- Set `is_reversal: true` and `reversed_entry_id: entryId` on the new reversal entry
+- Set `source_module` on reversal entry matching original's `source_module`
+- After creating reversal, update the original entry's `reversed_entry_id` to point back to the reversal entry (bidirectional link)
 
-1. **`useCreateAPPayment`** (line ~1054-1196): Posts GL at creation time using the **actual bank account** from the form — this is correct.
-2. **`useApproveAPPayment`** (line ~1888-1958): Posts a **second** GL entry on approval using **gl_settings defaults** (Trade Payable INTERNAL + Seylan Bank) — completely ignoring the actual bank used. This is the duplicate.
+### 3. Enhance the Detail Dialog UI
+**File: `src/components/accounting/JournalEntryDetailDialog.tsx`**
 
-Since payments are created with `status: "posted"` and GL is already posted at creation, the approval step should **not** post to GL again.
+- Replace `window.confirm` with a proper `AlertDialog` component (confirmation with description text)
+- Show "Reverse Entry" button only for `posted` entries (already done)
+- When viewing a **reversed** entry: show an info banner — "This entry was reversed by REV-xxx" with a clickable link
+- When viewing a **reversal** entry: show an info banner — "This is a reversal of JE-xxx"  
+- Add `reversed` to status badge variant mapping (e.g., orange/warning color)
 
-## Fix
+### 4. Update JournalEntriesView status filter
+**File: `src/components/accounting/JournalEntriesView.tsx`**
 
-### File: `src/hooks/useAccountingMutations.ts`
+Add "reversed" to the status filter dropdown so users can filter reversed entries.
 
-**In `useApproveAPPayment` (lines 1888-1968):**
-
-Add a **double-posting guard**: before creating a new JE, check if the payment already has a `journal_entry_id`. If it does, skip GL posting entirely — the entry was already created at payment time.
-
-Change the approval mutation to:
-1. Fetch the payment record including `journal_entry_id`
-2. If `journal_entry_id` is already set → skip GL posting, only update approval status
-3. If `journal_entry_id` is null → post GL as before (fallback for old payments that were created without GL)
-
-This is a ~5-line guard check added before the GL posting block.
-
-### Data Cleanup
-
-The 3 duplicate journal entries need attention:
-- **JE-20260402-0CC1** (24K) — duplicate, should be voided
-- **JE-20260402-1J8C** (200K) — duplicate, should be voided  
-- **JE-20260402-PNBI** (5M) — already voided + reversed ✓
-
-I'll void the remaining 2 duplicates and reverse their COA balance impact via a one-time cleanup in the migration or direct guidance.
+## Files to modify
+- **Migration**: Add `'reversed'` to enum
+- `src/hooks/useAccountingMutations.ts` — Populate `is_reversal`, `reversed_entry_id`, use `'reversed'` status
+- `src/components/accounting/JournalEntryDetailDialog.tsx` — AlertDialog confirmation, reversal info banners
+- `src/components/accounting/JournalEntriesView.tsx` — Add "reversed" to status filter
 
 ## Result
-- AP payments post GL exactly once (at creation)
-- Approval step only updates status, no duplicate JE
-- Correct bank account is always used (from payment form, not gl_settings defaults)
+- Original JE shows **"REVERSED"** badge (not void)
+- Reversal JE shows **"POSTED"** with `is_reversal = true`
+- Both entries link to each other with info banners
+- Proper styled confirmation dialog before reversing
+- Full audit trail preserved — nothing hidden
 
