@@ -1,37 +1,37 @@
 
 
-# Fix: Logo Missing + Old Template Appearing in Document Previews
+# Add VAT Toggle to Yutong Quotation Preview
 
-## Root Causes
+## What to build
+A toggle switch above the quotation preview that shows/hides VAT in the pricing table. When enabled, the table displays: SubTotal → Discount → VAT (18%) → Total (with VAT). When disabled, it shows the current layout without VAT. Both preview and PDF download respect the toggle state.
 
-### 1. Logo not rendering
-The `{{ncg_master_logo}}` placeholder falls back to `/ncg-holdings-logo.png` — a relative path. Inside an iframe using `srcDoc`, this path needs to resolve against the app origin. The issue is intermittent because:
-- If `companyData.logo_url` is set (Supabase storage URL), it works when network is good but fails on slow connections
-- If `companyData.logo_url` is empty, the fallback `/ncg-holdings-logo.png` may not resolve inside `srcDoc` iframes consistently
+## Implementation
 
-**Fix**: Convert the fallback to an absolute URL using `window.location.origin + '/ncg-holdings-logo.png'` so it always resolves correctly inside iframes.
+### File: `src/components/yutong/YutongQuotationViewModal.tsx`
+- Add `showVAT` state (`useState(false)`)
+- Render a toggle switch (using existing `Switch` component) above the preview tab content, labeled "Include VAT"
+- Pass `showVAT` prop to `YutongQuotationPreview`
 
-**File: `src/lib/document-template-utils.ts`** (line 162)
-- Change: `companyData?.logo_url || '/ncg-holdings-logo.png'`
-- To: `companyData?.logo_url || \`\${window.location.origin}/ncg-holdings-logo.png\``
-- Apply the same fix to all other fallback references to `/ncg-holdings-logo.png` in this file
+### File: `src/components/yutong/YutongQuotationPreview.tsx`
+- Add `showVAT?: boolean` to the props interface
+- Calculate VAT amount: `const vatRate = 0.18; const vatAmount = showVAT ? grandTotal * vatRate : 0; const totalWithVAT = grandTotal + vatAmount;`
+- After the current Grand Total row, conditionally render (when `showVAT` is true):
 
-### 2. Old template appearing / template flickering
-**File: `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx`** (lines 244-263)
+```text
+Current layout (showVAT off):
+  Bus Subtotal    103,500,000
+  GRAND TOTAL     103,500,000
 
-There is a "TEMPORARY FIX" `useEffect` that **overwrites the AP Payment Voucher template in the database every time the modal opens**. This:
-- Creates a race condition: template renders with old DB content, then gets overwritten async
-- Silently destroys any customized templates
-- Can show stale content if the update hasn't completed before render
+New layout (showVAT on):
+  SubTotal        103,500,000
+  Discount        -
+  VAT (18%)        18,630,000
+  Total           122,130,000
+```
 
-**Fix**: Remove this entire `useEffect` block. Template updates should only happen via "Replace All Templates" in Settings — not on every modal open.
+- When `showVAT` is true: replace the single "GRAND TOTAL" row with 3 summary rows (SubTotal, VAT, Total) styled like the reference screenshot
+- When `showVAT` is false: keep existing layout unchanged
 
-## Files to modify
-- `src/lib/document-template-utils.ts` — Use absolute URL for logo fallback
-- `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx` — Remove the auto-overwrite useEffect
-
-## Result
-- Logo always renders regardless of network timing
-- Templates stay consistent — no more random overwrites on modal open
-- "Replace All Templates" in Settings remains the proper way to update templates
+### No other files need changes
+The PDF download already captures `printRef.current` via `html2canvas`, so whatever is visible in the preview (with or without VAT) will be in the downloaded PDF.
 
