@@ -234,7 +234,20 @@ export const FinanceDocumentPreviewModal = ({
 
   const selectedTemplate = availableTemplates?.find((t) => t.id === selectedTemplateId);
   // Use resolved company for all lookups (sub-company details: phone, email, address, logo)
-  const company = companies?.find((c) => c.id === resolvedCompanyId);
+  // If sub-company has no logo_url, inherit from parent company
+  const resolvedCompany = companies?.find((c) => c.id === resolvedCompanyId);
+  const company = useMemo(() => {
+    if (!resolvedCompany) return undefined;
+    if (resolvedCompany.logo_url) return resolvedCompany;
+    // Inherit logo from parent company
+    if (resolvedCompany.parent_company_id && companies?.length) {
+      const parent = companies.find(c => c.id === resolvedCompany.parent_company_id);
+      if (parent?.logo_url) {
+        return { ...resolvedCompany, logo_url: parent.logo_url };
+      }
+    }
+    return resolvedCompany;
+  }, [resolvedCompany, companies]);
   const hasNoTemplate = !availableTemplates || availableTemplates.length === 0;
 
   // Generate fallback HTML using default template
