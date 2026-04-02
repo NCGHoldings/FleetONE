@@ -250,7 +250,7 @@ export const RelatedJournalEntries = ({ sourceId, sourceType }: RelatedJournalEn
 
       {selectedJEId && (
         <JournalEntryDetailDialog
-          entryId={selectedJEId}
+          entry={journalEntries.find(je => je.id === selectedJEId) || null}
           open={!!selectedJEId}
           onOpenChange={(open) => { if (!open) setSelectedJEId(null); }}
         />
