@@ -148,7 +148,7 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('Error in process-recurring-invoices:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

@@ -27,8 +27,11 @@ Deno.serve(async (req) => {
       .eq('setting_key', 'yutong_report_access_code')
       .single()
 
+    if (!setting) {
+      return new Response(JSON.stringify({ error: 'Access code not configured' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
     const storedCode = typeof setting.setting_value === 'string' ? setting.setting_value : JSON.stringify(setting.setting_value).replace(/"/g, '')
-    if (!setting || storedCode !== access_code) {
+    if (storedCode !== access_code) {
       return new Response(JSON.stringify({ error: 'Invalid access code' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
