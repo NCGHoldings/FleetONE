@@ -3,6 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
 import { Printer, Download, Mail, PenTool } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -46,6 +48,7 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('preview');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showVAT, setShowVAT] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -365,8 +368,18 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
           </TabsList>
 
           <TabsContent value="preview" className="mt-6">
+            <div className="flex items-center gap-3 mb-4 p-3 bg-muted rounded-lg">
+              <Switch
+                id="vat-toggle"
+                checked={showVAT}
+                onCheckedChange={setShowVAT}
+              />
+              <Label htmlFor="vat-toggle" className="text-sm font-medium cursor-pointer">
+                Include VAT (18%)
+              </Label>
+            </div>
             <div ref={printRef}>
-              <YutongQuotationPreview quotation={quotation} key={refreshKey} />
+              <YutongQuotationPreview quotation={quotation} key={refreshKey} showVAT={showVAT} />
             </div>
           </TabsContent>
 

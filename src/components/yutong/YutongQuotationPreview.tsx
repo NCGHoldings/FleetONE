@@ -61,9 +61,10 @@ interface QuotationAddOn {
 
 interface YutongQuotationPreviewProps {
   quotation: YutongQuotation;
+  showVAT?: boolean;
 }
 
-export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotationPreviewProps>(({ quotation }, ref) => {
+export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotationPreviewProps>(({ quotation, showVAT = false }, ref) => {
   const [addOns, setAddOns] = useState<QuotationAddOn[]>([]);
   const [busModelDetails, setBusModelDetails] = useState<BusModelDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -697,36 +698,122 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                 </>
               )}
 
-              {/* Grand Total */}
-              <tr>
-                <td
-                  colSpan={3}
-                  style={{
-                    fontWeight: "bold",
-                    textAlign: "right",
-                    padding: "12px 8px",
-                    fontSize: "16px",
-                    border: "2px solid #003366",
-                    background: "#003366",
-                    color: "white",
-                  }}
-                >
-                  GRAND TOTAL
-                </td>
-                <td
-                  style={{
-                    textAlign: "center",
-                    padding: "12px 8px",
-                    fontSize: "16px",
-                    border: "2px solid #003366",
-                    background: "#003366",
-                    color: "white",
-                    fontWeight: "bold",
-                  }}
-                >
-                  {grandTotal.toLocaleString()}
-                </td>
-              </tr>
+              {/* Grand Total / VAT Section */}
+              {showVAT ? (
+                <>
+                  <tr>
+                    <td
+                      colSpan={3}
+                      style={{
+                        fontWeight: "bold",
+                        textAlign: "right",
+                        padding: "8px",
+                        fontSize: "14px",
+                        border: "1px solid #003366",
+                        background: "#f5f5f5",
+                      }}
+                    >
+                      SubTotal
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "center",
+                        padding: "8px",
+                        fontSize: "14px",
+                        border: "1px solid #003366",
+                        background: "#f5f5f5",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {grandTotal.toLocaleString()}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td
+                      colSpan={3}
+                      style={{
+                        fontWeight: "bold",
+                        textAlign: "right",
+                        padding: "8px",
+                        fontSize: "14px",
+                        border: "1px solid #003366",
+                      }}
+                    >
+                      VAT (18%)
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "center",
+                        padding: "8px",
+                        fontSize: "14px",
+                        border: "1px solid #003366",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {Math.round(grandTotal * 0.18).toLocaleString()}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td
+                      colSpan={3}
+                      style={{
+                        fontWeight: "bold",
+                        textAlign: "right",
+                        padding: "12px 8px",
+                        fontSize: "16px",
+                        border: "2px solid #003366",
+                        background: "#003366",
+                        color: "white",
+                      }}
+                    >
+                      TOTAL (Including VAT)
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "center",
+                        padding: "12px 8px",
+                        fontSize: "16px",
+                        border: "2px solid #003366",
+                        background: "#003366",
+                        color: "white",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {Math.round(grandTotal * 1.18).toLocaleString()}
+                    </td>
+                  </tr>
+                </>
+              ) : (
+                <tr>
+                  <td
+                    colSpan={3}
+                    style={{
+                      fontWeight: "bold",
+                      textAlign: "right",
+                      padding: "12px 8px",
+                      fontSize: "16px",
+                      border: "2px solid #003366",
+                      background: "#003366",
+                      color: "white",
+                    }}
+                  >
+                    GRAND TOTAL
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "center",
+                      padding: "12px 8px",
+                      fontSize: "16px",
+                      border: "2px solid #003366",
+                      background: "#003366",
+                      color: "white",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {grandTotal.toLocaleString()}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
 
