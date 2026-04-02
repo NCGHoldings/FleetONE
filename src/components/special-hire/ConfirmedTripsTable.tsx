@@ -595,7 +595,6 @@ export function ConfirmedTripsTable() {
               document_type,
               payment_type,
               document_status,
-              document_data,
               storage_path,
               file_name,
               generated_at,
