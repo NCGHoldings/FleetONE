@@ -12,7 +12,16 @@ import { useBankFees } from "@/hooks/useBankFees";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { ARReceiptForm } from "./ARReceiptForm";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
+import { RelatedJournalEntries } from "./shared/RelatedJournalEntries";
 import { BankFeeForm } from "./BankFeeForm";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 
 export const ARReceiptsView = () => {
   const { data: receipts, isLoading } = useARReceipts();
