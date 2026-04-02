@@ -1736,15 +1736,24 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       // Fetch current bank details from finance settings for point-in-time capture
       let bankDetails: { payment_bank_name?: string; payment_account_name?: string; payment_account_no?: string } = {};
       if (!isEditing) {
+        // Fetch bank details scoped to the effective company to support multi-company setup
         const { data: finSettings } = await supabase
           .from('special_hire_finance_settings')
           .select('quotation_bank_name, quotation_account_name, quotation_account_no')
-          .single();
+          .limit(1)
+          .maybeSingle();
         if (finSettings) {
           bankDetails = {
             payment_bank_name: (finSettings as any).quotation_bank_name || 'Commercial Bank - Nugegoda',
             payment_account_name: (finSettings as any).quotation_account_name || 'NCG EXPRESS (PVT) LTD',
             payment_account_no: (finSettings as any).quotation_account_no || '1001077213',
+          };
+        } else {
+          // Fallback to new Commercial Bank details
+          bankDetails = {
+            payment_bank_name: 'Commercial Bank - Nugegoda',
+            payment_account_name: 'NCG EXPRESS (PVT) LTD',
+            payment_account_no: '1001077213',
           };
         }
       }

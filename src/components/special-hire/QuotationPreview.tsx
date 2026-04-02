@@ -989,21 +989,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         <div data-pdf-section="extra-charges">
         <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Extra{"\u00A0"}Charges</div>
         <div className="text-xs leading-tight text-gray-800" style={{ whiteSpace: "pre-wrap", overflowWrap: "break-word" }}>
-          {rateCard ? (
-            <>
-              Exceeding Per Kilometer will be charged Rs {rateCard.exceeding_km_rate_lkr?.toLocaleString() || "300.00"}
-              <br />
-              Exceeding per hour will be charged Rs {rateCard.overtime_rate_lkr_per_hour?.toLocaleString() || "1500.00"}
-              <br />
-            </>
-          ) : (
-            <>
-              Exceeding Per Kilometer will be charged Rs 300.00
-              <br />
-              Exceeding per hour will be charged Rs 1500.00
-              <br />
-            </>
-          )}
+          Exceeding Per Kilometer will be charged Rs {rateCard?.exceeding_km_rate_lkr?.toLocaleString() || "300.00"}
 
           {/* Additional Distance Charges */}
           {additionalCharges.filter((charge) => charge.type === "additional_distance").length > 0 && (
@@ -1029,11 +1015,11 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         <div data-pdf-section="payment-info">
           <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment{"\u00A0"}Information</div>
            <div className="text-xs leading-tight text-gray-800">
-             Account{"\u00A0"}No.{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_account_no || "1934 1401 7578"}
+             Account{"\u00A0"}No.{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_account_no || "1001077213"}
              <br />
              Account{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_account_name || "NCG EXPRESS (PVT) LTD"}
              <br />
-             Bank{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_bank_name || "Sampath Bank, Nugegoda"}
+             Bank{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_bank_name || "Commercial Bank - Nugegoda"}
           </div>
         </div>
 
