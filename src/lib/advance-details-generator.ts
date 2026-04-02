@@ -372,7 +372,7 @@ export function generateAdvanceDetailsHTML(data: AdvanceDetailsData, logoUrl?: s
 
         <!-- Footer -->
         <div class="footer">
-          <div>NCG Express - Transport Management System</div>
+          <div>NCG Holding (Pvt) Ltd - Transport Management System</div>
           <div>Page 1 of 1</div>
         </div>
       </div>
