@@ -28288,7 +28288,7 @@ export type Database = {
         | "completed"
         | "failed"
         | "approved"
-      journal_status: "draft" | "posted" | "void"
+      journal_status: "draft" | "posted" | "void" | "reversed"
       late_entry_status: "pending" | "approved" | "rejected"
       maintenance_status: "pending" | "in_progress" | "completed" | "cancelled"
       notification_status: "pending" | "sent" | "failed"
@@ -28594,7 +28594,7 @@ export const Constants = {
         "failed",
         "approved",
       ],
-      journal_status: ["draft", "posted", "void"],
+      journal_status: ["draft", "posted", "void", "reversed"],
       late_entry_status: ["pending", "approved", "rejected"],
       maintenance_status: ["pending", "in_progress", "completed", "cancelled"],
       notification_status: ["pending", "sent", "failed"],
