@@ -379,6 +379,78 @@ export const APPaymentsView = () => {
         onOpenChange={setChequePrintOpen}
         cheque={printCheque}
       />
+
+      {/* Payment Detail Dialog */}
+      <Dialog open={!!detailPayment} onOpenChange={(open) => { if (!open) setDetailPayment(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Payment Details</DialogTitle>
+            <DialogDescription>
+              {detailPayment?.payment_number}
+            </DialogDescription>
+          </DialogHeader>
+          {detailPayment && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Payment #</p>
+                  <p className="font-mono font-medium">{detailPayment.payment_number}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">{format(new Date(detailPayment.payment_date), "MMM dd, yyyy")}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Vendor</p>
+                  <p className="font-medium">{getVendorName(detailPayment.vendor_id)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Method</p>
+                  <p className="font-medium">{getPaymentMethodLabel(detailPayment.payment_method || "")}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Amount</p>
+                  <p className="font-bold text-lg"><CurrencyDisplay amount={detailPayment.amount} /></p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Reference</p>
+                  <p className="font-medium">{detailPayment.reference || "-"}</p>
+                </div>
+              </div>
+
+              {detailPayment.cheque_number && (
+                <>
+                  <Separator />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Cheque #</p>
+                      <p className="font-mono font-medium">{detailPayment.cheque_number}</p>
+                    </div>
+                    {detailPayment.cheque_date && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Cheque Date</p>
+                        <p className="font-medium">{format(new Date(detailPayment.cheque_date), "MMM dd, yyyy")}</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {detailPayment.notes && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Notes</p>
+                    <p className="text-sm">{detailPayment.notes}</p>
+                  </div>
+                </>
+              )}
+
+              <RelatedJournalEntries sourceId={detailPayment.id} sourceType="ap_payment" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
