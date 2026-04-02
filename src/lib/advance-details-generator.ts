@@ -232,10 +232,10 @@ export function generateAdvanceDetailsHTML(data: AdvanceDetailsData, logoUrl?: s
       <div class="document">
         <!-- Header -->
         <div class="header">
-          ${logoUrl ? `<img src="${logoUrl}" alt="NCG Express" />` : '<div style="width: 200px;"></div>'}
+           ${logoUrl ? `<img src="${logoUrl}" alt="NCG Holdings" />` : '<div style="width: 200px;"></div>'}
           <div class="header-title">
             <h1>Advance Payment Details</h1>
-            <p class="header-subtitle">NCG Express Transport Services</p>
+            <p class="header-subtitle">NCG Holding (Pvt) Ltd - Transport Services</p>
           </div>
         </div>
 
@@ -372,7 +372,7 @@ export function generateAdvanceDetailsHTML(data: AdvanceDetailsData, logoUrl?: s
 
         <!-- Footer -->
         <div class="footer">
-          <div>NCG Express - Transport Management System</div>
+          <div>NCG Holding (Pvt) Ltd - Transport Management System</div>
           <div>Page 1 of 1</div>
         </div>
       </div>

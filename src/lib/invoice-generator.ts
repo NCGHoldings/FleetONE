@@ -65,7 +65,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
   const isAdvanceInvoice = data.invoiceType === 'advance';
   const isSalesReceipt = data.document_type === 'sales_receipt' || isAdvanceInvoice;
   const currentDate = format(new Date(), 'dd/MM/yyyy');
-  const companyLogo = data.companyLogo || '/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png';
+  const companyLogo = data.companyLogo || '/lovable-uploads/ncg-holdings-logo.png';
   const isDraft = data.invoice_status === 'draft' && !data.forCustomer;
   const documentTitle = isSalesReceipt ? 'SALES RECEIPT' : 'INVOICE';
 
@@ -110,7 +110,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <img src="${companyLogo}" alt="Company Logo" style="width: 150px;">
           <div style="text-align: right; font-size: 13px;">
-            <b>NCG EXPRESS (PRIVATE) LIMITED</b><br>
+             <b>NCG Holding (Pvt) Ltd</b><br>
             157/1, Kebellaowita, Wenwellkola, Polgasowita<br>
             0777556322
           </div>
@@ -198,7 +198,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
 
         <div style="margin-top: 40px; text-align: center; font-size: 12px;">
           Page 1 of 1 <br>
-          NCG Express Transport Management System
+           NCG Holding - Transport Management System
         </div>
 
       </div>
@@ -231,9 +231,9 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           ${isDraft ? '<div class="draft-watermark"><div class="draft-text">DRAFT</div></div>' : ''}
           
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-            <img src="${companyLogo}" alt="NCG Express Logo" style="height: 70px;">
+             <img src="${companyLogo}" alt="NCG Holdings Logo" style="height: 70px;">
             <div style="text-align: right; font-size: 14px;">
-              <strong>NCG EXPRESS (PRIVATE) LIMITED</strong><br>
+              <strong>NCG Holding (Pvt) Ltd</strong><br>
               157, Kebellawovita, Wenivelkola, Polgasovita<br>
               0777556322
             </div>
@@ -376,17 +376,17 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           ` : ''}
 
           <div style="margin-top: 20px; font-size: 13px; clear: both;">
-            <strong>Payment Info</strong><br>
-            Account No: <b>193414017578</b><br>
-            Account Name: <b>NCG Express (Pvt) Limited</b><br>
-            Bank & Branch: <b>Sampath Bank - Nugegoda</b><br><br>
+             <strong>Payment Info</strong><br>
+            Account No: <b>1001077213</b><br>
+            Account Name: <b>NCG Holding (Pvt) Ltd</b><br>
+            Bank & Branch: <b>Commercial Bank - Nugegoda</b><br><br>
             <strong>Terms & Conditions:</strong><br>
-            1. Cheques are to be drawn in favour of <b>NCG EXPRESS (PVT) LIMITED</b> and A/C payee only.
+            1. Cheques are to be drawn in favour of <b>NCG Holding (Pvt) Ltd</b> and A/C payee only.
           </div>
 
           <div style="margin-top: 15px; padding-top: 10px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
             ${!data.forCustomer ? 'Page 1 of 2<br>' : ''}
-            NCG Express Transport Management System
+             NCG Holding - Transport Management System
           </div>
         </div>
 
@@ -395,7 +395,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         <div data-pdf-page="2" style="position: relative; width: 210mm; min-height: 297mm; padding: 15px 15px 25px 15px; box-sizing: border-box; background: #fff;">
 
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #000;">
-            <img src="${companyLogo}" alt="NCG Express Logo" style="height: 50px;">
+            <img src="${companyLogo}" alt="NCG Holdings Logo" style="height: 50px;">
             <div style="text-align: right; font-size: 13px;">
               <strong>${documentTitle} - ${data.invoiceNo}</strong><br>
               <span style="font-size: 12px; color: #555;">${data.quotationNo} | ${currentDate}</span>
@@ -445,7 +445,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
 
           <div style="margin-top: 20px; padding-top: 15px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
             Page 2 of 2<br>
-            NCG Express Transport Management System
+            NCG Holding - Transport Management System
           </div>
         </div>
         ` : ''}

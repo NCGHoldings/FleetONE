@@ -65,8 +65,8 @@ export function AdvanceReceiptPreview({ data, className = '' }: Props) {
       {/* Header */}
       <div className="flex justify-between items-start mb-5">
         <img
-          src="/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png"
-          alt="NCG Express Logo"
+           src="/lovable-uploads/ncg-holdings-logo.png"
+          alt="NCG Holdings Logo"
           style={{ width: '150px' }}
         />
         <div className="text-right text-sm">

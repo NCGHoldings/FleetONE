@@ -67,7 +67,7 @@ export function SpecialHireQuotationRepeatModal({
         .maybeSingle();
       const bankSnapshot = {
         payment_bank_name: (finSettings as any)?.quotation_bank_name || 'Commercial Bank - Nugegoda',
-        payment_account_name: (finSettings as any)?.quotation_account_name || 'NCG EXPRESS (PVT) LTD',
+        payment_account_name: (finSettings as any)?.quotation_account_name || 'NCG Holding (Pvt) Ltd',
         payment_account_no: (finSettings as any)?.quotation_account_no || '1001077213',
       };
 
