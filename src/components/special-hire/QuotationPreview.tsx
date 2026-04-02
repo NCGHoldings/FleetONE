@@ -1015,11 +1015,11 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         <div data-pdf-section="payment-info">
           <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Payment{"\u00A0"}Information</div>
            <div className="text-xs leading-tight text-gray-800">
-             Account{"\u00A0"}No.{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_account_no || "1001077213"}
-             <br />
-             Account{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_account_name || "NCG EXPRESS (PVT) LTD"}
-             <br />
-             Bank{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_bank_name || "Commercial Bank - Nugegoda"}
+              Account{"\u00A0"}No.{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_account_no || "1934 1401 7578"}
+              <br />
+              Account{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_account_name || "NCG EXPRESS (PVT) LTD"}
+              <br />
+              Bank{"\u00A0"}Name{"\u00A0"}:{"\u00A0"}{(quotation as any).payment_bank_name || "Sampath Bank, Nugegoda"}
           </div>
         </div>
 
