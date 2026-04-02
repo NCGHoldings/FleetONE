@@ -46,6 +46,8 @@ export interface SinotruckOrderInvoiceData {
   supplier_name?: string;
   supplier_address?: string;
   supplier_phone?: string;
+  companyEmail?: string;
+  companyPhone?: string;
   purchaser_tin?: string;
   purchaser_phone?: string;
   date_of_delivery?: string;
