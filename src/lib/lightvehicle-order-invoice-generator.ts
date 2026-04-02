@@ -554,7 +554,7 @@ export function generateLightVehicleOrderInvoiceHTML(data: LightVehicleOrderInvo
             <h1>NCG HOLDINGS</h1>
             <p class="subtitle">Light Vehicle Sales Division</p>
             <p>No. 123, Highlevel Road, Nugegoda, Sri Lanka</p>
-            <p>Tel: +94 11 XXX XXXX | Email: sales@ncgholdings.lk</p>
+            <p>Tel: ${data.companyPhone || '+94 77 766 5501'} | Email: ${data.companyEmail || 'info@ncgholdings.lk'}</p>
             <p>VAT Reg: XXXXXXXXXX</p>
           </div>
           <div class="invoice-badge">
