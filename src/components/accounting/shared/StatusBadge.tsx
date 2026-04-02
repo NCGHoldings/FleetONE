@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 type StatusType = 
   | "draft" | "posted" | "void" | "approved" | "rejected" | "pending" | "unpaid"
   | "open" | "closed" | "paid" | "partial" | "overdue" | "cancelled"
-  | "active" | "inactive" | "reconciled" | "unreconciled";
+  | "active" | "inactive" | "reconciled" | "unreconciled" | "reversed";
 
 interface StatusBadgeProps {
   status: string;
@@ -29,6 +29,7 @@ const statusConfig: Record<StatusType, { variant: "default" | "secondary" | "des
   inactive: { variant: "secondary", label: "Inactive" },
   reconciled: { variant: "default", label: "Reconciled" },
   unreconciled: { variant: "outline", label: "Unreconciled" },
+  reversed: { variant: "outline", label: "Reversed" },
 };
 
 export const StatusBadge = ({ status, className }: StatusBadgeProps) => {
