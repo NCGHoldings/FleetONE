@@ -376,12 +376,12 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           ` : ''}
 
           <div style="margin-top: 20px; font-size: 13px; clear: both;">
-            <strong>Payment Info</strong><br>
-            Account No: <b>193414017578</b><br>
-            Account Name: <b>NCG Express (Pvt) Limited</b><br>
-            Bank & Branch: <b>Sampath Bank - Nugegoda</b><br><br>
+             <strong>Payment Info</strong><br>
+            Account No: <b>1001077213</b><br>
+            Account Name: <b>NCG Holding (Pvt) Ltd</b><br>
+            Bank & Branch: <b>Commercial Bank - Nugegoda</b><br><br>
             <strong>Terms & Conditions:</strong><br>
-            1. Cheques are to be drawn in favour of <b>NCG EXPRESS (PVT) LIMITED</b> and A/C payee only.
+            1. Cheques are to be drawn in favour of <b>NCG Holding (Pvt) Ltd</b> and A/C payee only.
           </div>
 
           <div style="margin-top: 15px; padding-top: 10px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
