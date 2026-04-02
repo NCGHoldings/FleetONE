@@ -1,55 +1,96 @@
 
 
-# Fix: Special Hire Finance Settings Missing for LIVE Company
+# Cross-Check: Special Hire + Yutong — Complete Flow Diagrams + Fix Build Errors
 
-## Root Cause
+## Part 1: Build Error Fixes (17 TypeScript errors in Edge Functions)
 
-The `special_hire_finance_settings` table only has ONE row — for the **TEST** company (`f40b0a9d...`). The **LIVE** company (`a0000000...`) has **no settings row at all**. When you browse Special Hire on LIVE, `getEffectiveCompanyId()` returns `a0000000...`, the query finds nothing, and the system shows "Finance settings not configured."
+All errors are `error is of type 'unknown'` — need to cast to `Error` before accessing `.message`. Affects 7 files:
 
-This is NOT a network issue — it's a missing database record.
+| File | Lines | Fix |
+|------|-------|-----|
+| `populate-sample-fleet-data/index.ts` | 167 | `(error as Error).message` |
+| `process-payment-reminders/index.ts` | 207, 216, 234 | Cast `invErr`, `ruleErr`, `error` |
+| `process-recurring-invoices/index.ts` | 125, 131, 151 | Cast `err`, `error` |
+| `run-scheduled-tasks/index.ts` | 91, 99, 119 | Cast `taskErr`, `error` |
+| `service-callback/index.ts` | 119 | Cast `error` |
+| `submit-special-hire/index.ts` | 87 | Cast `error` |
+| `sync-staff-registry/index.ts` | 301 | Cast `error` |
+| `update-bus-odometer/index.ts` | 121 | Cast `error` |
+| `yutong-executive-report/index.ts` | 30 | Add null check for `setting` |
 
-The second error in the console (`Could not find a relationship between 'special_hire_ings' and 'chart_of_accounts'`) is a PostgREST schema cache issue from the new bank detail columns added in the last migration. This resolves by reloading the schema cache.
+## Part 2: Flow Diagrams
 
-## What Needs to Happen
+Two Mermaid diagrams will be generated to `/mnt/documents/`:
 
-### 1. SQL Migration — Insert LIVE company finance settings
+### Diagram 1: Special Hire Complete Operation-to-Finance Flow
 
-Create a `special_hire_finance_settings` row for company `a0000000-0000-0000-0000-000000000001` with the correct LIVE COA account IDs:
+Covers all scenarios verified against the code:
 
-| Setting | Account Code | Account Name | LIVE ID |
-|---------|-------------|--------------|---------|
-| Revenue Internal | 41103002 | TRANSPORT INCOME - SPECIAL HIRES INTERNAL | `51f1c30d-1bb8-4056-b423-82ced47ba3b0` |
-| Revenue External | 41103003 | TRANSPORT INCOME - SPECIAL HIRES EXTERNAL | `d28e31b7-52b9-45ad-85aa-e75e7661bad9` |
-| Trade Receivable | 12201001 | TRADE RECEIVABLE-EXTERNAL | `a1678110-362a-4e45-8014-350e49620b8f` |
-| Customer Advance | 22303001 | CUSTOMER ADVANCES | `ffe5f2b1-c2ad-4598-874d-153852a55646` |
-| Default Bank | 13001004 | COMMERCIAL BANK C/A - 1000516089 | `829019e2-e498-4c6e-a616-2423f047a535` |
-| VAT Output | 22302001 | VAT PAYABLE | `7f4b14be-19ba-453d-ae83-c93f394f60c9` |
-| WHT Payable | 22201007 | WHT PAYABLE | `6fdfcd2d-714e-49cc-9c23-35308247bc79` |
-| Commission Expense | 61301010 | SALES COMMISSION | `54f07249-a254-4d12-8d1d-7f68c6a76230` |
-| Bank details | Commercial Bank - Nugegoda, A/C 1001077213, NCG EXPRESS (PVT) LTD |
+```text
+OPERATIONS FLOW:
+  Quotation Created → Payment Received → Trip Completed → Post-Trip Adjustment → Invoice Sent → Balance Paid → Settled
 
-Auto-post flags all enabled. Prefixes: `SPH-INV`, `SPH-ADV`.
+FINANCE FLOW (Journal Entries):
+  JE1: Advance Payment     → DR Bank (13001011)           CR Customer Advance (22303001)
+  JE2: Full Payment         → DR Bank (13001011)           CR Customer Advance (22303001)
+  JE3: AR Invoice (Revenue) → DR Trade Receivable (12201001) CR Revenue Int/Ext (41103002/03)
+  JE4: Post-Trip Adjustment → DR Trade Receivable (12201001) CR Revenue Int/Ext (41103002/03)
+  JE5: Balance Payment      → DR Bank (13001011)           CR Trade Receivable (12201001)
+  JE6: Advance Application  → DR Customer Advance (22303001) CR Trade Receivable (12201001)
+  JE7: Discount (if any)    → DR Discount Expense           CR Trade Receivable (12201001)
+  JE8: Refund (if cancel)   → DR Customer Advance (22303001) CR Bank (13001011)
 
-### 2. Add new SHS bank account to LIVE COA
+SETTLEMENT CHECK:
+  Trade Receivable = Invoice + Adjustments - Advance Applied - Balance Paid - Discount = 0 ✓
+  Customer Advance = Payments In - Applied - Refunded = 0 ✓
+  Bank = All cash in - Refunds out ✓
+```
 
-The new Commercial Bank Nugegoda account (`1001077213`) needs a COA entry. Add:
-- Code: `13001011`
-- Name: `COMMERCIAL BANK C/A - 1001077213 (SHS)`
-- Type: Asset
-- Under the existing bank section
+### Diagram 2: Yutong Complete Operation-to-Finance Flow
 
-Then update the LIVE finance settings `default_bank_account_id` to point to this new account.
+```text
+OPERATIONS FLOW:
+  Quotation → Order → Payment (Advance) → Invoice Gen (PI/CI/TI) → Invoice Approval → Balance Payment → Delivered
 
-### 3. Notify PostgREST to reload schema cache
+FINANCE FLOW (Journal Entries):
+  JE1: Advance Payment       → DR Bank                     CR Customer Advance (22303001)
+  JE2: Invoice Approval       → DR Trade Receivable (12201001) CR Sales Revenue (41101001) + CR VAT Output (22302001)
+  JE3: Advance Application    → DR Customer Advance (22303001) CR Trade Receivable (12201001)
+  JE4: Balance Payment        → DR Bank                     CR Trade Receivable (12201001)
+  JE5: Full Payment (no adv)  → DR Bank                     CR Sales Revenue (41101001)
 
-Add `notify pgrst, 'reload schema'` at the end of the migration to clear the foreign key relationship cache error.
+AR INTEGRATION:
+  - Draft AR Invoice created at invoice generation (PI/CI/TI)
+  - Revenue JE linked back to ar_invoices.journal_entry_id on approval
+  - Balance payments create AR Receipts + Allocations
+  - Invoice status: draft → approved → partial → paid
+
+SETTLEMENT CHECK:
+  Trade Receivable = Invoice Amount - Advance Applied - Balance Paid = 0 ✓
+  Customer Advance = Advance In - Applied = 0 ✓
+  Revenue = Invoice Amount (excl VAT if tax invoice) ✓
+```
+
+### Cross-Check Verification Points
+
+Both modules will be validated against these accounting principles:
+1. Every JE has total_debit = total_credit (balanced)
+2. COA balances update correctly (debit-normal vs credit-normal)
+3. source_module tagged on every JE
+4. business_unit_code tagged (SPH / YUT)
+5. No revenue leakage (all income hits correct revenue account via item category)
+6. No double-posting (guards check existing journal_entry_id)
+7. AR Invoice ↔ JE linkage maintained
+8. Bank balance reflects all cash movements
 
 ## Files to modify
-- **SQL migration** — Insert LIVE settings row, add new bank COA entry, reload schema cache
+
+1. **7 edge function files** — Add `(error as Error).message` casts
+2. **1 edge function file** — Add null check for `setting`
+3. **Generate 2 Mermaid diagrams** to `/mnt/documents/`
 
 ## Result
-- Special Hire finance on LIVE works immediately — no more "not configured" message
-- All GL postings use correct LIVE COA accounts
-- New SHS bank account (Commercial Bank 1001077213) is properly tracked in COA
-- Past quotations unaffected (point-in-time bank snapshot already in place)
+- All 17 build errors fixed
+- Two comprehensive flow diagrams showing every operation step and its corresponding double-entry journal entry
+- Complete cross-reference between Operations and Finance for both Special Hire and Yutong
 
