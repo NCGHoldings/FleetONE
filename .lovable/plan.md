@@ -1,44 +1,28 @@
 
 
-# Fix: Update Bank Account Name + Replace Logo in Special Hire Documents
+# Fix: Bank Name Still Shows "NCG EXPRESS (PVT) LTD" in Quotation Preview
 
-## Two Changes
+## Problem
+The previous update missed the fallback values in `QuotationPreview.tsx` lines 1018-1022. These are the values shown when a quotation has no stored bank snapshot (`payment_account_name`, `payment_bank_name`, etc. are null).
 
-### 1. Bank Account Name: "NCG EXPRESS (PVT) LTD" → "NCG Holding (Pvt) Ltd"
-Update all **default/fallback** values only — old quotations with snapshot data keep their original values.
+The old Sampath Bank fallback is intentionally kept for **historical** quotations (pre-transition). But the screenshot shows a **new** quotation (QUO-2026-1765) still displaying "NCG EXPRESS (PVT) LTD" — meaning the bank snapshot wasn't saved during creation, or the fallback is being used.
 
-**Files with hardcoded fallback "NCG EXPRESS (PVT) LTD":**
-- `src/components/special-hire/SpecialHireFinanceSettings.tsx` — default value and placeholder
-- `src/components/special-hire/SpecialHireForm.tsx` — fallback in bank snapshot creation
-- `src/components/special-hire/SpecialHireQuotationRepeatModal.tsx` — fallback in repeat flow
-- `src/components/special-hire/QuotationPreview.tsx` — fallback when snapshot is empty (old quotations keep Sampath Bank fallback as-is for historical accuracy)
+## Root Cause
+Two possibilities:
+1. The fallback on line 1020 still says "NCG EXPRESS (PVT) LTD" — needs updating to "NCG Holding (Pvt) Ltd"
+2. The quotation was created before the SpecialHireForm snapshot fix was applied, so it has null bank fields
 
-**Files with hardcoded bank details in invoice/receipt HTML:**
-- `src/lib/invoice-generator.ts` — hardcoded "NCG Express (Pvt) Limited" and "Sampath Bank" in payment info section → update to "NCG Holding (Pvt) Ltd" and "Commercial Bank - Nugegoda" with account "1001077213"
+## Fix
 
-### 2. Logo: Replace old NCG Express logo with NCG Holdings logo
-Copy `user-uploads://images-2.png` to `public/lovable-uploads/` as the replacement, then update all references from the old logo path to the NCG Holdings logo.
+**File: `src/components/special-hire/QuotationPreview.tsx`** (lines 1018-1022)
 
-**Files referencing old logo (`52e834c4-cfda-4ea3-9da7-aac1f23e1162.png`):**
-- `src/components/special-hire/QuotationPreview.tsx` (2 places)
-- `src/components/special-hire/BalanceInvoicePreview.tsx`
-- `src/components/special-hire/AdvanceReceiptPreview.tsx`
-- `src/components/special-hire/PostTripAdjustmentPreview.tsx`
-- `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
-- `src/components/special-hire/AdvanceDetailsPreview.tsx`
-- `src/lib/invoice-generator.ts` (fallback)
-- `src/lib/advance-details-generator.ts`
+Update the 3 fallback values:
+- `"1934 1401 7578"` → `"1001077213"`
+- `"NCG EXPRESS (PVT) LTD"` → `"NCG Holding (Pvt) Ltd"`
+- `"Sampath Bank, Nugegoda"` → `"Commercial Bank - Nugegoda"`
 
-All logo references updated to use the new NCG Holdings logo at **same size, same position** — only the image file changes.
+Also update the footer on line 1029:
+- `"NCG Express"` → `"NCG Holding (Pvt) Ltd"`
 
-### 3. Company name text in HTML generators
-Update "NCG EXPRESS (PRIVATE) LIMITED" text references to "NCG Holding (Pvt) Ltd" in:
-- `src/lib/invoice-generator.ts`
-- `src/lib/advance-details-generator.ts`
-
-### What stays unchanged
-- Old quotations with existing `payment_account_name` snapshot → rendered as stored
-- Old quotations with null snapshot → keep Sampath Bank fallback (historical accuracy)
-- Logo size, position, and layout — identical, just different image
-- No flow changes, no structural changes
+**Note**: Old quotations that already have snapshot data stored will continue showing their original bank details — this only affects the fallback for quotations with null snapshot fields.
 
