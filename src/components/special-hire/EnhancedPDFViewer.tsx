@@ -514,8 +514,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
               }}
             />
           )}
-
-        {/* Fabric Canvas Overlay */}
+        </div>
         <canvas
           ref={canvasRef}
           className="absolute top-0 left-0 pointer-events-auto"
