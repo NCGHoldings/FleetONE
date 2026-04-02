@@ -1,55 +1,44 @@
 
 
-# Special Hire — Complete Operations & Finance Flow Diagram
+# Fix: Update Bank Account Name + Replace Logo in Special Hire Documents
 
-## What to build
-A detailed Mermaid diagram saved to `/mnt/documents/` showing the full Special Hire lifecycle from customer inquiry through to final GL settlement, with every journal entry and document listed.
+## Two Changes
 
-## Diagram content
+### 1. Bank Account Name: "NCG EXPRESS (PVT) LTD" → "NCG Holding (Pvt) Ltd"
+Update all **default/fallback** values only — old quotations with snapshot data keep their original values.
 
-### Operations Flow
-1. Customer Inquiry (Public Form / Manual)
-2. Quotation Created (versioning, bank snapshot, terms)
-3. Customer Confirmation
-4. Advance Payment (optional)
-5. Trip Assignment (driver, bus, route)
-6. Trip Execution
-7. Post-Trip Adjustments (extra KM, expenses, waiting)
-8. Final Invoice / AR Invoice generation
-9. Balance Payment
-10. Settlement & Closure
+**Files with hardcoded fallback "NCG EXPRESS (PVT) LTD":**
+- `src/components/special-hire/SpecialHireFinanceSettings.tsx` — default value and placeholder
+- `src/components/special-hire/SpecialHireForm.tsx` — fallback in bank snapshot creation
+- `src/components/special-hire/SpecialHireQuotationRepeatModal.tsx` — fallback in repeat flow
+- `src/components/special-hire/QuotationPreview.tsx` — fallback when snapshot is empty (old quotations keep Sampath Bank fallback as-is for historical accuracy)
 
-### Finance Flow (4 Journal Entries)
-| Step | Journal Entry | Debit | Credit |
-|------|--------------|-------|--------|
-| 1. Advance Payment received | JE-1 | Bank (13001011) | Customer Advance (22303001) |
-| 2. AR Invoice approved | JE-2 | Trade Receivable (12201001) | SPH Revenue (41103002/3) + VAT Output (22302001) |
-| 3. Balance Payment received | JE-3 | Bank (13001011) | Trade Receivable (12201001) |
-| 4. Advance Application (auto) | JE-4 | Customer Advance (22303001) | Trade Receivable (12201001) |
+**Files with hardcoded bank details in invoice/receipt HTML:**
+- `src/lib/invoice-generator.ts` — hardcoded "NCG Express (Pvt) Limited" and "Sampath Bank" in payment info section → update to "NCG Holding (Pvt) Ltd" and "Commercial Bank - Nugegoda" with account "1001077213"
 
-### Documents Generated
-- Quotation PDF (with bank snapshot)
-- Sales Receipt (advance)
-- AR Invoice PDF
-- Final Invoice PDF
-- Balance Receipt
-- Payment Voucher (if applicable)
+### 2. Logo: Replace old NCG Express logo with NCG Holdings logo
+Copy `user-uploads://images-2.png` to `public/lovable-uploads/` as the replacement, then update all references from the old logo path to the NCG Holdings logo.
 
-### Database Tables Hit
-- `special_hire_submissions`
-- `special_hire_quotations`
-- `special_hire_payments`
-- `special_hire_invoices`
-- `special_hire_trip_expenses`
-- `special_hire_post_trip_adjustments`
-- `finance_customers`
-- `ar_invoices` + `ar_invoice_items`
-- `journal_entries` + `journal_entry_lines`
-- `special_hire_finance_settings`
+**Files referencing old logo (`52e834c4-cfda-4ea3-9da7-aac1f23e1162.png`):**
+- `src/components/special-hire/QuotationPreview.tsx` (2 places)
+- `src/components/special-hire/BalanceInvoicePreview.tsx`
+- `src/components/special-hire/AdvanceReceiptPreview.tsx`
+- `src/components/special-hire/PostTripAdjustmentPreview.tsx`
+- `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
+- `src/components/special-hire/AdvanceDetailsPreview.tsx`
+- `src/lib/invoice-generator.ts` (fallback)
+- `src/lib/advance-details-generator.ts`
 
-## Output
-Single comprehensive Mermaid `.mmd` file at `/mnt/documents/special-hire-ops-finance-flow.mmd`
+All logo references updated to use the new NCG Holdings logo at **same size, same position** — only the image file changes.
 
-## No code changes needed
-This is a documentation/visualization task only.
+### 3. Company name text in HTML generators
+Update "NCG EXPRESS (PRIVATE) LIMITED" text references to "NCG Holding (Pvt) Ltd" in:
+- `src/lib/invoice-generator.ts`
+- `src/lib/advance-details-generator.ts`
+
+### What stays unchanged
+- Old quotations with existing `payment_account_name` snapshot → rendered as stored
+- Old quotations with null snapshot → keep Sampath Bank fallback (historical accuracy)
+- Logo size, position, and layout — identical, just different image
+- No flow changes, no structural changes
 
