@@ -61,9 +61,10 @@ interface QuotationAddOn {
 
 interface YutongQuotationPreviewProps {
   quotation: YutongQuotation;
+  showVAT?: boolean;
 }
 
-export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotationPreviewProps>(({ quotation }, ref) => {
+export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotationPreviewProps>(({ quotation, showVAT = false }, ref) => {
   const [addOns, setAddOns] = useState<QuotationAddOn[]>([]);
   const [busModelDetails, setBusModelDetails] = useState<BusModelDetails | null>(null);
   const [loading, setLoading] = useState(true);
