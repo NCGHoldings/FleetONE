@@ -20,9 +20,9 @@ interface RelatedJournalEntriesProps {
 interface JELine {
   id: string;
   account_id: string;
-  debit_amount: number;
-  credit_amount: number;
-  description: string;
+  debit: number;
+  credit: number;
+  description: string | null;
   account?: { account_code: string; account_name: string } | null;
 }
 
