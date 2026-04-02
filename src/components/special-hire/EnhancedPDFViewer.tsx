@@ -41,6 +41,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   const [drawingColor, setDrawingColor] = useState('#000000');
   const [brushWidth, setBrushWidth] = useState(2);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [iframeLoadFailed, setIframeLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!canvasRef.current || !pdfContainerRef.current) return;
