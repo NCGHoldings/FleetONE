@@ -386,7 +386,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
 
           <div style="margin-top: 15px; padding-top: 10px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
             ${!data.forCustomer ? 'Page 1 of 2<br>' : ''}
-            NCG Express Transport Management System
+             NCG Holding - Transport Management System
           </div>
         </div>
 
