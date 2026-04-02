@@ -368,8 +368,18 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
           </TabsList>
 
           <TabsContent value="preview" className="mt-6">
+            <div className="flex items-center gap-3 mb-4 p-3 bg-muted rounded-lg">
+              <Switch
+                id="vat-toggle"
+                checked={showVAT}
+                onCheckedChange={setShowVAT}
+              />
+              <Label htmlFor="vat-toggle" className="text-sm font-medium cursor-pointer">
+                Include VAT (18%)
+              </Label>
+            </div>
             <div ref={printRef}>
-              <YutongQuotationPreview quotation={quotation} key={refreshKey} />
+              <YutongQuotationPreview quotation={quotation} key={refreshKey} showVAT={showVAT} />
             </div>
           </TabsContent>
 
