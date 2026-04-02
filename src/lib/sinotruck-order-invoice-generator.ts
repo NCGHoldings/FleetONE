@@ -553,7 +553,7 @@ export function generateSinotruckOrderInvoiceHTML(data: SinotruckOrderInvoiceDat
     </div>
 
     <div class="footer-section">
-      <p>NCG Holdings (Pvt) Ltd | Sinotruck Authorized Dealer | Tel: +94 11 234 5678 | info@ncgholdings.lk</p>
+      <p>NCG Holdings (Pvt) Ltd | Sinotruck Authorized Dealer${data.supplier_phone ? ` | Tel: ${data.supplier_phone}` : ''}${data.companyEmail ? ` | ${data.companyEmail}` : ''}</p>
     </div>
     <div class="page-indicator">Page 2 of 2</div>
   </div>

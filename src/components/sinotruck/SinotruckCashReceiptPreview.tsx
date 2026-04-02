@@ -307,7 +307,7 @@ export const SinotruckCashReceiptPreview = forwardRef<HTMLDivElement, SinotruckC
             </div>
             <div>📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita</div>
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              ✉️ info@ncgholdings.lk
+              ✉️ {receipt.companyEmail || 'info@ncgholdings.lk'}
             </div>
           </div>
         </div>

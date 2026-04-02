@@ -94,8 +94,8 @@ export function generateLightVehicleOrderInvoiceHTML(data: LightVehicleOrderInvo
   const isTaxInvoice = data.invoiceCategory === 'tax_invoice';
   const displayAmount = isProforma && data.proformaAmount ? data.proformaAmount : data.totalAmount;
   const invoiceTitle = isProforma ? 'PROFORMA INVOICE' : 'TAX INVOICE';
-  const footerPhone = data.responsiblePersonPhone || '+94 77 123 4567';
-  const footerEmail = data.responsiblePersonEmail || 'info@ncgholdings.lk';
+  const footerPhone = data.responsiblePersonPhone || data.companyPhone || '+94 77 766 5501';
+  const footerEmail = data.responsiblePersonEmail || data.companyEmail || 'info@ncgholdings.lk';
 
   // For tax invoices, use the Sri Lankan government-mandated format
   if (isTaxInvoice) {
