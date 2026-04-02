@@ -750,7 +750,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                         fontWeight: "bold",
                       }}
                     >
-                      {Math.round(grandTotal * 0.18).toLocaleString()}
+                      {Math.round(grandTotal - grandTotal / 1.18).toLocaleString()}
                     </td>
                   </tr>
                   <tr>
