@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, DollarSign, TrendingDown, Wallet, Eye, Printer, ArrowRightLeft, Landmark } from "lucide-react";
+import { Plus, Search, DollarSign, TrendingDown, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText } from "lucide-react";
 import { ChequePrintPreview } from "./ChequePrintPreview";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
 import { useAPPayments, useVendors } from "@/hooks/useAccountingData";
