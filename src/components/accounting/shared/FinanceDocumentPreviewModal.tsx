@@ -162,6 +162,36 @@ export const FinanceDocumentPreviewModal = ({
     enabled: !!documentData?.id && (documentType === "ar_invoice" || documentType === "ap_invoice"),
   });
 
+  // Fetch vendor's default bank account as fallback when payment has no vendor_bank_account_id
+  const vendorIdForBankFallback = documentType === 'ap_payment_voucher' && !documentData?.vendor_bank_accounts && documentData?.vendor_id
+    ? documentData.vendor_id
+    : undefined;
+
+  const { data: fallbackVendorBank } = useQuery({
+    queryKey: ["vendor-bank-fallback", vendorIdForBankFallback],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendor_bank_accounts")
+        .select("*")
+        .eq("vendor_id", vendorIdForBankFallback!)
+        .order("is_default", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!vendorIdForBankFallback,
+  });
+
+  // Enrich documentData with fallback vendor bank if needed
+  const enrichedDocumentData = useMemo(() => {
+    if (!documentData) return documentData;
+    if (documentType === 'ap_payment_voucher' && !documentData.vendor_bank_accounts && fallbackVendorBank) {
+      return { ...documentData, vendor_bank_accounts: fallbackVendorBank };
+    }
+    return documentData;
+  }, [documentData, documentType, fallbackVendorBank]);
+
   // Fetch allocations for receipts/payments
   const { data: allocations } = useQuery({
     queryKey: ["doc-allocations", documentType, documentData?.id],

@@ -631,6 +631,7 @@ export const generateAPPaymentVoucherTemplate = (): string => `
       </div>
       <div class="text-sm" style="color: var(--muted); margin-top: 2px;">Branch: {{vendor_bank_branch}}</div>
       <div class="text-sm" style="color: var(--muted); margin-top: 2px;">A/C No: <strong style="color: var(--ink);">{{vendor_account_number}}</strong></div>
+      <div class="text-sm" style="color: var(--muted); margin-top: 2px;">A/C Name: {{vendor_account_holder}}</div>
     </div>
   </div>
 
