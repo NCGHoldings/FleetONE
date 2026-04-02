@@ -79,7 +79,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
       const { data, error } = await supabase
         .from('bank_accounts')
         .select('id, account_name, bank_name, account_number')
-        .eq('company_id', NCG_HOLDING_ID)
+        .in('company_id', [NCG_HOLDING_ID, 'a0000000-0000-0000-0000-000000000006'])
         .eq('is_active', true)
         .order('bank_name');
       if (error) throw error;
