@@ -22,6 +22,8 @@ import { Label } from '@/components/ui/label';
 import { cn, safeParseJSON } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useCompany } from '@/contexts/CompanyContext';
+import { buildSpecialHireQuotationBankSnapshot, SPECIAL_HIRE_QUOTATION_BANK_DEFAULTS } from '@/lib/special-hire-bank-details';
 import { CostBreakdown } from './CostBreakdown';
 import { LocationAutocomplete } from '@/components/ui/location-autocomplete';
 import { calculateExtraTimeCharge } from '@/lib/extra-time-calculator';
@@ -184,6 +186,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId?.() || selectedCompanyId;
 
   const AUTO_SAVE_KEY = 'special-hire-form-draft';
 
@@ -1736,25 +1740,17 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       // Fetch current bank details from finance settings for point-in-time capture
       let bankDetails: { payment_bank_name?: string; payment_account_name?: string; payment_account_no?: string } = {};
       if (!isEditing) {
-        // Fetch bank details scoped to the effective company to support multi-company setup
-        const { data: finSettings } = await supabase
-          .from('special_hire_finance_settings')
-          .select('quotation_bank_name, quotation_account_name, quotation_account_no')
-          .limit(1)
-          .maybeSingle();
-        if (finSettings) {
-          bankDetails = {
-            payment_bank_name: (finSettings as any).quotation_bank_name || 'Commercial Bank - Nugegoda',
-            payment_account_name: (finSettings as any).quotation_account_name || 'NCG Holding (Pvt) Ltd',
-            payment_account_no: (finSettings as any).quotation_account_no || '1001077213',
-          };
+        if (effectiveCompanyId) {
+          const { data: finSettings } = await supabase
+            .from('special_hire_finance_settings')
+            .select('quotation_bank_name, quotation_account_name, quotation_account_no')
+            .eq('company_id', effectiveCompanyId)
+            .limit(1)
+            .maybeSingle();
+
+          bankDetails = buildSpecialHireQuotationBankSnapshot(finSettings);
         } else {
-          // Fallback to new Commercial Bank details
-          bankDetails = {
-            payment_bank_name: 'Commercial Bank - Nugegoda',
-            payment_account_name: 'NCG Holding (Pvt) Ltd',
-            payment_account_no: '1001077213',
-          };
+          bankDetails = { ...SPECIAL_HIRE_QUOTATION_BANK_DEFAULTS };
         }
       }
 
