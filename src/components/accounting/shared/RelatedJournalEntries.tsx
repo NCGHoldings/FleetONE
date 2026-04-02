@@ -235,10 +235,10 @@ export const RelatedJournalEntries = ({ sourceId, sourceType }: RelatedJournalEn
                       {(line.account as any)?.account_code} - {(line.account as any)?.account_name || line.description}
                     </TableCell>
                     <TableCell className="text-xs py-1 text-right">
-                      {line.debit_amount > 0 ? <CurrencyDisplay amount={line.debit_amount} /> : "-"}
+                      {line.debit > 0 ? <CurrencyDisplay amount={line.debit} /> : "-"}
                     </TableCell>
                     <TableCell className="text-xs py-1 text-right">
-                      {line.credit_amount > 0 ? <CurrencyDisplay amount={line.credit_amount} /> : "-"}
+                      {line.credit > 0 ? <CurrencyDisplay amount={line.credit} /> : "-"}
                     </TableCell>
                   </TableRow>
                 ))}
