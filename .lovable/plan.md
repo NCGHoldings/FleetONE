@@ -1,65 +1,69 @@
 
-Fix Special Hire quotation bank details and overnight charge text by correcting both the data source and the preview logic.
+Fix the regression by restoring true point-in-time behavior for Special Hire quotation bank details.
 
-1. What I found
-- The preview is still coded to fall back to the old bank:
-  - `QuotationPreview.tsx` shows `1934 1401 7578` and `Sampath Bank, Nugegoda` whenever the quotation row has missing snapshot fields.
-- New quotation creation is fetching bank settings incorrectly:
-  - `SpecialHireForm.tsx` reads `special_hire_finance_settings` with `.single()` and no `company_id` filter.
-  - In a multi-company setup this can return the wrong row or no reliable row, so new quotations may save blank/mismatched bank snapshot fields.
-- The “Extra Charges” section always prints generic extra-charge text and does not respect your request to remove overnight wording from the quotation.
-- There is also a repeat/duplicate path that copies old quotation data as-is, which can carry old bank details forward into new quotations.
+1. What went wrong
+- Old quotations changed because `QuotationPreview.tsx` now falls back to Commercial Bank whenever `payment_*` snapshot fields are empty.
+- That means legacy quotations with null bank snapshot fields are rendered like new quotations.
+- New quotation creation and repeat flows also still fetch finance settings without a `company_id` filter, so the snapshot source is not safely company-scoped.
+- Edit/version paths currently preserve existing snapshot behavior indirectly, but the preview fallback broke historical immutability.
 
-2. Root cause
+2. What to change
+
+- `src/components/special-hire/QuotationPreview.tsx`
+  - Stop using Commercial Bank as a universal fallback for every quotation.
+  - Render bank details in this order:
+    1. quotation’s saved `payment_*` snapshot fields
+    2. legacy fallback only for old records with no snapshot: Sampath Bank / 1934 1401 7578
+  - This ensures historical quotations stay historical.
+
+- `src/components/special-hire/SpecialHireForm.tsx`
+  - Use the effective company logic already used in Special Hire finance hooks.
+  - Fetch `special_hire_finance_settings` by `company_id`.
+  - Keep Commercial Bank snapshot only for brand-new quotations (`!isEditing`).
+  - Do not overwrite bank snapshot fields during normal edit.
+
+- `src/components/special-hire/SpecialHireQuotationRepeatModal.tsx`
+  - Also fetch finance settings by effective `company_id`.
+  - Keep current behavior of re-snapshotting current bank details for a repeated quotation, because that is a new quotation.
+
+- `src/components/special-hire/EditQuotationModal.tsx`
+  - Ensure version creation keeps the original quotation’s saved `payment_*` fields unless you intentionally want versioned quotations to remain tied to the original snapshot.
+  - This avoids accidental re-banking of older quotation histories.
+
+3. Expected behavior after fix
+- Old quotation with no snapshot fields:
+  - shows old Sampath details
+- Old quotation with saved old snapshot:
+  - shows old Sampath details
+- Newly created quotation:
+  - shows Commercial Bank details
+- Repeated quotation:
+  - shows Commercial Bank details because it is a new quotation
+- Edited existing quotation:
+  - keeps its original bank snapshot
+- Versioned quotation:
+  - keeps the original quotation’s bank snapshot unless explicitly changed by business rule
+
+4. Technical details
 ```text
-Wrong bank keeps appearing because:
-preview fallback = old Sampath values
-+
-new quotation snapshot query = not company-scoped
-+
-duplicate quotation flow = copies old snapshot fields forward
+Correct rule:
+historical document display = stored snapshot
+if no snapshot exists and document is legacy = old bank fallback
+new quotation creation only = snapshot current finance settings
 
-Overnight text keeps appearing because:
-QuotationPreview always renders fixed extra-charge lines
-instead of conditionally hiding overnight wording
+Do not use:
+preview fallback = always Commercial Bank
+because that changes history at render time
 ```
 
-3. Implementation plan
-- Update `src/components/special-hire/SpecialHireForm.tsx`
-  - Use the same effective company logic already used by Special Hire finance hooks.
-  - Fetch `quotation_bank_name`, `quotation_account_name`, `quotation_account_no` by the effective `company_id`, not global `.single()`.
-  - Add a safe fallback to the new Commercial Bank details if settings are missing.
-- Update `src/components/special-hire/QuotationPreview.tsx`
-  - Remove fallback to old Sampath details in the live preview.
-  - Prefer quotation snapshot fields first.
-  - If snapshot is empty, fall back to the configured new Commercial Bank values, not Sampath.
-  - Make the “Extra Charges” text conditional:
-    - keep per-km line
-    - keep per-hour line if needed
-    - remove overnight line/text from the customer quotation output
-- Update `src/components/special-hire/SpecialHireQuotationRepeatModal.tsx`
-  - Do not blindly copy old `payment_*` bank snapshot fields into new repeated quotations.
-  - Re-snapshot current bank details for the new quotation, so future repeated quotations use the new bank account.
-- Review version/edit paths
-  - Ensure quotation versioning keeps existing snapshot fields for old quotations unless explicitly regenerated as a brand-new quotation.
-  - This preserves history while fixing future documents.
-
-4. Files to modify
-- `src/components/special-hire/SpecialHireForm.tsx`
+5. Files to update
 - `src/components/special-hire/QuotationPreview.tsx`
+- `src/components/special-hire/SpecialHireForm.tsx`
 - `src/components/special-hire/SpecialHireQuotationRepeatModal.tsx`
+- `src/components/special-hire/EditQuotationModal.tsx`
 
-5. Expected result
-- Future Special Hire quotations show:
-  - Account No: `1001077213`
-  - Account Name: `NCG EXPRESS (PVT) LTD`
-  - Bank Name: `Commercial Bank - Nugegoda`
-- Old quotations keep their historic snapshot if they were intentionally preserved.
-- Repeated/new quotations no longer reuse old Sampath details.
-- Overnight charge wording is removed from the quotation preview/output so it no longer shows again.
-
-6. Technical note
-- If the quotation visible in your screenshot is an older record that already saved old `payment_*` values, the system will keep showing that old value until that specific quotation snapshot is corrected or a new quotation/version is generated under the fixed logic.
-- So this fix should address both:
-  - the code bug for all future quotations
-  - the regression path that is still carrying old values into new/repeated quotations
+6. Result
+- Past quotations stay unchanged
+- Only new quotations use Commercial Bank
+- Repeat flow still uses the new bank correctly
+- Multi-company Special Hire setup uses the right finance settings row
