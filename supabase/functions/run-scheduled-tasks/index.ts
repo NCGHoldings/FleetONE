@@ -88,7 +88,7 @@ serve(async (req: Request) => {
       } catch (taskErr) {
         console.error(`Error executing task ${task.id}:`, taskErr);
         results.failed++;
-        results.errors.push(`${task.name}: ${taskErr.message}`);
+        results.errors.push(`${task.name}: ${(taskErr as Error).message}`);
 
         // Update task with error status
         await supabase
