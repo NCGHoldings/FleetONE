@@ -59,6 +59,18 @@ export function SpecialHireQuotationRepeatModal({
         throw new Error('Failed to fetch quotation details');
       }
 
+      // Fetch current bank details for new quotations (don't copy old bank snapshot)
+      const { data: finSettings } = await supabase
+        .from('special_hire_finance_settings')
+        .select('quotation_bank_name, quotation_account_name, quotation_account_no')
+        .limit(1)
+        .maybeSingle();
+      const bankSnapshot = {
+        payment_bank_name: (finSettings as any)?.quotation_bank_name || 'Commercial Bank - Nugegoda',
+        payment_account_name: (finSettings as any)?.quotation_account_name || 'NCG EXPRESS (PVT) LTD',
+        payment_account_no: (finSettings as any)?.quotation_account_no || '1001077213',
+      };
+
       // Create quotations one by one to get unique quotation numbers from DB sequence
       const createdQuotationNos: string[] = [];
       
