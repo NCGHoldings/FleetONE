@@ -490,18 +490,30 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             overflow: 'auto'
           }}
         >
-          <iframe
-            src={pdfUrl}
-            className="w-full h-full border-0"
-            title="PDF Document"
-            style={{
-              transform: `scale(${zoom / 100})`,
-              transformOrigin: 'top left',
-              width: `${10000 / zoom}%`,
-              height: `${10000 / zoom}%`,
-            }}
-          />
-        </div>
+          {iframeLoadFailed ? (
+            <div className="flex flex-col items-center justify-center h-full gap-4">
+              <p className="text-sm text-muted-foreground">Preview could not be loaded</p>
+              <a href={pdfUrl} download="document.pdf" target="_blank" rel="noopener noreferrer">
+                <Button variant="default" size="sm">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download PDF
+                </Button>
+              </a>
+            </div>
+          ) : (
+            <iframe
+              src={pdfUrl}
+              className="w-full h-full border-0"
+              title="PDF Document"
+              onError={() => setIframeLoadFailed(true)}
+              style={{
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: 'top left',
+                width: `${10000 / zoom}%`,
+                height: `${10000 / zoom}%`,
+              }}
+            />
+          )}
 
         {/* Fabric Canvas Overlay */}
         <canvas
