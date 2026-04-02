@@ -120,7 +120,7 @@ export const RelatedJournalEntries = ({ sourceId, sourceType }: RelatedJournalEn
         .from("journal_entries")
         .select(`
           id, entry_number, entry_date, status, description, is_reversal, reversed_entry_id, source_module,
-          journal_entry_lines(id, account_id, debit_amount, credit_amount, description,
+          journal_entry_lines(id, account_id, debit, credit, description,
             account:chart_of_accounts(account_code, account_name))
         `)
         .in("id", uniqueIds)
@@ -131,7 +131,7 @@ export const RelatedJournalEntries = ({ sourceId, sourceType }: RelatedJournalEn
         .from("journal_entries")
         .select(`
           id, entry_number, entry_date, status, description, is_reversal, reversed_entry_id, source_module,
-          journal_entry_lines(id, account_id, debit_amount, credit_amount, description,
+          journal_entry_lines(id, account_id, debit, credit, description,
             account:chart_of_accounts(account_code, account_name))
         `)
         .in("reversed_entry_id", uniqueIds)
