@@ -39,6 +39,7 @@ export const ARReceiptsView = () => {
   const [bankFeeOpen, setBankFeeOpen] = useState(false);
   const [feeReceiptId, setFeeReceiptId] = useState<string | undefined>();
   const [feeBankAccountId, setFeeBankAccountId] = useState<string | undefined>();
+  const [detailReceipt, setDetailReceipt] = useState<any>(null);
 
   const getCustomerName = (customerId: string) => {
     const customer = customers?.find(c => c.id === customerId);
