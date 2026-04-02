@@ -65,7 +65,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
   const isAdvanceInvoice = data.invoiceType === 'advance';
   const isSalesReceipt = data.document_type === 'sales_receipt' || isAdvanceInvoice;
   const currentDate = format(new Date(), 'dd/MM/yyyy');
-  const companyLogo = data.companyLogo || '/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png';
+  const companyLogo = data.companyLogo || '/lovable-uploads/ncg-holdings-logo.png';
   const isDraft = data.invoice_status === 'draft' && !data.forCustomer;
   const documentTitle = isSalesReceipt ? 'SALES RECEIPT' : 'INVOICE';
 
