@@ -714,7 +714,7 @@ export const useFinanceApproval = () => {
   };
 
   // NEW: Retry AR Integration for payments that missed AR creation
-  const retryARIntegration = async (paymentId: string) => {
+  const retryARIntegration = async (paymentId: string, companyId: string = NCG_HOLDING_ID) => {
     try {
       setIsLoading(true);
       console.log('[SPH Finance] ========== RETRY AR INTEGRATION ==========');
