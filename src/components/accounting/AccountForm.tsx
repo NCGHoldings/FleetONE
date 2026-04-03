@@ -231,10 +231,10 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Account Type *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={!!selectedParentId}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
+                      <SelectValue placeholder={selectedParentId ? "Auto-derived from parent" : "Select parent first"} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -245,6 +245,7 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
                     ))}
                   </SelectContent>
                 </Select>
+                {selectedParentId && <p className="text-xs text-muted-foreground">Auto-derived from parent account</p>}
                 <FormMessage />
               </FormItem>
             )}
