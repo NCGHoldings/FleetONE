@@ -1,42 +1,48 @@
 
 
-# Add App Version Display & "What's New" Changelog
+# Add GL Export Modal to Journal Entries View
 
 ## What to build
-A version numbering system with an in-app "What's New" panel so both you and users can confirm which version they're running and what features are available.
+An export button on the General Ledger (Journal Entries) page that opens a modal allowing users to customize and download their filtered journal entries as Excel, CSV, or PDF. The export respects all active filters (search, date range, status, business unit, amount range).
 
 ## How it works
 
-### 1. Version constant + build timestamp
-Create `src/config/appVersion.ts` with:
-- `APP_VERSION = "1.4.0"` (manually bumped when deploying new features)
-- `BUILD_DATE` auto-set from build time
-- `CHANGELOG` array with recent entries (version, date, title, description, type: feature/fix/improvement)
+### Export Modal
+- Format selector: Excel (.xlsx), CSV, PDF
+- Section toggles (checkboxes):
+  - **Summary**: Total entries, total debit/credit, date range, business unit breakdown
+  - **Journal Entries**: The filtered entry list with entry #, date, business unit, description, debit, credit, status
+  - **Include Line Items**: Expand each JE to show individual debit/credit lines with GL account codes and names (requires fetching `journal_entry_lines` for selected entries)
+  - **Source Module Breakdown**: Group totals by source_module
+- "Export" button triggers download with filename like `GL_Journal_Entries_2026-04-03.xlsx`
 
-### 2. "What's New" dialog component
-Create `src/components/layout/WhatsNewDialog.tsx`:
-- Triggered from a version badge in the Header or a "What's New" menu item
-- Shows grouped changelog entries by version with badges (New, Fix, Improved)
-- Auto-shows on first visit after version change (stores last-seen version in localStorage)
-- Scrollable list of recent changes (last 5-10 versions)
+### Excel Format (primary)
+- **Summary sheet**: Report metadata, filter criteria applied, totals
+- **Journal Entries sheet**: Filtered entries table with styled headers (reuse existing `headerStyle`/`cellStyle` pattern from SinotrukExcelExporter)
+- **Line Items sheet** (optional): All JE lines with account_code, account_name, debit, credit, description
+- **By Business Unit sheet** (optional): Subtotals grouped by business unit
+- **By Source Module sheet** (optional): Subtotals grouped by source_module
 
-### 3. Version badge in Header
-Add to `src/components/layout/Header.tsx`:
-- Small version badge (e.g., `v1.4.0`) next to the user menu
-- Clicking opens the What's New dialog
-- Shows a dot indicator when there are unseen updates
+### CSV Format
+- Flat export of the filtered entries table
 
-### 4. Populate initial changelog
-Pre-populate with recent major features from `ANTIGRAVITY_ncgCHANGELOG.md`:
-- Proforma Invoice toggle
-- Trial Balance fix
-- Landed Cost posting
-- Test mode data leak fix
-- Workflow column performance improvement
+### Data Flow
+- Export uses the already-filtered `filteredEntries` array from the view (no re-fetching)
+- If "Include Line Items" is checked, fetch `journal_entry_lines` for all filtered entry IDs in a single batch query before generating the file
 
-## Files
-- **Create**: `src/config/appVersion.ts` — version constant + changelog data
-- **Create**: `src/components/layout/WhatsNewDialog.tsx` — changelog dialog UI
-- **Modify**: `src/components/layout/Header.tsx` — add version badge + dialog trigger
-- **Modify**: `package.json` — update `version` field to match
+## Files to create/modify
+
+### Create: `src/components/accounting/GLExportModal.tsx`
+- Modal UI with format selector and section checkboxes
+- Handles export logic for Excel/CSV formats
+- Accepts `filteredEntries` and `filters` as props
+
+### Create: `src/components/accounting/GLExcelExporter.ts`
+- `exportGLReport(entries, lines, filters, options)` function
+- Multi-sheet workbook using `xlsx-js-style` (same pattern as SinotrukExcelExporter)
+
+### Modify: `src/components/accounting/JournalEntriesView.tsx`
+- Add "Export" button next to "New Entry" button
+- Add state for export modal open/close
+- Render `<GLExportModal>` with filtered data and current filter state
 
