@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,7 +32,7 @@ const accountSchema = z.object({
   account_type: z.enum(["asset", "liability", "equity", "revenue", "expense"], {
     required_error: "Please select an account type",
   }),
-  parent_account_id: z.string().optional(),
+  parent_account_id: z.string().min(1, "Parent account is required"),
   is_header: z.boolean().default(false),
   description: z.string().optional(),
 });
@@ -46,6 +47,7 @@ interface ParentAccount {
   id: string;
   account_code: string;
   account_name: string;
+  account_type: string | null;
   level1: string | null;
   level2: string | null;
   level3: string | null;
@@ -135,7 +137,7 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
       account_code: "",
       account_name: "",
       account_type: undefined,
-      parent_account_id: "_none",
+      parent_account_id: "",
       is_header: false,
       description: "",
     },
@@ -148,7 +150,7 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
       if (!effectiveCompanyId) return [];
       const { data, error } = await supabase
         .from("chart_of_accounts")
-        .select("id, account_code, account_name, level1, level2, level3, level4, level5, account_level")
+        .select("id, account_code, account_name, account_type, level1, level2, level3, level4, level5, account_level")
         .eq("company_id", effectiveCompanyId)
         .order("account_code");
       
@@ -158,11 +160,19 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
     enabled: !!effectiveCompanyId,
   });
 
+  // Auto-derive account_type from selected parent
+  const selectedParentId = form.watch("parent_account_id");
+  useEffect(() => {
+    if (selectedParentId && parentAccounts) {
+      const parent = parentAccounts.find(acc => acc.id === selectedParentId);
+      if (parent?.account_type) {
+        form.setValue("account_type", parent.account_type as any);
+      }
+    }
+  }, [selectedParentId, parentAccounts, form]);
+
   const onSubmit = (data: AccountFormData) => {
-    // Convert "_none" placeholder to undefined for database
-    const parentId = data.parent_account_id === "_none" || !data.parent_account_id 
-      ? undefined 
-      : data.parent_account_id;
+    const parentId = data.parent_account_id || undefined;
     
     // Find the selected parent account to derive level fields
     const selectedParent = parentId 
@@ -222,10 +232,10 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Account Type *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={!!selectedParentId}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
+                      <SelectValue placeholder={selectedParentId ? "Auto-derived from parent" : "Select parent first"} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -236,6 +246,7 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
                     ))}
                   </SelectContent>
                 </Select>
+                {selectedParentId && <p className="text-xs text-muted-foreground">Auto-derived from parent account</p>}
                 <FormMessage />
               </FormItem>
             )}
@@ -261,15 +272,14 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
           name="parent_account_id"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Parent Account (Optional)</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value ?? "_none"}>
+              <FormLabel>Parent Account *</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || undefined}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select parent account" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="_none">No Parent (Top Level)</SelectItem>
                   {parentAccounts?.filter(account => account.id && account.id.trim() !== '').map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.account_code} - {account.account_name}
