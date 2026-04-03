@@ -19,6 +19,7 @@ export const LandedCostView = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [postConfirmVoucherId, setPostConfirmVoucherId] = useState<string | null>(null);
   const [selectedVoucherId, setSelectedVoucherId] = useState<string | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   
   const { data: vouchers, isLoading } = useLandedCostVouchers(statusFilter === "_all" ? undefined : statusFilter);
   const postToGL = usePostLandedCostToGL();
