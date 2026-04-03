@@ -528,7 +528,7 @@ export const usePostLandedCostToGL = () => {
           journal_entry_id: glResult.journalEntryId,
           business_unit_code: businessUnitCode,
           status: "posted",
-        })
+        } as any)
         .eq("id", voucherId);
       if (updateErr) throw updateErr;
 
