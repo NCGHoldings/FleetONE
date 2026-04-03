@@ -1,42 +1,27 @@
 
+# Add Proforma Invoice Toggle to Special Hire Quotation Preview
 
-# Fix: Remove Orphaned Bank Account and Reassign Journal Entries
+## What to build
+A toggle switch in the QuotationModal header that lets users switch between "Quotation" and "Proforma Invoice" view. When toggled, the document title, labels, and PDF filename change accordingly.
 
-## Problem
+## Changes
 
-The account **1300101211 "COMMERCIAL BANK C/A - 1001077213 (SHS) - remove"** is an orphaned duplicate sitting at the wrong level. The correct account already exists as **13001011** under CASH AT BANK.
+### 1. `src/components/special-hire/QuotationPreview.tsx`
+- Add new optional prop: `documentMode?: 'quotation' | 'proforma_invoice'` (default: `'quotation'`)
+- Replace 4 hardcoded "Quotation" text instances with dynamic labels:
+  - Line 257: `"Quotation Special Hire"` → `"Proforma Invoice Special Hire"` or `"Quotation Special Hire"`
+  - Line 269: `"Quotation Generated on"` → `"Proforma Invoice Generated on"` or `"Quotation Generated on"`
+  - Line 271: `"Quotation No:"` → `"Proforma Invoice No:"` or `"Quotation No:"`
+  - Line 1060: Page 2 header `"Quotation No:"` → same dynamic label
 
-The orphan has **3 journal entry lines** that need to be reassigned before deletion:
+### 2. `src/components/special-hire/QuotationModal.tsx`
+- Add state: `const [documentMode, setDocumentMode] = useState<'quotation' | 'proforma_invoice'>('quotation')`
+- Add a toggle switch (using existing Switch or segmented button) in the dialog header next to the action buttons
+- Pass `documentMode` prop to `<QuotationPreview>`
+- Update PDF filename: `Quotation_...` vs `Proforma_Invoice_...` based on mode
+- Update email subject line to match the selected mode
+- Update dialog title: "Quotation Preview" vs "Proforma Invoice Preview"
 
-| JE | Debit | Credit | Status |
-|----|-------|--------|--------|
-| SPH-ADV-QUO-2025-0019 | 91,249.50 | — | reversed |
-| REV-SPH-ADV-QUO-2025-0019 | — | 91,249.50 | posted |
-| SPH-FULL-QUO-2025-0187 | 59,990.00 | — | posted |
-
-## Fix — Single Migration
-
-1. **Reassign** all 3 `journal_entry_lines` from orphan account (`6702d2bf-...`) to the correct account (`5a48ae07-...`, code 13001011)
-2. **Delete** the orphan account `1300101211` (`6702d2bf-...`)
-3. **Recalculate COA balance** on the correct account to reflect the moved lines
-
-### Migration SQL
-```sql
--- Move JE lines to correct account
-UPDATE journal_entry_lines 
-SET account_id = '5a48ae07-19e0-46d8-bd5c-1adc371d3d63'
-WHERE account_id = '6702d2bf-8a12-4f82-83eb-d37b61b4993e';
-
--- Delete orphan
-DELETE FROM chart_of_accounts 
-WHERE id = '6702d2bf-8a12-4f82-83eb-d37b61b4993e';
-```
-
-### Files
-- **Create**: Migration file to reassign lines and delete orphan
-
-### Result
-- Orphan account removed from COA tree
-- All journal entries preserved and linked to correct 13001011 account
-- No data loss — just account reassignment
-
+## Files to modify
+- `src/components/special-hire/QuotationPreview.tsx` — accept `documentMode` prop, swap labels
+- `src/components/special-hire/QuotationModal.tsx` — add toggle state, pass prop, update filename/subject
