@@ -407,6 +407,156 @@ export const useCreateUoM = () => {
   });
 };
 
+// ============ Landed Cost GL Posting ============
+export const usePostLandedCostToGL = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId, getEffectiveCompanyId, selectedCompany } = useCompany();
+
+  return useMutation({
+    mutationFn: async (voucherId: string) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      if (!effectiveCompanyId) throw new Error("No company selected");
+
+      // 1. Fetch voucher
+      const { data: voucher, error: vErr } = await supabase
+        .from("landed_cost_vouchers")
+        .select("*")
+        .eq("id", voucherId)
+        .single();
+      if (vErr) throw vErr;
+      if (voucher.status !== "draft") throw new Error("Only draft vouchers can be posted");
+      if (voucher.journal_entry_id) throw new Error("Voucher already has a journal entry (double-post guard)");
+
+      // 2. Fetch charges with expense accounts
+      const { data: charges, error: cErr } = await supabase
+        .from("landed_cost_charges")
+        .select("*, chart_of_accounts(account_code, account_name)")
+        .eq("voucher_id", voucherId);
+      if (cErr) throw cErr;
+      if (!charges || charges.length === 0) throw new Error("No charges found on this voucher");
+
+      // Validate all charges have expense_account_id
+      const missingAccounts = charges.filter(c => !c.expense_account_id);
+      if (missingAccounts.length > 0) {
+        throw new Error(`${missingAccounts.length} charge(s) missing expense account. Please assign GL accounts to all charges before posting.`);
+      }
+
+      // 3. Fetch items with their categories to get inventory_account_id
+      const { data: lcItems, error: iErr } = await supabase
+        .from("landed_cost_items")
+        .select("*, items(item_code, item_name, category_id)")
+        .eq("voucher_id", voucherId);
+      if (iErr) throw iErr;
+      if (!lcItems || lcItems.length === 0) throw new Error("No items found on this voucher");
+
+      // Get unique category IDs to resolve inventory accounts
+      const categoryIds = [...new Set(lcItems.map(i => i.items?.category_id).filter(Boolean))];
+      let inventoryAccountId: string | null = null;
+
+      if (categoryIds.length > 0) {
+        const { data: categories } = await supabase
+          .from("item_categories")
+          .select("id, inventory_account_id")
+          .in("id", categoryIds);
+        
+        // Use first category's inventory account (all items in same LCV typically share category)
+        inventoryAccountId = categories?.[0]?.inventory_account_id || null;
+      }
+
+      // Fallback: try gl_settings for default inventory account
+      if (!inventoryAccountId) {
+        const { data: glSettings } = await supabase
+          .from("gl_settings")
+          .select("setting_value")
+          .eq("company_id", effectiveCompanyId)
+          .eq("setting_key", "inventory_account_id")
+          .maybeSingle();
+        inventoryAccountId = glSettings?.setting_value || null;
+      }
+
+      if (!inventoryAccountId) {
+        throw new Error("No Inventory Account found. Please configure inventory_account_id in Item Categories or GL Settings.");
+      }
+
+      // 4. Build JE lines: DR Inventory / CR Expense per charge
+      const { createAndPostJournalEntry, generateEntryNumber } = await import("@/lib/gl-posting-utils");
+      
+      const totalCharges = charges.reduce((sum, c) => sum + (c.amount || 0), 0);
+      const businessUnitCode = (selectedCompany as any)?.business_unit_code || voucher.business_unit_code || undefined;
+
+      const jeLines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
+
+      for (const charge of charges) {
+        const chargeName = charge.chart_of_accounts?.account_name || charge.charge_type || "Landed Cost";
+        
+        // DR Inventory Account (increase item valuation)
+        jeLines.push({
+          account_id: inventoryAccountId,
+          description: `Landed Cost - ${chargeName} (${voucher.voucher_number})`,
+          debit: charge.amount,
+          credit: 0,
+        });
+
+        // CR Expense/Payable Account (source of the charge)
+        jeLines.push({
+          account_id: charge.expense_account_id!,
+          description: `Landed Cost - ${chargeName} (${voucher.voucher_number})`,
+          debit: 0,
+          credit: charge.amount,
+        });
+      }
+
+      // 5. Create and post JE
+      const glResult = await createAndPostJournalEntry({
+        entry_date: voucher.posting_date,
+        description: `Landed Cost Voucher: ${voucher.voucher_number}`,
+        reference: voucher.voucher_number,
+        lines: jeLines,
+        company_id: effectiveCompanyId,
+        business_unit_code: businessUnitCode,
+        source_module: "landed_cost",
+      });
+
+      if (!glResult.success) {
+        throw new Error(glResult.error || "Failed to create journal entry");
+      }
+
+      // 6. Link JE to voucher and update status
+      const { error: updateErr } = await supabase
+        .from("landed_cost_vouchers")
+        .update({
+          journal_entry_id: glResult.journalEntryId,
+          business_unit_code: businessUnitCode,
+          status: "posted",
+        })
+        .eq("id", voucherId);
+      if (updateErr) throw updateErr;
+
+      // 7. Update items.standard_cost with final_cost
+      for (const lcItem of lcItems) {
+        if (lcItem.item_id && lcItem.final_cost) {
+          await supabase
+            .from("items")
+            .update({ standard_cost: lcItem.final_cost })
+            .eq("id", lcItem.item_id);
+        }
+      }
+
+      return { journalEntryId: glResult.journalEntryId, voucherId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["landed-cost-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      toast({ title: "Landed Cost posted to GL", description: "Journal entry created and item costs updated." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to post to GL", description: error.message, variant: "destructive" });
+    },
+  });
+};
+
 export const useCreateUoMConversion = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
