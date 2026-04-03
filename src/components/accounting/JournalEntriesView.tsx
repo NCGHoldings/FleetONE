@@ -282,6 +282,11 @@ export const JournalEntriesView = () => {
             </Select>
           )}
           
+          <Button variant="outline" onClick={() => setIsExportOpen(true)}>
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+          
           <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
             <DialogTrigger asChild>
               <Button>
