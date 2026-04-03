@@ -1,32 +1,42 @@
 
 
-# Fix: Restrict Level 1 COA and Require Parent Account
+# Fix: Remove Orphaned Bank Account and Reassign Journal Entries
 
 ## Problem
-The "Add Account" form allows creating new top-level (Level 1) accounts via "No Parent (Top Level)". Level 1 should be locked to only the 6 standard categories: Assets, Liabilities, Equity, Revenue, Cost of Sales, Expenditure. Any new account must be created under one of these.
 
-The screenshot shows an account "COMMERCIAL BANK C/A" (code 1300101211) sitting at the wrong level — likely created without a proper parent.
+The account **1300101211 "COMMERCIAL BANK C/A - 1001077213 (SHS) - remove"** is an orphaned duplicate sitting at the wrong level. The correct account already exists as **13001011** under CASH AT BANK.
 
-## Fix
+The orphan has **3 journal entry lines** that need to be reassigned before deletion:
 
-### In `src/components/accounting/AccountForm.tsx`:
+| JE | Debit | Credit | Status |
+|----|-------|--------|--------|
+| SPH-ADV-QUO-2025-0019 | 91,249.50 | — | reversed |
+| REV-SPH-ADV-QUO-2025-0019 | — | 91,249.50 | posted |
+| SPH-FULL-QUO-2025-0187 | 59,990.00 | — | posted |
 
-1. **Remove "No Parent (Top Level)" option** — make parent account **required** (not optional)
-2. **Change parent_account_id** from `z.string().optional()` to `z.string().min(1, "Parent account is required")` and remove the `_none` default
-3. **Remove the `_none` SelectItem** from the parent dropdown
-4. **Filter parent accounts** to only show header accounts or accounts that logically can have children (exclude leaf transaction accounts if desired — or keep all for flexibility)
-5. **Auto-derive account_type** from the selected parent instead of manual selection — this prevents mismatches (e.g., creating an "asset" under a liability parent)
+## Fix — Single Migration
 
-### Validation changes:
-- Parent account is mandatory — no Level 1 creation allowed
-- Account type auto-set from parent's type (remove manual type selector or make it read-only)
+1. **Reassign** all 3 `journal_entry_lines` from orphan account (`6702d2bf-...`) to the correct account (`5a48ae07-...`, code 13001011)
+2. **Delete** the orphan account `1300101211` (`6702d2bf-...`)
+3. **Recalculate COA balance** on the correct account to reflect the moved lines
 
-### Files to modify
-- **`src/components/accounting/AccountForm.tsx`** — require parent, remove "No Parent", auto-derive type from parent
+### Migration SQL
+```sql
+-- Move JE lines to correct account
+UPDATE journal_entry_lines 
+SET account_id = '5a48ae07-19e0-46d8-bd5c-1adc371d3d63'
+WHERE account_id = '6702d2bf-8a12-4f82-83eb-d37b61b4993e';
+
+-- Delete orphan
+DELETE FROM chart_of_accounts 
+WHERE id = '6702d2bf-8a12-4f82-83eb-d37b61b4993e';
+```
+
+### Files
+- **Create**: Migration file to reassign lines and delete orphan
 
 ### Result
-- Users can only add accounts under existing hierarchy
-- No new Level 1 categories can be created
-- Account type always matches parent's type
-- Prevents orphaned/misplaced accounts like the one in the screenshot
+- Orphan account removed from COA tree
+- All journal entries preserved and linked to correct 13001011 account
+- No data loss — just account reassignment
 
