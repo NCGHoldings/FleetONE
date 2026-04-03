@@ -101,7 +101,7 @@ export const useFinanceApproval = () => {
   };
 
   // Background function for AR/GL integration + document regeneration
-  const performBackgroundIntegration = async (paymentId: string, paymentData: any, signatures?: any) => {
+  const performBackgroundIntegration = async (paymentId: string, paymentData: any, signatures?: any, companyId: string = NCG_HOLDING_ID) => {
     let journalEntry: any = null;
     let arInvoiceId: string | null = paymentData.quotation.ar_invoice_id;
     let customerId: string | null = paymentData.quotation.finance_customer_id;
