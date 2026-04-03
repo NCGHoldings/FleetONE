@@ -1587,7 +1587,7 @@ export function ConfirmedTripsTable() {
                                       <DropdownMenuItem
                                         onClick={async () => {
                                           const firstPayment = approvedPayments[0];
-                                          const result = await retryARIntegration(firstPayment.id);
+                                          const result = await retryARIntegration(firstPayment.id, getEffectiveCompanyId());
                                           if (result.success) {
                                             refetch();
                                           }
