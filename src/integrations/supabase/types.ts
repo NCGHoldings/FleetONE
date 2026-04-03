@@ -10427,6 +10427,7 @@ export type Database = {
           description: string | null
           expense_account_id: string | null
           id: string
+          vendor_id: string | null
           voucher_id: string | null
         }
         Insert: {
@@ -10436,6 +10437,7 @@ export type Database = {
           description?: string | null
           expense_account_id?: string | null
           id?: string
+          vendor_id?: string | null
           voucher_id?: string | null
         }
         Update: {
@@ -10445,6 +10447,7 @@ export type Database = {
           description?: string | null
           expense_account_id?: string | null
           id?: string
+          vendor_id?: string | null
           voucher_id?: string | null
         }
         Relationships: [
@@ -10453,6 +10456,13 @@ export type Database = {
             columns: ["expense_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "landed_cost_charges_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
           {
@@ -10515,11 +10525,13 @@ export type Database = {
       landed_cost_vouchers: {
         Row: {
           allocation_method: string | null
+          business_unit_code: string | null
           company_id: string | null
           created_at: string | null
           created_by: string | null
           grn_id: string | null
           id: string
+          journal_entry_id: string | null
           notes: string | null
           posting_date: string
           status: string | null
@@ -10529,11 +10541,13 @@ export type Database = {
         }
         Insert: {
           allocation_method?: string | null
+          business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           grn_id?: string | null
           id?: string
+          journal_entry_id?: string | null
           notes?: string | null
           posting_date?: string
           status?: string | null
@@ -10543,11 +10557,13 @@ export type Database = {
         }
         Update: {
           allocation_method?: string | null
+          business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           grn_id?: string | null
           id?: string
+          journal_entry_id?: string | null
           notes?: string | null
           posting_date?: string
           status?: string | null
@@ -10568,6 +10584,13 @@ export type Database = {
             columns: ["grn_id"]
             isOneToOne: false
             referencedRelation: "goods_receipt_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "landed_cost_vouchers_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
         ]

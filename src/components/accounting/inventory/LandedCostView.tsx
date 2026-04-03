@@ -6,16 +6,21 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Search, MoreHorizontal, DollarSign, FileText, TrendingUp } from "lucide-react";
-import { useLandedCostVouchers } from "@/hooks/useInventoryEnhanced";
+import { useLandedCostVouchers, usePostLandedCostToGL } from "@/hooks/useInventoryEnhanced";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
+import { RelatedJournalEntries } from "@/components/accounting/shared/RelatedJournalEntries";
 import { format } from "date-fns";
 
 export const LandedCostView = () => {
   const [statusFilter, setStatusFilter] = useState<string>("_all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [postConfirmVoucherId, setPostConfirmVoucherId] = useState<string | null>(null);
+  const [selectedVoucherId, setSelectedVoucherId] = useState<string | null>(null);
   
   const { data: vouchers, isLoading } = useLandedCostVouchers(statusFilter === "_all" ? undefined : statusFilter);
+  const postToGL = usePostLandedCostToGL();
 
   const filteredVouchers = vouchers?.filter(v => 
     v.voucher_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -25,6 +30,8 @@ export const LandedCostView = () => {
   const totalAdditionalCost = vouchers?.reduce((sum, v) => sum + (v.total_additional_cost || 0), 0) || 0;
   const postedVouchers = vouchers?.filter(v => v.status === "posted").length || 0;
   const draftVouchers = vouchers?.filter(v => v.status === "draft").length || 0;
+
+  const selectedVoucher = vouchers?.find(v => v.id === selectedVoucherId);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -50,6 +57,13 @@ export const LandedCostView = () => {
       default:
         return method;
     }
+  };
+
+  const handlePostToGL = () => {
+    if (!postConfirmVoucherId) return;
+    postToGL.mutate(postConfirmVoucherId, {
+      onSettled: () => setPostConfirmVoucherId(null),
+    });
   };
 
   return (
@@ -167,15 +181,24 @@ export const LandedCostView = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setSelectedVoucherId(voucher.id)}>
+                          View Details
+                        </DropdownMenuItem>
                         <DropdownMenuItem>View Items</DropdownMenuItem>
                         <DropdownMenuItem>View Charges</DropdownMenuItem>
                         {voucher.status === "draft" && (
                           <>
                             <DropdownMenuItem>Edit</DropdownMenuItem>
-                            <DropdownMenuItem>Post to GL</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setPostConfirmVoucherId(voucher.id)}>
+                              Post to GL
+                            </DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive">Cancel</DropdownMenuItem>
                           </>
+                        )}
+                        {voucher.status === "posted" && voucher.journal_entry_id && (
+                          <DropdownMenuItem onClick={() => setSelectedVoucherId(voucher.id)}>
+                            View Journal Entry
+                          </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -186,6 +209,46 @@ export const LandedCostView = () => {
           </Table>
         )}
       </Card>
+
+      {/* Related Journal Entries for selected posted voucher */}
+      {selectedVoucher && (
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">
+            Voucher Details — {selectedVoucher.voucher_number}
+          </h3>
+          <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+            <div><span className="text-muted-foreground">Status:</span> {getStatusBadge(selectedVoucher.status)}</div>
+            <div><span className="text-muted-foreground">Allocation:</span> {getAllocationMethodLabel(selectedVoucher.allocation_method)}</div>
+            <div><span className="text-muted-foreground">Total Additional Cost:</span> <CurrencyDisplay amount={selectedVoucher.total_additional_cost || 0} /></div>
+            <div><span className="text-muted-foreground">GRN:</span> {selectedVoucher.goods_receipt_notes?.grn_number || "-"}</div>
+          </div>
+          {(selectedVoucher as any).journal_entry_id && (
+            <RelatedJournalEntries sourceId={selectedVoucher.id} sourceType="ap_invoice" />
+          )}
+        </Card>
+      )}
+
+      {/* Post to GL Confirmation Dialog */}
+      <AlertDialog open={!!postConfirmVoucherId} onOpenChange={(open) => !open && setPostConfirmVoucherId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Post Landed Cost to General Ledger?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will create a journal entry with the following double-entry:
+              <br /><br />
+              <strong>DR</strong> Inventory Account (increases item valuation)<br />
+              <strong>CR</strong> Expense/Payable Account (per charge)<br /><br />
+              Item standard costs will be updated with the final landed cost. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePostToGL} disabled={postToGL.isPending}>
+              {postToGL.isPending ? "Posting..." : "Post to GL"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
