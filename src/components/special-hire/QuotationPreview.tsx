@@ -70,9 +70,11 @@ interface QuotationData {
 interface Props {
   quotation: QuotationData;
   className?: string;
+  documentMode?: 'quotation' | 'proforma_invoice';
 }
 
-export function QuotationPreview({ quotation, className = "" }: Props) {
+export function QuotationPreview({ quotation, className = "", documentMode = 'quotation' }: Props) {
+  const docLabel = documentMode === 'proforma_invoice' ? 'Proforma Invoice' : 'Quotation';
   const [rateCard, setRateCard] = useState<any>(null);
 
   // Ensure bus_fleet_details is always parsed and normalized to correct structure
