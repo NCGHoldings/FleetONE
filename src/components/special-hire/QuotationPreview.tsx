@@ -268,9 +268,9 @@ export function QuotationPreview({ quotation, className = "", documentMode = 'qu
               specialhire.ncgexpress@ncg.lk
             </div>
             <div className="text-xs mt-1 text-gray-700">
-              Quotation{"\u00A0"}Generated{"\u00A0"}on{"\u00A0"}{format(new Date(parsedQuotation.created_at), "dd/MM/yyyy, hh:mm a")}
+              {docLabel}{"\u00A0"}Generated{"\u00A0"}on{"\u00A0"}{format(new Date(parsedQuotation.created_at), "dd/MM/yyyy, hh:mm a")}
                <br />
-               Quotation{"\u00A0"}No:{"\u00A0"}{parsedQuotation.quotation_no}
+               {docLabel}{"\u00A0"}No:{"\u00A0"}{parsedQuotation.quotation_no}
             </div>
           </div>
         </div>
