@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Download, Printer, Mail, Loader2, MessageCircle } from 'lucide-react';
 import { QuotationPreview } from './QuotationPreview';
 import { toast } from 'sonner';
