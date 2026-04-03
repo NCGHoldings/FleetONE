@@ -1,52 +1,45 @@
 
+# Create Comprehensive Yutong Sales Complete Flow Diagram
 
-# Confirmed: Test Mode Data Leak in Special Hire Finance Approval
+## What to build
+A detailed Mermaid diagram (like the Special Hire one) covering the full Yutong bus sales lifecycle from quotation to settlement, including operations, finance, documents, and database tables.
 
-## Verdict: TRUE
+## Flow sections to include
 
-The external AI's finding is **accurate**. `useFinanceApproval.ts` hardcodes `NCG_HOLDING_ID` (live) in all 11 locations. It never checks which company the user has selected, so any Special Hire approval done while in test mode writes directly to the live General Ledger.
+### 1. Operations Flow
+- Customer Inquiry → Quotation Created → Convert to Order (with payment schedule: Cash 10/40/50, Lease 20/80)
+- Supplier Management → Shipment/Logistics → Customs → Processing → RMV → Delivery
+- Payment recording (advance, interim, balance)
+- Invoice generation (PI skips AR/GL, CI/TI create draft AR)
+- Invoice approval (triggers revenue recognition GL)
 
-## What leaks
+### 2. Finance Flow — Journal Entries
+- **JE-1**: Advance/Interim Payment → DR Bank / CR Customer Advance (22303001)
+- **JE-2**: Invoice Approval (Revenue Recognition) → DR Trade Receivable (12201001) / CR Sales Revenue (41101001) + CR VAT Output (22302001)
+- **JE-3**: Advance Application (auto on approval) → DR Customer Advance (22303001) / CR Trade Receivable (12201001)
+- **JE-4**: Balance Payment → DR Bank / CR Trade Receivable (12201001)
+- **JE-5**: Full Payment (no invoice) → DR Bank / CR Sales Revenue (41101001)
+- Proforma Invoice explicitly excluded from AR/GL
 
-| Data Type | Hardcoded Line(s) | Impact |
-|-----------|-------------------|--------|
-| Finance Settings fetch | 113, 738 | Always reads live settings (minor) |
-| Customer creation | 135, 753 | Test customers appear in live customer list |
-| AR Invoice creation | 212, 791 | Test invoices in live AR aging reports |
-| GL Journal Entries (advance/full/balance) | 233, 245, 257 | Test JEs in live Trial Balance, P&L, Balance Sheet |
-| Advance Application JE | 285 | Test advance clearing in live GL |
-| AR Receipt creation | 315 | Test receipts in live receipt reports |
+### 3. Documents Generated
+- Quotation PDF, Proforma Invoice, Customer Invoice, Tax Invoice, Cash Receipts, Delivery Orders
 
-## Why it happens
+### 4. Database Tables
+- yutong_quotations, yutong_orders, yutong_customer_payments, yutong_payment_schedules, yutong_invoice_records, yutong_invoice_documents, yutong_cash_receipts, yutong_delivery_orders, finance_customers, ar_invoices, journal_entries
 
-`useFinanceApproval` is a React hook but it never reads the selected company from `CompanyContext`. It imports the constant `NCG_HOLDING_ID` and passes it directly to every finance function. The `getEffectiveCompanyId()` function in CompanyContext correctly resolves test sub-companies to `NCG_TEST_ID`, but it's never called here.
+### 5. AR Integration
+- Draft AR at invoice generation (CI/TI only)
+- Status update on approval
+- Balance payments create AR Receipts
+- Duplicate prevention guard
 
-## Proposed Fix
+### 6. Settlement Verification
+- Trade Receivable = Invoice - Advance Applied - Balance Paid = 0
+- Customer Advance = Advance In - Applied = 0
+- source_module: yutong_sales, business_unit_code: YUT
 
-### Approach
-Pass the effective company ID into `useFinanceApproval` from the calling component, rather than hardcoding it.
+## File to create
+- `/mnt/documents/Yutong_Complete_Sales_Flow.mmd` — comprehensive Mermaid diagram
 
-### Files to modify
-
-**1. `src/hooks/useFinanceApproval.ts`**
-- Remove the hardcoded `NCG_HOLDING_ID` import usage for GL/AR operations
-- Accept `effectiveCompanyId` as a parameter to `approvePayment()` and the batch approval function
-- Replace all 11 `NCG_HOLDING_ID` references with the passed-in company ID
-
-**2. `src/components/special-hire/FinanceApprovalWithSignature.tsx`**
-- Import `useCompany` from CompanyContext
-- Get `getEffectiveCompanyId()` and pass it to `approvePayment(paymentId, notes, effectiveCompanyId)`
-
-**3. `src/components/special-hire/ConfirmedTripsTable.tsx`** (or wherever batch approval is triggered)
-- Same pattern: pass `getEffectiveCompanyId()` to the approval calls
-
-### What this does NOT change
-- Live data remains untouched — this only ensures future test approvals go to the test company
-- No migration needed — this is a code-only fix
-- Existing test contamination (if any) would need a separate data cleanup
-
-## Risk Assessment
-- **Current risk**: HIGH if anyone has approved Special Hire payments while in test mode
-- **Likelihood of past contamination**: Depends on usage — if test mode Special Hire approvals have occurred, live reports are already affected
-- **Fix complexity**: LOW — parameter threading through 3 files
-
+## No code changes needed
+This is a documentation artifact only.
