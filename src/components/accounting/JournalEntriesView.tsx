@@ -386,6 +386,22 @@ export const JournalEntriesView = () => {
         open={showDetail}
         onOpenChange={setShowDetail}
       />
+
+      {/* GL Export Modal */}
+      <GLExportModal
+        open={isExportOpen}
+        onOpenChange={setIsExportOpen}
+        filteredEntries={filteredEntries}
+        filters={{
+          searchQuery,
+          filterStatus,
+          filterBusinessUnit,
+          dateFrom: dateRange?.from,
+          dateTo: dateRange?.to,
+          minAmount,
+          maxAmount,
+        }}
+      />
     </Card>
   );
 };
