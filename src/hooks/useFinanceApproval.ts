@@ -284,7 +284,7 @@ export const useFinanceApproval = () => {
             customerName: paymentData.quotation.customer_name,
             advanceAmount: totalAdvance,
             settings,
-            effectiveCompanyId: NCG_HOLDING_ID,
+            effectiveCompanyId: companyId,
           });
           if (applyResult) {
             console.log('[SPH Finance] ✅ Advance applied to invoice:', applyResult.entry_number);
