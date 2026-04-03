@@ -353,8 +353,9 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
 
       // Step 2: Prepare email data
       const date = new Date().toISOString().split('T')[0];
-      const filename = `Quotation_${quotation.quotation_no}_${date}.pdf`;
-      const subject = `Quotation ${quotation.quotation_no} - NCG Express`;
+      const prefix = documentMode === 'proforma_invoice' ? 'Proforma_Invoice' : 'Quotation';
+      const filename = `${prefix}_${quotation.quotation_no}_${date}.pdf`;
+      const subject = `${docLabel} ${quotation.quotation_no} - NCG Express`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2563eb;">NCG Express</h2>
