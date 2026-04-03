@@ -232,7 +232,7 @@ export const useFinanceApproval = () => {
         customerName: paymentData.quotation.customer_name,
         amount: paymentData.amount,
         settings,
-        effectiveCompanyId: NCG_HOLDING_ID,
+        effectiveCompanyId: companyId,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Advance GL posted:', journalEntry.entry_number);
