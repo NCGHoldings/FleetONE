@@ -32,6 +32,7 @@ const BUSINESS_UNIT_LABELS: Record<string, { label: string; variant: "default" |
 
 export const JournalEntriesView = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [filterBusinessUnit, setFilterBusinessUnit] = useState<string>("all");
