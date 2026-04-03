@@ -136,7 +136,7 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
       account_code: "",
       account_name: "",
       account_type: undefined,
-      parent_account_id: "_none",
+      parent_account_id: "",
       is_header: false,
       description: "",
     },
