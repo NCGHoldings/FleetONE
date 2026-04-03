@@ -106,7 +106,7 @@ export const CreateLandedCostVoucherModal = ({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("goods_receipt_notes")
-        .select("id, grn_number, received_date, status")
+        .select("id, grn_number, receipt_date, status")
         .eq("company_id", selectedCompanyId!)
         .order("received_date", { ascending: false });
       if (error) throw error;
