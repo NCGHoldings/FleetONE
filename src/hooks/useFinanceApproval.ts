@@ -50,7 +50,7 @@ export const useFinanceApproval = () => {
     }
   };
 
-  const approvePayment = async (paymentId: string, notes?: string, signatures?: any) => {
+  const approvePayment = async (paymentId: string, notes?: string, signatures?: any, companyId?: string) => {
     try {
       setIsLoading(true);
       console.log('[SPH Finance] ========== APPROVAL START ==========');
