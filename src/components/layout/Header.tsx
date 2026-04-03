@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Bell, Search, User, Settings, LogOut, Menu } from "lucide-react";
 import { DarkModeToggle } from "./DarkModeToggle";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { APP_VERSION } from "@/config/appVersion";
+import { WhatsNewDialog, useHasNewVersion } from "./WhatsNewDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
