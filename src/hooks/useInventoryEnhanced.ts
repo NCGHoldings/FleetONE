@@ -243,7 +243,7 @@ export const useCreateLandedCostVoucher = () => {
   return useMutation({
     mutationFn: async (voucher: {
       voucher_number: string;
-      grn_id: string;
+      grn_id?: string;
       posting_date: string;
       allocation_method: "by_value" | "by_quantity" | "by_weight";
       notes?: string;
