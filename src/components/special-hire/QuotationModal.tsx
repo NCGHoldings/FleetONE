@@ -47,6 +47,9 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isEmailing, setIsEmailing] = useState(false);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const [documentMode, setDocumentMode] = useState<'quotation' | 'proforma_invoice'>('quotation');
+
+  const docLabel = documentMode === 'proforma_invoice' ? 'Proforma Invoice' : 'Quotation';
 
   const handlePrint = () => {
     if (printRef.current) {
