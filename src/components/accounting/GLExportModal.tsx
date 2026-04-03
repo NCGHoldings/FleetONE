@@ -176,8 +176,8 @@ export const GLExportModal = ({ open, onOpenChange, filteredEntries, filters }: 
             </Select>
           </div>
 
-          {/* Section toggles - only for Excel */}
-          {exportFormat === "xlsx" && (
+          {/* Section toggles */}
+          {(
             <div className="space-y-3">
               <Label>Include Sections</Label>
               <div className="space-y-2">
