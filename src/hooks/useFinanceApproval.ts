@@ -112,7 +112,7 @@ export const useFinanceApproval = () => {
       console.warn('[SPH Finance] ⚠️ No document found for payment. Proceeding anyway...');
     }
 
-    const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+    const settings = await fetchSpecialHireFinanceSettings(companyId);
     
     if (!settings) {
       console.warn('[SPH Finance] ⚠️ Special Hire Finance settings not configured');
