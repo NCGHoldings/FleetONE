@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, CheckCircle, XCircle, RotateCcw, Search } from "lucide-react";
+import { Plus, Eye, CheckCircle, XCircle, RotateCcw, Search, Download } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "./shared/StatusBadge";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
@@ -18,6 +18,8 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Filter } from "lucide-react";
 import { toast } from "sonner";
+import { GLExportModal } from "./GLExportModal";
+import { GLExportFilters } from "./GLExcelExporter";
 
 // Business unit display mapping
 const BUSINESS_UNIT_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
@@ -30,6 +32,7 @@ const BUSINESS_UNIT_LABELS: Record<string, { label: string; variant: "default" |
 
 export const JournalEntriesView = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [filterBusinessUnit, setFilterBusinessUnit] = useState<string>("all");
@@ -279,6 +282,11 @@ export const JournalEntriesView = () => {
             </Select>
           )}
           
+          <Button variant="outline" onClick={() => setIsExportOpen(true)}>
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+          
           <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -377,6 +385,22 @@ export const JournalEntriesView = () => {
         entry={selectedEntry}
         open={showDetail}
         onOpenChange={setShowDetail}
+      />
+
+      {/* GL Export Modal */}
+      <GLExportModal
+        open={isExportOpen}
+        onOpenChange={setIsExportOpen}
+        filteredEntries={filteredEntries}
+        filters={{
+          searchQuery,
+          filterStatus,
+          filterBusinessUnit,
+          dateFrom: dateRange?.from,
+          dateTo: dateRange?.to,
+          minAmount,
+          maxAmount,
+        }}
       />
     </Card>
   );
