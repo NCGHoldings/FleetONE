@@ -18,12 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileSpreadsheet, Printer, Download, AlertCircle, CheckCircle } from "lucide-react";
+import { FileSpreadsheet, Printer, Download, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import {
   useChartOfAccounts,
-  useJournalEntries,
   useFinancialPeriods,
   useCostCenters,
+  useTrialBalanceData,
 } from "@/hooks/useAccountingData";
 import { format } from "date-fns";
 
@@ -39,9 +39,11 @@ interface TrialBalanceRow {
   closingCredit: number;
 }
 
+// Debit-normal account types
+const DEBIT_NORMAL_TYPES = ["asset", "expense", "cost_of_sales"];
+
 export const TrialBalanceView = () => {
   const { data: accounts = [] } = useChartOfAccounts();
-  const { data: journalEntries = [] } = useJournalEntries("posted");
   const { data: periods = [] } = useFinancialPeriods();
   const { data: costCenters = [] } = useCostCenters();
 
@@ -51,89 +53,94 @@ export const TrialBalanceView = () => {
 
   const selectedPeriod = periods.find((p: any) => p.id === selectedPeriodId);
 
+  const { openingMovements, periodMovements, isLoading } = useTrialBalanceData(
+    selectedPeriod?.start_date || null,
+    selectedPeriod?.end_date || null,
+    selectedCostCenter !== "all" ? selectedCostCenter : undefined
+  );
+
+  // Build lookup maps for movements
+  const openingMap = useMemo(() => {
+    const map: Record<string, { debit: number; credit: number }> = {};
+    openingMovements.forEach((m) => {
+      map[m.account_id] = { debit: m.total_debit, credit: m.total_credit };
+    });
+    return map;
+  }, [openingMovements]);
+
+  const periodMap = useMemo(() => {
+    const map: Record<string, { debit: number; credit: number }> = {};
+    periodMovements.forEach((m) => {
+      map[m.account_id] = { debit: m.total_debit, credit: m.total_credit };
+    });
+    return map;
+  }, [periodMovements]);
+
   // Calculate trial balance
   const trialBalance = useMemo(() => {
     if (!selectedPeriod) return [];
 
-    const periodStart = new Date(selectedPeriod.start_date);
-    const periodEnd = new Date(selectedPeriod.end_date);
-
-    // Filter entries within period
-    const periodEntries = journalEntries.filter((entry: any) => {
-      const entryDate = new Date(entry.entry_date);
-      return entryDate >= periodStart && entryDate <= periodEnd;
-    });
-
-    // Calculate balances per account
-    const balances: Record<string, TrialBalanceRow> = {};
+    const rows: TrialBalanceRow[] = [];
 
     accounts.forEach((account: any) => {
-      balances[account.id] = {
+      const isDebitNormal = DEBIT_NORMAL_TYPES.includes(account.account_type);
+
+      // Opening = COA opening_balance + all JE lines before period start
+      const coaOpening = account.opening_balance || 0;
+      const jeOpening = openingMap[account.id] || { debit: 0, credit: 0 };
+      // Net opening = COA opening + (JE debits - JE credits)
+      const netOpening = coaOpening + (jeOpening.debit - jeOpening.credit);
+
+      let openingDebit = 0;
+      let openingCredit = 0;
+      if (isDebitNormal) {
+        // Debit-normal: positive net → debit column, negative → credit column
+        if (netOpening >= 0) {
+          openingDebit = netOpening;
+        } else {
+          openingCredit = Math.abs(netOpening);
+        }
+      } else {
+        // Credit-normal: positive net means more debits than credits → debit column
+        // But for credit-normal accounts, a natural balance is credit
+        // Net = DR - CR; if negative (CR > DR), show in credit; if positive (DR > CR), show in debit
+        if (netOpening >= 0) {
+          openingDebit = netOpening;
+        } else {
+          openingCredit = Math.abs(netOpening);
+        }
+      }
+
+      // Period movements: raw debits and credits
+      const jePeriod = periodMap[account.id] || { debit: 0, credit: 0 };
+      const periodDebit = jePeriod.debit;
+      const periodCredit = jePeriod.credit;
+
+      // Closing = Opening net + Period net
+      const netClosing = netOpening + (periodDebit - periodCredit);
+      let closingDebit = 0;
+      let closingCredit = 0;
+      if (netClosing >= 0) {
+        closingDebit = netClosing;
+      } else {
+        closingCredit = Math.abs(netClosing);
+      }
+
+      rows.push({
         accountCode: account.account_code,
         accountName: account.account_name,
         accountType: account.account_type,
-        openingDebit: 0,
-        openingCredit: 0,
-        periodDebit: 0,
-        periodCredit: 0,
-        closingDebit: 0,
-        closingCredit: 0,
-      };
-
-      // Use opening balance from account if available
-      const openingBalance = account.opening_balance || 0;
-      if (openingBalance >= 0) {
-        if (["asset", "expense"].includes(account.account_type)) {
-          balances[account.id].openingDebit = openingBalance;
-        } else {
-          balances[account.id].openingCredit = openingBalance;
-        }
-      } else {
-        if (["asset", "expense"].includes(account.account_type)) {
-          balances[account.id].openingCredit = Math.abs(openingBalance);
-        } else {
-          balances[account.id].openingDebit = Math.abs(openingBalance);
-        }
-      }
+        openingDebit,
+        openingCredit,
+        periodDebit,
+        periodCredit,
+        closingDebit,
+        closingCredit,
+      });
     });
 
-    // Sum up period movements from journal entry lines
-    periodEntries.forEach((entry: any) => {
-      if (entry.lines) {
-        entry.lines.forEach((line: any) => {
-          if (line.account_id && balances[line.account_id]) {
-            // Filter by cost center if selected
-            if (
-              selectedCostCenter !== "all" &&
-              line.cost_center_id !== selectedCostCenter
-            ) {
-              return;
-            }
-            balances[line.account_id].periodDebit += line.debit || 0;
-            balances[line.account_id].periodCredit += line.credit || 0;
-          }
-        });
-      }
-    });
-
-    // Calculate closing balances
-    Object.values(balances).forEach((row) => {
-      const netOpening = row.openingDebit - row.openingCredit;
-      const netPeriod = row.periodDebit - row.periodCredit;
-      const netClosing = netOpening + netPeriod;
-
-      if (netClosing >= 0) {
-        row.closingDebit = netClosing;
-        row.closingCredit = 0;
-      } else {
-        row.closingDebit = 0;
-        row.closingCredit = Math.abs(netClosing);
-      }
-    });
-
-    // Filter and sort
-    let result = Object.values(balances);
-
+    // Filter zero balances
+    let result = rows;
     if (!showZeroBalances) {
       result = result.filter(
         (row) =>
@@ -147,7 +154,7 @@ export const TrialBalanceView = () => {
     }
 
     return result.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
-  }, [accounts, journalEntries, selectedPeriod, selectedCostCenter, showZeroBalances]);
+  }, [accounts, openingMap, periodMap, selectedPeriod, showZeroBalances]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -183,7 +190,6 @@ export const TrialBalanceView = () => {
   };
 
   const handleExport = () => {
-    // Create CSV content
     const headers = [
       "Account Code",
       "Account Name",
@@ -308,59 +314,61 @@ export const TrialBalanceView = () => {
       </Card>
 
       {/* Balance Status */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Opening Balance</p>
-                <p className="text-lg font-semibold">
-                  {isBalanced.opening ? "Balanced" : "Unbalanced"}
-                </p>
+      {selectedPeriodId && !isLoading && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Opening Balance</p>
+                  <p className="text-lg font-semibold">
+                    {isBalanced.opening ? "Balanced" : "Unbalanced"}
+                  </p>
+                </div>
+                {isBalanced.opening ? (
+                  <CheckCircle className="h-8 w-8 text-green-500" />
+                ) : (
+                  <AlertCircle className="h-8 w-8 text-destructive" />
+                )}
               </div>
-              {isBalanced.opening ? (
-                <CheckCircle className="h-8 w-8 text-green-500" />
-              ) : (
-                <AlertCircle className="h-8 w-8 text-destructive" />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Period Movements</p>
-                <p className="text-lg font-semibold">
-                  {isBalanced.period ? "Balanced" : "Unbalanced"}
-                </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Period Movements</p>
+                  <p className="text-lg font-semibold">
+                    {isBalanced.period ? "Balanced" : "Unbalanced"}
+                  </p>
+                </div>
+                {isBalanced.period ? (
+                  <CheckCircle className="h-8 w-8 text-green-500" />
+                ) : (
+                  <AlertCircle className="h-8 w-8 text-destructive" />
+                )}
               </div>
-              {isBalanced.period ? (
-                <CheckCircle className="h-8 w-8 text-green-500" />
-              ) : (
-                <AlertCircle className="h-8 w-8 text-destructive" />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Closing Balance</p>
-                <p className="text-lg font-semibold">
-                  {isBalanced.closing ? "Balanced" : "Unbalanced"}
-                </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Closing Balance</p>
+                  <p className="text-lg font-semibold">
+                    {isBalanced.closing ? "Balanced" : "Unbalanced"}
+                  </p>
+                </div>
+                {isBalanced.closing ? (
+                  <CheckCircle className="h-8 w-8 text-green-500" />
+                ) : (
+                  <AlertCircle className="h-8 w-8 text-destructive" />
+                )}
               </div>
-              {isBalanced.closing ? (
-                <CheckCircle className="h-8 w-8 text-green-500" />
-              ) : (
-                <AlertCircle className="h-8 w-8 text-destructive" />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Trial Balance Table */}
       <Card>
@@ -369,6 +377,11 @@ export const TrialBalanceView = () => {
             <div className="text-center py-12 text-muted-foreground">
               <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Select a financial period to generate the trial balance</p>
+            </div>
+          ) : isLoading ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin opacity-50" />
+              <p>Calculating trial balance...</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -424,52 +437,62 @@ export const TrialBalanceView = () => {
                     </TableRow>
                   ))}
 
+                  {trialBalance.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        No account movements found for this period
+                      </TableCell>
+                    </TableRow>
+                  )}
+
                   {/* Totals Row */}
-                  <TableRow className="font-bold bg-muted/50">
-                    <TableCell colSpan={3}>TOTALS</TableCell>
-                    <TableCell
-                      className={`text-right font-mono border-l ${
-                        !isBalanced.opening ? "text-destructive" : ""
-                      }`}
-                    >
-                      {formatNumber(totals.openingDebit)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right font-mono ${
-                        !isBalanced.opening ? "text-destructive" : ""
-                      }`}
-                    >
-                      {formatNumber(totals.openingCredit)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right font-mono border-l ${
-                        !isBalanced.period ? "text-destructive" : ""
-                      }`}
-                    >
-                      {formatNumber(totals.periodDebit)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right font-mono ${
-                        !isBalanced.period ? "text-destructive" : ""
-                      }`}
-                    >
-                      {formatNumber(totals.periodCredit)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right font-mono border-l ${
-                        !isBalanced.closing ? "text-destructive" : ""
-                      }`}
-                    >
-                      {formatNumber(totals.closingDebit)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right font-mono ${
-                        !isBalanced.closing ? "text-destructive" : ""
-                      }`}
-                    >
-                      {formatNumber(totals.closingCredit)}
-                    </TableCell>
-                  </TableRow>
+                  {trialBalance.length > 0 && (
+                    <TableRow className="font-bold bg-muted/50">
+                      <TableCell colSpan={3}>TOTALS</TableCell>
+                      <TableCell
+                        className={`text-right font-mono border-l ${
+                          !isBalanced.opening ? "text-destructive" : ""
+                        }`}
+                      >
+                        {formatNumber(totals.openingDebit)}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-mono ${
+                          !isBalanced.opening ? "text-destructive" : ""
+                        }`}
+                      >
+                        {formatNumber(totals.openingCredit)}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-mono border-l ${
+                          !isBalanced.period ? "text-destructive" : ""
+                        }`}
+                      >
+                        {formatNumber(totals.periodDebit)}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-mono ${
+                          !isBalanced.period ? "text-destructive" : ""
+                        }`}
+                      >
+                        {formatNumber(totals.periodCredit)}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-mono border-l ${
+                          !isBalanced.closing ? "text-destructive" : ""
+                        }`}
+                      >
+                        {formatNumber(totals.closingDebit)}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-mono ${
+                          !isBalanced.closing ? "text-destructive" : ""
+                        }`}
+                      >
+                        {formatNumber(totals.closingCredit)}
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>

@@ -136,18 +136,19 @@ export const useJournalEntryLines = (entryId: string) => {
 
 // ============ Financial Periods ============
 export const useFinancialPeriods = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["financial-periods", selectedCompanyId],
+    queryKey: ["financial-periods", effectiveCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("financial_periods")
         .select("*")
         .order("start_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       const { data, error } = await query;
@@ -1620,7 +1621,153 @@ export const useCompanies = () => {
         .select("*")
         .order("name");
       if (error) throw error;
-      return data;
+    return data;
     },
   });
+};
+
+// ============ Trial Balance Data ============
+// Fetches aggregated debit/credit movements from journal_entry_lines
+// Split into opening (before period) and period (within period) movements
+export const useTrialBalanceData = (
+  periodStartDate: string | null,
+  periodEndDate: string | null,
+  costCenterId?: string
+) => {
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
+
+  // Opening movements: all posted JE lines before period start
+  const openingQuery = useQuery({
+    queryKey: ["trial-balance-opening", periodStartDate, effectiveCompanyId, autoBusinessUnitCode, costCenterId],
+    queryFn: async () => {
+      if (!periodStartDate) return [];
+
+      // Get all posted journal entry IDs before period start
+      let jeQuery = supabase
+        .from("journal_entries")
+        .select("id")
+        .eq("status", "posted")
+        .lt("entry_date", periodStartDate);
+
+      if (effectiveCompanyId) {
+        jeQuery = jeQuery.eq("company_id", effectiveCompanyId);
+      }
+      if (autoBusinessUnitCode) {
+        jeQuery = jeQuery.eq("business_unit_code", autoBusinessUnitCode);
+      }
+
+      const { data: entries, error: jeError } = await jeQuery;
+      if (jeError) throw jeError;
+      if (!entries || entries.length === 0) return [];
+
+      const entryIds = entries.map(e => e.id);
+
+      // Fetch lines for those entries in batches (Supabase IN filter limit)
+      const batchSize = 200;
+      const allLines: { account_id: string; debit: number; credit: number }[] = [];
+
+      for (let i = 0; i < entryIds.length; i += batchSize) {
+        const batch = entryIds.slice(i, i + batchSize);
+        let lineQuery = supabase
+          .from("journal_entry_lines")
+          .select("account_id, debit, credit, cost_center_id")
+          .in("journal_entry_id", batch);
+
+        const { data: lines, error: lineError } = await lineQuery;
+        if (lineError) throw lineError;
+        if (lines) allLines.push(...lines as any);
+      }
+
+      // Filter by cost center if needed, then aggregate
+      const filtered = costCenterId && costCenterId !== "all"
+        ? allLines.filter((l: any) => l.cost_center_id === costCenterId)
+        : allLines;
+
+      const agg: Record<string, { debit: number; credit: number }> = {};
+      filtered.forEach(line => {
+        if (!line.account_id) return;
+        if (!agg[line.account_id]) agg[line.account_id] = { debit: 0, credit: 0 };
+        agg[line.account_id].debit += line.debit || 0;
+        agg[line.account_id].credit += line.credit || 0;
+      });
+
+      return Object.entries(agg).map(([account_id, vals]) => ({
+        account_id,
+        total_debit: vals.debit,
+        total_credit: vals.credit,
+      }));
+    },
+    enabled: !!selectedCompanyId && !!periodStartDate,
+  });
+
+  // Period movements: posted JE lines within period
+  const periodQuery = useQuery({
+    queryKey: ["trial-balance-period", periodStartDate, periodEndDate, effectiveCompanyId, autoBusinessUnitCode, costCenterId],
+    queryFn: async () => {
+      if (!periodStartDate || !periodEndDate) return [];
+
+      let jeQuery = supabase
+        .from("journal_entries")
+        .select("id")
+        .eq("status", "posted")
+        .gte("entry_date", periodStartDate)
+        .lte("entry_date", periodEndDate);
+
+      if (effectiveCompanyId) {
+        jeQuery = jeQuery.eq("company_id", effectiveCompanyId);
+      }
+      if (autoBusinessUnitCode) {
+        jeQuery = jeQuery.eq("business_unit_code", autoBusinessUnitCode);
+      }
+
+      const { data: entries, error: jeError } = await jeQuery;
+      if (jeError) throw jeError;
+      if (!entries || entries.length === 0) return [];
+
+      const entryIds = entries.map(e => e.id);
+
+      const batchSize = 200;
+      const allLines: { account_id: string; debit: number; credit: number }[] = [];
+
+      for (let i = 0; i < entryIds.length; i += batchSize) {
+        const batch = entryIds.slice(i, i + batchSize);
+        let lineQuery = supabase
+          .from("journal_entry_lines")
+          .select("account_id, debit, credit, cost_center_id")
+          .in("journal_entry_id", batch);
+
+        const { data: lines, error: lineError } = await lineQuery;
+        if (lineError) throw lineError;
+        if (lines) allLines.push(...lines as any);
+      }
+
+      const filtered = costCenterId && costCenterId !== "all"
+        ? allLines.filter((l: any) => l.cost_center_id === costCenterId)
+        : allLines;
+
+      const agg: Record<string, { debit: number; credit: number }> = {};
+      filtered.forEach(line => {
+        if (!line.account_id) return;
+        if (!agg[line.account_id]) agg[line.account_id] = { debit: 0, credit: 0 };
+        agg[line.account_id].debit += line.debit || 0;
+        agg[line.account_id].credit += line.credit || 0;
+      });
+
+      return Object.entries(agg).map(([account_id, vals]) => ({
+        account_id,
+        total_debit: vals.debit,
+        total_credit: vals.credit,
+      }));
+    },
+    enabled: !!selectedCompanyId && !!periodStartDate && !!periodEndDate,
+  });
+
+  return {
+    openingMovements: openingQuery.data || [],
+    periodMovements: periodQuery.data || [],
+    isLoading: openingQuery.isLoading || periodQuery.isLoading,
+    error: openingQuery.error || periodQuery.error,
+  };
 };
