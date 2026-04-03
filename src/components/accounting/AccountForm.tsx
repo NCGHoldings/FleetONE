@@ -47,6 +47,7 @@ interface ParentAccount {
   id: string;
   account_code: string;
   account_name: string;
+  account_type: string | null;
   level1: string | null;
   level2: string | null;
   level3: string | null;
