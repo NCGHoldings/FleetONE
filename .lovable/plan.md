@@ -1,31 +1,61 @@
 
 
-# Fix GL Export: Sections Not Reflecting Customization
+# Fix Landed Cost: Build the Create Voucher Form
 
 ## Problem
-The exported Excel file always looks the same regardless of which sections are checked/unchecked. Two issues:
+The Landed Cost module is non-functional because:
+1. The "New Landed Cost Voucher" button has **no onClick handler** — no form or modal exists
+2. There are **zero GRNs** in the database, so even with a form, there's nothing to create vouchers from
+3. The complete creation workflow (select GRN → pick items → add charges → allocate) is missing
 
-1. **Line Items sheet never appears**: The condition `options.includeLineItems && lineItems.length > 0` means if the Supabase fetch returns empty (e.g., FK join issue with `chart_of_accounts`), the sheet is silently skipped even when the user checked it.
+## What to build
 
-2. **Options state may not reset between opens**: The modal keeps previous state when reopened, so toggling has no visible effect if user doesn't notice the checkboxes.
+### 1. Create `src/components/accounting/inventory/CreateLandedCostVoucherModal.tsx`
+A multi-step modal form:
 
-## Fix
+**Step 1 — Voucher Header**
+- Auto-generate voucher number (`LCV-YYYY-MMDD-HHMM`)
+- Select GRN from dropdown (fetches `goods_receipt_notes` with `grn_number`)
+- Posting date (default today)
+- Allocation method: By Value / By Quantity / By Weight
+- Notes field
 
-### 1. `src/components/accounting/GLExcelExporter.ts`
-- Remove `lineItems.length > 0` guard — if user checks "Line Items", always add the sheet (show empty table with headers if no data)
-- Add a "No data" row when line items array is empty so user sees the sheet exists
+**Step 2 — Items** (auto-populated from GRN)
+- When GRN is selected, fetch `grn_lines` joined with `items` for that GRN
+- Show item code, item name, received quantity, unit cost, line total
+- User can check/uncheck items to include
+- Original cost = `line_total` from GRN line
 
-### 2. `src/components/accounting/GLExportModal.tsx`
-- Reset options to defaults when modal opens (use `useEffect` on `open`)
-- Add better error handling: log line items count before export
-- Fix potential FK join issue: use explicit select with `chart_of_accounts!account_id(...)` if needed
-- When CSV is selected and user clicks Export, also respect "include line items" option — currently CSV only exports journal entries header-level data
+**Step 3 — Charges**
+- Add rows for charges: charge type (dropdown: Freight, Insurance, Customs Duty, Stamp Duty, Port Charges, Clearing Agent Fee, Other), description, amount, vendor (optional from vendors list), expense account (from COA)
+- Dynamic add/remove rows
+- Show total charges
 
-### 3. CSV with Line Items support
-- When CSV format is selected and "Include Line Items" is checked, export a flat CSV with one row per line item (entry info repeated per line)
-- When unchecked, export journal entry level only (current behavior)
+**Step 4 — Allocation Preview**
+- Show how charges will be allocated across items based on selected method
+- Display: item name, original cost, allocated cost, final cost
+- Total row
 
-## Files to modify
-- `src/components/accounting/GLExcelExporter.ts` — remove lineItems.length guard, add empty-state row
-- `src/components/accounting/GLExportModal.tsx` — reset state on open, improve error handling, enable CSV section toggles
+**Submit** calls `useCreateLandedCostVoucher` mutation
+
+### 2. Modify `src/components/accounting/inventory/LandedCostView.tsx`
+- Add state for modal open/close
+- Wire "New Landed Cost Voucher" button onClick to open modal
+- Pass `onSuccess` callback to refresh voucher list
+
+### 3. Allow creating without GRN (manual mode)
+Since there are zero GRNs, add a "Manual Entry" option:
+- Instead of selecting a GRN, user can manually add items from the `items` table
+- Select item → enter original cost → add to list
+- This ensures the feature works even without the full PR→PO→GRN pipeline
+
+## Files
+- **Create**: `src/components/accounting/inventory/CreateLandedCostVoucherModal.tsx` — full multi-step create form
+- **Modify**: `src/components/accounting/inventory/LandedCostView.tsx` — wire button + render modal
+
+## Result
+- Users can create landed cost vouchers (from GRN or manually)
+- Add multiple charges with GL account mapping
+- See allocation preview before saving
+- Draft vouchers appear in list, ready to "Post to GL" (existing logic)
 
