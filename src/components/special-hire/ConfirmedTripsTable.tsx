@@ -13,6 +13,7 @@ import {
   Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck, RotateCcw, FileText, Mail, Calculator
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useCompany } from '@/contexts/CompanyContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSpecialHire, type QuotationWithPayments } from '@/hooks/useRealtimeSpecialHire';
 import { useFinanceApproval } from '@/hooks/useFinanceApproval';
