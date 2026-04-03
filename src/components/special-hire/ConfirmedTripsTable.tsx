@@ -863,7 +863,7 @@ export function ConfirmedTripsTable() {
 
   // Handle finance approval with document approval
   const handleFinanceApproval = async (paymentId: string, notes?: string) => {
-    const result = await approvePayment(paymentId, notes);
+    const result = await approvePayment(paymentId, notes, undefined, getEffectiveCompanyId());
     if (result.success) {
       setFinanceApprovalModalOpen(false);
       setSelectedFinancePayment(null);
