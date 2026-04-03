@@ -34,7 +34,7 @@ export const FinanceApprovalWithSignature: React.FC<FinanceApprovalWithSignature
         approval_date: approvalData.approval_date,
       };
 
-      const result = await approvePayment(paymentId, `Approved by ${approverSignature.approver_name} with signature`);
+      const result = await approvePayment(paymentId, `Approved by ${approverSignature.approver_name} with signature`, undefined, getEffectiveCompanyId());
 
       if (result.success) {
         setShowApprovalModal(false);
