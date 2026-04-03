@@ -186,7 +186,7 @@ export const CreateLandedCostVoucherModal = ({
         .select("id, account_code, account_name")
         .eq("company_id", selectedCompanyId!)
         .eq("is_active", true)
-        .in("account_type", ["Expense", "Cost of Sales", "Asset"])
+        .in("account_type", ["expense", "asset"])
         .order("account_code");
       if (error) throw error;
       return data || [];
