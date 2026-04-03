@@ -6,6 +6,7 @@ import { useFinanceApproval } from '@/hooks/useFinanceApproval';
 import { type ApprovalSignature } from '@/lib/invoice-generator';
 import { Check, FileText, Pen } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCompany } from '@/contexts/CompanyContext';
 
 interface FinanceApprovalWithSignatureProps {
   paymentId: string;
