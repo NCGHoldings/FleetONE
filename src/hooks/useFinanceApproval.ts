@@ -752,7 +752,7 @@ export const useFinanceApproval = () => {
           customerName: paymentData.quotation.customer_name,
           customerPhone: paymentData.quotation.customer_phone,
           customerEmail: paymentData.quotation.customer_email,
-          companyId: NCG_HOLDING_ID,
+          companyId: companyId,
         });
 
         if (!customerId) {
