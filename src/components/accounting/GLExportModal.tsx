@@ -59,9 +59,37 @@ export const GLExportModal = ({ open, onOpenChange, filteredEntries, filters }: 
 
     setIsExporting(true);
     try {
+      // For CSV, also fetch line items if requested
       if (exportFormat === "csv") {
-        exportGLToCSV(filteredEntries);
-        toast.success(`Exported ${filteredEntries.length} entries as CSV`);
+        let csvLineItems: GLLineItem[] = [];
+        if (options.includeLineItems) {
+          const entryIds = filteredEntries.map(e => e.id);
+          for (let i = 0; i < entryIds.length; i += 50) {
+            const chunk = entryIds.slice(i, i + 50);
+            const { data, error } = await supabase
+              .from("journal_entry_lines")
+              .select("journal_entry_id, account_id, description, debit, credit, chart_of_accounts(account_code, account_name)")
+              .in("journal_entry_id", chunk);
+            if (error) throw error;
+            if (data) {
+              const mapped = data.map((line: any) => {
+                const entry = filteredEntries.find(e => e.id === line.journal_entry_id);
+                return {
+                  journal_entry_id: line.journal_entry_id,
+                  entry_number: entry?.entry_number || '',
+                  account_code: line.chart_of_accounts?.account_code || '',
+                  account_name: line.chart_of_accounts?.account_name || '',
+                  description: line.description || '',
+                  debit: line.debit || 0,
+                  credit: line.credit || 0,
+                };
+              });
+              csvLineItems.push(...mapped);
+            }
+          }
+        }
+        exportGLToCSV(filteredEntries, csvLineItems, options.includeLineItems);
+        toast.success(`Exported ${filteredEntries.length} entries${options.includeLineItems ? ` with ${csvLineItems.length} line items` : ''} as CSV`);
         onOpenChange(false);
         return;
       }
