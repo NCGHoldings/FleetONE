@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Download, Printer, Mail, Loader2, MessageCircle } from 'lucide-react';
 import { QuotationPreview } from './QuotationPreview';
 import { toast } from 'sonner';
@@ -45,6 +47,9 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isEmailing, setIsEmailing] = useState(false);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const [documentMode, setDocumentMode] = useState<'quotation' | 'proforma_invoice'>('quotation');
+
+  const docLabel = documentMode === 'proforma_invoice' ? 'Proforma Invoice' : 'Quotation';
 
   const handlePrint = () => {
     if (printRef.current) {
@@ -299,12 +304,13 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
 
       // Generate filename with quotation number and date
       const date = new Date().toISOString().split('T')[0];
-      const filename = `Quotation_${quotation.quotation_no}_${date}.pdf`;
+      const prefix = documentMode === 'proforma_invoice' ? 'Proforma_Invoice' : 'Quotation';
+      const filename = `${prefix}_${quotation.quotation_no}_${date}.pdf`;
       
       // Download the PDF
       pdf.save(filename);
       
-      toast.success('Quotation downloaded successfully');
+      toast.success(`${docLabel} downloaded successfully`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast.error('Failed to download quotation');
@@ -347,8 +353,9 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
 
       // Step 2: Prepare email data
       const date = new Date().toISOString().split('T')[0];
-      const filename = `Quotation_${quotation.quotation_no}_${date}.pdf`;
-      const subject = `Quotation ${quotation.quotation_no} - NCG Express`;
+      const prefix = documentMode === 'proforma_invoice' ? 'Proforma_Invoice' : 'Quotation';
+      const filename = `${prefix}_${quotation.quotation_no}_${date}.pdf`;
+      const subject = `${docLabel} ${quotation.quotation_no} - NCG Express`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2563eb;">NCG Express</h2>
@@ -525,8 +532,19 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>Quotation Preview - {quotation.quotation_no}</span>
+          <DialogTitle className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-4">
+              <span>{docLabel} Preview - {quotation.quotation_no}</span>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="doc-mode-toggle" className="text-xs font-normal text-muted-foreground">Quotation</Label>
+                <Switch
+                  id="doc-mode-toggle"
+                  checked={documentMode === 'proforma_invoice'}
+                  onCheckedChange={(checked) => setDocumentMode(checked ? 'proforma_invoice' : 'quotation')}
+                />
+                <Label htmlFor="doc-mode-toggle" className="text-xs font-normal text-muted-foreground">Proforma Invoice</Label>
+              </div>
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleWhatsApp} disabled={isSendingWhatsApp}>
                 {isSendingWhatsApp ? (
@@ -561,7 +579,7 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
         </DialogHeader>
         
         <div ref={printRef}>
-          <QuotationPreview quotation={quotation} />
+          <QuotationPreview quotation={quotation} documentMode={documentMode} />
         </div>
       </DialogContent>
     </Dialog>

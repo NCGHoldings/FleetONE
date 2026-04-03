@@ -70,9 +70,11 @@ interface QuotationData {
 interface Props {
   quotation: QuotationData;
   className?: string;
+  documentMode?: 'quotation' | 'proforma_invoice';
 }
 
-export function QuotationPreview({ quotation, className = "" }: Props) {
+export function QuotationPreview({ quotation, className = "", documentMode = 'quotation' }: Props) {
+  const docLabel = documentMode === 'proforma_invoice' ? 'Proforma Invoice' : 'Quotation';
   const [rateCard, setRateCard] = useState<any>(null);
 
   // Ensure bus_fleet_details is always parsed and normalized to correct structure
@@ -254,7 +256,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           {/* Right Block */}
           <div className="text-right" style={{ maxWidth: "45%" }}>
             <div className="bg-blue-600 text-white font-bold text-lg px-4 py-2 inline-block mb-2 w-full">
-              Quotation{"\u00A0"}Special{"\u00A0"}Hire
+              {docLabel}{"\u00A0"}Special{"\u00A0"}Hire
             </div>
             <div className="text-sm leading-tight text-black">
               No. 157 Y, Kabellaowita, Weniwelkola,
@@ -266,9 +268,9 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               specialhire.ncgexpress@ncg.lk
             </div>
             <div className="text-xs mt-1 text-gray-700">
-              Quotation{"\u00A0"}Generated{"\u00A0"}on{"\u00A0"}{format(new Date(parsedQuotation.created_at), "dd/MM/yyyy, hh:mm a")}
+              {docLabel}{"\u00A0"}Generated{"\u00A0"}on{"\u00A0"}{format(new Date(parsedQuotation.created_at), "dd/MM/yyyy, hh:mm a")}
                <br />
-               Quotation{"\u00A0"}No:{"\u00A0"}{parsedQuotation.quotation_no}
+               {docLabel}{"\u00A0"}No:{"\u00A0"}{parsedQuotation.quotation_no}
             </div>
           </div>
         </div>
@@ -1057,7 +1059,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           </div>
           <div className="text-right">
             <div className="text-sm font-semibold text-blue-600">
-               Quotation{"\u00A0"}No:{"\u00A0"}{parsedQuotation.quotation_no}
+               {docLabel}{"\u00A0"}No:{"\u00A0"}{parsedQuotation.quotation_no}
             </div>
             <div className="text-xs text-gray-500">
               Terms &amp; Conditions
