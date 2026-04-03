@@ -569,6 +569,61 @@ export function ConfirmedTripsTable() {
     }));
   };
 
+  // Load signer settings ONCE for the entire table
+  useEffect(() => {
+    const loadSignerSettings = async () => {
+      try {
+        const { data: settings } = await supabase
+          .from('special_hire_signature_settings')
+          .select('signature_role, default_user_id, is_enabled');
+
+        const signerMap: Record<string, SignerSetting> = {};
+        
+        if (settings) {
+          const userIds = settings.filter(s => s.default_user_id).map(s => s.default_user_id);
+          
+          const profilesMap: Record<string, string> = {};
+          if (userIds.length > 0) {
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name')
+              .in('id', userIds);
+            
+            if (profiles) {
+              profiles.forEach(p => {
+                const fullName = [p.first_name, p.last_name].filter(Boolean).join(' ');
+                if (fullName) profilesMap[p.id] = fullName;
+              });
+            }
+          }
+          
+          const getRoleFallbackLabel = (role: string): string => {
+            switch (role) {
+              case 'prepared_by': return 'Preparer';
+              case 'checked_by': return 'Checker';
+              case 'approved_by': return 'Finance';
+              default: return 'Not Set';
+            }
+          };
+
+          settings.forEach(setting => {
+            const name = setting.default_user_id ? profilesMap[setting.default_user_id] : undefined;
+            signerMap[setting.signature_role] = {
+              role: setting.signature_role,
+              name: name || getRoleFallbackLabel(setting.signature_role),
+              isEnabled: setting.is_enabled
+            };
+          });
+        }
+        
+        setSignerSettings(signerMap);
+      } catch (error) {
+        console.error('Error loading signer settings:', error);
+      }
+    };
+    loadSignerSettings();
+  }, []);
+
   // Load document statuses for all confirmed quotations (BATCHED to prevent N+1 queries)
   useEffect(() => {
     const loadAllDocuments = async () => {
