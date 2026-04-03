@@ -18,6 +18,8 @@ import {
 } from '@/hooks/useSpecialHireFinance';
 import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
 
+// Default to NCG_HOLDING_ID for backward compatibility, but callers should pass the effective company ID
+
 export const useFinanceApproval = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
