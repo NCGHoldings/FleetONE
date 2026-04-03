@@ -314,7 +314,7 @@ export const useFinanceApproval = () => {
         paymentMethod: paymentData.payment_method || 'cash',
         reference: paymentData.reference_no,
         paymentId,
-        companyId: NCG_HOLDING_ID,
+        companyId: companyId,
         journalEntryId: journalEntry?.id,
       });
 
