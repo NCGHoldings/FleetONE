@@ -84,8 +84,8 @@ export interface GLLineItem {
   account_code: string;
   account_name: string;
   description: string;
-  debit_amount: number;
-  credit_amount: number;
+  debit: number;
+  credit: number;
 }
 
 const BUSINESS_UNIT_LABELS: Record<string, string> = {
@@ -174,8 +174,8 @@ export function exportGLToExcel(
       l.account_code || '',
       l.account_name || '',
       l.description || '',
-      l.debit_amount || 0,
-      l.credit_amount || 0,
+      l.debit || 0,
+      l.credit || 0,
     ]);
     addStyledSheet(wb, 'Line Items', headers, rows, [4, 5]);
   }

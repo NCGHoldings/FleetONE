@@ -61,7 +61,7 @@ export const GLExportModal = ({ open, onOpenChange, filteredEntries, filters }: 
           const chunk = entryIds.slice(i, i + 50);
           const { data, error } = await supabase
             .from("journal_entry_lines")
-            .select("journal_entry_id, account_id, description, debit_amount, credit_amount, chart_of_accounts(account_code, account_name)")
+            .select("journal_entry_id, account_id, description, debit, credit, chart_of_accounts(account_code, account_name)")
             .in("journal_entry_id", chunk);
 
           if (error) throw error;
@@ -75,8 +75,8 @@ export const GLExportModal = ({ open, onOpenChange, filteredEntries, filters }: 
                 account_code: line.chart_of_accounts?.account_code || '',
                 account_name: line.chart_of_accounts?.account_name || '',
                 description: line.description || '',
-                debit_amount: line.debit_amount || 0,
-                credit_amount: line.credit_amount || 0,
+                debit: line.debit || 0,
+                credit: line.credit || 0,
               };
             });
             lineItems.push(...mapped);
