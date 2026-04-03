@@ -579,7 +579,7 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
         </DialogHeader>
         
         <div ref={printRef}>
-          <QuotationPreview quotation={quotation} />
+          <QuotationPreview quotation={quotation} documentMode={documentMode} />
         </div>
       </DialogContent>
     </Dialog>

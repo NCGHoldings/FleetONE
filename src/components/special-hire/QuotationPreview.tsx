@@ -1059,7 +1059,7 @@ export function QuotationPreview({ quotation, className = "", documentMode = 'qu
           </div>
           <div className="text-right">
             <div className="text-sm font-semibold text-blue-600">
-               Quotation{"\u00A0"}No:{"\u00A0"}{parsedQuotation.quotation_no}
+               {docLabel}{"\u00A0"}No:{"\u00A0"}{parsedQuotation.quotation_no}
             </div>
             <div className="text-xs text-gray-500">
               Terms &amp; Conditions
