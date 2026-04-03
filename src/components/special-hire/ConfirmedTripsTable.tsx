@@ -1266,6 +1266,7 @@ export function ConfirmedTripsTable() {
                             documents={documentsData[trip.id] || []}
                             hasPayments={(trip.payments?.length || 0) > 0}
                             documentsLoading={!documentsData[trip.id] && documentsLoading}
+                            signerSettings={signerSettings}
                             onPreviewDocument={(doc) => {
                               if (doc) {
                                 setCurrentDocument(doc);
