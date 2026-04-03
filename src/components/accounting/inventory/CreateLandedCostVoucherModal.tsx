@@ -598,7 +598,7 @@ export const CreateLandedCostVoucherModal = ({
                         </div>
                       </TableCell>
                       <TableCell className="text-right"><CurrencyDisplay amount={item.original_cost} /></TableCell>
-                      <TableCell className="text-right text-blue-600 font-medium">
+                      <TableCell className="text-right text-primary font-medium">
                         <CurrencyDisplay amount={allocated} />
                       </TableCell>
                       <TableCell className="text-right font-bold">
@@ -610,7 +610,7 @@ export const CreateLandedCostVoucherModal = ({
                 <TableRow className="border-t-2">
                   <TableCell className="font-bold">TOTAL</TableCell>
                   <TableCell className="text-right font-bold"><CurrencyDisplay amount={totalOriginalCost} /></TableCell>
-                  <TableCell className="text-right font-bold text-blue-600"><CurrencyDisplay amount={totalCharges} /></TableCell>
+                  <TableCell className="text-right font-bold text-primary"><CurrencyDisplay amount={totalCharges} /></TableCell>
                   <TableCell className="text-right font-bold"><CurrencyDisplay amount={totalOriginalCost + totalCharges} /></TableCell>
                 </TableRow>
               </TableBody>
