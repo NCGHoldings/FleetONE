@@ -52,7 +52,7 @@ export const FinanceApprovalWithSignature: React.FC<FinanceApprovalWithSignature
   const handleQuickApproval = async () => {
     try {
       setIsApproving(true);
-      const result = await approvePayment(paymentId, 'Quick approval without signature');
+      const result = await approvePayment(paymentId, 'Quick approval without signature', undefined, getEffectiveCompanyId());
       
       if (result.success) {
         onApproved?.();
