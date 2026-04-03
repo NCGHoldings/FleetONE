@@ -211,7 +211,7 @@ export const useFinanceApproval = () => {
         totalAmount,
         advanceAmount: actualAdvanceAmount,
         dueDate,
-        companyId: NCG_HOLDING_ID,
+        companyId: companyId,
       });
 
       if (!arResult) {
