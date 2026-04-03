@@ -22,6 +22,7 @@ export const FinanceApprovalWithSignature: React.FC<FinanceApprovalWithSignature
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const { approvePayment, isLoading } = useFinanceApproval();
+  const { getEffectiveCompanyId } = useCompany();
 
   const handleApprovalWithSignature = async (approvalData: any) => {
     try {
