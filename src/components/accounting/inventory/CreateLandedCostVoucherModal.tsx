@@ -376,7 +376,7 @@ export const CreateLandedCostVoucherModal = ({
                   <SelectContent>
                     {(grns || []).map((grn) => (
                       <SelectItem key={grn.id} value={grn.id}>
-                        {grn.grn_number} — {format(new Date(grn.received_date), "MMM dd, yyyy")}
+                        {grn.grn_number} — {format(new Date(grn.receipt_date), "MMM dd, yyyy")}
                       </SelectItem>
                     ))}
                     {(!grns || grns.length === 0) && (
