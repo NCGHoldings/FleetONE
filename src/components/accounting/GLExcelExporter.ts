@@ -167,16 +167,18 @@ export function exportGLToExcel(
   }
 
   // Line Items sheet
-  if (options.includeLineItems && lineItems.length > 0) {
+  if (options.includeLineItems) {
     const headers = ['Entry #', 'Account Code', 'Account Name', 'Description', 'Debit', 'Credit'];
-    const rows = lineItems.map(l => [
-      l.entry_number || '',
-      l.account_code || '',
-      l.account_name || '',
-      l.description || '',
-      l.debit || 0,
-      l.credit || 0,
-    ]);
+    const rows = lineItems.length > 0
+      ? lineItems.map(l => [
+          l.entry_number || '',
+          l.account_code || '',
+          l.account_name || '',
+          l.description || '',
+          l.debit || 0,
+          l.credit || 0,
+        ])
+      : [['No line items found', '', '', '', '', '']];
     addStyledSheet(wb, 'Line Items', headers, rows, [4, 5]);
   }
 
