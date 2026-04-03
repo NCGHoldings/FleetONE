@@ -7,18 +7,19 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface SignerSetting {
+  role: string;
+  name: string;
+  isEnabled: boolean;
+}
+
 interface SignatureWorkflowIndicatorProps {
   quotationId: string;
   documents: any[];
   hasPayments: boolean;
   documentsLoading?: boolean;
+  signerSettings?: Record<string, SignerSetting>;
   onPreviewDocument?: (document: any | null) => void;
-}
-
-interface SignerSetting {
-  role: string;
-  name: string;
-  isEnabled: boolean;
 }
 
 export function SignatureWorkflowIndicator({ 
@@ -26,58 +27,9 @@ export function SignatureWorkflowIndicator({
   documents, 
   hasPayments,
   documentsLoading = false,
+  signerSettings = {},
   onPreviewDocument 
 }: SignatureWorkflowIndicatorProps) {
-  const [signerSettings, setSignerSettings] = useState<Record<string, SignerSetting>>({});
-  const [settingsLoading, setSettingsLoading] = useState(true);
-
-  useEffect(() => {
-    loadSignerSettings();
-  }, []);
-
-  const loadSignerSettings = async () => {
-    try {
-      const { data: settings } = await supabase
-        .from('special_hire_signature_settings')
-        .select('signature_role, default_user_id, is_enabled');
-
-      const signerMap: Record<string, SignerSetting> = {};
-      
-      if (settings) {
-        const userIds = settings.filter(s => s.default_user_id).map(s => s.default_user_id);
-        
-        const profilesMap: Record<string, string> = {};
-        if (userIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name')
-            .in('id', userIds);
-          
-          if (profiles) {
-            profiles.forEach(p => {
-              const fullName = [p.first_name, p.last_name].filter(Boolean).join(' ');
-              if (fullName) profilesMap[p.id] = fullName;
-            });
-          }
-        }
-        
-        settings.forEach(setting => {
-          const name = setting.default_user_id ? profilesMap[setting.default_user_id] : undefined;
-          signerMap[setting.signature_role] = {
-            role: setting.signature_role,
-            name: name || getRoleFallbackLabel(setting.signature_role),
-            isEnabled: setting.is_enabled
-          };
-        });
-      }
-      
-      setSignerSettings(signerMap);
-    } catch (error) {
-      console.error('Error loading signer settings:', error);
-    } finally {
-      setSettingsLoading(false);
-    }
-  };
 
   const getRoleFallbackLabel = (role: string): string => {
     switch (role) {
