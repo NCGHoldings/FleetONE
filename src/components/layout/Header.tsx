@@ -23,6 +23,8 @@ export function Header() {
   const { user, userProfile, userRoles, signOut } = useAuth();
   const navigate = useNavigate();
   const { activeTheme, isThemeActive } = useSeasonalThemeContext();
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  const hasNewVersion = useHasNewVersion();
 
   const getInitials = (firstName?: string, lastName?: string) => {
     if (!firstName && !lastName) return "U";
