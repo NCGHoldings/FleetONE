@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
+import { CreateLandedCostVoucherModal } from "./CreateLandedCostVoucherModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ export const LandedCostView = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [postConfirmVoucherId, setPostConfirmVoucherId] = useState<string | null>(null);
   const [selectedVoucherId, setSelectedVoucherId] = useState<string | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   
   const { data: vouchers, isLoading } = useLandedCostVouchers(statusFilter === "_all" ? undefined : statusFilter);
   const postToGL = usePostLandedCostToGL();
@@ -134,7 +136,7 @@ export const LandedCostView = () => {
               </SelectContent>
             </Select>
           </div>
-          <Button>
+          <Button onClick={() => setCreateModalOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Landed Cost Voucher
           </Button>
@@ -249,6 +251,11 @@ export const LandedCostView = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CreateLandedCostVoucherModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+      />
     </div>
   );
 };
