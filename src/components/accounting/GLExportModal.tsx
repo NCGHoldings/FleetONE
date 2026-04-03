@@ -177,34 +177,34 @@ export const GLExportModal = ({ open, onOpenChange, filteredEntries, filters }: 
           </div>
 
           {/* Section toggles */}
-          {(
-            <div className="space-y-3">
-              <Label>Include Sections</Label>
-              <div className="space-y-2">
-                {([
-                  { key: "includeSummary" as const, label: "Summary & Filter Info", desc: "Report metadata, totals, applied filters" },
-                  { key: "includeEntries" as const, label: "Journal Entries", desc: "Entry list with dates, amounts, status" },
-                  { key: "includeLineItems" as const, label: "Line Items (GL Detail)", desc: "Individual debit/credit lines with account codes" },
-                  { key: "includeByBusinessUnit" as const, label: "By Business Unit", desc: "Subtotals grouped by business unit" },
-                  { key: "includeBySourceModule" as const, label: "By Source Module", desc: "Subtotals grouped by source module" },
-                ]).map(item => (
-                  <div key={item.key} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50">
-                    <Checkbox
-                      id={item.key}
-                      checked={options[item.key]}
-                      onCheckedChange={() => toggleOption(item.key)}
-                    />
-                    <div className="grid gap-0.5 leading-none">
-                      <label htmlFor={item.key} className="text-sm font-medium cursor-pointer">
-                        {item.label}
-                      </label>
-                      <p className="text-xs text-muted-foreground">{item.desc}</p>
-                    </div>
+          <div className="space-y-3">
+            <Label>Include Sections</Label>
+            <div className="space-y-2">
+              {([
+                { key: "includeSummary" as const, label: "Summary & Filter Info", desc: "Report metadata, totals, applied filters", xlsxOnly: true },
+                { key: "includeEntries" as const, label: "Journal Entries", desc: "Entry list with dates, amounts, status", xlsxOnly: true },
+                { key: "includeLineItems" as const, label: "Line Items (GL Detail)", desc: "Individual debit/credit lines with account codes", xlsxOnly: false },
+                { key: "includeByBusinessUnit" as const, label: "By Business Unit", desc: "Subtotals grouped by business unit", xlsxOnly: true },
+                { key: "includeBySourceModule" as const, label: "By Source Module", desc: "Subtotals grouped by source module", xlsxOnly: true },
+              ])
+                .filter(item => exportFormat === "xlsx" || !item.xlsxOnly)
+                .map(item => (
+                <div key={item.key} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50">
+                  <Checkbox
+                    id={item.key}
+                    checked={options[item.key]}
+                    onCheckedChange={() => toggleOption(item.key)}
+                  />
+                  <div className="grid gap-0.5 leading-none">
+                    <label htmlFor={item.key} className="text-sm font-medium cursor-pointer">
+                      {item.label}
+                    </label>
+                    <p className="text-xs text-muted-foreground">{item.desc}</p>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
         </div>
 
         <DialogFooter>
