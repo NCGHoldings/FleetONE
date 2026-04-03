@@ -85,7 +85,7 @@ export const useFinanceApproval = () => {
       setIsLoading(false);
 
       // Fire background integration (non-blocking)
-      performBackgroundIntegration(paymentId, paymentData, signatures).catch(err => {
+      performBackgroundIntegration(paymentId, paymentData, signatures, companyId || NCG_HOLDING_ID).catch(err => {
         console.error('[SPH Finance] ❌ Background integration failed:', err);
         toast.warning('Payment approved but finance integration needs retry. Use "Retry AR Integration".');
       });
