@@ -79,6 +79,18 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-1.5 sm:gap-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setWhatsNewOpen(true)}
+          className="relative h-7 px-2 text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-all"
+        >
+          v{APP_VERSION}
+          {hasNewVersion && (
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full animate-pulse" />
+          )}
+        </Button>
+        <WhatsNewDialog open={whatsNewOpen} onOpenChange={setWhatsNewOpen} />
         <DarkModeToggle />
         <Button variant="ghost" size="icon" className="relative h-9 w-9 hover:scale-110 transition-all duration-300 hover:bg-primary/10">
           <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
