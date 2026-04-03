@@ -1,53 +1,42 @@
 
 
-# Fix Trial Balance — Two Critical Issues
+# Add App Version Display & "What's New" Changelog
 
-## Problem 1: No Financial Periods Exist
-The `financial_periods` table is **empty**. The Trial Balance requires selecting a period, so nothing can be generated. The system already has a "Financial Periods" management page (under Settings) that can auto-generate monthly or quarterly periods — but none have been created yet.
+## What to build
+A version numbering system with an in-app "What's New" panel so both you and users can confirm which version they're running and what features are available.
 
-**Fix**: Create a migration to auto-seed financial periods covering the existing journal entry date range (Oct 2025 → Mar 2026, plus Apr 2026). This gives 7 monthly periods immediately. Users can still manage periods manually going forward.
+## How it works
 
-## Problem 2: Journal Entry Lines Never Fetched
-The `useJournalEntries` hook selects `"*, business_unit_code"` from `journal_entries` but does **not** join `journal_entry_lines`. The Trial Balance code on line 102 checks `entry.lines` — which is always `undefined`. So period movements (Debit/Credit) are always zero.
+### 1. Version constant + build timestamp
+Create `src/config/appVersion.ts` with:
+- `APP_VERSION = "1.4.0"` (manually bumped when deploying new features)
+- `BUILD_DATE` auto-set from build time
+- `CHANGELOG` array with recent entries (version, date, title, description, type: feature/fix/improvement)
 
-**Fix**: Create a dedicated query for the Trial Balance that fetches journal entry lines with their account IDs, filtered by period date range. Instead of loading all entries + lines into memory, aggregate directly in SQL for performance (370+ posted entries).
+### 2. "What's New" dialog component
+Create `src/components/layout/WhatsNewDialog.tsx`:
+- Triggered from a version badge in the Header or a "What's New" menu item
+- Shows grouped changelog entries by version with badges (New, Fix, Improved)
+- Auto-shows on first visit after version change (stores last-seen version in localStorage)
+- Scrollable list of recent changes (last 5-10 versions)
 
-## Problem 3: Opening Balance Logic Is Wrong
-Currently opening balances come from `account.opening_balance` (a static field on COA). For a proper Trial Balance, opening balance should be the **cumulative sum of all posted JE lines before the period start date**. The static `opening_balance` field is only valid for the very first period.
+### 3. Version badge in Header
+Add to `src/components/layout/Header.tsx`:
+- Small version badge (e.g., `v1.4.0`) next to the user menu
+- Clicking opens the What's New dialog
+- Shows a dot indicator when there are unseen updates
 
-**Fix**: Calculate opening balances from journal entries dated before the period start.
+### 4. Populate initial changelog
+Pre-populate with recent major features from `ANTIGRAVITY_ncgCHANGELOG.md`:
+- Proforma Invoice toggle
+- Trial Balance fix
+- Landed Cost posting
+- Test mode data leak fix
+- Workflow column performance improvement
 
----
-
-## Implementation
-
-### 1. Migration: Seed Financial Periods (Oct 2025 – Apr 2026)
-Create 7 monthly periods for the NCG Holding company, covering all existing posted journal entries.
-
-### 2. New hook: `useTrialBalanceData` in `src/hooks/useAccountingData.ts`
-A dedicated query that:
-- Accepts `periodStartDate`, `periodEndDate`, `companyId`, optional `costCenterId`
-- Fetches **opening movements** (all posted JE lines before period start) grouped by `account_id`
-- Fetches **period movements** (posted JE lines within period) grouped by `account_id`
-- Returns pre-aggregated data — no client-side looping through thousands of lines
-
-### 3. Rewrite `TrialBalanceView.tsx` calculation logic
-- Replace `useJournalEntries("posted")` with the new `useTrialBalanceData` hook
-- Opening balance = `account.opening_balance` + sum of all JE lines before period start (handles the "COA opening balance is initial only" correctly)
-- Period movements = sum of JE lines within the period
-- Closing = Opening + Period movements
-- Proper debit-normal vs credit-normal placement based on account type
-
-### Files
-- **Create**: Migration to seed 7 monthly financial periods
-- **Modify**: `src/hooks/useAccountingData.ts` — add `useTrialBalanceData` hook
-- **Modify**: `src/components/accounting/TrialBalanceView.tsx` — use new hook, fix calculation logic
-
-### Accounting Principles Enforced
-- DR = CR validation on all three columns (Opening, Period, Closing)
-- Debit-normal accounts (Asset, Expense, Cost of Sales) show positive balance in Debit column
-- Credit-normal accounts (Liability, Equity, Revenue) show positive balance in Credit column
-- Only `posted` status journal entries included (excludes draft, void, reversed)
-- Company isolation via `company_id` filter
-- Business unit filtering preserved
+## Files
+- **Create**: `src/config/appVersion.ts` — version constant + changelog data
+- **Create**: `src/components/layout/WhatsNewDialog.tsx` — changelog dialog UI
+- **Modify**: `src/components/layout/Header.tsx` — add version badge + dialog trigger
+- **Modify**: `package.json` — update `version` field to match
 
