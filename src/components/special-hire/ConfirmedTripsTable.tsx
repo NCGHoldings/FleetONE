@@ -73,7 +73,7 @@ export function ConfirmedTripsTable() {
   const [statusLoading, setStatusLoading] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string>('');
   const [documentsLoading, setDocumentsLoading] = useState(false);
-
+  const [signerSettings, setSignerSettings] = useState<Record<string, SignerSetting>>({});
   // Check user roles
   const isFinanceUser = hasRole('finance') || hasRole('admin') || hasRole('super_admin');
   const isOperationsUser = hasRole('admin') || hasRole('super_admin') || hasRole('supervisor');
