@@ -429,12 +429,13 @@ export const usePostLandedCostToGL = () => {
       if (voucher.journal_entry_id) throw new Error("Voucher already has a journal entry (double-post guard)");
 
       // 2. Fetch charges with expense accounts
-      const { data: charges, error: cErr } = await supabase
+      const { data: chargesRaw, error: cErr } = await supabase
         .from("landed_cost_charges")
         .select("*, chart_of_accounts(account_code, account_name)")
         .eq("voucher_id", voucherId);
       if (cErr) throw cErr;
-      if (!charges || charges.length === 0) throw new Error("No charges found on this voucher");
+      const charges = (chargesRaw || []) as any[];
+      if (charges.length === 0) throw new Error("No charges found on this voucher");
 
       // Validate all charges have expense_account_id
       const missingAccounts = charges.filter(c => !c.expense_account_id);
