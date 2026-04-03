@@ -32,7 +32,7 @@ const accountSchema = z.object({
   account_type: z.enum(["asset", "liability", "equity", "revenue", "expense"], {
     required_error: "Please select an account type",
   }),
-  parent_account_id: z.string().optional(),
+  parent_account_id: z.string().min(1, "Parent account is required"),
   is_header: z.boolean().default(false),
   description: z.string().optional(),
 });
