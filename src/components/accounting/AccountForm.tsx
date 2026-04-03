@@ -149,7 +149,7 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
       if (!effectiveCompanyId) return [];
       const { data, error } = await supabase
         .from("chart_of_accounts")
-        .select("id, account_code, account_name, level1, level2, level3, level4, level5, account_level")
+        .select("id, account_code, account_name, account_type, level1, level2, level3, level4, level5, account_level")
         .eq("company_id", effectiveCompanyId)
         .order("account_code");
       
