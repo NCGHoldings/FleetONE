@@ -136,18 +136,19 @@ export const useJournalEntryLines = (entryId: string) => {
 
 // ============ Financial Periods ============
 export const useFinancialPeriods = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["financial-periods", selectedCompanyId],
+    queryKey: ["financial-periods", effectiveCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("financial_periods")
         .select("*")
         .order("start_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       const { data, error } = await query;
