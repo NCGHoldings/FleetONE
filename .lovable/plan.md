@@ -1,66 +1,52 @@
 
 
-# Cross-Check: Special Hire Complete Flow MMD vs Actual Code
+# Confirmed: Test Mode Data Leak in Special Hire Finance Approval
 
-## Accuracy Assessment
+## Verdict: TRUE
 
-### What the diagram gets RIGHT
+The external AI's finding is **accurate**. `useFinanceApproval.ts` hardcodes `NCG_HOLDING_ID` (live) in all 11 locations. It never checks which company the user has selected, so any Special Hire approval done while in test mode writes directly to the live General Ledger.
 
-1. **Quotation Phase** (Q1-Q4) — Correct. Customer request → create quotation → confirm → PDF generated.
+## What leaks
 
-2. **Advance Payment Flow** (Scenario A) — Mostly correct:
-   - Confirm advance → Draft sales receipt → Finance approves → GL posted (DR Bank / CR Customer Advance) ✓
-   - Sales receipt approved with signatures ✓
-   - AR Invoice created ✓ (but **only for full/balance payments**, NOT advance — see issue below)
+| Data Type | Hardcoded Line(s) | Impact |
+|-----------|-------------------|--------|
+| Finance Settings fetch | 113, 738 | Always reads live settings (minor) |
+| Customer creation | 135, 753 | Test customers appear in live customer list |
+| AR Invoice creation | 212, 791 | Test invoices in live AR aging reports |
+| GL Journal Entries (advance/full/balance) | 233, 245, 257 | Test JEs in live Trial Balance, P&L, Balance Sheet |
+| Advance Application JE | 285 | Test advance clearing in live GL |
+| AR Receipt creation | 315 | Test receipts in live receipt reports |
 
-3. **Full Payment Flow** (Scenario B) — Mostly correct:
-   - Full payment uses same GL as advance (DR Bank / CR Customer Advance) ✓
-   - AR Invoice + Receipt created ✓
+## Why it happens
 
-4. **Advance + Balance Flow** (Scenario D) — Correct sequence ✓
+`useFinanceApproval` is a React hook but it never reads the selected company from `CompanyContext`. It imports the constant `NCG_HOLDING_ID` and passes it directly to every finance function. The `getEffectiveCompanyId()` function in CompanyContext correctly resolves test sub-companies to `NCG_TEST_ID`, but it's never called here.
 
-5. **GL Posting Summary** — All 4 JE types confirmed in code:
-   - DR Bank / CR Customer Advance (advance/full payment) ✓
-   - DR Receivable / CR SPH Revenue (invoice sent) ✓
-   - DR Advance / CR Receivable (advance application) ✓
-   - DR Discount Expense / CR Receivable (discount) ✓
-   - Double-posting guard ✓
+## Proposed Fix
 
-6. **Post-Trip Adjustment** — Confirmed: separate GL posting (DR Trade Receivable / CR Revenue) exists in `PostTripAdjustmentModal.tsx` ✓
+### Approach
+Pass the effective company ID into `useFinanceApproval` from the calling component, rather than hardcoding it.
 
-### Issues Found (Diagram Does NOT Match Code)
+### Files to modify
 
-#### Issue 1: AR Invoice Timing for Advance Payments
-- **Diagram says** (A6): AR Invoice created right after advance approval
-- **Code says** (`useFinanceApproval.ts` line 154-156): AR Invoice is only created for `isFullPayment || isBalance`, NOT for advance payments
-- **Actual behavior**: For advance-only, AR Invoice is created later when the final/balance invoice is sent via `GenerateBalanceInvoiceModal`
+**1. `src/hooks/useFinanceApproval.ts`**
+- Remove the hardcoded `NCG_HOLDING_ID` import usage for GL/AR operations
+- Accept `effectiveCompanyId` as a parameter to `approvePayment()` and the batch approval function
+- Replace all 11 `NCG_HOLDING_ID` references with the passed-in company ID
 
-#### Issue 2: GL Posting Trigger for Invoice (JE #2)
-- **Diagram says** (A12-A13): GL for revenue recognition happens when "Email to Customer" is clicked
-- **Code confirms**: This is correct — `GenerateBalanceInvoiceModal.tsx` line 461-471 posts invoice GL only when email is sent. But the diagram's "Email to Customer? → Yes/No" branching is misleading — the GL also posts when downloading, not just emailing (need to verify)
+**2. `src/components/special-hire/FinanceApprovalWithSignature.tsx`**
+- Import `useCompany` from CompanyContext
+- Get `getEffectiveCompanyId()` and pass it to `approvePayment(paymentId, notes, effectiveCompanyId)`
 
-#### Issue 3: Post-Trip Adjustment GL is Missing from Diagram Scenarios
-- **Code**: `PostTripAdjustmentModal.tsx` lines 276-302 posts a **separate JE** (DR Trade Receivable / CR Revenue) for post-trip adjustments
-- **Diagram**: Shows post-trip adjustments feed into the final invoice amount, but does NOT show this as a separate GL posting event
-- **The GL Summary box mentions it indirectly** but the scenario flows don't include it
+**3. `src/components/special-hire/ConfirmedTripsTable.tsx`** (or wherever batch approval is triggered)
+- Same pattern: pass `getEffectiveCompanyId()` to the approval calls
 
-#### Issue 4: Scenario C (No Payment) — Oversimplified
-- **Diagram**: Shows a linear flow with "Payment Reminder" feature
-- **Code**: Payment Reminder exists as a document type but the flow is essentially the same as advance/balance — customer pays, finance approves, GL posts. No separate "no payment" path really exists in the code.
+### What this does NOT change
+- Live data remains untouched — this only ensures future test approvals go to the test company
+- No migration needed — this is a code-only fix
+- Existing test contamination (if any) would need a separate data cleanup
 
-#### Issue 5: Full Payment GL Entry Label
-- **Diagram** (B4): Says "DR Bank / CR Customer Advance (AR Flow)"
-- **Code** (`useSpecialHireFinance.ts` line 151-153): Confirms full payments use same advance flow (DR Bank / CR Customer Advance), then AR Invoice handles revenue recognition later. The label is correct but could be clearer.
-
-### Summary of Required Corrections
-
-| # | Diagram Element | Current | Should Be |
-|---|----------------|---------|-----------|
-| 1 | A6 (Advance → AR Invoice) | AR Invoice Created right after advance | AR Invoice created later at balance/final invoice stage |
-| 2 | Post-trip GL | Not shown as separate JE in flow | Add JE step: DR Receivable / CR Revenue (adjustment amount) |
-| 3 | Scenario C | Separate "no payment" path | Simplify — merges into advance/balance flow once payment happens |
-
-### Recommendation
-
-Update the `.mmd` diagram to fix the 3 issues above. The biggest inaccuracy is **Issue 1** — the diagram shows AR Invoice being created immediately after advance approval, but in code it only happens when a full/balance payment is approved or when the final invoice is sent.
+## Risk Assessment
+- **Current risk**: HIGH if anyone has approved Special Hire payments while in test mode
+- **Likelihood of past contamination**: Depends on usage — if test mode Special Hire approvals have occurred, live reports are already affected
+- **Fix complexity**: LOW — parameter threading through 3 files
 
