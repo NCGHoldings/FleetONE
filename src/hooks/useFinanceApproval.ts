@@ -18,6 +18,8 @@ import {
 } from '@/hooks/useSpecialHireFinance';
 import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
 
+// Default to NCG_HOLDING_ID for backward compatibility, but callers should pass the effective company ID
+
 export const useFinanceApproval = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
@@ -48,7 +50,7 @@ export const useFinanceApproval = () => {
     }
   };
 
-  const approvePayment = async (paymentId: string, notes?: string, signatures?: any) => {
+  const approvePayment = async (paymentId: string, notes?: string, signatures?: any, companyId?: string) => {
     try {
       setIsLoading(true);
       console.log('[SPH Finance] ========== APPROVAL START ==========');
@@ -83,7 +85,7 @@ export const useFinanceApproval = () => {
       setIsLoading(false);
 
       // Fire background integration (non-blocking)
-      performBackgroundIntegration(paymentId, paymentData, signatures).catch(err => {
+      performBackgroundIntegration(paymentId, paymentData, signatures, companyId || NCG_HOLDING_ID).catch(err => {
         console.error('[SPH Finance] ❌ Background integration failed:', err);
         toast.warning('Payment approved but finance integration needs retry. Use "Retry AR Integration".');
       });
@@ -99,7 +101,7 @@ export const useFinanceApproval = () => {
   };
 
   // Background function for AR/GL integration + document regeneration
-  const performBackgroundIntegration = async (paymentId: string, paymentData: any, signatures?: any) => {
+  const performBackgroundIntegration = async (paymentId: string, paymentData: any, signatures?: any, companyId: string = NCG_HOLDING_ID) => {
     let journalEntry: any = null;
     let arInvoiceId: string | null = paymentData.quotation.ar_invoice_id;
     let customerId: string | null = paymentData.quotation.finance_customer_id;
@@ -110,7 +112,7 @@ export const useFinanceApproval = () => {
       console.warn('[SPH Finance] ⚠️ No document found for payment. Proceeding anyway...');
     }
 
-    const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+    const settings = await fetchSpecialHireFinanceSettings(companyId);
     
     if (!settings) {
       console.warn('[SPH Finance] ⚠️ Special Hire Finance settings not configured');
@@ -132,7 +134,7 @@ export const useFinanceApproval = () => {
         customerName: paymentData.quotation.customer_name,
         customerPhone: paymentData.quotation.customer_phone,
         customerEmail: paymentData.quotation.customer_email,
-        companyId: NCG_HOLDING_ID,
+        companyId: companyId,
       });
 
       if (!customerId) {
@@ -209,7 +211,7 @@ export const useFinanceApproval = () => {
         totalAmount,
         advanceAmount: actualAdvanceAmount,
         dueDate,
-        companyId: NCG_HOLDING_ID,
+        companyId: companyId,
       });
 
       if (!arResult) {
@@ -230,7 +232,7 @@ export const useFinanceApproval = () => {
         customerName: paymentData.quotation.customer_name,
         amount: paymentData.amount,
         settings,
-        effectiveCompanyId: NCG_HOLDING_ID,
+        effectiveCompanyId: companyId,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Advance GL posted:', journalEntry.entry_number);
@@ -242,7 +244,7 @@ export const useFinanceApproval = () => {
         customerName: paymentData.quotation.customer_name,
         amount: paymentData.amount,
         settings,
-        effectiveCompanyId: NCG_HOLDING_ID,
+        effectiveCompanyId: companyId,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Full payment GL posted:', journalEntry.entry_number);
@@ -254,7 +256,7 @@ export const useFinanceApproval = () => {
         customerName: paymentData.quotation.customer_name,
         balanceAmount: paymentData.amount,
         settings,
-        effectiveCompanyId: NCG_HOLDING_ID,
+        effectiveCompanyId: companyId,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Balance GL posted:', journalEntry.entry_number);
@@ -282,7 +284,7 @@ export const useFinanceApproval = () => {
             customerName: paymentData.quotation.customer_name,
             advanceAmount: totalAdvance,
             settings,
-            effectiveCompanyId: NCG_HOLDING_ID,
+            effectiveCompanyId: companyId,
           });
           if (applyResult) {
             console.log('[SPH Finance] ✅ Advance applied to invoice:', applyResult.entry_number);
@@ -312,7 +314,7 @@ export const useFinanceApproval = () => {
         paymentMethod: paymentData.payment_method || 'cash',
         reference: paymentData.reference_no,
         paymentId,
-        companyId: NCG_HOLDING_ID,
+        companyId: companyId,
         journalEntryId: journalEntry?.id,
       });
 
@@ -712,7 +714,7 @@ export const useFinanceApproval = () => {
   };
 
   // NEW: Retry AR Integration for payments that missed AR creation
-  const retryARIntegration = async (paymentId: string) => {
+  const retryARIntegration = async (paymentId: string, companyId: string = NCG_HOLDING_ID) => {
     try {
       setIsLoading(true);
       console.log('[SPH Finance] ========== RETRY AR INTEGRATION ==========');
@@ -735,7 +737,7 @@ export const useFinanceApproval = () => {
         throw new Error('Only approved payments can have AR integration retried');
       }
 
-      const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+      const settings = await fetchSpecialHireFinanceSettings(companyId);
       if (!settings) {
         throw new Error('Special Hire Finance settings not configured');
       }
@@ -750,7 +752,7 @@ export const useFinanceApproval = () => {
           customerName: paymentData.quotation.customer_name,
           customerPhone: paymentData.quotation.customer_phone,
           customerEmail: paymentData.quotation.customer_email,
-          companyId: NCG_HOLDING_ID,
+          companyId: companyId,
         });
 
         if (!customerId) {
@@ -788,7 +790,7 @@ export const useFinanceApproval = () => {
           totalAmount,
           advanceAmount: paymentData.amount,
           dueDate,
-          companyId: NCG_HOLDING_ID,
+          companyId: companyId,
           journalEntryId: paymentData.journal_entry_id,
         });
 

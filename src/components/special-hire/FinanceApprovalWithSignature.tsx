@@ -6,6 +6,7 @@ import { useFinanceApproval } from '@/hooks/useFinanceApproval';
 import { type ApprovalSignature } from '@/lib/invoice-generator';
 import { Check, FileText, Pen } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCompany } from '@/contexts/CompanyContext';
 
 interface FinanceApprovalWithSignatureProps {
   paymentId: string;
@@ -21,6 +22,7 @@ export const FinanceApprovalWithSignature: React.FC<FinanceApprovalWithSignature
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const { approvePayment, isLoading } = useFinanceApproval();
+  const { getEffectiveCompanyId } = useCompany();
 
   const handleApprovalWithSignature = async (approvalData: any) => {
     try {
@@ -32,7 +34,7 @@ export const FinanceApprovalWithSignature: React.FC<FinanceApprovalWithSignature
         approval_date: approvalData.approval_date,
       };
 
-      const result = await approvePayment(paymentId, `Approved by ${approverSignature.approver_name} with signature`);
+      const result = await approvePayment(paymentId, `Approved by ${approverSignature.approver_name} with signature`, undefined, getEffectiveCompanyId());
 
       if (result.success) {
         setShowApprovalModal(false);
@@ -50,7 +52,7 @@ export const FinanceApprovalWithSignature: React.FC<FinanceApprovalWithSignature
   const handleQuickApproval = async () => {
     try {
       setIsApproving(true);
-      const result = await approvePayment(paymentId, 'Quick approval without signature');
+      const result = await approvePayment(paymentId, 'Quick approval without signature', undefined, getEffectiveCompanyId());
       
       if (result.success) {
         onApproved?.();

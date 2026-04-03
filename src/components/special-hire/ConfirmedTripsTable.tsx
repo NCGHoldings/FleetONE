@@ -13,6 +13,7 @@ import {
   Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck, RotateCcw, FileText, Mail, Calculator
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useCompany } from '@/contexts/CompanyContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSpecialHire, type QuotationWithPayments } from '@/hooks/useRealtimeSpecialHire';
 import { useFinanceApproval } from '@/hooks/useFinanceApproval';
@@ -39,6 +40,7 @@ export function ConfirmedTripsTable() {
   const { user, hasRole } = useAuth();
   const { approvePayment, rejectPayment, generateApprovedInvoice, retryARIntegration, isLoading: financeLoading } = useFinanceApproval();
   const { generateAndStoreDraftDocument, getDocumentsByQuotation, regenerateDocument, approveDocument } = useDocumentManagement();
+  const { getEffectiveCompanyId } = useCompany();
   
   // State for filtering and search
   const [searchQuery, setSearchQuery] = useState('');
@@ -861,7 +863,7 @@ export function ConfirmedTripsTable() {
 
   // Handle finance approval with document approval
   const handleFinanceApproval = async (paymentId: string, notes?: string) => {
-    const result = await approvePayment(paymentId, notes);
+    const result = await approvePayment(paymentId, notes, undefined, getEffectiveCompanyId());
     if (result.success) {
       setFinanceApprovalModalOpen(false);
       setSelectedFinancePayment(null);
@@ -1585,7 +1587,7 @@ export function ConfirmedTripsTable() {
                                       <DropdownMenuItem
                                         onClick={async () => {
                                           const firstPayment = approvedPayments[0];
-                                          const result = await retryARIntegration(firstPayment.id);
+                                          const result = await retryARIntegration(firstPayment.id, getEffectiveCompanyId());
                                           if (result.success) {
                                             refetch();
                                           }
