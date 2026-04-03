@@ -40,6 +40,7 @@ export function ConfirmedTripsTable() {
   const { user, hasRole } = useAuth();
   const { approvePayment, rejectPayment, generateApprovedInvoice, retryARIntegration, isLoading: financeLoading } = useFinanceApproval();
   const { generateAndStoreDraftDocument, getDocumentsByQuotation, regenerateDocument, approveDocument } = useDocumentManagement();
+  const { getEffectiveCompanyId } = useCompany();
   
   // State for filtering and search
   const [searchQuery, setSearchQuery] = useState('');
