@@ -790,7 +790,7 @@ export const useFinanceApproval = () => {
           totalAmount,
           advanceAmount: paymentData.amount,
           dueDate,
-          companyId: NCG_HOLDING_ID,
+          companyId: companyId,
           journalEntryId: paymentData.journal_entry_id,
         });
 
