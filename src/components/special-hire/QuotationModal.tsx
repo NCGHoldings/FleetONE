@@ -304,12 +304,13 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
 
       // Generate filename with quotation number and date
       const date = new Date().toISOString().split('T')[0];
-      const filename = `Quotation_${quotation.quotation_no}_${date}.pdf`;
+      const prefix = documentMode === 'proforma_invoice' ? 'Proforma_Invoice' : 'Quotation';
+      const filename = `${prefix}_${quotation.quotation_no}_${date}.pdf`;
       
       // Download the PDF
       pdf.save(filename);
       
-      toast.success('Quotation downloaded successfully');
+      toast.success(`${docLabel} downloaded successfully`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast.error('Failed to download quotation');
