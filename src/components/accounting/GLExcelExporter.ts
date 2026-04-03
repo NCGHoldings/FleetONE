@@ -84,8 +84,8 @@ export interface GLLineItem {
   account_code: string;
   account_name: string;
   description: string;
-  debit_amount: number;
-  credit_amount: number;
+  debit: number;
+  credit: number;
 }
 
 const BUSINESS_UNIT_LABELS: Record<string, string> = {
