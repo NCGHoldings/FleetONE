@@ -418,12 +418,13 @@ export const usePostLandedCostToGL = () => {
       if (!effectiveCompanyId) throw new Error("No company selected");
 
       // 1. Fetch voucher
-      const { data: voucher, error: vErr } = await supabase
+      const { data: voucherRaw, error: vErr } = await supabase
         .from("landed_cost_vouchers")
         .select("*")
         .eq("id", voucherId)
         .single();
       if (vErr) throw vErr;
+      const voucher = voucherRaw as any;
       if (voucher.status !== "draft") throw new Error("Only draft vouchers can be posted");
       if (voucher.journal_entry_id) throw new Error("Voucher already has a journal entry (double-post guard)");
 
