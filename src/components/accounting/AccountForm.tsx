@@ -271,15 +271,14 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
           name="parent_account_id"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Parent Account (Optional)</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value ?? "_none"}>
+              <FormLabel>Parent Account *</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || undefined}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select parent account" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="_none">No Parent (Top Level)</SelectItem>
                   {parentAccounts?.filter(account => account.id && account.id.trim() !== '').map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.account_code} - {account.account_name}
