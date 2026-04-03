@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   CheckCircle, Mail, Clock, FileText, Eye, Send, Lock, AlertCircle, CreditCard, Loader2
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface SignerSetting {
   role: string;
