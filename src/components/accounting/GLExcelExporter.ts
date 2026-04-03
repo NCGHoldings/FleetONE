@@ -167,16 +167,18 @@ export function exportGLToExcel(
   }
 
   // Line Items sheet
-  if (options.includeLineItems && lineItems.length > 0) {
+  if (options.includeLineItems) {
     const headers = ['Entry #', 'Account Code', 'Account Name', 'Description', 'Debit', 'Credit'];
-    const rows = lineItems.map(l => [
-      l.entry_number || '',
-      l.account_code || '',
-      l.account_name || '',
-      l.description || '',
-      l.debit || 0,
-      l.credit || 0,
-    ]);
+    const rows = lineItems.length > 0
+      ? lineItems.map(l => [
+          l.entry_number || '',
+          l.account_code || '',
+          l.account_name || '',
+          l.description || '',
+          l.debit || 0,
+          l.credit || 0,
+        ])
+      : [['No line items found', '', '', '', '', '']];
     addStyledSheet(wb, 'Line Items', headers, rows, [4, 5]);
   }
 
@@ -227,21 +229,48 @@ export function exportGLToExcel(
   XLSX.writeFile(wb, fileName);
 }
 
-export function exportGLToCSV(entries: any[]) {
-  const headers = ['Entry #', 'Date', 'Business Unit', 'Description', 'Reference', 'Source Module', 'Debit', 'Credit', 'Status'];
-  const rows = entries.map(e => [
-    e.entry_number || '',
-    e.entry_date ? format(new Date(e.entry_date), 'yyyy-MM-dd') : '',
-    BUSINESS_UNIT_LABELS[e.business_unit_code] || e.business_unit_code || 'HQ',
-    `"${(e.description || '').replace(/"/g, '""')}"`,
-    e.reference || '',
-    e.source_module || '',
-    (e.total_debit || 0).toFixed(2),
-    (e.total_credit || 0).toFixed(2),
-    e.status || '',
-  ]);
+export function exportGLToCSV(entries: any[], lineItems: GLLineItem[] = [], includeLineItems: boolean = false) {
+  if (includeLineItems && lineItems.length > 0) {
+    // Flat CSV: one row per line item with entry info repeated
+    const headers = ['Entry #', 'Date', 'Business Unit', 'Description', 'Reference', 'Source Module', 'Status', 'Account Code', 'Account Name', 'Line Description', 'Debit', 'Credit'];
+    const rows = lineItems.map(l => {
+      const entry = entries.find(e => e.id === l.journal_entry_id);
+      return [
+        l.entry_number || '',
+        entry?.entry_date ? format(new Date(entry.entry_date), 'yyyy-MM-dd') : '',
+        BUSINESS_UNIT_LABELS[entry?.business_unit_code] || entry?.business_unit_code || 'HQ',
+        `"${(entry?.description || '').replace(/"/g, '""')}"`,
+        entry?.reference || '',
+        entry?.source_module || '',
+        entry?.status || '',
+        l.account_code || '',
+        l.account_name || '',
+        `"${(l.description || '').replace(/"/g, '""')}"`,
+        (l.debit || 0).toFixed(2),
+        (l.credit || 0).toFixed(2),
+      ];
+    });
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    downloadCSV(csv);
+  } else {
+    const headers = ['Entry #', 'Date', 'Business Unit', 'Description', 'Reference', 'Source Module', 'Debit', 'Credit', 'Status'];
+    const rows = entries.map(e => [
+      e.entry_number || '',
+      e.entry_date ? format(new Date(e.entry_date), 'yyyy-MM-dd') : '',
+      BUSINESS_UNIT_LABELS[e.business_unit_code] || e.business_unit_code || 'HQ',
+      `"${(e.description || '').replace(/"/g, '""')}"`,
+      e.reference || '',
+      e.source_module || '',
+      (e.total_debit || 0).toFixed(2),
+      (e.total_credit || 0).toFixed(2),
+      e.status || '',
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    downloadCSV(csv);
+  }
+}
 
-  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+function downloadCSV(csv: string) {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -33,6 +33,20 @@ export const GLExportModal = ({ open, onOpenChange, filteredEntries, filters }: 
     includeBySourceModule: false,
   });
 
+  // Reset options when modal opens
+  useEffect(() => {
+    if (open) {
+      setOptions({
+        includeSummary: true,
+        includeEntries: true,
+        includeLineItems: false,
+        includeByBusinessUnit: true,
+        includeBySourceModule: false,
+      });
+      setExportFormat("xlsx");
+    }
+  }, [open]);
+
   const toggleOption = (key: keyof GLExportOptions) => {
     setOptions(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -45,9 +59,37 @@ export const GLExportModal = ({ open, onOpenChange, filteredEntries, filters }: 
 
     setIsExporting(true);
     try {
+      // For CSV, also fetch line items if requested
       if (exportFormat === "csv") {
-        exportGLToCSV(filteredEntries);
-        toast.success(`Exported ${filteredEntries.length} entries as CSV`);
+        let csvLineItems: GLLineItem[] = [];
+        if (options.includeLineItems) {
+          const entryIds = filteredEntries.map(e => e.id);
+          for (let i = 0; i < entryIds.length; i += 50) {
+            const chunk = entryIds.slice(i, i + 50);
+            const { data, error } = await supabase
+              .from("journal_entry_lines")
+              .select("journal_entry_id, account_id, description, debit, credit, chart_of_accounts(account_code, account_name)")
+              .in("journal_entry_id", chunk);
+            if (error) throw error;
+            if (data) {
+              const mapped = data.map((line: any) => {
+                const entry = filteredEntries.find(e => e.id === line.journal_entry_id);
+                return {
+                  journal_entry_id: line.journal_entry_id,
+                  entry_number: entry?.entry_number || '',
+                  account_code: line.chart_of_accounts?.account_code || '',
+                  account_name: line.chart_of_accounts?.account_name || '',
+                  description: line.description || '',
+                  debit: line.debit || 0,
+                  credit: line.credit || 0,
+                };
+              });
+              csvLineItems.push(...mapped);
+            }
+          }
+        }
+        exportGLToCSV(filteredEntries, csvLineItems, options.includeLineItems);
+        toast.success(`Exported ${filteredEntries.length} entries${options.includeLineItems ? ` with ${csvLineItems.length} line items` : ''} as CSV`);
         onOpenChange(false);
         return;
       }
@@ -134,35 +176,35 @@ export const GLExportModal = ({ open, onOpenChange, filteredEntries, filters }: 
             </Select>
           </div>
 
-          {/* Section toggles - only for Excel */}
-          {exportFormat === "xlsx" && (
-            <div className="space-y-3">
-              <Label>Include Sections</Label>
-              <div className="space-y-2">
-                {([
-                  { key: "includeSummary" as const, label: "Summary & Filter Info", desc: "Report metadata, totals, applied filters" },
-                  { key: "includeEntries" as const, label: "Journal Entries", desc: "Entry list with dates, amounts, status" },
-                  { key: "includeLineItems" as const, label: "Line Items (GL Detail)", desc: "Individual debit/credit lines with account codes" },
-                  { key: "includeByBusinessUnit" as const, label: "By Business Unit", desc: "Subtotals grouped by business unit" },
-                  { key: "includeBySourceModule" as const, label: "By Source Module", desc: "Subtotals grouped by source module" },
-                ]).map(item => (
-                  <div key={item.key} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50">
-                    <Checkbox
-                      id={item.key}
-                      checked={options[item.key]}
-                      onCheckedChange={() => toggleOption(item.key)}
-                    />
-                    <div className="grid gap-0.5 leading-none">
-                      <label htmlFor={item.key} className="text-sm font-medium cursor-pointer">
-                        {item.label}
-                      </label>
-                      <p className="text-xs text-muted-foreground">{item.desc}</p>
-                    </div>
+          {/* Section toggles */}
+          <div className="space-y-3">
+            <Label>Include Sections</Label>
+            <div className="space-y-2">
+              {([
+                { key: "includeSummary" as const, label: "Summary & Filter Info", desc: "Report metadata, totals, applied filters", xlsxOnly: true },
+                { key: "includeEntries" as const, label: "Journal Entries", desc: "Entry list with dates, amounts, status", xlsxOnly: true },
+                { key: "includeLineItems" as const, label: "Line Items (GL Detail)", desc: "Individual debit/credit lines with account codes", xlsxOnly: false },
+                { key: "includeByBusinessUnit" as const, label: "By Business Unit", desc: "Subtotals grouped by business unit", xlsxOnly: true },
+                { key: "includeBySourceModule" as const, label: "By Source Module", desc: "Subtotals grouped by source module", xlsxOnly: true },
+              ])
+                .filter(item => exportFormat === "xlsx" || !item.xlsxOnly)
+                .map(item => (
+                <div key={item.key} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50">
+                  <Checkbox
+                    id={item.key}
+                    checked={options[item.key]}
+                    onCheckedChange={() => toggleOption(item.key)}
+                  />
+                  <div className="grid gap-0.5 leading-none">
+                    <label htmlFor={item.key} className="text-sm font-medium cursor-pointer">
+                      {item.label}
+                    </label>
+                    <p className="text-xs text-muted-foreground">{item.desc}</p>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
         </div>
 
         <DialogFooter>
