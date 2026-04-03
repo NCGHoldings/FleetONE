@@ -532,8 +532,19 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>Quotation Preview - {quotation.quotation_no}</span>
+          <DialogTitle className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-4">
+              <span>{docLabel} Preview - {quotation.quotation_no}</span>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="doc-mode-toggle" className="text-xs font-normal text-muted-foreground">Quotation</Label>
+                <Switch
+                  id="doc-mode-toggle"
+                  checked={documentMode === 'proforma_invoice'}
+                  onCheckedChange={(checked) => setDocumentMode(checked ? 'proforma_invoice' : 'quotation')}
+                />
+                <Label htmlFor="doc-mode-toggle" className="text-xs font-normal text-muted-foreground">Proforma Invoice</Label>
+              </div>
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleWhatsApp} disabled={isSendingWhatsApp}>
                 {isSendingWhatsApp ? (
