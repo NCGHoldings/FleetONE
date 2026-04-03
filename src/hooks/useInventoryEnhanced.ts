@@ -463,15 +463,14 @@ export const usePostLandedCostToGL = () => {
         inventoryAccountId = categories?.[0]?.inventory_account_id || null;
       }
 
-      // Fallback: try gl_settings for default inventory account
+      // Fallback: try gl_settings expense_account_id as inventory proxy
       if (!inventoryAccountId) {
         const { data: glSettings } = await supabase
           .from("gl_settings")
-          .select("setting_value")
+          .select("expense_account_id")
           .eq("company_id", effectiveCompanyId)
-          .eq("setting_key", "inventory_account_id")
           .maybeSingle();
-        inventoryAccountId = glSettings?.setting_value || null;
+        inventoryAccountId = glSettings?.expense_account_id || null;
       }
 
       if (!inventoryAccountId) {

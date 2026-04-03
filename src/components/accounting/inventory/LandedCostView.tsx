@@ -211,12 +211,20 @@ export const LandedCostView = () => {
       </Card>
 
       {/* Related Journal Entries for selected posted voucher */}
-      {selectedVoucher?.journal_entry_id && (
+      {selectedVoucher && (
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">
-            Related Journal Entries — {selectedVoucher.voucher_number}
+            Voucher Details — {selectedVoucher.voucher_number}
           </h3>
-          <RelatedJournalEntries journalEntryIds={[selectedVoucher.journal_entry_id]} />
+          <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+            <div><span className="text-muted-foreground">Status:</span> {getStatusBadge(selectedVoucher.status)}</div>
+            <div><span className="text-muted-foreground">Allocation:</span> {getAllocationMethodLabel(selectedVoucher.allocation_method)}</div>
+            <div><span className="text-muted-foreground">Total Additional Cost:</span> <CurrencyDisplay amount={selectedVoucher.total_additional_cost || 0} /></div>
+            <div><span className="text-muted-foreground">GRN:</span> {selectedVoucher.goods_receipt_notes?.grn_number || "-"}</div>
+          </div>
+          {(selectedVoucher as any).journal_entry_id && (
+            <RelatedJournalEntries sourceId={selectedVoucher.id} sourceType="ap_invoice" />
+          )}
         </Card>
       )}
 
