@@ -32,7 +32,7 @@ import { resolveBusType, calculateTotalKm, getTripDistance } from '@/lib/special
 import { PaymentTimelineFresh } from './PaymentTimelineFresh';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { SignatureWorkflowIndicator } from './SignatureWorkflowIndicator';
+import { SignatureWorkflowIndicator, type SignerSetting } from './SignatureWorkflowIndicator';
 
 export function ConfirmedTripsTable() {
   const { quotations, loading: realtimeLoading, refetch } = useRealtimeSpecialHire();
