@@ -159,11 +159,19 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
     enabled: !!effectiveCompanyId,
   });
 
+  // Auto-derive account_type from selected parent
+  const selectedParentId = form.watch("parent_account_id");
+  useEffect(() => {
+    if (selectedParentId && parentAccounts) {
+      const parent = parentAccounts.find(acc => acc.id === selectedParentId);
+      if (parent?.account_type) {
+        form.setValue("account_type", parent.account_type as any);
+      }
+    }
+  }, [selectedParentId, parentAccounts, form]);
+
   const onSubmit = (data: AccountFormData) => {
-    // Convert "_none" placeholder to undefined for database
-    const parentId = data.parent_account_id === "_none" || !data.parent_account_id 
-      ? undefined 
-      : data.parent_account_id;
+    const parentId = data.parent_account_id || undefined;
     
     // Find the selected parent account to derive level fields
     const selectedParent = parentId 
