@@ -33,6 +33,20 @@ export const GLExportModal = ({ open, onOpenChange, filteredEntries, filters }: 
     includeBySourceModule: false,
   });
 
+  // Reset options when modal opens
+  useEffect(() => {
+    if (open) {
+      setOptions({
+        includeSummary: true,
+        includeEntries: true,
+        includeLineItems: false,
+        includeByBusinessUnit: true,
+        includeBySourceModule: false,
+      });
+      setExportFormat("xlsx");
+    }
+  }, [open]);
+
   const toggleOption = (key: keyof GLExportOptions) => {
     setOptions(prev => ({ ...prev, [key]: !prev[key] }));
   };
