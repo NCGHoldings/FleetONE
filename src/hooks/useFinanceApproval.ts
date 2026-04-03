@@ -737,7 +737,7 @@ export const useFinanceApproval = () => {
         throw new Error('Only approved payments can have AR integration retried');
       }
 
-      const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+      const settings = await fetchSpecialHireFinanceSettings(companyId);
       if (!settings) {
         throw new Error('Special Hire Finance settings not configured');
       }
