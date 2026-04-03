@@ -1,48 +1,38 @@
 
 
-# Add GL Export Modal to Journal Entries View
+# Fix Trial Balance: Company ID Mismatch
 
-## What to build
-An export button on the General Ledger (Journal Entries) page that opens a modal allowing users to customize and download their filtered journal entries as Excel, CSV, or PDF. The export respects all active filters (search, date range, status, business unit, amount range).
+## Root Cause
+The Trial Balance shows all zeros because financial periods are seeded under `a0000000-...-0001` but **all real journal entries** (370 posted) are under different company IDs:
+- `f40b0a9d-...` (NCGH, 177 entries) — the actual NCG Holding with sub-companies YUT, SBO, SNT, SPH, LTV
+- `7ece7595-...` (NCGE, 176 entries) — NCG Express
 
-## How it works
+The company `a0000000-...-0001` has only **14 posted JEs total** and **zero for March 2026**.
 
-### Export Modal
-- Format selector: Excel (.xlsx), CSV, PDF
-- Section toggles (checkboxes):
-  - **Summary**: Total entries, total debit/credit, date range, business unit breakdown
-  - **Journal Entries**: The filtered entry list with entry #, date, business unit, description, debit, credit, status
-  - **Include Line Items**: Expand each JE to show individual debit/credit lines with GL account codes and names (requires fetching `journal_entry_lines` for selected entries)
-  - **Source Module Breakdown**: Group totals by source_module
-- "Export" button triggers download with filename like `GL_Journal_Entries_2026-04-03.xlsx`
+The code labels `f40b0a9d-...` as `NCG_TEST_ID` but it's actually the real production company where all finance approvals post journal entries.
 
-### Excel Format (primary)
-- **Summary sheet**: Report metadata, filter criteria applied, totals
-- **Journal Entries sheet**: Filtered entries table with styled headers (reuse existing `headerStyle`/`cellStyle` pattern from SinotrukExcelExporter)
-- **Line Items sheet** (optional): All JE lines with account_code, account_name, debit, credit, description
-- **By Business Unit sheet** (optional): Subtotals grouped by business unit
-- **By Source Module sheet** (optional): Subtotals grouped by source_module
+## Fix: Seed Financial Periods for the Real Companies
 
-### CSV Format
-- Flat export of the filtered entries table
+### Migration
+Create financial periods for both real companies that have journal entries:
 
-### Data Flow
-- Export uses the already-filtered `filteredEntries` array from the view (no re-fetching)
-- If "Include Line Items" is checked, fetch `journal_entry_lines` for all filtered entry IDs in a single batch query before generating the file
+1. **`f40b0a9d-ae5b-41b3-9188-535ae94c9020`** (real NCG Holding / NCGH) — Oct 2025 to Apr 2026, 7 monthly periods
+2. **`7ece7595-8b7b-46de-8bfc-c1e8e0da7513`** (NCG Express / NCGE) — Oct 2025 to Apr 2026, 7 monthly periods
 
-## Files to create/modify
+This ensures that when a user selects either company, the Trial Balance finds matching periods AND matching journal entries.
 
-### Create: `src/components/accounting/GLExportModal.tsx`
-- Modal UI with format selector and section checkboxes
-- Handles export logic for Excel/CSV formats
-- Accepts `filteredEntries` and `filters` as props
+### Optional: Investigate Company ID Constants
+The constants in `CompanyContext.tsx` may be swapped:
+- `NCG_HOLDING_ID = 'a0000000-...-0001'` — appears to be a seed/placeholder company, not the real one
+- `NCG_TEST_ID = 'f40b0a9d-...'` — is actually the production NCGH
 
-### Create: `src/components/accounting/GLExcelExporter.ts`
-- `exportGLReport(entries, lines, filters, options)` function
-- Multi-sheet workbook using `xlsx-js-style` (same pattern as SinotrukExcelExporter)
+This is a **separate, larger investigation** that affects many modules. For now, seeding periods for the real companies fixes the Trial Balance immediately.
 
-### Modify: `src/components/accounting/JournalEntriesView.tsx`
-- Add "Export" button next to "New Entry" button
-- Add state for export modal open/close
-- Render `<GLExportModal>` with filtered data and current filter state
+### Files
+- **Create**: Migration to insert 14 financial periods (7 for each real company)
+
+### Result
+- Trial Balance will show actual data when the user selects the real NCG Holding or NCG Express company
+- All 370 posted journal entries become visible in the Trial Balance
+- Opening/Period/Closing balances will populate correctly
 
