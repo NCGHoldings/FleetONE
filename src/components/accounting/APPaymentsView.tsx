@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ChequePrintPreview } from "./ChequePrintPreview";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
 import { useAPPayments, useVendors } from "@/hooks/useAccountingData";
+import { useDeleteAPPayment } from "@/hooks/useAccountingMutations";
 import { useBankFees } from "@/hooks/useBankFees";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { APPaymentForm } from "./APPaymentForm";
@@ -28,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 export const APPaymentsView = () => {
   const { data: payments, isLoading } = useAPPayments();
   const { data: vendors } = useVendors();
+  const deletePayment = useDeleteAPPayment();
   const { data: bankFees } = useBankFees();
   
   const [searchTerm, setSearchTerm] = useState("");

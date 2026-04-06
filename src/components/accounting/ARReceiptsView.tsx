@@ -9,6 +9,7 @@ import { Plus, Search, DollarSign, TrendingUp, Wallet, Eye, Printer, ArrowRightL
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
 import { useARReceipts, useCustomers } from "@/hooks/useAccountingData";
+import { useDeleteARReceipt } from "@/hooks/useAccountingMutations";
 import { useBankFees } from "@/hooks/useBankFees";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { ARReceiptForm } from "./ARReceiptForm";
@@ -27,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 export const ARReceiptsView = () => {
   const { data: receipts, isLoading } = useARReceipts();
   const { data: customers } = useCustomers();
+  const deleteReceipt = useDeleteARReceipt();
   const { data: bankFees } = useBankFees();
   
   const [searchTerm, setSearchTerm] = useState("");
