@@ -509,6 +509,8 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
       setPaymentBankAccountId("");
       setPaymentChequeNumber("");
       setPaymentReference("");
+      setAllocateToUnits(false);
+      setCostAllocations([]);
     } catch (error) {
       // Error handled by mutation
     }
