@@ -1,58 +1,34 @@
 
 
-# Fix: Auto-Match Fails for Katunayaka — Wrong Admission Prefixes
+# Fix: AP Direct Payment Voucher — Show Account Code, Name, Description, Amount
 
 ## Problem
-All 92 transactions show as "Unmatched" (0 auto-matched) because the system can't extract admission numbers like `LKA000187` from bank statement descriptions.
+When previewing a Direct Payment voucher, the document shows "No allocations" because:
+1. The modal only fetches `ap_payment_allocations` — but direct payments use `ap_payment_lines` instead
+2. The placeholder mapping has no `{{payment_line_items}}` for direct payment lines
+3. The voucher template has no section to display line item details (account code, account name, description, qty, price, amount)
 
-**Root cause**: When the Katunayaka branch was auto-created, default prefixes `['N', 'LNU']` were used. But Katunayaka students use prefix `LKA` (31 students) and `Sta` (4 students). The regex in `extractAdmissionNumbers()` only looks for configured prefixes, so `LKA000187` in the description is never recognized.
+## Solution
 
-## Solution — Two changes
+### 1. Fetch `ap_payment_lines` for direct payments
+**File**: `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx`
 
-### 1. Auto-detect prefixes from actual student data when creating default settings
-**File**: `src/components/school/BankStatementUploadZone.tsx`
+Add a new `useQuery` that fetches `ap_payment_lines` (joined with `chart_of_accounts` for account code/name) when `documentType === "ap_payment_voucher"` and `documentData?.is_direct_payment === true`.
 
-When auto-creating settings for a new branch (the fallback block), query the branch's students to detect the actual admission number prefixes in use, instead of hardcoding `['N', 'LNU']`.
+Pass the fetched lines into `mapDocumentToPlaceholders` as the `lineItems` parameter.
 
-```
-// Before inserting default settings:
-// Query distinct prefixes from school_students for this branch
-// Extract the alphabetic prefix from each admission_no (e.g., LKA from LKA000187)
-// Use those as admission_prefixes, falling back to ['N', 'LNU'] if none found
-```
+### 2. Generate payment line items table
+**File**: `src/lib/document-template-utils.ts`
 
-### 2. Same fix in branch creation
-**File**: `src/pages/SchoolBusService.tsx`
+In the `ap_payment_voucher` case:
+- Add a new function `generatePaymentLineItemsTable()` that renders columns: Account Code, Account Name, Description, Qty, Unit Price, Tax, Amount
+- Set `{{payment_line_items}}` placeholder with this table
+- When direct payment lines exist, also override `{{allocations}}` with the line items table (so existing templates show the data instead of "No allocations")
 
-Same logic — when a new branch is created and default settings are inserted, detect prefixes from imported students (or use a broader default like `['N', 'LNU', 'LKA', 'TKA', 'TN', 'R0']` that covers all known branch patterns).
-
-### 3. Immediate data fix — update Katunayaka settings
-**File**: `src/components/school/BankStatementUploadZone.tsx`
-
-Add `LKA` detection: before processing, check if any students have prefixes not in the current settings, and auto-add them. This fixes the problem for the existing Katunayaka branch without manual intervention.
-
-Alternatively, in the `handleProcess` function, after fetching students and before matching, dynamically detect all unique prefixes from the student list and merge them with the configured prefixes:
-
-```typescript
-// After fetching students, detect actual prefixes
-const detectedPrefixes = new Set<string>();
-students?.forEach((s: any) => {
-  const match = s.admission_no?.match(/^([A-Za-z]+)/);
-  if (match) detectedPrefixes.add(match[1].toUpperCase());
-});
-// Merge with configured prefixes
-const allPrefixes = [...new Set([...prefixes, ...detectedPrefixes])];
-```
-
-Then use `allPrefixes` instead of `prefixes` in the `extractAdmissionNumbers()` call.
+### 3. No template changes needed
+The existing `{{allocations}}` placeholder position in the voucher template will now show the payment line items table for direct payments, and the normal allocations table for regular payments.
 
 ## Files
-- **Modify**: `src/components/school/BankStatementUploadZone.tsx` — auto-detect student prefixes and merge with settings before matching
-- **Modify**: `src/pages/SchoolBusService.tsx` — use broader default prefixes on branch creation
-
-## Result
-- Katunayaka's `LKA000187` descriptions will be matched to student `LKA000187` automatically
-- Any future branch with different prefixes will also work without manual settings configuration
-- Existing branches with correct settings are unaffected (their prefixes are just augmented)
-- User can still customize prefixes in Settings page if needed
+- **Modify**: `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx` — fetch `ap_payment_lines` with joined account data
+- **Modify**: `src/lib/document-template-utils.ts` — generate payment lines table and set as `{{allocations}}` for direct payments
 
