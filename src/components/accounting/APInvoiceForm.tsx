@@ -15,7 +15,7 @@ import { useCreateAPInvoice, useUpdateAPInvoice, useCreateAPPayment } from "@/ho
 import { useCompany } from "@/contexts/CompanyContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays } from "date-fns";
-import { Plus, Trash2, Check, ChevronsUpDown, Bus, Route, Banknote, CreditCard } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Bus, Route, Banknote, CreditCard, Split } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -72,6 +72,54 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
   const [paymentBankAccountId, setPaymentBankAccountId] = useState("");
   const [paymentChequeNumber, setPaymentChequeNumber] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
+
+  // Cost Allocation state
+  const [allocateToUnits, setAllocateToUnits] = useState(false);
+  const [allocationMode, setAllocationMode] = useState<"amount" | "percentage">("amount");
+  const [costAllocations, setCostAllocations] = useState<Array<{
+    id: string;
+    unit_code: string;
+    amount: number;
+    percentage: number;
+  }>>([]);
+
+  const BUSINESS_UNITS = [
+    { code: "SBO", label: "School Bus Operations" },
+    { code: "YUT", label: "Yutong" },
+    { code: "SPH", label: "Special Hire" },
+    { code: "LTV", label: "Light Vehicle" },
+    { code: "SNT", label: "Sinotruck" },
+  ];
+
+  const addAllocation = () => {
+    setCostAllocations(prev => [...prev, {
+      id: Date.now().toString(),
+      unit_code: "",
+      amount: 0,
+      percentage: 0,
+    }]);
+  };
+
+  const removeAllocation = (id: string) => {
+    setCostAllocations(prev => prev.filter(a => a.id !== id));
+  };
+
+  const updateAllocation = (id: string, field: string, value: any) => {
+    setCostAllocations(prev => prev.map(a => {
+      if (a.id !== id) return a;
+      const updated = { ...a, [field]: value };
+      if (field === "percentage" && allocationMode === "percentage") {
+        updated.amount = Math.round((subtotal * (updated.percentage / 100)) * 100) / 100;
+      }
+      if (field === "amount" && allocationMode === "amount" && subtotal > 0) {
+        updated.percentage = Math.round((updated.amount / subtotal) * 100 * 100) / 100;
+      }
+      return updated;
+    }));
+  };
+
+  const totalAllocated = costAllocations.reduce((sum, a) => sum + a.amount, 0);
+  const unallocatedAmount = subtotal - totalAllocated;
 
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 },
