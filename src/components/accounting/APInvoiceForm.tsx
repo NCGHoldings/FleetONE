@@ -921,12 +921,81 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
               )}
             />
 
+            {/* Pay Now (Optional) - only for new invoices */}
+            {!isEditing && (
+              <div className="border rounded-lg p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Banknote className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium text-sm">Pay Now (Optional)</span>
+                  </div>
+                  <Switch checked={payNow} onCheckedChange={setPayNow} />
+                </div>
+
+                {payNow && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Payment Method</label>
+                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="cheque">Cheque</SelectItem>
+                          <SelectItem value="cash">Cash</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Bank Account</label>
+                      <Select value={paymentBankAccountId} onValueChange={setPaymentBankAccountId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select bank account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {bankAccounts?.map((acc) => (
+                            <SelectItem key={acc.id} value={acc.id}>
+                              {acc.account_name} - {acc.bank_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {paymentMethod === "cheque" && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Cheque Number</label>
+                        <Input
+                          value={paymentChequeNumber}
+                          onChange={(e) => setPaymentChequeNumber(e.target.value)}
+                          placeholder="Cheque number"
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Reference</label>
+                      <Input
+                        value={paymentReference}
+                        onChange={(e) => setPaymentReference(e.target.value)}
+                        placeholder="Payment reference"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? (isEditing ? "Updating..." : "Recording...") : (isEditing ? "Update Invoice" : "Record Invoice")}
+                {isPending
+                  ? (isEditing ? "Updating..." : (payNow ? "Recording & Paying..." : "Recording..."))
+                  : (isEditing ? "Update Invoice" : (payNow ? "Record Invoice & Pay" : "Record Invoice"))}
               </Button>
             </div>
           </form>
