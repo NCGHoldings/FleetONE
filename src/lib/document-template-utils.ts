@@ -103,6 +103,43 @@ const generateLineItemsTable = (lineItems: any[]): string => {
   `;
 };
 
+// Generate payment line items table for direct payments
+const generatePaymentLineItemsTable = (lineItems: any[]): string => {
+  if (!lineItems?.length) {
+    return '<p>No line items</p>';
+  }
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead><tr style="background:#f3f4f6;">
+      <th style="border:1px solid #ddd;padding:6px;text-align:left;">Account Code</th>
+      <th style="border:1px solid #ddd;padding:6px;text-align:left;">Account Name</th>
+      <th style="border:1px solid #ddd;padding:6px;text-align:left;">Description</th>
+      <th style="border:1px solid #ddd;padding:6px;text-align:right;">Qty</th>
+      <th style="border:1px solid #ddd;padding:6px;text-align:right;">Unit Price</th>
+      <th style="border:1px solid #ddd;padding:6px;text-align:right;">Tax</th>
+      <th style="border:1px solid #ddd;padding:6px;text-align:right;">Amount</th>
+    </tr></thead><tbody>`;
+  let total = 0;
+  lineItems.forEach((item: any) => {
+    const lineTotal = item.line_total || (item.quantity || 1) * (item.unit_price || 0);
+    total += lineTotal;
+    html += `<tr>
+      <td style="border:1px solid #ddd;padding:6px;">${item.chart_of_accounts?.account_code || ''}</td>
+      <td style="border:1px solid #ddd;padding:6px;">${item.chart_of_accounts?.account_name || ''}</td>
+      <td style="border:1px solid #ddd;padding:6px;">${item.description || ''}</td>
+      <td style="border:1px solid #ddd;padding:6px;text-align:right;">${item.quantity || 1}</td>
+      <td style="border:1px solid #ddd;padding:6px;text-align:right;">${formatCurrency(item.unit_price)}</td>
+      <td style="border:1px solid #ddd;padding:6px;text-align:right;">${formatCurrency(item.tax_amount || 0)}</td>
+      <td style="border:1px solid #ddd;padding:6px;text-align:right;">${formatCurrency(lineTotal)}</td>
+    </tr>`;
+  });
+  html += `<tr style="font-weight:bold;background:#f9fafb;">
+    <td colspan="6" style="border:1px solid #ddd;padding:6px;text-align:right;">Total</td>
+    <td style="border:1px solid #ddd;padding:6px;text-align:right;">${formatCurrency(total)}</td>
+  </tr>`;
+  html += '</tbody></table>';
+  return html;
+};
+
 // Generate allocations table for receipts/payments
 const generateAllocationsTable = (allocations: any[]): string => {
   if (!allocations?.length) {
@@ -392,7 +429,13 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{reference}}'] = documentData?.reference || '';
       placeholders['{{cheque_number}}'] = documentData?.cheque_number || '';
       placeholders['{{notes}}'] = documentData?.notes || '';
-      placeholders['{{allocations}}'] = generateAllocationsTable(allocations || []);
+      // For direct payments, show payment line items instead of allocations
+      if (documentData?.is_direct_payment && lineItems?.length) {
+        placeholders['{{allocations}}'] = generatePaymentLineItemsTable(lineItems);
+        placeholders['{{payment_line_items}}'] = generatePaymentLineItemsTable(lineItems);
+      } else {
+        placeholders['{{allocations}}'] = generateAllocationsTable(allocations || []);
+      }
 
       // ===== Yutong / Custom Template Aliases =====
       // Voucher aliases
