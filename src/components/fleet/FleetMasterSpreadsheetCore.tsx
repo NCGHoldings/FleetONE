@@ -316,6 +316,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
   let globalIndex = 0;
 
   return (
+    <>
     <div ref={scrollContainerRef} className="border rounded-lg overflow-auto max-h-[80vh]">
       <Table>
         <TableHeader className="sticky top-0 z-20">
