@@ -1,55 +1,89 @@
 
 
-# Add Optional "Pay Now" to AP Invoice Creation Form
+# Force Delete for AP/AR Invoices, Payments & Receipts (Testing Mode)
 
 ## Problem
-Currently, after creating an AP Invoice, users must navigate to the Payments tab to record a payment separately. This is extra steps for invoices that are paid immediately (e.g., cash purchases, same-day bank transfers).
+Currently, AP/AR invoices can only be deleted when in "draft" or "cancelled" status. AP Payments and AR Receipts have **no delete option at all**. When deleting, the system does NOT reverse the linked Journal Entries or COA balance changes, leaving the books corrupted.
+
+During testing, you need to delete **any** record regardless of status, with full financial cleanup.
 
 ## Solution
-Add a collapsible **"Pay Now (Optional)"** section at the bottom of the AP Invoice form (between Notes and the action buttons). When toggled on, it shows bank account, payment method, reference, and cheque fields. On submit, the system:
 
-1. Creates the AP Invoice (existing flow — triggers JE-1: DR Expense / CR Trade Payable)
-2. Then creates an AP Payment allocated to that invoice (triggers JE-2: DR Trade Payable / CR Bank)
-3. Uses the existing `useCreateAPPayment` mutation which already handles GL posting, bank balance updates, and double-posting guards
+### 1. Create a shared `reverseAndDeleteJournalEntry` utility
+**File**: `src/lib/gl-posting-utils.ts`
 
-This keeps the two JEs separate and correct — no risk of double-posting since invoice creation and payment creation are sequential with distinct mutations.
+Add a new exported function that:
+- Fetches the JE and its lines by `journal_entry_id`
+- Reverses each COA balance change (undo debits/credits based on account normal type)
+- Deletes the `journal_entry_lines` rows
+- Deletes the `journal_entries` row
+- Returns success/failure
 
-## Changes
+This will be reused by all 4 delete mutations.
 
-### Modify: `src/components/accounting/APInvoiceForm.tsx`
+### 2. Upgrade `useDeleteAPInvoice` — full cascade delete
+**File**: `src/hooks/useAccountingMutations.ts`
 
-1. **New state variables**:
-   - `payNow: boolean` (toggle)
-   - `paymentMethod: string` (bank_transfer, cheque, cash)
-   - `paymentBankAccountId: string`
-   - `paymentChequeNumber: string`
-   - `paymentReference: string`
+- Fetch the invoice to get `journal_entry_id`
+- Delete any `ap_payment_allocations` linked to this invoice
+- Call `reverseAndDeleteJournalEntry` if JE exists
+- Delete `ap_invoice_lines`, then `ap_invoices`
+- Invalidate queries for invoices, payments, journal entries, COA
 
-2. **Import additions**: `useBankAccounts` from hooks, `useCreateAPPayment` from mutations, `Switch` from UI, bank account icons
+### 3. Upgrade `useDeleteARInvoice` — full cascade delete
+**File**: `src/hooks/useAccountingMutations.ts`
 
-3. **New UI section** (after Notes, before buttons): A `Switch` labeled "Pay Now (Optional)" that expands to show:
-   - Payment Method selector (Bank Transfer / Cheque / Cash)
-   - Bank Account selector (from `useBankAccounts`)
-   - Cheque Number (if cheque selected)
-   - Reference field
-   
-4. **Modified `onSubmit`**: After successful invoice creation (non-edit mode only), if `payNow` is true:
-   - Generate a payment number (e.g., `PAY-{timestamp}`)
-   - Call `createPayment.mutateAsync()` with the invoice ID in allocations
-   - The payment amount = `netPayable`
-   - Show success toast mentioning both invoice and payment were created
+- Same pattern: fetch invoice → delete `ar_receipt_allocations` → reverse JE → delete lines → delete invoice
+- Invalidate AR queries
 
-5. **Guard**: The "Pay Now" section only appears for new invoices (not when editing)
+### 4. Create `useDeleteAPPayment` (new)
+**File**: `src/hooks/useAccountingMutations.ts`
 
-6. **Button text**: Changes to "Record Invoice & Pay" when pay-now is toggled on
+- Fetch payment to get `journal_entry_id` and `bank_account_id`
+- Delete `ap_payment_allocations` for this payment
+- Delete linked `bank_transactions`
+- Reverse bank account balance (add back the payment amount)
+- Reverse and delete JE
+- Delete `ap_payment_lines` (for direct payments)
+- Delete `ap_payments` row
+- Invalidate payment, invoice, bank, JE queries
 
-## Technical Safety
-- Invoice JE (DR Expense / CR Trade Payable) fires first via `useCreateAPInvoice`
-- Payment JE (DR Trade Payable / CR Bank) fires second via `useCreateAPPayment`
-- Both mutations have independent double-posting guards
-- If payment fails after invoice succeeds, user gets a toast error and can still pay manually from the Payments tab
-- The payment allocation links to the specific invoice, so invoice status updates to "paid"
+### 5. Create `useDeleteARReceipt` (new)
+**File**: `src/hooks/useAccountingMutations.ts`
+
+- Same pattern as AP Payment: fetch receipt → delete allocations → delete bank transactions → reverse bank balance → reverse JE → delete receipt
+- Invalidate receipt, invoice, bank queries
+
+### 6. Remove status restriction on delete buttons
+**Files**: `src/components/accounting/AccountsPayableView.tsx`, `src/components/accounting/AccountsReceivableView.tsx`
+
+- Change `canDelete` to always return `true` (all statuses)
+- Update delete confirmation dialog text to warn about JE reversal
+
+### 7. Add delete buttons to AP Payments & AR Receipts views
+**Files**: `src/components/accounting/APPaymentsView.tsx`, `src/components/accounting/ARReceiptsView.tsx`
+
+- Import `Trash2` icon, `AlertDialog` components, and the new delete mutations
+- Add delete button per row with confirmation dialog
+- Wire up the delete mutation with proper query invalidation
+
+### Safety
+- Only financial/accounting data is touched — no operational tables (trips, special hires, school data)
+- Each delete reverses COA balances line-by-line to keep the books balanced
+- Bank account balances are restored when payments/receipts are deleted
+- Bank transactions linked to the payment/receipt are removed
+- All query caches are invalidated so UI reflects changes immediately
+
+## Technical Details
+- `reverseAndDeleteJournalEntry(journalEntryId)`: For each JE line, if the line has a debit, subtract that from COA balance; if credit, add it back (opposite of what posting did)
+- Bank balance reversal: for AP payment delete, add amount back to bank; for AR receipt delete, subtract amount from bank
+- `ap_payment_allocations` / `ar_receipt_allocations` are deleted first to avoid FK violations
 
 ## Files
-- **Modify**: `src/components/accounting/APInvoiceForm.tsx` — add optional pay-now section and sequential payment creation
+- **Modify**: `src/lib/gl-posting-utils.ts` — add `reverseAndDeleteJournalEntry`
+- **Modify**: `src/hooks/useAccountingMutations.ts` — upgrade AR/AP invoice delete, add payment/receipt delete
+- **Modify**: `src/components/accounting/AccountsPayableView.tsx` — allow delete for all statuses
+- **Modify**: `src/components/accounting/AccountsReceivableView.tsx` — allow delete for all statuses
+- **Modify**: `src/components/accounting/APPaymentsView.tsx` — add delete button + confirmation
+- **Modify**: `src/components/accounting/ARReceiptsView.tsx` — add delete button + confirmation
 
