@@ -54,6 +54,8 @@ interface Student {
   mother_contact_no?: string;
   payment_date?: string;
   update_new?: number;
+  fixed_monthly_amount?: number;
+  current_amount_due?: number;
   service_type?: string;
   pickup_point?: string;
   dropoff_point?: string;
@@ -664,6 +666,9 @@ export default function SchoolStudentDatabase() {
                     emergency_contact_number: formData.get("emergency_contact_number") as string,
                     payment_status: formData.get("payment_status") as string,
                     payment_amount: formData.get("payment_amount") ? Number(formData.get("payment_amount")) : null,
+                    fixed_monthly_amount: formData.get("fixed_monthly_amount") ? Number(formData.get("fixed_monthly_amount")) : null,
+                    current_amount_due: formData.get("current_amount_due") ? Number(formData.get("current_amount_due")) : null,
+                    update_new: formData.get("fixed_monthly_amount") ? Number(formData.get("fixed_monthly_amount")) : null,
                     remarks: formData.get("remarks") as string,
                   })
                   .eq("id", selectedStudent.id);
@@ -770,6 +775,14 @@ export default function SchoolStudentDatabase() {
                 <div>
                   <Label htmlFor="payment_amount">Payment Amount</Label>
                   <Input id="payment_amount" name="payment_amount" type="number" defaultValue={selectedStudent.payment_amount || ""} />
+                </div>
+                <div>
+                  <Label htmlFor="fixed_monthly_amount">Fixed Monthly Amount</Label>
+                  <Input id="fixed_monthly_amount" name="fixed_monthly_amount" type="number" defaultValue={selectedStudent.fixed_monthly_amount || ""} placeholder="Monthly fee amount" />
+                </div>
+                <div>
+                  <Label htmlFor="current_amount_due">Current Amount Due</Label>
+                  <Input id="current_amount_due" name="current_amount_due" type="number" defaultValue={selectedStudent.current_amount_due || ""} placeholder="Outstanding balance" />
                 </div>
                 <div className="col-span-2">
                   <Label htmlFor="address">Address</Label>
