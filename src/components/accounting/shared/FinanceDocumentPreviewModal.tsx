@@ -133,9 +133,10 @@ export const FinanceDocumentPreviewModal = ({
     return true;
   });
 
-  // Fetch line items for invoices
+  // Fetch line items for invoices and direct payments
+  const isDirectPayment = documentType === "ap_payment_voucher" && documentData?.is_direct_payment;
   const { data: lineItems } = useQuery({
-    queryKey: ["doc-line-items", documentType, documentData?.id],
+    queryKey: ["doc-line-items", documentType, documentData?.id, isDirectPayment],
     queryFn: async () => {
       if (!documentData?.id) return [];
       
@@ -156,10 +157,20 @@ export const FinanceDocumentPreviewModal = ({
         if (error) throw error;
         return data;
       }
+
+      // Fetch ap_payment_lines for direct payments with account info
+      if (isDirectPayment) {
+        const { data, error } = await supabase
+          .from("ap_payment_lines")
+          .select("*, chart_of_accounts(account_code, account_name)")
+          .eq("payment_id", documentData.id);
+        if (error) throw error;
+        return data;
+      }
       
       return [];
     },
-    enabled: !!documentData?.id && (documentType === "ar_invoice" || documentType === "ap_invoice"),
+    enabled: !!documentData?.id && (documentType === "ar_invoice" || documentType === "ap_invoice" || !!isDirectPayment),
   });
 
   // Fetch vendor's default bank account as fallback when payment has no vendor_bank_account_id
