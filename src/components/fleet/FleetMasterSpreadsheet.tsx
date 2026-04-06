@@ -9,7 +9,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { formatLKR } from '@/lib/accounting-utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
@@ -246,18 +247,37 @@ export function FleetMasterSpreadsheet() {
             <DialogTitle>Add Bus to Fleet Roster</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Select value={selectedBusId} onValueChange={setSelectedBusId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a bus..." />
-              </SelectTrigger>
-              <SelectContent>
-                {availableBuses.map(b => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.bus_no} {b.route ? `— ${b.route}` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between">
+                  {selectedBusId
+                    ? (() => {
+                        const bus = availableBuses.find(b => b.id === selectedBusId);
+                        return bus ? `${bus.bus_no}${bus.route ? ` — ${bus.route}` : ''}` : 'Select a bus...';
+                      })()
+                    : 'Select a bus...'}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0 z-[100]" align="start">
+                <Command>
+                  <CommandInput placeholder="Search bus number or route..." className="border-b" />
+                  <CommandEmpty>No bus found.</CommandEmpty>
+                  <CommandGroup className="max-h-60 overflow-y-auto">
+                    {availableBuses.map(b => (
+                      <CommandItem
+                        key={b.id}
+                        value={`${b.bus_no} ${b.route || ''}`}
+                        onSelect={() => setSelectedBusId(b.id)}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", selectedBusId === b.id ? "opacity-100" : "opacity-0")} />
+                        {b.bus_no} {b.route ? `— ${b.route}` : ''}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </Command>
+              </PopoverContent>
+            </Popover>
             <Button onClick={handleAddBus} disabled={!selectedBusId} className="w-full">
               <Bus className="h-4 w-4 mr-2" /> Add to Roster
             </Button>
