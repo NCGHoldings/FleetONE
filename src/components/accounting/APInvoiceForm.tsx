@@ -57,12 +57,21 @@ interface APInvoiceFormProps {
 export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceFormProps) => {
   const { data: vendors } = useVendors();
   const { data: taxCodes } = useTaxCodes();
+  const { data: bankAccounts } = useBankAccounts();
   const createInvoice = useCreateAPInvoice();
   const updateInvoice = useUpdateAPInvoice();
+  const createPayment = useCreateAPPayment();
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const queryClient = useQueryClient();
 
   const isEditing = !!editingInvoice;
+
+  // Pay Now state
+  const [payNow, setPayNow] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
+  const [paymentBankAccountId, setPaymentBankAccountId] = useState("");
+  const [paymentChequeNumber, setPaymentChequeNumber] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
 
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 },
