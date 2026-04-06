@@ -1,64 +1,58 @@
 
 
-# Fix: AP Payment GL Posting to Use Vendor Category Account Mappings
+# Fix: Auto-Match Fails for Katunayaka — Wrong Admission Prefixes
 
 ## Problem
-When creating an AP Payment (normal or advance), the GL posting logic does **NOT** use the vendor's category-linked GL accounts. Instead, it searches the Chart of Accounts for any account with "trade payable" in the name (line 1148-1157 in `useAccountingMutations.ts`).
+All 92 transactions show as "Unmatched" (0 auto-matched) because the system can't extract admission numbers like `LKA000187` from bank statement descriptions.
 
-This means:
-- **Vendor Category mappings are ignored** — even if a vendor is in category "SUP-INT" with Trade Payable mapped to "22101001 - TRADE PAYABLE - INTERNAL", the payment posts to whichever "trade payable" account the raw search finds first
-- **Advance payments** don't use the category's `advance_account_id` at all — they post DR to the same generic trade payable instead of the vendor's advance account
-- The `resolveVendorAPAccounts()` function already exists and is used by AP Invoice creation — but the Payment creation skips it entirely
+**Root cause**: When the Katunayaka branch was auto-created, default prefixes `['N', 'LNU']` were used. But Katunayaka students use prefix `LKA` (31 students) and `Sta` (4 students). The regex in `extractAdmissionNumbers()` only looks for configured prefixes, so `LKA000187` in the description is never recognized.
 
-## What works correctly today
-- **AP Invoice creation** (line 840) — correctly calls `resolveVendorAPAccounts()` ✓
-- **AP Invoice approval** (line 1808) — correctly calls `resolveVendorAPAccounts()` ✓
-- **Leasing payments** — correctly calls `resolveVendorAPAccounts()` ✓
-- **AP Payments** — does NOT use it ✗
+## Solution — Two changes
 
-## Solution
+### 1. Auto-detect prefixes from actual student data when creating default settings
+**File**: `src/components/school/BankStatementUploadZone.tsx`
 
-### Modify: `src/hooks/useAccountingMutations.ts`
+When auto-creating settings for a new branch (the fallback block), query the branch's students to detect the actual admission number prefixes in use, instead of hardcoding `['N', 'LNU']`.
 
-Replace the raw COA search (lines 1145-1157) with `resolveVendorAPAccounts()`:
-
-**Current code (broken):**
-```typescript
-const { data: payableAccounts } = await supabase
-  .from("chart_of_accounts")
-  .select("id, account_name")
-  .eq("company_id", effectiveCompanyId)
-  .eq("account_type", "liability")
-  .eq("is_active", true)
-  .ilike("account_name", "%trade payable%")
-  .limit(1);
-
-const tradePayableId = payableAccounts?.[0]?.id || null;
+```
+// Before inserting default settings:
+// Query distinct prefixes from school_students for this branch
+// Extract the alphabetic prefix from each admission_no (e.g., LKA from LKA000187)
+// Use those as admission_prefixes, falling back to ['N', 'LNU'] if none found
 ```
 
-**New code (fixed):**
-```typescript
-const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
-const resolvedAccounts = await resolveVendorAPAccounts(payment.vendor_id, effectiveCompanyId);
+### 2. Same fix in branch creation
+**File**: `src/pages/SchoolBusService.tsx`
 
-// For advance payments: use the advance account if available, else fall back to trade payable
-const tradePayableId = payment.is_advance
-  ? (resolvedAccounts.advanceAccountId || resolvedAccounts.apAccountId)
-  : resolvedAccounts.apAccountId;
+Same logic — when a new branch is created and default settings are inserted, detect prefixes from imported students (or use a broader default like `['N', 'LNU', 'LKA', 'TKA', 'TN', 'R0']` that covers all known branch patterns).
+
+### 3. Immediate data fix — update Katunayaka settings
+**File**: `src/components/school/BankStatementUploadZone.tsx`
+
+Add `LKA` detection: before processing, check if any students have prefixes not in the current settings, and auto-add them. This fixes the problem for the existing Katunayaka branch without manual intervention.
+
+Alternatively, in the `handleProcess` function, after fetching students and before matching, dynamically detect all unique prefixes from the student list and merge them with the configured prefixes:
+
+```typescript
+// After fetching students, detect actual prefixes
+const detectedPrefixes = new Set<string>();
+students?.forEach((s: any) => {
+  const match = s.admission_no?.match(/^([A-Za-z]+)/);
+  if (match) detectedPrefixes.add(match[1].toUpperCase());
+});
+// Merge with configured prefixes
+const allPrefixes = [...new Set([...prefixes, ...detectedPrefixes])];
 ```
 
-This ensures:
-1. **Normal payments** → DR Trade Payable (from vendor category or global fallback), CR Bank
-2. **Advance payments** → DR Supplier Advance account (from vendor category), CR Bank
-3. If no category mapping exists, falls back to global GL settings (same as invoices)
-4. WHT payable lookup remains unchanged (already correct)
+Then use `allPrefixes` instead of `prefixes` in the `extractAdmissionNumbers()` call.
 
 ## Files
-- **Modify**: `src/hooks/useAccountingMutations.ts` — replace raw COA search with `resolveVendorAPAccounts()` in `useCreateAPPayment`
+- **Modify**: `src/components/school/BankStatementUploadZone.tsx` — auto-detect student prefixes and merge with settings before matching
+- **Modify**: `src/pages/SchoolBusService.tsx` — use broader default prefixes on branch creation
 
 ## Result
-- AP Payments correctly hit the vendor's category-linked Trade Payable account (e.g., "TRADE PAYABLE - INTERNAL" for SUP-INT vendors)
-- Advance payments correctly debit the vendor's Advance Payment account (e.g., "SUPPLIER ADVANCES - INTERNAL")
-- Consistent with how AP Invoice creation already works
-- Global fallback still applies if no category is configured
+- Katunayaka's `LKA000187` descriptions will be matched to student `LKA000187` automatically
+- Any future branch with different prefixes will also work without manual settings configuration
+- Existing branches with correct settings are unaffected (their prefixes are just augmented)
+- User can still customize prefixes in Settings page if needed
 
