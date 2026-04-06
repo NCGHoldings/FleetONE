@@ -1143,18 +1143,14 @@ export const useCreateAPPayment = () => {
           await supabase.from("ap_payments").update({ journal_entry_id: je.id }).eq("id", data.id);
         }
       } else if (!payment.is_direct_payment) {
-        // Normal / Advance payment GL posting (existing logic)
-        // Find Trade Payable account from COA
-        const { data: payableAccounts } = await supabase
-          .from("chart_of_accounts")
-          .select("id, account_name")
-          .eq("company_id", effectiveCompanyId)
-          .eq("account_type", "liability")
-          .eq("is_active", true)
-          .ilike("account_name", "%trade payable%")
-          .limit(1);
-        
-        const tradePayableId = payableAccounts?.[0]?.id || null;
+        // Normal / Advance payment GL posting — resolve via vendor category mappings
+        const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
+        const resolvedPaymentAccounts = await resolveVendorAPAccounts(payment.vendor_id, effectiveCompanyId);
+
+        // For advance payments: use the advance account if available, else fall back to trade payable
+        const tradePayableId = payment.is_advance
+          ? (resolvedPaymentAccounts.advanceAccountId || resolvedPaymentAccounts.apAccountId)
+          : resolvedPaymentAccounts.apAccountId;
 
         // Calculate total write-offs
         const totalWriteOff = payment.allocations?.reduce((sum, a) => sum + (a.write_off_amount || 0), 0) || 0;
