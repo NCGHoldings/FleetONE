@@ -9,12 +9,25 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { formatLKR } from "@/lib/accounting-utils";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import { format } from 'date-fns';
+
+interface PendingTripsUpdate {
+  rosterId: string;
+  busNo: string;
+  currentTrips: number;
+  newTrips: number;
+}
 
 interface Props {
   rows: ExpandedFleetRow[];
   loading: boolean;
   onUpdate: (rosterId: string, field: string, value: any) => void;
   editMode?: 'master' | 'daily';
+  selectedDate?: Date;
   availableRoutes?: any[];
 }
 
@@ -24,9 +37,10 @@ const REMARK_OPTIONS = ['Running', 'Repair', 'Hire', 'Accident', 'Stopped', 'Sol
 
 const TOTAL_COLUMNS = 25;
 
-export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode = 'master', availableRoutes = [] }: Props) {
+export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode = 'master', selectedDate, availableRoutes = [] }: Props) {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
+  const [pendingTripsUpdate, setPendingTripsUpdate] = useState<PendingTripsUpdate | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const savedScrollRef = useRef<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -70,8 +84,33 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
       saveScrollPosition();
       const numericFields = ['trips_per_day', 'day_target', 'sort_order', 'odometer_start', 'odometer_end', 'fuel_liters'];
       const val = numericFields.includes(field) ? Number(editValue) || 0 : editValue;
+      
+      // Intercept trips_per_day in daily mode for confirmation
+      if (editMode === 'daily' && field === 'trips_per_day') {
+        const row = rows.find(r => r.id === rosterId && r.trip_sequence === 1);
+        const currentTrips = row?.trips_per_day || 0;
+        const newTrips = Number(val) || 0;
+        if (newTrips !== currentTrips) {
+          setPendingTripsUpdate({
+            rosterId,
+            busNo: row?.bus_no || 'Unknown',
+            currentTrips,
+            newTrips,
+          });
+          setEditingCell(null);
+          return;
+        }
+      }
+      
       onUpdate(rosterId, field, val);
       setEditingCell(null);
+    }
+  };
+
+  const confirmTripsUpdate = () => {
+    if (pendingTripsUpdate) {
+      onUpdate(pendingTripsUpdate.rosterId, 'trips_per_day', pendingTripsUpdate.newTrips);
+      setPendingTripsUpdate(null);
     }
   };
 
