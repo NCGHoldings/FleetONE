@@ -1,49 +1,37 @@
 
 
-# Fix: Company Dropdown Guard & Data Protection
+# Fix: Allow Trips/Day Editing in "Today Only" Mode
 
 ## Problem
-1. The CompanySwitcher sometimes shows "No companies available" even though companies exist — this happens when the auth session or user access queries haven't resolved yet, but `isLoading` for companies is already `false`
-2. When no company is selected (or dropdown fails to load), the accounting pages still render with zero/empty data — misleading users into thinking data is missing
-3. No retry or refresh mechanism exists for users when the dropdown fails
+In "Today Only" (daily edit mode), clicking `trips_per_day` to edit it fails because:
+1. The code enters the daily mode branch and checks for `row.trip_id`
+2. If no trip exists yet, it shows "No trip generated" error and returns
+3. Even if a trip exists, `trips_per_day` is not mapped to any `daily_trips` field, so `dailyUpdatePayload` stays empty — the code falls through to the master roster update, which works, but only by accident
+4. For sub-rows or buses without trips created yet, editing is completely blocked
 
-## Root Cause
-In `CompanyContext.tsx`, the company list query (`companies-hierarchy`) can finish loading before `session` and `userCompanyAccess` queries resolve. When that happens:
-- `isLoading = false` (companies loaded fine)
-- But `companies` array is empty because `isManagementRole = false` (roles haven't loaded yet) and `hasExplicitAccess = false` (access hasn't loaded yet)
-- The CompanySwitcher sees empty companies and shows "No companies available"
+`trips_per_day` is a **master roster field** — it should always update `fleet_master_roster` regardless of edit mode.
 
 ## Fix
 
-### 1. Fix `CompanyContext.tsx` — Include all loading states
-- Combine `isLoading` from companies query WITH session/access/roles loading states
-- Only report `isLoading = false` when ALL three queries have resolved
-- This prevents the "No companies available" flash
+### Modify `src/hooks/useFleetMasterSpreadsheet.ts`
+In the `updateField` function, add an early check: if the field is a "master-only" field (`trips_per_day`, `bus_type`, `permit_type`, `sort_order`), skip the daily mode branch entirely and go straight to the master roster update.
 
-### 2. Fix `CompanySwitcher.tsx` — Add retry button
-- When companies array is empty after loading, show a "Retry" button instead of just a disabled message
-- The retry button invalidates the `companies-hierarchy`, `auth-session-company`, `user-company-access-current`, and `user-roles-company` queries
-- Add auto-retry: if companies are empty after load, automatically retry once after 2 seconds
+Add before the `if (editMode === 'daily')` block (around line 268):
 
-### 3. Create `CompanyRequiredGuard.tsx` — Protect data pages
-- A wrapper component that checks if `selectedCompanyId` exists and company data is loaded
-- If not loaded: show a loading spinner with "Loading company data..."
-- If loaded but no company selected: show a card with message "Please select a company to view data" and the CompanySwitcher
-- Wrap the accounting page content with this guard so users never see misleading zero data
+```typescript
+// Master-only fields should always update fleet_master_roster, even in daily mode
+const masterOnlyFields = ['trips_per_day', 'bus_type', 'permit_type', 'sort_order', 'day_target'];
+if (masterOnlyFields.includes(field)) {
+  const numericFields = ['trips_per_day', 'day_target', 'sort_order'];
+  const finalValue = numericFields.includes(field) ? Number(value) || 0 : value;
+  // update fleet_master_roster and refetch
+  ...
+  return;
+}
+```
 
-### 4. Update `src/pages/Accounting.tsx`
-- Wrap the main content area (below the header) with `CompanyRequiredGuard`
-- Keep the header/CompanySwitcher visible outside the guard so users can still interact
+This ensures `trips_per_day` can be changed in both Master and Today Only views, and the row expansion (number of trip rows) updates immediately after the change.
 
-## Files
-- **Modify**: `src/contexts/CompanyContext.tsx` — combine loading states from session + access + roles + companies
-- **Modify**: `src/components/accounting/CompanySwitcher.tsx` — add retry button, auto-retry logic
-- **Create**: `src/components/accounting/CompanyRequiredGuard.tsx` — guard component for data pages
-- **Modify**: `src/pages/Accounting.tsx` — wrap content with CompanyRequiredGuard
-
-## Result
-- Company dropdown never falsely shows "No companies available" while auth is still loading
-- Users see a clear loading state until everything is ready
-- If something fails, users can retry without refreshing the page
-- Data pages are protected from showing misleading zero/empty values when no company is selected
+### File
+- **Modify**: `src/hooks/useFleetMasterSpreadsheet.ts` — add master-only field bypass before daily mode branch
 
