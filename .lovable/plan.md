@@ -1,67 +1,54 @@
 
 
-# Auto-Increment Version & Changelog on Every Build
+# Fix: Trips/Day Editing in "Today Only" Mode (Daily Override)
 
 ## Problem
-Currently, `APP_VERSION` and `CHANGELOG` in `src/config/appVersion.ts` must be manually edited every time a change is made. The user wants the version to auto-update and changelog entries to appear automatically without manual edits.
+Two issues with Trips/Day in daily mode:
 
-## Approach
-Since this is a client-side Vite app with no CI pipeline we control, we use a **Vite build plugin** that auto-generates version info at build time using the git commit history. Each build gets a new patch version based on the date + build timestamp, and recent git commits become the changelog entries.
+1. **Cannot edit**: `trips_per_day` is not in the `dailyEditable` list in the Core component, so it shows as greyed out with "Master Edit Only" tooltip
+2. **Wrong behavior**: Even after the previous fix (master-only bypass), changing Trips/Day in daily mode permanently changes the master roster. The user wants daily-only adjustments (e.g., a bus normally runs 1 trip but today needs 2)
+3. **Hidden trips**: If extra `daily_trips` records exist beyond `trips_per_day`, they are invisible because row expansion only loops up to `master.trips_per_day`
 
-## How it works
+## Solution
 
-### 1. Create `src/config/autoVersion.ts` — Vite virtual module consumer
-- Replace the hardcoded `APP_VERSION` and `CHANGELOG` with values injected at build time via Vite's `define` or `import.meta.env`
-- `APP_VERSION` = date-based version like `1.4.YMMDD` (e.g., `1.4.60406` for April 6, 2026) — auto-increments every day/build
-- `BUILD_TIMESTAMP` = exact build time ISO string
-- `CHANGELOG` remains the static array (kept for historical entries) but the **latest entry** is auto-generated from the current version + date
+### Concept: Daily trip count = actual trips, not master default
+In daily mode, the number of visible trip rows per bus should reflect the **actual daily_trips count** for that date (or the master default, whichever is higher). Changing Trips/Day in daily mode will **add or remove daily_trips records** for that bus on the selected date, without touching the master roster.
 
-### 2. Simpler approach — Use `BUILD_DATE` + auto-patch
-Since there's no git in the sandbox, use a simpler strategy:
-- **Version**: Auto-generate from `package.json` base version + build date as patch identifier
-- **Build ID**: Use `Date.now()` at build time via Vite `define`
-- **Changelog**: Keep the manual `CHANGELOG` array for historical records, but add a **Vite plugin** that writes the current date and version into the file automatically when building
+### 1. Modify `src/components/fleet/FleetMasterSpreadsheetCore.tsx`
+- Add `trips_per_day` to the `dailyEditable` array so it becomes clickable in Today Only mode
 
-### 3. Recommended: Build-time injection via `vite.config.ts`
-Add `define` entries:
-```typescript
-define: {
-  __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
-  __APP_BUILD_ID__: JSON.stringify(Date.now().toString(36)),
-}
-```
+### 2. Modify `src/hooks/useFleetMasterSpreadsheet.ts`
 
-Update `appVersion.ts`:
-- `BUILD_DATE` uses `__APP_BUILD_TIME__` (compile-time constant, not runtime `new Date()`)
-- Add `BUILD_ID` for unique build identification
-- Version stays manually controlled (semantic versioning should be intentional), but `BUILD_DATE` and `BUILD_ID` let users and devs confirm they're on the latest build
+**A. Fix row expansion (in `fetchRoster`)**:
+- After fetching daily trips, compute `effectiveTripsPerDay = max(master.trips_per_day, actual_daily_trips_count)` per bus
+- Use `effectiveTripsPerDay` for the expansion loop instead of `row.trips_per_day`
+- This ensures extra trips created for a specific day are always visible
 
-### 4. Auto-add changelog entries
-Since changelog descriptions require human-written text (not auto-generatable), the best UX is:
-- Keep `CHANGELOG` as the manual source of truth
-- But **every time I (Lovable) make changes**, I will automatically bump the version and add entries — this is already the workflow, just needs to be consistent
-- Add the build timestamp to the "What's New" dialog so users can verify exact build freshness
+**B. Fix `updateField` for `trips_per_day` in daily mode**:
+- Remove `trips_per_day` from the `masterOnlyFields` array
+- Add a new daily-mode handler before the master-only check:
+  - When `editMode === 'daily'` and `field === 'trips_per_day'`:
+    - Get current actual trip count for this bus on this date
+    - If new value > current count: insert additional `daily_trips` records (with auto-generated trip numbers, copying route/driver/conductor from master)
+    - If new value < current count: delete the excess trips (last ones first, only if they have no income data)
+    - Refresh the roster silently
+    - **Do NOT update `fleet_master_roster`**
+  - When `editMode === 'master'`: keep current behavior (update master roster)
 
-## Changes
+### 3. Safety guard for trip deletion
+When reducing trips in daily mode, only delete trips that have:
+- No income (`income` is null or 0)
+- No odometer data
+This prevents accidental data loss. If a trip has data, show a toast warning instead.
 
-### Modify: `vite.config.ts`
-- Add `define` block with `__APP_BUILD_TIME__` and `__APP_BUILD_ID__`
-
-### Modify: `src/config/appVersion.ts`
-- Replace `BUILD_DATE = new Date().toISOString()` with `BUILD_DATE = __APP_BUILD_TIME__` (compile-time)
-- Add `BUILD_ID` constant
-- Bump version to `1.5.0` and add changelog entry for today's changes (Trips/Day edit fix, Company guard, GL export fixes)
-
-### Modify: `src/components/layout/WhatsNewDialog.tsx`
-- Show `BUILD_DATE` and `BUILD_ID` under version number so users can confirm exact build
-- Format: "v1.5.0 • Built Apr 6, 2026 10:03 AM • Build #abc123"
-
-### Modify: `src/components/layout/Header.tsx`
-- Show build date in tooltip on version badge hover
+## Files
+- **Modify**: `src/components/fleet/FleetMasterSpreadsheetCore.tsx` — add `trips_per_day` to daily editable list
+- **Modify**: `src/hooks/useFleetMasterSpreadsheet.ts` — daily trip count expansion fix + daily-mode add/remove trips logic
 
 ## Result
-- Every deployment gets a unique build timestamp and ID — no two builds look the same
-- Users can verify they have the latest version by checking the build time
-- Changelog continues to be maintained with meaningful descriptions (auto-generated commit messages would be meaningless to end users)
-- Version bumps happen automatically as part of each Lovable change session
+- Trips/Day is editable in "Today Only" mode
+- Changes only affect the selected date (add/remove `daily_trips` records)
+- Master roster stays unchanged
+- Extra trips beyond master default are always visible
+- Safe deletion prevents wiping trips that have income data
 
