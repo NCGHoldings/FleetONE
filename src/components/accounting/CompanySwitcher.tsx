@@ -1,4 +1,5 @@
-import { Building2, ChevronDown, Check, Bus, Car, Truck, Briefcase, Building, FlaskConical } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Building2, ChevronDown, Check, Bus, Car, Truck, Briefcase, Building, FlaskConical, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Get icon based on business unit type
 const getBusinessUnitIcon = (type: string | null | undefined) => {
@@ -41,9 +43,32 @@ export const CompanySwitcher = () => {
     setSelectedCompanyId, 
     isLoading 
   } = useCompany();
+  const queryClient = useQueryClient();
+  const autoRetried = useRef(false);
 
-  // Debug logging
-  console.log("CompanySwitcher - isLoading:", isLoading, "companies:", companies?.length);
+  // Auto-retry once if companies are empty after loading
+  useEffect(() => {
+    if (!isLoading && (!companies || companies.length === 0) && !autoRetried.current) {
+      autoRetried.current = true;
+      const timer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["companies-hierarchy"] });
+        queryClient.invalidateQueries({ queryKey: ["auth-session-company"] });
+        queryClient.invalidateQueries({ queryKey: ["user-company-access-current"] });
+        queryClient.invalidateQueries({ queryKey: ["user-roles-company"] });
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+    if (companies && companies.length > 0) {
+      autoRetried.current = false;
+    }
+  }, [isLoading, companies, queryClient]);
+
+  const handleRetry = () => {
+    queryClient.invalidateQueries({ queryKey: ["companies-hierarchy"] });
+    queryClient.invalidateQueries({ queryKey: ["auth-session-company"] });
+    queryClient.invalidateQueries({ queryKey: ["user-company-access-current"] });
+    queryClient.invalidateQueries({ queryKey: ["user-roles-company"] });
+  };
 
   if (isLoading) {
     return (
@@ -57,9 +82,9 @@ export const CompanySwitcher = () => {
   if (!companies || companies.length === 0) {
     console.warn("CompanySwitcher - No companies available");
     return (
-      <Button variant="outline" disabled className="w-[220px]">
-        <Building2 className="h-4 w-4 mr-2" />
-        No companies available
+      <Button variant="outline" onClick={handleRetry} className="w-[220px]">
+        <RefreshCw className="h-4 w-4 mr-2" />
+        Retry loading companies
       </Button>
     );
   }

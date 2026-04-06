@@ -65,7 +65,7 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
 
   // Fetch current user session
-  const { data: session } = useQuery({
+  const { data: session, isLoading: sessionLoading } = useQuery({
     queryKey: ["auth-session-company"],
     queryFn: async () => {
       const { data } = await supabase.auth.getSession();
@@ -77,7 +77,7 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
   const userId = session?.user?.id;
 
   // Fetch user's company access permissions
-  const { data: userCompanyAccess = [] } = useQuery({
+  const { data: userCompanyAccess = [], isLoading: accessLoading } = useQuery({
     queryKey: ["user-company-access-current", userId],
     queryFn: async () => {
       if (!userId) return [];
@@ -98,7 +98,7 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
 
   // Fetch user roles
-  const { data: userRoles = [] } = useQuery({
+  const { data: userRoles = [], isLoading: rolesLoading } = useQuery({
     queryKey: ["user-roles-company", userId],
     queryFn: async () => {
       if (!userId) return [];
@@ -119,7 +119,7 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
 
   // Fetch all companies with hierarchy support
-  const { data: allCompanies = [], isLoading, error } = useQuery({
+  const { data: allCompanies = [], isLoading: companiesLoading, error } = useQuery({
     queryKey: ["companies-hierarchy"],
     queryFn: async () => {
       console.log("Fetching companies...");
@@ -140,6 +140,9 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
     retry: 3,
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
+
+  // Combined loading state — only false when ALL dependencies resolved
+  const isLoading = sessionLoading || companiesLoading || (!!userId && (accessLoading || rolesLoading));
 
   // Log any query errors
   useEffect(() => {
