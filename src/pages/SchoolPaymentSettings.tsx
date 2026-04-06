@@ -34,9 +34,9 @@ export default function SchoolPaymentSettings() {
       .from('school_payment_import_settings')
       .select('*')
       .eq('branch_id', branchId!)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       console.error('Error fetching settings:', error);
       return;
     }

@@ -124,17 +124,30 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           .select()
           .single();
 
-        if (createError || !newSettings) {
-          toast({
-            title: "Settings Error",
-            description: "Could not create default import settings. Please try again.",
-            variant: "destructive",
-          });
-          setStep("preview");
-          setProcessing(false);
-          return;
+        if (createError) {
+          // If duplicate/conflict, re-fetch the existing row
+          if (createError.code === '23505') {
+            const { data: refetched } = await supabase
+              .from('school_payment_import_settings')
+              .select('*')
+              .eq('branch_id', branchId)
+              .maybeSingle();
+            settings = refetched;
+          }
+          
+          if (!settings) {
+            toast({
+              title: "Settings Error",
+              description: `Could not create default settings: ${createError.message}`,
+              variant: "destructive",
+            });
+            setStep("preview");
+            setProcessing(false);
+            return;
+          }
+        } else {
+          settings = newSettings;
         }
-        settings = newSettings;
       }
 
       setProgress(20);
