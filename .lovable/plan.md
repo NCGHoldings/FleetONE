@@ -1,61 +1,49 @@
 
 
-# Fix Landed Cost: Build the Create Voucher Form
+# Fix: Company Dropdown Guard & Data Protection
 
 ## Problem
-The Landed Cost module is non-functional because:
-1. The "New Landed Cost Voucher" button has **no onClick handler** — no form or modal exists
-2. There are **zero GRNs** in the database, so even with a form, there's nothing to create vouchers from
-3. The complete creation workflow (select GRN → pick items → add charges → allocate) is missing
+1. The CompanySwitcher sometimes shows "No companies available" even though companies exist — this happens when the auth session or user access queries haven't resolved yet, but `isLoading` for companies is already `false`
+2. When no company is selected (or dropdown fails to load), the accounting pages still render with zero/empty data — misleading users into thinking data is missing
+3. No retry or refresh mechanism exists for users when the dropdown fails
 
-## What to build
+## Root Cause
+In `CompanyContext.tsx`, the company list query (`companies-hierarchy`) can finish loading before `session` and `userCompanyAccess` queries resolve. When that happens:
+- `isLoading = false` (companies loaded fine)
+- But `companies` array is empty because `isManagementRole = false` (roles haven't loaded yet) and `hasExplicitAccess = false` (access hasn't loaded yet)
+- The CompanySwitcher sees empty companies and shows "No companies available"
 
-### 1. Create `src/components/accounting/inventory/CreateLandedCostVoucherModal.tsx`
-A multi-step modal form:
+## Fix
 
-**Step 1 — Voucher Header**
-- Auto-generate voucher number (`LCV-YYYY-MMDD-HHMM`)
-- Select GRN from dropdown (fetches `goods_receipt_notes` with `grn_number`)
-- Posting date (default today)
-- Allocation method: By Value / By Quantity / By Weight
-- Notes field
+### 1. Fix `CompanyContext.tsx` — Include all loading states
+- Combine `isLoading` from companies query WITH session/access/roles loading states
+- Only report `isLoading = false` when ALL three queries have resolved
+- This prevents the "No companies available" flash
 
-**Step 2 — Items** (auto-populated from GRN)
-- When GRN is selected, fetch `grn_lines` joined with `items` for that GRN
-- Show item code, item name, received quantity, unit cost, line total
-- User can check/uncheck items to include
-- Original cost = `line_total` from GRN line
+### 2. Fix `CompanySwitcher.tsx` — Add retry button
+- When companies array is empty after loading, show a "Retry" button instead of just a disabled message
+- The retry button invalidates the `companies-hierarchy`, `auth-session-company`, `user-company-access-current`, and `user-roles-company` queries
+- Add auto-retry: if companies are empty after load, automatically retry once after 2 seconds
 
-**Step 3 — Charges**
-- Add rows for charges: charge type (dropdown: Freight, Insurance, Customs Duty, Stamp Duty, Port Charges, Clearing Agent Fee, Other), description, amount, vendor (optional from vendors list), expense account (from COA)
-- Dynamic add/remove rows
-- Show total charges
+### 3. Create `CompanyRequiredGuard.tsx` — Protect data pages
+- A wrapper component that checks if `selectedCompanyId` exists and company data is loaded
+- If not loaded: show a loading spinner with "Loading company data..."
+- If loaded but no company selected: show a card with message "Please select a company to view data" and the CompanySwitcher
+- Wrap the accounting page content with this guard so users never see misleading zero data
 
-**Step 4 — Allocation Preview**
-- Show how charges will be allocated across items based on selected method
-- Display: item name, original cost, allocated cost, final cost
-- Total row
-
-**Submit** calls `useCreateLandedCostVoucher` mutation
-
-### 2. Modify `src/components/accounting/inventory/LandedCostView.tsx`
-- Add state for modal open/close
-- Wire "New Landed Cost Voucher" button onClick to open modal
-- Pass `onSuccess` callback to refresh voucher list
-
-### 3. Allow creating without GRN (manual mode)
-Since there are zero GRNs, add a "Manual Entry" option:
-- Instead of selecting a GRN, user can manually add items from the `items` table
-- Select item → enter original cost → add to list
-- This ensures the feature works even without the full PR→PO→GRN pipeline
+### 4. Update `src/pages/Accounting.tsx`
+- Wrap the main content area (below the header) with `CompanyRequiredGuard`
+- Keep the header/CompanySwitcher visible outside the guard so users can still interact
 
 ## Files
-- **Create**: `src/components/accounting/inventory/CreateLandedCostVoucherModal.tsx` — full multi-step create form
-- **Modify**: `src/components/accounting/inventory/LandedCostView.tsx` — wire button + render modal
+- **Modify**: `src/contexts/CompanyContext.tsx` — combine loading states from session + access + roles + companies
+- **Modify**: `src/components/accounting/CompanySwitcher.tsx` — add retry button, auto-retry logic
+- **Create**: `src/components/accounting/CompanyRequiredGuard.tsx` — guard component for data pages
+- **Modify**: `src/pages/Accounting.tsx` — wrap content with CompanyRequiredGuard
 
 ## Result
-- Users can create landed cost vouchers (from GRN or manually)
-- Add multiple charges with GL account mapping
-- See allocation preview before saving
-- Draft vouchers appear in list, ready to "Post to GL" (existing logic)
+- Company dropdown never falsely shows "No companies available" while auth is still loading
+- Users see a clear loading state until everything is ready
+- If something fails, users can retry without refreshing the page
+- Data pages are protected from showing misleading zero/empty values when no company is selected
 
