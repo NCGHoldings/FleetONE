@@ -1,33 +1,48 @@
 
 
-# Updated Special Hire Complete Flow Diagram
+# Fix: School Student Excel Import Crash
 
-## What changed since the last diagram
-The system has evolved with several new capabilities that need to be reflected:
+## Problem
+When importing a student Excel file, the parser crashes with `TypeError: Cannot read properties of undefined (reading 'toLowerCase')`. This happens because the Excel file has empty/blank header cells — `XLSX.utils.sheet_to_json` with `{ header: 1 }` returns `undefined` for empty cells in the header row. When `autoMapColumns` iterates over these headers and calls `header.toLowerCase()`, it crashes.
 
-1. **Auto-Signature system** — documents get automatic signatures (prepared_by, checked_by, approved_by) from configured settings
-2. **Auto-email on all signatures complete** — when all 3 signatures are added, the system auto-sends the document via email
-3. **Quick Approval button** — one-click approval that triggers auto-signature + PDF regeneration
-4. **Final Invoice available without payments** — now works for any confirmed/completed trip regardless of payment status
-5. **Sales Receipt for all payment types** — not just advance payments
-6. **Payment Reminder flow** — send payment reminder from action column when post-trip adjustment exists
-7. **Multiple business scenarios** documented (no payment, advance only, full payment, post-trip adjustment flows)
-8. **Document regeneration** — PDFs auto-regenerate when signatures change
-9. **Finance Approval modal** — bridges operations documents to finance/GL
+## Solution
+Filter out `undefined`/empty header values before processing:
 
-## Plan
+### Modify: `src/components/school/SchoolExcelImport.tsx`
 
-### Create updated Mermaid diagram at `/mnt/documents/special-hire-ops-finance-flow-v2.mmd`
+**Line 112** — Filter headers to only include defined, non-empty string values:
+```typescript
+const rawHeaders = jsonData[0] as any[];
+const headers = rawHeaders.map((h, i) => (h != null ? String(h).trim() : '')).filter(h => h !== '');
+```
 
-The diagram will include:
-- **Operations Flow** — all scenarios (no payment, advance, full, balance before trip, post-trip adjustment)
-- **Document Flow** — Quotation PDF → Sales Receipt(s) → Payment Reminder → Final Invoice, with auto-signature and auto-email
-- **Finance Flow** — All 5 JE types (JE-1 through JE-4 + JE-ADJ)
-- **Signature & Approval Flow** — auto-signature settings → QuickApproval → PDF regeneration → auto-email
-- **Database Tables** — all relevant tables
-- **Settlement Formula** — updated with all scenarios
-- **Business Scenarios** — the 5 real-world payment patterns the user described
+**Line 118** — Guard against undefined headers in row-to-object mapping (use rawHeaders length to preserve column index alignment):
+```typescript
+const rawHeaders = jsonData[0] as any[];
+// ...
+setExcelData(rows.map(row => {
+  const obj: any = {};
+  headers.forEach((header, index) => {
+    if (header) {
+      obj[header] = row[rawHeaders.indexOf(header) >= 0 ? rawHeaders.indexOf(header) : index];
+    }
+  });
+  return obj;
+}));
+```
 
-### File
-- **Create**: `/mnt/documents/special-hire-ops-finance-flow-v2.mmd`
+**Line 169-170** — Add safety guard in `autoMapColumns`:
+```typescript
+const matchingHeader = headers.find(header => {
+  if (!header) return false;
+  const h = header.toLowerCase().replace(/\s+/g, ' ').trim();
+```
+
+This ensures:
+- Empty header columns are safely skipped
+- Column index alignment is preserved for data rows
+- The auto-mapping logic never crashes on undefined values
+
+## Files
+- **Modify**: `src/components/school/SchoolExcelImport.tsx` — filter empty headers + add null guards
 
