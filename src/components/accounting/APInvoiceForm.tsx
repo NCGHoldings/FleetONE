@@ -118,8 +118,6 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     }));
   };
 
-  const totalAllocated = costAllocations.reduce((sum, a) => sum + a.amount, 0);
-  const unallocatedAmount = subtotal - totalAllocated;
 
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 },
