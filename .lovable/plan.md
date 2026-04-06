@@ -1,83 +1,64 @@
 
-# Fix: "Process & Match" Still Fails for Katunayaka
 
-## What I found
-- **Katunayaka branch exists** in the database.
-- It currently has **no `school_payment_import_settings` row**.
-- In the **current codebase**, `src/components/school/BankStatementUploadZone.tsx` already uses `.maybeSingle()` and already tries to auto-create default settings.
-- The exact toast text shown in your screenshot — **"Please configure import settings first"** — does **not exist anywhere in the current codebase**.
+# Fix: AP Payment GL Posting to Use Vendor Category Account Mappings
 
-## Do I know what the issue is?
-**Yes.**
+## Problem
+When creating an AP Payment (normal or advance), the GL posting logic does **NOT** use the vendor's category-linked GL accounts. Instead, it searches the Chart of Accounts for any account with "trade payable" in the name (line 1148-1157 in `useAccountingMutations.ts`).
 
-The actual issue is now **two-part**:
+This means:
+- **Vendor Category mappings are ignored** — even if a vendor is in category "SUP-INT" with Trade Payable mapped to "22101001 - TRADE PAYABLE - INTERNAL", the payment posts to whichever "trade payable" account the raw search finds first
+- **Advance payments** don't use the category's `advance_account_id` at all — they post DR to the same generic trade payable instead of the vendor's advance account
+- The `resolveVendorAPAccounts()` function already exists and is used by AP Invoice creation — but the Payment creation skips it entirely
 
-1. **The branch has no settings row yet**, so defaults must be created.
-2. **Your browser/preview is still showing an older frontend bundle** that contains the old behavior, because the toast in your screenshot is from old code, not the current source.
+## What works correctly today
+- **AP Invoice creation** (line 840) — correctly calls `resolveVendorAPAccounts()` ✓
+- **AP Invoice approval** (line 1808) — correctly calls `resolveVendorAPAccounts()` ✓
+- **Leasing payments** — correctly calls `resolveVendorAPAccounts()` ✓
+- **AP Payments** — does NOT use it ✗
 
-## Why it failed
-For a brand-new branch, the first import needs a default settings row.  
-That part was already fixed in source, but the screen you are seeing is still using the **older version** that stops immediately when settings are missing.
+## Solution
 
-Also, the import flow should be made more robust so that if settings creation fails, it:
-- shows the **real database error**
-- retries by **re-fetching** the row
-- never leaves you with a vague settings error again
+### Modify: `src/hooks/useAccountingMutations.ts`
 
-## Plan
+Replace the raw COA search (lines 1145-1157) with `resolveVendorAPAccounts()`:
 
-### 1. Harden the import flow
-**File:** `src/components/school/BankStatementUploadZone.tsx`
+**Current code (broken):**
+```typescript
+const { data: payableAccounts } = await supabase
+  .from("chart_of_accounts")
+  .select("id, account_name")
+  .eq("company_id", effectiveCompanyId)
+  .eq("account_type", "liability")
+  .eq("is_active", true)
+  .ilike("account_name", "%trade payable%")
+  .limit(1);
 
-Update the settings step so it:
-- keeps using `.maybeSingle()`
-- inserts default settings if missing
-- if insert hits a duplicate/unique conflict, **re-fetches the row**
-- if insert fails for another reason, shows the **actual error message**
-- only continues once a valid settings row is confirmed
+const tradePayableId = payableAccounts?.[0]?.id || null;
+```
 
-### 2. Align the Settings page
-**File:** `src/pages/SchoolPaymentSettings.tsx`
+**New code (fixed):**
+```typescript
+const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
+const resolvedAccounts = await resolveVendorAPAccounts(payment.vendor_id, effectiveCompanyId);
 
-Make the Settings page use the same safe pattern:
-- replace `.single()` with `.maybeSingle()`
-- use the same default-create logic as the import page
+// For advance payments: use the advance account if available, else fall back to trade payable
+const tradePayableId = payment.is_advance
+  ? (resolvedAccounts.advanceAccountId || resolvedAccounts.apAccountId)
+  : resolvedAccounts.apAccountId;
+```
 
-This avoids mixed behavior between the two screens.
+This ensures:
+1. **Normal payments** → DR Trade Payable (from vendor category or global fallback), CR Bank
+2. **Advance payments** → DR Supplier Advance account (from vendor category), CR Bank
+3. If no category mapping exists, falls back to global GL settings (same as invoices)
+4. WHT payable lookup remains unchanged (already correct)
 
-### 3. Prevent the problem when creating a branch
-**File:** `src/pages/SchoolBusService.tsx`
+## Files
+- **Modify**: `src/hooks/useAccountingMutations.ts` — replace raw COA search with `resolveVendorAPAccounts()` in `useCreateAPPayment`
 
-When a new school branch is created, also create its default:
-- `school_payment_import_settings`
+## Result
+- AP Payments correctly hit the vendor's category-linked Trade Payable account (e.g., "TRADE PAYABLE - INTERNAL" for SUP-INT vendors)
+- Advance payments correctly debit the vendor's Advance Payment account (e.g., "SUPPLIER ADVANCES - INTERNAL")
+- Consistent with how AP Invoice creation already works
+- Global fallback still applies if no category is configured
 
-That way, a new branch is ready immediately and users do not depend on the Payment Import page to create setup data.
-
-## Verification
-I would verify the fix with this exact flow:
-
-1. Create a fresh school branch
-2. Go directly to **Payment Import**
-3. Upload a bank statement
-4. Click **Process & Match**
-5. Confirm:
-   - no settings error
-   - settings row exists automatically
-   - import continues normally
-
-## Immediate guidance for you
-After the fix is implemented, you should:
-- do a **hard refresh**
-- reopen the preview/import page
-- check the **version/build badge** in the header changed
-- test Katunayaka again
-
-## Expected result
-- New branches can import immediately
-- No more old **"configure import settings first"** failure
-- If anything still goes wrong, the app will show the **real cause**, not a generic toast
-
-## Files to update
-- `src/components/school/BankStatementUploadZone.tsx`
-- `src/pages/SchoolPaymentSettings.tsx`
-- `src/pages/SchoolBusService.tsx`
