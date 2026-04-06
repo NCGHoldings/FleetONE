@@ -5,10 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, DollarSign, TrendingDown, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText } from "lucide-react";
+import { Plus, Search, DollarSign, TrendingDown, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ChequePrintPreview } from "./ChequePrintPreview";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
 import { useAPPayments, useVendors } from "@/hooks/useAccountingData";
+import { useDeleteAPPayment } from "@/hooks/useAccountingMutations";
 import { useBankFees } from "@/hooks/useBankFees";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { APPaymentForm } from "./APPaymentForm";
@@ -27,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 export const APPaymentsView = () => {
   const { data: payments, isLoading } = useAPPayments();
   const { data: vendors } = useVendors();
+  const deletePayment = useDeleteAPPayment();
   const { data: bankFees } = useBankFees();
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -337,6 +340,30 @@ export const APPaymentsView = () => {
                           <ArrowRightLeft className="h-4 w-4" />
                         </Button>
                       )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" title="Delete Payment" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Payment {payment.payment_number}?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will reverse all linked Journal Entries, restore bank balance, and remove payment allocations. This cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => deletePayment.mutate(payment.id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>

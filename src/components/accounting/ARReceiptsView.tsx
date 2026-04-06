@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, DollarSign, TrendingUp, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText } from "lucide-react";
+import { Plus, Search, DollarSign, TrendingUp, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
 import { useARReceipts, useCustomers } from "@/hooks/useAccountingData";
+import { useDeleteARReceipt } from "@/hooks/useAccountingMutations";
 import { useBankFees } from "@/hooks/useBankFees";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { ARReceiptForm } from "./ARReceiptForm";
@@ -26,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 export const ARReceiptsView = () => {
   const { data: receipts, isLoading } = useARReceipts();
   const { data: customers } = useCustomers();
+  const deleteReceipt = useDeleteARReceipt();
   const { data: bankFees } = useBankFees();
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -274,6 +277,30 @@ export const ARReceiptsView = () => {
                           <ArrowRightLeft className="h-4 w-4" />
                         </Button>
                       )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" title="Delete Receipt" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Receipt {receipt.receipt_number}?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will reverse all linked Journal Entries, restore bank balance, and remove receipt allocations. This cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => deleteReceipt.mutate(receipt.id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>

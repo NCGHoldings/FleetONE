@@ -693,3 +693,76 @@ export async function fixBalanceDiscrepancies(
     };
   }
 }
+
+// ============ Force Delete: Reverse & Delete Journal Entry ============
+
+/**
+ * Reverses COA balance changes and deletes a journal entry + its lines.
+ * Used by force-delete mutations during testing mode.
+ */
+export async function reverseAndDeleteJournalEntry(journalEntryId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // 1. Fetch JE lines with account info
+    const { data: jeLines, error: linesErr } = await supabase
+      .from("journal_entry_lines")
+      .select("id, account_id, debit, credit")
+      .eq("journal_entry_id", journalEntryId);
+
+    if (linesErr) throw linesErr;
+
+    // 2. Reverse each COA balance change
+    if (jeLines && jeLines.length > 0) {
+      for (const line of jeLines) {
+        // Fetch current account to know normal type
+        const { data: account, error: accErr } = await supabase
+          .from("chart_of_accounts")
+          .select("id, current_balance, account_type")
+          .eq("id", line.account_id)
+          .single();
+
+        if (accErr || !account) continue;
+
+        const debitAmt = Number(line.debit) || 0;
+        const creditAmt = Number(line.credit) || 0;
+
+        // Determine normal type: Assets & Expenses are "debit-normal", rest are "credit-normal"
+        const normalType = account.account_type?.toLowerCase();
+        const isDebitNormal = ["asset", "assets", "expense", "expenses", "expenditure", "cost of sales"].includes(normalType || "");
+
+        // Reverse: undo what posting did
+        let balanceAdjustment = 0;
+        if (isDebitNormal) {
+          balanceAdjustment = -debitAmt + creditAmt;
+        } else {
+          balanceAdjustment = debitAmt - creditAmt;
+        }
+
+        const newBalance = Number(account.current_balance || 0) + balanceAdjustment;
+
+        await supabase
+          .from("chart_of_accounts")
+          .update({ current_balance: newBalance })
+          .eq("id", line.account_id);
+      }
+    }
+
+    // 3. Delete JE lines
+    await supabase
+      .from("journal_entry_lines")
+      .delete()
+      .eq("journal_entry_id", journalEntryId);
+
+    // 4. Delete JE
+    await supabase
+      .from("journal_entries")
+      .delete()
+      .eq("id", journalEntryId);
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to reverse journal entry",
+    };
+  }
+}
