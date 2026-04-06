@@ -266,10 +266,121 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
         return;
       }
 
-      // Master-only fields should always update fleet_master_roster, even in daily mode
-      const masterOnlyFields = ['trips_per_day', 'bus_type', 'permit_type', 'sort_order', 'day_target'];
+      // Handle trips_per_day based on edit mode
+      if (field === 'trips_per_day') {
+        const newCount = Number(value) || 1;
+        
+        if (editMode === 'daily') {
+          // Daily mode: add/remove daily_trips records for this date only
+          const row = expandedRows.find(r => r.id === rosterId);
+          if (!row?.bus_id) return;
+
+          // Get current daily trips for this bus on this date
+          const { data: currentTrips } = await supabase
+            .from("daily_trips")
+            .select("id, trip_no, income_details, odometer_start, odometer_end")
+            .eq("bus_id", row.bus_id)
+            .eq("trip_date", dateStr)
+            .order("trip_no", { ascending: true });
+
+          const currentCount = currentTrips?.length || 0;
+
+          if (newCount > currentCount) {
+            // Add more trips
+            const datePrefix = dateStr.replace(/-/g, '');
+            const { data: maxTripData } = await supabase
+              .from("daily_trips")
+              .select("trip_no")
+              .ilike("trip_no", `${datePrefix}-%`)
+              .order("trip_no", { ascending: false })
+              .limit(1);
+
+            let tripCounter = 1;
+            if (maxTripData && maxTripData.length > 0) {
+              const match = maxTripData[0].trip_no.match(/-(\d+)$/);
+              if (match) tripCounter = parseInt(match[1], 10) + 1;
+            }
+
+            const tripsToInsert = [];
+            for (let i = 0; i < newCount - currentCount; i++) {
+              tripsToInsert.push({
+                bus_id: row.bus_id,
+                route_id: row.route_id,
+                route_label: row.route_label,
+                trip_date: dateStr,
+                trip_no: `${datePrefix}-${String(tripCounter + i).padStart(4, '0')}`,
+                notes: JSON.stringify({
+                  driver: row.default_driver || null,
+                  conductor: row.default_conductor || null,
+                }),
+                data_source: 'manual' as const,
+              });
+            }
+
+            const { error } = await supabase.from("daily_trips").insert(tripsToInsert);
+            if (error) throw error;
+            toast({ title: "Trips added", description: `Added ${tripsToInsert.length} trip(s) for today` });
+          } else if (newCount < currentCount) {
+            // Remove excess trips (from last), only if they have no income/odometer data
+            const tripsToCheck = (currentTrips || []).slice(newCount);
+            const safeToDelete: string[] = [];
+            const hasData: number = tripsToCheck.filter(t => {
+              const income = t.income_details as any;
+              const hasIncome = income && (
+                Number(income.bus_collection || 0) > 0 ||
+                Number(income.call_booking || 0) > 0 ||
+                Number(income.agent_booking || 0) > 0 ||
+                Number(income.luggage_income || 0) > 0
+              );
+              const hasOdometer = (t.odometer_start && t.odometer_start > 0) || (t.odometer_end && t.odometer_end > 0);
+              if (!hasIncome && !hasOdometer) {
+                safeToDelete.push(t.id);
+                return false;
+              }
+              return true;
+            }).length;
+
+            if (safeToDelete.length > 0) {
+              const { error } = await supabase
+                .from("daily_trips")
+                .delete()
+                .in("id", safeToDelete);
+              if (error) throw error;
+            }
+
+            if (hasData > 0) {
+              toast({ 
+                title: "Some trips kept", 
+                description: `${hasData} trip(s) have income/odometer data and cannot be removed`, 
+                variant: "destructive" 
+              });
+            } else {
+              toast({ title: "Trips reduced", description: `Removed ${safeToDelete.length} trip(s) for today` });
+            }
+          }
+
+          await fetchRoster(true);
+          return;
+        }
+
+        // Master mode: update fleet_master_roster
+        const { error } = await supabase
+          .from("fleet_master_roster")
+          .update({ trips_per_day: newCount })
+          .eq("id", rosterId);
+
+        if (error) throw error;
+        setExpandedRows(prev => prev.map(r =>
+          r.id === rosterId ? { ...r, trips_per_day: newCount } : r
+        ));
+        await fetchRoster(true);
+        return;
+      }
+
+      // Other master-only fields should always update fleet_master_roster
+      const masterOnlyFields = ['bus_type', 'permit_type', 'sort_order', 'day_target'];
       if (masterOnlyFields.includes(field)) {
-        const masterNumericFields = ['trips_per_day', 'day_target', 'sort_order'];
+        const masterNumericFields = ['day_target', 'sort_order'];
         const masterValue = masterNumericFields.includes(field) ? Number(value) || 0 : value;
 
         const { error } = await supabase
@@ -282,10 +393,6 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
         setExpandedRows(prev => prev.map(r =>
           r.id === rosterId ? { ...r, [field]: masterValue } : r
         ));
-
-        if (field === 'trips_per_day') {
-          await fetchRoster(true);
-        }
         return;
       }
 
