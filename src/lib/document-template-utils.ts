@@ -429,7 +429,13 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{reference}}'] = documentData?.reference || '';
       placeholders['{{cheque_number}}'] = documentData?.cheque_number || '';
       placeholders['{{notes}}'] = documentData?.notes || '';
-      placeholders['{{allocations}}'] = generateAllocationsTable(allocations || []);
+      // For direct payments, show payment line items instead of allocations
+      if (documentData?.is_direct_payment && lineItems?.length) {
+        placeholders['{{allocations}}'] = generatePaymentLineItemsTable(lineItems);
+        placeholders['{{payment_line_items}}'] = generatePaymentLineItemsTable(lineItems);
+      } else {
+        placeholders['{{allocations}}'] = generateAllocationsTable(allocations || []);
+      }
 
       // ===== Yutong / Custom Template Aliases =====
       // Voucher aliases
