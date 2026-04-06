@@ -409,6 +409,9 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
   const whtAmount = applyWht ? (subtotal * whtRate) / 100 : 0;
   const netPayable = grossTotal - whtAmount;
 
+  const totalAllocated = costAllocations.reduce((sum, a) => sum + a.amount, 0);
+  const unallocatedAmount = subtotal - totalAllocated;
+
   const selectedRoute = routes?.find(r => r.id === selectedRouteId);
   const selectedBus = buses?.find(b => b.id === selectedBusId);
   const selectedSchoolRoute = schoolRoutes?.find(r => r.id === selectedSchoolRouteId);
