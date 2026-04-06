@@ -93,7 +93,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
     // In Daily mode, only allow editing trip-specific fields and select string fields
     const dailyEditable = [
       'route_label', 'route_id', 'remark', 'default_driver', 'default_conductor',
-      'odometer_start', 'odometer_end', 'fuel_liters'
+      'odometer_start', 'odometer_end', 'fuel_liters', 'trips_per_day'
     ];
     return dailyEditable.includes(field);
   };

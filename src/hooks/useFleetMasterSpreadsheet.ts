@@ -142,20 +142,21 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
         });
       }
 
-      // Expand rows based on trips_per_day
+      // Expand rows based on max(trips_per_day, actual daily trips count)
       const expanded: ExpandedFleetRow[] = [];
       rosterRows.forEach((row) => {
         const busTrips = tripsMap[row.bus_id || ''] || [];
         const totalExpenses = expensesMap[row.bus_id || ''] || 0;
+        const effectiveTripsPerDay = Math.max(row.trips_per_day, busTrips.length);
 
-        for (let seq = 1; seq <= row.trips_per_day; seq++) {
+        for (let seq = 1; seq <= effectiveTripsPerDay; seq++) {
           const matchedTrip = busTrips[seq - 1] || null;
           const incomeDetails = matchedTrip?.income_details as any;
           const passengerIncome = incomeDetails
             ? (Number(incomeDetails.bus_collection) || 0) + (Number(incomeDetails.call_booking) || 0) + (Number(incomeDetails.agent_booking) || 0)
             : 0;
           const luggageIncome = incomeDetails ? (Number(incomeDetails.luggage_income) || 0) : 0;
-          const tripExpenses = row.trips_per_day > 1 ? totalExpenses / row.trips_per_day : totalExpenses;
+          const tripExpenses = effectiveTripsPerDay > 1 ? totalExpenses / effectiveTripsPerDay : totalExpenses;
 
           // Extract driver/conductor from trip notes JSON if available
           let tripDriver = row.default_driver;
@@ -196,7 +197,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
             conductor_name: tripConductor,
             daily_turn_01_time: tripTurn01,
             daily_turn_02_time: tripTurn02,
-            _isExpanded: row.trips_per_day > 1,
+            _isExpanded: effectiveTripsPerDay > 1,
             start_meter: startMeter,
             end_meter: endMeter,
             total_mileage: totalMileage,
