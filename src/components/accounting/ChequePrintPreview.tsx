@@ -21,7 +21,7 @@ interface ChequePrintPreviewProps {
 }
 
 const numberToWords = (num: number): string => {
-  if (num === 0) return "ZERO";
+  if (num === 0) return "RUPEES ZERO ONLY";
   const ones = ["", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE",
     "TEN", "ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN", "SIXTEEN",
     "SEVENTEEN", "EIGHTEEN", "NINETEEN"];
@@ -38,16 +38,16 @@ const numberToWords = (num: number): string => {
 
   const intPart = Math.floor(num);
   const decPart = Math.round((num - intPart) * 100);
-  let result = convert(intPart);
+  let result = "RUPEES " + convert(intPart);
   if (decPart > 0) result += " AND CENTS " + convert(decPart);
-  result += " RUPEES ONLY";
+  result += " ONLY";
   return result;
 };
 
 // Split amount words into two lines if too long
 const splitAmountWords = (words: string): [string, string] => {
-  if (words.length <= 50) return [words, ""];
-  const mid = words.lastIndexOf(" ", 50);
+  if (words.length <= 55) return [words, ""];
+  const mid = words.lastIndexOf(" ", 55);
   if (mid === -1) return [words, ""];
   return [words.substring(0, mid), words.substring(mid + 1)];
 };
