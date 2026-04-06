@@ -3832,17 +3832,37 @@ export const useProcessRecurringEntry = () => {
 
 export const useDeleteARInvoice = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   return useMutation({
     mutationFn: async (id: string) => {
-      // First delete related lines
+      // 1. Fetch invoice to get journal_entry_id
+      const { data: invoice } = await supabase
+        .from("ar_invoices")
+        .select("id, journal_entry_id")
+        .eq("id", id)
+        .single();
+
+      // 2. Delete receipt allocations linked to this invoice
+      await supabase.from("ar_receipt_allocations").delete().eq("invoice_id", id);
+
+      // 3. Reverse and delete JE if exists
+      if (invoice?.journal_entry_id) {
+        const { reverseAndDeleteJournalEntry } = await import("@/lib/gl-posting-utils");
+        await reverseAndDeleteJournalEntry(invoice.journal_entry_id);
+      }
+
+      // 4. Delete invoice lines then invoice
       await supabase.from("ar_invoice_lines").delete().eq("invoice_id", id);
       const { error } = await supabase.from("ar_invoices").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ar-invoices", selectedCompanyId] });
-      toast.success("AR Invoice deleted successfully");
+      const effectiveCompanyId = getEffectiveCompanyId();
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", effectiveCompanyId] });
+      toast.success("AR Invoice deleted with JE reversal");
     },
     onError: (error) => toast.error(`Failed to delete: ${error.message}`),
   });
@@ -3850,18 +3870,158 @@ export const useDeleteARInvoice = () => {
 
 export const useDeleteAPInvoice = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   return useMutation({
     mutationFn: async (id: string) => {
+      // 1. Fetch invoice to get journal_entry_id
+      const { data: invoice } = await supabase
+        .from("ap_invoices")
+        .select("id, journal_entry_id")
+        .eq("id", id)
+        .single();
+
+      // 2. Delete payment allocations linked to this invoice
+      await supabase.from("ap_payment_allocations").delete().eq("invoice_id", id);
+
+      // 3. Reverse and delete JE if exists
+      if (invoice?.journal_entry_id) {
+        const { reverseAndDeleteJournalEntry } = await import("@/lib/gl-posting-utils");
+        await reverseAndDeleteJournalEntry(invoice.journal_entry_id);
+      }
+
+      // 4. Delete invoice lines then invoice
       await supabase.from("ap_invoice_lines").delete().eq("invoice_id", id);
       const { error } = await supabase.from("ap_invoices").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
-      toast.success("AP Invoice deleted successfully");
+      const effectiveCompanyId = getEffectiveCompanyId();
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", effectiveCompanyId] });
+      toast.success("AP Invoice deleted with JE reversal");
     },
     onError: (error) => toast.error(`Failed to delete: ${error.message}`),
+  });
+};
+
+// ============ Force Delete: AP Payment ============
+export const useDeleteAPPayment = () => {
+  const queryClient = useQueryClient();
+  const { getEffectiveCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // 1. Fetch payment
+      const { data: payment } = await supabase
+        .from("ap_payments")
+        .select("id, journal_entry_id, bank_account_id, amount")
+        .eq("id", id)
+        .single();
+      if (!payment) throw new Error("Payment not found");
+
+      // 2. Delete allocations
+      await supabase.from("ap_payment_allocations").delete().eq("payment_id", id);
+
+      // 3. Delete linked bank transactions
+      await supabase.from("bank_transactions").delete().eq("reference", `AP-PAY-${id}`);
+
+      // 4. Reverse bank account balance (add amount back)
+      if (payment.bank_account_id) {
+        const { data: bankAcc } = await supabase
+          .from("bank_accounts")
+          .select("id, current_balance")
+          .eq("id", payment.bank_account_id)
+          .single();
+        if (bankAcc) {
+          await supabase.from("bank_accounts").update({
+            current_balance: Number(bankAcc.current_balance || 0) + Number(payment.amount || 0)
+          }).eq("id", payment.bank_account_id);
+        }
+      }
+
+      // 5. Reverse and delete JE
+      if (payment.journal_entry_id) {
+        const { reverseAndDeleteJournalEntry } = await import("@/lib/gl-posting-utils");
+        await reverseAndDeleteJournalEntry(payment.journal_entry_id);
+      }
+
+      // 6. Delete payment lines (direct payments)
+      await supabase.from("ap_payment_lines").delete().eq("payment_id", id);
+
+      // 7. Delete payment
+      const { error } = await supabase.from("ap_payments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", effectiveCompanyId] });
+      toast.success("AP Payment deleted with JE & bank reversal");
+    },
+    onError: (error) => toast.error(`Failed to delete payment: ${error.message}`),
+  });
+};
+
+// ============ Force Delete: AR Receipt ============
+export const useDeleteARReceipt = () => {
+  const queryClient = useQueryClient();
+  const { getEffectiveCompanyId } = useCompany();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // 1. Fetch receipt
+      const { data: receipt } = await supabase
+        .from("ar_receipts")
+        .select("id, journal_entry_id, bank_account_id, amount")
+        .eq("id", id)
+        .single();
+      if (!receipt) throw new Error("Receipt not found");
+
+      // 2. Delete allocations
+      await supabase.from("ar_receipt_allocations").delete().eq("receipt_id", id);
+
+      // 3. Delete linked bank transactions
+      await supabase.from("bank_transactions").delete().eq("reference", `AR-REC-${id}`);
+
+      // 4. Reverse bank account balance (subtract amount back)
+      if (receipt.bank_account_id) {
+        const { data: bankAcc } = await supabase
+          .from("bank_accounts")
+          .select("id, current_balance")
+          .eq("id", receipt.bank_account_id)
+          .single();
+        if (bankAcc) {
+          await supabase.from("bank_accounts").update({
+            current_balance: Number(bankAcc.current_balance || 0) - Number(receipt.amount || 0)
+          }).eq("id", receipt.bank_account_id);
+        }
+      }
+
+      // 5. Reverse and delete JE
+      if (receipt.journal_entry_id) {
+        const { reverseAndDeleteJournalEntry } = await import("@/lib/gl-posting-utils");
+        await reverseAndDeleteJournalEntry(receipt.journal_entry_id);
+      }
+
+      // 6. Delete receipt
+      const { error } = await supabase.from("ar_receipts").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      queryClient.invalidateQueries({ queryKey: ["ar-receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", effectiveCompanyId] });
+      toast.success("AR Receipt deleted with JE & bank reversal");
+    },
+    onError: (error) => toast.error(`Failed to delete receipt: ${error.message}`),
   });
 };
 
