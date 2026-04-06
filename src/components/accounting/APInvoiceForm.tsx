@@ -401,7 +401,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
           lines: lineData,
         });
       } else {
-        await createInvoice.mutateAsync({
+        const invoiceResult = await createInvoice.mutateAsync({
           invoice_number: data.invoice_number,
           vendor_id: data.vendor_id,
           invoice_date: data.invoice_date,
@@ -416,6 +416,32 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
           school_route_id: selectedSchoolRouteId || undefined,
           lines: lineData,
         });
+
+        // Sequential payment creation if Pay Now is enabled
+        if (payNow && invoiceResult?.id) {
+          try {
+            const payNum = `PAY-${Date.now().toString().slice(-8)}`;
+            await createPayment.mutateAsync({
+              payment_number: payNum,
+              vendor_id: data.vendor_id,
+              payment_date: data.invoice_date,
+              amount: netPayable,
+              payment_method: paymentMethod,
+              bank_account_id: paymentBankAccountId || undefined,
+              cheque_number: paymentChequeNumber || undefined,
+              reference: paymentReference || undefined,
+              notes: `Auto-payment for ${data.invoice_number}`,
+              allocations: [{
+                invoice_id: invoiceResult.id,
+                allocated_amount: netPayable,
+                wht_deducted: whtAmount > 0 ? whtAmount : undefined,
+              }],
+            });
+            toast.success("Invoice & Payment recorded successfully");
+          } catch (payErr: any) {
+            toast.error(`Invoice created but payment failed: ${payErr.message}. You can pay manually from the Payments tab.`);
+          }
+        }
       }
       onOpenChange(false);
       form.reset();
@@ -423,12 +449,17 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
       setSelectedRouteId("");
       setSelectedBusId("");
       setSelectedSchoolRouteId("");
+      setPayNow(false);
+      setPaymentMethod("bank_transfer");
+      setPaymentBankAccountId("");
+      setPaymentChequeNumber("");
+      setPaymentReference("");
     } catch (error) {
       // Error handled by mutation
     }
   };
 
-  const isPending = isEditing ? updateInvoice.isPending : createInvoice.isPending;
+  const isPending = isEditing ? updateInvoice.isPending : (createInvoice.isPending || createPayment.isPending);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
