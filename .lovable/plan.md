@@ -1,41 +1,41 @@
 
 
-# Add Confirmation Dialog Before Creating/Removing Trips in Daily Mode
+# Fix: Make Driver, Conductor & Times Editable on Sub-Rows (Trip Sequence > 1)
 
 ## Problem
-When a user changes Trips/Day in "Today Only" mode, trips are created or removed immediately without any confirmation. The user wants to review the action details (bus, date, how many trips will be added/removed) before it happens.
+When a bus has multiple trips per day, only the first trip row (trip_sequence=1) shows editable fields for Driver, Conductor, Turn 01, and Turn 02. All sub-rows (trip_sequence > 1) display "↑" arrows, meaning users cannot assign different crew or times to individual trips -- but in practice, different trips can have different drivers/conductors.
+
+The data model already supports this: each `daily_trips` record stores its own `notes` JSON with `driver`, `conductor`, `turn_01_time`, `turn_02_time`. The rendering just blocks editing on sub-rows.
 
 ## Solution
-Add a confirmation dialog that appears when `trips_per_day` is edited in daily mode. The dialog shows:
-- Bus number and date
-- Current trip count → new trip count
-- What will happen (e.g., "2 new trip(s) will be created" or "1 trip(s) will be removed")
-- Confirm / Cancel buttons
-
-### Architecture
-Since `updateField` is in a hook (not a component), the confirmation state needs to live in the Core component and intercept the update before it reaches the hook.
 
 ### 1. Modify `src/components/fleet/FleetMasterSpreadsheetCore.tsx`
-- Add state for a pending trips confirmation: `{ rosterId, busNo, currentTrips, newTrips, date }`
-- Before calling `onUpdate` for `trips_per_day` in daily mode, intercept and show an `AlertDialog` with action details
-- On confirm → call `onUpdate(rosterId, 'trips_per_day', newValue)`
-- On cancel → discard
 
-### 2. Add confirmation UI
-- Use existing `AlertDialog` component
-- Show: "Change Trips for [Bus] on [Date]?"
-- Details: "Current: X trip(s) → New: Y trip(s)" and "This will create/remove Z trip record(s) for this date only. Master roster will not be changed."
-- Buttons: "Cancel" and "Confirm"
+**A. Update `renderEditableCell` (line 142)**
+- Expand the sub-row editable whitelist to include `default_driver`, `default_conductor`, `turn_01_time`, `turn_02_time` alongside the existing `trip_no`, `odometer_start`, `odometer_end`, `fuel_liters`
+- Sub-rows will now show their own driver/conductor/time values and be clickable
 
-### 3. Props extension
-- Add `editMode` and `selectedDate` to the Core component props so it can determine when to show the dialog and what date to display
+**B. Update `renderDropdownCell` (line 183)**
+- Remove the blanket `trip_sequence > 1 → "↑"` return
+- Instead, allow dropdowns like `remark` to still show "↑" on sub-rows, but let crew/time fields through (these use `renderEditableCell`, not dropdowns, so this may just need the remark check)
+
+**C. Update table row rendering (lines 393-396)**
+- For sub-rows, display the trip-specific driver/conductor/time from `row.driver_name`, `row.conductor_name`, `row.daily_turn_01_time`, `row.daily_turn_02_time` instead of hiding them with "↑"
+
+### 2. Modify `src/hooks/useFleetMasterSpreadsheet.ts`
+
+**Update `updateField` daily mode handler**
+- The existing logic at line 417 already handles updating `default_driver`/`default_conductor`/`turn_01_time`/`turn_02_time` via the `notes` JSON on a specific `daily_trips` record using `row.trip_id`
+- Ensure this works correctly for sub-rows by verifying the correct `trip_id` is used (each expanded row already carries its own `trip_id`)
+- No major logic changes needed here -- the handler already supports per-trip updates
 
 ## Files
-- **Modify**: `src/components/fleet/FleetMasterSpreadsheetCore.tsx` — add AlertDialog for trips_per_day confirmation in daily mode
-- **Modify**: Parent component that renders Core — pass `editMode` and `selectedDate` props
+- **Modify**: `src/components/fleet/FleetMasterSpreadsheetCore.tsx` -- allow sub-row editing for crew and time fields
+- **Modify**: `src/hooks/useFleetMasterSpreadsheet.ts` -- verify sub-row trip_id routing (minor if any)
 
 ## Result
-- User sees exactly what will happen before trips are created or removed
-- Shows bus number, date, current vs new count, and action description
-- Can cancel safely before any database changes occur
+- Each trip row shows its own Driver, Conductor, Turn 01, Turn 02 values
+- Users can edit these per-trip in daily mode
+- Different drivers/conductors can be assigned to different trips of the same bus on the same day
+- Master mode behavior unchanged
 
