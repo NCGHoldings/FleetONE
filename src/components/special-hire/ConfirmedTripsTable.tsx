@@ -1432,7 +1432,7 @@ export function ConfirmedTripsTable() {
                                 </DropdownMenuItem>
 
                                 {/* Generate Final Invoice - works WITH or WITHOUT adjustment */}
-                                {approvedPayments.length > 0 && (
+                                {(trip.trip_status === 'completed' || trip.trip_status === 'confirmed') && (
                                   <DropdownMenuItem
                                     onClick={() => {
                                       setSelectedTrip(trip);
@@ -1530,7 +1530,7 @@ export function ConfirmedTripsTable() {
                                 )}
 
                                 {/* Email Sales Receipt - open approved receipt */}
-                                {approvedPayments.filter(p => p.payment_type === 'advance').length > 0 && (
+                                {approvedPayments.length > 0 && (
                                   <DropdownMenuItem
                                     onClick={async () => {
                                       try {

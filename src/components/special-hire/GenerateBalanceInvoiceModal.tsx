@@ -225,7 +225,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       numberOfBuses: quotationData.number_of_buses,
       numberOfPassengers: quotationData.number_of_passengers,
       totalAmount: totalAmount,
-      advanceAmount: quotationData.advance_paid,
+      advanceAmount: getActualTotalPaid(),
       balanceAmount: finalBalance,
       paidAmount: actualTotalPaid,
       tripDistance: quotationData.tripDistance,
@@ -626,7 +626,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       paid: { label: 'Paid', variant: 'default' as const, icon: CheckCircle },
     };
 
-    const config = statusConfig[invoiceStatus];
+    const config = statusConfig[invoiceStatus as keyof typeof statusConfig] || statusConfig.draft;
     const Icon = config.icon;
 
     return (

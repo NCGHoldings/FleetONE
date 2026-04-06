@@ -235,7 +235,10 @@ export function useRealtimeSpecialHire() {
           // Use calculated values that include adjustments
           total_paid: calculatedTotalPaid,
           balance_due: calculatedBalance,
-          advance_paid: quotation.advance_paid ?? approvedPayments.filter(p => p.payment_type === 'advance').reduce((sum, p) => sum + (p.amount || 0), 0),
+          advance_paid: Math.max(
+            quotation.advance_paid || 0,
+            approvedPayments.filter(p => p.payment_type === 'advance').reduce((sum, p) => sum + (p.amount || 0), 0)
+          ),
           // Include adjustment data for the Financial column
           adjustment_amount: adjustmentAmount,
           has_finalized_adjustment: !!adjustment,
