@@ -234,6 +234,7 @@ export function FleetMasterSpreadsheet() {
           loading={loading}
           onUpdate={updateField}
           editMode={editMode}
+          selectedDate={selectedDate}
           availableRoutes={availableRoutes}
         />
       </div>
