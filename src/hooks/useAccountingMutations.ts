@@ -888,6 +888,7 @@ export const useCreateAPInvoice = () => {
             vendorName: vendorData?.vendor_name,
             expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
             sourceModule: 'manual_ap',
+            costAllocations: cost_allocations,
           });
 
           if (glResult.success && glResult.journalEntryId) {
