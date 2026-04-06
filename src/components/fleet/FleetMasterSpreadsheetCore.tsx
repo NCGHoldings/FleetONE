@@ -445,5 +445,44 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
         </TableBody>
       </Table>
     </div>
+
+    {/* Trips/Day confirmation dialog */}
+    <AlertDialog open={!!pendingTripsUpdate} onOpenChange={(open) => !open && setPendingTripsUpdate(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Change Trips for {pendingTripsUpdate?.busNo}?
+          </AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2">
+              <p>
+                <strong>Date:</strong> {selectedDate ? format(selectedDate, 'EEEE, MMM do yyyy') : 'Today'}
+              </p>
+              <p>
+                <strong>Current:</strong> {pendingTripsUpdate?.currentTrips} trip(s) → <strong>New:</strong> {pendingTripsUpdate?.newTrips} trip(s)
+              </p>
+              {pendingTripsUpdate && pendingTripsUpdate.newTrips > pendingTripsUpdate.currentTrips && (
+                <p className="text-primary font-medium">
+                  {pendingTripsUpdate.newTrips - pendingTripsUpdate.currentTrips} new trip record(s) will be created for this date only.
+                </p>
+              )}
+              {pendingTripsUpdate && pendingTripsUpdate.newTrips < pendingTripsUpdate.currentTrips && (
+                <p className="text-destructive font-medium">
+                  {pendingTripsUpdate.currentTrips - pendingTripsUpdate.newTrips} trip record(s) will be removed (only if they have no income/odometer data).
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Master roster will not be changed.
+              </p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={confirmTripsUpdate}>Confirm</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
