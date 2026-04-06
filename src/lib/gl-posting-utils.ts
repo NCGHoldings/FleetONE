@@ -716,7 +716,7 @@ export async function reverseAndDeleteJournalEntry(journalEntryId: string): Prom
         // Fetch current account to know normal type
         const { data: account, error: accErr } = await supabase
           .from("chart_of_accounts")
-          .select("id, balance, account_type")
+          .select("id, current_balance, account_type")
           .eq("id", line.account_id)
           .single();
 
@@ -730,20 +730,18 @@ export async function reverseAndDeleteJournalEntry(journalEntryId: string): Prom
         const isDebitNormal = ["asset", "assets", "expense", "expenses", "expenditure", "cost of sales"].includes(normalType || "");
 
         // Reverse: undo what posting did
-        // Posting added debit to debit-normal (increased), so we subtract
-        // Posting added credit to debit-normal (decreased), so we add back
         let balanceAdjustment = 0;
         if (isDebitNormal) {
-          balanceAdjustment = -debitAmt + creditAmt; // reverse: subtract debits, add credits
+          balanceAdjustment = -debitAmt + creditAmt;
         } else {
-          balanceAdjustment = debitAmt - creditAmt; // reverse: add debits, subtract credits
+          balanceAdjustment = debitAmt - creditAmt;
         }
 
-        const newBalance = Number(account.balance || 0) + balanceAdjustment;
+        const newBalance = Number(account.current_balance || 0) + balanceAdjustment;
 
         await supabase
           .from("chart_of_accounts")
-          .update({ balance: newBalance })
+          .update({ current_balance: newBalance })
           .eq("id", line.account_id);
       }
     }
