@@ -83,6 +83,7 @@ import { DataImportWizard } from "@/components/accounting/DataImportWizard";
 import { AdvanceAllocationForm } from "@/components/accounting/AdvanceAllocationForm";
 // Multi-company
 import { CompanySwitcher } from "@/components/accounting/CompanySwitcher";
+import { CompanyRequiredGuard } from "@/components/accounting/CompanyRequiredGuard";
 import { TestModeBanner } from "@/components/accounting/TestModeBanner";
 // Settings Components
 import { CompanySettingsView } from "@/components/accounting/settings/CompanySettingsView";
@@ -182,27 +183,28 @@ const Accounting = () => {
             <CompanySwitcher />
           </div>
 
-          <TestModeBanner />
+           <TestModeBanner />
 
-          {/* Module Navigation */}
-          <div className="flex flex-wrap gap-2 pb-2 border-b">
-            {moduleButtons.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setActiveModule(id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeModule === id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted hover:bg-muted/80 text-muted-foreground"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </button>
-            ))}
-          </div>
+          <CompanyRequiredGuard>
+           {/* Module Navigation */}
+           <div className="flex flex-wrap gap-2 pb-2 border-b">
+             {moduleButtons.map(({ id, label, icon: Icon }) => (
+               <button
+                 key={id}
+                 onClick={() => setActiveModule(id)}
+                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                   activeModule === id
+                     ? "bg-primary text-primary-foreground"
+                     : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                 }`}
+               >
+                 <Icon className="h-4 w-4" />
+                 {label}
+               </button>
+             ))}
+           </div>
 
-          {/* General Ledger Module */}
+           {/* General Ledger Module */}
           {activeModule === "gl" && (
             <Tabs defaultValue="dashboard" className="space-y-6">
               <ScrollArea className="w-full whitespace-nowrap">
@@ -1007,6 +1009,7 @@ const Accounting = () => {
               </TabsContent>
             </Tabs>
           )}
+          </CompanyRequiredGuard>
         </div>
       </AppLayout>
     </PageAccessGuard>
