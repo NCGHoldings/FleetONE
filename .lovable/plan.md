@@ -1,54 +1,41 @@
 
 
-# Fix: Trips/Day Editing in "Today Only" Mode (Daily Override)
+# Add Confirmation Dialog Before Creating/Removing Trips in Daily Mode
 
 ## Problem
-Two issues with Trips/Day in daily mode:
-
-1. **Cannot edit**: `trips_per_day` is not in the `dailyEditable` list in the Core component, so it shows as greyed out with "Master Edit Only" tooltip
-2. **Wrong behavior**: Even after the previous fix (master-only bypass), changing Trips/Day in daily mode permanently changes the master roster. The user wants daily-only adjustments (e.g., a bus normally runs 1 trip but today needs 2)
-3. **Hidden trips**: If extra `daily_trips` records exist beyond `trips_per_day`, they are invisible because row expansion only loops up to `master.trips_per_day`
+When a user changes Trips/Day in "Today Only" mode, trips are created or removed immediately without any confirmation. The user wants to review the action details (bus, date, how many trips will be added/removed) before it happens.
 
 ## Solution
+Add a confirmation dialog that appears when `trips_per_day` is edited in daily mode. The dialog shows:
+- Bus number and date
+- Current trip count → new trip count
+- What will happen (e.g., "2 new trip(s) will be created" or "1 trip(s) will be removed")
+- Confirm / Cancel buttons
 
-### Concept: Daily trip count = actual trips, not master default
-In daily mode, the number of visible trip rows per bus should reflect the **actual daily_trips count** for that date (or the master default, whichever is higher). Changing Trips/Day in daily mode will **add or remove daily_trips records** for that bus on the selected date, without touching the master roster.
+### Architecture
+Since `updateField` is in a hook (not a component), the confirmation state needs to live in the Core component and intercept the update before it reaches the hook.
 
 ### 1. Modify `src/components/fleet/FleetMasterSpreadsheetCore.tsx`
-- Add `trips_per_day` to the `dailyEditable` array so it becomes clickable in Today Only mode
+- Add state for a pending trips confirmation: `{ rosterId, busNo, currentTrips, newTrips, date }`
+- Before calling `onUpdate` for `trips_per_day` in daily mode, intercept and show an `AlertDialog` with action details
+- On confirm → call `onUpdate(rosterId, 'trips_per_day', newValue)`
+- On cancel → discard
 
-### 2. Modify `src/hooks/useFleetMasterSpreadsheet.ts`
+### 2. Add confirmation UI
+- Use existing `AlertDialog` component
+- Show: "Change Trips for [Bus] on [Date]?"
+- Details: "Current: X trip(s) → New: Y trip(s)" and "This will create/remove Z trip record(s) for this date only. Master roster will not be changed."
+- Buttons: "Cancel" and "Confirm"
 
-**A. Fix row expansion (in `fetchRoster`)**:
-- After fetching daily trips, compute `effectiveTripsPerDay = max(master.trips_per_day, actual_daily_trips_count)` per bus
-- Use `effectiveTripsPerDay` for the expansion loop instead of `row.trips_per_day`
-- This ensures extra trips created for a specific day are always visible
-
-**B. Fix `updateField` for `trips_per_day` in daily mode**:
-- Remove `trips_per_day` from the `masterOnlyFields` array
-- Add a new daily-mode handler before the master-only check:
-  - When `editMode === 'daily'` and `field === 'trips_per_day'`:
-    - Get current actual trip count for this bus on this date
-    - If new value > current count: insert additional `daily_trips` records (with auto-generated trip numbers, copying route/driver/conductor from master)
-    - If new value < current count: delete the excess trips (last ones first, only if they have no income data)
-    - Refresh the roster silently
-    - **Do NOT update `fleet_master_roster`**
-  - When `editMode === 'master'`: keep current behavior (update master roster)
-
-### 3. Safety guard for trip deletion
-When reducing trips in daily mode, only delete trips that have:
-- No income (`income` is null or 0)
-- No odometer data
-This prevents accidental data loss. If a trip has data, show a toast warning instead.
+### 3. Props extension
+- Add `editMode` and `selectedDate` to the Core component props so it can determine when to show the dialog and what date to display
 
 ## Files
-- **Modify**: `src/components/fleet/FleetMasterSpreadsheetCore.tsx` — add `trips_per_day` to daily editable list
-- **Modify**: `src/hooks/useFleetMasterSpreadsheet.ts` — daily trip count expansion fix + daily-mode add/remove trips logic
+- **Modify**: `src/components/fleet/FleetMasterSpreadsheetCore.tsx` — add AlertDialog for trips_per_day confirmation in daily mode
+- **Modify**: Parent component that renders Core — pass `editMode` and `selectedDate` props
 
 ## Result
-- Trips/Day is editable in "Today Only" mode
-- Changes only affect the selected date (add/remove `daily_trips` records)
-- Master roster stays unchanged
-- Extra trips beyond master default are always visible
-- Safe deletion prevents wiping trips that have income data
+- User sees exactly what will happen before trips are created or removed
+- Shows bus number, date, current vs new count, and action description
+- Can cancel safely before any database changes occur
 
