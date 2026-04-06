@@ -1,5 +1,9 @@
-export const APP_VERSION = "1.4.0";
-export const BUILD_DATE = new Date().toISOString();
+declare const __APP_BUILD_TIME__: string;
+declare const __APP_BUILD_ID__: string;
+
+export const APP_VERSION = "1.5.0";
+export const BUILD_DATE = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : new Date().toISOString();
+export const BUILD_ID = typeof __APP_BUILD_ID__ !== 'undefined' ? __APP_BUILD_ID__ : 'dev';
 
 export interface ChangelogEntry {
   version: string;
@@ -7,11 +11,24 @@ export interface ChangelogEntry {
   title: string;
   changes: {
     type: 'feature' | 'fix' | 'improvement';
-    description: string;
+  description: string;
   }[];
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "1.5.0",
+    date: "2026-04-06",
+    title: "Version Tracking, Guards & Daily Edit Fixes",
+    changes: [
+      { type: "feature", description: "Auto build timestamp & build ID injected at compile time — every deployment is uniquely identifiable" },
+      { type: "feature", description: "Company dropdown guard prevents misleading zero data on accounting pages" },
+      { type: "fix", description: "Trips/Day can now be edited in 'Today Only' daily sheet mode" },
+      { type: "fix", description: "GL Export respects section toggles (line items, summary, filters)" },
+      { type: "fix", description: "Trial Balance company ID mismatch resolved — real company periods seeded" },
+      { type: "improvement", description: "What's New dialog shows exact build time and build ID for version verification" },
+    ],
+  },
   {
     version: "1.4.0",
     date: "2026-04-03",

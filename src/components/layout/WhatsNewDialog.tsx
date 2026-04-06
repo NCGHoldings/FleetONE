@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { APP_VERSION, CHANGELOG, type ChangelogEntry } from "@/config/appVersion";
+import { APP_VERSION, BUILD_DATE, BUILD_ID, CHANGELOG, type ChangelogEntry } from "@/config/appVersion";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sparkles, Wrench, TrendingUp } from "lucide-react";
+import { Sparkles, Wrench, TrendingUp, Clock, Hash } from "lucide-react";
 
 const LAST_SEEN_KEY = "app_last_seen_version";
 
@@ -18,6 +18,17 @@ const typeConfig = {
   fix: { label: "Fix", icon: Wrench, className: "bg-destructive/10 text-destructive border-destructive/20" },
   improvement: { label: "Improved", icon: TrendingUp, className: "bg-accent/10 text-accent-foreground border-accent/20" },
 };
+
+function formatBuildDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+}
 
 interface WhatsNewDialogProps {
   open: boolean;
@@ -39,8 +50,20 @@ export function WhatsNewDialog({ open, onOpenChange }: WhatsNewDialogProps) {
             <Sparkles className="h-5 w-5 text-primary" />
             What's New
           </DialogTitle>
-          <DialogDescription>
-            Current version: v{APP_VERSION}
+          <DialogDescription asChild>
+            <div className="space-y-1">
+              <div className="font-semibold">v{APP_VERSION}</div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Built: {formatBuildDate(BUILD_DATE)}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Hash className="h-3 w-3" />
+                  {BUILD_ID}
+                </span>
+              </div>
+            </div>
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[55vh] pr-4">
