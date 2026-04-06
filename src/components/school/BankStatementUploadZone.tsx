@@ -116,7 +116,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
             branch_id: branchId,
             min_confidence_threshold: 80,
             auto_approve_high_confidence: true,
-            admission_prefixes: ['N', 'LNU'],
+            admission_prefixes: ['N', 'LNU', 'LKA', 'TKA', 'TN', 'R0', 'Sta'],
             default_payment_method: 'Bank Transfer',
             auto_split_siblings: true,
             enable_pattern_learning: true,
@@ -178,6 +178,20 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
 
       setProgress(50);
 
+      // Auto-detect admission prefixes from actual student data and merge with configured ones
+      const configuredPrefixes = Array.isArray(settings.admission_prefixes) 
+        ? settings.admission_prefixes 
+        : (typeof settings.admission_prefixes === 'string' 
+          ? JSON.parse(settings.admission_prefixes) 
+          : ['N', 'LNU']);
+
+      const detectedPrefixes = new Set<string>();
+      students?.forEach((s: any) => {
+        const match = s.admission_no?.match(/^([A-Za-z]+)/);
+        if (match) detectedPrefixes.add(match[1].toUpperCase());
+      });
+      const mergedPrefixes = [...new Set([...configuredPrefixes.map((p: string) => p.toUpperCase()), ...detectedPrefixes])];
+
       // Process each transaction — SAME matching logic as before, using new parser output
       const importItems = [];
       let autoMatched = 0;
@@ -185,11 +199,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
       let unmatched = 0;
 
       for (const txn of parseResult.transactions) {
-        const prefixes = Array.isArray(settings.admission_prefixes) 
-          ? settings.admission_prefixes 
-          : (typeof settings.admission_prefixes === 'string' 
-            ? JSON.parse(settings.admission_prefixes) 
-            : ['N', 'LNU']);
+        const prefixes = mergedPrefixes;
         
         const patterns = Array.isArray(settings.custom_patterns)
           ? settings.custom_patterns
