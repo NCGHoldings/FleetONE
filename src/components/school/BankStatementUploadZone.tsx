@@ -100,21 +100,41 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
       setProgress(10);
 
       // Fetch branch settings
-      const { data: settings } = await supabase
+      const { data: fetchedSettings } = await supabase
         .from('school_payment_import_settings')
         .select('*')
         .eq('branch_id', branchId)
-        .single();
+        .maybeSingle();
+
+      let settings = fetchedSettings;
 
       if (!settings) {
-        toast({
-          title: "Settings Not Found",
-          description: "Please configure import settings first (go to Import Settings)",
-          variant: "destructive",
-        });
-        setStep("preview");
-        setProcessing(false);
-        return;
+        // Auto-create default settings for new branches
+        const { data: newSettings, error: createError } = await supabase
+          .from('school_payment_import_settings')
+          .insert([{
+            branch_id: branchId,
+            min_confidence_threshold: 80,
+            auto_approve_high_confidence: true,
+            admission_prefixes: ['N', 'LNU'],
+            default_payment_method: 'Bank Transfer',
+            auto_split_siblings: true,
+            enable_pattern_learning: true,
+          }])
+          .select()
+          .single();
+
+        if (createError || !newSettings) {
+          toast({
+            title: "Settings Error",
+            description: "Could not create default import settings. Please try again.",
+            variant: "destructive",
+          });
+          setStep("preview");
+          setProcessing(false);
+          return;
+        }
+        settings = newSettings;
       }
 
       setProgress(20);
