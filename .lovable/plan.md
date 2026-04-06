@@ -1,59 +1,83 @@
 
+# Fix: "Process & Match" Still Fails for Katunayaka
 
-# Fix: "Process & Match" Fails for New Branches — Auto-Create Default Settings
+## What I found
+- **Katunayaka branch exists** in the database.
+- It currently has **no `school_payment_import_settings` row**.
+- In the **current codebase**, `src/components/school/BankStatementUploadZone.tsx` already uses `.maybeSingle()` and already tries to auto-create default settings.
+- The exact toast text shown in your screenshot — **"Please configure import settings first"** — does **not exist anywhere in the current codebase**.
 
-## Problem
-When clicking "Process & Match 92 Transactions" on the Katunayaka branch, the system queries `school_payment_import_settings` for this branch. Since it's a new branch with no settings row, `.single()` returns a 406 error, and the toast "Settings Not Found — Please configure import settings first" appears.
+## Do I know what the issue is?
+**Yes.**
 
-## Root Cause
-`BankStatementUploadZone.tsx` line 103-107 uses `.single()` to fetch settings but does not auto-create defaults when none exist. The Settings page (`SchoolPaymentSettings.tsx`) already has this auto-create logic, but users shouldn't have to visit Settings before importing.
+The actual issue is now **two-part**:
 
-## Solution
+1. **The branch has no settings row yet**, so defaults must be created.
+2. **Your browser/preview is still showing an older frontend bundle** that contains the old behavior, because the toast in your screenshot is from old code, not the current source.
 
-### Modify: `src/components/school/BankStatementUploadZone.tsx`
+## Why it failed
+For a brand-new branch, the first import needs a default settings row.  
+That part was already fixed in source, but the screen you are seeing is still using the **older version** that stops immediately when settings are missing.
 
-In `handleProcess`, after the settings query fails or returns null, auto-create default settings (same defaults as `SchoolPaymentSettings.tsx`):
+Also, the import flow should be made more robust so that if settings creation fails, it:
+- shows the **real database error**
+- retries by **re-fetching** the row
+- never leaves you with a vague settings error again
 
-```typescript
-// Replace .single() with .maybeSingle()
-const { data: settings } = await supabase
-  .from('school_payment_import_settings')
-  .select('*')
-  .eq('branch_id', branchId)
-  .maybeSingle();
+## Plan
 
-let activeSettings = settings;
+### 1. Harden the import flow
+**File:** `src/components/school/BankStatementUploadZone.tsx`
 
-if (!activeSettings) {
-  // Auto-create default settings for this branch
-  const { data: newSettings, error: createError } = await supabase
-    .from('school_payment_import_settings')
-    .insert([{
-      branch_id: branchId,
-      min_confidence_threshold: 80,
-      auto_approve_high_confidence: true,
-      admission_prefixes: ['N', 'LNU'],
-      default_payment_method: 'Bank Transfer',
-      auto_split_siblings: true,
-      enable_pattern_learning: true,
-    }])
-    .select()
-    .single();
+Update the settings step so it:
+- keeps using `.maybeSingle()`
+- inserts default settings if missing
+- if insert hits a duplicate/unique conflict, **re-fetches the row**
+- if insert fails for another reason, shows the **actual error message**
+- only continues once a valid settings row is confirmed
 
-  if (createError || !newSettings) {
-    toast({ title: "Settings Error", description: "Could not create default settings", variant: "destructive" });
-    setStep("preview");
-    setProcessing(false);
-    return;
-  }
-  activeSettings = newSettings;
-}
-```
+### 2. Align the Settings page
+**File:** `src/pages/SchoolPaymentSettings.tsx`
 
-Then use `activeSettings` instead of `settings` for the rest of the function.
+Make the Settings page use the same safe pattern:
+- replace `.single()` with `.maybeSingle()`
+- use the same default-create logic as the import page
 
-## Result
-- New branches can immediately use "Process & Match" without visiting Settings first
-- Default settings are auto-created with sensible values matching existing branches
-- No more 406 errors from `.single()` on missing rows
+This avoids mixed behavior between the two screens.
 
+### 3. Prevent the problem when creating a branch
+**File:** `src/pages/SchoolBusService.tsx`
+
+When a new school branch is created, also create its default:
+- `school_payment_import_settings`
+
+That way, a new branch is ready immediately and users do not depend on the Payment Import page to create setup data.
+
+## Verification
+I would verify the fix with this exact flow:
+
+1. Create a fresh school branch
+2. Go directly to **Payment Import**
+3. Upload a bank statement
+4. Click **Process & Match**
+5. Confirm:
+   - no settings error
+   - settings row exists automatically
+   - import continues normally
+
+## Immediate guidance for you
+After the fix is implemented, you should:
+- do a **hard refresh**
+- reopen the preview/import page
+- check the **version/build badge** in the header changed
+- test Katunayaka again
+
+## Expected result
+- New branches can import immediately
+- No more old **"configure import settings first"** failure
+- If anything still goes wrong, the app will show the **real cause**, not a generic toast
+
+## Files to update
+- `src/components/school/BankStatementUploadZone.tsx`
+- `src/pages/SchoolPaymentSettings.tsx`
+- `src/pages/SchoolBusService.tsx`
