@@ -196,7 +196,7 @@ export default function SchoolBusService() {
 
     setCreating(true);
     try {
-      const { error } = await supabase.from("school_branches").insert({
+      const { data: newBranch, error } = await supabase.from("school_branches").insert({
         branch_name: formData.branch_name.trim(),
         branch_code: formData.branch_code.trim().toUpperCase(),
         address: formData.address.trim() || null,
@@ -205,9 +205,22 @@ export default function SchoolBusService() {
         manager_name: formData.manager_name.trim() || null,
         is_active: true,
         is_total_branch: false,
-      });
+      }).select().single();
 
       if (error) throw error;
+
+      // Auto-create default import settings for the new branch
+      if (newBranch) {
+        await supabase.from('school_payment_import_settings').insert([{
+          branch_id: newBranch.id,
+          min_confidence_threshold: 80,
+          auto_approve_high_confidence: true,
+          admission_prefixes: ['N', 'LNU'],
+          default_payment_method: 'Bank Transfer',
+          auto_split_siblings: true,
+          enable_pattern_learning: true,
+        }]);
+      }
 
       toast({
         title: "Branch Created",
