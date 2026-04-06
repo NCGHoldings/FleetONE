@@ -1,48 +1,30 @@
 
 
-# Fix: School Student Excel Import Crash
+# Add Fixed Amount Edit to Student Edit Modal
 
 ## Problem
-When importing a student Excel file, the parser crashes with `TypeError: Cannot read properties of undefined (reading 'toLowerCase')`. This happens because the Excel file has empty/blank header cells — `XLSX.utils.sheet_to_json` with `{ header: 1 }` returns `undefined` for empty cells in the header row. When `autoMapColumns` iterates over these headers and calls `header.toLowerCase()`, it crashes.
+The "Edit Student" form is missing the **Fixed Amount** (`fixed_monthly_amount`) field. This is the monthly fee amount used across the payment system (balance calculations, AR invoicing, outstanding reports). Currently it can only be set via Excel import — there's no way to edit it per student.
 
 ## Solution
-Filter out `undefined`/empty header values before processing:
 
-### Modify: `src/components/school/SchoolExcelImport.tsx`
+### Modify: `src/pages/SchoolStudentDatabase.tsx`
 
-**Line 112** — Filter headers to only include defined, non-empty string values:
-```typescript
-const rawHeaders = jsonData[0] as any[];
-const headers = rawHeaders.map((h, i) => (h != null ? String(h).trim() : '')).filter(h => h !== '');
-```
+1. **Add missing fields to `Student` interface** (line ~56):
+   - `fixed_monthly_amount?: number`
+   - `current_amount_due?: number`
 
-**Line 118** — Guard against undefined headers in row-to-object mapping (use rawHeaders length to preserve column index alignment):
-```typescript
-const rawHeaders = jsonData[0] as any[];
-// ...
-setExcelData(rows.map(row => {
-  const obj: any = {};
-  headers.forEach((header, index) => {
-    if (header) {
-      obj[header] = row[rawHeaders.indexOf(header) >= 0 ? rawHeaders.indexOf(header) : index];
-    }
-  });
-  return obj;
-}));
-```
+2. **Add Fixed Amount field to the Edit Student form** (after Payment Amount field, ~line 772):
+   - Add a numeric input for `fixed_monthly_amount` with label "Fixed Monthly Amount"
+   - Add a numeric input for `current_amount_due` with label "Current Amount Due"
 
-**Line 169-170** — Add safety guard in `autoMapColumns`:
-```typescript
-const matchingHeader = headers.find(header => {
-  if (!header) return false;
-  const h = header.toLowerCase().replace(/\s+/g, ' ').trim();
-```
+3. **Include in the update query** (line ~648-668):
+   - Add `fixed_monthly_amount` and `current_amount_due` to the `.update()` call
+   - When `fixed_monthly_amount` changes, also sync `update_new` (these should match)
 
-This ensures:
-- Empty header columns are safely skipped
-- Column index alignment is preserved for data rows
-- The auto-mapping logic never crashes on undefined values
+4. **Show Fixed Amount in the student table columns** if not already visible — add to the column visibility options
 
-## Files
-- **Modify**: `src/components/school/SchoolExcelImport.tsx` — filter empty headers + add null guards
+## Result
+- Fixed Amount can be edited per student from the Edit Student modal
+- Changes immediately reflect in Payment Management, Outstanding views, and AR invoicing
+- Both `fixed_monthly_amount` and `current_amount_due` stay in sync when edited
 
