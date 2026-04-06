@@ -21,7 +21,7 @@ interface ChequePrintPreviewProps {
 }
 
 const numberToWords = (num: number): string => {
-  if (num === 0) return "ZERO";
+  if (num === 0) return "RUPEES ZERO ONLY";
   const ones = ["", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE",
     "TEN", "ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN", "SIXTEEN",
     "SEVENTEEN", "EIGHTEEN", "NINETEEN"];
@@ -38,16 +38,16 @@ const numberToWords = (num: number): string => {
 
   const intPart = Math.floor(num);
   const decPart = Math.round((num - intPart) * 100);
-  let result = convert(intPart);
+  let result = "RUPEES " + convert(intPart);
   if (decPart > 0) result += " AND CENTS " + convert(decPart);
-  result += " RUPEES ONLY";
+  result += " ONLY";
   return result;
 };
 
 // Split amount words into two lines if too long
 const splitAmountWords = (words: string): [string, string] => {
-  if (words.length <= 50) return [words, ""];
-  const mid = words.lastIndexOf(" ", 50);
+  if (words.length <= 55) return [words, ""];
+  const mid = words.lastIndexOf(" ", 55);
   if (mid === -1) return [words, ""];
   return [words.substring(0, mid), words.substring(mid + 1)];
 };
@@ -231,43 +231,61 @@ export const ChequePrintPreview = ({ open, onOpenChange, cheque }: ChequePrintPr
                 </div>
               )}
 
-              {/* Date Digits - top right */}
+              {/* Date Digits - top right with / separators */}
               <div
                 style={{
                   position: "absolute",
                   top: "8mm",
-                  left: "120mm",
+                  left: "118mm",
                   display: "flex",
-                  gap: "1mm",
+                  alignItems: "center",
+                  gap: "0.5mm",
                 }}
               >
                 {dateDigits.map((digit, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      width: "5.5mm",
-                      height: "7mm",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "12px",
-                      fontWeight: "bold",
-                      borderBottom: "1px solid #999",
-                      marginRight: i === 1 || i === 3 ? "2mm" : "0",
-                    }}
-                  >
-                    {digit}
+                  <div key={i} style={{ display: "flex", alignItems: "center" }}>
+                    <div
+                      style={{
+                        width: "5mm",
+                        height: "7mm",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        borderBottom: "1px solid #999",
+                      }}
+                    >
+                      {digit}
+                    </div>
+                    {(i === 1 || i === 3) && (
+                      <span style={{ fontSize: "10px", fontWeight: "bold", margin: "0 0.5mm", paddingTop: "1mm" }}>/</span>
+                    )}
                   </div>
                 ))}
+              </div>
+
+              {/* "Pay" label */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: "20mm",
+                  left: "5mm",
+                  fontSize: "9px",
+                  fontWeight: "bold",
+                  color: "#333",
+                }}
+              >
+                Pay
               </div>
 
               {/* Payee Line */}
               <div
                 style={{
                   position: "absolute",
-                  top: "22mm",
-                  left: "15mm",
-                  width: "145mm",
+                  top: "20mm",
+                  left: "18mm",
+                  width: "140mm",
                   fontSize: "13px",
                   fontWeight: "bold",
                   borderBottom: "1px solid #999",
@@ -278,15 +296,32 @@ export const ChequePrintPreview = ({ open, onOpenChange, cheque }: ChequePrintPr
                 }}
               >
                 {cheque.payee.toUpperCase()}
+                <span style={{ fontSize: "8px", fontWeight: "normal", marginLeft: "3mm", color: "#555" }}>
+                  or Bearer
+                </span>
+              </div>
+
+              {/* "Rupees" label */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: "30mm",
+                  left: "5mm",
+                  fontSize: "9px",
+                  fontWeight: "bold",
+                  color: "#333",
+                }}
+              >
+                Rupees
               </div>
 
               {/* Amount in Words - Line 1 */}
               <div
                 style={{
                   position: "absolute",
-                  top: "32mm",
-                  left: "5mm",
-                  width: "130mm",
+                  top: "30mm",
+                  left: "22mm",
+                  width: "113mm",
                   fontSize: "10px",
                   fontWeight: "bold",
                   borderBottom: "1px solid #ccc",
@@ -301,7 +336,7 @@ export const ChequePrintPreview = ({ open, onOpenChange, cheque }: ChequePrintPr
               <div
                 style={{
                   position: "absolute",
-                  top: "40mm",
+                  top: "38mm",
                   left: "5mm",
                   width: "130mm",
                   fontSize: "10px",
@@ -318,9 +353,9 @@ export const ChequePrintPreview = ({ open, onOpenChange, cheque }: ChequePrintPr
               <div
                 style={{
                   position: "absolute",
-                  top: "30mm",
-                  left: "140mm",
-                  width: "32mm",
+                  top: "32mm",
+                  left: "139mm",
+                  width: "33mm",
                   height: "10mm",
                   border: "1.5px solid #000",
                   display: "flex",
@@ -332,6 +367,23 @@ export const ChequePrintPreview = ({ open, onOpenChange, cheque }: ChequePrintPr
                 }}
               >
                 Rs. {formatAmount(cheque.amount)}
+              </div>
+
+              {/* Signature line */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: "55mm",
+                  left: "105mm",
+                  width: "60mm",
+                  borderTop: "1px solid #999",
+                  textAlign: "center",
+                  paddingTop: "1mm",
+                  fontSize: "7px",
+                  color: "#666",
+                }}
+              >
+                Authorised Signature
               </div>
 
               {/* MICR zone - bottom blank strip */}
