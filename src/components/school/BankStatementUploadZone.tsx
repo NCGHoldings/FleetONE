@@ -116,7 +116,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
             branch_id: branchId,
             min_confidence_threshold: 80,
             auto_approve_high_confidence: true,
-            admission_prefixes: ['N', 'LNU'],
+            admission_prefixes: ['N', 'LNU', 'LKA', 'TKA', 'TN', 'R0', 'Sta'],
             default_payment_method: 'Bank Transfer',
             auto_split_siblings: true,
             enable_pattern_learning: true,
