@@ -92,7 +92,7 @@ export const AccountsPayableView = () => {
   };
 
   const canEdit = (status: string) => !["paid", "posted"].includes(status);
-  const canDelete = (status: string) => ["draft", "cancelled"].includes(status);
+  const canDelete = (_status: string) => true; // Force delete enabled for testing
 
   const handlePayClick = (invoice: any) => {
     setSelectedInvoiceForPayment(invoice);
