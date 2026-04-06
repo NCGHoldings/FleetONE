@@ -1,30 +1,59 @@
 
 
-# Add Fixed Amount Edit to Student Edit Modal
+# Fix: "Process & Match" Fails for New Branches — Auto-Create Default Settings
 
 ## Problem
-The "Edit Student" form is missing the **Fixed Amount** (`fixed_monthly_amount`) field. This is the monthly fee amount used across the payment system (balance calculations, AR invoicing, outstanding reports). Currently it can only be set via Excel import — there's no way to edit it per student.
+When clicking "Process & Match 92 Transactions" on the Katunayaka branch, the system queries `school_payment_import_settings` for this branch. Since it's a new branch with no settings row, `.single()` returns a 406 error, and the toast "Settings Not Found — Please configure import settings first" appears.
+
+## Root Cause
+`BankStatementUploadZone.tsx` line 103-107 uses `.single()` to fetch settings but does not auto-create defaults when none exist. The Settings page (`SchoolPaymentSettings.tsx`) already has this auto-create logic, but users shouldn't have to visit Settings before importing.
 
 ## Solution
 
-### Modify: `src/pages/SchoolStudentDatabase.tsx`
+### Modify: `src/components/school/BankStatementUploadZone.tsx`
 
-1. **Add missing fields to `Student` interface** (line ~56):
-   - `fixed_monthly_amount?: number`
-   - `current_amount_due?: number`
+In `handleProcess`, after the settings query fails or returns null, auto-create default settings (same defaults as `SchoolPaymentSettings.tsx`):
 
-2. **Add Fixed Amount field to the Edit Student form** (after Payment Amount field, ~line 772):
-   - Add a numeric input for `fixed_monthly_amount` with label "Fixed Monthly Amount"
-   - Add a numeric input for `current_amount_due` with label "Current Amount Due"
+```typescript
+// Replace .single() with .maybeSingle()
+const { data: settings } = await supabase
+  .from('school_payment_import_settings')
+  .select('*')
+  .eq('branch_id', branchId)
+  .maybeSingle();
 
-3. **Include in the update query** (line ~648-668):
-   - Add `fixed_monthly_amount` and `current_amount_due` to the `.update()` call
-   - When `fixed_monthly_amount` changes, also sync `update_new` (these should match)
+let activeSettings = settings;
 
-4. **Show Fixed Amount in the student table columns** if not already visible — add to the column visibility options
+if (!activeSettings) {
+  // Auto-create default settings for this branch
+  const { data: newSettings, error: createError } = await supabase
+    .from('school_payment_import_settings')
+    .insert([{
+      branch_id: branchId,
+      min_confidence_threshold: 80,
+      auto_approve_high_confidence: true,
+      admission_prefixes: ['N', 'LNU'],
+      default_payment_method: 'Bank Transfer',
+      auto_split_siblings: true,
+      enable_pattern_learning: true,
+    }])
+    .select()
+    .single();
+
+  if (createError || !newSettings) {
+    toast({ title: "Settings Error", description: "Could not create default settings", variant: "destructive" });
+    setStep("preview");
+    setProcessing(false);
+    return;
+  }
+  activeSettings = newSettings;
+}
+```
+
+Then use `activeSettings` instead of `settings` for the rest of the function.
 
 ## Result
-- Fixed Amount can be edited per student from the Edit Student modal
-- Changes immediately reflect in Payment Management, Outstanding views, and AR invoicing
-- Both `fixed_monthly_amount` and `current_amount_due` stay in sync when edited
+- New branches can immediately use "Process & Match" without visiting Settings first
+- Default settings are auto-created with sensible values matching existing branches
+- No more 406 errors from `.single()` on missing rows
 
