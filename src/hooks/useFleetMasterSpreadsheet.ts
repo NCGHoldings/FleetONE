@@ -265,6 +265,29 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
         return;
       }
 
+      // Master-only fields should always update fleet_master_roster, even in daily mode
+      const masterOnlyFields = ['trips_per_day', 'bus_type', 'permit_type', 'sort_order', 'day_target'];
+      if (masterOnlyFields.includes(field)) {
+        const masterNumericFields = ['trips_per_day', 'day_target', 'sort_order'];
+        const masterValue = masterNumericFields.includes(field) ? Number(value) || 0 : value;
+
+        const { error } = await supabase
+          .from("fleet_master_roster")
+          .update({ [field]: masterValue })
+          .eq("id", rosterId);
+
+        if (error) throw error;
+
+        setExpandedRows(prev => prev.map(r =>
+          r.id === rosterId ? { ...r, [field]: masterValue } : r
+        ));
+
+        if (field === 'trips_per_day') {
+          await fetchRoster(true);
+        }
+        return;
+      }
+
       if (editMode === 'daily') {
         const row = expandedRows.find(r => r.id === rosterId);
         if (!row?.trip_id) {
