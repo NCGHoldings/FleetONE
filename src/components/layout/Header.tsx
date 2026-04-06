@@ -4,7 +4,7 @@ import { DarkModeToggle } from "./DarkModeToggle";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { APP_VERSION } from "@/config/appVersion";
+import { APP_VERSION, BUILD_DATE, BUILD_ID } from "@/config/appVersion";
 import { WhatsNewDialog, useHasNewVersion } from "./WhatsNewDialog";
 import {
   DropdownMenu,
@@ -84,6 +84,7 @@ export function Header() {
           size="sm"
           onClick={() => setWhatsNewOpen(true)}
           className="relative h-7 px-2 text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-all"
+          title={`v${APP_VERSION} • Built: ${new Date(BUILD_DATE).toLocaleString()} • Build #${BUILD_ID}`}
         >
           v{APP_VERSION}
           {hasNewVersion && (

@@ -13,6 +13,10 @@ export default defineConfig(({ mode }) => ({
   build: {
     target: "esnext",
   },
+  define: {
+    __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __APP_BUILD_ID__: JSON.stringify(Date.now().toString(36)),
+  },
   plugins: [
     react(),
     mode === 'development' &&
