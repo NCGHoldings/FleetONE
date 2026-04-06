@@ -109,14 +109,18 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
           throw new Error("Empty Excel file");
         }
 
-        const headers = jsonData[0] as string[];
+        const rawHeaders = (jsonData[0] as any[]).map((h: any) => (h != null ? String(h).trim() : ''));
+        const headers = rawHeaders.filter((h: string) => h !== '');
         const rows = jsonData.slice(1) as any[][];
         
         setExcelColumns(headers);
         setExcelData(rows.map(row => {
           const obj: any = {};
-          headers.forEach((header, index) => {
-            obj[header] = row[index];
+          headers.forEach((header) => {
+            const colIndex = rawHeaders.indexOf(header);
+            if (header && colIndex >= 0) {
+              obj[header] = row[colIndex];
+            }
           });
           return obj;
         }));
@@ -167,6 +171,7 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
 
     REQUIRED_COLUMNS.forEach(col => {
       const matchingHeader = headers.find(header => {
+        if (!header) return false;
         const h = header.toLowerCase().replace(/\s+/g, ' ').trim();
         const hNoSpace = h.replace(/\s+/g, '');
         
