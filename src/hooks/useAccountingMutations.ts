@@ -789,6 +789,7 @@ export const useCreateAPInvoice = () => {
         line_total: number;
         account_id?: string;
       }>;
+      cost_allocations?: Array<{ unit_code: string; amount: number }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
@@ -796,7 +797,7 @@ export const useCreateAPInvoice = () => {
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
       
-      const { lines, ...headerData } = invoice;
+      const { lines, cost_allocations, ...headerData } = invoice;
       
       const { data, error } = await supabase
         .from("ap_invoices")
@@ -887,6 +888,7 @@ export const useCreateAPInvoice = () => {
             vendorName: vendorData?.vendor_name,
             expenseLines: expenseLines.length > 0 ? expenseLines : undefined,
             sourceModule: 'manual_ap',
+            costAllocations: cost_allocations,
           });
 
           if (glResult.success && glResult.journalEntryId) {

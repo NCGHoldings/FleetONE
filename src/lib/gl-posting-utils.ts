@@ -436,59 +436,124 @@ export async function postAPInvoiceToGL(params: {
   vendorName?: string;
   expenseLines?: Array<{ accountId: string; amount: number; taxAmount?: number; description?: string }>;
   sourceModule?: string;
+  costAllocations?: Array<{ unit_code: string; amount: number }>;
 }): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
+  const hasCostAllocations = params.costAllocations && params.costAllocations.length > 0;
+
+  // ---- Build debit lines ----
   const debitLines: JournalEntryLine[] = [];
   let totalTaxAmount = 0;
+  // Track per-line business_unit_code for JE lines
+  const lineBusinessUnits: string[] = [];
 
-  if (params.expenseLines && params.expenseLines.length > 0) {
-    // Group by accountId and sum NET amounts (line_total - tax_amount)
-    const grouped = new Map<string, { netAmount: number; description: string }>();
-    for (const line of params.expenseLines) {
-      const lineTax = line.taxAmount || 0;
-      const lineNet = line.amount - lineTax; // Net = line_total - tax
-      totalTaxAmount += lineTax;
+  if (hasCostAllocations) {
+    // Cost allocation mode: split expense across business units proportionally
+    const totalAllocated = params.costAllocations!.reduce((s, a) => s + a.amount, 0);
 
-      const existing = grouped.get(line.accountId);
-      if (existing) {
-        existing.netAmount += lineNet;
-      } else {
-        grouped.set(line.accountId, {
-          netAmount: lineNet,
-          description: line.description || `Expense/Purchase - ${params.invoiceNumber}`,
-        });
+    if (params.expenseLines && params.expenseLines.length > 0) {
+      // For each expense line, split across allocations proportionally
+      for (const line of params.expenseLines) {
+        const lineTax = line.taxAmount || 0;
+        const lineNet = line.amount - lineTax;
+        totalTaxAmount += lineTax;
+
+        for (const alloc of params.costAllocations!) {
+          const ratio = totalAllocated > 0 ? alloc.amount / totalAllocated : 0;
+          const allocAmount = Math.round(lineNet * ratio * 100) / 100;
+          if (allocAmount > 0) {
+            debitLines.push({
+              account_id: line.accountId,
+              description: `${line.description || 'Expense'} [${alloc.unit_code}]`,
+              debit: allocAmount,
+              credit: 0,
+            });
+            lineBusinessUnits.push(alloc.unit_code);
+          }
+        }
       }
-    }
-    for (const [accountId, data] of grouped) {
-      if (data.netAmount > 0) {
-        debitLines.push({
-          account_id: accountId,
-          description: data.description,
-          debit: Math.round(data.netAmount * 100) / 100,
-          credit: 0,
-        });
+    } else {
+      // No per-line accounts: split the total to default expense per allocation
+      for (const alloc of params.costAllocations!) {
+        if (alloc.amount > 0) {
+          debitLines.push({
+            account_id: params.expenseAccountId,
+            description: `Expense/Purchase - ${params.invoiceNumber} [${alloc.unit_code}]`,
+            debit: alloc.amount,
+            credit: 0,
+          });
+          lineBusinessUnits.push(alloc.unit_code);
+        }
       }
     }
   } else {
-    // Fallback: single debit to default expense account
-    debitLines.push({
-      account_id: params.expenseAccountId,
-      description: `Expense/Purchase - ${params.invoiceNumber}`,
-      debit: params.totalAmount,
-      credit: 0,
-    });
+    // Standard mode (no cost allocations)
+    if (params.expenseLines && params.expenseLines.length > 0) {
+      const grouped = new Map<string, { netAmount: number; description: string }>();
+      for (const line of params.expenseLines) {
+        const lineTax = line.taxAmount || 0;
+        const lineNet = line.amount - lineTax;
+        totalTaxAmount += lineTax;
+
+        const existing = grouped.get(line.accountId);
+        if (existing) {
+          existing.netAmount += lineNet;
+        } else {
+          grouped.set(line.accountId, {
+            netAmount: lineNet,
+            description: line.description || `Expense/Purchase - ${params.invoiceNumber}`,
+          });
+        }
+      }
+      for (const [accountId, data] of grouped) {
+        if (data.netAmount > 0) {
+          debitLines.push({
+            account_id: accountId,
+            description: data.description,
+            debit: Math.round(data.netAmount * 100) / 100,
+            credit: 0,
+          });
+          lineBusinessUnits.push(params.businessUnitCode || '');
+        }
+      }
+    } else {
+      debitLines.push({
+        account_id: params.expenseAccountId,
+        description: `Expense/Purchase - ${params.invoiceNumber}`,
+        debit: params.totalAmount,
+        credit: 0,
+      });
+      lineBusinessUnits.push(params.businessUnitCode || '');
+    }
   }
 
   // Add Input Tax debit line if tax exists AND input_tax_account is configured
   if (totalTaxAmount > 0 && params.inputTaxAccountId) {
-    debitLines.push({
-      account_id: params.inputTaxAccountId,
-      description: `Input Tax (VAT/NBT) - ${params.invoiceNumber}`,
-      debit: Math.round(totalTaxAmount * 100) / 100,
-      credit: 0,
-    });
+    if (hasCostAllocations) {
+      // Split tax proportionally across allocations
+      const totalAllocated = params.costAllocations!.reduce((s, a) => s + a.amount, 0);
+      for (const alloc of params.costAllocations!) {
+        const ratio = totalAllocated > 0 ? alloc.amount / totalAllocated : 0;
+        const taxPortion = Math.round(totalTaxAmount * ratio * 100) / 100;
+        if (taxPortion > 0) {
+          debitLines.push({
+            account_id: params.inputTaxAccountId,
+            description: `Input Tax (VAT/NBT) - ${params.invoiceNumber} [${alloc.unit_code}]`,
+            debit: taxPortion,
+            credit: 0,
+          });
+          lineBusinessUnits.push(alloc.unit_code);
+        }
+      }
+    } else {
+      debitLines.push({
+        account_id: params.inputTaxAccountId,
+        description: `Input Tax (VAT/NBT) - ${params.invoiceNumber}`,
+        debit: Math.round(totalTaxAmount * 100) / 100,
+        credit: 0,
+      });
+      lineBusinessUnits.push(params.businessUnitCode || '');
+    }
   } else if (totalTaxAmount > 0 && !params.inputTaxAccountId) {
-    // No Input Tax account configured — add tax back to the first expense line
-    // so the journal still balances (legacy behavior)
     if (debitLines.length > 0) {
       debitLines[0].debit = Math.round((debitLines[0].debit + totalTaxAmount) * 100) / 100;
     }
@@ -496,6 +561,74 @@ export async function postAPInvoiceToGL(params: {
 
   // Credit must equal the actual sum of debits to guarantee balance
   const actualDebitTotal = Math.round(debitLines.reduce((sum, l) => sum + l.debit, 0) * 100) / 100;
+
+  // For cost allocations, we need per-line business_unit_code on JE lines
+  // Use the extended createAndPostJournalEntry with per-line overrides
+  if (hasCostAllocations) {
+    // Custom JE creation with per-line business_unit_code
+    try {
+      const allLines = [
+        ...debitLines,
+        {
+          account_id: params.tradePayableId,
+          description: `Trade Payable - ${params.invoiceNumber}`,
+          debit: 0,
+          credit: actualDebitTotal,
+        },
+      ];
+      // Add the credit line's business unit
+      lineBusinessUnits.push(params.businessUnitCode || '');
+
+      const totalDebit = allLines.reduce((s, l) => s + l.debit, 0);
+      const totalCredit = allLines.reduce((s, l) => s + l.credit, 0);
+
+      if (Math.abs(totalDebit - totalCredit) > 0.01) {
+        return { success: false, error: `Journal entry not balanced: DR ${totalDebit} ≠ CR ${totalCredit}` };
+      }
+
+      const { data: journalEntry, error: entryError } = await supabase
+        .from("journal_entries")
+        .insert([{
+          entry_number: generateEntryNumber(),
+          entry_date: params.invoiceDate,
+          description: `AP Invoice: ${params.invoiceNumber}${params.vendorName ? ` - ${params.vendorName}` : ""} (Multi-Unit)`,
+          reference: params.invoiceNumber,
+          total_debit: totalDebit,
+          total_credit: totalCredit,
+          status: "posted",
+          posted_at: new Date().toISOString(),
+          company_id: params.companyId,
+          business_unit_code: params.businessUnitCode,
+          source_module: params.sourceModule,
+        }])
+        .select()
+        .single();
+
+      if (entryError) throw entryError;
+
+      const jeLines = allLines.map((line, idx) => ({
+        journal_entry_id: journalEntry.id,
+        account_id: line.account_id,
+        description: line.description,
+        debit: line.debit,
+        credit: line.credit,
+        company_id: params.companyId,
+        business_unit_code: lineBusinessUnits[idx] || params.businessUnitCode,
+      }));
+
+      const { error: linesError } = await supabase.from("journal_entry_lines").insert(jeLines);
+      if (linesError) throw linesError;
+
+      for (const line of allLines) {
+        await updateAccountBalance(line.account_id, line.debit, line.credit);
+      }
+
+      return { success: true, journalEntryId: journalEntry.id };
+    } catch (error) {
+      console.error("GL Posting Error (Cost Allocation):", error);
+      return { success: false, error: error instanceof Error ? error.message : "Failed to create journal entry" };
+    }
+  }
 
   return createAndPostJournalEntry({
     entry_date: params.invoiceDate,

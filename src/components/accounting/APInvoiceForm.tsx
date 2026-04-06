@@ -15,7 +15,7 @@ import { useCreateAPInvoice, useUpdateAPInvoice, useCreateAPPayment } from "@/ho
 import { useCompany } from "@/contexts/CompanyContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays } from "date-fns";
-import { Plus, Trash2, Check, ChevronsUpDown, Bus, Route, Banknote, CreditCard } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Bus, Route, Banknote, CreditCard, Split } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -72,6 +72,52 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
   const [paymentBankAccountId, setPaymentBankAccountId] = useState("");
   const [paymentChequeNumber, setPaymentChequeNumber] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
+
+  // Cost Allocation state
+  const [allocateToUnits, setAllocateToUnits] = useState(false);
+  const [allocationMode, setAllocationMode] = useState<"amount" | "percentage">("amount");
+  const [costAllocations, setCostAllocations] = useState<Array<{
+    id: string;
+    unit_code: string;
+    amount: number;
+    percentage: number;
+  }>>([]);
+
+  const BUSINESS_UNITS = [
+    { code: "SBO", label: "School Bus Operations" },
+    { code: "YUT", label: "Yutong" },
+    { code: "SPH", label: "Special Hire" },
+    { code: "LTV", label: "Light Vehicle" },
+    { code: "SNT", label: "Sinotruck" },
+  ];
+
+  const addAllocation = () => {
+    setCostAllocations(prev => [...prev, {
+      id: Date.now().toString(),
+      unit_code: "",
+      amount: 0,
+      percentage: 0,
+    }]);
+  };
+
+  const removeAllocation = (id: string) => {
+    setCostAllocations(prev => prev.filter(a => a.id !== id));
+  };
+
+  const updateAllocation = (id: string, field: string, value: any) => {
+    setCostAllocations(prev => prev.map(a => {
+      if (a.id !== id) return a;
+      const updated = { ...a, [field]: value };
+      if (field === "percentage" && allocationMode === "percentage") {
+        updated.amount = Math.round((subtotal * (updated.percentage / 100)) * 100) / 100;
+      }
+      if (field === "amount" && allocationMode === "amount" && subtotal > 0) {
+        updated.percentage = Math.round((updated.amount / subtotal) * 100 * 100) / 100;
+      }
+      return updated;
+    }));
+  };
+
 
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 },
@@ -363,6 +409,9 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
   const whtAmount = applyWht ? (subtotal * whtRate) / 100 : 0;
   const netPayable = grossTotal - whtAmount;
 
+  const totalAllocated = costAllocations.reduce((sum, a) => sum + a.amount, 0);
+  const unallocatedAmount = subtotal - totalAllocated;
+
   const selectedRoute = routes?.find(r => r.id === selectedRouteId);
   const selectedBus = buses?.find(b => b.id === selectedBusId);
   const selectedSchoolRoute = schoolRoutes?.find(r => r.id === selectedSchoolRouteId);
@@ -401,6 +450,11 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
           lines: lineData,
         });
       } else {
+        // Prepare cost allocations if enabled
+        const validAllocations = allocateToUnits && costAllocations.length > 0 && Math.abs(unallocatedAmount) <= 0.01
+          ? costAllocations.filter(a => a.unit_code && a.amount > 0).map(a => ({ unit_code: a.unit_code, amount: a.amount }))
+          : undefined;
+
         const invoiceResult = await createInvoice.mutateAsync({
           invoice_number: data.invoice_number,
           vendor_id: data.vendor_id,
@@ -415,6 +469,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
           bus_id: selectedBusId || undefined,
           school_route_id: selectedSchoolRouteId || undefined,
           lines: lineData,
+          cost_allocations: validAllocations,
         });
 
         // Sequential payment creation if Pay Now is enabled
@@ -454,6 +509,8 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
       setPaymentBankAccountId("");
       setPaymentChequeNumber("");
       setPaymentReference("");
+      setAllocateToUnits(false);
+      setCostAllocations([]);
     } catch (error) {
       // Error handled by mutation
     }
@@ -906,6 +963,104 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                 </div>
               </div>
             </div>
+
+            {/* Cost Allocation by Business Unit (Optional) */}
+            {!isEditing && (
+              <div className="border rounded-lg p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Split className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium text-sm">Allocate to Business Units (Optional)</span>
+                  </div>
+                  <Switch checked={allocateToUnits} onCheckedChange={(checked) => {
+                    setAllocateToUnits(checked);
+                    if (!checked) setCostAllocations([]);
+                  }} />
+                </div>
+
+                {allocateToUnits && (
+                  <div className="space-y-3 pt-2 border-t">
+                    <div className="flex items-center gap-4">
+                      <label className="text-sm font-medium">Mode:</label>
+                      <Select value={allocationMode} onValueChange={(v: "amount" | "percentage") => setAllocationMode(v)}>
+                        <SelectTrigger className="w-40 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="amount">By Amount</SelectItem>
+                          <SelectItem value="percentage">By Percentage</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {costAllocations.map((alloc) => (
+                      <div key={alloc.id} className="flex items-center gap-3">
+                        <Select value={alloc.unit_code} onValueChange={(v) => updateAllocation(alloc.id, "unit_code", v)}>
+                          <SelectTrigger className="w-48 h-9">
+                            <SelectValue placeholder="Select unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {BUSINESS_UNITS.filter(bu => 
+                              bu.code === alloc.unit_code || !costAllocations.some(a => a.id !== alloc.id && a.unit_code === bu.code)
+                            ).map(bu => (
+                              <SelectItem key={bu.code} value={bu.code}>{bu.code} — {bu.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        {allocationMode === "percentage" ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={alloc.percentage}
+                              onChange={(e) => updateAllocation(alloc.id, "percentage", parseFloat(e.target.value) || 0)}
+                              className="w-24 h-9"
+                              min={0} max={100} step={0.01}
+                            />
+                            <span className="text-sm">%</span>
+                          </div>
+                        ) : (
+                          <CurrencyInput
+                            value={alloc.amount}
+                            onValueChange={(val) => updateAllocation(alloc.id, "amount", val)}
+                            placeholder="0"
+                            compact
+                          />
+                        )}
+
+                        <span className="text-sm text-muted-foreground min-w-[100px] text-right">
+                          = <CurrencyDisplay amount={alloc.amount} />
+                        </span>
+
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeAllocation(alloc.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+
+                    <Button type="button" variant="outline" size="sm" onClick={addAllocation} disabled={costAllocations.length >= BUSINESS_UNITS.length}>
+                      <Plus className="h-4 w-4 mr-1" /> Add Unit
+                    </Button>
+
+                    {costAllocations.length > 0 && (
+                      <div className="flex justify-between items-center p-2 bg-muted/50 rounded text-sm">
+                        <span>Allocated: <CurrencyDisplay amount={totalAllocated} /> / <CurrencyDisplay amount={subtotal} /></span>
+                        {Math.abs(unallocatedAmount) > 0.01 && (
+                          <span className="text-destructive font-medium">
+                            Unallocated: <CurrencyDisplay amount={unallocatedAmount} />
+                          </span>
+                        )}
+                        {Math.abs(unallocatedAmount) <= 0.01 && (
+                          <span className="text-green-600 font-medium flex items-center gap-1">
+                            <Check className="h-3.5 w-3.5" /> Fully allocated
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <FormField
               control={form.control}
