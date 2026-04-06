@@ -620,7 +620,7 @@ export async function postAPInvoiceToGL(params: {
       if (linesError) throw linesError;
 
       for (const line of allLines) {
-        await updateAccountBalanceUtil(line.account_id, line.debit, line.credit);
+        await updateAccountBalance(line.account_id, line.debit, line.credit);
       }
 
       return { success: true, journalEntryId: journalEntry.id };
