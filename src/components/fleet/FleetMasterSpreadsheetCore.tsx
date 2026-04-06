@@ -139,7 +139,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
 
   const renderEditableCell = (row: ExpandedFleetRow, field: string, value: any, type: 'text' | 'number' = 'text') => {
     const cellKey = `${row.id}-${row.trip_sequence}-${field}`;
-    if (row.trip_sequence > 1 && !['trip_no', 'odometer_start', 'odometer_end', 'fuel_liters'].includes(field)) {
+    if (row.trip_sequence > 1 && !['trip_no', 'odometer_start', 'odometer_end', 'fuel_liters', 'default_driver', 'default_conductor', 'turn_01_time', 'turn_02_time'].includes(field)) {
       return <span className="text-muted-foreground text-sm">↑</span>;
     }
 
@@ -180,7 +180,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
   };
 
   const renderDropdownCell = (row: ExpandedFleetRow, field: string, value: string, options: string[]) => {
-    if (row.trip_sequence > 1) {
+    if (row.trip_sequence > 1 && !['default_driver', 'default_conductor'].includes(field)) {
       return <span className="text-muted-foreground text-sm">↑</span>;
     }
     
