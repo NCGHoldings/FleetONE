@@ -10,15 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useVendors, useTaxCodes } from "@/hooks/useAccountingData";
-import { useCreateAPInvoice, useUpdateAPInvoice } from "@/hooks/useAccountingMutations";
+import { useVendors, useTaxCodes, useBankAccounts } from "@/hooks/useAccountingData";
+import { useCreateAPInvoice, useUpdateAPInvoice, useCreateAPPayment } from "@/hooks/useAccountingMutations";
 import { useCompany } from "@/contexts/CompanyContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays } from "date-fns";
-import { Plus, Trash2, Check, ChevronsUpDown, Bus, Route } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Bus, Route, Banknote, CreditCard } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -56,12 +57,21 @@ interface APInvoiceFormProps {
 export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceFormProps) => {
   const { data: vendors } = useVendors();
   const { data: taxCodes } = useTaxCodes();
+  const { data: bankAccounts } = useBankAccounts();
   const createInvoice = useCreateAPInvoice();
   const updateInvoice = useUpdateAPInvoice();
+  const createPayment = useCreateAPPayment();
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const queryClient = useQueryClient();
 
   const isEditing = !!editingInvoice;
+
+  // Pay Now state
+  const [payNow, setPayNow] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
+  const [paymentBankAccountId, setPaymentBankAccountId] = useState("");
+  const [paymentChequeNumber, setPaymentChequeNumber] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
 
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 },
@@ -391,7 +401,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
           lines: lineData,
         });
       } else {
-        await createInvoice.mutateAsync({
+        const invoiceResult = await createInvoice.mutateAsync({
           invoice_number: data.invoice_number,
           vendor_id: data.vendor_id,
           invoice_date: data.invoice_date,
@@ -406,6 +416,32 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
           school_route_id: selectedSchoolRouteId || undefined,
           lines: lineData,
         });
+
+        // Sequential payment creation if Pay Now is enabled
+        if (payNow && invoiceResult?.id) {
+          try {
+            const payNum = `PAY-${Date.now().toString().slice(-8)}`;
+            await createPayment.mutateAsync({
+              payment_number: payNum,
+              vendor_id: data.vendor_id,
+              payment_date: data.invoice_date,
+              amount: netPayable,
+              payment_method: paymentMethod,
+              bank_account_id: paymentBankAccountId || undefined,
+              cheque_number: paymentChequeNumber || undefined,
+              reference: paymentReference || undefined,
+              notes: `Auto-payment for ${data.invoice_number}`,
+              allocations: [{
+                invoice_id: invoiceResult.id,
+                allocated_amount: netPayable,
+                wht_deducted: whtAmount > 0 ? whtAmount : undefined,
+              }],
+            });
+            toast.success("Invoice & Payment recorded successfully");
+          } catch (payErr: any) {
+            toast.error(`Invoice created but payment failed: ${payErr.message}. You can pay manually from the Payments tab.`);
+          }
+        }
       }
       onOpenChange(false);
       form.reset();
@@ -413,12 +449,17 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
       setSelectedRouteId("");
       setSelectedBusId("");
       setSelectedSchoolRouteId("");
+      setPayNow(false);
+      setPaymentMethod("bank_transfer");
+      setPaymentBankAccountId("");
+      setPaymentChequeNumber("");
+      setPaymentReference("");
     } catch (error) {
       // Error handled by mutation
     }
   };
 
-  const isPending = isEditing ? updateInvoice.isPending : createInvoice.isPending;
+  const isPending = isEditing ? updateInvoice.isPending : (createInvoice.isPending || createPayment.isPending);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -880,12 +921,81 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
               )}
             />
 
+            {/* Pay Now (Optional) - only for new invoices */}
+            {!isEditing && (
+              <div className="border rounded-lg p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Banknote className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium text-sm">Pay Now (Optional)</span>
+                  </div>
+                  <Switch checked={payNow} onCheckedChange={setPayNow} />
+                </div>
+
+                {payNow && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Payment Method</label>
+                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="cheque">Cheque</SelectItem>
+                          <SelectItem value="cash">Cash</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Bank Account</label>
+                      <Select value={paymentBankAccountId} onValueChange={setPaymentBankAccountId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select bank account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {bankAccounts?.map((acc) => (
+                            <SelectItem key={acc.id} value={acc.id}>
+                              {acc.account_name} - {acc.bank_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {paymentMethod === "cheque" && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Cheque Number</label>
+                        <Input
+                          value={paymentChequeNumber}
+                          onChange={(e) => setPaymentChequeNumber(e.target.value)}
+                          placeholder="Cheque number"
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Reference</label>
+                      <Input
+                        value={paymentReference}
+                        onChange={(e) => setPaymentReference(e.target.value)}
+                        placeholder="Payment reference"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? (isEditing ? "Updating..." : "Recording...") : (isEditing ? "Update Invoice" : "Record Invoice")}
+                {isPending
+                  ? (isEditing ? "Updating..." : (payNow ? "Recording & Paying..." : "Recording..."))
+                  : (isEditing ? "Update Invoice" : (payNow ? "Record Invoice & Pay" : "Record Invoice"))}
               </Button>
             </div>
           </form>
