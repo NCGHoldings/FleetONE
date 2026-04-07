@@ -309,12 +309,33 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
               <th style="border: 1px solid #ddd; padding: 6px; text-align: center; background: #f1f1f1; width: 15%;">Vehicle No</th>
               <th style="border: 1px solid #ddd; padding: 6px; text-align: center; background: #f1f1f1; width: 20%;">Amount</th>
             </tr>
-            <tr>
-              <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- External</td>
-              <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${itemDetail}<br><br>Remark: ${data.vehicleNo || '-'} ${data.driverName ? `(D) ${data.driverName}` : ''} ${data.conductorName ? `(C) ${data.conductorName}` : ''}</td>
-              <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${data.vehicleNo || '-'}</td>
-              <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-weight: bold;">${subTotal.toLocaleString()}.00</td>
-            </tr>
+            ${(() => {
+              const vehicleList = (data.vehicleNo || '-').split(',').map(v => v.trim()).filter(Boolean);
+              const driverList = (data.driverName || '').split(',').map(v => v.trim());
+              const conductorList = (data.conductorName || '').split(',').map(v => v.trim());
+              const busCount = Math.max(data.numberOfBuses || 1, vehicleList.length);
+              
+              if (busCount > 1 && vehicleList.length > 1) {
+                const perBusAmount = Math.round(subTotal / busCount);
+                return vehicleList.map((vNo, idx) => {
+                  const driver = driverList[idx] || '';
+                  const conductor = conductorList[idx] || '';
+                  return `<tr>
+                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- External</td>
+                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${itemDetail}<br><br>Remark: ${vNo} ${driver ? `(D) ${driver}` : ''} ${conductor ? `(C) ${conductor}` : ''}</td>
+                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${vNo}</td>
+                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-weight: bold;">${perBusAmount.toLocaleString()}.00</td>
+                  </tr>`;
+                }).join('');
+              } else {
+                return `<tr>
+                  <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- External</td>
+                  <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${itemDetail}<br><br>Remark: ${data.vehicleNo || '-'} ${data.driverName ? `(D) ${data.driverName}` : ''} ${data.conductorName ? `(C) ${data.conductorName}` : ''}</td>
+                  <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${data.vehicleNo || '-'}</td>
+                  <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-weight: bold;">${subTotal.toLocaleString()}.00</td>
+                </tr>`;
+              }
+            })()}
           </table>
 
           <table style="width: 100%; max-width: 300px; float: right; border-collapse: collapse; margin-top: 12px; font-size: 14px;">

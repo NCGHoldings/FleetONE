@@ -14,6 +14,7 @@ interface VehicleAssignmentModalProps {
   onClose: () => void;
   quotationId: string;
   quotationNo: string;
+  numberOfBuses?: number;
   currentAssignment: {
     driver_name?: string | null;
     conductor_name?: string | null;
@@ -22,7 +23,7 @@ interface VehicleAssignmentModalProps {
   onSave: () => void;
 }
 
-interface Bus {
+interface BusRecord {
   id: string;
   bus_no: string;
   model: string;
@@ -30,19 +31,25 @@ interface Bus {
   status: string;
 }
 
+interface BusSlot {
+  busNo: string;
+  driverName: string;
+  conductorName: string;
+}
+
 export function VehicleAssignmentModal({
   isOpen,
   onClose,
   quotationId,
   quotationNo,
+  numberOfBuses = 1,
   currentAssignment,
   onSave
 }: VehicleAssignmentModalProps) {
-  const [driverName, setDriverName] = useState(currentAssignment.driver_name || '');
-  const [conductorName, setConductorName] = useState(currentAssignment.conductor_name || '');
-  const [busNo, setBusNo] = useState(currentAssignment.bus_no || '');
+  const slotCount = Math.max(1, numberOfBuses);
+  const [slots, setSlots] = useState<BusSlot[]>([]);
   const [loading, setLoading] = useState(false);
-  const [buses, setBuses] = useState<Bus[]>([]);
+  const [buses, setBuses] = useState<BusRecord[]>([]);
   const [busesLoading, setBusesLoading] = useState(false);
 
   // Load available buses
@@ -70,24 +77,42 @@ export function VehicleAssignmentModal({
     }
   }, [isOpen]);
 
-  // Reset form when modal opens with new data
+  // Parse comma-separated values into slots when modal opens
   useEffect(() => {
     if (isOpen) {
-      setDriverName(currentAssignment.driver_name || '');
-      setConductorName(currentAssignment.conductor_name || '');
-      setBusNo(currentAssignment.bus_no || '');
+      const busNos = (currentAssignment.bus_no || '').split(',').map(s => s.trim()).filter(Boolean);
+      const drivers = (currentAssignment.driver_name || '').split(',').map(s => s.trim()).filter(Boolean);
+      const conductors = (currentAssignment.conductor_name || '').split(',').map(s => s.trim()).filter(Boolean);
+
+      const newSlots: BusSlot[] = [];
+      for (let i = 0; i < slotCount; i++) {
+        newSlots.push({
+          busNo: busNos[i] || '',
+          driverName: drivers[i] || '',
+          conductorName: conductors[i] || '',
+        });
+      }
+      setSlots(newSlots);
     }
-  }, [isOpen, currentAssignment]);
+  }, [isOpen, currentAssignment, slotCount]);
+
+  const updateSlot = (index: number, field: keyof BusSlot, value: string) => {
+    setSlots(prev => prev.map((slot, i) => i === index ? { ...slot, [field]: value } : slot));
+  };
 
   const handleSave = async () => {
     setLoading(true);
     try {
+      const busNoJoined = slots.map(s => s.busNo).filter(Boolean).join(', ');
+      const driverJoined = slots.map(s => s.driverName).filter(Boolean).join(', ');
+      const conductorJoined = slots.map(s => s.conductorName).filter(Boolean).join(', ');
+
       const { error } = await supabase
         .from('special_hire_quotations')
         .update({
-          assigned_driver_name: driverName || null,
-          assigned_conductor_name: conductorName || null,
-          assigned_bus_no: busNo || null,
+          assigned_driver_name: driverJoined || null,
+          assigned_conductor_name: conductorJoined || null,
+          assigned_bus_no: busNoJoined || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', quotationId);
@@ -105,108 +130,121 @@ export function VehicleAssignmentModal({
     }
   };
 
-  const handleBusSelect = (selectedBusNo: string) => {
-    setBusNo(selectedBusNo);
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bus className="w-5 h-5 text-primary" />
             Vehicle Assignment
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">{quotationNo}</p>
+          <p className="text-sm text-muted-foreground">
+            {quotationNo} — {slotCount} bus{slotCount > 1 ? 'es' : ''}
+          </p>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Driver Name */}
-          <div className="space-y-2">
-            <Label htmlFor="driver" className="flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-blue-500" />
-              Driver Name
-            </Label>
-            <Input
-              id="driver"
-              value={driverName}
-              onChange={(e) => setDriverName(e.target.value)}
-              placeholder="Enter driver name"
-            />
-          </div>
+          {slots.map((slot, index) => (
+            <Card key={index} className="border-dashed">
+              <CardContent className="p-4 space-y-3">
+                {slotCount > 1 && (
+                  <p className="text-xs font-semibold text-muted-foreground">Bus {index + 1} of {slotCount}</p>
+                )}
 
-          {/* Conductor Name */}
-          <div className="space-y-2">
-            <Label htmlFor="conductor" className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-green-500" />
-              Conductor Name
-            </Label>
-            <Input
-              id="conductor"
-              value={conductorName}
-              onChange={(e) => setConductorName(e.target.value)}
-              placeholder="Enter conductor name"
-            />
-          </div>
+                {/* Bus Number */}
+                <div className="space-y-1">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Bus className="w-3.5 h-3.5 text-purple-500" />
+                    Bus Number
+                  </Label>
+                  <div className="flex gap-2">
+                    <Select value={slot.busNo} onValueChange={(v) => updateSlot(index, 'busNo', v)}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select a bus" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {busesLoading ? (
+                          <SelectItem value="loading" disabled>Loading buses...</SelectItem>
+                        ) : buses.length === 0 ? (
+                          <SelectItem value="none" disabled>No active buses found</SelectItem>
+                        ) : (
+                          buses.map((bus) => (
+                            <SelectItem key={bus.id} value={bus.bus_no}>
+                              {bus.bus_no} - {bus.model} ({bus.capacity} seats)
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={slot.busNo}
+                      onChange={(e) => updateSlot(index, 'busNo', e.target.value)}
+                      placeholder="Or type"
+                      className="w-28"
+                    />
+                  </div>
+                </div>
 
-          {/* Bus Number - with dropdown */}
-          <div className="space-y-2">
-            <Label htmlFor="bus" className="flex items-center gap-2">
-              <Bus className="w-4 h-4 text-purple-500" />
-              Bus Number
-            </Label>
-            <div className="flex gap-2">
-              <Select value={busNo} onValueChange={handleBusSelect}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Select a bus or type manually" />
-                </SelectTrigger>
-                <SelectContent>
-                  {busesLoading ? (
-                    <SelectItem value="loading" disabled>Loading buses...</SelectItem>
-                  ) : buses.length === 0 ? (
-                    <SelectItem value="none" disabled>No active buses found</SelectItem>
-                  ) : (
-                    buses.map((bus) => (
-                      <SelectItem key={bus.id} value={bus.bus_no}>
-                        {bus.bus_no} - {bus.model} ({bus.capacity} seats)
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              <Input
-                value={busNo}
-                onChange={(e) => setBusNo(e.target.value)}
-                placeholder="Or type bus no"
-                className="w-32"
-              />
-            </div>
-          </div>
+                {/* Driver */}
+                <div className="space-y-1">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <UserPlus className="w-3.5 h-3.5 text-blue-500" />
+                    Driver Name
+                  </Label>
+                  <Input
+                    value={slot.driverName}
+                    onChange={(e) => updateSlot(index, 'driverName', e.target.value)}
+                    placeholder="Enter driver name"
+                  />
+                </div>
 
-          {/* Current Assignment Preview */}
-          {(driverName || conductorName || busNo) && (
+                {/* Conductor */}
+                <div className="space-y-1">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Users className="w-3.5 h-3.5 text-green-500" />
+                    Conductor Name
+                  </Label>
+                  <Input
+                    value={slot.conductorName}
+                    onChange={(e) => updateSlot(index, 'conductorName', e.target.value)}
+                    placeholder="Enter conductor name"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Preview */}
+          {slots.some(s => s.busNo || s.driverName || s.conductorName) && (
             <Card className="bg-muted/50">
               <CardContent className="p-3">
                 <p className="text-xs font-medium text-muted-foreground mb-2">Assignment Preview:</p>
-                <div className="space-y-1 text-sm">
-                  {driverName && (
-                    <div className="flex items-center gap-2">
-                      <UserPlus className="w-3 h-3 text-blue-500" />
-                      <span>{driverName}</span>
-                    </div>
-                  )}
-                  {conductorName && (
-                    <div className="flex items-center gap-2">
-                      <Users className="w-3 h-3 text-green-500" />
-                      <span>{conductorName}</span>
-                    </div>
-                  )}
-                  {busNo && (
-                    <div className="flex items-center gap-2">
-                      <Bus className="w-3 h-3 text-purple-500" />
-                      <span>{busNo}</span>
-                    </div>
-                  )}
+                <div className="space-y-2 text-sm">
+                  {slots.map((slot, i) => (
+                    (slot.busNo || slot.driverName || slot.conductorName) && (
+                      <div key={i} className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        {slotCount > 1 && <span className="text-xs font-semibold text-muted-foreground">Bus {i + 1}:</span>}
+                        {slot.busNo && (
+                          <span className="flex items-center gap-1">
+                            <Bus className="w-3 h-3 text-purple-500" />
+                            {slot.busNo}
+                          </span>
+                        )}
+                        {slot.driverName && (
+                          <span className="flex items-center gap-1">
+                            <UserPlus className="w-3 h-3 text-blue-500" />
+                            {slot.driverName}
+                          </span>
+                        )}
+                        {slot.conductorName && (
+                          <span className="flex items-center gap-1">
+                            <Users className="w-3 h-3 text-green-500" />
+                            {slot.conductorName}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  ))}
                 </div>
               </CardContent>
             </Card>
