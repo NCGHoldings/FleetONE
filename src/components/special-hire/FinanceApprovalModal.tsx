@@ -116,9 +116,12 @@ export const FinanceApprovalModal = ({
 
       const result = await getDocumentsByQuotation(paymentDetails.quotation_id);
       if (result.success && result.documents && result.documents.length > 0) {
-        // Check for existing signatures on the first document (they usually share signatures)
-        const firstDoc = result.documents[0];
-        const signaturesResult = await getDocumentApprovals(firstDoc.id);
+        // Filter to documents for this specific payment
+        const paymentDocs = result.documents.filter(doc => doc.payment_id === paymentData.id);
+        const docToCheck = paymentDocs.length > 0 ? paymentDocs[0] : result.documents[0];
+        
+        // Load signatures using the actual document ID
+        const signaturesResult = await getDocumentApprovals(docToCheck.id);
         
         if (signaturesResult.success) {
           const existingSigs: any = {};

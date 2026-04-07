@@ -919,64 +919,16 @@ export function ConfirmedTripsTable() {
       const { success, documents } = await getDocumentsByQuotation(quotation.id);
       
       if (success && documents && documents.length > 0) {
-        // Show the most recent document
-        const latestDocument = documents[0];
+        // Prefer approved over draft, then most recent
+        const approved = documents.filter(d => d.document_status === 'approved');
+        const latestDocument = approved.length > 0 ? approved[0] : documents[0];
         setCurrentDocument(latestDocument);
         setDocumentViewerOpen(true);
         return;
       }
 
-      // Fetch adjustment data if available
-      const { data: adjustment } = await supabase
-        .from('special_hire_trip_adjustments')
-        .select('*')
-        .eq('quotation_id', quotation.id)
-        .eq('adjustment_status', 'finalized')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      // Fallback to old invoice generation if no stored documents
-      const invoiceData: InvoiceData = {
-        invoiceNo: `INV-${Date.now()}`,
-        invoiceType: 'balance' as const,
-        quotationNo: quotation.quotation_no,
-        customerName: quotation.customer_name,
-        customerPhone: quotation.customer_phone || '',
-        customerEmail: quotation.customer_email,
-        companyName: quotation.company_name,
-        pickupLocation: quotation.pickup_location,
-        dropLocation: quotation.drop_location,
-        pickupDate: new Date(quotation.pickup_datetime),
-        dropDate: new Date(quotation.drop_datetime || quotation.pickup_datetime),
-        busType: (() => { try { const fd = typeof (quotation as any).bus_fleet_details === 'string' ? JSON.parse((quotation as any).bus_fleet_details) : (quotation as any).bus_fleet_details; return fd?.buses?.[0]?.bus_type_name || (quotation as any).bus_types?.name || 'Standard Bus'; } catch { return 'Standard Bus'; } })(),
-        numberOfBuses: quotation.number_of_buses,
-        numberOfPassengers: quotation.number_of_passengers,
-        totalAmount: calculateTotalAmount(quotation),
-        advanceAmount: quotation.advance_paid || 0,
-        paidAmount: quotation.total_paid || 0,
-        companyLogo: companyLogo,
-        vehicleNo: quotation.assigned_bus_no,
-        driverName: quotation.assigned_driver_name,
-        conductorName: quotation.assigned_conductor_name,
-        // Real trip distance from quotation
-        tripDistance: (quotation as any).km_trip || (quotation as any).total_distance_km,
-        totalKm: ((quotation as any).km_parking_to_pickup || 0) + ((quotation as any).km_trip || 0) + ((quotation as any).km_drop_to_parking || 0),
-        // Include adjustment data if available
-        hasAdjustments: !!adjustment,
-        originalQuotedKm: adjustment?.original_quoted_km,
-        actualKmTraveled: adjustment?.actual_km_traveled,
-        extraKm: adjustment?.extra_km,
-        extraKmChargePerKm: adjustment?.extra_km_charge_per_km,
-        extraKmTotalCharge: adjustment?.extra_km_total_charge,
-        additionalExpenses: (adjustment?.additional_expenses as any[]) || [],
-        totalAdditionalExpenses: adjustment?.total_additional_expenses,
-        adjustmentNotes: adjustment?.notes,
-        hideSignaturePage,
-      };
-
-      setCurrentInvoiceData(invoiceData);
-      setInvoiceViewerOpen(true);
+      // No stored documents — show a message instead of generating ad-hoc preview
+      toast.info('No documents have been generated for this quotation yet. A document will be created when a payment is confirmed.');
     } catch (error) {
       console.error('Error viewing documents:', error);
       toast.error('Failed to load documents');
@@ -2073,17 +2025,7 @@ export function ConfirmedTripsTable() {
         />
       )}
 
-      {invoiceViewerOpen && currentInvoiceData && (
-        <InvoiceViewer
-          isOpen={invoiceViewerOpen}
-          onClose={() => {
-            setInvoiceViewerOpen(false);
-            setCurrentInvoiceData(null);
-          }}
-          invoiceData={currentInvoiceData}
-          onDownload={handleDownloadInvoice}
-        />
-      )}
+      {/* InvoiceViewer removed — all document viewing goes through DocumentViewer */}
       {/* Advance Details Modal */}
       {selectedTrip && (
         <AdvanceDetailsModal

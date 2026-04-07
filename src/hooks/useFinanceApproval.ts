@@ -282,29 +282,40 @@ companyId: effectiveCompanyId,
           .single();
 
         if (setting?.is_enabled && setting.default_user_id) {
-          const { data: existingApproval } = await supabase
-            .from('document_approvals')
+          // Find documents for this payment to get actual document IDs
+          const { data: paymentDocs } = await supabase
+            .from('document_storage')
             .select('id')
-            .eq('document_id', paymentData.quotation.id)
-            .eq('approval_type', 'checked_by')
-            .maybeSingle();
+            .eq('payment_id', paymentId)
+            .limit(1);
+          
+          const actualDocId = paymentDocs?.[0]?.id;
+          
+          if (actualDocId) {
+            const { data: existingApproval } = await supabase
+              .from('document_approvals')
+              .select('id')
+              .eq('document_id', actualDocId)
+              .eq('approval_type', 'checked_by')
+              .maybeSingle();
 
-          if (!existingApproval) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('first_name, last_name, signature_data, user_id')
-              .eq('user_id', setting.default_user_id)
-              .single();
+            if (!existingApproval) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('first_name, last_name, signature_data, user_id')
+                .eq('user_id', setting.default_user_id)
+                .single();
 
-            if (profile?.signature_data) {
-              await supabase.from('document_approvals').insert({
-                document_id: paymentData.quotation.id,
-                approval_type: 'checked_by',
-                approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-                signature_data: profile.signature_data,
-                approval_date: new Date().toISOString().split('T')[0],
-                user_id: profile.user_id,
-              });
+              if (profile?.signature_data) {
+                await supabase.from('document_approvals').insert({
+                  document_id: actualDocId,
+                  approval_type: 'checked_by',
+                  approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+                  signature_data: profile.signature_data,
+                  approval_date: new Date().toISOString().split('T')[0],
+                  user_id: profile.user_id,
+                });
+              }
             }
           }
         }
@@ -427,7 +438,7 @@ companyId: effectiveCompanyId,
       const totalApprovedPaid = (approvedPaymentsList || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
       for (const doc of draftDocuments || []) {
-        let docApprovals = await getDocumentApprovals(paymentData.quotation.id);
+        let docApprovals = await getDocumentApprovals(doc.id);
         if (signatures) {
           docApprovals = { ...docApprovals, ...signatures };
         }
