@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Upload, CheckCircle2, AlertCircle, PlusCircle, Loader2, FileSpreadsheet, Trash2, Ban } from "lucide-react";
+import { Upload, CheckCircle2, AlertCircle, PlusCircle, Loader2, FileSpreadsheet, Trash2, Ban, ArrowRight } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -19,34 +19,39 @@ interface FleetVehicleDataImportProps {
   onSuccess?: () => void;
 }
 
+interface MappedData {
+  bus_no?: string;
+  vehicle_name?: string;
+  vehicle_brand?: string;
+  permit_no?: string;
+  permit_category?: string;
+  capacity?: number;
+  chassis_number?: string;
+  engine_number?: string;
+  type?: string;
+  route?: string;
+  year?: number;
+  owner_name?: string;
+  owner_address?: string;
+  owner_nic?: string;
+  ownership_type?: string;
+  leasing_bank?: string;
+  leasing_end_date?: string;
+  permit_expiry_date?: string;
+  revenue_license_expiry?: string;
+  revenue_amount?: number;
+  insurance_company?: string;
+  insurance_expiry?: string;
+  insurance_month?: string;
+  default_driver_name?: string;
+  driver_phone?: string;
+  documents_status?: string;
+}
+
 interface ParsedRow {
   rowIndex: number;
   raw: Record<string, any>;
-  mapped: {
-    bus_no?: string;
-    vehicle_name?: string;
-    vehicle_brand?: string;
-    permit_no?: string;
-    permit_category?: string;
-    capacity?: number;
-    chassis_number?: string;
-    engine_number?: string;
-    type?: string;
-    route?: string;
-    year?: number;
-    owner_name?: string;
-    owner_address?: string;
-    owner_nic?: string;
-    leasing_bank?: string;
-    leasing_end_date?: string;
-    permit_expiry_date?: string;
-    revenue_license_expiry?: string;
-    insurance_company?: string;
-    insurance_expiry?: string;
-    default_driver_name?: string;
-    driver_phone?: string;
-    documents_status?: string;
-  };
+  mapped: MappedData;
   matchStatus: "matched" | "new" | "no_bus_no";
   matchedBusId?: string;
   matchedBusNo?: string;
@@ -59,46 +64,81 @@ interface UnmatchedDbBus {
   selected: boolean;
 }
 
-const HEADER_SYNONYMS: Record<string, string[]> = {
-  bus_no: ["vehicle no", "vehicle number", "bus no", "bus number", "reg no", "registration", "reg. no", "veh no", "v.no", "bus reg", "registration number", "reg number"],
-  vehicle_name: ["vehicle name", "name", "veh name"],
-  vehicle_brand: ["vehicle brand", "brand", "make", "manufacturer"],
-  permit_no: ["permit no", "permit number", "permit"],
-  permit_category: ["permit catagory", "permit category", "permit cat"],
-  capacity: ["seating capacity", "capacity", "seats", "seat capacity"],
-  chassis_number: ["chassie no", "chassis no", "chassis number", "chassie number", "chasis no", "chasi no", "chassis"],
-  engine_number: ["engine no", "engine number", "engine"],
-  type: ["usage type", "usage", "type"],
-  route: ["allocation route", "route", "allocated route", "route allocation"],
-  year: ["yom", "year of manufacture", "year", "manufacture year", "mfg year", "manufacturing year"],
-  owner_name: ["ownership", "owner", "owner name", "owner's name", "owners name"],
-  owner_address: ["owner's address", "owner address", "address", "owners address"],
-  owner_nic: ["owner's id", "owner id", "nic", "owner nic", "owners id", "id no"],
-  leasing_bank: ["leasing bank", "leasing", "bank", "finance company"],
-  leasing_end_date: ["leasing end date", "leasing end", "lease end", "lease end date"],
-  permit_expiry_date: ["permit expiry date", "permit expiry", "permit expire"],
-  revenue_license_expiry: ["revenue expire", "revenue expiry", "revenue license", "revenue licence", "revenue license expiry", "amount revenue expire", "days to revenue", "licence", "license"],
-  insurance_company: ["insurence company", "insurance company", "insurer", "insurance"],
-  insurance_expiry: ["insurence expiry date", "insurance expiry date", "insurance expiry", "insurence expiry", "days to expire insurence", "insurence month"],
-  default_driver_name: ["driver name", "driver"],
-  documents_status: ["documents", "document", "docs"],
-  driver_phone: ["phone number", "phone", "driver phone", "contact", "contact number", "mobile"],
-};
+interface ImportError {
+  busNo: string;
+  error: string;
+}
 
-function detectHeaders(headers: string[]): Record<string, number> {
+// Deterministic header mapping — exact match first, then approved aliases
+// No generic single-word aliases like "name", "owner", "insurance", "phone"
+const FIELD_MAPPINGS: { field: string; exact: string[]; aliases: string[] }[] = [
+  { field: "bus_no", exact: ["vehicle no", "vehicle number", "bus no", "bus number"], aliases: ["reg no", "registration number", "reg. no", "veh no", "v.no", "bus reg"] },
+  { field: "vehicle_name", exact: ["vehicle name", "veh name"], aliases: [] },
+  { field: "vehicle_brand", exact: ["vehicle brand", "brand", "make"], aliases: ["manufacturer"] },
+  { field: "permit_no", exact: ["permit no", "permit number"], aliases: [] },
+  { field: "permit_category", exact: ["permit catagory", "permit category"], aliases: ["permit cat"] },
+  { field: "capacity", exact: ["seating capacity", "seat capacity"], aliases: ["capacity", "seats"] },
+  { field: "chassis_number", exact: ["chassie no", "chassis no", "chassis number", "chassie number"], aliases: ["chasis no", "chasi no"] },
+  { field: "engine_number", exact: ["engine no", "engine number"], aliases: [] },
+  { field: "type", exact: ["usage type"], aliases: [] },
+  { field: "route", exact: ["allocation route", "allocated route", "route allocation"], aliases: [] },
+  { field: "year", exact: ["yom", "year of manufacture"], aliases: ["manufacture year", "mfg year", "manufacturing year"] },
+  { field: "owner_name", exact: ["ownership", "owner name", "owner's name"], aliases: ["owners name"] },
+  { field: "owner_address", exact: ["owner's address", "owner address", "owners address"], aliases: [] },
+  { field: "owner_nic", exact: ["owner's id", "owner id", "owner nic", "owners id"], aliases: ["nic", "id no"] },
+  { field: "leasing_bank", exact: ["leasing bank"], aliases: ["finance company"] },
+  { field: "leasing_end_date", exact: ["leasing end date", "leasing end"], aliases: ["lease end", "lease end date"] },
+  { field: "permit_expiry_date", exact: ["permit expiry date", "permit expiry"], aliases: ["permit expire"] },
+  { field: "revenue_license_expiry", exact: ["revenue expire", "revenue expiry", "revenue license expiry", "revenue licence expiry", "amount revenue expire"], aliases: ["days to revenue"] },
+  { field: "revenue_amount", exact: ["amount revenue", "revenue amount"], aliases: [] },
+  { field: "insurance_company", exact: ["insurence company", "insurance company"], aliases: ["insurer"] },
+  { field: "insurance_expiry", exact: ["insurence expiry date", "insurance expiry date", "insurance expiry", "insurence expiry"], aliases: ["days to expire insurence"] },
+  { field: "insurance_month", exact: ["insurence month", "insurance month"], aliases: [] },
+  { field: "default_driver_name", exact: ["driver name"], aliases: [] },
+  { field: "driver_phone", exact: ["phone number", "driver phone", "contact number"], aliases: ["mobile"] },
+  { field: "documents_status", exact: ["documents", "document status"], aliases: ["docs"] },
+  // "licence" alone maps to revenue license
+  { field: "revenue_license_expiry_alt", exact: ["licence", "license"], aliases: [] },
+];
+
+function detectHeaders(headers: string[]): { mapping: Record<string, number>; headerMap: { excel: string; field: string }[] } {
   const mapping: Record<string, number> = {};
+  const headerMap: { excel: string; field: string }[] = [];
+  const usedIndices = new Set<number>();
+
+  // Pass 1: exact matches
   headers.forEach((h, idx) => {
-    if (!h) return;
+    if (!h || usedIndices.has(idx)) return;
     const normalized = h.toString().trim().toLowerCase();
-    for (const [field, synonyms] of Object.entries(HEADER_SYNONYMS)) {
-      if (mapping[field] !== undefined) continue;
-      if (synonyms.some(s => normalized === s || normalized.includes(s))) {
-        mapping[field] = idx;
+    for (const fm of FIELD_MAPPINGS) {
+      const targetField = fm.field === "revenue_license_expiry_alt" ? "revenue_license_expiry" : fm.field;
+      if (mapping[targetField] !== undefined) continue;
+      if (fm.exact.some(s => normalized === s)) {
+        mapping[targetField] = idx;
+        usedIndices.add(idx);
+        headerMap.push({ excel: h.toString().trim(), field: targetField });
         break;
       }
     }
   });
-  return mapping;
+
+  // Pass 2: alias matches for unmapped fields
+  headers.forEach((h, idx) => {
+    if (!h || usedIndices.has(idx)) return;
+    const normalized = h.toString().trim().toLowerCase();
+    for (const fm of FIELD_MAPPINGS) {
+      const targetField = fm.field === "revenue_license_expiry_alt" ? "revenue_license_expiry" : fm.field;
+      if (mapping[targetField] !== undefined) continue;
+      if (fm.aliases.some(s => normalized === s || normalized.includes(s))) {
+        mapping[targetField] = idx;
+        usedIndices.add(idx);
+        headerMap.push({ excel: h.toString().trim(), field: targetField });
+        break;
+      }
+    }
+  });
+
+  return { mapping, headerMap };
 }
 
 function parseExcelDate(val: any): string | undefined {
@@ -119,6 +159,19 @@ function parseExcelDate(val: any): string | undefined {
   return undefined;
 }
 
+// Only these fields are valid columns on the buses table
+const VALID_BUS_COLUMNS = new Set([
+  "bus_no", "vehicle_name", "vehicle_brand", "permit_no", "permit_category",
+  "capacity", "chassis_number", "engine_number", "type", "route", "year",
+  "owner_name", "owner_address", "owner_nic", "ownership_type",
+  "leasing_bank", "leasing_end_date", "permit_expiry_date",
+  "revenue_license_expiry", "revenue_amount",
+  "insurance_company", "insurance_expiry", "insurance_month",
+  "default_driver_name", "driver_phone", "documents_status",
+  "model", "status", "current_mileage", "category_id", "sub_category_id",
+  "category_assignment_source", "import_raw_data",
+]);
+
 export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetVehicleDataImportProps) {
   const [step, setStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
@@ -126,6 +179,8 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
   const [unmatchedDbBuses, setUnmatchedDbBuses] = useState<UnmatchedDbBus[]>([]);
   const [unmatchedAction, setUnmatchedAction] = useState<"none" | "deactivate" | "delete">("none");
   const [summary, setSummary] = useState({ updated: 0, created: 0, skipped: 0, deactivated: 0, deleted: 0 });
+  const [headerMap, setHeaderMap] = useState<{ excel: string; field: string }[]>([]);
+  const [importErrors, setImportErrors] = useState<ImportError[]>([]);
   const { toast } = useToast();
 
   const resetState = () => {
@@ -135,6 +190,8 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
     setUnmatchedDbBuses([]);
     setUnmatchedAction("none");
     setSummary({ updated: 0, created: 0, skipped: 0, deactivated: 0, deleted: 0 });
+    setHeaderMap([]);
+    setImportErrors([]);
   };
 
   const onDrop = useCallback(async (files: File[]) => {
@@ -162,14 +219,14 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
       }
 
       const headers = Array.from(rawData[headerRowIdx] as any[]).map(h => String(h || "").trim());
-      const colMap = detectHeaders(headers);
+      const { mapping: colMap, headerMap: detectedHeaderMap } = detectHeaders(headers);
+      setHeaderMap(detectedHeaderMap);
 
-      if (!colMap.bus_no && colMap.bus_no !== 0) {
+      if (colMap.bus_no === undefined) {
         toast({ title: "Error", description: "Could not find 'Vehicle No' column in the Excel", variant: "destructive" });
         return;
       }
 
-      // Fetch existing buses
       const { data: existingBuses } = await supabase.from("buses").select("id, bus_no");
       const busMap = new Map<string, { id: string; bus_no: string }>();
       (existingBuses || []).forEach(b => busMap.set(normalizeBusNo(b.bus_no), b));
@@ -184,8 +241,14 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
         const getValue = (field: string) => {
           const idx = colMap[field];
           if (idx === undefined) return undefined;
-          const v = row[idx];
+          const v = row?.[idx];
           return v != null ? String(v).trim() : undefined;
+        };
+
+        const getDateValue = (field: string) => {
+          const idx = colMap[field];
+          if (idx === undefined) return undefined;
+          return parseExcelDate(row?.[idx]);
         };
 
         const busNo = getValue("bus_no");
@@ -193,31 +256,50 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
 
         excelBusNos.add(normalizeBusNo(busNo));
 
-        const mapped: ParsedRow["mapped"] = {
+        const capacityStr = getValue("capacity");
+        const yearStr = getValue("year");
+        const revenueStr = getValue("revenue_amount");
+
+        const mapped: MappedData = {
           bus_no: busNo,
           vehicle_name: getValue("vehicle_name"),
           vehicle_brand: getValue("vehicle_brand"),
           permit_no: getValue("permit_no"),
           permit_category: getValue("permit_category"),
-          capacity: getValue("capacity") ? parseInt(getValue("capacity")!) : undefined,
+          capacity: capacityStr ? parseInt(capacityStr) || undefined : undefined,
           chassis_number: getValue("chassis_number"),
           engine_number: getValue("engine_number"),
           type: getValue("type"),
           route: getValue("route"),
-          year: getValue("year") ? parseInt(getValue("year")!) : undefined,
+          year: yearStr ? parseInt(yearStr) || undefined : undefined,
           owner_name: getValue("owner_name"),
           owner_address: getValue("owner_address"),
           owner_nic: getValue("owner_nic"),
+          ownership_type: getValue("owner_name"), // "Ownership" column maps to ownership classification
           leasing_bank: getValue("leasing_bank"),
-          leasing_end_date: parseExcelDate(colMap.leasing_end_date !== undefined ? row[colMap.leasing_end_date] : undefined),
-          permit_expiry_date: parseExcelDate(colMap.permit_expiry_date !== undefined ? row[colMap.permit_expiry_date] : undefined),
-          revenue_license_expiry: parseExcelDate(colMap.revenue_license_expiry !== undefined ? row[colMap.revenue_license_expiry] : undefined),
+          leasing_end_date: getDateValue("leasing_end_date"),
+          permit_expiry_date: getDateValue("permit_expiry_date"),
+          revenue_license_expiry: getDateValue("revenue_license_expiry"),
+          revenue_amount: revenueStr ? parseFloat(revenueStr) || undefined : undefined,
           insurance_company: getValue("insurance_company"),
-          insurance_expiry: parseExcelDate(colMap.insurance_expiry !== undefined ? row[colMap.insurance_expiry] : undefined),
+          insurance_expiry: getDateValue("insurance_expiry"),
+          insurance_month: getValue("insurance_month"),
           default_driver_name: getValue("default_driver_name"),
           driver_phone: getValue("driver_phone"),
           documents_status: getValue("documents_status"),
         };
+
+        // If "Ownership" column was detected under owner_name but it's really an ownership type
+        // check if the value looks like a type (Own, Leased, Hired) vs a person's name
+        if (mapped.owner_name) {
+          const ownerLower = mapped.owner_name.toLowerCase();
+          if (["own", "leased", "hired", "company", "private"].includes(ownerLower)) {
+            mapped.ownership_type = mapped.owner_name;
+            mapped.owner_name = undefined;
+          } else {
+            mapped.ownership_type = undefined; // It's a real name, not a type
+          }
+        }
 
         const normalizedNo = normalizeBusNo(busNo);
         const match = busMap.get(normalizedNo);
@@ -233,11 +315,10 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
           matchStatus: match ? "matched" : "new",
           matchedBusId: match?.id,
           matchedBusNo: match?.bus_no,
-          fieldsToUpdate: fieldsToUpdate.filter(f => mapped[f as keyof typeof mapped] != null && String(mapped[f as keyof typeof mapped]).trim() !== ""),
+          fieldsToUpdate,
         });
       }
 
-      // Detect DB buses NOT in Excel — likely fake/test data
       const unmatched: UnmatchedDbBus[] = (existingBuses || [])
         .filter(b => !excelBusNos.has(normalizeBusNo(b.bus_no)))
         .map(b => ({ id: b.id, bus_no: b.bus_no, selected: true }));
@@ -264,25 +345,19 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
   const handleImport = async () => {
     setStep("importing");
     let updated = 0, created = 0, skipped = 0, deactivated = 0, deleted = 0;
+    const errors: ImportError[] = [];
 
-    // Fetch routes, categories, and sub-categories
-    const [{ data: routes }, { data: categories }, { data: subCategories }] = await Promise.all([
-      supabase.from("routes").select("id, route_name"),
+    const [{ data: categories }, { data: subCategories }] = await Promise.all([
       supabase.from("bus_categories").select("id, name"),
       supabase.from("bus_sub_categories").select("id, name, category_id"),
     ]);
 
-    const routeMap = new Map<string, string>();
-    (routes || []).forEach(r => routeMap.set(r.route_name.toLowerCase().trim(), r.id));
-
-    // Build category lookup
     const catByName = new Map<string, string>();
     (categories || []).forEach(c => catByName.set(c.name.toLowerCase().trim(), c.id));
 
     const subCatByName = new Map<string, string>();
     (subCategories || []).forEach(sc => subCatByName.set(sc.name.toLowerCase().trim(), sc.id));
 
-    // Map usage type → category
     const getCategoryId = (usageType?: string): string | undefined => {
       if (!usageType) return catByName.get("public bus");
       const u = usageType.toLowerCase().trim();
@@ -291,60 +366,69 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
       return catByName.get("public bus");
     };
 
-    // Map permit category → sub-category
     const getSubCategoryId = (permitCat?: string): string | undefined => {
       if (!permitCat) return undefined;
       const p = permitCat.toLowerCase().trim();
       if (p.includes("super luxury") || p.includes("super lux")) return subCatByName.get("super luxury");
       if (p.includes("semi")) return subCatByName.get("semi luxury");
-      // Try exact match
       return subCatByName.get(p);
     };
 
+    // Filter payload to only valid bus columns
+    const cleanPayload = (data: Record<string, any>): Record<string, any> => {
+      const cleaned: Record<string, any> = {};
+      for (const [k, v] of Object.entries(data)) {
+        if (VALID_BUS_COLUMNS.has(k) && v != null && String(v).trim() !== "") {
+          cleaned[k] = v;
+        }
+      }
+      return cleaned;
+    };
+
     for (const row of parsedRows) {
-      const updateData: Record<string, any> = {};
+      const rawUpdateData: Record<string, any> = {};
       for (const field of row.fieldsToUpdate) {
-        const val = row.mapped[field as keyof typeof row.mapped];
+        const val = row.mapped[field as keyof MappedData];
         if (val != null && String(val).trim() !== "") {
-          updateData[field] = val;
+          rawUpdateData[field] = val;
         }
       }
 
-      // Auto-assign category from Excel usage type & permit category
+      // Category assignment
       const categoryId = getCategoryId(row.mapped.type);
       const subCategoryId = getSubCategoryId(row.mapped.permit_category);
-      if (categoryId) updateData.category_id = categoryId;
-      if (subCategoryId) updateData.sub_category_id = subCategoryId;
+      if (categoryId) rawUpdateData.category_id = categoryId;
+      if (subCategoryId) rawUpdateData.sub_category_id = subCategoryId;
+      rawUpdateData.category_assignment_source = "excel_import";
+
+      // Store raw Excel data for audit
+      rawUpdateData.import_raw_data = row.raw;
 
       if (row.matchStatus === "matched" && row.matchedBusId) {
-        if (Object.keys(updateData).length === 0) { skipped++; continue; }
-        if (updateData.route && !updateData.route_id) {
-          const routeId = routeMap.get(String(updateData.route).toLowerCase().trim());
-          if (routeId) updateData.route_id = routeId;
-        }
-        const { error } = await supabase.from("buses").update(updateData).eq("id", row.matchedBusId);
+        const payload = cleanPayload(rawUpdateData);
+        delete payload.bus_no; // Don't update bus_no on existing
+        if (Object.keys(payload).length === 0) { skipped++; continue; }
+        const { error } = await supabase.from("buses").update(payload).eq("id", row.matchedBusId);
         if (error) {
           console.error("Update error for", row.mapped.bus_no, error);
+          errors.push({ busNo: row.mapped.bus_no || "?", error: error.message });
           skipped++;
         } else {
           updated++;
         }
       } else if (row.matchStatus === "new" && autoCreate) {
-        updateData.bus_no = row.mapped.bus_no;
-        updateData.status = "active";
-        if (!updateData.model) updateData.model = updateData.vehicle_brand || "Unknown";
-        if (!updateData.current_mileage) updateData.current_mileage = 0;
-        // NOT NULL defaults — prevent constraint violations
-        if (!updateData.type) updateData.type = "Public Transport";
-        if (!updateData.year) updateData.year = 2000;
-        if (!updateData.capacity) updateData.capacity = 54;
-        if (updateData.route) {
-          const routeId = routeMap.get(String(updateData.route).toLowerCase().trim());
-          if (routeId) updateData.route_id = routeId;
-        }
-        const { error } = await supabase.from("buses").insert(updateData as any);
+        rawUpdateData.bus_no = row.mapped.bus_no;
+        rawUpdateData.status = "active";
+        if (!rawUpdateData.model) rawUpdateData.model = rawUpdateData.vehicle_brand || "Unknown";
+        if (!rawUpdateData.current_mileage) rawUpdateData.current_mileage = 0;
+        if (!rawUpdateData.type) rawUpdateData.type = "Public Transport";
+        if (!rawUpdateData.year) rawUpdateData.year = 2000;
+        if (!rawUpdateData.capacity) rawUpdateData.capacity = 54;
+        const payload = cleanPayload(rawUpdateData);
+        const { error } = await supabase.from("buses").insert(payload as any);
         if (error) {
-          console.error("Insert error for", row.mapped.bus_no, error, JSON.stringify(updateData));
+          console.error("Insert error for", row.mapped.bus_no, error, JSON.stringify(payload));
+          errors.push({ busNo: row.mapped.bus_no || "?", error: error.message });
           skipped++;
         } else {
           created++;
@@ -369,6 +453,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
       }
     }
 
+    setImportErrors(errors);
     setSummary({ updated, created, skipped, deactivated, deleted });
     setStep("done");
     toast({
@@ -419,6 +504,22 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
 
         {step === "preview" && (
           <div className="space-y-4">
+            {/* Header mapping preview */}
+            {headerMap.length > 0 && (
+              <div className="border rounded-lg p-3 bg-muted/30">
+                <p className="text-xs font-semibold mb-2">Column Mapping ({headerMap.length} columns detected)</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {headerMap.map((m, i) => (
+                    <Badge key={i} variant="outline" className="text-[10px] gap-1 py-0.5">
+                      <span className="text-muted-foreground">{m.excel}</span>
+                      <ArrowRight className="w-2.5 h-2.5" />
+                      <span className="font-semibold">{m.field}</span>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <div className="flex gap-3">
                 <Badge variant="outline" className="gap-1 text-green-600 border-green-300">
@@ -439,7 +540,6 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
               </div>
             </div>
 
-            {/* Unmatched DB buses warning */}
             {unmatchedDbBuses.length > 0 && (
               <div className="border border-red-300 bg-red-50 dark:bg-red-950/20 rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2">
@@ -456,30 +556,19 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
                   <span className="text-xs text-muted-foreground mr-2">Select all</span>
                   {unmatchedDbBuses.map(bus => (
                     <label key={bus.id} className="flex items-center gap-1 text-xs bg-background border rounded px-2 py-1 cursor-pointer">
-                      <Checkbox
-                        checked={bus.selected}
-                        onCheckedChange={() => toggleUnmatchedBus(bus.id)}
-                      />
+                      <Checkbox checked={bus.selected} onCheckedChange={() => toggleUnmatchedBus(bus.id)} />
                       <span className="font-mono font-medium text-red-700 dark:text-red-400">{bus.bus_no}</span>
                     </label>
                   ))}
                 </div>
                 {selectedUnmatchedCount > 0 && (
                   <div className="flex gap-2 mt-1">
-                    <Button
-                      size="sm"
-                      variant={unmatchedAction === "deactivate" ? "default" : "outline"}
-                      className="text-xs h-7 gap-1"
-                      onClick={() => setUnmatchedAction(unmatchedAction === "deactivate" ? "none" : "deactivate")}
-                    >
+                    <Button size="sm" variant={unmatchedAction === "deactivate" ? "default" : "outline"} className="text-xs h-7 gap-1"
+                      onClick={() => setUnmatchedAction(unmatchedAction === "deactivate" ? "none" : "deactivate")}>
                       <Ban className="w-3 h-3" /> Flag as Inactive ({selectedUnmatchedCount})
                     </Button>
-                    <Button
-                      size="sm"
-                      variant={unmatchedAction === "delete" ? "destructive" : "outline"}
-                      className="text-xs h-7 gap-1"
-                      onClick={() => setUnmatchedAction(unmatchedAction === "delete" ? "none" : "delete")}
-                    >
+                    <Button size="sm" variant={unmatchedAction === "delete" ? "destructive" : "outline"} className="text-xs h-7 gap-1"
+                      onClick={() => setUnmatchedAction(unmatchedAction === "delete" ? "none" : "delete")}>
                       <Trash2 className="w-3 h-3" /> Delete Permanently ({selectedUnmatchedCount})
                     </Button>
                   </div>
@@ -521,7 +610,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
                       <td className="p-2 font-mono text-[10px]">{row.mapped.chassis_number || "-"}</td>
                       <td className="p-2 font-mono text-[10px]">{row.mapped.engine_number || "-"}</td>
                       <td className="p-2">{row.mapped.permit_no || "-"}</td>
-                      <td className="p-2">{row.mapped.owner_name || "-"}</td>
+                      <td className="p-2">{row.mapped.owner_name || row.mapped.ownership_type || "-"}</td>
                       <td className="p-2">{row.mapped.leasing_bank || "-"}</td>
                       <td className="p-2">{row.mapped.insurance_company || "-"}</td>
                       <td className="p-2">{row.mapped.default_driver_name || "-"}</td>
@@ -563,7 +652,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
         )}
 
         {step === "done" && (
-          <div className="flex flex-col items-center gap-4 py-12">
+          <div className="flex flex-col items-center gap-4 py-8">
             <CheckCircle2 className="w-16 h-16 text-green-500" />
             <p className="text-xl font-bold">Import Complete!</p>
             <div className="flex gap-4">
@@ -592,6 +681,26 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
                 </div>
               )}
             </div>
+
+            {/* Error details */}
+            {importErrors.length > 0 && (
+              <div className="w-full border border-red-300 bg-red-50 dark:bg-red-950/20 rounded-lg p-3 mt-2">
+                <p className="text-sm font-semibold text-red-700 dark:text-red-400 mb-2">
+                  {importErrors.length} Failed Rows:
+                </p>
+                <ScrollArea className="max-h-32">
+                  <div className="space-y-1">
+                    {importErrors.map((e, i) => (
+                      <div key={i} className="text-xs flex gap-2">
+                        <span className="font-mono font-medium text-red-700">{e.busNo}</span>
+                        <span className="text-muted-foreground">{e.error}</span>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+
             <Button onClick={() => { resetState(); onOpenChange(false); }} className="mt-4">Done</Button>
           </div>
         )}

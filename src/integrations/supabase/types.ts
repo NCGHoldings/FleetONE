@@ -4579,12 +4579,15 @@ export type Database = {
           created_at: string
           current_mileage: number | null
           default_driver_name: string | null
+          documents_status: string | null
           driver_phone: string | null
           engine_number: string | null
           expected_km_per_liter: number | null
           id: string
+          import_raw_data: Json | null
           insurance_company: string | null
           insurance_expiry: string | null
+          insurance_month: string | null
           last_alert_km: number | null
           last_alert_sent_at: string | null
           last_service_date: string | null
@@ -4598,10 +4601,12 @@ export type Database = {
           owner_address: string | null
           owner_name: string | null
           owner_nic: string | null
+          ownership_type: string | null
           permit_category: string | null
           permit_expiry_date: string | null
           permit_no: string | null
           registration_number: string | null
+          revenue_amount: number | null
           revenue_license_expiry: string | null
           route: string | null
           service_interval_km: number | null
@@ -4626,12 +4631,15 @@ export type Database = {
           created_at?: string
           current_mileage?: number | null
           default_driver_name?: string | null
+          documents_status?: string | null
           driver_phone?: string | null
           engine_number?: string | null
           expected_km_per_liter?: number | null
           id?: string
+          import_raw_data?: Json | null
           insurance_company?: string | null
           insurance_expiry?: string | null
+          insurance_month?: string | null
           last_alert_km?: number | null
           last_alert_sent_at?: string | null
           last_service_date?: string | null
@@ -4645,10 +4653,12 @@ export type Database = {
           owner_address?: string | null
           owner_name?: string | null
           owner_nic?: string | null
+          ownership_type?: string | null
           permit_category?: string | null
           permit_expiry_date?: string | null
           permit_no?: string | null
           registration_number?: string | null
+          revenue_amount?: number | null
           revenue_license_expiry?: string | null
           route?: string | null
           service_interval_km?: number | null
@@ -4673,12 +4683,15 @@ export type Database = {
           created_at?: string
           current_mileage?: number | null
           default_driver_name?: string | null
+          documents_status?: string | null
           driver_phone?: string | null
           engine_number?: string | null
           expected_km_per_liter?: number | null
           id?: string
+          import_raw_data?: Json | null
           insurance_company?: string | null
           insurance_expiry?: string | null
+          insurance_month?: string | null
           last_alert_km?: number | null
           last_alert_sent_at?: string | null
           last_service_date?: string | null
@@ -4692,10 +4705,12 @@ export type Database = {
           owner_address?: string | null
           owner_name?: string | null
           owner_nic?: string | null
+          ownership_type?: string | null
           permit_category?: string | null
           permit_expiry_date?: string | null
           permit_no?: string | null
           registration_number?: string | null
+          revenue_amount?: number | null
           revenue_license_expiry?: string | null
           route?: string | null
           service_interval_km?: number | null
