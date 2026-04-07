@@ -28,8 +28,8 @@ export interface DocumentTemplate {
   company_id?: string;
   template_type_id?: string;
   default_workflow_id?: string;
-  companies?: { name: string } | null;
-  document_template_types?: { type_name: string; type_code: string } | null;
+  companies?: { name: string; short_code?: string } | null;
+  document_template_types?: { type_name: string; type_code: string; module?: string } | null;
   section_mappings: {
     sections: ParsedDocumentSection[];
     systemPlaceholders: string[];
@@ -120,10 +120,7 @@ export const useDocumentTemplateTypes = () => {
   });
 };
 
-// Header mode type for document templates
-export type HeaderMode = 'header_image' | 'logo_only' | 'html_only' | 'logo_and_html';
-
-// Create a new template
+// Header mode re-exported from interface above
 export const useCreateDocumentTemplate = () => {
   const queryClient = useQueryClient();
   
