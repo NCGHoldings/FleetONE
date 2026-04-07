@@ -287,6 +287,14 @@ export default function Complaints() {
     }
 
     try {
+      const editIncidentDetails: Record<string, string> = {};
+      if (formData.routeNumber) editIncidentDetails.route_number = formData.routeNumber;
+      if (formData.busNumber) editIncidentDetails.bus_number = formData.busNumber;
+      if (formData.incidentDate) editIncidentDetails.incident_date = formData.incidentDate;
+      if (formData.incidentTime) editIncidentDetails.incident_time = formData.incidentTime;
+      if (formData.location) editIncidentDetails.location = formData.location;
+      if (formData.driverName) editIncidentDetails.driver_name = formData.driverName;
+
       const { error } = await supabase
         .from('feedback_complaints')
         .update({
@@ -296,6 +304,7 @@ export default function Complaints() {
           priority: formData.priority,
           type: formData.type,
           staff_group: formData.staff_group || null,
+          related_persons: Object.keys(editIncidentDetails).length > 0 ? editIncidentDetails : null
         })
         .eq('id', editingComplaint.id);
 
