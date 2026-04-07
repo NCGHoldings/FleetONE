@@ -34,6 +34,7 @@ interface VoucherItem {
   original_cost: number;
   selected: boolean;
   grn_line_id?: string;
+  weight?: number;
 }
 
 interface VoucherCharge {
@@ -108,7 +109,7 @@ export const CreateLandedCostVoucherModal = ({
         .from("goods_receipt_notes")
         .select("id, grn_number, receipt_date, status")
         .eq("company_id", selectedCompanyId!)
-        .order("received_date", { ascending: false });
+        .order("receipt_date", { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -198,10 +199,19 @@ export const CreateLandedCostVoucherModal = ({
   const totalOriginalCost = selectedItems.reduce((s, i) => s + i.original_cost, 0);
   const totalCharges = charges.reduce((s, c) => s + c.amount, 0);
 
+  const totalQuantity = selectedItems.reduce((s, i) => s + i.quantity, 0);
+  const totalWeight = selectedItems.reduce((s, i) => s + (i.weight || 0), 0);
+
   const getAllocation = (item: VoucherItem) => {
     if (selectedItems.length === 0 || totalCharges === 0) return 0;
     if (allocationMethod === "by_value") {
       return totalOriginalCost > 0 ? (item.original_cost / totalOriginalCost) * totalCharges : 0;
+    }
+    if (allocationMethod === "by_quantity") {
+      return totalQuantity > 0 ? (item.quantity / totalQuantity) * totalCharges : 0;
+    }
+    if (allocationMethod === "by_weight") {
+      return totalWeight > 0 ? ((item.weight || 0) / totalWeight) * totalCharges : 0;
     }
     return totalCharges / selectedItems.length;
   };
@@ -285,6 +295,8 @@ export const CreateLandedCostVoucherModal = ({
           grn_line_id: i.grn_line_id,
           item_id: i.item_id,
           original_cost: i.original_cost,
+          quantity: i.quantity,
+          weight: i.weight,
         })),
         charges: charges.map((c) => ({
           charge_type: c.charge_type,
@@ -446,6 +458,7 @@ export const CreateLandedCostVoucherModal = ({
                     <TableHead>Item Code</TableHead>
                     <TableHead>Item Name</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
+                    {allocationMethod === "by_weight" && <TableHead className="text-right">Weight (kg)</TableHead>}
                     <TableHead className="text-right">Unit Cost</TableHead>
                     <TableHead className="text-right">Total Cost</TableHead>
                     {entryMode === "manual" && <TableHead className="w-10"></TableHead>}
@@ -465,6 +478,25 @@ export const CreateLandedCostVoucherModal = ({
                       <TableCell className="font-mono text-sm">{item.item_code}</TableCell>
                       <TableCell>{item.item_name}</TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>
+                      {allocationMethod === "by_weight" && (
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={item.weight || ""}
+                            onChange={(e) =>
+                              setItems((prev) =>
+                                prev.map((i) =>
+                                  i.id === item.id ? { ...i, weight: Number(e.target.value) } : i
+                                )
+                              )
+                            }
+                            className="w-20 text-right h-8"
+                            placeholder="0"
+                          />
+                        </TableCell>
+                      )}
                       <TableCell className="text-right"><CurrencyDisplay amount={item.unit_cost} /></TableCell>
                       <TableCell className="text-right font-semibold"><CurrencyDisplay amount={item.original_cost} /></TableCell>
                       {entryMode === "manual" && (

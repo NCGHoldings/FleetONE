@@ -251,6 +251,8 @@ export const useCreateLandedCostVoucher = () => {
         grn_line_id?: string;
         item_id: string;
         original_cost: number;
+        quantity?: number;
+        weight?: number;
       }[];
       charges: {
         charge_type: string;
@@ -279,11 +281,18 @@ export const useCreateLandedCostVoucher = () => {
       if (voucherError) throw voucherError;
       
       // Calculate allocated costs based on method
+      const totalQuantity = items.reduce((sum, i) => sum + (i.quantity || 1), 0);
+      const totalWeight = items.reduce((sum, i) => sum + (i.weight || 0), 0);
+
       const voucherItems = items.map(item => {
         let allocatedCost = 0;
         
         if (voucher.allocation_method === "by_value") {
-          allocatedCost = (item.original_cost / totalOriginalCost) * totalCharges;
+          allocatedCost = totalOriginalCost > 0 ? (item.original_cost / totalOriginalCost) * totalCharges : 0;
+        } else if (voucher.allocation_method === "by_quantity") {
+          allocatedCost = totalQuantity > 0 ? ((item.quantity || 1) / totalQuantity) * totalCharges : 0;
+        } else if (voucher.allocation_method === "by_weight") {
+          allocatedCost = totalWeight > 0 ? ((item.weight || 0) / totalWeight) * totalCharges : 0;
         } else {
           allocatedCost = totalCharges / items.length;
         }
