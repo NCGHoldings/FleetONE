@@ -8,11 +8,14 @@ import { format, startOfMonth, endOfMonth } from 'date-fns';
 import {
     CalendarDays, Bus, MapPin, Clock, CheckCircle, XCircle,
     AlertCircle, DollarSign, Users, Eye, Building, Phone,
-    TrendingUp, Loader2, FileText, CreditCard, Pause, GitBranch
+    TrendingUp, Loader2, FileText, CreditCard, Pause, GitBranch,
+    MessageSquare
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 import { QuotationModal } from './QuotationModal';
+import { SpecialHireRemarkDialog } from './SpecialHireRemarkDialog';
 
 interface CalendarQuotation {
     id: string;
