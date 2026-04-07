@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Bus, Users, FileText, DollarSign, Wrench, GraduationCap, 
-  Truck, Calendar, RefreshCw, AlertTriangle, Route, ShieldCheck
+  Truck, Calendar, RefreshCw, AlertTriangle, Route, ShieldCheck, MessageSquareWarning
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
