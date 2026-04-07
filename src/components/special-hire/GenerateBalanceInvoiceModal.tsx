@@ -20,7 +20,7 @@ import {
   postDiscountToGLStandalone,
   updateSPHARInvoiceOnInvoiceSent,
 } from '@/hooks/useSpecialHireFinance';
-import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
+
 
 interface GenerateBalanceInvoiceModalProps {
   open: boolean;
@@ -69,6 +69,7 @@ interface GenerateBalanceInvoiceModalProps {
     adjustment_notes?: string;
   };
   onInvoiceGenerated?: () => void;
+  effectiveCompanyId?: string;
 }
 
 export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalProps> = ({
@@ -77,8 +78,12 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   quotationData,
   adjustmentData,
   onInvoiceGenerated,
+  effectiveCompanyId,
 }) => {
   const { user } = useAuth();
+  // Import NCG_HOLDING_ID as fallback for effectiveCompanyId
+  const NCG_HOLDING_FALLBACK = 'a0000000-0000-0000-0000-000000000001';
+  const companyIdToUse = effectiveCompanyId || NCG_HOLDING_FALLBACK;
   const [isLoading, setIsLoading] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [documentId, setDocumentId] = useState<string | null>(null);
@@ -440,7 +445,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
           console.log('[SPH GL] No existing GL found — proceeding with GL & AR posting...');
         }
 
-        const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+        const settings = await fetchSpecialHireFinanceSettings(companyIdToUse);
         
         if (settings?.auto_post_invoices && !existingJE) {
           // Post GROSS invoice amount (before discount) — discount is posted separately
@@ -467,7 +472,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             totalAmount: fullInvoiceAmount,
             isInternal,
             settings,
-            effectiveCompanyId: NCG_HOLDING_ID,
+            effectiveCompanyId: companyIdToUse,
           });
           
           if (invoiceGLResult) {
@@ -503,7 +508,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
                   customerName: quotationData.customer_name,
                   customerPhone: quotationData.customer_phone,
                   customerEmail: quotationData.customer_email,
-                  companyId: NCG_HOLDING_ID,
+                  companyId: companyIdToUse,
                 });
               }
 
@@ -517,7 +522,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
                   totalAmount: fullInvoiceAmount,
                   advanceAmount: quotationData.advance_paid,
                   dueDate,
-                  companyId: NCG_HOLDING_ID,
+                  companyId: companyIdToUse,
                   journalEntryId: invoiceGLResult.id, // Pass journalEntryId to skip double GL posting
                 });
                 
@@ -563,7 +568,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
                 customerName: quotationData.customer_name,
                 advanceAmount,
                 settings,
-                effectiveCompanyId: NCG_HOLDING_ID,
+                effectiveCompanyId: companyIdToUse,
               });
               
               if (advanceGLResult) {
@@ -587,7 +592,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
               customerName: quotationData.customer_name,
               discountAmount,
               settings,
-              effectiveCompanyId: NCG_HOLDING_ID,
+              effectiveCompanyId: companyIdToUse,
             });
 
             if (discountGLResult) {

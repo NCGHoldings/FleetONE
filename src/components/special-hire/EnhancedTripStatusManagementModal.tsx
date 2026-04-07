@@ -38,6 +38,7 @@ interface TripStatusManagementModalProps {
   } | null;
   onStatusChange: (data: TripStatusData) => Promise<void>;
   loading?: boolean;
+  effectiveCompanyId?: string;
 }
 
 const STATUS_OPTIONS = [
@@ -102,6 +103,7 @@ export function EnhancedTripStatusManagementModal({
   trip,
   onStatusChange,
   loading = false,
+  effectiveCompanyId,
 }: TripStatusManagementModalProps) {
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [reason, setReason] = useState<string>('');
@@ -140,7 +142,8 @@ export function EnhancedTripStatusManagementModal({
       try {
         const { fetchSpecialHireFinanceSettings, postRefundToGLStandalone } = await import("@/hooks/useSpecialHireFinance");
         const { NCG_HOLDING_ID } = await import("@/contexts/CompanyContext");
-        const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+        const companyIdToUse = effectiveCompanyId || NCG_HOLDING_ID;
+        const settings = await fetchSpecialHireFinanceSettings(companyIdToUse);
         
         if (settings && trip) {
           const glResult = await postRefundToGLStandalone({
@@ -149,7 +152,7 @@ export function EnhancedTripStatusManagementModal({
             refundAmount: refundAmount,
             reason: finalReason.trim(),
             settings,
-            effectiveCompanyId: NCG_HOLDING_ID,
+            effectiveCompanyId: companyIdToUse,
           });
           
           if (glResult) {

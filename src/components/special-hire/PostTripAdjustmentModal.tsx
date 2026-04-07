@@ -61,6 +61,7 @@ interface PostTripAdjustmentModalProps {
   originalOvernightCharge?: number;
   hourlyRate?: number;
   nightBlockFee?: number;
+  effectiveCompanyId?: string;
 }
 
 export const PostTripAdjustmentModal = ({
@@ -81,6 +82,7 @@ export const PostTripAdjustmentModal = ({
   originalOvernightCharge = 0,
   hourlyRate = 500,
   nightBlockFee = 10000,
+  effectiveCompanyId,
 }: PostTripAdjustmentModalProps) => {
   const {
     loading,
@@ -279,7 +281,8 @@ export const PostTripAdjustmentModal = ({
         try {
           const { postPostTripAdjustmentToGLStandalone, fetchSpecialHireFinanceSettings } = await import("@/hooks/useSpecialHireFinance");
           const { NCG_HOLDING_ID } = await import("@/contexts/CompanyContext");
-          const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+          const companyIdToUse = effectiveCompanyId || NCG_HOLDING_ID;
+          const settings = await fetchSpecialHireFinanceSettings(companyIdToUse);
 
           if (settings) {
             // Build adjustment details string
@@ -294,7 +297,7 @@ export const PostTripAdjustmentModal = ({
               adjustmentAmount: totals.adjustment_amount,
               adjustmentDetails: details.join(', '),
               settings,
-              effectiveCompanyId: NCG_HOLDING_ID,
+              effectiveCompanyId: companyIdToUse,
             });
 
             if (glResult) {
