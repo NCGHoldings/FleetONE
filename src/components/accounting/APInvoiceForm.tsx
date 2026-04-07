@@ -64,6 +64,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
   const createPayment = useCreateAPPayment();
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const queryClient = useQueryClient();
+  const generatePayNum = useGenerateNumber();
 
   const isEditing = !!editingInvoice;
 
