@@ -177,7 +177,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [autoCreate, setAutoCreate] = useState(true);
   const [unmatchedDbBuses, setUnmatchedDbBuses] = useState<UnmatchedDbBus[]>([]);
-  const [unmatchedAction, setUnmatchedAction] = useState<"none" | "deactivate" | "delete">("none");
+  const [unmatchedAction, setUnmatchedAction] = useState<"none" | "deactivate" | "delete">("delete");
   const [summary, setSummary] = useState({ updated: 0, created: 0, skipped: 0, deactivated: 0, deleted: 0 });
   const [headerMap, setHeaderMap] = useState<{ excel: string; field: string }[]>([]);
   const [importErrors, setImportErrors] = useState<ImportError[]>([]);
@@ -442,7 +442,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
     const selectedUnmatched = unmatchedDbBuses.filter(b => b.selected);
     if (unmatchedAction === "deactivate" && selectedUnmatched.length > 0) {
       for (const bus of selectedUnmatched) {
-        const { error } = await supabase.from("buses").update({ status: "inactive" } as any).eq("id", bus.id);
+        const { error } = await supabase.from("buses").update({ status: "retired" } as any).eq("id", bus.id);
         if (!error) deactivated++;
       }
     } else if (unmatchedAction === "delete" && selectedUnmatched.length > 0) {
@@ -565,7 +565,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
                   <div className="flex gap-2 mt-1">
                     <Button size="sm" variant={unmatchedAction === "deactivate" ? "default" : "outline"} className="text-xs h-7 gap-1"
                       onClick={() => setUnmatchedAction(unmatchedAction === "deactivate" ? "none" : "deactivate")}>
-                      <Ban className="w-3 h-3" /> Flag as Inactive ({selectedUnmatchedCount})
+                      <Ban className="w-3 h-3" /> Flag as Retired ({selectedUnmatchedCount})
                     </Button>
                     <Button size="sm" variant={unmatchedAction === "delete" ? "destructive" : "outline"} className="text-xs h-7 gap-1"
                       onClick={() => setUnmatchedAction(unmatchedAction === "delete" ? "none" : "delete")}>
