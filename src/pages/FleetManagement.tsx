@@ -864,12 +864,26 @@ const FleetManagementComponent = () => {
       {/* Fleet Alerts Panel */}
       <FleetAlertsPanel onBusClick={handleOpenMasterDataSheet} />
 
+      {/* Filter Panel */}
+      <FleetFilterPanel
+        filters={filters}
+        onFiltersChange={setFilters}
+        categories={categoryOptions}
+        subCategories={subCategoryOptions}
+        distinctTypes={distinctTypes}
+        distinctModels={distinctModels}
+        distinctYears={distinctYears}
+        distinctRoutes={distinctRoutes}
+        activeFilterCount={activeFilterCount}
+      />
+
       {/* Data Table */}
       <DataTable
         columns={columns}
-        data={data}
-        searchKey="bus_no"
-        title={`Fleet Overview (${data.length} buses)`}
+        data={filteredData}
+        customSearch={customSearch}
+        searchKeys={["bus_no", "type", "route", "model", "owner"]}
+        title={`Fleet Overview (${filteredData.length}${filteredData.length !== data.length ? ` of ${data.length}` : ""} buses)`}
         onExport={handleExport}
       />
 
