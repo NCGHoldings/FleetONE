@@ -376,7 +376,9 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
                       <td className="p-2">{row.mapped.insurance_company || "-"}</td>
                       <td className="p-2">{row.mapped.default_driver_name || "-"}</td>
                       <td className="p-2">
-                        <Badge variant="secondary" className="text-[10px]">{row.fieldsToUpdate.length}</Badge>
+                        <span className="cursor-help" title={row.fieldsToUpdate.join(', ')}>
+                          <Badge variant="secondary" className="text-[10px]">{row.fieldsToUpdate.length} fields</Badge>
+                        </span>
                       </td>
                     </tr>
                   ))}
