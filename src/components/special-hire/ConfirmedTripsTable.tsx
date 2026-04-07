@@ -406,6 +406,15 @@ export function ConfirmedTripsTable() {
       setSelectedTrip(null);
       refetch();
 
+      // Compute cumulative total paid to date (all approved payments + this new one)
+      const { data: allPriorPayments } = await supabase
+        .from('special_hire_payments')
+        .select('amount')
+        .eq('quotation_id', tripForDoc.id)
+        .eq('status', 'approved');
+      const priorPaidTotal = (allPriorPayments || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+      const totalPaidToDate = priorPaidTotal + paymentData.amount; // include current (pending) payment
+
       // Fire-and-forget: Generate draft document in background
       const draftInvoiceData: InvoiceData = {
         invoiceNo: `DRAFT-${paymentIdForDoc}`,
@@ -425,6 +434,7 @@ export function ConfirmedTripsTable() {
         totalAmount: calculateTotalAmount(tripForDoc),
         advanceAmount: tripForDoc.advance_paid || 0,
         paidAmount: paymentData.amount,
+        totalPaidToDate,
         vehicleNo: paymentData.busNo || tripForDoc.assigned_bus_no,
         driverName: paymentData.driverName || tripForDoc.assigned_driver_name,
         conductorName: paymentData.conductorName || tripForDoc.assigned_conductor_name,

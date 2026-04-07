@@ -62,6 +62,7 @@ export interface InvoiceData {
   checkedBy?: ApprovalSignature;
   approvedBy?: ApprovalSignature;
   hideSignaturePage?: boolean;
+  totalPaidToDate?: number;
 }
 
 export const generateInvoiceHTML = (data: InvoiceData): string => {
@@ -144,16 +145,16 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             <th style="border: 1px solid #000; padding: 8px; text-align: left;">Amount</th>
           </tr>
           <tr>
-            <td style="border: 1px solid #000; padding: 8px;">ADVANCE PAYMENT</td>
+            <td style="border: 1px solid #000; padding: 8px;">${data.invoiceType === 'advance' ? 'ADVANCE PAYMENT' : 'BALANCE PAYMENT'}</td>
             <td style="border: 1px solid #000; padding: 8px;">${currentDate}</td>
             <td style="border: 1px solid #000; padding: 8px;">${data.quotationNo}</td>
             <td style="border: 1px solid #000; padding: 8px; text-align: right; font-weight: bold;">${data.paidAmount.toLocaleString()}.00</td>
           </tr>
         </table>
 
-        <p style="text-align: right; font-weight: bold; margin: 10px 0;">Advance Payment Total: LKR ${data.paidAmount.toLocaleString()}.00</p>
-        <p style="text-align: right; font-weight: bold; margin: 10px 0;">Total Payment Amount: LKR ${data.paidAmount.toLocaleString()}.00</p>
-        <p style="text-align: right; font-weight: bold; margin: 10px 0; color: #b91c1c;">Balance Due: LKR ${(data.totalAmount - data.paidAmount).toLocaleString()}.00</p>
+        <p style="text-align: right; font-weight: bold; margin: 10px 0;">This Payment: LKR ${data.paidAmount.toLocaleString()}.00</p>
+        ${data.totalPaidToDate != null ? `<p style="text-align: right; font-weight: bold; margin: 10px 0;">Total Paid to Date: LKR ${data.totalPaidToDate.toLocaleString()}.00</p>` : ''}
+        <p style="text-align: right; font-weight: bold; margin: 10px 0; color: #b91c1c;">Balance Due: LKR ${(data.totalAmount - (data.totalPaidToDate ?? data.paidAmount)).toLocaleString()}.00</p>
 
         <p style="font-style: italic; margin: 15px 0;">Trip Details: ${format(data.pickupDate, 'dd/MM/yyyy')} - ${format(data.dropDate, 'dd/MM/yyyy')} | ${data.pickupLocation} to ${data.dropLocation} | ${data.numberOfPassengers} Pax | ${data.busType}</p>
 
