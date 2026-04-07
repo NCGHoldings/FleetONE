@@ -223,7 +223,7 @@ export function LandedCostVoucherForm({ open, onOpenChange, onSuccess }: { open:
     setIsSubmitting(true);
     try {
       // Create Voucher
-      const { data: voucher, error: vError } = await supabase
+      const { data: voucher, error: vError } = await (supabase as any)
         .from('landed_cost_vouchers')
         .insert({
           company_id: values.company_id,
@@ -241,7 +241,7 @@ export function LandedCostVoucherForm({ open, onOpenChange, onSuccess }: { open:
       if (vError) throw vError;
 
       // Create Phase 2 Enterprise Charges
-      const { error: cError } = await supabase
+      const { error: cError } = await (supabase as any)
         .from('landed_cost_charges')
         .insert(values.charges.map(c => ({
           voucher_id: voucher.id,
@@ -257,7 +257,7 @@ export function LandedCostVoucherForm({ open, onOpenChange, onSuccess }: { open:
       if (cError) throw cError;
 
       // Create Allocated Items with Exemption Data
-      const { error: iError } = await supabase
+      const { error: iError } = await (supabase as any)
         .from('landed_cost_items')
         .insert(calculatedItems.map(item => ({
           voucher_id: voucher.id,
