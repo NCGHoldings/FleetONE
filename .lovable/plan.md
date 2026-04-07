@@ -1,44 +1,71 @@
 
 
-# Fix Public Complaint Form URL and Security
+# Fix: Multi-Bus Invoice & Vehicle Assignment
 
 ## Problem
-1. The QR generator and shared links use `window.location.origin`, so in preview they produce `https://preview--ncg-fleetone.lovable.app/public/complaint` — the "preview" URL leaks internal app context
-2. The published URL should be `https://ncg-fleetone.lovable.app/public/complaint` — clean, no "preview"
-3. Need to verify the public form cannot leak any data (SELECT queries, navigation to other pages, etc.)
 
-## Security Audit (Already Confirmed)
-- The public form uses `createAnonymousClient()` with `persistSession: false`, no token storage — good
-- INSERT policy restricts anon to only `type IN ('complaint', 'good_feedback')`, `status = 'new'`, `reported_by IS NULL` — good, no data can be read back
-- The `.insert()` call does NOT use `.select()` — good, no SELECT needed
-- The `/public/complaint` route is outside `ProtectedRoute` — correct, it's a standalone page
-- No navigation links to internal pages exist on the public form — good
-- The anon key is a publishable key (read-only by design) — acceptable
+The system user reported that a quotation was created for **2 buses**, but:
+1. The invoice only shows **1 bus** with the full total amount attributed to it
+2. The bus number field (`assigned_bus_no`) only stores a **single** bus number — there's no way to assign multiple bus numbers for multi-bus trips
+
+## Root Cause
+
+- `assigned_bus_no` is a single text field on `special_hire_quotations` — it cannot hold multiple bus numbers
+- `VehicleAssignmentModal` only allows selecting **one** bus
+- `invoice-generator.ts` (line 312-317) renders a **single row** in the line items table, showing the full `subTotal` and one `vehicleNo`
+- The `numberOfBuses` field exists in `InvoiceData` but is never used to split the invoice into per-bus rows
 
 ## Plan
 
-### 1. Update QR Generator to use published domain
-**Modify `src/components/complaints/ComplaintQRGenerator.tsx`**
-- Replace `window.location.origin` with the published domain `https://ncg-fleetone.lovable.app`
-- Always generate QR code and URL pointing to `https://ncg-fleetone.lovable.app/public/complaint`
-- This ensures printed QR codes and copied links always use the clean published URL, regardless of whether staff generate them from preview or published site
+### 1. Update Vehicle Assignment to support multiple buses
+**Modify `src/components/special-hire/VehicleAssignmentModal.tsx`**
+- Read `number_of_buses` from the quotation to know how many bus slots to show
+- Render N bus selection fields (one per bus in the quotation)
+- Store as comma-separated string in `assigned_bus_no` (e.g., `"NE 2157, NE 2158"`) — no DB schema change needed
+- Also allow multiple driver/conductor names (comma-separated) for each bus
 
-### 2. Add security headers to the public form page
-**Modify `src/components/complaints/PublicComplaintForm.tsx`**
-- Add `useEffect` to set `document.title` to a generic "NCG Express - Submit Feedback" (no internal info)
-- Ensure no console.log statements leak internal data in production
+### 2. Update Invoice to show per-bus line items
+**Modify `src/lib/invoice-generator.ts`**
+- Parse `vehicleNo` as comma-separated list (split by `,`)
+- When `numberOfBuses > 1`:
+  - Calculate `perBusAmount = totalAmount / numberOfBuses`
+  - Render one row per bus with individual vehicle number and per-bus amount
+  - Show full total in the summary section (unchanged)
+- When `numberOfBuses === 1`: keep current single-row behavior
 
-### 3. No migration needed
-- RLS policies are already correctly configured
-- The anon INSERT policy properly restricts what can be submitted
-- No SELECT policy exists for anon — data cannot be read
+### 3. Pass number_of_buses through all invoice generation paths
+**Verify/update these files** to ensure `numberOfBuses` is correctly passed:
+- `src/components/special-hire/ConfirmedTripsTable.tsx`
+- `src/hooks/useFinanceApproval.ts`
+- `src/hooks/useDocumentRegeneration.ts`
+- `src/hooks/useDocumentManagement.ts`
+- `src/components/special-hire/EnhancedDocumentViewer.tsx`
 
-## Result
-- QR codes and shared links will always point to `https://ncg-fleetone.lovable.app/public/complaint`
-- The public form remains fully isolated — insert only, no data leakage
-- Staff can share the link/QR safely with customers
+Currently these files pass `vehicleNo` from `assigned_bus_no` but may not pass `numberOfBuses` from the quotation's `number_of_buses`.
+
+## Technical Details
+
+**Invoice line items table (current — single row):**
+```text
+| Description | Item Detail | Vehicle No | Amount  |
+| Leyland...  | Route...    | NE 2157    | 42,870  |
+```
+
+**Invoice line items table (fixed — per bus rows):**
+```text
+| Description | Item Detail | Vehicle No | Amount  |
+| Leyland...  | Route...    | NE 2157    | 21,435  |
+| Leyland...  | Route...    | NE 2158    | 21,435  |
+```
+
+**No database migration needed** — `assigned_bus_no` is already a text field that can hold comma-separated values.
 
 ## Files
-- **Modify**: `src/components/complaints/ComplaintQRGenerator.tsx` — hardcode published domain
-- **Modify**: `src/components/complaints/PublicComplaintForm.tsx` — set proper page title
+- **Modify**: `src/components/special-hire/VehicleAssignmentModal.tsx` — multi-bus assignment UI
+- **Modify**: `src/lib/invoice-generator.ts` — per-bus line item rows
+- **Verify/Modify**: `src/components/special-hire/ConfirmedTripsTable.tsx` — pass `numberOfBuses`
+- **Verify/Modify**: `src/hooks/useFinanceApproval.ts` — pass `numberOfBuses`
+- **Verify/Modify**: `src/hooks/useDocumentRegeneration.ts` — pass `numberOfBuses`
+- **Verify/Modify**: `src/hooks/useDocumentManagement.ts` — pass `numberOfBuses`
+- **Verify/Modify**: `src/components/special-hire/EnhancedDocumentViewer.tsx` — pass `numberOfBuses`
 
