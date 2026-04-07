@@ -1,0 +1,91 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#4F46E5', 'primaryTextColor': '#fff'}}}%%
+flowchart TD
+    subgraph QUOTATION["1. QUOTATION PHASE"]
+        Q1[Customer Request] --> Q2[Create Quotation]
+        Q2 --> Q3[Confirm Quotation]
+        Q3 --> Q4[Quotation PDF Generated]
+    end
+    style QUOTATION fill:#f0f9ff,stroke:#3b82f6
+
+    Q3 --> DECIDE{Customer Payment<br/>Timing?}
+
+    %% ===== SCENARIO A: ADVANCE =====
+    DECIDE -->|Advance| A1[Confirm Advance Payment]
+    A1 --> A2[Draft Sales Receipt Created ✅]
+    A2 --> A3{Finance Approves?}
+    A3 -->|Yes| A4["GL: DR Bank / CR Customer Advance ✅"]
+    A4 --> A5[Sales Receipt → APPROVED with Signatures ✅]
+    A5 --> A6[AR Invoice Created ✅]
+    A6 --> A7{Trip Completed}
+    A7 --> A8{Post-Trip<br/>Adjustment?}
+    A8 -->|No extra charges| A9["Generate Final Invoice<br/>(Original amounts) ✅"]
+    A8 -->|Extra KM/charges| A10[Record Post-Trip Adjustment ✅]
+    A10 --> A11["Generate Final Invoice<br/>(With extras) ✅"]
+    A9 --> A12{Email to Customer?}
+    A11 --> A12
+    A12 -->|Yes| A13["GL: DR Receivable / CR SPH Revenue ✅"]
+    A12 -->|No| A14[Download PDF Only ✅]
+
+    %% ===== SCENARIO B: FULL PAYMENT =====
+    DECIDE -->|Full| B1[Confirm Full Payment]
+    B1 --> B2[Draft Invoice Created ✅]
+    B2 --> B3{Finance Approves?}
+    B3 -->|Yes| B4["GL: DR Bank / CR Customer Advance ✅<br/>(AR Flow)"]
+    B4 --> B5[Invoice → APPROVED with Signatures ✅]
+    B5 --> B6[AR Invoice + Receipt Created ✅]
+    B6 --> B7{Trip Completed}
+    B7 --> B8{Post-Trip<br/>Adjustment?}
+    B8 -->|No extra| B9["Settled ✅<br/>(No further action needed)"]
+    B8 -->|Extra charges| B10[Post-Trip Adjustment ✅]
+    B10 --> B11[Generate Supplementary Invoice ✅]
+
+    %% ===== SCENARIO C: NO PAYMENT =====
+    DECIDE -->|No payment| C1[Trip Happens]
+    C1 --> C2{Need to<br/>remind customer?}
+    C2 -->|Yes| C3["Send Payment Reminder 🆕<br/>(Invoice without signatures, NO GL)"]
+    C3 --> C4[Customer Pays]
+    C2 -->|No| C4
+    C4 --> C5[Confirm Payment]
+    C5 --> C6[Draft Document Created ✅]
+    C6 --> C7[Finance Approves → GL Posted ✅]
+    C7 --> C8{Adjustment?}
+    C8 -->|Yes| C9[Post-Trip → Final Invoice ✅]
+    C8 -->|No| C10[Generate Final Invoice ✅]
+
+    %% ===== SCENARIO D: ADVANCE + BALANCE =====
+    DECIDE -->|Advance then Balance| D1[Confirm Advance]
+    D1 --> D2[Sales Receipt → Finance Approval ✅]
+    D2 --> D3[Trip Happens]
+    D3 --> D4[Confirm Balance Payment]
+    D4 --> D5[Draft Invoice → Finance Approval ✅]
+    D5 --> D6["GL Posted ✅"]
+    D6 --> D7{Adjustment?}
+    D7 -->|Yes| D8[Post-Trip → Supplementary Invoice ✅]
+    D7 -->|No| D9["Settled ✅"]
+
+    %% ===== DOCUMENT MANAGEMENT =====
+    subgraph DOCS["6. DOCUMENT MANAGEMENT"]
+        DOC1["View Documents ✅<br/>All docs for quotation"]
+        DOC2["Re-generate Sales Receipt ✅"]
+        DOC3["Re-generate Final Invoice ✅"]
+        DOC4["Email Sales Receipt 🆕<br/>Send approved receipt to customer"]
+        DOC5["Send Payment Reminder 🆕<br/>Quick invoice, no GL"]
+    end
+    style DOCS fill:#fef3c7,stroke:#f59e0b
+
+    %% ===== GL POSTING SUMMARY =====
+    subgraph GL["GL POSTING EVENTS"]
+        GL1["Finance Approval:<br/>DR Bank / CR Customer Advance ✅"]
+        GL2["Final Invoice Email:<br/>DR Receivable / CR SPH Revenue ✅"]
+        GL3["Advance Application:<br/>DR Advance / CR Receivable ✅"]
+        GL4["Discount:<br/>DR Discount Expense / CR Receivable ✅"]
+        GL5["GL Guard: No double-posting 🆕"]
+    end
+    style GL fill:#ecfdf5,stroke:#10b981
+
+    %% LEGEND
+    subgraph LEGEND["LEGEND"]
+        L1["✅ = Implemented & Working"]
+        L2["🆕 = New Feature (This Update)"]
+    end
+    style LEGEND fill:#f5f3ff,stroke:#8b5cf6
