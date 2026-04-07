@@ -61,6 +61,7 @@ export interface InvoiceData {
   preparedBy?: ApprovalSignature;
   checkedBy?: ApprovalSignature;
   approvedBy?: ApprovalSignature;
+  hideSignaturePage?: boolean;
 }
 
 export const generateInvoiceHTML = (data: InvoiceData): string => {
@@ -160,6 +161,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           *Note: Please make sure to place the name, signature and date in the given space accordingly.
         </p>
 
+        ${!data.hideSignaturePage ? `
         <!-- Signature Section -->
         <table style="width: 100%; border-collapse: collapse; margin-top: 30px; font-size: 14px;">
           <tr style="background: #f0f0f0;">
@@ -197,6 +199,11 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             </td>
           </tr>
         </table>
+        ` : `
+        <div style="margin-top: 30px; text-align: center; font-size: 12px; color: #555; font-style: italic;">
+          "This is a computer-generated document and does not require a physical signature."
+        </div>
+        `}
 
         <div style="margin-top: 40px; text-align: center; font-size: 12px;">
           Page 1 of 1 <br>
@@ -395,12 +402,12 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           </div>
 
           <div style="margin-top: 15px; padding-top: 10px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
-            ${!data.forCustomer ? 'Page 1 of 2<br>' : ''}
+            ${!data.forCustomer && !data.hideSignaturePage ? 'Page 1 of 2<br>' : ''}
              NCG Holding - Transport Management System
           </div>
         </div>
 
-        ${!data.forCustomer ? `
+        ${!data.forCustomer && !data.hideSignaturePage ? `
         <!-- PAGE 2 -->
         <div data-pdf-page="2" style="position: relative; width: 210mm; min-height: 297mm; padding: 15px 15px 25px 15px; box-sizing: border-box; background: #fff;">
 
@@ -457,6 +464,11 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             Page 2 of 2<br>
             NCG Holding - Transport Management System
           </div>
+        </div>
+        ` : data.hideSignaturePage ? `
+        <!-- Computer-generated note when signature page is hidden -->
+        <div style="margin-top: 20px; text-align: center; font-size: 12px; color: #555; font-style: italic;">
+          "This is a computer-generated document and does not require a physical signature."
         </div>
         ` : ''}
       </div>
