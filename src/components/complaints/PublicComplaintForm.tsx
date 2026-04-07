@@ -5,19 +5,34 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { createAnonymousClient } from "@/integrations/supabase/public-client";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, CheckCircle, Send } from "lucide-react";
+import { AlertTriangle, CheckCircle, Send, ThumbsUp, X } from "lucide-react";
 import { publicComplaintSchema } from "@/lib/validation";
 import { z } from "zod";
+import { Badge } from "@/components/ui/badge";
+
+const CATEGORIES = [
+  { value: "service", label: "Service Quality" },
+  { value: "driver", label: "Driver Behavior" },
+  { value: "vehicle", label: "Vehicle Condition" },
+  { value: "scheduling", label: "Scheduling Issues" },
+  { value: "safety", label: "Safety Concerns" },
+  { value: "billing", label: "Billing Issues" },
+  { value: "customer_service", label: "Customer Service" },
+  { value: "other", label: "Other" },
+];
 
 interface PublicComplaintFormData {
+  type: 'complaint' | 'good_feedback';
   customerName: string;
   customerPhone: string;
   customerEmail: string;
   title: string;
   description: string;
-  category: string;
+  category: string[];
   priority: string;
   routeNumber: string;
   busNumber: string;
@@ -27,26 +42,40 @@ interface PublicComplaintFormData {
   driverName: string;
 }
 
+const initialFormData: PublicComplaintFormData = {
+  type: 'complaint',
+  customerName: '',
+  customerPhone: '',
+  customerEmail: '',
+  title: '',
+  description: '',
+  category: [],
+  priority: 'medium',
+  routeNumber: '',
+  busNumber: '',
+  incidentDate: '',
+  incidentTime: '',
+  location: '',
+  driverName: '',
+};
+
 export default function PublicComplaintForm() {
-  const [formData, setFormData] = useState<PublicComplaintFormData>({
-    customerName: '',
-    customerPhone: '',
-    customerEmail: '',
-    title: '',
-    description: '',
-    category: '',
-    priority: 'medium',
-    routeNumber: '',
-    busNumber: '',
-    incidentDate: '',
-    incidentTime: '',
-    location: '',
-    driverName: '',
-  });
+  const [formData, setFormData] = useState<PublicComplaintFormData>({ ...initialFormData });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [complaintId, setComplaintId] = useState('');
   const { toast } = useToast();
+
+  const isGoodFeedback = formData.type === 'good_feedback';
+
+  const toggleCategory = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      category: prev.category.includes(value)
+        ? prev.category.filter(c => c !== value)
+        : [...prev.category, value]
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +109,7 @@ export default function PublicComplaintForm() {
         driver_name: formData.driverName || null,
       };
 
-      const clientRef = `CMP-${Date.now().toString(36).toUpperCase()}`;
+      const clientRef = `${isGoodFeedback ? 'FBK' : 'CMP'}-${Date.now().toString(36).toUpperCase()}`;
 
       const anonClient = createAnonymousClient();
       const { error } = await anonClient
@@ -88,9 +117,9 @@ export default function PublicComplaintForm() {
         .insert({
           title: formData.title,
           description: formData.description,
-          category: formData.category,
+          category: formData.category.join(','),
           priority: formData.priority,
-          type: 'complaint',
+          type: formData.type,
           status: 'new',
           reported_by: null,
           escalation_level: 1,
@@ -99,21 +128,20 @@ export default function PublicComplaintForm() {
 
       if (error) throw error;
 
-      const generatedId = clientRef;
-      setComplaintId(generatedId);
+      setComplaintId(clientRef);
       setSubmitted(true);
 
       toast({
         title: "Success",
-        description: `Complaint submitted successfully! Reference: ${generatedId}`,
+        description: `${isGoodFeedback ? 'Feedback' : 'Complaint'} submitted successfully! Reference: ${clientRef}`,
       });
 
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
-      console.error('Error creating complaint:', errMsg, error);
+      console.error('Error creating submission:', errMsg, error);
       toast({
         title: "Error",
-        description: errMsg || "Failed to submit complaint. Please try again.",
+        description: errMsg || "Failed to submit. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -126,12 +154,16 @@ export default function PublicComplaintForm() {
       <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="w-8 h-8 text-success" />
+            <div className={`mx-auto w-16 h-16 ${isGoodFeedback ? 'bg-green-500/10' : 'bg-success/10'} rounded-full flex items-center justify-center mb-4`}>
+              <CheckCircle className={`w-8 h-8 ${isGoodFeedback ? 'text-green-500' : 'text-success'}`} />
             </div>
-            <CardTitle className="text-2xl text-success">Complaint Submitted!</CardTitle>
+            <CardTitle className={`text-2xl ${isGoodFeedback ? 'text-green-600' : 'text-success'}`}>
+              {isGoodFeedback ? 'Thank You for Your Feedback!' : 'Complaint Submitted!'}
+            </CardTitle>
             <CardDescription>
-              Thank you for your feedback. We take all complaints seriously.
+              {isGoodFeedback
+                ? 'We appreciate your positive feedback. It helps us recognize great service!'
+                : 'Thank you for your feedback. We take all complaints seriously.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-center">
@@ -140,32 +172,19 @@ export default function PublicComplaintForm() {
               <p className="text-xl font-mono font-bold">{complaintId}</p>
             </div>
             <p className="text-sm text-muted-foreground">
-              Please save this reference number for tracking your complaint status.
-              We will review your complaint and respond within 48 hours.
+              {isGoodFeedback
+                ? 'Your feedback has been recorded and will be shared with the relevant team.'
+                : 'Please save this reference number for tracking your complaint status. We will review your complaint and respond within 48 hours.'}
             </p>
             <Button 
               onClick={() => {
                 setSubmitted(false);
-                setFormData({
-                  customerName: '',
-                  customerPhone: '',
-                  customerEmail: '',
-                  title: '',
-                  description: '',
-                  category: '',
-                  priority: 'medium',
-                  routeNumber: '',
-                  busNumber: '',
-                  incidentDate: '',
-                  incidentTime: '',
-                  location: '',
-                  driverName: '',
-                });
+                setFormData({ ...initialFormData });
               }}
               variant="outline"
               className="w-full"
             >
-              Submit Another Complaint
+              Submit Another {isGoodFeedback ? 'Feedback' : 'Complaint'}
             </Button>
           </CardContent>
         </Card>
@@ -178,31 +197,64 @@ export default function PublicComplaintForm() {
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="mx-auto w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mb-6">
-            <AlertTriangle className="w-10 h-10 text-destructive" />
+          <div className={`mx-auto w-20 h-20 ${isGoodFeedback ? 'bg-green-500/10' : 'bg-destructive/10'} rounded-full flex items-center justify-center mb-6`}>
+            {isGoodFeedback ? (
+              <ThumbsUp className="w-10 h-10 text-green-500" />
+            ) : (
+              <AlertTriangle className="w-10 h-10 text-destructive" />
+            )}
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">
-            Submit a Complaint
+            {isGoodFeedback ? 'Submit Good Feedback' : 'Submit a Complaint'}
           </h1>
           <p className="text-lg text-muted-foreground">
-            We value your feedback and are committed to resolving your concerns
+            {isGoodFeedback
+              ? 'Let us know about a great experience with our service'
+              : 'We value your feedback and are committed to resolving your concerns'}
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Complaint Details</CardTitle>
+            <CardTitle>{isGoodFeedback ? 'Feedback Details' : 'Complaint Details'}</CardTitle>
             <CardDescription>
-              Please provide as much detail as possible to help us address your concern effectively.
+              {isGoodFeedback
+                ? 'Tell us about the positive experience you had.'
+                : 'Please provide as much detail as possible to help us address your concern effectively.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Type Selection */}
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Submission Type *</Label>
+                <RadioGroup
+                  value={formData.type}
+                  onValueChange={(value: 'complaint' | 'good_feedback') => setFormData(prev => ({ ...prev, type: value }))}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="complaint" id="type-complaint" />
+                    <Label htmlFor="type-complaint" className="flex items-center gap-1.5 cursor-pointer">
+                      <AlertTriangle className="w-4 h-4 text-destructive" />
+                      Complaint
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="good_feedback" id="type-feedback" />
+                    <Label htmlFor="type-feedback" className="flex items-center gap-1.5 cursor-pointer">
+                      <ThumbsUp className="w-4 h-4 text-green-500" />
+                      Good Feedback
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
               {/* Contact Information */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Contact Information</h3>
                 <p className="text-sm text-muted-foreground">
-                  Providing your contact details helps us follow up on your complaint more effectively.
+                  Providing your contact details helps us follow up more effectively.
                 </p>
                 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -241,14 +293,18 @@ export default function PublicComplaintForm() {
 
               {/* Incident Details */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Incident Details</h3>
+                <h3 className="text-lg font-semibold">
+                  {isGoodFeedback ? 'Trip Details' : 'Incident Details'}
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  Please provide details about the incident to help us investigate.
+                  Please provide at least a Route Number or Bus Number.
                 </p>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <Label htmlFor="routeNumber">Route Number</Label>
+                    <Label htmlFor="routeNumber">
+                      Route Number <span className="text-destructive">†</span>
+                    </Label>
                     <Input
                       id="routeNumber"
                       value={formData.routeNumber}
@@ -257,7 +313,9 @@ export default function PublicComplaintForm() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="busNumber">Bus Number</Label>
+                    <Label htmlFor="busNumber">
+                      Bus Number <span className="text-destructive">†</span>
+                    </Label>
                     <Input
                       id="busNumber"
                       value={formData.busNumber}
@@ -266,10 +324,11 @@ export default function PublicComplaintForm() {
                     />
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground">† At least one of Route Number or Bus Number is required</p>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <Label htmlFor="incidentDate">Date of Incident *</Label>
+                    <Label htmlFor="incidentDate">Date *</Label>
                     <Input
                       id="incidentDate"
                       type="date"
@@ -279,7 +338,7 @@ export default function PublicComplaintForm() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="incidentTime">Time of Incident *</Label>
+                    <Label htmlFor="incidentTime">Time *</Label>
                     <Input
                       id="incidentTime"
                       type="time"
@@ -312,9 +371,11 @@ export default function PublicComplaintForm() {
                 </div>
               </div>
 
-              {/* Complaint Details */}
+              {/* Details */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Complaint Details</h3>
+                <h3 className="text-lg font-semibold">
+                  {isGoodFeedback ? 'Feedback Details' : 'Complaint Details'}
+                </h3>
                 
                 <div>
                   <Label htmlFor="title">Subject *</Label>
@@ -322,44 +383,53 @@ export default function PublicComplaintForm() {
                     id="title"
                     value={formData.title}
                     onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="Brief description of your complaint"
+                    placeholder={isGoodFeedback ? "What was great about the experience?" : "Brief description of your complaint"}
                     required
                   />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label htmlFor="category">Category *</Label>
-                    <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select complaint category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="service">Service Quality</SelectItem>
-                        <SelectItem value="driver">Driver Behavior</SelectItem>
-                        <SelectItem value="vehicle">Vehicle Condition</SelectItem>
-                        <SelectItem value="scheduling">Scheduling Issues</SelectItem>
-                        <SelectItem value="safety">Safety Concerns</SelectItem>
-                        <SelectItem value="billing">Billing Issues</SelectItem>
-                        <SelectItem value="customer_service">Customer Service</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {/* Multi-Category Selection */}
+                <div>
+                  <Label>Category * <span className="text-xs text-muted-foreground font-normal">(select one or more)</span></Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {CATEGORIES.map((cat) => {
+                      const isSelected = formData.category.includes(cat.value);
+                      return (
+                        <Badge
+                          key={cat.value}
+                          variant={isSelected ? "default" : "outline"}
+                          className={`cursor-pointer select-none transition-colors ${
+                            isSelected
+                              ? isGoodFeedback
+                                ? 'bg-green-500 hover:bg-green-600 text-white'
+                                : ''
+                              : 'hover:bg-muted'
+                          }`}
+                          onClick={() => toggleCategory(cat.value)}
+                        >
+                          {cat.label}
+                          {isSelected && <X className="w-3 h-3 ml-1" />}
+                        </Badge>
+                      );
+                    })}
                   </div>
+                  {formData.category.length === 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">Please select at least one category</p>
+                  )}
+                </div>
 
-                  <div>
-                    <Label htmlFor="priority">Priority</Label>
-                    <Select value={formData.priority} onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div>
+                  <Label htmlFor="priority">Priority</Label>
+                  <Select value={formData.priority} onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
@@ -368,7 +438,9 @@ export default function PublicComplaintForm() {
                     id="description"
                     value={formData.description}
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Please provide a detailed description of your complaint including what happened, when it occurred, and any other relevant information..."
+                    placeholder={isGoodFeedback
+                      ? "Tell us what made this a great experience..."
+                      : "Please provide a detailed description of your complaint including what happened, when it occurred, and any other relevant information..."}
                     rows={6}
                     required
                   />
@@ -379,7 +451,7 @@ export default function PublicComplaintForm() {
                 <Button 
                   type="submit" 
                   disabled={isSubmitting}
-                  className="flex-1"
+                  className={`flex-1 ${isGoodFeedback ? 'bg-green-500 hover:bg-green-600' : ''}`}
                 >
                   {isSubmitting ? (
                     <>
@@ -388,8 +460,8 @@ export default function PublicComplaintForm() {
                     </>
                   ) : (
                     <>
-                      <Send className="w-4 h-4 mr-2" />
-                      Submit Complaint
+                      {isGoodFeedback ? <ThumbsUp className="w-4 h-4 mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+                      {isGoodFeedback ? 'Submit Feedback' : 'Submit Complaint'}
                     </>
                   )}
                 </Button>
@@ -398,8 +470,8 @@ export default function PublicComplaintForm() {
               <div className="text-xs text-muted-foreground bg-muted p-3 rounded-lg">
                 <p className="font-semibold mb-1">Privacy Notice:</p>
                 <p>
-                  Your complaint will be reviewed by our team. Any personal information provided 
-                  will be used solely for the purpose of addressing your complaint and will be 
+                  Your {isGoodFeedback ? 'feedback' : 'complaint'} will be reviewed by our team. Any personal information provided 
+                  will be used solely for the purpose of addressing your {isGoodFeedback ? 'feedback' : 'complaint'} and will be 
                   handled in accordance with our privacy policy.
                 </p>
               </div>

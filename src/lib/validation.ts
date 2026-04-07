@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 // Complaint Form Validation
 export const publicComplaintSchema = z.object({
+  type: z.enum(['complaint', 'good_feedback']),
   title: z.string()
     .trim()
     .min(5, 'Title must be at least 5 characters')
@@ -14,8 +15,7 @@ export const publicComplaintSchema = z.object({
     .trim()
     .min(20, 'Description must be at least 20 characters')
     .max(2000, 'Description must be less than 2000 characters'),
-  category: z.string()
-    .min(1, 'Category is required'),
+  category: z.array(z.string()).min(1, 'At least one category is required'),
   priority: z.enum(['low', 'medium', 'high']),
   customerName: z.string()
     .trim()
@@ -54,6 +54,9 @@ export const publicComplaintSchema = z.object({
     .max(255, 'Email must be less than 255 characters')
     .optional()
     .or(z.literal(''))
+}).refine(data => (data.routeNumber && data.routeNumber.trim() !== '') || (data.busNumber && data.busNumber.trim() !== ''), {
+  message: 'Please provide at least a Route Number or Bus Number',
+  path: ['routeNumber']
 });
 
 // Special Hire Form Validation
