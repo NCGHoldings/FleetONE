@@ -74,7 +74,13 @@ export default function Complaints() {
     staff_group: '',
     status: 'new',
     assigned_to: '',
-    action_taken: ''
+    action_taken: '',
+    routeNumber: '',
+    busNumber: '',
+    incidentDate: '',
+    incidentTime: '',
+    location: '',
+    driverName: ''
   });
   const { toast } = useToast();
 
