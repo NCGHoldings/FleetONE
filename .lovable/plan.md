@@ -1,42 +1,31 @@
 
 
-# Add Delete Option for Journal Entries (Testing Mode)
+# Fix: Show Delete & Transfer Buttons in LIVE Mode Too
 
-## Current State
-- **AR Invoices**: Delete button exists, works for all statuses ✅
-- **AP Invoices**: Delete button exists, works for all statuses ✅
-- **AP Payments**: Delete button exists ✅
-- **AR Receipts**: Delete button exists ✅
-- **Journal Entries**: **NO delete button** ❌ — only View, Approve, Reject, and Reverse actions
+## What's Happening
 
-## What's Needed
+1. **JE Delete button**: The code is correctly implemented (Trash2 icon in actions column). It should be visible on all journal entries. If you're not seeing it, the latest build may not have deployed yet — try refreshing the page. The red trash icon should appear next to the eye/reverse icons.
 
-Add a **force delete** option to Journal Entries that:
-1. Reverses COA balance impact (using the existing `reverseAndDeleteJournalEntry` utility)
-2. Deletes all `journal_entry_lines`
-3. Deletes the `journal_entry` record itself
-4. Works for **any status** (draft, posted, reversed) during testing
+2. **Transfer Data & Clear Test Data buttons**: These are **intentionally hidden in LIVE mode** — they only show when you select NCG Test company. The `TestModeBanner` component returns just a green "LIVE MODE" banner with no action buttons when `isTestCompany` is false (line 70-80).
 
-## Implementation
+## Plan: Make Transfer Button Available in LIVE Mode
 
-### 1. Add `useDeleteJournalEntry` mutation in `useAccountingMutations.ts`
-- Calls the existing `reverseAndDeleteJournalEntry()` from `gl-posting-utils.ts` which already handles COA balance reversal + line deletion + entry deletion
-- Invalidates `journal-entries` and `chart-of-accounts` queries
-- Shows success/error toast
+Since you need to transfer data between live and test environments from either side, the Transfer button should be visible in LIVE mode too.
 
-### 2. Add delete button + confirmation dialog in `JournalEntriesView.tsx`
-- Import `Trash2` icon and `AlertDialog` components
-- Add a red trash button in the actions column (available for all statuses)
-- Add `deleteConfirmId` state and confirmation dialog (same pattern as AP/AR views)
-- Wire up to the new `useDeleteJournalEntry` mutation
+### Changes
 
-## Safety
-- The `reverseAndDeleteJournalEntry` utility already exists and is battle-tested (used by all AP/AR delete mutations)
-- Only reverses COA balances for "posted" entries; draft entries are simply deleted
-- No operational (trips, buses, routes) data is touched
-- This is a temporary testing feature — can be disabled later by restricting `canDelete` to draft-only
+**File: `src/components/accounting/TestModeBanner.tsx`**
+
+1. Move the "Transfer Data" button into the LIVE MODE banner (lines 70-80) so it's accessible from both modes
+2. Keep "Clear Test Data" restricted to TEST MODE only (safety)
+3. The transfer dialog already supports both directions (`live_to_test` and `test_to_live`), so no logic changes needed
+
+### JE Delete Button
+
+The delete button code is already deployed in `JournalEntriesView.tsx` (line 247-255). It renders unconditionally for all journal entries regardless of status. If it's not showing:
+- The latest build may need a page refresh
+- If still missing after refresh, I'll investigate further
 
 ## Files
-- **Modify**: `src/hooks/useAccountingMutations.ts` — add `useDeleteJournalEntry` mutation
-- **Modify**: `src/components/accounting/JournalEntriesView.tsx` — add delete button + confirmation dialog
+- **Modify**: `src/components/accounting/TestModeBanner.tsx` — add Transfer Data button to the LIVE MODE banner section
 
