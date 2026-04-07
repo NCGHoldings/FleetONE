@@ -202,6 +202,14 @@ export default function Complaints() {
         return;
       }
       
+      const incidentDetails: Record<string, string> = {};
+      if (formData.routeNumber) incidentDetails.route_number = formData.routeNumber;
+      if (formData.busNumber) incidentDetails.bus_number = formData.busNumber;
+      if (formData.incidentDate) incidentDetails.incident_date = formData.incidentDate;
+      if (formData.incidentTime) incidentDetails.incident_time = formData.incidentTime;
+      if (formData.location) incidentDetails.location = formData.location;
+      if (formData.driverName) incidentDetails.driver_name = formData.driverName;
+
       const { error } = await supabase
         .from('feedback_complaints')
         .insert({
@@ -213,7 +221,8 @@ export default function Complaints() {
           staff_group: formData.staff_group || null,
           status: 'new',
           reported_by: profile.id,
-          escalation_level: 1
+          escalation_level: 1,
+          related_persons: Object.keys(incidentDetails).length > 0 ? incidentDetails : null
         });
 
       if (error) throw error;
