@@ -137,14 +137,16 @@ export const BusDocumentPreviewModal = ({
                       </div>
 
                       {busFolderLink && (
-                        <ExternalLink
-                          className="w-3.5 h-3.5 text-muted-foreground hover:text-primary shrink-0 cursor-pointer"
+                        <span
+                          className="shrink-0 cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
                             window.open(busFolderLink, '_blank');
                           }}
                           title="View source on Antigravity"
-                        />
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
+                        </span>
                       )}
                     </button>
                   ))}
