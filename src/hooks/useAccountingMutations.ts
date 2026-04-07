@@ -3925,6 +3925,9 @@ export const useDeleteAPPayment = () => {
       // 2. Delete allocations
       await supabase.from("ap_payment_allocations").delete().eq("payment_id", id);
 
+      // 2b. Delete linked cheque register entries
+      await (supabase as any).from("cheque_register").delete().eq("payment_id", id);
+
       // 3. Delete linked bank transactions
       await supabase.from("bank_transactions").delete().eq("reference", `AP-PAY-${id}`);
 
@@ -3985,6 +3988,9 @@ export const useDeleteARReceipt = () => {
 
       // 2. Delete allocations
       await supabase.from("ar_receipt_allocations").delete().eq("receipt_id", id);
+
+      // 2b. Delete linked cheque register entries
+      await (supabase as any).from("cheque_register").delete().eq("ar_receipt_id", id);
 
       // 3. Delete linked bank transactions
       await supabase.from("bank_transactions").delete().eq("reference", `AR-REC-${id}`);
