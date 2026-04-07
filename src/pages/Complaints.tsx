@@ -891,6 +891,37 @@ export default function Complaints() {
               </Select>
             </div>
 
+            {/* Incident Details */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <Label className="text-sm font-semibold">Incident Details</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="edit-routeNumber" className="text-xs">Route Number</Label>
+                  <Input id="edit-routeNumber" value={formData.routeNumber} onChange={(e) => setFormData(prev => ({ ...prev, routeNumber: e.target.value }))} placeholder="e.g. 138" />
+                </div>
+                <div>
+                  <Label htmlFor="edit-busNumber" className="text-xs">Bus Number</Label>
+                  <Input id="edit-busNumber" value={formData.busNumber} onChange={(e) => setFormData(prev => ({ ...prev, busNumber: e.target.value }))} placeholder="e.g. NB-1234" />
+                </div>
+                <div>
+                  <Label htmlFor="edit-incidentDate" className="text-xs">Date of Incident</Label>
+                  <Input id="edit-incidentDate" type="date" value={formData.incidentDate} onChange={(e) => setFormData(prev => ({ ...prev, incidentDate: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-incidentTime" className="text-xs">Time of Incident</Label>
+                  <Input id="edit-incidentTime" type="time" value={formData.incidentTime} onChange={(e) => setFormData(prev => ({ ...prev, incidentTime: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="edit-location" className="text-xs">Location / Bus Stop</Label>
+                  <Input id="edit-location" value={formData.location} onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))} placeholder="e.g. Kaduwela Bus Stand" />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="edit-driverName" className="text-xs">Driver Name (optional)</Label>
+                  <Input id="edit-driverName" value={formData.driverName} onChange={(e) => setFormData(prev => ({ ...prev, driverName: e.target.value }))} placeholder="Driver name if known" />
+                </div>
+              </div>
+            </div>
+
             <div>
               <Label htmlFor="edit-description">Description *</Label>
               <Textarea
