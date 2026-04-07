@@ -80,7 +80,9 @@ export default function PublicComplaintForm() {
         driver_name: formData.driverName || null,
       };
 
-      const { data, error } = await supabase
+      const clientRef = `CMP-${Date.now().toString(36).toUpperCase()}`;
+
+      const { error } = await supabase
         .from('feedback_complaints')
         .insert({
           title: formData.title,
@@ -92,13 +94,11 @@ export default function PublicComplaintForm() {
           reported_by: null,
           escalation_level: 1,
           related_persons: relatedPersons,
-        })
-        .select('id')
-        .single();
+        });
 
       if (error) throw error;
 
-      const generatedId = `CMP-${data.id.slice(-6)}`;
+      const generatedId = clientRef;
       setComplaintId(generatedId);
       setSubmitted(true);
 
