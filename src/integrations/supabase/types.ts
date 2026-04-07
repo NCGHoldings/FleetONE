@@ -21011,6 +21011,44 @@ export type Database = {
           },
         ]
       }
+      special_hire_remarks: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          id: string
+          quotation_id: string
+          remark_type: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          id?: string
+          quotation_id: string
+          remark_type?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          id?: string
+          quotation_id?: string
+          remark_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_hire_remarks_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       special_hire_signature_settings: {
         Row: {
           created_at: string | null
