@@ -754,7 +754,36 @@ export default function Complaints() {
               </Select>
             </div>
 
-            <div>
+            {/* Incident Details */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <Label className="text-sm font-semibold">Incident Details</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="routeNumber" className="text-xs">Route Number</Label>
+                  <Input id="routeNumber" value={formData.routeNumber} onChange={(e) => setFormData(prev => ({ ...prev, routeNumber: e.target.value }))} placeholder="e.g. 138" />
+                </div>
+                <div>
+                  <Label htmlFor="busNumber" className="text-xs">Bus Number</Label>
+                  <Input id="busNumber" value={formData.busNumber} onChange={(e) => setFormData(prev => ({ ...prev, busNumber: e.target.value }))} placeholder="e.g. NB-1234" />
+                </div>
+                <div>
+                  <Label htmlFor="incidentDate" className="text-xs">Date of Incident</Label>
+                  <Input id="incidentDate" type="date" value={formData.incidentDate} onChange={(e) => setFormData(prev => ({ ...prev, incidentDate: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="incidentTime" className="text-xs">Time of Incident</Label>
+                  <Input id="incidentTime" type="time" value={formData.incidentTime} onChange={(e) => setFormData(prev => ({ ...prev, incidentTime: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="location" className="text-xs">Location / Bus Stop</Label>
+                  <Input id="location" value={formData.location} onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))} placeholder="e.g. Kaduwela Bus Stand" />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="driverName" className="text-xs">Driver Name (optional)</Label>
+                  <Input id="driverName" value={formData.driverName} onChange={(e) => setFormData(prev => ({ ...prev, driverName: e.target.value }))} placeholder="Driver name if known" />
+                </div>
+              </div>
+            </div>
               <Label htmlFor="staff_group">Related Staff Group</Label>
               <Select value={formData.staff_group} onValueChange={(value) => setFormData(prev => ({ ...prev, staff_group: value }))}>
                 <SelectTrigger>
