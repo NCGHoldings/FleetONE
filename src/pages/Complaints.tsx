@@ -83,23 +83,7 @@ export default function Complaints() {
   const [relatedPersons, setRelatedPersons] = useState<RelatedPerson[]>([]);
   const [newPersonName, setNewPersonName] = useState('');
   const [newPersonRole, setNewPersonRole] = useState('');
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: '',
-    priority: 'medium',
-    type: 'complaint',
-    staff_group: '',
-    status: 'new',
-    assigned_to: '',
-    action_taken: '',
-    routeNumber: '',
-    busNumber: '',
-    incidentDate: '',
-    incidentTime: '',
-    location: '',
-    driverName: ''
-  });
+  const [formData, setFormData] = useState({ ...defaultFormData });
   const { toast } = useToast();
 
   useEffect(() => {
