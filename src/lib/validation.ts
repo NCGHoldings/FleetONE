@@ -13,7 +13,7 @@ export const publicComplaintSchema = z.object({
     .max(200, 'Title must be less than 200 characters'),
   description: z.string()
     .trim()
-    .min(20, 'Description must be at least 20 characters')
+    .min(1, 'Description is required')
     .max(2000, 'Description must be less than 2000 characters'),
   category: z.array(z.string()).min(1, 'At least one category is required'),
   priority: z.enum(['low', 'medium', 'high']),
