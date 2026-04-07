@@ -440,8 +440,8 @@ export const DrillDownModal = ({
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Debit</TableHead>
                   <TableHead className="text-right">Credit</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                </TableRow>
+                   <TableHead className="text-right">Balance</TableHead>
+                   <TableHead className="w-10"></TableHead>
               </TableHeader>
               <TableBody>
                 {transactionsWithBalance.map((t) => {
@@ -503,7 +503,17 @@ export const DrillDownModal = ({
                       <TableCell className="text-right font-mono">
                         <CurrencyDisplay amount={t.runningBalance} />
                       </TableCell>
-                    </TableRow>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteConfirmJEId(entry?.id)}
+                          title="Delete this journal entry"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                   );
                 })}
               </TableBody>
