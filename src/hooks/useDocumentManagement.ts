@@ -169,11 +169,11 @@ export const useDocumentManagement = () => {
       const totalApprovedPaid = (approvedPaymentsList || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
 
-      // Fetch current signatures for the document
+      // Fetch current signatures for the document using actual document ID
       const { data: signatures } = await supabase
         .from('document_approvals')
         .select('*')
-        .eq('document_id', draftDoc.quotation_id);
+        .eq('document_id', documentId);
 
       // Map signatures to the format expected by invoice generator
       const signatureMap = {
@@ -313,11 +313,11 @@ export const useDocumentManagement = () => {
       if (approvedPaymentsError2) throw approvedPaymentsError2;
       const totalApprovedPaid2 = (approvedPaymentsList2 || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-      // Fetch current signatures for the document
+      // Fetch current signatures for the document using actual document ID
       const { data: signatures } = await supabase
         .from('document_approvals')
         .select('*')
-        .eq('document_id', existingDoc.quotation_id);
+        .eq('document_id', documentId);
 
       // Map signatures to the format expected by invoice generator
       const signatureMap = {

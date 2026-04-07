@@ -71,11 +71,11 @@ export const useDocumentRegeneration = () => {
         console.log('Adjustment data for regeneration:', adjustmentData);
       }
 
-      // Fetch current signatures for the document (use quotationId for consistency)
+      // Fetch current signatures for the document using actual document ID
       const { data: signatures } = await supabase
         .from('document_approvals')
         .select('*')
-        .eq('document_id', quotationId);
+        .eq('document_id', documentId);
 
       // Map signatures to the format expected by invoice generator
       const signatureMap = {
