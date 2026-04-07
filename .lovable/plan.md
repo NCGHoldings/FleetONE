@@ -1,62 +1,112 @@
 
+Fix: Special Hire document flow shows two different viewers and inconsistent signature/draft states
 
-# Fix Build Errors and Add Antigravity External Links to Fleet Documents
+What is happening now
+- The workflow eye icon opens `DocumentViewer` using a stored `document_storage` record.
+- Some other places still open `InvoiceViewer`, which generates a fresh preview from `invoiceData` instead of the stored document.
+- Because of that, users can see:
+  - one view with no embedded signatures
+  - another view with DRAFT/APPROVED text
+  - different content for what should be the same document
+- There is also inconsistent signature linking:
+  - some code saves/fetches approvals by real document id
+  - other code uses `quotationId` as `document_id`
+- This is the main reason the system behaves like there are “2 documents”.
 
-## Problem
+Root causes found
+1. Two parallel viewers exist
+- `src/components/special-hire/ConfirmedTripsTable.tsx` uses both:
+  - `DocumentViewer`
+  - `InvoiceViewer`
+- `viewInvoice()` can still fall back to generated `InvoiceViewer` output if it does not use the stored document path.
 
-The Antigravity bus document integration code is fully synced (manifest, modal, images), but the Lovable preview cannot render it because **TypeScript build errors in other files from the same merge prevent compilation**. Additionally, you want both bus-level folder links and per-document source links to Antigravity.
+2. Signatures are attached inconsistently
+- In `src/hooks/useDocumentManagement.ts`, prepared-by auto-signature is inserted with:
+  - `document_id: quotationId`
+- In `src/hooks/useFinanceApproval.ts`, checked-by auto-signature is also inserted with:
+  - `document_id: paymentData.quotation.id`
+- But viewers mostly read signatures by actual document row id:
+  - `document.id`
+- So signatures can exist, but not appear in the opened document.
 
-## Step 1: Fix build errors blocking the preview
+3. Multiple generation/regeneration paths
+- `useDocumentManagement`
+- `useDocumentRegeneration`
+- `DocumentViewer` local regeneration
+- `EnhancedDocumentViewer` local regeneration
+- `useFinanceApproval` fallback draft creation + approval regeneration
+- These do similar work with slightly different rules, which causes mismatch.
 
-These files from the external merge have type mismatches that must be fixed before anything renders:
+Implementation plan
 
-1. **`src/components/accounting/settings/DocumentTemplateManager.tsx`** (line 52-55)
-   - Calls `useDocumentTemplates(companyId, typeId)` with 2 args, but hook only accepts 1
-   - Destructures `{ data: templates, isLoading, refetch }` but hook returns `{ templates, loading, refetch }`
-   - Fix: Change to `useDocumentTemplates(selectedTypeId === "all" ? undefined : selectedTypeId)` and destructure as `{ templates, loading: isLoading, refetch }`
+1. Make one single document viewer path
+- Keep `DocumentViewer` as the only viewer for Special Hire payment/invoice documents.
+- Stop using `InvoiceViewer` in `ConfirmedTripsTable.tsx`.
+- Update all “View” actions (workflow eye, actions column, payment timeline/trip details, documents modal) to open the correct stored `document_storage` record in `DocumentViewer`.
+- If no document exists, show a clear “No generated document yet” state instead of rendering a different generated preview.
 
-2. **`src/components/accounting/shared/FinanceDocumentPreviewModal.tsx`** (line 88)
-   - Same destructuring mismatch: `{ data: allTemplates }` → `{ templates: allTemplates }`
+2. Make stored document the single source of truth
+- Standardize on actual `document_storage.id` as the only valid `document_id` for approvals.
+- Fix auto-signature insertions in:
+  - `src/hooks/useDocumentManagement.ts`
+  - `src/hooks/useFinanceApproval.ts`
+- Remove the current quotation-id-as-document-id behavior.
+- Ensure every signature fetch/regeneration reads approvals from the same real document id.
 
-3. **`src/components/accounting/inventory/LandedCostVoucherForm.tsx`** — Supabase deep type instantiation errors
-   - Cast queries with `as any` to bypass strict typing
+3. Unify document selection rules
+- Create one consistent helper/selection rule for:
+  - advance payment document
+  - final/balance invoice
+  - approved vs draft preference
+- Use it everywhere:
+  - workflow column
+  - documents modal
+  - trip details / payment timeline view buttons
+  - finance approval modal
+- Rule: prefer approved document for that payment/type; if none exists, use latest draft for that same payment/type.
 
-4. **`src/hooks/useLeaveRequests.ts`** — `leave_requests` table not in generated types
-   - Cast `.from('leave_requests')` with `as any`
+4. Remove duplicate preview logic
+- Refactor `viewInvoice()` in `ConfirmedTripsTable.tsx` so it resolves a stored document instead of generating ad-hoc `InvoiceData` preview output.
+- Keep `InvoiceViewer.tsx` only if it is still needed elsewhere; otherwise remove its use from Special Hire flow entirely.
+- This ensures users never see one preview from DB and another preview from generated HTML.
 
-5. **`src/components/special-hire/LoadSavedRouteDialog.tsx`** — `saved_routes` table not in types
-   - Cast `.from('saved_routes')` with `as any`
+5. Consolidate regeneration behavior
+- Choose one regeneration path as the main one:
+  - preferably hook-based regeneration via `useDocumentRegeneration` / `useDocumentManagement`
+- Remove duplicate local regeneration logic inside viewers where possible.
+- Make regeneration update the existing document record, not create a parallel-looking version.
+- Keep filename updates if needed, but keep the same document row as the canonical record.
 
-## Step 2: Add Antigravity external links
+6. Clean up DRAFT / APPROVED behavior
+- Show DRAFT only when the actual stored document status is draft.
+- After approval, all entry points should open the approved stored file, so users no longer see old draft wording from a different view.
+- For balance/final customer invoice behavior, keep the “no signatures required” rule only if that is the intended business rule, but apply it consistently in the single viewer.
 
-Once the build works, enhance the document modal with external links:
+7. Fix finance approval modal consistency
+- In `src/components/special-hire/FinanceApprovalModal.tsx`, make document listing, signature display, and view action all use the same selected stored document.
+- Ensure existing signatures are loaded from the same actual document id, not the first arbitrary document or quotation-level pseudo-id.
 
-1. **`src/data/bus_folder_links.json`** (new file)
-   - A mapping of bus numbers to their Antigravity cloud folder URLs
-   - Format: `{ "JC 2449": "https://antigravity.cloud/ncg/buses/JC2449", ... }`
-   - Initially empty/placeholder — you or Antigravity can populate it later
+8. Verify all places that expose document links/buttons
+- Cross-check and align these components:
+  - `src/components/special-hire/ConfirmedTripsTable.tsx`
+  - `src/components/special-hire/FinanceApprovalModal.tsx`
+  - `src/components/special-hire/PaymentTimeline.tsx`
+  - `src/components/special-hire/TripDetailsModal.tsx`
+  - `src/components/special-hire/DocumentViewer.tsx`
+  - `src/hooks/useDocumentManagement.ts`
+  - `src/hooks/useDocumentRegeneration.ts`
+  - `src/hooks/useFinanceApproval.ts`
 
-2. **`src/components/fleet/BusDocumentPreviewModal.tsx`**
-   - Add a "View on Antigravity" button in the modal header (bus-level folder link)
-   - Add a small external link icon next to each document in the sidebar (per-document link)
-   - If no Antigravity link exists for a bus, hide the button gracefully
+Expected result
+- Only one document opens for each action
+- Workflow eye icon and Actions > View Documents show the same canonical file
+- No more mismatch between no-signature view and signed view
+- No duplicate-feeling draft/approved versions from different renderers
+- Signature data appears reliably because all approvals point to the actual document id
+- Users see one clean Special Hire document flow
 
-3. **`src/pages/FleetManagement.tsx`**
-   - No changes needed — the existing "📎 X Docs" badge and modal integration are already correct
-
-## Files to modify
-- `src/components/accounting/settings/DocumentTemplateManager.tsx` — fix hook usage
-- `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx` — fix hook usage
-- `src/components/accounting/inventory/LandedCostVoucherForm.tsx` — type casts
-- `src/hooks/useLeaveRequests.ts` — type casts
-- `src/components/special-hire/LoadSavedRouteDialog.tsx` — type casts
-- `src/data/bus_folder_links.json` — new Antigravity URL mapping
-- `src/components/fleet/BusDocumentPreviewModal.tsx` — add Antigravity links UI
-
-## Result
-- The preview will compile and render successfully
-- Fleet Management table shows "📎 X Docs" badges for buses with documents
-- Clicking a badge opens the document modal with sidebar + preview
-- Modal header shows "View on Antigravity" folder link
-- Each document in the sidebar has an external source link icon
-
+Technical notes
+- Highest-risk issue is signature identity mismatch:
+  - approvals currently mix `document.id` and `quotationId`
+- Highest-impact UX fix is removing `InvoiceViewer` from this Special Hire path and routing everything to `DocumentViewer`
+- This is mainly a consistency/consolidation fix across multiple files, not a database-schema change
