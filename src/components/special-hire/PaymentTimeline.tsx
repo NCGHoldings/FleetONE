@@ -68,7 +68,7 @@ export function PaymentTimeline({
   
   // Use total paid amount for progress calculation, not just advance
   const paymentProgress = safeTotal > 0 ? Math.min((totalPaidAmount / safeTotal) * 100, 100) : 0;
-  const isFullyPaid = safeBalance <= 0 && totalPaidAmount >= safeTotal;
+  const isFullyPaid = totalPaidAmount >= safeTotal && safeTotal > 0;
 
   const getPaymentStatusBadge = (status: string) => {
     // Handle undefined or null status
@@ -126,8 +126,8 @@ export function PaymentTimeline({
           </div>
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Balance</div>
-            <div className={`font-semibold text-sm ${safeBalance > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-              LKR {Math.max(0, safeBalance).toLocaleString()}
+            <div className={`font-semibold text-sm ${(safeTotal - totalPaidAmount) > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+              LKR {Math.max(0, safeTotal - totalPaidAmount).toLocaleString()}
             </div>
           </div>
         </div>

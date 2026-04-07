@@ -1923,15 +1923,7 @@ export function ConfirmedTripsTable() {
                           {doc.document_status === 'draft' ? 'DRAFT' : 'APPROVED'}
                         </Badge>
                         <span className="font-medium">
-                          {doc.document_type === 'sales_receipt' 
-                            ? 'Sales Receipt' 
-                            : doc.payment_type === 'balance'
-                            ? 'Final Balance Invoice'
-                            : doc.payment_type === 'advance'
-                            ? 'Advance Invoice'
-                            : doc.payment_type === 'full'
-                            ? 'Full Payment Invoice'
-                            : 'Invoice'}
+                          {getDocumentLabel(doc)}
                         </span>
                         <span className="text-muted-foreground">({doc.payment_type})</span>
                       </div>

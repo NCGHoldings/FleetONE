@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { 
   CheckCircle, Mail, Clock, FileText, Eye, Send, Lock, AlertCircle, CreditCard, Loader2
 } from 'lucide-react';
+import { getDocumentShortLabel } from '@/lib/special-hire-document-helpers';
 
 export interface SignerSetting {
   role: string;
@@ -39,11 +40,7 @@ export function SignatureWorkflowIndicator({
     }
   };
 
-  const getDocumentTypeLabel = (doc: any) => {
-    if (doc.payment_type === 'advance') return 'Sales Receipt';
-    if (doc.payment_type === 'balance' || doc.payment_type === 'full') return 'Invoice';
-    return doc.document_type === 'sales_receipt' ? 'Sales Receipt' : 'Invoice';
-  };
+  const getDocumentTypeLabel = (doc: any) => getDocumentShortLabel(doc);
 
   const getSignatureStatus = (doc: any) => {
     const approvals = doc.document_approvals || [];
