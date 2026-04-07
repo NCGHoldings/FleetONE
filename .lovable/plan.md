@@ -1,51 +1,50 @@
 
 
-# Fix: Landed Cost Voucher — DB Error + Allocation Logic
+# Fix: Import ALL 217 Buses from Excel + Flag/Remove Fake DB Buses
 
-## 3 Issues Found
+## Current Problem
 
-### Issue 1: Database Error (400 Bad Request)
-The GRN query on line 111 orders by `received_date`, but the column is actually `receipt_date`. This causes the "column goods_receipt_notes.received_date does not exist" error visible in your console.
+- Excel has **217 buses** (100% accurate source of truth)
+- Database has **76 buses** (68 matched to Excel, 8 did NOT match — likely fake/test data like NK-1234, NK-2847, NK-3456, NK-5678, NK-9012)
+- Import showed "68 updated, 0 created, **150 skipped**" — the 150 new buses were skipped because the "Auto-create" toggle was OFF by default
+- Even when toggled ON, user may not notice it — it should default to ON since Excel is the master source
 
-**Fix**: Change `.order("received_date")` → `.order("receipt_date")`
+## What I'll Change
 
-### Issue 2: "By Quantity" Allocation — Wrong Logic
-Currently both "By Quantity" and "By Weight" fall into the same `else` branch that simply divides charges equally among items:
-```js
-if (voucher.allocation_method === "by_value") {
-  allocatedCost = (item.original_cost / totalOriginalCost) * totalCharges;
-} else {
-  allocatedCost = totalCharges / items.length;  // ← same for both!
-}
-```
+### 1. Auto-Create ON by Default
+Change `autoCreate` initial state from `false` to `true` so all 150 new buses get created automatically.
 
-**Correct "By Quantity"** should allocate proportionally based on each item's quantity:
-```
-allocatedCost = (item.quantity / totalQuantity) * totalCharges
-```
+### 2. Add "Buses NOT in Excel" Warning Section
+After parsing, cross-reference DB buses against Excel. Show a red-highlighted section listing DB buses that have NO match in the Excel sheet (e.g., NK-1234, NK-3456). These are likely fake/test entries.
 
-This applies in BOTH places — the hook (`useInventoryEnhanced.ts`) and the preview function (`getAllocation` in the modal).
+Add options:
+- **Flag as inactive**: Mark unmatched DB buses as `status = 'inactive'`
+- **Delete permanently**: Remove them from the database entirely
+- User can select which action to take before importing
 
-### Issue 3: "By Weight" Allocation — No Weight Data
-The `VoucherItem` interface has no `weight` field. For proper weight-based allocation, we need to:
-- Add an optional `weight` field to items (user enters per-item weight in kg)
-- Show weight input column when "By Weight" is selected
-- Allocate: `(item.weight / totalWeight) * totalCharges`
+### 3. Improve Import Button Text
+Show clear counts: "Import 68 Updates + Create 150 New Buses" and separately "Flag/Delete 8 Unmatched DB Buses"
+
+### 4. Route Matching for New Buses
+When creating new buses, if the Excel has a route name, try to match it to existing routes in the `routes` table and set the `route_id`.
+
+## Technical Details
+
+- New state: `unmatchedDbBuses` — buses in DB but not in Excel
+- After parsing Excel, compute: `existingBuses.filter(b => !excelBusNos.has(normalizeBusNo(b.bus_no)))`
+- Show these in a separate warning table with checkboxes
+- During import, process selected unmatched buses (deactivate or delete)
+- `autoCreate` defaults to `true`
 
 ## Files
-- **Modify**: `src/components/accounting/inventory/CreateLandedCostVoucherModal.tsx`
-  - Fix `received_date` → `receipt_date`
-  - Fix `getAllocation()` to handle all 3 methods properly
-  - Add `weight` field to `VoucherItem` interface
-  - Show weight input column when allocation method is "By Weight"
-  - Pass quantity + weight data to the mutation
-- **Modify**: `src/hooks/useInventoryEnhanced.ts`
-  - Add `quantity` and `weight` to the mutation's item type
-  - Implement correct allocation for all 3 methods:
-    - **By Value**: `(originalCost / totalOriginalCost) * totalCharges`
-    - **By Quantity**: `(quantity / totalQuantity) * totalCharges`
-    - **By Weight**: `(weight / totalWeight) * totalCharges`
+- **Modify**: `src/components/fleet/FleetVehicleDataImport.tsx`
+  - Default `autoCreate = true`
+  - Add unmatched DB bus detection and display
+  - Add deactivate/delete options for unmatched buses
+  - Execute cleanup during import step
 
 ## Result
-All 3 allocation methods will work correctly, GRN loading will stop erroring, and "By Weight" will have a proper weight input column.
+- All 217 Excel buses will be imported (68 updated + 149 created)
+- 8 fake/test DB buses flagged and removable
+- Excel becomes the single source of truth for the fleet
 
