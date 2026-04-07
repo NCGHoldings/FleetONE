@@ -1,30 +1,25 @@
 
 
-# Fix: Signature Page Toggle Not Persisting
+# Fix: Make Standard Rate (Std Rate) Editable in Fleet Spreadsheet
 
-## Root Cause
-
-The `special_hire_signature_settings` table has **no row** for `signature_page` — only `approved_by`, `checked_by`, `prepared_by` exist. When the page loads and can't find a `signature_page` row, it defaults to `true` (line 52-53).
-
-The save function on line 107-116 tries to insert/update, but doesn't check for errors on that specific operation — so if the insert fails (e.g., due to a column constraint), it fails silently and the row never gets created.
+## Problem
+The "Std Rate" column in the Fleet Master Spreadsheet is currently read-only — it displays `buses.expected_km_per_liter` (defaults to 8.00 for all buses) but cannot be changed inline. Users need to edit each bus individually via the Edit Bus modal to change this value.
 
 ## Plan
 
-### 1. Auto-create the `signature_page` row on first load
-In `loadSettings()`, when no `signature_page` row is found (line 51-54), immediately insert it into the database instead of just setting local state. This guarantees the row exists for future toggles.
+### 1. Make the Std Rate cell an editable input (FleetMasterSpreadsheetCore.tsx)
+Replace the static text display at line 414-416 with an editable `<Input>` field (same pattern used for Start KM, End KM, Fuel fields). On blur or Enter, it saves the new value.
 
-### 2. Add error handling on the signature_page save
-In `handleSave()`, add proper error checking on the insert/update for the `signature_page` row (lines 107-116) so failures are reported to the user.
+### 2. Add `updateStandardRate` handler (useFleetMasterSpreadsheet.ts)
+Add a new function that updates `buses.expected_km_per_liter` directly for the given bus ID. After saving, recalculate the performance value (standard_rate - fuel_consumption) and do a silent refresh to update the row.
 
-### 3. Make the toggle save immediately (no need for Save button)
-Change the `Switch` for "Show Signature Page" to save directly to the database on toggle — similar to how most master toggles work. This eliminates the "toggle then forget to save" problem.
+### 3. Recalculate performance on change
+When the standard rate changes, the "Perform" column value must also update since `performance = standardRate - fuelConsumption`.
 
 ## Files
-- **Modify**: `src/components/settings/SpecialHireSignatureSettings.tsx`
-  - Auto-insert `signature_page` row on first load if missing
-  - Make the toggle save immediately via `onCheckedChange`
-  - Add error handling on the DB operations
+- **Modify**: `src/components/fleet/FleetMasterSpreadsheetCore.tsx` — replace static cell with editable input for Std Rate
+- **Modify**: `src/hooks/useFleetMasterSpreadsheet.ts` — add `updateStandardRate(busId, value)` that writes to `buses.expected_km_per_liter` and refreshes
 
 ## Result
-Toggling "Show Signature Page" off will persist immediately — no need to scroll down and click Save. Refreshing the page will show the correct state.
+Users can click on any Std Rate cell, type a new value (e.g., 6.5, 9.0), and it saves immediately to the bus record. Performance column auto-recalculates.
 
