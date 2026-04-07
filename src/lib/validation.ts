@@ -35,11 +35,9 @@ export const publicComplaintSchema = z.object({
     .optional()
     .or(z.literal('')),
   incidentDate: z.string()
-    .optional()
-    .or(z.literal('')),
+    .min(1, 'Incident date is required'),
   incidentTime: z.string()
-    .optional()
-    .or(z.literal('')),
+    .min(1, 'Incident time is required'),
   location: z.string()
     .trim()
     .max(500, 'Location must be less than 500 characters')
