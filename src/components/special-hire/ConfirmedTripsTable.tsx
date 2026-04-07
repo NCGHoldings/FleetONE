@@ -2138,11 +2138,12 @@ export function ConfirmedTripsTable() {
 
       {/* Vehicle Assignment Quick Edit Modal */}
       {selectedTrip && (
-        <VehicleAssignmentModal
+         <VehicleAssignmentModal
           isOpen={vehicleAssignmentModalOpen}
           onClose={() => setVehicleAssignmentModalOpen(false)}
           quotationId={selectedTrip.id}
           quotationNo={selectedTrip.quotation_no}
+          numberOfBuses={selectedTrip.number_of_buses}
           currentAssignment={{
             driver_name: selectedTrip.assigned_driver_name,
             conductor_name: selectedTrip.assigned_conductor_name,
