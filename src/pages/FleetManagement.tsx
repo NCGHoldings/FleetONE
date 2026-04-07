@@ -93,6 +93,7 @@ const FleetManagementComponent = () => {
   const [loanModalOpen, setLoanModalOpen] = useState(false);
   const [loanDashboardModalOpen, setLoanDashboardModalOpen] = useState(false);
   const [masterDataSheetOpen, setMasterDataSheetOpen] = useState(false);
+  const [vehicleImportOpen, setVehicleImportOpen] = useState(false);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
   const { toast } = useToast();
 

@@ -269,7 +269,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
         updateData.status = "active";
         if (!updateData.model) updateData.model = updateData.vehicle_brand || "Unknown";
         if (!updateData.current_mileage) updateData.current_mileage = 0;
-        const { error } = await supabase.from("buses").insert(updateData);
+        const { error } = await supabase.from("buses").insert(updateData as any);
         if (error) {
           console.error("Insert error for", row.mapped.bus_no, error);
           skipped++;
