@@ -1,112 +1,67 @@
 
-Fix: Special Hire document flow shows two different viewers and inconsistent signature/draft states
 
-What is happening now
-- The workflow eye icon opens `DocumentViewer` using a stored `document_storage` record.
-- Some other places still open `InvoiceViewer`, which generates a fresh preview from `invoiceData` instead of the stored document.
-- Because of that, users can see:
-  - one view with no embedded signatures
-  - another view with DRAFT/APPROVED text
-  - different content for what should be the same document
-- There is also inconsistent signature linking:
-  - some code saves/fetches approvals by real document id
-  - other code uses `quotationId` as `document_id`
-- This is the main reason the system behaves like there are “2 documents”.
+# Fix: Inconsistent Document Labels, Wrong Balance in Payment Modal, and Stale Data in Trip Details
 
-Root causes found
-1. Two parallel viewers exist
-- `src/components/special-hire/ConfirmedTripsTable.tsx` uses both:
-  - `DocumentViewer`
-  - `InvoiceViewer`
-- `viewInvoice()` can still fall back to generated `InvoiceViewer` output if it does not use the stored document path.
+## Problems Identified
 
-2. Signatures are attached inconsistently
-- In `src/hooks/useDocumentManagement.ts`, prepared-by auto-signature is inserted with:
-  - `document_id: quotationId`
-- In `src/hooks/useFinanceApproval.ts`, checked-by auto-signature is also inserted with:
-  - `document_id: paymentData.quotation.id`
-- But viewers mostly read signatures by actual document row id:
-  - `document.id`
-- So signatures can exist, but not appear in the opened document.
+### 1. Workflow column shows "Sales Receipt" and "Invoice" but Documents modal shows both as "Sales Receipt"
+- In `SignatureWorkflowIndicator.tsx` (line 43-45), `getDocumentTypeLabel()` maps `payment_type === 'balance'` to "Invoice", but advance to "Sales Receipt"
+- In the Documents modal (ConfirmedTripsTable line 1926), labels are based on `document_type` field
+- The mismatch happens because both advance and balance documents are stored with `document_type: 'sales_receipt'` in `document_storage`, but the workflow indicator uses `payment_type` to decide the label
+- **Fix**: Unify labeling logic — use a single shared helper function that both the workflow indicator and documents modal use. The label should be determined consistently: advance = "Sales Receipt", balance/full = "Invoice"
 
-3. Multiple generation/regeneration paths
-- `useDocumentManagement`
-- `useDocumentRegeneration`
-- `DocumentViewer` local regeneration
-- `EnhancedDocumentViewer` local regeneration
-- `useFinanceApproval` fallback draft creation + approval regeneration
-- These do similar work with slightly different rules, which causes mismatch.
+### 2. PaymentConfirmationModal shows wrong balance after 2nd payment
+- In `PaymentConfirmationModal.tsx` (line 102-103):
+  ```
+  const advancePaid = quotationData.advance_paid || 0;
+  const balanceDue = finalTotal - advancePaid;
+  ```
+- It only subtracts `advance_paid` (first advance payment) from the total, not `total_paid` (all approved payments)
+- When the user already made 2 payments (advance + balance), the modal still calculates balance as `total - advancePaid` instead of `total - totalPaid`
+- **Fix**: Pass `total_paid` to the modal and use it for balance calculation instead of just `advance_paid`
 
-Implementation plan
+### 3. Trip Details modal (eye icon) shows "Paid: LKR 0" despite payments existing
+- In `ConfirmedTripsTable.tsx` (line 1829-1850), the TripDetailsModal receives:
+  - `total_amount: calculateTotalAmount(selectedTrip)` — correct
+  - But `advance_paid` and `balance_due` come from `selectedTrip.advance_paid` and `selectedTrip.balance_due`
+  - The `PaymentTimeline` component (line 277-287) receives these static values and also receives `payments` array
+  - Looking at the PaymentTimeline component, it correctly calculates `totalPaidAmount` from the payments array (line 65-67), showing correct payment history
+  - BUT it shows `safeBalance` (line 129) from the prop `balanceDue` which is the raw value, not recalculated
+  - The payments passed to TripDetailsModal use the wrong field mapping — `trip.payments` maps `status` but PaymentTimeline expects `payment_status`
+- **Fix**: PaymentTimeline should calculate balance from `totalAmount - totalPaidAmount` instead of using the `balanceDue` prop directly. Also fix the payment field mapping.
 
-1. Make one single document viewer path
-- Keep `DocumentViewer` as the only viewer for Special Hire payment/invoice documents.
-- Stop using `InvoiceViewer` in `ConfirmedTripsTable.tsx`.
-- Update all “View” actions (workflow eye, actions column, payment timeline/trip details, documents modal) to open the correct stored `document_storage` record in `DocumentViewer`.
-- If no document exists, show a clear “No generated document yet” state instead of rendering a different generated preview.
+## Implementation Plan
 
-2. Make stored document the single source of truth
-- Standardize on actual `document_storage.id` as the only valid `document_id` for approvals.
-- Fix auto-signature insertions in:
-  - `src/hooks/useDocumentManagement.ts`
-  - `src/hooks/useFinanceApproval.ts`
-- Remove the current quotation-id-as-document-id behavior.
-- Ensure every signature fetch/regeneration reads approvals from the same real document id.
+### File 1: Create shared document label helper
+**New file**: `src/lib/special-hire-document-helpers.ts`
+- Export `getDocumentLabel(doc: { document_type: string; payment_type: string }): string`
+- advance → "Sales Receipt", balance/full → "Invoice", else use document_type
 
-3. Unify document selection rules
-- Create one consistent helper/selection rule for:
-  - advance payment document
-  - final/balance invoice
-  - approved vs draft preference
-- Use it everywhere:
-  - workflow column
-  - documents modal
-  - trip details / payment timeline view buttons
-  - finance approval modal
-- Rule: prefer approved document for that payment/type; if none exists, use latest draft for that same payment/type.
+### File 2: `src/components/special-hire/SignatureWorkflowIndicator.tsx`
+- Import and use the shared helper in `getDocumentTypeLabel()`
 
-4. Remove duplicate preview logic
-- Refactor `viewInvoice()` in `ConfirmedTripsTable.tsx` so it resolves a stored document instead of generating ad-hoc `InvoiceData` preview output.
-- Keep `InvoiceViewer.tsx` only if it is still needed elsewhere; otherwise remove its use from Special Hire flow entirely.
-- This ensures users never see one preview from DB and another preview from generated HTML.
+### File 3: `src/components/special-hire/ConfirmedTripsTable.tsx`
+- Documents modal (line ~1926): Use the shared helper for label
+- PaymentConfirmationModal props (line 1678): Add `total_paid: selectedTrip.total_paid`
+- TripDetailsModal payments mapping: Ensure `payment_status` field is mapped correctly from `status`
 
-5. Consolidate regeneration behavior
-- Choose one regeneration path as the main one:
-  - preferably hook-based regeneration via `useDocumentRegeneration` / `useDocumentManagement`
-- Remove duplicate local regeneration logic inside viewers where possible.
-- Make regeneration update the existing document record, not create a parallel-looking version.
-- Keep filename updates if needed, but keep the same document row as the canonical record.
+### File 4: `src/components/special-hire/PaymentConfirmationModal.tsx`
+- Add `total_paid` to the `quotationData` interface
+- Line 102-103: Change balance calculation to use `total_paid` instead of just `advance_paid`:
+  ```
+  const totalPaidSoFar = quotationData.total_paid || quotationData.advance_paid || 0;
+  const balanceDue = Math.max(finalTotal - totalPaidSoFar, 0);
+  ```
 
-6. Clean up DRAFT / APPROVED behavior
-- Show DRAFT only when the actual stored document status is draft.
-- After approval, all entry points should open the approved stored file, so users no longer see old draft wording from a different view.
-- For balance/final customer invoice behavior, keep the “no signatures required” rule only if that is the intended business rule, but apply it consistently in the single viewer.
+### File 5: `src/components/special-hire/PaymentTimeline.tsx`
+- Calculate displayed balance from actual payments instead of raw prop:
+  ```
+  const actualBalance = Math.max(safeTotal - totalPaidAmount, 0);
+  ```
+- Use `actualBalance` in the UI instead of `safeBalance`
 
-7. Fix finance approval modal consistency
-- In `src/components/special-hire/FinanceApprovalModal.tsx`, make document listing, signature display, and view action all use the same selected stored document.
-- Ensure existing signatures are loaded from the same actual document id, not the first arbitrary document or quotation-level pseudo-id.
+## Result
+- All views (workflow column, documents modal, trip details, payment modal) show consistent document labels
+- Balance due is always calculated from actual approved payments, not stale DB fields
+- Single source of truth for payment calculations across all modals
 
-8. Verify all places that expose document links/buttons
-- Cross-check and align these components:
-  - `src/components/special-hire/ConfirmedTripsTable.tsx`
-  - `src/components/special-hire/FinanceApprovalModal.tsx`
-  - `src/components/special-hire/PaymentTimeline.tsx`
-  - `src/components/special-hire/TripDetailsModal.tsx`
-  - `src/components/special-hire/DocumentViewer.tsx`
-  - `src/hooks/useDocumentManagement.ts`
-  - `src/hooks/useDocumentRegeneration.ts`
-  - `src/hooks/useFinanceApproval.ts`
-
-Expected result
-- Only one document opens for each action
-- Workflow eye icon and Actions > View Documents show the same canonical file
-- No more mismatch between no-signature view and signed view
-- No duplicate-feeling draft/approved versions from different renderers
-- Signature data appears reliably because all approvals point to the actual document id
-- Users see one clean Special Hire document flow
-
-Technical notes
-- Highest-risk issue is signature identity mismatch:
-  - approvals currently mix `document.id` and `quotationId`
-- Highest-impact UX fix is removing `InvoiceViewer` from this Special Hire path and routing everything to `DocumentViewer`
-- This is mainly a consistency/consolidation fix across multiple files, not a database-schema change
