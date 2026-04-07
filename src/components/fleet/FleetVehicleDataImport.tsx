@@ -467,7 +467,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
         if (!error) deleted++;
         else {
           console.error("Delete error for", bus.bus_no, error);
-          errors.push(`Failed to delete ${bus.bus_no}: ${error.message}`);
+          errors.push({ row: 0, bus_no: bus.bus_no, field: 'delete', message: error.message });
         }
       }
     }
