@@ -1489,8 +1489,8 @@ export function ConfirmedTripsTable() {
                                         // Fetch adjustment data if exists
                                         let adjustment: any = null;
                                         if (trip.has_finalized_adjustment) {
-                                          const { data: adjData } = await supabase
-                                            .from('special_hire_trip_adjustments')
+                                          const { data: adjData } = await (supabase
+                                            .from('special_hire_trip_adjustments') as any)
                                             .select('*')
                                             .eq('quotation_id', trip.id)
                                             .eq('is_finalized', true)
