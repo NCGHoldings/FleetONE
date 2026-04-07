@@ -14,6 +14,7 @@ import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Plus, CheckCircle, Clock, XCircle, Download, Send, FileSpreadsheet } from "lucide-react";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 export const PaymentBatchView = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
