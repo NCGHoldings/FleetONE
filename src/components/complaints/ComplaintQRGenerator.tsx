@@ -15,8 +15,7 @@ export default function ComplaintQRGenerator() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const currentDomain = window.location.origin;
-    const complaintUrl = `${currentDomain}/public/complaint`;
+    const complaintUrl = 'https://ncg-fleetone.lovable.app/public/complaint';
     setPublicUrl(complaintUrl);
     generateQRCode(complaintUrl);
   }, []);

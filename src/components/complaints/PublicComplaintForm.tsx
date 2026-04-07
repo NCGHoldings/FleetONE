@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -65,6 +65,10 @@ export default function PublicComplaintForm() {
   const [submitted, setSubmitted] = useState(false);
   const [complaintId, setComplaintId] = useState('');
   const { toast } = useToast();
+
+  useEffect(() => {
+    document.title = 'NCG Express - Submit Feedback';
+  }, []);
 
   const isGoodFeedback = formData.type === 'good_feedback';
 
