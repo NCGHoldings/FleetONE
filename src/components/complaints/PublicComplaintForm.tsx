@@ -66,6 +66,10 @@ export default function PublicComplaintForm() {
   const [complaintId, setComplaintId] = useState('');
   const { toast } = useToast();
 
+  useEffect(() => {
+    document.title = 'NCG Express - Submit Feedback';
+  }, []);
+
   const isGoodFeedback = formData.type === 'good_feedback';
 
   const toggleCategory = (value: string) => {
