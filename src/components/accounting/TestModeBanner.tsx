@@ -66,166 +66,6 @@ export const TestModeBanner = () => {
   const [showConfirmTransfer, setShowConfirmTransfer] = useState(false);
   const queryClient = useQueryClient();
 
-  // Show LIVE banner for non-test companies
-  if (!isTestCompany) {
-    return (
-      <>
-        <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-lg px-4 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-            <span className="font-semibold text-sm">🟢 LIVE MODE</span>
-            <span className="text-xs text-emerald-600 dark:text-emerald-500">
-              — This is your production environment. All data is real.
-            </span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-blue-500/50 text-blue-700 hover:bg-blue-500/20 dark:text-blue-400"
-            onClick={() => setShowTransferDialog(true)}
-          >
-            <ArrowLeftRight className="h-3 w-3 mr-1" />
-            Transfer Data
-          </Button>
-        </div>
-
-        {/* Transfer Dialog (reused from below) */}
-        <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Transfer Accounting Data</DialogTitle>
-              <DialogDescription>
-                Copy accounting data between live and test environments.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label className="font-medium">Direction</Label>
-                <div className="flex gap-2">
-                  <Button
-                    variant={transferDirection === 'live_to_test' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTransferDirection('live_to_test')}
-                    className="flex-1"
-                  >
-                    Live → Test
-                  </Button>
-                  <Button
-                    variant={transferDirection === 'test_to_live' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTransferDirection('test_to_live')}
-                    className="flex-1"
-                  >
-                    Test → Live
-                  </Button>
-                </div>
-                {transferDirection === 'test_to_live' && (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      <strong>Warning:</strong> This will write test data to your production environment!
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label className="font-medium">When target has existing data</Label>
-                <div className="flex gap-2">
-                  <Button
-                    variant={transferMode === 'clear_then_copy' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTransferMode('clear_then_copy')}
-                    className="flex-1"
-                  >
-                    Clear & Replace
-                  </Button>
-                  <Button
-                    variant={transferMode === 'merge' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTransferMode('merge')}
-                    className="flex-1"
-                  >
-                    Merge (skip conflicts)
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="font-medium">Tables to Transfer</Label>
-                  <Badge variant="secondary">{selectedTables.length} selected</Badge>
-                </div>
-                <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto border rounded-md p-2">
-                  {TRANSFER_TABLES.map(table => (
-                    <label
-                      key={table.key}
-                      className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-2 py-1"
-                    >
-                      <Checkbox
-                        checked={selectedTables.includes(table.key)}
-                        onCheckedChange={() => toggleTable(table.key)}
-                      />
-                      <span className="text-sm">{table.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowTransferDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => setShowConfirmTransfer(true)}
-                disabled={selectedTables.length === 0 || isTransferring}
-              >
-                {isTransferring ? "Transferring..." : "Start Transfer"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Transfer Confirmation */}
-        <AlertDialog open={showConfirmTransfer} onOpenChange={setShowConfirmTransfer}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirm Data Transfer</AlertDialogTitle>
-              <AlertDialogDescription>
-                <strong>Direction:</strong> {transferDirection === 'live_to_test' ? 'Live → Test' : 'Test → Live'}
-                <br />
-                <strong>Mode:</strong> {transferMode === 'clear_then_copy' ? 'Clear & Replace' : 'Merge'}
-                <br />
-                <strong>Tables:</strong> {selectedTables.length} selected
-                <br /><br />
-                {transferDirection === 'test_to_live' ? (
-                  <span className="text-destructive font-bold">
-                    ⚠️ This will modify PRODUCTION data. Are you absolutely sure?
-                  </span>
-                ) : (
-                  'This will copy data from live to the test environment.'
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleTransfer}
-                className={transferDirection === 'test_to_live'
-                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  : ""
-                }
-              >
-                Confirm Transfer
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </>
-    );
-  }
-
   const handleClearTestData = async () => {
     setIsClearing(true);
     try {
@@ -315,6 +155,169 @@ export const TestModeBanner = () => {
       prev.includes(key) ? prev.filter(t => t !== key) : [...prev, key]
     );
   };
+
+  const renderTransferDialog = () => (
+    <>
+      <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Transfer Accounting Data</DialogTitle>
+            <DialogDescription>
+              Copy accounting data between live and test environments.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="font-medium">Direction</Label>
+              <div className="flex gap-2">
+                <Button
+                  variant={transferDirection === 'live_to_test' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setTransferDirection('live_to_test')}
+                  className="flex-1"
+                >
+                  Live → Test
+                </Button>
+                <Button
+                  variant={transferDirection === 'test_to_live' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setTransferDirection('test_to_live')}
+                  className="flex-1"
+                >
+                  Test → Live
+                </Button>
+              </div>
+              {transferDirection === 'test_to_live' && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Warning:</strong> This will write test data to your production environment!
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label className="font-medium">When target has existing data</Label>
+              <div className="flex gap-2">
+                <Button
+                  variant={transferMode === 'clear_then_copy' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setTransferMode('clear_then_copy')}
+                  className="flex-1"
+                >
+                  Clear & Replace
+                </Button>
+                <Button
+                  variant={transferMode === 'merge' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setTransferMode('merge')}
+                  className="flex-1"
+                >
+                  Merge (skip conflicts)
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="font-medium">Tables to Transfer</Label>
+                <Badge variant="secondary">{selectedTables.length} selected</Badge>
+              </div>
+              <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto border rounded-md p-2">
+                {TRANSFER_TABLES.map(table => (
+                  <label
+                    key={table.key}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-2 py-1"
+                  >
+                    <Checkbox
+                      checked={selectedTables.includes(table.key)}
+                      onCheckedChange={() => toggleTable(table.key)}
+                    />
+                    <span className="text-sm">{table.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTransferDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => setShowConfirmTransfer(true)}
+              disabled={selectedTables.length === 0 || isTransferring}
+            >
+              {isTransferring ? "Transferring..." : "Start Transfer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showConfirmTransfer} onOpenChange={setShowConfirmTransfer}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Data Transfer</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>Direction:</strong> {transferDirection === 'live_to_test' ? 'Live → Test' : 'Test → Live'}
+              <br />
+              <strong>Mode:</strong> {transferMode === 'clear_then_copy' ? 'Clear & Replace' : 'Merge'}
+              <br />
+              <strong>Tables:</strong> {selectedTables.length} selected
+              <br /><br />
+              {transferDirection === 'test_to_live' ? (
+                <span className="text-destructive font-bold">
+                  ⚠️ This will modify PRODUCTION data. Are you absolutely sure?
+                </span>
+              ) : (
+                'This will copy data from live to the test environment.'
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleTransfer}
+              className={transferDirection === 'test_to_live'
+                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                : ""
+              }
+            >
+              Confirm Transfer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+
+  // Show LIVE banner for non-test companies
+  if (!isTestCompany) {
+    return (
+      <>
+        <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-lg px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+            <span className="font-semibold text-sm">🟢 LIVE MODE</span>
+            <span className="text-xs text-emerald-600 dark:text-emerald-500">
+              — This is your production environment. All data is real.
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-blue-500/50 text-blue-700 hover:bg-blue-500/20 dark:text-blue-400"
+            onClick={() => setShowTransferDialog(true)}
+          >
+            <ArrowLeftRight className="h-3 w-3 mr-1" />
+            Transfer Data
+          </Button>
+        </div>
+        {renderTransferDialog()}
+      </>
+    );
+  }
 
   return (
     <>
