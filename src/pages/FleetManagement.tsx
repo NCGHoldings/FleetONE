@@ -33,6 +33,8 @@ import { BusLoanDashboardModal } from "@/components/fleet/BusLoanDashboardModal"
 import { BusCategoryBadge } from "@/components/fleet/BusCategoryBadge";
 import { BusMasterDataSheet } from "@/components/fleet/BusMasterDataSheet";
 import { FleetAlertsPanel } from "@/components/fleet/FleetAlertsPanel";
+import { FleetVehicleDataImport } from "@/components/fleet/FleetVehicleDataImport";
+import { Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Fleet {
