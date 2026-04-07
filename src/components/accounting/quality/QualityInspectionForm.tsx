@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useItems } from "@/hooks/useAccountingData";
 import { useInspectionTemplates, useCreateQualityInspection } from "@/hooks/useQualityInspection";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 const formSchema = z.object({
   inspection_number: z.string().min(1, "Inspection number is required"),
@@ -27,15 +29,20 @@ export const QualityInspectionForm = ({ onSuccess }: QualityInspectionFormProps)
   const { data: items } = useItems();
   const { data: templates } = useInspectionTemplates();
   const createInspection = useCreateQualityInspection();
+  const generateNumber = useGenerateNumber();
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      inspection_number: `QI-${Date.now()}`,
+      inspection_number: "",
       inspection_date: new Date().toISOString().split("T")[0],
       inspected_qty: 1,
     },
   });
+
+  useEffect(() => {
+    generateNumber("qi").then(num => form.setValue("inspection_number", num));
+  }, []);
   
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     await createInspection.mutateAsync({

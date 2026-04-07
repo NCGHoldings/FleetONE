@@ -53,6 +53,10 @@ export const SalesOrderForm = ({ onSuccess }: SalesOrderFormProps) => {
       order_date: new Date().toISOString().split("T")[0],
     },
   });
+
+  useEffect(() => {
+    generateNumber("so").then(num => form.setValue("so_number", num));
+  }, []);
   
   const addLine = () => {
     setLines([...lines, {

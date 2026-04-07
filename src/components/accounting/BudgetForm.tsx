@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -10,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCreateBudget } from "@/hooks/useAccountingMutations";
 import { useCostCenters } from "@/hooks/useAccountingData";
 import { Loader2 } from "lucide-react";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 const budgetSchema = z.object({
   budget_code: z.string().min(1, "Code is required"),
@@ -31,6 +33,7 @@ interface BudgetFormProps {
 export const BudgetForm = ({ open, onOpenChange }: BudgetFormProps) => {
   const { data: costCenters } = useCostCenters();
   const createBudget = useCreateBudget();
+  const generateNumber = useGenerateNumber();
 
   const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
@@ -38,7 +41,7 @@ export const BudgetForm = ({ open, onOpenChange }: BudgetFormProps) => {
   const form = useForm<BudgetFormData>({
     resolver: zodResolver(budgetSchema),
     defaultValues: {
-      budget_code: `BUD-${currentYear}-${Date.now().toString().slice(-4)}`,
+      budget_code: "",
       budget_name: "",
       fiscal_year: currentYear.toString(),
       budget_period: "annual",
@@ -46,6 +49,12 @@ export const BudgetForm = ({ open, onOpenChange }: BudgetFormProps) => {
       description: "",
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      generateNumber("budget").then(num => form.setValue("budget_code", num));
+    }
+  }, [open]);
 
   const onSubmit = async (data: BudgetFormData) => {
     try {
