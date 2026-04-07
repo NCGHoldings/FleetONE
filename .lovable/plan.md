@@ -1,33 +1,28 @@
 
-# Fix: Signature Page Toggle — CHECK Constraint Violation
 
-## Root Cause
+# Add Complaints Module to Company Module Overview Dashboard
 
-The `special_hire_signature_settings` table has a CHECK constraint:
-```
-CHECK (signature_role IN ('prepared_by', 'checked_by', 'approved_by'))
-```
+## What's Missing
 
-The code tries to insert a row with `signature_role = 'signature_page'`, which violates this constraint → **400 Bad Request** every time the page loads and every time the toggle is clicked.
+The **Complaints** module exists in the app (page at `/complaints`, 4 records in DB) but is **not shown** in the Module Overview dashboard (`RealDataSummary.tsx`). All other modules (Fleet, Staff, Special Hire, Yutong, School Bus, Maintenance, Accounting, Daily Trips, Routes, Accidents) are listed there — Complaints is missing.
 
 ## Plan
 
-### 1. Database migration — add `signature_page` to the CHECK constraint
-Drop the existing constraint and recreate it with the additional value:
-```sql
-ALTER TABLE special_hire_signature_settings 
-  DROP CONSTRAINT special_hire_signature_settings_signature_role_check;
+### 1. Add Complaints to the Module Overview Dashboard (`RealDataSummary.tsx`)
 
-ALTER TABLE special_hire_signature_settings 
-  ADD CONSTRAINT special_hire_signature_settings_signature_role_check 
-  CHECK (signature_role = ANY (ARRAY['prepared_by','checked_by','approved_by','signature_page']));
-```
+- Add a query for `feedback_complaints` in the `Promise.all` block (fetch `id, status, type`)
+- Count total complaints, and count open/unresolved complaints as `issueCount`
+- Add a new module card: `{ name: 'Complaints', icon: <MessageSquareWarning />, count: total, issueCount: openCount, path: '/complaints', color: 'text-rose-400', bgColor: 'bg-rose-500/20' }`
 
-### 2. No code changes needed
-The existing code in `SpecialHireSignatureSettings.tsx` already handles auto-creating the row and immediate toggle save — it just couldn't insert because the constraint blocked it.
+### 2. Add Complaints to Cross-Module Checks (`useCrossModuleChecks.ts`)
+
+- Add a check for unresolved complaints older than 48 hours (SLA breach)
+- This gives visibility into complaint handling performance on the system health dashboard
 
 ## Files
-- **New migration**: Update CHECK constraint on `special_hire_signature_settings.signature_role`
+- **Modify**: `src/components/system-health/RealDataSummary.tsx` — add `feedback_complaints` query and Complaints module card
+- **Modify**: `src/hooks/useCrossModuleChecks.ts` — add SLA check for overdue complaints
 
 ## Result
-The toggle will persist correctly. When disabled, all Special Hire documents (invoices, receipts, payment reminders) will generate without the signature page.
+Complaints will appear as a clickable module card in the dashboard showing total count and open issues, matching all other modules.
+
