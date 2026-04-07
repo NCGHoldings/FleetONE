@@ -1486,8 +1486,49 @@ export function ConfirmedTripsTable() {
                                   <DropdownMenuItem
                                     onClick={async () => {
                                       try {
+                                        // Fetch adjustment data if exists
+                                        let adjustment: any = null;
+                                        if (trip.has_finalized_adjustment) {
+                                          const { data: adjData } = await supabase
+                                            .from('special_hire_trip_adjustments')
+                                            .select('*')
+                                            .eq('quotation_id', trip.id)
+                                            .eq('is_finalized', true)
+                                            .order('created_at', { ascending: false })
+                                            .limit(1)
+                                            .single();
+                                          adjustment = adjData;
+                                        }
+
+                                        // Generate proper invoice number
+                                        let invoiceNo = `REM-${trip.quotation_no}`;
+                                        // Check if a balance invoice already exists
+                                        const existingInvoice = trip.invoices?.find((inv: any) => inv.invoice_type === 'balance' || inv.invoice_type === 'final');
+                                        if (existingInvoice?.invoice_no) {
+                                          invoiceNo = existingInvoice.invoice_no;
+                                        } else {
+                                          try {
+                                            const { data: genNo } = await supabase.rpc('generate_entity_number', {
+                                              p_entity_type: 'ar_invoice',
+                                              p_company_id: null,
+                                            });
+                                            if (genNo) invoiceNo = genNo;
+                                          } catch (e) {
+                                            console.warn('Numbering fallback for payment reminder:', e);
+                                          }
+                                        }
+
+                                        // Parse intermediate stops
+                                        let intermediateStops: Array<{ location: string }> = [];
+                                        try {
+                                          const stops = (trip as any).intermediate_stops;
+                                          if (stops && Array.isArray(stops)) {
+                                            intermediateStops = stops.map((s: any) => ({ location: s.location || '' })).filter((s: any) => s.location);
+                                          }
+                                        } catch (e) { /* ignore */ }
+
                                         const reminderData: InvoiceData = {
-                                          invoiceNo: `REM-${trip.quotation_no}`,
+                                          invoiceNo,
                                           invoiceType: 'balance',
                                           quotationNo: trip.quotation_no,
                                           customerName: trip.customer_name,
@@ -1496,6 +1537,7 @@ export function ConfirmedTripsTable() {
                                           companyName: trip.company_name,
                                           pickupLocation: trip.pickup_location,
                                           dropLocation: trip.drop_location,
+                                          intermediateStops,
                                           pickupDate: new Date(trip.pickup_datetime),
                                           dropDate: new Date(trip.drop_datetime || trip.pickup_datetime),
                                           busType: resolveBusType(trip),
@@ -1506,12 +1548,24 @@ export function ConfirmedTripsTable() {
                                           balanceAmount: trip.balance_due,
                                           paidAmount: trip.total_paid || 0,
                                           companyLogo,
-                                          vehicleNo: trip.assigned_bus_no,
-                                          driverName: trip.assigned_driver_name,
-                                          conductorName: trip.assigned_conductor_name,
+                                          vehicleNo: trip.assigned_bus_no || '',
+                                          driverName: trip.assigned_driver_name || '',
+                                          conductorName: trip.assigned_conductor_name || '',
+                                          tripDistance: getTripDistance(trip),
+                                          totalKm: calculateTotalKm(trip),
                                           invoice_status: 'approved',
                                           document_type: 'invoice',
                                           forCustomer: true,
+                                          // Adjustment data
+                                          hasAdjustments: !!adjustment,
+                                          originalQuotedKm: adjustment ? (adjustment.original_quoted_km || getTripDistance(trip)) : undefined,
+                                          actualKmTraveled: adjustment?.actual_km_traveled,
+                                          extraKm: adjustment?.extra_km,
+                                          extraKmChargePerKm: adjustment?.extra_km_charge_per_km,
+                                          extraKmTotalCharge: adjustment?.extra_km_total_charge,
+                                          additionalExpenses: adjustment?.additional_expenses || [],
+                                          totalAdditionalExpenses: adjustment?.total_additional_expenses,
+                                          adjustmentNotes: adjustment?.notes,
                                         };
 
                                         const pdfBlob = await generateInvoicePDF(reminderData);
