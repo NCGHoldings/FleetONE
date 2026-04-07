@@ -567,6 +567,15 @@ export const useFinanceApproval = () => {
                (quotation.discount_amount_lkr || 0);
       };
 
+      // Fetch signature page setting
+      const { data: sigPageSetting } = await supabase
+        .from('special_hire_signature_settings')
+        .select('is_enabled')
+        .eq('signature_role', 'signature_page')
+        .maybeSingle();
+
+      const hideSignaturePage = sigPageSetting?.is_enabled === false;
+
       const invoiceData: InvoiceData = {
         invoiceNo: `APPROVED-${paymentData.id}`,
         invoiceType: paymentData.payment_type as 'advance' | 'balance',
@@ -590,6 +599,7 @@ export const useFinanceApproval = () => {
         conductorName: paymentData.quotation.assigned_conductor_name,
         invoice_status: 'approved',
         document_type: 'sales_receipt',
+        hideSignaturePage,
       };
 
       const pdfBlob = await generateInvoicePDF(invoiceData);
