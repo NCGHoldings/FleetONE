@@ -33,7 +33,9 @@ import { BusLoanDashboardModal } from "@/components/fleet/BusLoanDashboardModal"
 import { BusCategoryBadge } from "@/components/fleet/BusCategoryBadge";
 import { BusMasterDataSheet } from "@/components/fleet/BusMasterDataSheet";
 import { FleetAlertsPanel } from "@/components/fleet/FleetAlertsPanel";
+import { BusDocumentPreviewModal } from "@/components/fleet/BusDocumentPreviewModal";
 import { useNavigate } from "react-router-dom";
+import busDocsManifest from "@/data/bus_documents.json";
 
 interface Fleet {
   id: string;
@@ -91,8 +93,14 @@ const FleetManagementComponent = () => {
   const [loanModalOpen, setLoanModalOpen] = useState(false);
   const [loanDashboardModalOpen, setLoanDashboardModalOpen] = useState(false);
   const [masterDataSheetOpen, setMasterDataSheetOpen] = useState(false);
+  const [docPreviewModalOpen, setDocPreviewModalOpen] = useState(false);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const handleOpenDocPreview = (bus: Fleet) => {
+    setSelectedBus(bus);
+    setDocPreviewModalOpen(true);
+  };
 
   const handleOpenMasterDataSheet = (busId: string) => {
     setSelectedBusId(busId);
@@ -182,6 +190,35 @@ const FleetManagementComponent = () => {
     {
       accessorKey: "bus_no",
       header: "Bus No.",
+      cell: ({ row }) => {
+        const bus = row.original;
+        
+        // Find if this bus has documents in the manifest
+        const docMap = busDocsManifest as Record<string, string[]>;
+        let match = docMap[bus.bus_no];
+        if (!match) {
+          const withoutSpaces = bus.bus_no.replace(/\s+/g, '');
+          const keyMatch = Object.keys(docMap).find(k => k.replace(/\s+/g, '') === withoutSpaces);
+          if (keyMatch) match = docMap[keyMatch];
+        }
+
+        const docCount = match?.length || 0;
+
+        return (
+          <div className="flex flex-col gap-1.5 items-start">
+            <span className="font-semibold">{bus.bus_no}</span>
+            {docCount > 0 && (
+              <Badge 
+                variant="outline" 
+                className="text-xs py-0 h-5 bg-blue-500/10 text-blue-600 border-blue-200 hover:bg-blue-500/20 cursor-pointer flex items-center gap-1"
+                onClick={() => handleOpenDocPreview(bus)}
+              >
+                📎 {docCount} Docs
+              </Badge>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "category_id",
@@ -798,6 +835,12 @@ const FleetManagementComponent = () => {
         onOpenChange={setLoanDashboardModalOpen}
         busId={selectedBus?.id || ""}
         busNumber={selectedBus?.bus_no || ""}
+      />
+
+      <BusDocumentPreviewModal
+        open={docPreviewModalOpen}
+        onOpenChange={setDocPreviewModalOpen}
+        busNo={selectedBus?.bus_no || ""}
       />
 
       {/* Deactivate Confirmation Dialog */}
