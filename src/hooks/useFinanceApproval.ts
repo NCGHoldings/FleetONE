@@ -577,6 +577,14 @@ export const useFinanceApproval = () => {
 
       const hideSignaturePage = sigPageSetting?.is_enabled === false;
 
+      // Fetch cumulative total paid to date
+      const { data: allApprovedPayments } = await supabase
+        .from('special_hire_payments')
+        .select('amount')
+        .eq('quotation_id', paymentData.quotation.id)
+        .eq('status', 'approved');
+      const totalPaidToDate = (allApprovedPayments || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
       const invoiceData: InvoiceData = {
         invoiceNo: `APPROVED-${paymentData.id}`,
         invoiceType: paymentData.payment_type as 'advance' | 'balance',
@@ -595,6 +603,7 @@ export const useFinanceApproval = () => {
         totalAmount: calculateTotalAmount(paymentData.quotation),
         advanceAmount: paymentData.quotation.advance_paid || 0,
         paidAmount: paymentData.amount,
+        totalPaidToDate,
         vehicleNo: paymentData.quotation.assigned_bus_no,
         driverName: paymentData.quotation.assigned_driver_name,
         conductorName: paymentData.quotation.assigned_conductor_name,
