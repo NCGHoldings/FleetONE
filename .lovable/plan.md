@@ -1,55 +1,55 @@
 
 
-# Fix: COA Balance Out of Sync with Journal Entry Totals
+# Fix: Orphaned Journal Entries and COA Corruption from Past AP Payment Deletes
 
-## Problem Found
+## What I Found
 
-The Seylan Bank C/A account (13001001) shows **LKR 24,000** in the COA tree, but the DrillDown modal correctly calculates the **Net Movement as -LKR 200,000** from actual journal entry lines.
+**16 orphaned Journal Entries** exist in the database — AP payments were deleted previously (before the cheque_register fix), but their JEs and JE lines were **never cleaned up**. This means:
 
-**Root cause**: The `current_balance` field on `chart_of_accounts` is updated incrementally (add/subtract on each transaction). When transactions are deleted or reversed without properly reversing the balance adjustment, the stored balance drifts out of sync. The recent "force delete" feature for AP payments/invoices deletes JE lines but does NOT reverse the COA balance updates, causing this exact corruption.
+1. **JE lines still exist** → COA balances were never reversed
+2. **JE records still exist** → They appear in GL reports as real transactions
+3. **COA `current_balance` is wrong** for all accounts touched by these deleted payments
 
-**Evidence from database**:
-- Account `9b3a2559` (NCG Holding): Total DR = 5,000,000 / Total CR = 5,200,000 → Net = -200,000. But `current_balance` = 24,000 (wrong)
-- Account `8a348132` (sub-company): Total DR = 36,200 / Total CR = 0 → Net = 36,200. But `current_balance` = 8,000 (also wrong)
+### Orphaned JEs (payment deleted, JE remains):
+| Entry Number | Description |
+|---|---|
+| JE-20260406-R0XJ | AP Payment to David Pieris Motor |
+| JE-DP-PAY-2026-25577 | Direct Payment to T Tiron |
+| JE-DP-PAY-2026-25574 | Direct Payment to Ledgerwall |
+| JE-20260406-YHJH | AP Payment to NCG Green Energy |
+| JE-20260406-LDR0 | AP Payment to NCG Green Energy (duplicate) |
+| JE-DP-PAY-2026-25573 | Direct Payment to NCG Express |
+| JE-DP-PAY-2026-25569 | Direct Payment to Nations Trust Bank |
+| JE-20260404-QC4E | AP Payment to Darshani |
+| JE-20260404-X3Z2 | AP Payment to Dialog Finance |
+| + 7 more... |
 
-## Two Fixes Needed
+## Two-Step Fix
 
-### Fix 1: Force-delete must reverse COA balances before deleting JE lines
+### Step 1: Database Migration — Delete All Orphaned AP Payment JEs
 
-**File**: `src/hooks/useAccountingMutations.ts`
+Create a migration that:
+1. Finds all `journal_entries` with description starting with "AP Payment:" or "Direct Payment" that have **no matching `ap_payments` row** linking to them
+2. Deletes their `journal_entry_lines` first
+3. Deletes the `journal_entries` themselves
 
-In `useDeleteAPPayment`, `useDeleteAPInvoice`, `useDeleteARInvoice`, and `useDeleteARReceipt`:
-- Before deleting journal entry lines, fetch them with their debit/credit amounts
-- Call `reverseAccountBalance(accountId, debit, credit)` for each line — this subtracts the original balance adjustment
-- Then proceed with line deletion
+This is safe because the parent AP payment record is already gone — these JEs are dangling references.
 
-Add a helper function:
-```typescript
-async function reverseCOABalancesForJE(journalEntryId: string) {
-  // Fetch all lines for this JE
-  // For each line, reverse the balance adjustment on the COA account
-  // (opposite of updateAccountBalance logic)
-}
-```
+### Step 2: Recalculate All COA Balances
 
-### Fix 2: Add a "Recalculate All Balances" action (already exists partially)
+After cleaning orphaned JEs, run the existing `recalculateCOABalances` function (via the Balance Reconciliation Tool in Settings) to recompute every account's `current_balance` from actual remaining JE lines. This fixes all drift caused by the orphaned entries.
 
-**File**: `src/lib/gl-posting-utils.ts` — `recalculateCOABalances` already exists
+### Step 3: Prevent Future Orphans (Already Done)
 
-The existing Balance Reconciliation Tool can fix current corruption. But we should also:
-- Auto-run reconciliation after any force-delete operation, OR
-- At minimum, show a warning toast after delete: "COA balances have been updated"
-
-### Fix 3: Immediate data fix — recalculate all COA balances now
-
-After deploying Fix 1, trigger the existing `recalculateCOABalances` function (via the Balance Reconciliation Tool in Settings) to fix all currently corrupted balances across all accounts.
+The `reverseAndDeleteJournalEntry` function is already called in all delete mutations — this ensures future deletes properly clean up. No code changes needed.
 
 ## Files
-- **Modify**: `src/hooks/useAccountingMutations.ts` — add COA balance reversal before JE line deletion in all delete mutations
-- **Modify**: `src/lib/gl-posting-utils.ts` — export a reusable `reverseCOABalancesForJE` helper
+- **New migration**: SQL to delete orphaned AP payment JEs and their lines
+- **No code changes needed** — the reversal logic is already in place for future operations
 
 ## Result
-- Force-deleting AP/AR invoices and payments will properly reverse COA balance changes
-- Existing corrupted balances can be fixed via the Reconciliation Tool
-- COA tree balances will match the DrillDown net movement going forward
+- 16 orphaned JEs removed from the GL
+- COA balances corrected to match actual posted transactions
+- Future deletes will properly clean up (already working)
+- User should run Balance Reconciliation Tool after migration to confirm all balances are correct
 
