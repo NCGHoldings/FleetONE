@@ -67,6 +67,7 @@ interface Fleet {
   category_id?: string;
   sub_category_id?: string;
   category_assignment_source?: string;
+  revenue_license_expiry?: string;
 }
 
 const getStatusBadge = (status: Fleet['status']) => {
