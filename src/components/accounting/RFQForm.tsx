@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2 } from "lucide-react";
 import { useVendors, useItems } from "@/hooks/useAccountingData";
 import { useCreateRFQ } from "@/hooks/useRFQ";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 const formSchema = z.object({
   rfq_number: z.string().min(1, "RFQ number is required"),
@@ -28,6 +29,7 @@ export const RFQForm = ({ onSuccess }: RFQFormProps) => {
   const { data: vendors } = useVendors();
   const { data: items } = useItems();
   const createRFQ = useCreateRFQ();
+  const generateNumber = useGenerateNumber();
   
   const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
   const [lines, setLines] = useState<{
@@ -40,10 +42,14 @@ export const RFQForm = ({ onSuccess }: RFQFormProps) => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      rfq_number: `RFQ-${Date.now()}`,
+      rfq_number: "",
       rfq_date: new Date().toISOString().split("T")[0],
     },
   });
+
+  useEffect(() => {
+    generateNumber("rfq").then(num => form.setValue("rfq_number", num));
+  }, []);
   
   const toggleVendor = (vendorId: string) => {
     setSelectedVendors(prev => 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { usePurchaseOrders, useVendors } from "@/hooks/useAccountingData";
 import { useCreateGoodsReceipt } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 const grnSchema = z.object({
   grn_number: z.string().min(1, "GRN number is required"),
@@ -42,17 +43,27 @@ export const GoodsReceiptForm = ({ open, onOpenChange, purchaseOrderId }: GoodsR
   const { data: purchaseOrders } = usePurchaseOrders();
   const { data: vendors } = useVendors();
   const createGRN = useCreateGoodsReceipt();
+  const generateNumber = useGenerateNumber();
+  const numberGenerated = useRef(false);
 
   const [lines, setLines] = useState<GRNLine[]>([]);
 
   const form = useForm<GRNFormData>({
     resolver: zodResolver(grnSchema),
     defaultValues: {
-      grn_number: `GRN-${Date.now().toString().slice(-6)}`,
+      grn_number: "",
       receipt_date: new Date().toISOString().split("T")[0],
       purchase_order_id: purchaseOrderId || undefined,
     },
   });
+
+  useEffect(() => {
+    if (open && !numberGenerated.current) {
+      numberGenerated.current = true;
+      generateNumber("grn").then(num => form.setValue("grn_number", num));
+    }
+    if (!open) numberGenerated.current = false;
+  }, [open]);
 
   // When PO is selected, load its lines
   const selectedPOId = form.watch("purchase_order_id");

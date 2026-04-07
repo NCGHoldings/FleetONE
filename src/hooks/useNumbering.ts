@@ -30,6 +30,14 @@ export const entityTypeLabels: Record<string, string> = {
   journal: "Journal Entry",
   grn: "Goods Receipt Note",
   po: "Purchase Order",
+  credit_note: "Credit Note",
+  debit_note: "Debit Note",
+  rfq: "Request for Quotation",
+  so: "Sales Order",
+  qi: "Quality Inspection",
+  stock_transfer: "Stock Transfer",
+  budget: "Budget",
+  payment_batch: "Payment Batch",
 };
 
 export function useNumberingSequences() {
