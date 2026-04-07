@@ -69,6 +69,7 @@ interface GenerateBalanceInvoiceModalProps {
     adjustment_notes?: string;
   };
   onInvoiceGenerated?: () => void;
+  effectiveCompanyId?: string;
 }
 
 export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalProps> = ({
@@ -77,6 +78,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   quotationData,
   adjustmentData,
   onInvoiceGenerated,
+  effectiveCompanyId,
 }) => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
