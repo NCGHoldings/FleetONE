@@ -244,6 +244,15 @@ export const JournalEntriesView = () => {
               <RotateCcw className="h-4 w-4" />
             </Button>
           )}
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleteConfirmId(row.original.id)}
+            disabled={deleteEntry.isPending}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       ),
     },
