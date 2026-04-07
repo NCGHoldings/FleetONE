@@ -129,9 +129,9 @@ export function LandedCostVoucherForm({ open, onOpenChange, onSuccess }: { open:
         { data: sData }, 
         { data: aData }
       ] = await Promise.all([
-        supabase.from('companies').select('id, name').order('name'),
-        supabase.from('suppliers').select('id, supplier_name').order('supplier_name'),
-        supabase.from('chart_of_accounts').select('id, account_code, account_name').eq('account_type', 'Liability').order('account_code')
+        (supabase as any).from('companies').select('id, name').order('name'),
+        (supabase as any).from('suppliers').select('id, supplier_name').order('supplier_name'),
+        (supabase as any).from('chart_of_accounts').select('id, account_code, account_name').eq('account_type', 'Liability').order('account_code')
       ]);
       setCompanies(cData || []);
       setSuppliers(sData || []);
@@ -144,8 +144,8 @@ export function LandedCostVoucherForm({ open, onOpenChange, onSuccess }: { open:
   const loadCompanyDependentData = async (companyId: string) => {
     try {
       const [{ data: pData }, { data: gData }] = await Promise.all([
-        supabase.from('projects').select('id, project_name').order('project_name'),
-        supabase.from('goods_receipt_notes').select('id, grn_number').eq('company_id', companyId).eq('status', 'Received').order('grn_number', { ascending: false })
+        (supabase as any).from('projects').select('id, project_name').order('project_name'),
+        (supabase as any).from('goods_receipt_notes').select('id, grn_number').eq('company_id', companyId).eq('status', 'Received').order('grn_number', { ascending: false })
       ]);
       setProjects(pData || []);
       setGrns(gData || []);
@@ -156,7 +156,7 @@ export function LandedCostVoucherForm({ open, onOpenChange, onSuccess }: { open:
 
   const loadGRNItems = async (grnId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('grn_items')
         .select(`
           id, quantity, unit_price,

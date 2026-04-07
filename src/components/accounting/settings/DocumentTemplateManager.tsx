@@ -49,8 +49,7 @@ export const DocumentTemplateManager = () => {
   });
 
   const { data: templateTypes } = useDocumentTemplateTypes();
-  const { data: templates, isLoading, refetch } = useDocumentTemplates(
-    selectedCompanyId === "all" ? undefined : selectedCompanyId,
+  const { templates, loading: isLoading, refetch } = useDocumentTemplates(
     selectedTypeId === "all" ? undefined : selectedTypeId
   );
   const deleteTemplate = useDeleteDocumentTemplate();

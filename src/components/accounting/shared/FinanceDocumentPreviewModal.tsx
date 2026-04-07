@@ -85,7 +85,7 @@ export const FinanceDocumentPreviewModal = ({
   }, [open, documentData?.id]);
 
   const { data: companies } = useCompanies();
-  const { data: allTemplates } = useDocumentTemplates();
+  const { templates: allTemplates } = useDocumentTemplates();
 
   // Resolve actual company: If businessUnitCode provided, find sub-company by short_code
   const resolvedCompanyId = useMemo(() => {
