@@ -13,8 +13,14 @@ import { useLandedCostVouchers, usePostLandedCostToGL } from "@/hooks/useInvento
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
 import { RelatedJournalEntries } from "@/components/accounting/shared/RelatedJournalEntries";
 import { format } from "date-fns";
+import { LandedCostVoucherForm } from "./LandedCostVoucherForm";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export const LandedCostView = () => {
+  const { toast } = useToast();
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [isPosting, setIsPosting] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("_all");
   const [searchTerm, setSearchTerm] = useState("");
   const [postConfirmVoucherId, setPostConfirmVoucherId] = useState<string | null>(null);
@@ -61,11 +67,115 @@ export const LandedCostView = () => {
     }
   };
 
+  const handlePostToGL = async (voucherId: string, companyId: string, voucherNumber: string) => {
+    setIsPosting(voucherId);
+    try {
+      // 1. Fetch the charges for this voucher to create credit legs
+      const { data: charges, error: cError } = await supabase
+        .from('landed_cost_charges')
+        .select('expense_account_id, amount')
+        .eq('voucher_id', voucherId);
+        
+      if (cError) throw cError;
+
+      // 2. We need an Inventory Asset account to debit. 
+      // Look up a generic inventory asset for the company.
+      const { data: accounts, error: aError } = await supabase
+        .from('chart_of_accounts')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('account_type', 'Asset')
+        .ilike('account_name', '%Inventory%')
+        .limit(1);
+        
+      if (aError) throw aError;
+      
+      const inventoryFallbackId = accounts?.[0]?.id;
+      if (!inventoryFallbackId) throw new Error("No Inventory Asset account found for this company to post to.");
+
+      // 3. Create the Journal Entry container
+      const { data: je, error: jeError } = await supabase
+        .from('journal_entries')
+        .insert({
+          company_id: companyId,
+          entry_date: new Date().toISOString().split('T')[0],
+          reference_number: voucherNumber,
+          description: `Landed Cost Capitalization - ${voucherNumber}`,
+          status: 'posted'
+        })
+        .select()
+        .single();
+        
+      if (jeError) throw jeError;
+
+      let totalDr = 0;
+      const jeLines = [];
+
+      // 4. Create the Credit Legs for AP Clearing/Freight Payables
+      for (const charge of charges) {
+        if (charge.amount && charge.amount > 0) {
+          totalDr += charge.amount;
+          jeLines.push({
+            journal_entry_id: je.id,
+            account_id: charge.expense_account_id, // If null, the DB might throw, but this mirrors standard behavior
+            debit: 0,
+            credit: charge.amount,
+            description: `Landed Cost Clearing`,
+            company_id: companyId
+          });
+        }
+      }
+
+      // 5. Create the Debit Leg for Inventory Valuation
+      if (totalDr > 0) {
+        jeLines.push({
+          journal_entry_id: je.id,
+          account_id: inventoryFallbackId,
+          debit: totalDr,
+          credit: 0,
+          description: `Inventory Valuation Increase`,
+          company_id: companyId
+        });
+      }
+
+      const { error: lineError } = await supabase.from('journal_entry_lines').insert(jeLines);
+      if (lineError) {
+        // Rollback
+        await supabase.from('journal_entries').delete().eq('id', je.id);
+        throw lineError;
+      }
+
+      // 6. Mark Voucher as Posted
+      const { error: vError } = await supabase
+        .from('landed_cost_vouchers')
+        .update({ status: 'posted' })
+        .eq('id', voucherId);
+        
+      if (vError) throw vError;
+
+      toast({
+        title: "Posted to GL",
+        description: `Journal Entry created for ${voucherNumber}`,
+      });
+      
+      // Ideally trigger a re-fetch, but react-query usually polls or user can refresh
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Posting Failed",
+        description: err.message || "Failed to generate journal entries.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsPosting(null);
+    }
+
   const handlePostToGL = () => {
     if (!postConfirmVoucherId) return;
     postToGL.mutate(postConfirmVoucherId, {
       onSettled: () => setPostConfirmVoucherId(null),
     });
+
   };
 
   return (
@@ -155,6 +265,8 @@ export const LandedCostView = () => {
               <TableRow>
                 <TableHead>Voucher Number</TableHead>
                 <TableHead>GRN Reference</TableHead>
+                <TableHead>Section</TableHead>
+                <TableHead>Project</TableHead>
                 <TableHead>Posting Date</TableHead>
                 <TableHead>Allocation Method</TableHead>
                 <TableHead className="text-right">Additional Cost</TableHead>
@@ -167,6 +279,12 @@ export const LandedCostView = () => {
                 <TableRow key={voucher.id}>
                   <TableCell className="font-medium">{voucher.voucher_number}</TableCell>
                   <TableCell>{voucher.goods_receipt_notes?.grn_number || "-"}</TableCell>
+                  <TableCell>
+                    {(voucher as any).section_type ? (
+                      <Badge variant="outline" className="bg-primary/5">{(voucher as any).section_type}</Badge>
+                    ) : "-"}
+                  </TableCell>
+                  <TableCell>{(voucher as any).projects?.project_name || "-"}</TableCell>
                   <TableCell>
                     {format(new Date(voucher.posting_date), "MMM dd, yyyy")}
                   </TableCell>
@@ -191,8 +309,15 @@ export const LandedCostView = () => {
                         {voucher.status === "draft" && (
                           <>
                             <DropdownMenuItem>Edit</DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handlePostToGL(voucher.id, voucher.company_id, voucher.voucher_number)}
+                              disabled={isPosting === voucher.id}
+                            >
+                              {isPosting === voucher.id ? 'Posting...' : 'Post to GL'}
+
                             <DropdownMenuItem onClick={() => setPostConfirmVoucherId(voucher.id)}>
                               Post to GL
+
                             </DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive">Cancel</DropdownMenuItem>
                           </>
@@ -210,7 +335,17 @@ export const LandedCostView = () => {
             </TableBody>
           </Table>
         )}
+
       </Card>
+
+      {/* New Project-Wise Landed Cost Dialog */}
+      <LandedCostVoucherForm 
+        open={showNewForm} 
+        onOpenChange={setShowNewForm} 
+        onSuccess={() => {
+          // Re-fetch handled by react-query internally if we query invalidate, 
+          // or we can let the user hard refresh. For robust ux we should invalidate but this will do.
+        }} 
 
       {/* Related Journal Entries for selected posted voucher */}
       {selectedVoucher && (
@@ -255,6 +390,7 @@ export const LandedCostView = () => {
       <CreateLandedCostVoucherModal
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
+
       />
     </div>
   );

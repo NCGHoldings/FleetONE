@@ -55,6 +55,7 @@ This gives a reusable tool for future cleanups during the testing phase.
 - "Delete All Orphaned JEs" button with confirmation
 - After cleanup, auto-triggers reconciliation fix
 
+
 ## Files
 - **Modify**: `src/components/accounting/DrillDownModal.tsx` — add per-row delete button + confirmation
 - **Modify**: `src/components/accounting/settings/BalanceReconciliationTool.tsx` — add orphaned JE scanner section

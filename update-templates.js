@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+const fs = require('fs');
+
+const fileContent = `import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -213,7 +215,7 @@ export const useUploadHeaderImage = () => {
   return useMutation({
     mutationFn: async ({ file, companyId }: { file: File; companyId: string }) => {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${companyId}/${Date.now()}.${fileExt}`;
+      const fileName = \`\${companyId}/\${Date.now()}.\${fileExt}\`;
       
       const { data, error } = await supabase.storage
         .from("document-headers")
@@ -232,3 +234,5 @@ export const useUploadHeaderImage = () => {
     },
   });
 };
+`
+fs.writeFileSync('src/hooks/useDocumentTemplates.ts', fileContent);

@@ -16,13 +16,15 @@ import {
   checkPaymentDocument,
   applyAdvanceToInvoiceStandalone,
 } from '@/hooks/useSpecialHireFinance';
-import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
+import { useCompany } from '@/contexts/CompanyContext';
 
 // Default to NCG_HOLDING_ID for backward compatibility, but callers should pass the effective company ID
 
 export const useFinanceApproval = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
+  const { companyId } = useCompany();
+  const effectiveCompanyId = companyId || '93010b42-701d-4007-88ba-5d2daeb611ab'; // Fallback to NCG Holdings if context missing
 
   // Helper function to get approval signatures for a document
   const getDocumentApprovals = async (documentId: string) => {
@@ -112,7 +114,7 @@ export const useFinanceApproval = () => {
       console.warn('[SPH Finance] ⚠️ No document found for payment. Proceeding anyway...');
     }
 
-    const settings = await fetchSpecialHireFinanceSettings(companyId);
+const settings = await fetchSpecialHireFinanceSettings(effectiveCompanyId);
     
     if (!settings) {
       console.warn('[SPH Finance] ⚠️ Special Hire Finance settings not configured');
@@ -134,7 +136,7 @@ export const useFinanceApproval = () => {
         customerName: paymentData.quotation.customer_name,
         customerPhone: paymentData.quotation.customer_phone,
         customerEmail: paymentData.quotation.customer_email,
-        companyId: companyId,
+companyId: effectiveCompanyId,
       });
 
       if (!customerId) {
@@ -163,7 +165,7 @@ export const useFinanceApproval = () => {
         customerName: paymentData.quotation.customer_name,
         amount: paymentData.amount,
         settings,
-        effectiveCompanyId: companyId,
+effectiveCompanyId: effectiveCompanyId,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Advance GL posted:', journalEntry.entry_number);
@@ -175,7 +177,7 @@ export const useFinanceApproval = () => {
         customerName: paymentData.quotation.customer_name,
         amount: paymentData.amount,
         settings,
-        effectiveCompanyId: companyId,
+effectiveCompanyId: effectiveCompanyId,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Full payment GL posted:', journalEntry.entry_number);
@@ -187,7 +189,7 @@ export const useFinanceApproval = () => {
         customerName: paymentData.quotation.customer_name,
         balanceAmount: paymentData.amount,
         settings,
-        effectiveCompanyId: companyId,
+effectiveCompanyId: effectiveCompanyId,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Balance GL posted:', journalEntry.entry_number);
@@ -215,7 +217,7 @@ export const useFinanceApproval = () => {
             customerName: paymentData.quotation.customer_name,
             advanceAmount: totalAdvance,
             settings,
-            effectiveCompanyId: companyId,
+effectiveCompanyId: effectiveCompanyId,
           });
           if (applyResult) {
             console.log('[SPH Finance] ✅ Advance applied to invoice:', applyResult.entry_number);
@@ -245,7 +247,7 @@ export const useFinanceApproval = () => {
         paymentMethod: paymentData.payment_method || 'cash',
         reference: paymentData.reference_no,
         paymentId,
-        companyId: companyId,
+companyId: effectiveCompanyId,
         journalEntryId: journalEntry?.id,
       });
 
@@ -668,7 +670,7 @@ export const useFinanceApproval = () => {
         throw new Error('Only approved payments can have AR integration retried');
       }
 
-      const settings = await fetchSpecialHireFinanceSettings(companyId);
+const settings = await fetchSpecialHireFinanceSettings(effectiveCompanyId);
       if (!settings) {
         throw new Error('Special Hire Finance settings not configured');
       }
@@ -683,7 +685,7 @@ export const useFinanceApproval = () => {
           customerName: paymentData.quotation.customer_name,
           customerPhone: paymentData.quotation.customer_phone,
           customerEmail: paymentData.quotation.customer_email,
-          companyId: companyId,
+companyId: effectiveCompanyId,
         });
 
         if (!customerId) {
@@ -721,7 +723,7 @@ export const useFinanceApproval = () => {
           totalAmount,
           advanceAmount: paymentData.amount,
           dueDate,
-          companyId: companyId,
+companyId: effectiveCompanyId,
           journalEntryId: paymentData.journal_entry_id,
         });
 
