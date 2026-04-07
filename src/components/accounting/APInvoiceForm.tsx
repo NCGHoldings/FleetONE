@@ -24,6 +24,7 @@ import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 const invoiceSchema = z.object({
   invoice_number: z.string().min(1, "Invoice number is required"),
@@ -63,6 +64,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
   const createPayment = useCreateAPPayment();
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const queryClient = useQueryClient();
+  const generatePayNum = useGenerateNumber();
 
   const isEditing = !!editingInvoice;
 
@@ -475,7 +477,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
         // Sequential payment creation if Pay Now is enabled
         if (payNow && invoiceResult?.id) {
           try {
-            const payNum = `PAY-${Date.now().toString().slice(-8)}`;
+            const payNum = await generatePayNum("payment");
             await createPayment.mutateAsync({
               payment_number: payNum,
               vendor_id: data.vendor_id,

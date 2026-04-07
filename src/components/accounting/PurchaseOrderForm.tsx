@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -13,6 +13,7 @@ import { useVendors, useItems } from "@/hooks/useAccountingData";
 import { useCreatePurchaseOrder } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 const poSchema = z.object({
   po_number: z.string().min(1, "PO number is required"),
@@ -42,6 +43,8 @@ export const PurchaseOrderForm = ({ open, onOpenChange }: PurchaseOrderFormProps
   const { data: vendors } = useVendors();
   const { data: items } = useItems();
   const createPO = useCreatePurchaseOrder();
+  const generateNumber = useGenerateNumber();
+  const numberGenerated = useRef(false);
 
   const [lines, setLines] = useState<POLine[]>([
     { id: "1", item_id: "", description: "", quantity: 1, unit_price: 0, line_total: 0 },
@@ -50,10 +53,18 @@ export const PurchaseOrderForm = ({ open, onOpenChange }: PurchaseOrderFormProps
   const form = useForm<POFormData>({
     resolver: zodResolver(poSchema),
     defaultValues: {
-      po_number: `PO-${Date.now().toString().slice(-6)}`,
+      po_number: "",
       po_date: new Date().toISOString().split("T")[0],
     },
   });
+
+  useEffect(() => {
+    if (open && !numberGenerated.current) {
+      numberGenerated.current = true;
+      generateNumber("po").then(num => form.setValue("po_number", num));
+    }
+    if (!open) numberGenerated.current = false;
+  }, [open]);
 
   const addLine = () => {
     setLines([

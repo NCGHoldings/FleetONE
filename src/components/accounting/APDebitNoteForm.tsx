@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useVendors, useAPInvoices } from "@/hooks/useAccountingData";
 import { useCreateAPDebitNote } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 const debitNoteSchema = z.object({
   debit_note_number: z.string().min(1, "Debit note number is required"),
@@ -32,17 +33,24 @@ export const APDebitNoteForm = ({ open, onOpenChange }: APDebitNoteFormProps) =>
   const { data: vendors } = useVendors();
   const { data: invoices } = useAPInvoices();
   const createDebitNote = useCreateAPDebitNote();
+  const generateNumber = useGenerateNumber();
   const [selectedVendor, setSelectedVendor] = useState<string>("");
 
   const form = useForm<DebitNoteFormData>({
     resolver: zodResolver(debitNoteSchema),
     defaultValues: {
-      debit_note_number: `DN-${Date.now().toString().slice(-6)}`,
+      debit_note_number: "",
       debit_date: new Date().toISOString().split("T")[0],
       amount: 0,
       reason: "",
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      generateNumber("debit_note").then(num => form.setValue("debit_note_number", num));
+    }
+  }, [open]);
 
   const vendorInvoices = invoices?.filter(inv => 
     inv.vendor_id === selectedVendor && inv.status !== "cancelled"

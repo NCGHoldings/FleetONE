@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useCustomers, useARInvoices } from "@/hooks/useAccountingData";
 import { useCreateARCreditNote } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 const creditNoteSchema = z.object({
   credit_note_number: z.string().min(1, "Credit note number is required"),
@@ -32,17 +33,24 @@ export const ARCreditNoteForm = ({ open, onOpenChange }: ARCreditNoteFormProps) 
   const { data: customers } = useCustomers();
   const { data: invoices } = useARInvoices();
   const createCreditNote = useCreateARCreditNote();
+  const generateNumber = useGenerateNumber();
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
 
   const form = useForm<CreditNoteFormData>({
     resolver: zodResolver(creditNoteSchema),
     defaultValues: {
-      credit_note_number: `CN-${Date.now().toString().slice(-6)}`,
+      credit_note_number: "",
       credit_date: new Date().toISOString().split("T")[0],
       amount: 0,
       reason: "",
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      generateNumber("credit_note").then(num => form.setValue("credit_note_number", num));
+    }
+  }, [open]);
 
   const customerInvoices = invoices?.filter(inv => 
     inv.customer_id === selectedCustomer && inv.status !== "cancelled"

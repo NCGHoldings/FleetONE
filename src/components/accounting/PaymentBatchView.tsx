@@ -14,6 +14,7 @@ import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Plus, CheckCircle, Clock, XCircle, Download, Send, FileSpreadsheet } from "lucide-react";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 export const PaymentBatchView = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -21,6 +22,7 @@ export const PaymentBatchView = () => {
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
   const queryClient = useQueryClient();
+  const generateNumber = useGenerateNumber();
 
   // Fetch payment batches
   const { data: batches, isLoading } = useQuery({
@@ -76,7 +78,7 @@ export const PaymentBatchView = () => {
 
       const invoicesToPay = outstandingInvoices?.filter(inv => selectedInvoices.includes(inv.id)) || [];
       const totalAmount = invoicesToPay.reduce((sum, inv) => sum + Number(inv.balance), 0);
-      const batchNumber = `PB-${format(new Date(), "yyyyMMdd")}-${Date.now().toString().slice(-4)}`;
+      const batchNumber = await generateNumber("payment_batch");
 
       // Create batch
       const { data: batch, error: batchError } = await supabase

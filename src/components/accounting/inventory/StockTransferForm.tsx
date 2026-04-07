@@ -14,6 +14,7 @@ import { Plus, ArrowRight, Truck, Package, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Textarea } from "@/components/ui/textarea";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 interface TransferLine {
   item_id: string;
@@ -43,6 +44,7 @@ interface Item {
 export const StockTransferForm = () => {
   const { selectedCompany } = useCompany();
   const queryClient = useQueryClient();
+  const generateNumber = useGenerateNumber();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     from_warehouse_id: "",
@@ -142,7 +144,7 @@ export const StockTransferForm = () => {
         throw new Error("Add at least one item to transfer");
       }
 
-      const transferNumber = `ST-${Date.now()}`;
+      const transferNumber = await generateNumber("stock_transfer");
 
       const { data: transfer, error: transferError } = await supabase
         .from("stock_transfers")

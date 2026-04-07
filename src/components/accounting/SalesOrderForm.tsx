@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -13,6 +13,7 @@ import { useCustomers, useItems } from "@/hooks/useAccountingData";
 import { usePaymentTerms, useCreateSalesOrder } from "@/hooks/useSalesOrders";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 const formSchema = z.object({
   so_number: z.string().min(1, "SO number is required"),
@@ -34,6 +35,7 @@ export const SalesOrderForm = ({ onSuccess }: SalesOrderFormProps) => {
   const { data: paymentTerms } = usePaymentTerms();
   const { data: items } = useItems();
   const createOrder = useCreateSalesOrder();
+  const generateNumber = useGenerateNumber();
   
   const [lines, setLines] = useState<{
     item_id: string;
@@ -47,10 +49,14 @@ export const SalesOrderForm = ({ onSuccess }: SalesOrderFormProps) => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      so_number: `SO-${Date.now()}`,
+      so_number: "",
       order_date: new Date().toISOString().split("T")[0],
     },
   });
+
+  useEffect(() => {
+    generateNumber("so").then(num => form.setValue("so_number", num));
+  }, []);
   
   const addLine = () => {
     setLines([...lines, {
