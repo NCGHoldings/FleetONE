@@ -858,17 +858,14 @@ export async function reverseAndDeleteJournalEntry(journalEntryId: string): Prom
         const debitAmt = Number(line.debit) || 0;
         const creditAmt = Number(line.credit) || 0;
 
-        // Determine normal type: Assets & Expenses are "debit-normal", rest are "credit-normal"
-        const normalType = account.account_type?.toLowerCase();
-        const isDebitNormal = ["asset", "assets", "expense", "expenses", "expenditure", "cost of sales"].includes(normalType || "");
-
-        // Reverse: undo what posting did
-        let balanceAdjustment = 0;
-        if (isDebitNormal) {
-          balanceAdjustment = -debitAmt + creditAmt;
-        } else {
-          balanceAdjustment = debitAmt - creditAmt;
-        }
+        // Must match updateAccountBalance logic exactly:
+        // netAmount = debit - credit
+        // isDebitNormal → adjustment = +netAmount (so reversal = -netAmount)
+        // isCreditNormal → adjustment = -netAmount (so reversal = +netAmount)
+        const isDebitNormal = ["asset", "expense"].includes(account.account_type || "");
+        const netAmount = debitAmt - creditAmt;
+        // Reverse: negate the original adjustment
+        const balanceAdjustment = isDebitNormal ? -netAmount : netAmount;
 
         const newBalance = Number(account.current_balance || 0) + balanceAdjustment;
 
