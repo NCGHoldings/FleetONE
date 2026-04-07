@@ -1675,6 +1675,7 @@ export function ConfirmedTripsTable() {
 
       {balanceInvoiceModalOpen && selectedTrip && (
         <GenerateBalanceInvoiceModal
+          effectiveCompanyId={getEffectiveCompanyId()}
           open={balanceInvoiceModalOpen}
           onOpenChange={(open) => {
             setBalanceInvoiceModalOpen(open);
@@ -1759,6 +1760,7 @@ export function ConfirmedTripsTable() {
 
       {statusModalOpen && selectedTrip && (
         <EnhancedTripStatusManagementModal
+          effectiveCompanyId={getEffectiveCompanyId()}
           open={statusModalOpen}
           onOpenChange={() => {
             setStatusModalOpen(false);
@@ -2026,6 +2028,7 @@ export function ConfirmedTripsTable() {
       {/* Post-Trip Adjustment Modal */}
       {selectedTrip && (
         <PostTripAdjustmentModal
+          effectiveCompanyId={getEffectiveCompanyId()}
           open={adjustmentModalOpen}
           onOpenChange={(open) => {
             setAdjustmentModalOpen(open);
