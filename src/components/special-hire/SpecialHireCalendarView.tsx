@@ -272,6 +272,30 @@ export function SpecialHireCalendarView() {
         };
     }, [selectedDate, currentMonth]);
 
+    // Batch-load remark summaries for all quotations on the current day
+    const quotationIds = useMemo(() => quotations.map(q => q.id), [quotations]);
+    const { data: remarkSummaries = {} } = useQuery({
+        queryKey: ['special-hire-remark-summaries', quotationIds],
+        queryFn: async () => {
+            if (quotationIds.length === 0) return {};
+            const { data, error } = await supabase
+                .from('special_hire_remarks')
+                .select('quotation_id, content, created_at')
+                .in('quotation_id', quotationIds)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            const map: Record<string, { count: number; latest: string; latestAt: string }> = {};
+            (data || []).forEach((r: any) => {
+                if (!map[r.quotation_id]) {
+                    map[r.quotation_id] = { count: 0, latest: r.content, latestAt: r.created_at };
+                }
+                map[r.quotation_id].count++;
+            });
+            return map;
+        },
+        enabled: quotationIds.length > 0,
+    });
+
     // Group quotations by parent (deduplicate versions)
     const groupedHires = useMemo((): GroupedHire[] => {
         const groups = new Map<string, CalendarQuotation[]>();
