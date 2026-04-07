@@ -44,6 +44,7 @@ interface Item {
 export const StockTransferForm = () => {
   const { selectedCompany } = useCompany();
   const queryClient = useQueryClient();
+  const generateNumber = useGenerateNumber();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     from_warehouse_id: "",
