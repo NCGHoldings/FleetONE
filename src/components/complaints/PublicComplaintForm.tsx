@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabasePublic as supabase } from "@/integrations/supabase/public-client";
+import { createAnonymousClient } from "@/integrations/supabase/public-client";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, CheckCircle, Send } from "lucide-react";
 import { publicComplaintSchema } from "@/lib/validation";
@@ -82,7 +82,8 @@ export default function PublicComplaintForm() {
 
       const clientRef = `CMP-${Date.now().toString(36).toUpperCase()}`;
 
-      const { error } = await supabase
+      const anonClient = createAnonymousClient();
+      const { error } = await anonClient
         .from('feedback_complaints')
         .insert({
           title: formData.title,
@@ -108,10 +109,11 @@ export default function PublicComplaintForm() {
       });
 
     } catch (error) {
-      console.error('Error creating complaint:', error);
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error('Error creating complaint:', errMsg, error);
       toast({
         title: "Error",
-        description: "Failed to submit complaint. Please try again.",
+        description: errMsg || "Failed to submit complaint. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -267,21 +269,23 @@ export default function PublicComplaintForm() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <Label htmlFor="incidentDate">Date of Incident</Label>
+                    <Label htmlFor="incidentDate">Date of Incident *</Label>
                     <Input
                       id="incidentDate"
                       type="date"
                       value={formData.incidentDate}
                       onChange={(e) => setFormData(prev => ({ ...prev, incidentDate: e.target.value }))}
+                      required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="incidentTime">Time of Incident</Label>
+                    <Label htmlFor="incidentTime">Time of Incident *</Label>
                     <Input
                       id="incidentTime"
                       type="time"
                       value={formData.incidentTime}
                       onChange={(e) => setFormData(prev => ({ ...prev, incidentTime: e.target.value }))}
+                      required
                     />
                   </div>
                 </div>
