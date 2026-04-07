@@ -1,6 +1,6 @@
  
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -9,6 +9,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -30,8 +40,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Loader2, Download, X, Filter, Bus, Route } from "lucide-react";
+import { Loader2, Download, X, Filter, Bus, Route, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { reverseAndDeleteJournalEntry } from "@/lib/gl-posting-utils";
+import { toast } from "sonner";
 
 interface DrillDownModalProps {
   open: boolean;
@@ -56,12 +68,35 @@ export const DrillDownModal = ({
     : accountId
       ? [accountId]
       : [];
+  const queryClient = useQueryClient();
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>(initialDateRange || {});
   const [businessUnitFilter, setBusinessUnitFilter] = useState<string>("_all");
   const [transactionType, setTransactionType] = useState<string>("all");
   const [busFilter, setBusFilter] = useState<string>("_all");
   const [routeFilter, setRouteFilter] = useState<string>("_all");
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [deleteConfirmJEId, setDeleteConfirmJEId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteJE = async () => {
+    if (!deleteConfirmJEId) return;
+    setIsDeleting(true);
+    try {
+      const result = await reverseAndDeleteJournalEntry(deleteConfirmJEId);
+      if (result.success) {
+        toast.success("Journal entry deleted and COA balances reversed");
+        queryClient.invalidateQueries({ queryKey: ["account-transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      } else {
+        toast.error(result.error || "Failed to delete journal entry");
+      }
+    } catch (error) {
+      toast.error("Failed to delete journal entry");
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmJEId(null);
+    }
+  };
 
   // Fetch buses for filter
   const { data: buses } = useQuery({
@@ -265,6 +300,7 @@ export const DrillDownModal = ({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
@@ -405,8 +441,9 @@ export const DrillDownModal = ({
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Debit</TableHead>
                   <TableHead className="text-right">Credit</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                </TableRow>
+                   <TableHead className="text-right">Balance</TableHead>
+                   <TableHead className="w-10"></TableHead>
+                 </TableRow>
               </TableHeader>
               <TableBody>
                 {transactionsWithBalance.map((t) => {
@@ -468,6 +505,17 @@ export const DrillDownModal = ({
                       <TableCell className="text-right font-mono">
                         <CurrencyDisplay amount={t.runningBalance} />
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteConfirmJEId(entry?.id)}
+                          title="Delete this journal entry"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -494,5 +542,28 @@ export const DrillDownModal = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={!!deleteConfirmJEId} onOpenChange={(open) => !open && setDeleteConfirmJEId(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Journal Entry?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will reverse all COA balance impacts and permanently delete the journal entry and its lines.
+            This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDeleteJE}
+            disabled={isDeleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isDeleting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</> : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 };
