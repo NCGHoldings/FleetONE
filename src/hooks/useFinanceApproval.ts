@@ -299,26 +299,26 @@ companyId: effectiveCompanyId,
               .eq('approval_type', 'checked_by')
               .maybeSingle();
 
-          if (!existingApproval) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('first_name, last_name, signature_data, user_id')
-              .eq('user_id', setting.default_user_id)
-              .single();
+            if (!existingApproval) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('first_name, last_name, signature_data, user_id')
+                .eq('user_id', setting.default_user_id)
+                .single();
 
-            if (profile?.signature_data) {
-              await supabase.from('document_approvals').insert({
-                document_id: actualDocId,
-                approval_type: 'checked_by',
-                approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-                signature_data: profile.signature_data,
-                approval_date: new Date().toISOString().split('T')[0],
-                user_id: profile.user_id,
-              });
+              if (profile?.signature_data) {
+                await supabase.from('document_approvals').insert({
+                  document_id: actualDocId,
+                  approval_type: 'checked_by',
+                  approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+                  signature_data: profile.signature_data,
+                  approval_date: new Date().toISOString().split('T')[0],
+                  user_id: profile.user_id,
+                });
+              }
             }
           }
-          }
-          }
+        }
         }
       } catch (sigError) {
         console.log('[SPH Finance] Auto-signature skipped:', sigError);
