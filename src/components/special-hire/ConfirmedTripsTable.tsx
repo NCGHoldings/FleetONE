@@ -30,6 +30,7 @@ import { GenerateBalanceInvoiceModal } from './GenerateBalanceInvoiceModal';
 import { VehicleAssignmentModal } from './VehicleAssignmentModal';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { resolveBusType, calculateTotalKm, getTripDistance } from '@/lib/special-hire-invoice-helpers';
+import { getDocumentLabel } from '@/lib/special-hire-document-helpers';
 import { PaymentTimelineFresh } from './PaymentTimelineFresh';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';

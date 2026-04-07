@@ -400,8 +400,8 @@ export const PaymentConfirmationModal = ({
                 {isAdvanceAlreadyPaid && (
                   <>
                     <div>
-                      <p className="font-medium">Advance Paid:</p>
-                      <p className="text-green-600">LKR {advancePaid.toLocaleString()}</p>
+                      <p className="font-medium">Total Paid:</p>
+                      <p className="text-green-600">LKR {totalPaidSoFar.toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="font-medium">Balance Due:</p>
