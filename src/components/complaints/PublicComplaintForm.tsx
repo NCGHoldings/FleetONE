@@ -19,6 +19,12 @@ interface PublicComplaintFormData {
   description: string;
   category: string;
   priority: string;
+  routeNumber: string;
+  busNumber: string;
+  incidentDate: string;
+  incidentTime: string;
+  location: string;
+  driverName: string;
 }
 
 export default function PublicComplaintForm() {
@@ -29,7 +35,13 @@ export default function PublicComplaintForm() {
     title: '',
     description: '',
     category: '',
-    priority: 'medium'
+    priority: 'medium',
+    routeNumber: '',
+    busNumber: '',
+    incidentDate: '',
+    incidentTime: '',
+    location: '',
+    driverName: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -39,7 +51,6 @@ export default function PublicComplaintForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form data
     try {
       publicComplaintSchema.parse(formData);
     } catch (error) {
@@ -57,27 +68,30 @@ export default function PublicComplaintForm() {
     setIsSubmitting(true);
 
     try {
-      // Format contact info to include in description
-      let enhancedDescription = formData.description;
-      
-      if (formData.customerName || formData.customerPhone || formData.customerEmail) {
-        enhancedDescription += "\n\n--- Customer Contact Information ---";
-        if (formData.customerName) enhancedDescription += `\nName: ${formData.customerName}`;
-        if (formData.customerPhone) enhancedDescription += `\nPhone: ${formData.customerPhone}`;
-        if (formData.customerEmail) enhancedDescription += `\nEmail: ${formData.customerEmail}`;
-      }
-      
+      const relatedPersons = {
+        customer_name: formData.customerName || null,
+        customer_phone: formData.customerPhone || null,
+        customer_email: formData.customerEmail || null,
+        route_number: formData.routeNumber || null,
+        bus_number: formData.busNumber || null,
+        incident_date: formData.incidentDate || null,
+        incident_time: formData.incidentTime || null,
+        location: formData.location || null,
+        driver_name: formData.driverName || null,
+      };
+
       const { data, error } = await supabase
         .from('feedback_complaints')
         .insert({
           title: formData.title,
-          description: enhancedDescription,
+          description: formData.description,
           category: formData.category,
           priority: formData.priority,
           type: 'complaint',
           status: 'new',
-          reported_by: null, // Anonymous submission
-          escalation_level: 1
+          reported_by: null,
+          escalation_level: 1,
+          related_persons: relatedPersons,
         })
         .select('id')
         .single();
@@ -137,7 +151,13 @@ export default function PublicComplaintForm() {
                   title: '',
                   description: '',
                   category: '',
-                  priority: 'medium'
+                  priority: 'medium',
+                  routeNumber: '',
+                  busNumber: '',
+                  incidentDate: '',
+                  incidentTime: '',
+                  location: '',
+                  driverName: '',
                 });
               }}
               variant="outline"
@@ -176,9 +196,9 @@ export default function PublicComplaintForm() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Contact Information (Optional) */}
+              {/* Contact Information */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Contact Information (Optional)</h3>
+                <h3 className="text-lg font-semibold">Contact Information</h3>
                 <p className="text-sm text-muted-foreground">
                   Providing your contact details helps us follow up on your complaint more effectively.
                 </p>
@@ -194,12 +214,13 @@ export default function PublicComplaintForm() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="customerPhone">Phone Number</Label>
+                    <Label htmlFor="customerPhone">Phone Number *</Label>
                     <Input
                       id="customerPhone"
                       value={formData.customerPhone}
                       onChange={(e) => setFormData(prev => ({ ...prev, customerPhone: e.target.value }))}
-                      placeholder="Your phone number"
+                      placeholder="e.g. 0771234567"
+                      required
                     />
                   </div>
                 </div>
@@ -213,6 +234,77 @@ export default function PublicComplaintForm() {
                     onChange={(e) => setFormData(prev => ({ ...prev, customerEmail: e.target.value }))}
                     placeholder="Your email address"
                   />
+                </div>
+              </div>
+
+              {/* Incident Details */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Incident Details</h3>
+                <p className="text-sm text-muted-foreground">
+                  Please provide details about the incident to help us investigate.
+                </p>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="routeNumber">Route Number</Label>
+                    <Input
+                      id="routeNumber"
+                      value={formData.routeNumber}
+                      onChange={(e) => setFormData(prev => ({ ...prev, routeNumber: e.target.value }))}
+                      placeholder="e.g. 138, 155"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="busNumber">Bus Number</Label>
+                    <Input
+                      id="busNumber"
+                      value={formData.busNumber}
+                      onChange={(e) => setFormData(prev => ({ ...prev, busNumber: e.target.value }))}
+                      placeholder="e.g. NK-1234"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="incidentDate">Date of Incident</Label>
+                    <Input
+                      id="incidentDate"
+                      type="date"
+                      value={formData.incidentDate}
+                      onChange={(e) => setFormData(prev => ({ ...prev, incidentDate: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="incidentTime">Time of Incident</Label>
+                    <Input
+                      id="incidentTime"
+                      type="time"
+                      value={formData.incidentTime}
+                      onChange={(e) => setFormData(prev => ({ ...prev, incidentTime: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="location">Location / Bus Stop</Label>
+                    <Input
+                      id="location"
+                      value={formData.location}
+                      onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                      placeholder="e.g. Pettah, Panadura"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="driverName">Driver Name (if known)</Label>
+                    <Input
+                      id="driverName"
+                      value={formData.driverName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, driverName: e.target.value }))}
+                      placeholder="Driver's name"
+                    />
+                  </div>
                 </div>
               </div>
 

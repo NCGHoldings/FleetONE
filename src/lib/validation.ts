@@ -23,7 +23,31 @@ export const publicComplaintSchema = z.object({
     .optional(),
   customerPhone: z.string()
     .trim()
-    .regex(/^\+?[0-9]{10,15}$/, 'Invalid phone number format')
+    .regex(/^\+?[0-9]{10,15}$/, 'Invalid phone number format'),
+  routeNumber: z.string()
+    .trim()
+    .max(50, 'Route number must be less than 50 characters')
+    .optional()
+    .or(z.literal('')),
+  busNumber: z.string()
+    .trim()
+    .max(50, 'Bus number must be less than 50 characters')
+    .optional()
+    .or(z.literal('')),
+  incidentDate: z.string()
+    .optional()
+    .or(z.literal('')),
+  incidentTime: z.string()
+    .optional()
+    .or(z.literal('')),
+  location: z.string()
+    .trim()
+    .max(500, 'Location must be less than 500 characters')
+    .optional()
+    .or(z.literal('')),
+  driverName: z.string()
+    .trim()
+    .max(100, 'Driver name must be less than 100 characters')
     .optional()
     .or(z.literal('')),
   customerEmail: z.string()
