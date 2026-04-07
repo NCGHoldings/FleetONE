@@ -33,6 +33,8 @@ import { BusLoanDashboardModal } from "@/components/fleet/BusLoanDashboardModal"
 import { BusCategoryBadge } from "@/components/fleet/BusCategoryBadge";
 import { BusMasterDataSheet } from "@/components/fleet/BusMasterDataSheet";
 import { FleetAlertsPanel } from "@/components/fleet/FleetAlertsPanel";
+import { FleetVehicleDataImport } from "@/components/fleet/FleetVehicleDataImport";
+import { Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Fleet {
@@ -91,6 +93,7 @@ const FleetManagementComponent = () => {
   const [loanModalOpen, setLoanModalOpen] = useState(false);
   const [loanDashboardModalOpen, setLoanDashboardModalOpen] = useState(false);
   const [masterDataSheetOpen, setMasterDataSheetOpen] = useState(false);
+  const [vehicleImportOpen, setVehicleImportOpen] = useState(false);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -661,14 +664,22 @@ const FleetManagementComponent = () => {
               </p>
             </div>
           </div>
-          <Button 
-            onClick={handleAddBus} 
-            className="gap-2 bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300 animate-scale-in" 
-            style={{ animationDelay: '0.2s' }}
-          >
-            <Plus className="w-4 h-4 animate-pulse-subtle" />
-            Add New Bus
-          </Button>
+          <div className="flex gap-2 animate-scale-in" style={{ animationDelay: '0.2s' }}>
+            <Button 
+              onClick={() => setVehicleImportOpen(true)} 
+              className="gap-2 bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300"
+            >
+              <Upload className="w-4 h-4" />
+              Import Vehicle Data
+            </Button>
+            <Button 
+              onClick={handleAddBus} 
+              className="gap-2 bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300"
+            >
+              <Plus className="w-4 h-4 animate-pulse-subtle" />
+              Add New Bus
+            </Button>
+          </div>
         </div>
         
         {/* Animated Background Elements */}
@@ -752,6 +763,13 @@ const FleetManagementComponent = () => {
           setMasterDataSheetOpen(false);
           setSelectedBusId(null);
         }}
+      />
+
+      {/* Vehicle Data Import */}
+      <FleetVehicleDataImport
+        open={vehicleImportOpen}
+        onOpenChange={setVehicleImportOpen}
+        onSuccess={fetchFleet}
       />
 
       {/* Modals */}

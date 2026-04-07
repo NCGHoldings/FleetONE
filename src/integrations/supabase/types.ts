@@ -4578,14 +4578,19 @@ export type Database = {
           chassis_number: string | null
           created_at: string
           current_mileage: number | null
+          default_driver_name: string | null
+          driver_phone: string | null
           engine_number: string | null
           expected_km_per_liter: number | null
           id: string
+          insurance_company: string | null
           insurance_expiry: string | null
           last_alert_km: number | null
           last_alert_sent_at: string | null
           last_service_date: string | null
           last_service_mileage: number | null
+          leasing_bank: string | null
+          leasing_end_date: string | null
           model: string
           next_service_date: string | null
           next_service_mileage: number | null
@@ -4593,6 +4598,9 @@ export type Database = {
           owner_address: string | null
           owner_name: string | null
           owner_nic: string | null
+          permit_category: string | null
+          permit_expiry_date: string | null
+          permit_no: string | null
           registration_number: string | null
           revenue_license_expiry: string | null
           route: string | null
@@ -4603,6 +4611,8 @@ export type Database = {
           type: string
           tyre_size_standard: string | null
           updated_at: string
+          vehicle_brand: string | null
+          vehicle_name: string | null
           year: number
         }
         Insert: {
@@ -4615,14 +4625,19 @@ export type Database = {
           chassis_number?: string | null
           created_at?: string
           current_mileage?: number | null
+          default_driver_name?: string | null
+          driver_phone?: string | null
           engine_number?: string | null
           expected_km_per_liter?: number | null
           id?: string
+          insurance_company?: string | null
           insurance_expiry?: string | null
           last_alert_km?: number | null
           last_alert_sent_at?: string | null
           last_service_date?: string | null
           last_service_mileage?: number | null
+          leasing_bank?: string | null
+          leasing_end_date?: string | null
           model: string
           next_service_date?: string | null
           next_service_mileage?: number | null
@@ -4630,6 +4645,9 @@ export type Database = {
           owner_address?: string | null
           owner_name?: string | null
           owner_nic?: string | null
+          permit_category?: string | null
+          permit_expiry_date?: string | null
+          permit_no?: string | null
           registration_number?: string | null
           revenue_license_expiry?: string | null
           route?: string | null
@@ -4640,6 +4658,8 @@ export type Database = {
           type: string
           tyre_size_standard?: string | null
           updated_at?: string
+          vehicle_brand?: string | null
+          vehicle_name?: string | null
           year: number
         }
         Update: {
@@ -4652,14 +4672,19 @@ export type Database = {
           chassis_number?: string | null
           created_at?: string
           current_mileage?: number | null
+          default_driver_name?: string | null
+          driver_phone?: string | null
           engine_number?: string | null
           expected_km_per_liter?: number | null
           id?: string
+          insurance_company?: string | null
           insurance_expiry?: string | null
           last_alert_km?: number | null
           last_alert_sent_at?: string | null
           last_service_date?: string | null
           last_service_mileage?: number | null
+          leasing_bank?: string | null
+          leasing_end_date?: string | null
           model?: string
           next_service_date?: string | null
           next_service_mileage?: number | null
@@ -4667,6 +4692,9 @@ export type Database = {
           owner_address?: string | null
           owner_name?: string | null
           owner_nic?: string | null
+          permit_category?: string | null
+          permit_expiry_date?: string | null
+          permit_no?: string | null
           registration_number?: string | null
           revenue_license_expiry?: string | null
           route?: string | null
@@ -4677,6 +4705,8 @@ export type Database = {
           type?: string
           tyre_size_standard?: string | null
           updated_at?: string
+          vehicle_brand?: string | null
+          vehicle_name?: string | null
           year?: number
         }
         Relationships: [
