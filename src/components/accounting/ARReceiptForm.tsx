@@ -17,6 +17,7 @@ import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, CheckCircle } from "lucide-react";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 const receiptSchema = z.object({
   receipt_number: z.string().min(1, "Receipt number is required"),
@@ -54,6 +55,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const { data: bankAccounts } = useBankAccounts();
   const { data: allInvoices } = useARInvoices();
   const createReceipt = useCreateARReceipt();
+  const generateNumber = useGenerateNumber();
 
   const [allocations, setAllocations] = useState<InvoiceAllocation[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(preselectedCustomerId || "");
@@ -63,7 +65,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const form = useForm<ReceiptFormData>({
     resolver: zodResolver(receiptSchema),
     defaultValues: {
-      receipt_number: `RCV-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      receipt_number: "",
       customer_id: preselectedCustomerId || "",
       receipt_date: format(new Date(), "yyyy-MM-dd"),
       amount: 0,
@@ -73,6 +75,12 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
       is_advance: isAdvanceMode,
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      generateNumber("receipt").then(num => form.setValue("receipt_number", num));
+    }
+  }, [open]);
 
   // Reset form when dialog opens
   useEffect(() => {
