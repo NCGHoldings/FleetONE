@@ -1857,7 +1857,7 @@ export function ConfirmedTripsTable() {
               ) : quotationDocuments.length > 0 ? (
                 <div className="grid gap-4">
                   {(() => {
-                    // Filter to show only latest sales receipt + latest final invoice (hide superseded drafts)
+                    // Show ALL sales receipts (one per payment) + latest final invoice
                     const salesReceipts = quotationDocuments.filter(d => d.document_type === 'sales_receipt');
                     const balanceInvoices = quotationDocuments.filter(d => d.document_type === 'invoice' && d.payment_type === 'balance');
                     const otherDocs = quotationDocuments.filter(d => 
@@ -1865,7 +1865,7 @@ export function ConfirmedTripsTable() {
                       !(d.document_type === 'invoice' && d.payment_type === 'balance')
                     );
                     
-                    // Pick latest (prefer approved over draft)
+                    // Pick latest invoice only (prefer approved over draft)
                     const pickLatest = (docs: typeof quotationDocuments) => {
                       if (!docs.length) return null;
                       const approved = docs.filter(d => d.document_status !== 'draft');
@@ -1873,10 +1873,9 @@ export function ConfirmedTripsTable() {
                       return docs[docs.length - 1];
                     };
                     
-                    const latestReceipt = pickLatest(salesReceipts);
                     const latestInvoice = pickLatest(balanceInvoices);
                     const filteredDocs = [
-                      ...(latestReceipt ? [latestReceipt] : []),
+                      ...salesReceipts, // Show ALL sales receipts
                       ...(latestInvoice ? [latestInvoice] : []),
                       ...otherDocs,
                     ];
