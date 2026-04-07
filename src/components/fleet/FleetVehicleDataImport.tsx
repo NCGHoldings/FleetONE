@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Upload, CheckCircle2, AlertCircle, PlusCircle, Loader2, FileSpreadsheet } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Upload, CheckCircle2, AlertCircle, PlusCircle, Loader2, FileSpreadsheet, Trash2, Ban } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +50,12 @@ interface ParsedRow {
   matchedBusId?: string;
   matchedBusNo?: string;
   fieldsToUpdate: string[];
+}
+
+interface UnmatchedDbBus {
+  id: string;
+  bus_no: string;
+  selected: boolean;
 }
 
 const HEADER_SYNONYMS: Record<string, string[]> = {
@@ -113,15 +120,19 @@ function parseExcelDate(val: any): string | undefined {
 export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetVehicleDataImportProps) {
   const [step, setStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
-  const [autoCreate, setAutoCreate] = useState(false);
-  const [summary, setSummary] = useState({ updated: 0, created: 0, skipped: 0 });
+  const [autoCreate, setAutoCreate] = useState(true);
+  const [unmatchedDbBuses, setUnmatchedDbBuses] = useState<UnmatchedDbBus[]>([]);
+  const [unmatchedAction, setUnmatchedAction] = useState<"none" | "deactivate" | "delete">("none");
+  const [summary, setSummary] = useState({ updated: 0, created: 0, skipped: 0, deactivated: 0, deleted: 0 });
   const { toast } = useToast();
 
   const resetState = () => {
     setStep("upload");
     setParsedRows([]);
-    setAutoCreate(false);
-    setSummary({ updated: 0, created: 0, skipped: 0 });
+    setAutoCreate(true);
+    setUnmatchedDbBuses([]);
+    setUnmatchedAction("none");
+    setSummary({ updated: 0, created: 0, skipped: 0, deactivated: 0, deleted: 0 });
   };
 
   const onDrop = useCallback(async (files: File[]) => {
@@ -139,7 +150,6 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
         return;
       }
 
-      // Find header row (first row with 3+ non-empty cells)
       let headerRowIdx = 0;
       for (let i = 0; i < Math.min(10, rawData.length); i++) {
         const row = rawData[i] as any[];
@@ -163,6 +173,8 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
       (existingBuses || []).forEach(b => busMap.set(normalizeBusNo(b.bus_no), b));
 
       const rows: ParsedRow[] = [];
+      const excelBusNos = new Set<string>();
+
       for (let i = headerRowIdx + 1; i < rawData.length; i++) {
         const row = rawData[i] as any[];
         if (!row || row.every(c => c == null || String(c).trim() === "")) continue;
@@ -176,6 +188,8 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
 
         const busNo = getValue("bus_no");
         if (!busNo) continue;
+
+        excelBusNos.add(normalizeBusNo(busNo));
 
         const mapped: ParsedRow["mapped"] = {
           bus_no: busNo,
@@ -220,12 +234,18 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
         });
       }
 
+      // Detect DB buses NOT in Excel — likely fake/test data
+      const unmatched: UnmatchedDbBus[] = (existingBuses || [])
+        .filter(b => !excelBusNos.has(normalizeBusNo(b.bus_no)))
+        .map(b => ({ id: b.id, bus_no: b.bus_no, selected: true }));
+
+      setUnmatchedDbBuses(unmatched);
       setParsedRows(rows);
       setStep("preview");
 
       toast({
         title: "Excel Parsed",
-        description: `Found ${rows.length} rows: ${rows.filter(r => r.matchStatus === "matched").length} matched, ${rows.filter(r => r.matchStatus === "new").length} new`,
+        description: `Found ${rows.length} rows: ${rows.filter(r => r.matchStatus === "matched").length} matched, ${rows.filter(r => r.matchStatus === "new").length} new. ${unmatched.length} DB buses not in Excel.`,
       });
     } catch (err: any) {
       toast({ title: "Parse Error", description: err.message, variant: "destructive" });
@@ -240,7 +260,12 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
 
   const handleImport = async () => {
     setStep("importing");
-    let updated = 0, created = 0, skipped = 0;
+    let updated = 0, created = 0, skipped = 0, deactivated = 0, deleted = 0;
+
+    // Fetch routes for matching new buses
+const { data: routes } = await supabase.from("routes").select("id, route_name");
+    const routeMap = new Map<string, string>();
+    (routes || []).forEach(r => routeMap.set(r.route_name.toLowerCase().trim(), r.id));
 
     for (const row of parsedRows) {
       const updateData: Record<string, any> = {};
@@ -257,6 +282,11 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
       }
 
       if (row.matchStatus === "matched" && row.matchedBusId) {
+        // Try to match route for existing buses too
+        if (updateData.route && !updateData.route_id) {
+          const routeId = routeMap.get(String(updateData.route).toLowerCase().trim());
+          if (routeId) updateData.route_id = routeId;
+        }
         const { error } = await supabase.from("buses").update(updateData).eq("id", row.matchedBusId);
         if (error) {
           console.error("Update error for", row.mapped.bus_no, error);
@@ -269,6 +299,11 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
         updateData.status = "active";
         if (!updateData.model) updateData.model = updateData.vehicle_brand || "Unknown";
         if (!updateData.current_mileage) updateData.current_mileage = 0;
+        // Match route for new buses
+        if (updateData.route) {
+          const routeId = routeMap.get(String(updateData.route).toLowerCase().trim());
+          if (routeId) updateData.route_id = routeId;
+        }
         const { error } = await supabase.from("buses").insert(updateData as any);
         if (error) {
           console.error("Insert error for", row.mapped.bus_no, error);
@@ -281,17 +316,41 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
       }
     }
 
-    setSummary({ updated, created, skipped });
+    // Handle unmatched DB buses
+    const selectedUnmatched = unmatchedDbBuses.filter(b => b.selected);
+    if (unmatchedAction === "deactivate" && selectedUnmatched.length > 0) {
+      for (const bus of selectedUnmatched) {
+        const { error } = await supabase.from("buses").update({ status: "inactive" } as any).eq("id", bus.id);
+        if (!error) deactivated++;
+      }
+    } else if (unmatchedAction === "delete" && selectedUnmatched.length > 0) {
+      for (const bus of selectedUnmatched) {
+        const { error } = await supabase.from("buses").delete().eq("id", bus.id);
+        if (!error) deleted++;
+        else console.error("Delete error for", bus.bus_no, error);
+      }
+    }
+
+    setSummary({ updated, created, skipped, deactivated, deleted });
     setStep("done");
     toast({
       title: "Import Complete",
-      description: `${updated} updated, ${created} created, ${skipped} skipped`,
+      description: `${updated} updated, ${created} created, ${skipped} skipped${deactivated ? `, ${deactivated} deactivated` : ""}${deleted ? `, ${deleted} deleted` : ""}`,
     });
     onSuccess?.();
   };
 
+  const toggleUnmatchedBus = (id: string) => {
+    setUnmatchedDbBuses(prev => prev.map(b => b.id === id ? { ...b, selected: !b.selected } : b));
+  };
+
+  const toggleAllUnmatched = (checked: boolean) => {
+    setUnmatchedDbBuses(prev => prev.map(b => ({ ...b, selected: checked })));
+  };
+
   const matchedCount = parsedRows.filter(r => r.matchStatus === "matched").length;
   const newCount = parsedRows.filter(r => r.matchStatus === "new").length;
+  const selectedUnmatchedCount = unmatchedDbBuses.filter(b => b.selected).length;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) resetState(); onOpenChange(v); }}>
@@ -330,6 +389,11 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
                 <Badge variant="outline" className="gap-1 text-yellow-600 border-yellow-300">
                   <PlusCircle className="w-3 h-3" /> {newCount} New
                 </Badge>
+                {unmatchedDbBuses.length > 0 && (
+                  <Badge variant="outline" className="gap-1 text-red-600 border-red-300">
+                    <AlertCircle className="w-3 h-3" /> {unmatchedDbBuses.length} Not in Excel
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Switch id="auto-create" checked={autoCreate} onCheckedChange={setAutoCreate} />
@@ -337,7 +401,55 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
               </div>
             </div>
 
-            <ScrollArea className="h-[50vh] border rounded-lg">
+            {/* Unmatched DB buses warning */}
+            {unmatchedDbBuses.length > 0 && (
+              <div className="border border-red-300 bg-red-50 dark:bg-red-950/20 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600" />
+                  <span className="text-sm font-semibold text-red-700 dark:text-red-400">
+                    {unmatchedDbBuses.length} buses in database but NOT in Excel (likely fake/test data)
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <Checkbox
+                    checked={selectedUnmatchedCount === unmatchedDbBuses.length}
+                    onCheckedChange={(checked) => toggleAllUnmatched(!!checked)}
+                  />
+                  <span className="text-xs text-muted-foreground mr-2">Select all</span>
+                  {unmatchedDbBuses.map(bus => (
+                    <label key={bus.id} className="flex items-center gap-1 text-xs bg-background border rounded px-2 py-1 cursor-pointer">
+                      <Checkbox
+                        checked={bus.selected}
+                        onCheckedChange={() => toggleUnmatchedBus(bus.id)}
+                      />
+                      <span className="font-mono font-medium text-red-700 dark:text-red-400">{bus.bus_no}</span>
+                    </label>
+                  ))}
+                </div>
+                {selectedUnmatchedCount > 0 && (
+                  <div className="flex gap-2 mt-1">
+                    <Button
+                      size="sm"
+                      variant={unmatchedAction === "deactivate" ? "default" : "outline"}
+                      className="text-xs h-7 gap-1"
+                      onClick={() => setUnmatchedAction(unmatchedAction === "deactivate" ? "none" : "deactivate")}
+                    >
+                      <Ban className="w-3 h-3" /> Flag as Inactive ({selectedUnmatchedCount})
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={unmatchedAction === "delete" ? "destructive" : "outline"}
+                      className="text-xs h-7 gap-1"
+                      onClick={() => setUnmatchedAction(unmatchedAction === "delete" ? "none" : "delete")}
+                    >
+                      <Trash2 className="w-3 h-3" /> Delete Permanently ({selectedUnmatchedCount})
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <ScrollArea className="h-[40vh] border rounded-lg">
               <table className="w-full text-xs">
                 <thead className="bg-muted/50 sticky top-0">
                   <tr>
@@ -357,7 +469,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
                 </thead>
                 <tbody>
                   {parsedRows.map((row, i) => (
-                    <tr key={i} className={`border-b ${row.matchStatus === "matched" ? "bg-green-50/50" : "bg-yellow-50/50"}`}>
+                    <tr key={i} className={`border-b ${row.matchStatus === "matched" ? "bg-green-50/50 dark:bg-green-950/10" : "bg-yellow-50/50 dark:bg-yellow-950/10"}`}>
                       <td className="p-2">
                         {row.matchStatus === "matched" ? (
                           <Badge variant="outline" className="text-green-600 text-[10px]">Match</Badge>
@@ -386,12 +498,20 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
               </table>
             </ScrollArea>
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={resetState}>Cancel</Button>
-              <Button onClick={handleImport} className="gap-2">
-                <Upload className="w-4 h-4" />
-                Import {matchedCount} Updates{autoCreate && newCount > 0 ? ` + ${newCount} New` : ""}
-              </Button>
+            <div className="flex justify-between items-center">
+              <p className="text-xs text-muted-foreground">
+                Will import: {matchedCount} updates{autoCreate && newCount > 0 ? ` + ${newCount} new buses` : ""}
+                {unmatchedAction !== "none" && selectedUnmatchedCount > 0
+                  ? ` | ${unmatchedAction === "delete" ? "Delete" : "Deactivate"} ${selectedUnmatchedCount} unmatched`
+                  : ""}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={resetState}>Cancel</Button>
+                <Button onClick={handleImport} className="gap-2">
+                  <Upload className="w-4 h-4" />
+                  Import {matchedCount} Updates{autoCreate && newCount > 0 ? ` + Create ${newCount} New` : ""}
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -400,7 +520,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
           <div className="flex flex-col items-center gap-4 py-12">
             <Loader2 className="w-12 h-12 animate-spin text-primary" />
             <p className="text-lg font-medium">Importing vehicle data...</p>
-            <p className="text-sm text-muted-foreground">Updating {parsedRows.length} records</p>
+            <p className="text-sm text-muted-foreground">Processing {parsedRows.length} records</p>
           </div>
         )}
 
@@ -421,6 +541,18 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
                 <p className="text-2xl font-bold text-muted-foreground">{summary.skipped}</p>
                 <p className="text-sm text-muted-foreground">Skipped</p>
               </div>
+              {summary.deactivated > 0 && (
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-orange-600">{summary.deactivated}</p>
+                  <p className="text-sm text-muted-foreground">Deactivated</p>
+                </div>
+              )}
+              {summary.deleted > 0 && (
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-red-600">{summary.deleted}</p>
+                  <p className="text-sm text-muted-foreground">Deleted</p>
+                </div>
+              )}
             </div>
             <Button onClick={() => { resetState(); onOpenChange(false); }} className="mt-4">Done</Button>
           </div>
