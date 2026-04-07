@@ -151,7 +151,8 @@ export const useDocumentRegeneration = () => {
           : calculateTotalAmount(quotationData),
         
         advanceAmount: quotationData.advance_paid || 0,
-        paidAmount,
+        paidAmount: isAdvanceDoc ? (paymentData?.amount || 0) : totalApprovedPaid,
+        totalPaidToDate: totalApprovedPaid,
         vehicleNo: quotationData.assigned_bus_no,
         driverName: quotationData.assigned_driver_name,
         conductorName: quotationData.assigned_conductor_name,
