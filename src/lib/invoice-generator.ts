@@ -41,6 +41,8 @@ export interface InvoiceData {
   invoice_status?: 'draft' | 'approved';
   document_type?: 'sales_receipt' | 'invoice';
   forCustomer?: boolean; // Flag to generate clean invoice for customer (no signatures, no draft text)
+  // Intermediate stops for route display
+  intermediateStops?: Array<{ location: string; id?: string; lat?: number; lng?: number }>;
   // Post-trip adjustment fields
   hasAdjustments?: boolean;
   originalQuotedKm?: number;
@@ -218,7 +220,15 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const totalPaid = data.paidAmount || 0;
     // Use explicit balanceAmount when provided (balance invoices), else compute
     const balanceDue = data.balanceAmount != null ? data.balanceAmount : Math.max(0, priceAfterDiscount - totalPaid);
-    const itemDetail = data.itemDetail || `${data.pickupLocation} to ${data.dropLocation}`;
+    // Build route with intermediate stops
+    const routeParts = [data.pickupLocation];
+    if (data.intermediateStops && data.intermediateStops.length > 0) {
+      data.intermediateStops.forEach(stop => {
+        if (stop.location) routeParts.push(stop.location);
+      });
+    }
+    routeParts.push(data.dropLocation);
+    const itemDetail = data.itemDetail || routeParts.join(' → ');
     // Use original trip distance from quotation first, then totalKm, then actual (post-trip) as fallback
     const mileage = data.tripDistance || data.totalKm || data.actualKmTraveled || 0;
 
@@ -293,8 +303,8 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             </tr>
             <tr>
               <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- External</td>
-              <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${itemDetail}<br><br>Remark: ${data.vehicleNo || 'NE 2157'} ${data.driverName ? `(D) ${data.driverName}` : '(D) Tharindu'} ${data.conductorName ? `(A) ${data.conductorName}` : '(A) Kalpa'}</td>
-              <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${data.vehicleNo || 'NE 2157'}</td>
+              <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${itemDetail}<br><br>Remark: ${data.vehicleNo || '-'} ${data.driverName ? `(D) ${data.driverName}` : ''} ${data.conductorName ? `(C) ${data.conductorName}` : ''}</td>
+              <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${data.vehicleNo || '-'}</td>
               <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-weight: bold;">${subTotal.toLocaleString()}.00</td>
             </tr>
           </table>
