@@ -446,10 +446,29 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
         if (!error) deactivated++;
       }
     } else if (unmatchedAction === "delete" && selectedUnmatched.length > 0) {
+      const fkTables = [
+        "daily_trips", "daily_bus_expenses", "daily_cash_settlements",
+        "fleet_master_roster", "bus_service_alerts", "maintenance_records",
+        "route_permits", "insurance_records", "special_hire_projects",
+        "real_time_tracking", "driver_allocations", "route_expenses",
+        "bus_loans", "journal_entry_lines", "bus_tyres",
+        "tyre_rotation_history", "tyre_inspection_records",
+        "fuel_consumption_logs", "fuel_alerts", "bus_fuel_readings",
+        "driver_behavior_events", "safety_alerts", "gps_location_history",
+        "completed_trips", "fleet_analytics_daily", "bus_daily_mileage",
+        "bus_api_connections", "ar_invoices", "ap_invoices", "expense_requests"
+      ];
       for (const bus of selectedUnmatched) {
+        // Clean up FK-linked records first
+        for (const table of fkTables) {
+          await supabase.from(table as any).delete().eq("bus_id", bus.id);
+        }
         const { error } = await supabase.from("buses").delete().eq("id", bus.id);
         if (!error) deleted++;
-        else console.error("Delete error for", bus.bus_no, error);
+        else {
+          console.error("Delete error for", bus.bus_no, error);
+          errors.push(`Failed to delete ${bus.bus_no}: ${error.message}`);
+        }
       }
     }
 
