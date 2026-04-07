@@ -49,8 +49,14 @@ export const SpecialHireSignatureSettings = () => {
       if (sigPageSetting) {
         setShowSignaturePage(sigPageSetting.is_enabled);
       } else {
-        // Auto-create the setting if it doesn't exist
+        // Auto-create the setting row in the database so it persists
         setShowSignaturePage(true);
+        const { error: insertErr } = await supabase
+          .from('special_hire_signature_settings')
+          .insert({ signature_role: 'signature_page', is_enabled: true, default_user_id: null });
+        if (insertErr) {
+          console.error('Failed to auto-create signature_page setting:', insertErr);
+        }
       }
       
       // Only show role-based settings in the cards
@@ -200,7 +206,34 @@ export const SpecialHireSignatureSettings = () => {
             </div>
             <Switch
               checked={showSignaturePage}
-              onCheckedChange={setShowSignaturePage}
+              onCheckedChange={async (checked) => {
+                setShowSignaturePage(checked);
+                try {
+                  const { data: existing } = await supabase
+                    .from('special_hire_signature_settings')
+                    .select('id')
+                    .eq('signature_role', 'signature_page')
+                    .maybeSingle();
+
+                  if (existing) {
+                    const { error } = await supabase
+                      .from('special_hire_signature_settings')
+                      .update({ is_enabled: checked })
+                      .eq('signature_role', 'signature_page');
+                    if (error) throw error;
+                  } else {
+                    const { error } = await supabase
+                      .from('special_hire_signature_settings')
+                      .insert({ signature_role: 'signature_page', is_enabled: checked, default_user_id: null });
+                    if (error) throw error;
+                  }
+                  toast.success(checked ? 'Signature page enabled' : 'Signature page disabled');
+                } catch (err) {
+                  console.error('Failed to save signature page toggle:', err);
+                  toast.error('Failed to save signature page setting');
+                  setShowSignaturePage(!checked); // revert on failure
+                }
+              }}
             />
           </div>
         </CardHeader>
