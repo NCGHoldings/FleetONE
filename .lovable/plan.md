@@ -1,28 +1,48 @@
 
 
-# Add Complaints Module to Company Module Overview Dashboard
+# Fix: Sales Receipt Cumulative Balance & Payment History
 
-## What's Missing
+## Problem
 
-The **Complaints** module exists in the app (page at `/complaints`, 4 records in DB) but is **not shown** in the Module Overview dashboard (`RealDataSummary.tsx`). All other modules (Fleet, Staff, Special Hire, Yutong, School Bus, Maintenance, Accounting, Daily Trips, Routes, Accidents) are listed there — Complaints is missing.
+Each Sales Receipt shows `Balance Due = Total - THIS payment only`, ignoring all prior payments. Screenshot shows:
+- Receipt 1: Paid 131,000 → Balance Due: 130,000 (correct, only 1 payment)
+- Receipt 2: Paid 132,974 → Balance Due: 131,974 (WRONG — should be 5,750 because 131,000 was already paid)
+
+The root cause: `paidAmount` in `InvoiceData` is set to `paymentData.amount` (current payment only), and the HTML template computes `Balance Due = totalAmount - paidAmount`.
 
 ## Plan
 
-### 1. Add Complaints to the Module Overview Dashboard (`RealDataSummary.tsx`)
+### 1. Add `totalPaidToDate` field to InvoiceData (`src/lib/invoice-generator.ts`)
 
-- Add a query for `feedback_complaints` in the `Promise.all` block (fetch `id, status, type`)
-- Count total complaints, and count open/unresolved complaints as `issueCount`
-- Add a new module card: `{ name: 'Complaints', icon: <MessageSquareWarning />, count: total, issueCount: openCount, path: '/complaints', color: 'text-rose-400', bgColor: 'bg-rose-500/20' }`
+Add a new optional field `totalPaidToDate?: number` to the `InvoiceData` interface. This represents the cumulative sum of all approved payments up to and including the current one.
 
-### 2. Add Complaints to Cross-Module Checks (`useCrossModuleChecks.ts`)
+Update the sales receipt HTML template (lines 146-156) to:
+- Show "This Payment" amount (current `paidAmount`)
+- Show "Total Paid to Date" (cumulative `totalPaidToDate`)
+- Calculate `Balance Due = totalAmount - totalPaidToDate` instead of `totalAmount - paidAmount`
+- Label the payment row correctly (ADVANCE PAYMENT vs BALANCE PAYMENT based on `invoiceType`)
 
-- Add a check for unresolved complaints older than 48 hours (SLA breach)
-- This gives visibility into complaint handling performance on the system health dashboard
+### 2. Pass cumulative total in ConfirmedTripsTable.tsx (draft generation)
+
+At line 427, after confirming a payment, query `special_hire_payments` for all approved + the new payment for this quotation to compute `totalPaidToDate`. Pass it alongside `paidAmount`.
+
+### 3. Pass cumulative total in useFinanceApproval.ts (approval regeneration)
+
+Line 448 already computes `totalApprovedPaid` — use it as `totalPaidToDate` for sales receipts too (currently only used for invoices). Change the line to always pass `totalPaidToDate: totalApprovedPaid`.
+
+Also fix the other generation points (lines 374 and 596) to fetch and pass cumulative totals.
+
+### 4. Fix the "Regenerate Sales Receipt" path (useFinanceApproval.ts line ~590)
+
+The `generateApprovedInvoice` function also builds `InvoiceData` with just `paymentData.amount`. Add a query for all approved payments to compute `totalPaidToDate`.
 
 ## Files
-- **Modify**: `src/components/system-health/RealDataSummary.tsx` — add `feedback_complaints` query and Complaints module card
-- **Modify**: `src/hooks/useCrossModuleChecks.ts` — add SLA check for overdue complaints
+- **Modify**: `src/lib/invoice-generator.ts` — add `totalPaidToDate` to interface; update sales receipt HTML to show cumulative balance
+- **Modify**: `src/components/special-hire/ConfirmedTripsTable.tsx` — compute and pass `totalPaidToDate` when generating draft receipts
+- **Modify**: `src/hooks/useFinanceApproval.ts` — pass `totalPaidToDate` in all 3 generation paths (approval, fallback, regeneration)
 
 ## Result
-Complaints will appear as a clickable module card in the dashboard showing total count and open issues, matching all other modules.
+- Receipt 1 (131,000): Balance Due = 269,724 - 131,000 = 138,724
+- Receipt 2 (132,974): Balance Due = 269,724 - 263,974 = 5,750
+- Each receipt shows the individual payment amount AND cumulative total paid to date
 
