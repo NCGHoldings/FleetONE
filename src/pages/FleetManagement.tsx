@@ -97,7 +97,123 @@ const FleetManagementComponent = () => {
   const [masterDataSheetOpen, setMasterDataSheetOpen] = useState(false);
   const [vehicleImportOpen, setVehicleImportOpen] = useState(false);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FleetFilters>({ ...defaultFilters });
+  const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([]);
+  const [subCategoryOptions, setSubCategoryOptions] = useState<{ id: string; name: string }[]>([]);
   const { toast } = useToast();
+
+  // Fetch categories on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const [catRes, subCatRes] = await Promise.all([
+        supabase.from("bus_categories").select("id, name").order("name"),
+        supabase.from("bus_sub_categories").select("id, name").order("name"),
+      ]);
+      if (catRes.data) setCategoryOptions(catRes.data);
+      if (subCatRes.data) setSubCategoryOptions(subCatRes.data);
+    };
+    fetchCategories();
+  }, []);
+
+  // Compute distinct values from data
+  const distinctTypes = useMemo(() => [...new Set(data.map((b) => b.type).filter(Boolean))].sort(), [data]);
+  const distinctModels = useMemo(() => [...new Set(data.map((b) => b.model).filter(Boolean))].sort(), [data]);
+  const distinctYears = useMemo(() => [...new Set(data.map((b) => b.year).filter(Boolean))], [data]);
+  const distinctRoutes = useMemo(() => [...new Set(data.map((b) => b.route).filter((r): r is string => !!r))].sort(), [data]);
+
+  // Count active filters
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.categories.length) count++;
+    if (filters.subCategories.length) count++;
+    if (filters.types.length) count++;
+    if (filters.models.length) count++;
+    if (filters.years.length) count++;
+    if (filters.statuses.length) count++;
+    if (filters.routes.length) count++;
+    if (filters.insuranceExpiry) count++;
+    if (filters.licenseExpiry) count++;
+    if (filters.mileageMin || filters.mileageMax) count++;
+    if (filters.runningDaysMin || filters.runningDaysMax) count++;
+    if (filters.revenueMin || filters.revenueMax) count++;
+    return count;
+  }, [filters]);
+
+  // Apply filters
+  const filteredData = useMemo(() => {
+    let result = data;
+    const now = new Date();
+    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    if (filters.categories.length)
+      result = result.filter((b) => b.category_id && filters.categories.includes(b.category_id));
+    if (filters.subCategories.length)
+      result = result.filter((b) => b.sub_category_id && filters.subCategories.includes(b.sub_category_id));
+    if (filters.statuses.length)
+      result = result.filter((b) => filters.statuses.includes(b.status));
+    if (filters.types.length)
+      result = result.filter((b) => filters.types.includes(b.type));
+    if (filters.models.length)
+      result = result.filter((b) => filters.models.includes(b.model));
+    if (filters.years.length)
+      result = result.filter((b) => filters.years.includes(b.year));
+    if (filters.routes.length)
+      result = result.filter((b) => b.route && filters.routes.includes(b.route));
+
+    // Insurance expiry filter
+    if (filters.insuranceExpiry) {
+      result = result.filter((b) => {
+        if (!b.insurance_expiry) return filters.insuranceExpiry === "expired";
+        const exp = new Date(b.insurance_expiry);
+        switch (filters.insuranceExpiry) {
+          case "expired": return exp < now;
+          case "expiring_30": return exp >= now && exp <= in30Days;
+          case "this_month": return exp.getMonth() === now.getMonth() && exp.getFullYear() === now.getFullYear();
+          case "valid": return exp > in30Days;
+          default: return true;
+        }
+      });
+    }
+
+    // License expiry filter
+    if (filters.licenseExpiry) {
+      result = result.filter((b) => {
+        if (!b.revenue_license_expiry) return filters.licenseExpiry === "expired";
+        const exp = new Date(b.revenue_license_expiry);
+        switch (filters.licenseExpiry) {
+          case "expired": return exp < now;
+          case "expiring_30": return exp >= now && exp <= in30Days;
+          case "this_month": return exp.getMonth() === now.getMonth() && exp.getFullYear() === now.getFullYear();
+          case "valid": return exp > in30Days;
+          default: return true;
+        }
+      });
+    }
+
+    // Range filters
+    if (filters.mileageMin) result = result.filter((b) => b.current_mileage >= Number(filters.mileageMin));
+    if (filters.mileageMax) result = result.filter((b) => b.current_mileage <= Number(filters.mileageMax));
+    if (filters.runningDaysMin) result = result.filter((b) => (b.running_days || 0) >= Number(filters.runningDaysMin));
+    if (filters.runningDaysMax) result = result.filter((b) => (b.running_days || 0) <= Number(filters.runningDaysMax));
+    if (filters.revenueMin) result = result.filter((b) => (b.avg_daily_revenue || 0) >= Number(filters.revenueMin));
+    if (filters.revenueMax) result = result.filter((b) => (b.avg_daily_revenue || 0) <= Number(filters.revenueMax));
+
+    return result;
+  }, [data, filters]);
+
+  // Multi-key search function
+  const customSearch = useCallback((items: Fleet[], query: string) => {
+    if (!query.trim()) return items;
+    const q = query.toLowerCase();
+    return items.filter((b) =>
+      b.bus_no?.toLowerCase().includes(q) ||
+      b.type?.toLowerCase().includes(q) ||
+      b.route?.toLowerCase().includes(q) ||
+      b.model?.toLowerCase().includes(q) ||
+      b.owner_name?.toLowerCase().includes(q)
+    );
+  }, []);
 
   const handleOpenMasterDataSheet = (busId: string) => {
     setSelectedBusId(busId);
