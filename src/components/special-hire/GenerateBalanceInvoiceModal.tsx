@@ -81,6 +81,9 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   effectiveCompanyId,
 }) => {
   const { user } = useAuth();
+  // Import NCG_HOLDING_ID as fallback for effectiveCompanyId
+  const NCG_HOLDING_FALLBACK = 'a0000000-0000-0000-0000-000000000001';
+  const companyIdToUse = effectiveCompanyId || NCG_HOLDING_FALLBACK;
   const [isLoading, setIsLoading] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [documentId, setDocumentId] = useState<string | null>(null);

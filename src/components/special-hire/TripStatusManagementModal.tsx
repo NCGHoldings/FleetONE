@@ -36,6 +36,7 @@ interface TripStatusManagementModalProps {
   } | null;
   onStatusChange: (data: TripStatusData) => Promise<void>;
   loading?: boolean;
+  effectiveCompanyId?: string;
 }
 
 const STATUS_OPTIONS = [
