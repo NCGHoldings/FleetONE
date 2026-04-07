@@ -147,6 +147,8 @@ export function SpecialHireCalendarView() {
     const [showModal, setShowModal] = useState(false);
     const [selectedVersions, setSelectedVersions] = useState<Record<string, string>>({});
     const [viewMode, setViewMode] = useState<'hires' | 'created'>('hires');
+    const [remarkDialogOpen, setRemarkDialogOpen] = useState(false);
+    const [remarkTarget, setRemarkTarget] = useState<{ id: string; quotationNo: string; customerName: string } | null>(null);
 
     const safeParseJSON = <T,>(value: any, fallback: T): T => {
         if (value === null || value === undefined || value === '') return fallback;
