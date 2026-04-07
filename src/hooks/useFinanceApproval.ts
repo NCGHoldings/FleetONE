@@ -376,7 +376,7 @@ export const useFinanceApproval = () => {
           driverName: paymentData.quotation.assigned_driver_name,
           conductorName: paymentData.quotation.assigned_conductor_name,
           invoice_status: 'draft',
-          document_type: paymentData.payment_type === 'advance' ? 'sales_receipt' : 'invoice',
+           document_type: 'sales_receipt',
         };
 
         const pdfBlob = await genPdf(fallbackData);
@@ -589,7 +589,7 @@ export const useFinanceApproval = () => {
         driverName: paymentData.quotation.assigned_driver_name,
         conductorName: paymentData.quotation.assigned_conductor_name,
         invoice_status: 'approved',
-        document_type: paymentData.payment_type === 'advance' ? 'sales_receipt' : 'invoice',
+        document_type: 'sales_receipt',
       };
 
       const pdfBlob = await generateInvoicePDF(invoiceData);
