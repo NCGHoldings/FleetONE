@@ -57,6 +57,8 @@ export const JournalEntriesView = () => {
   const postEntry = usePostJournalEntry();
   const rejectEntry = useRejectJournalEntry();
   const reverseEntry = useReverseJournalEntry();
+  const deleteEntry = useDeleteJournalEntry();
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Filter entries based on multiple criteria
   const filteredEntries = useMemo(() => {
