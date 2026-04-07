@@ -152,78 +152,9 @@ export const useFinanceApproval = () => {
         .eq('id', paymentData.quotation.id);
     }
 
-    // Step 2b: Create AR Invoice if full or balance payment and customer exists
-    // ADVANCE payments should NOT create an AR Invoice for the full amount yet.
-    // The AR Invoice will be generated later when the trip is completed (Balance Invoice) or here if missing.
-    if (customerId && (isFullPayment || isBalance) && !arInvoiceId) {
-      console.log('[SPH Finance] Creating AR Invoice for Full/Balance Payment...');
-      
-      // Base quotation amount
-      let totalAmount = (paymentData.quotation.gross_revenue || 0) +
-        (paymentData.quotation.fuel_cost_fuel_only || 0) +
-        (paymentData.quotation.commission_pass_through_amount || 0) +
-        (paymentData.quotation.total_additional_charges || 0) -
-        (paymentData.quotation.discount_amount_lkr || 0);
-
-      // Include post-trip adjustment amounts if any
-      try {
-        const { data: adjustment } = await supabase
-          .from('special_hire_trip_adjustments')
-          .select('extra_km_total_charge, total_additional_expenses')
-          .eq('quotation_id', paymentData.quotation.id)
-          .maybeSingle();
-        
-        if (adjustment) {
-          const adjustmentTotal = (adjustment.extra_km_total_charge || 0) + (adjustment.total_additional_expenses || 0);
-          if (adjustmentTotal > 0) {
-            totalAmount += adjustmentTotal;
-            console.log('[SPH Finance] Including post-trip adjustment in AR Invoice:', adjustmentTotal, 'New total:', totalAmount);
-          }
-        }
-      } catch (err) {
-        console.warn('[SPH Finance] Could not fetch adjustment data:', err);
-      }
-
-      const dueDate = format(
-        new Date(paymentData.quotation.pickup_datetime || new Date()),
-        'yyyy-MM-dd'
-      );
-
-      // Query actual advance payments to pass correct advance amount (not balance payment amount)
-      let actualAdvanceAmount = 0;
-      try {
-        const { data: advPmts } = await supabase
-          .from('special_hire_payments')
-          .select('amount')
-          .eq('quotation_id', paymentData.quotation.id)
-          .eq('payment_type', 'advance')
-          .eq('status', 'approved');
-        actualAdvanceAmount = (advPmts || []).reduce((s, p) => s + (p.amount || 0), 0);
-      } catch (err) {
-        console.warn('[SPH Finance] Could not fetch advance payments:', err);
-      }
-
-      const arResult = await createSPHARInvoice({
-        quotationId: paymentData.quotation.id,
-        quotationNo: paymentData.quotation.quotation_no,
-        customerId,
-        customerName: paymentData.quotation.customer_name,
-        totalAmount,
-        advanceAmount: actualAdvanceAmount,
-        dueDate,
-        companyId: companyId,
-      });
-
-      if (!arResult) {
-        console.error('[SPH Finance] ❌ Failed to create AR Invoice');
-        toast.error('Failed to create AR Invoice. Check Finance Settings.');
-        // Don't return, allow advance processing to continue
-      } else {
-        arInvoiceId = arResult.invoiceId;
-        console.log('[SPH Finance] ✅ AR Invoice created:', arResult.invoiceNumber);
-        toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
-      }
-    }
+    // Step 2b: AR Invoice creation is now deferred to "Generate Final Invoice" action (after trip completion)
+    // Payment approval only creates the customer and posts GL — no AR Invoice at this stage.
+    // The AR Invoice will be created when the user clicks "Generate Final Invoice" after the trip is completed.
 
     // Step 2c: Post GL Entry
     if (isAdvance && settings.auto_post_advance_payments) {
@@ -445,7 +376,7 @@ export const useFinanceApproval = () => {
           driverName: paymentData.quotation.assigned_driver_name,
           conductorName: paymentData.quotation.assigned_conductor_name,
           invoice_status: 'draft',
-          document_type: paymentData.payment_type === 'advance' ? 'sales_receipt' : 'invoice',
+           document_type: 'sales_receipt',
         };
 
         const pdfBlob = await genPdf(fallbackData);
@@ -658,7 +589,7 @@ export const useFinanceApproval = () => {
         driverName: paymentData.quotation.assigned_driver_name,
         conductorName: paymentData.quotation.assigned_conductor_name,
         invoice_status: 'approved',
-        document_type: paymentData.payment_type === 'advance' ? 'sales_receipt' : 'invoice',
+        document_type: 'sales_receipt',
       };
 
       const pdfBlob = await generateInvoicePDF(invoiceData);

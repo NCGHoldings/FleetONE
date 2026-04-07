@@ -428,7 +428,7 @@ export function ConfirmedTripsTable() {
         driverName: paymentData.driverName || tripForDoc.assigned_driver_name,
         conductorName: paymentData.conductorName || tripForDoc.assigned_conductor_name,
         invoice_status: 'draft' as const,
-        document_type: paymentData.paymentType === 'advance' ? 'sales_receipt' as const : 'invoice' as const,
+        document_type: 'sales_receipt' as const,
       };
 
       console.log('🚀 Triggering run-in-background document generation for:', draftInvoiceData.invoiceNo);
@@ -831,15 +831,15 @@ export function ConfirmedTripsTable() {
 
   // Render document status summary
   const renderDocumentStatusSummary = (documents: any[]) => {
-    const salesReceipt = documents.find(d => d.document_type === 'sales_receipt');
+    const salesReceipts = documents.filter(d => d.document_type === 'sales_receipt');
     const finalInvoice = documents.find(d => d.document_type === 'invoice');
     
     return (
       <div className="space-y-1">
-        {salesReceipt && (
+        {salesReceipts.length > 0 && (
           <div className="text-xs flex items-center gap-1">
-            <span className="font-medium">Receipt:</span>{' '}
-            {renderEmailStatusBadge(salesReceipt.email_status, salesReceipt.ready_to_send)}
+            <span className="font-medium">SR ×{salesReceipts.length}:</span>{' '}
+            {renderEmailStatusBadge(salesReceipts[salesReceipts.length - 1].email_status, salesReceipts[salesReceipts.length - 1].ready_to_send)}
           </div>
         )}
         {finalInvoice && (
@@ -848,7 +848,7 @@ export function ConfirmedTripsTable() {
             {renderEmailStatusBadge(finalInvoice.email_status, finalInvoice.ready_to_send)}
           </div>
         )}
-        {!salesReceipt && !finalInvoice && (
+        {salesReceipts.length === 0 && !finalInvoice && (
           <span className="text-xs text-muted-foreground">No documents</span>
         )}
       </div>
@@ -1431,8 +1431,8 @@ export function ConfirmedTripsTable() {
                                   View Documents
                                 </DropdownMenuItem>
 
-                                {/* Generate Final Invoice - works WITH or WITHOUT adjustment */}
-                                {(trip.trip_status === 'completed' || trip.trip_status === 'confirmed') && (
+                                {/* Generate Final Invoice - Only after trip completion */}
+                                {trip.trip_status === 'completed' && (
                                   <DropdownMenuItem
                                     onClick={() => {
                                       setSelectedTrip(trip);
@@ -1443,6 +1443,13 @@ export function ConfirmedTripsTable() {
                                   >
                                     <FileText className="w-4 h-4 mr-2 text-orange-600" />
                                     Generate Final Invoice
+                                  </DropdownMenuItem>
+                                )}
+                                {trip.trip_status === 'confirmed' && (
+                                  <DropdownMenuItem disabled className="opacity-50">
+                                    <FileText className="w-4 h-4 mr-2 text-muted-foreground" />
+                                    Generate Final Invoice
+                                    <span className="ml-auto text-xs text-muted-foreground">Trip must complete</span>
                                   </DropdownMenuItem>
                                 )}
 
@@ -1529,56 +1536,55 @@ export function ConfirmedTripsTable() {
                                   </DropdownMenuItem>
                                 )}
 
-                                {/* Email Sales Receipt - open approved receipt */}
-                                {approvedPayments.length > 0 && (
-                                  <DropdownMenuItem
-                                    onClick={async () => {
-                                      try {
-                                        const tripDocs = documentsData[trip.id] || [];
-                                        const salesReceipt = tripDocs.find(
-                                          (d: any) => d.document_type === 'sales_receipt' && d.document_status === 'approved'
-                                        );
-                                        if (salesReceipt) {
-                                          setCurrentDocument(salesReceipt);
+                                {/* Email Sales Receipts - show all approved receipts */}
+                                {(() => {
+                                  const tripDocs = documentsData[trip.id] || [];
+                                  const approvedReceipts = tripDocs.filter(
+                                    (d: any) => d.document_type === 'sales_receipt' && d.document_status === 'approved'
+                                  );
+                                  if (approvedReceipts.length === 0) return null;
+                                  if (approvedReceipts.length === 1) {
+                                    return (
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setCurrentDocument(approvedReceipts[0]);
                                           setSelectedTrip(trip);
                                           setDocumentViewerOpen(true);
-                                        } else {
-                                          toast.error('No approved Sales Receipt found. Ensure finance has approved the payment.');
-                                        }
-                                      } catch (error) {
-                                        console.error('Error opening sales receipt:', error);
-                                        toast.error('Failed to open sales receipt');
-                                      }
-                                    }}
-                                  >
-                                    <Mail className="w-4 h-4 mr-2 text-green-600" />
-                                    Email Sales Receipt
-                                  </DropdownMenuItem>
-                                )}
+                                        }}
+                                      >
+                                        <Mail className="w-4 h-4 mr-2 text-green-600" />
+                                        Email Sales Receipt
+                                      </DropdownMenuItem>
+                                    );
+                                  }
+                                  return approvedReceipts.map((sr: any, idx: number) => (
+                                    <DropdownMenuItem
+                                      key={`sr-email-${sr.id}`}
+                                      onClick={() => {
+                                        setCurrentDocument(sr);
+                                        setSelectedTrip(trip);
+                                        setDocumentViewerOpen(true);
+                                      }}
+                                    >
+                                      <Mail className="w-4 h-4 mr-2 text-green-600" />
+                                      Email Sales Receipt #{idx + 1}
+                                    </DropdownMenuItem>
+                                  ));
+                                })()}
 
                                 <DropdownMenuSeparator />
 
                                 {/* === FINANCE / REGENERATE === */}
                                 {approvedPayments.length > 0 && (
                                   <>
-                                    {approvedPayments.filter(p => p.payment_type === 'advance').map(p => (
+                                    {approvedPayments.map((p, idx) => (
                                       <DropdownMenuItem
                                         key={`receipt-${p.id}`}
                                         onClick={() => generateApprovedInvoice(p.id)}
                                         disabled={financeLoading}
                                       >
                                         <RotateCcw className="w-4 h-4 mr-2" />
-                                        Re-generate Sales Receipt
-                                      </DropdownMenuItem>
-                                    ))}
-                                    {approvedPayments.filter(p => p.payment_type === 'balance' || p.payment_type === 'full').map(p => (
-                                      <DropdownMenuItem
-                                        key={`invoice-${p.id}`}
-                                        onClick={() => generateApprovedInvoice(p.id)}
-                                        disabled={financeLoading}
-                                      >
-                                        <RotateCcw className="w-4 h-4 mr-2" />
-                                        Re-generate Final Invoice
+                                        Re-generate Sales Receipt {approvedPayments.length > 1 ? `#${idx + 1}` : ''}
                                       </DropdownMenuItem>
                                     ))}
 
@@ -1851,7 +1857,7 @@ export function ConfirmedTripsTable() {
               ) : quotationDocuments.length > 0 ? (
                 <div className="grid gap-4">
                   {(() => {
-                    // Filter to show only latest sales receipt + latest final invoice (hide superseded drafts)
+                    // Show ALL sales receipts (one per payment) + latest final invoice
                     const salesReceipts = quotationDocuments.filter(d => d.document_type === 'sales_receipt');
                     const balanceInvoices = quotationDocuments.filter(d => d.document_type === 'invoice' && d.payment_type === 'balance');
                     const otherDocs = quotationDocuments.filter(d => 
@@ -1859,7 +1865,7 @@ export function ConfirmedTripsTable() {
                       !(d.document_type === 'invoice' && d.payment_type === 'balance')
                     );
                     
-                    // Pick latest (prefer approved over draft)
+                    // Pick latest invoice only (prefer approved over draft)
                     const pickLatest = (docs: typeof quotationDocuments) => {
                       if (!docs.length) return null;
                       const approved = docs.filter(d => d.document_status !== 'draft');
@@ -1867,10 +1873,9 @@ export function ConfirmedTripsTable() {
                       return docs[docs.length - 1];
                     };
                     
-                    const latestReceipt = pickLatest(salesReceipts);
                     const latestInvoice = pickLatest(balanceInvoices);
                     const filteredDocs = [
-                      ...(latestReceipt ? [latestReceipt] : []),
+                      ...salesReceipts, // Show ALL sales receipts
                       ...(latestInvoice ? [latestInvoice] : []),
                       ...otherDocs,
                     ];
