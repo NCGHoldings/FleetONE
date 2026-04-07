@@ -10,7 +10,7 @@ import { Save, PenTool, CheckCircle, Award } from 'lucide-react';
 
 interface SignatureSetting {
   id: string;
-  signature_role: 'prepared_by' | 'checked_by' | 'approved_by';
+  signature_role: string;
   default_user_id: string | null;
   is_enabled: boolean;
 }
@@ -26,6 +26,7 @@ export const SpecialHireSignatureSettings = () => {
   const [previews, setPreviews] = useState<Record<string, SignaturePreview>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showSignaturePage, setShowSignaturePage] = useState(true);
 
   useEffect(() => {
     loadSettings();
@@ -40,7 +41,21 @@ export const SpecialHireSignatureSettings = () => {
         .order('signature_role');
 
       if (error) throw error;
-      setSettings((data || []) as SignatureSetting[]);
+      
+      const allSettings = (data || []) as SignatureSetting[];
+      
+      // Separate the signature_page toggle from role settings
+      const sigPageSetting = allSettings.find(s => s.signature_role === 'signature_page');
+      if (sigPageSetting) {
+        setShowSignaturePage(sigPageSetting.is_enabled);
+      } else {
+        // Auto-create the setting if it doesn't exist
+        setShowSignaturePage(true);
+      }
+      
+      // Only show role-based settings in the cards
+      const roleSettings = allSettings.filter(s => s.signature_role !== 'signature_page');
+      setSettings(roleSettings);
 
       // Load signature previews for selected users
       if (data) {
@@ -82,6 +97,25 @@ export const SpecialHireSignatureSettings = () => {
     try {
       setSaving(true);
 
+      // Save the signature page toggle
+      const { data: existingPage } = await supabase
+        .from('special_hire_signature_settings')
+        .select('id')
+        .eq('signature_role', 'signature_page')
+        .maybeSingle();
+
+      if (existingPage) {
+        await supabase
+          .from('special_hire_signature_settings')
+          .update({ is_enabled: showSignaturePage })
+          .eq('signature_role', 'signature_page');
+      } else {
+        await supabase
+          .from('special_hire_signature_settings')
+          .insert({ signature_role: 'signature_page', is_enabled: showSignaturePage, default_user_id: null });
+      }
+
+      // Save role settings
       for (const setting of settings) {
         const { error } = await supabase
           .from('special_hire_signature_settings')
@@ -95,7 +129,7 @@ export const SpecialHireSignatureSettings = () => {
       }
 
       toast.success('Signature settings saved successfully!');
-      await loadSettings(); // Reload to get fresh previews
+      await loadSettings();
     } catch (error) {
       console.error('Error saving settings:', error);
       toast.error('Failed to save signature settings');
@@ -153,6 +187,24 @@ export const SpecialHireSignatureSettings = () => {
           Configure default signers for automated document signatures. Signatures will be added automatically at each approval stage.
         </p>
       </div>
+
+      {/* Master toggle for signature page visibility */}
+      <Card className="border-2 border-primary/20">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Show Signature Page on Documents</CardTitle>
+              <CardDescription>
+                When disabled, invoices and receipts will be single-page without the signature section. You can re-enable it anytime.
+              </CardDescription>
+            </div>
+            <Switch
+              checked={showSignaturePage}
+              onCheckedChange={setShowSignaturePage}
+            />
+          </div>
+        </CardHeader>
+      </Card>
 
       <div className="grid gap-6">
         {settings.map((setting) => {

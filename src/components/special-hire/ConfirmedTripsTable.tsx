@@ -76,6 +76,7 @@ export function ConfirmedTripsTable() {
   const [companyLogo, setCompanyLogo] = useState<string>('');
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [signerSettings, setSignerSettings] = useState<Record<string, SignerSetting>>({});
+  const [hideSignaturePage, setHideSignaturePage] = useState(false);
   // Check user roles
   const isFinanceUser = hasRole('finance') || hasRole('admin') || hasRole('super_admin');
   const isOperationsUser = hasRole('admin') || hasRole('super_admin') || hasRole('supervisor');
@@ -429,6 +430,7 @@ export function ConfirmedTripsTable() {
         conductorName: paymentData.conductorName || tripForDoc.assigned_conductor_name,
         invoice_status: 'draft' as const,
         document_type: 'sales_receipt' as const,
+        hideSignaturePage,
       };
 
       console.log('🚀 Triggering run-in-background document generation for:', draftInvoiceData.invoiceNo);
@@ -609,6 +611,10 @@ export function ConfirmedTripsTable() {
           };
 
           settings.forEach(setting => {
+            if (setting.signature_role === 'signature_page') {
+              // This controls visibility of the entire signature page on documents
+              return;
+            }
             const name = setting.default_user_id ? profilesMap[setting.default_user_id] : undefined;
             signerMap[setting.signature_role] = {
               role: setting.signature_role,
@@ -616,6 +622,14 @@ export function ConfirmedTripsTable() {
               isEnabled: setting.is_enabled
             };
           });
+
+          // Check if signature page is disabled
+          const sigPageSetting = settings.find(s => s.signature_role === 'signature_page');
+          if (sigPageSetting && !sigPageSetting.is_enabled) {
+            setHideSignaturePage(true);
+          } else {
+            setHideSignaturePage(false);
+          }
         }
         
         setSignerSettings(signerMap);
@@ -948,6 +962,7 @@ export function ConfirmedTripsTable() {
         additionalExpenses: (adjustment?.additional_expenses as any[]) || [],
         totalAdditionalExpenses: adjustment?.total_additional_expenses,
         adjustmentNotes: adjustment?.notes,
+        hideSignaturePage,
       };
 
       setCurrentInvoiceData(invoiceData);
@@ -1566,6 +1581,7 @@ export function ConfirmedTripsTable() {
                                           additionalExpenses: adjustment?.additional_expenses || [],
                                           totalAdditionalExpenses: adjustment?.total_additional_expenses,
                                           adjustmentNotes: adjustment?.notes,
+                                          hideSignaturePage,
                                         };
 
                                         const pdfBlob = await generateInvoicePDF(reminderData);
