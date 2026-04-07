@@ -1,60 +1,52 @@
 
-# Fix: Clean Orphaned JEs from Live COA + Add Reusable Orphan Cleanup Tool
 
-## What's Wrong
+# Add "View Related Documents" to Journal Entry Detail Dialog
 
-The **COMMERCIAL BANK C/A - 13001011** account shows 2 orphaned journal entries that leaked from test-mode Special Hire operations:
+## What the User Wants
+When viewing a Journal Entry's lines, add a "View" action that finds and shows all related source documents (AR Invoice, AP Invoice, AR Receipt, AP Payment, etc.) linked to that JE, with preview capability using the existing `FinanceDocumentPreviewModal`.
 
-| Entry | Type | Amount | Status |
-|---|---|---|---|
-| `SPH-FULL-QUO-2025-0187-v1.1-MNIFWKJ2` | Debit | 59,990.00 | posted |
-| `REV-SPH-ADV-QUO-2025-0019-MNI9U7YI` | Credit | 91,249.50 | posted |
-| `SPH-ADV-QUO-2025-0019-MNI9U7YI` | (reversed) | — | reversed |
-| `REV-SPH-FULL-QUO-2026-1640-v1.1` | (reversal) | — | posted |
+## How It Works
 
-All 4 JEs have **zero links** to any AR invoice, AR receipt, AP invoice, or AP payment. They are orphans from deleted/test Special Hire payments that leaked into the live GL before the isolation fix.
+The `journal_entries` table has a `journal_entry_id` foreign key from 7+ source tables (ar_invoices, ap_invoices, ar_receipts, ap_payments, special_hire_payments, yutong_customer_payments, sinotruck_customer_payments, etc.). By querying these tables for a matching `journal_entry_id`, we can find all related source documents and display them.
 
-The JE delete button exists in the Journal Entries list view, but the user can't easily find these from the COA DrillDown. And after deleting, the COA balance still needs reconciliation.
+## Changes
 
-## Solution: Two Changes
+### File: `src/components/accounting/JournalEntryDetailDialog.tsx`
 
-### 1. Add "Delete JE" button directly in the DrillDown Modal
+1. **Add "Related Documents" section** below the Entry Lines table:
+   - Query all source tables (`ar_invoices`, `ap_invoices`, `ar_receipts`, `ap_payments`, `bank_transactions`, `special_hire_payments`) by `journal_entry_id = entry.id`
+   - Display results as a list of clickable cards/rows showing: document type, document number, amount, date
+   - Each row has a "View" button (Eye icon)
 
-In the DrillDown modal's transaction table, add a small red trash icon per row. Clicking it:
-- Confirms via AlertDialog
-- Calls `reverseAndDeleteJournalEntry` (same utility used everywhere)
-- Refreshes the drilldown data
-- Shows success toast
+2. **Add document preview capability**:
+   - Import `FinanceDocumentPreviewModal`
+   - On clicking "View", open the preview modal with `documentType` mapped from the source table (e.g., `ar_invoices` → `"ar_invoice"`)
+   - Pass the full document data to the modal
 
-This lets users clean up bad entries directly from the COA view without navigating to the JE list.
+3. **Data fetching logic** (inside the dialog, using a new `useQuery`):
+   ```
+   - Query ar_invoices where journal_entry_id = entryId → label "AR Invoice"
+   - Query ap_invoices where journal_entry_id = entryId → label "AP Invoice"  
+   - Query ar_receipts where journal_entry_id = entryId → label "AR Receipt"
+   - Query ap_payments where journal_entry_id = entryId → label "AP Payment"
+   - Query special_hire_payments where journal_entry_id = entryId → label "Special Hire Payment"
+   - Query bank_transactions where journal_entry_id = entryId → label "Bank Transaction"
+   ```
+   All queries run in parallel via `Promise.all`, results merged into a unified list.
 
-### 2. Add "Orphaned JE Scanner" to Balance Reconciliation Tool
+4. **UI**: Below the lines table, add a "Related Documents" section with a small table:
+   | Type | Document # | Amount | Date | Action |
+   |------|-----------|--------|------|--------|
+   | AR Invoice | INV-001 | 50,000 | 2026-01-15 | 👁 View |
 
-Add a new section to the existing `BalanceReconciliationTool.tsx` that:
-- Scans for JEs that have NO linked source document (no AR invoice, AP invoice, AR receipt, or AP payment references them)
-- Displays them in a table with entry number, date, description, and total amount
-- Provides a "Delete All Orphaned JEs" button that bulk-deletes them using `reverseAndDeleteJournalEntry`
-- After cleanup, auto-runs the balance reconciliation to fix any COA discrepancies
+   Clicking "View" opens `FinanceDocumentPreviewModal` with the appropriate `documentType` and `documentData`.
 
-This gives a reusable tool for future cleanups during the testing phase.
+### No other files need changes
+- `FinanceDocumentPreviewModal` already supports all document types
+- No database changes needed — all queries use existing `journal_entry_id` columns
 
-## Technical Details
+## Result
+- Every JE detail dialog shows which source documents created it
+- Users can click "View" to preview the AR/AP invoice, receipt, or payment document directly
+- Works for all modules: manual AR/AP, Special Hire, Yutong, Sinotruck, School Bus
 
-### DrillDown Modal changes
-- Import `Trash2`, `AlertDialog` components, and `reverseAndDeleteJournalEntry`
-- Add state: `deleteConfirmJEId`
-- Add trash icon button in each table row (new column)
-- Add AlertDialog for confirmation
-- On delete success: invalidate the drilldown query + chart-of-accounts queries
-
-### Orphan Scanner in BalanceReconciliationTool
-- New function `scanOrphanedJEs(companyId)`: queries `journal_entries` LEFT JOIN all source tables, filters where all links are null
-- New state: `orphanedJEs`, `isScanning`, `isCleaning`
-- "Scan for Orphaned JEs" button
-- Results table showing orphans
-- "Delete All Orphaned JEs" button with confirmation
-- After cleanup, auto-triggers reconciliation fix
-
-## Files
-- **Modify**: `src/components/accounting/DrillDownModal.tsx` — add per-row delete button + confirmation
-- **Modify**: `src/components/accounting/settings/BalanceReconciliationTool.tsx` — add orphaned JE scanner section
