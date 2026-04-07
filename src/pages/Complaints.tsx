@@ -783,6 +783,7 @@ export default function Complaints() {
                   <Input id="driverName" value={formData.driverName} onChange={(e) => setFormData(prev => ({ ...prev, driverName: e.target.value }))} placeholder="Driver name if known" />
                 </div>
               </div>
+            </div>
 
             <div>
               <Label htmlFor="staff_group">Related Staff Group</Label>
