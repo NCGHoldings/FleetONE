@@ -149,7 +149,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
         }
       }
 
-      const headers = (rawData[headerRowIdx] as any[]).map(h => String(h || "").trim());
+      const headers = Array.from(rawData[headerRowIdx] as any[]).map(h => String(h || "").trim());
       const colMap = detectHeaders(headers);
 
       if (!colMap.bus_no && colMap.bus_no !== 0) {
@@ -206,12 +206,12 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
         const match = busMap.get(normalizedNo);
 
         const fieldsToUpdate = Object.entries(mapped)
-          .filter(([k, v]) => k !== "bus_no" && v != null && v !== "" && !isNaN(v as any) !== false)
+          .filter(([k, v]) => k !== "bus_no" && v != null && String(v).trim() !== "")
           .map(([k]) => k);
 
         rows.push({
           rowIndex: i,
-          raw: Object.fromEntries(headers.map((h, idx) => [h, row[idx]])),
+          raw: Object.fromEntries(headers.map((h, idx) => [h || `col_${idx}`, row?.[idx] ?? null])),
           mapped,
           matchStatus: match ? "matched" : "new",
           matchedBusId: match?.id,
