@@ -430,6 +430,7 @@ export function ConfirmedTripsTable() {
         conductorName: paymentData.conductorName || tripForDoc.assigned_conductor_name,
         invoice_status: 'draft' as const,
         document_type: 'sales_receipt' as const,
+        hideSignaturePage,
       };
 
       console.log('🚀 Triggering run-in-background document generation for:', draftInvoiceData.invoiceNo);
@@ -961,6 +962,7 @@ export function ConfirmedTripsTable() {
         additionalExpenses: (adjustment?.additional_expenses as any[]) || [],
         totalAdditionalExpenses: adjustment?.total_additional_expenses,
         adjustmentNotes: adjustment?.notes,
+        hideSignaturePage,
       };
 
       setCurrentInvoiceData(invoiceData);
@@ -1579,6 +1581,7 @@ export function ConfirmedTripsTable() {
                                           additionalExpenses: adjustment?.additional_expenses || [],
                                           totalAdditionalExpenses: adjustment?.total_additional_expenses,
                                           adjustmentNotes: adjustment?.notes,
+                                          hideSignaturePage,
                                         };
 
                                         const pdfBlob = await generateInvoicePDF(reminderData);
