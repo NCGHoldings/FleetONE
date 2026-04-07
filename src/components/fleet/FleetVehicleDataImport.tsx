@@ -216,6 +216,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
           insurance_expiry: parseExcelDate(colMap.insurance_expiry !== undefined ? row[colMap.insurance_expiry] : undefined),
           default_driver_name: getValue("default_driver_name"),
           driver_phone: getValue("driver_phone"),
+          documents_status: getValue("documents_status"),
         };
 
         const normalizedNo = normalizeBusNo(busNo);
