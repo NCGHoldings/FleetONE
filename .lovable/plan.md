@@ -1,70 +1,37 @@
 
 
-# Plan: Show All Excel-Imported Fields in Bus Master Data Sheet + Improve Import Header Matching
+# Fix: "Iterator value undefined is not an entry object" Parse Error
 
-## What's Missing
+## Root Cause
 
-The Master Data Sheet overview currently shows only 8 bus fields and 3 owner fields. After the Excel import populates the new columns, these fields are **not displayed**:
+Line 214 in `FleetVehicleDataImport.tsx`:
+```js
+raw: Object.fromEntries(headers.map((h, idx) => [h, row[idx]]))
+```
 
-| Excel Column | DB Column | Currently Shown? |
-|---|---|---|
-| Vehicle Name | `vehicle_name` | No |
-| Vehicle Brand | `vehicle_brand` | No |
-| Permit No | `permit_no` | No |
-| Permit Category | `permit_category` | No |
-| Permit Expiry Date | `permit_expiry_date` | No |
-| Leasing Bank | `leasing_bank` | No |
-| Leasing End Date | `leasing_end_date` | No |
-| Insurance Company | `insurance_company` | No |
-| Default Driver | `default_driver_name` | No |
-| Driver Phone | `driver_phone` | No |
-| Revenue License Expiry | `revenue_license_expiry` | Shows status only, no date detail |
-| Insurance Expiry | `insurance_expiry` | Shows status only, no date detail |
+When XLSX parses a sparse Excel row (e.g., trailing empty columns), the `row` array can have **holes** (empty slots). The `headers.map()` produces entries like `[headerName, undefined]` which is fine, but if the Excel row itself is shorter than the headers array, `row[idx]` is just undefined — that's not the issue.
 
-The `useBusMasterData` hook already fetches `SELECT *` from buses — so all data is available, just not rendered.
+The real problem: `rawData[headerRowIdx]` from XLSX can be a **sparse array**. When `.map()` runs on a sparse array, empty slots produce `undefined` entries in the result. `Object.fromEntries()` then throws because it receives `undefined` instead of a `[key, value]` pair.
 
-## What I'll Do
+## Fix
 
-### 1. Expand Bus Master Overview Tab
+Two changes in the `onDrop` callback:
 
-Update `BusMasterOverviewTab.tsx` to show ALL fields in organized sections:
+1. **Line 152** — Convert sparse header array to dense:
+   ```js
+   const headers = Array.from(rawData[headerRowIdx] as any[]).map(h => String(h || "").trim());
+   ```
 
-**Bus Information card** (expand from 8 to 12 fields):
-- Add: Vehicle Name, Vehicle Brand, Permit No, Permit Category
+2. **Line 214** — Guard against sparse data rows:
+   ```js
+   raw: Object.fromEntries(headers.map((h, idx) => [h || `col_${idx}`, row?.[idx] ?? null])),
+   ```
 
-**Owner Information card** (keep existing 3 fields)
-
-**New: Permit & Licensing card**:
-- Permit No, Permit Category, Permit Expiry Date, Revenue License Expiry (with date + status)
-
-**New: Leasing & Finance card**:
-- Leasing Bank, Leasing End Date
-
-**New: Driver Information card**:
-- Default Driver Name, Driver Phone
-
-**Document Status card** (enhance):
-- Show Insurance Company name alongside the insurance expiry status
-
-### 2. Expand Excel Import Header Synonyms
-
-Add more fuzzy synonyms to handle variations in Excel column names:
-
-- "vehicle no" → also match "veh no", "v.no", "bus reg", "registration number"
-- "chassie no" → also match "chasis no", "chasi no" (common misspellings)
-- "insurence" → also match "insurance" (fix both spellings)
-- "yom" → also match "manufacture year", "mfg year"
-- "ownership" → also match "owner's name"
-- Add "documents" synonym group for any document-related columns
-
-### 3. Import Preview Enhancement
-
-In the import preview table, show which fields will be populated with a clearer field-by-field diff (currently just shows count of fields to update).
+3. **Line 209** — Fix the no-op filter condition `!isNaN(v as any) !== false` (always true). Replace with:
+   ```js
+   .filter(([k, v]) => k !== "bus_no" && v != null && String(v).trim() !== "")
+   ```
 
 ## Files
-- **Modify**: `src/components/fleet/BusMasterOverviewTab.tsx` — add all new field sections
-- **Modify**: `src/components/fleet/FleetVehicleDataImport.tsx` — expand header synonyms, improve preview
-
-## Result
-After importing the Excel sheet, opening any bus's Master Data Sheet will show all fields populated: permits, leasing, insurance company, driver info — everything from the operations Excel.
+- **Modify**: `src/components/fleet/FleetVehicleDataImport.tsx` — 3 line fixes
 
