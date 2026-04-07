@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Bus, Users, FileText, DollarSign, Wrench, GraduationCap, 
-  Truck, Calendar, RefreshCw, AlertTriangle, Route, ShieldCheck
+  Truck, Calendar, RefreshCw, AlertTriangle, Route, ShieldCheck, MessageSquareWarning
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +41,7 @@ export const RealDataSummary = () => {
         tripsResult,
         routesResult,
         accidentsResult,
+        complaintsResult,
       ] = await Promise.all([
         supabase.from('buses').select('id, status', { count: 'exact' }),
         supabase.from('profiles').select('id, status', { count: 'exact' }),
@@ -52,6 +53,7 @@ export const RealDataSummary = () => {
         supabase.from('daily_trips').select('id, status', { count: 'exact' }),
         supabase.from('routes').select('id, is_active', { count: 'exact' }),
         supabase.from('accident_records').select('id, status', { count: 'exact' }),
+        supabase.from('feedback_complaints').select('id, status', { count: 'exact' }),
       ]);
 
       const buses = busesResult.data || [];
@@ -84,6 +86,9 @@ export const RealDataSummary = () => {
       const accidents = accidentsResult.data || [];
       const openAccidents = accidents.filter(a => a.status && a.status !== 'closed').length;
 
+      const complaints = complaintsResult.data || [];
+      const openComplaints = complaints.filter(c => c.status !== 'resolved' && c.status !== 'closed').length;
+
       setModules([
         { name: 'Fleet', icon: <Bus className="h-5 w-5" />, count: buses.length, activeCount: activeBuses, path: '/fleet-management', color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
         { name: 'Staff', icon: <Users className="h-5 w-5" />, count: staff.length, activeCount: activeStaff, path: '/staff-management', color: 'text-green-400', bgColor: 'bg-green-500/20' },
@@ -95,6 +100,7 @@ export const RealDataSummary = () => {
         { name: 'Daily Trips', icon: <Calendar className="h-5 w-5" />, count: trips.length, path: '/daily-trips', color: 'text-indigo-400', bgColor: 'bg-indigo-500/20' },
         { name: 'Routes', icon: <Route className="h-5 w-5" />, count: routes.length, activeCount: activeRoutes, path: '/route-permits', color: 'text-pink-400', bgColor: 'bg-pink-500/20' },
         { name: 'Accidents', icon: <AlertTriangle className="h-5 w-5" />, count: accidents.length, issueCount: openAccidents, path: '/fleet-management', color: 'text-red-400', bgColor: 'bg-red-500/20' },
+        { name: 'Complaints', icon: <MessageSquareWarning className="h-5 w-5" />, count: complaints.length, issueCount: openComplaints, path: '/complaints', color: 'text-rose-400', bgColor: 'bg-rose-500/20' },
       ]);
     } catch (error) {
       console.error('Error fetching module data:', error);

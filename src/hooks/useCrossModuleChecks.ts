@@ -222,6 +222,24 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
         action: { label: 'View Allocations', path: '/driver-allocation' }
       });
 
+      // 11. Unresolved complaints older than 48 hours (SLA breach)
+      const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+      const { count: overdueComplaints } = await supabase
+        .from('feedback_complaints')
+        .select('*', { count: 'exact', head: true })
+        .not('status', 'in', '("resolved","closed")')
+        .lt('created_at', twoDaysAgo);
+
+      newResults.push({
+        id: 'overdue-complaints',
+        name: 'Overdue Complaints (48h SLA)',
+        modules: ['Complaints', 'Operations'],
+        status: (overdueComplaints ?? 0) > 0 ? 'warning' : 'success',
+        message: (overdueComplaints ?? 0) > 0 ? `${overdueComplaints} complaints unresolved past 48h` : 'All complaints within SLA',
+        count: overdueComplaints ?? 0,
+        action: { label: 'View Complaints', path: '/complaints' }
+      });
+
     } catch (error) {
       console.error('Cross-module check error:', error);
     }
