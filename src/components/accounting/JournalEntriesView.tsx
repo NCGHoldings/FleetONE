@@ -1,19 +1,20 @@
 import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, CheckCircle, XCircle, RotateCcw, Search, Download } from "lucide-react";
+import { Plus, Eye, CheckCircle, XCircle, RotateCcw, Search, Download, Trash2 } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "./shared/StatusBadge";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { JournalEntryForm } from "./JournalEntryForm";
 import { JournalEntryDetailDialog } from "./JournalEntryDetailDialog";
 import { useJournalEntries } from "@/hooks/useAccountingData";
-import { usePostJournalEntry, useRejectJournalEntry, useReverseJournalEntry } from "@/hooks/useAccountingMutations";
+import { usePostJournalEntry, useRejectJournalEntry, useReverseJournalEntry, useDeleteJournalEntry } from "@/hooks/useAccountingMutations";
 import { useCompany } from "@/contexts/CompanyContext";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Filter } from "lucide-react";
@@ -56,6 +57,8 @@ export const JournalEntriesView = () => {
   const postEntry = usePostJournalEntry();
   const rejectEntry = useRejectJournalEntry();
   const reverseEntry = useReverseJournalEntry();
+  const deleteEntry = useDeleteJournalEntry();
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Filter entries based on multiple criteria
   const filteredEntries = useMemo(() => {
@@ -241,6 +244,15 @@ export const JournalEntriesView = () => {
               <RotateCcw className="h-4 w-4" />
             </Button>
           )}
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleteConfirmId(row.original.id)}
+            disabled={deleteEntry.isPending}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       ),
     },
@@ -402,6 +414,32 @@ export const JournalEntriesView = () => {
           maxAmount,
         }}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Journal Entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reverse all COA balance impacts, delete all journal entry lines, and permanently remove this entry. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteConfirmId) {
+                  deleteEntry.mutate(deleteConfirmId);
+                  setDeleteConfirmId(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
