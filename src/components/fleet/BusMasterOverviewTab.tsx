@@ -3,7 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { BusMasterData } from "@/hooks/useBusMasterData";
 import { 
   Bus, User, MapPin, Gauge, Calendar, Shield, 
-  FileText, AlertTriangle, CheckCircle, Clock
+  FileText, AlertTriangle, CheckCircle, Clock,
+  CreditCard, Phone, KeyRound
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -41,6 +42,8 @@ export const BusMasterOverviewTab = ({ data }: BusMasterOverviewTabProps) => {
       case 'expired': return <AlertTriangle className="h-4 w-4 text-red-500" />;
     }
   };
+
+  const busAny = bus as any;
 
   return (
     <div className="space-y-4">
@@ -120,6 +123,14 @@ export const BusMasterOverviewTab = ({ data }: BusMasterOverviewTabProps) => {
                 <p className="font-medium">{bus.model}</p>
               </div>
               <div>
+                <p className="text-muted-foreground text-xs">Vehicle Name</p>
+                <p className="font-medium">{busAny.vehicle_name || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Vehicle Brand</p>
+                <p className="font-medium">{busAny.vehicle_brand || 'N/A'}</p>
+              </div>
+              <div>
                 <p className="text-muted-foreground text-xs">Year</p>
                 <p className="font-medium">{bus.year}</p>
               </div>
@@ -174,6 +185,94 @@ export const BusMasterOverviewTab = ({ data }: BusMasterOverviewTabProps) => {
         </Card>
       </div>
 
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Permit & Licensing */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <KeyRound className="h-4 w-4" />
+              Permit & Licensing
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs">Permit No</p>
+                <p className="font-medium">{busAny.permit_no || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Permit Category</p>
+                <p className="font-medium">{busAny.permit_category || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Permit Expiry</p>
+                <p className="font-medium">
+                  {busAny.permit_expiry_date
+                    ? format(new Date(busAny.permit_expiry_date), 'MMM dd, yyyy')
+                    : 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Revenue License Expiry</p>
+                <p className="font-medium">
+                  {documents.revenueLicenseExpiry
+                    ? format(new Date(documents.revenueLicenseExpiry), 'MMM dd, yyyy')
+                    : 'N/A'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Leasing & Finance */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Leasing & Finance
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs">Leasing Bank</p>
+                <p className="font-medium">{busAny.leasing_bank || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Leasing End Date</p>
+                <p className="font-medium">
+                  {busAny.leasing_end_date
+                    ? format(new Date(busAny.leasing_end_date), 'MMM dd, yyyy')
+                    : 'N/A'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Driver Information */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Phone className="h-4 w-4" />
+            Driver Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-muted-foreground text-xs">Default Driver Name</p>
+              <p className="font-medium">{busAny.default_driver_name || 'Not assigned'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Driver Phone</p>
+              <p className="font-medium">{busAny.driver_phone || 'N/A'}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Document Status */}
       <Card>
         <CardHeader className="pb-3">
@@ -190,6 +289,7 @@ export const BusMasterOverviewTab = ({ data }: BusMasterOverviewTabProps) => {
                 <div>
                   <p className="font-medium text-sm">Insurance</p>
                   <p className="text-xs text-muted-foreground">
+                    {busAny.insurance_company ? `${busAny.insurance_company} — ` : ''}
                     {documents.insuranceExpiry 
                       ? `Expires: ${format(new Date(documents.insuranceExpiry), 'MMM dd, yyyy')}`
                       : 'No expiry date set'}
