@@ -224,9 +224,25 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
 
   // Trip-level fields that should update daily_trips instead of fleet_master_roster
   const TRIP_FIELDS = ['odometer_start', 'odometer_end', 'fuel_liters'];
+  const BUS_DIRECT_FIELDS = ['standard_rate'];
 
   const updateField = async (rosterId: string, field: string, value: any) => {
     try {
+      // Standard rate updates the buses table directly
+      if (BUS_DIRECT_FIELDS.includes(field)) {
+        const row = expandedRows.find(r => r.id === rosterId);
+        if (!row?.bus_id) return;
+        const numVal = Number(value) || 0;
+        const dbField = field === 'standard_rate' ? 'expected_km_per_liter' : field;
+        const { error } = await supabase
+          .from("buses")
+          .update({ [dbField]: numVal })
+          .eq("id", row.bus_id);
+        if (error) throw error;
+        await fetchRoster(true);
+        return;
+      }
+
       if (TRIP_FIELDS.includes(field)) {
         // Find the matching expanded row to get trip_id
         const row = expandedRows.find(r => r.id === rosterId);

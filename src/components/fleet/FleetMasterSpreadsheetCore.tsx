@@ -411,8 +411,8 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                     <TableCell className="text-sm text-right font-mono py-2 min-h-[40px]">
                       {hasFuelData ? row.fuel_consumption.toFixed(2) : '-'}
                     </TableCell>
-                    <TableCell className="text-sm text-right font-mono text-muted-foreground py-2 min-h-[40px]">
-                      {isSubRow ? '' : (row.standard_rate > 0 ? row.standard_rate.toFixed(2) : '-')}
+                    <TableCell className="text-sm text-right font-mono py-1 min-h-[40px]">
+                      {isSubRow ? '' : renderEditableCell(row, 'standard_rate', row.standard_rate || '', 'number')}
                     </TableCell>
                     <TableCell className={`text-sm text-right font-mono font-bold py-2 min-h-[40px] ${getPerformanceColor(row.performance, hasFuelData)}`}>
                       {hasFuelData ? (row.performance >= 0 ? '+' : '') + row.performance.toFixed(2) : '-'}
