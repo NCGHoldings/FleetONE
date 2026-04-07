@@ -141,8 +141,8 @@ export const TestModeBanner = () => {
 
       if (data?.success) {
         const results = data.results || {};
-        const totalCopied = Object.values(results).reduce((sum: number, r: any) => sum + (r.copied || 0), 0);
-        const totalErrors = Object.values(results).reduce((sum: number, r: any) => sum + (r.errors?.length || 0), 0);
+        const totalCopied = Object.values(results).reduce((sum: number, r: any) => sum + (r.copied || 0), 0) as number;
+        const totalErrors = Object.values(results).reduce((sum: number, r: any) => sum + (r.errors?.length || 0), 0) as number;
 
         if (totalErrors > 0) {
           toast.warning(`Transfer completed with ${totalErrors} errors. ${totalCopied} records copied.`);
