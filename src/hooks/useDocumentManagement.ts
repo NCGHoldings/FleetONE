@@ -38,83 +38,10 @@ export const useDocumentManagement = () => {
         throw new Error('User not authenticated');
       }
 
-      // Auto-add prepared_by signature FIRST, before generating PDF
-      try {
-        const { data: setting } = await supabase
-          .from('special_hire_signature_settings')
-          .select('default_user_id, is_enabled')
-          .eq('signature_role', 'prepared_by')
-          .single();
-
-        if (setting?.is_enabled && setting.default_user_id) {
-          // Check if prepared_by signature already exists
-          const { data: existingApproval } = await supabase
-            .from('document_approvals')
-            .select('id')
-            .eq('document_id', quotationId)
-            .eq('approval_type', 'prepared_by')
-            .maybeSingle();
-
-          if (!existingApproval) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('first_name, last_name, signature_data, user_id')
-              .eq('user_id', setting.default_user_id)
-              .single();
-
-            if (profile?.signature_data) {
-              const { error: insertError } = await supabase.from('document_approvals').insert({
-                document_id: quotationId,
-                approval_type: 'prepared_by',
-                approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-                signature_data: profile.signature_data,
-                approval_date: new Date().toISOString().split('T')[0],
-                user_id: profile.user_id,
-              });
-
-              if (!insertError) {
-                console.log('✅ Prepared By signature auto-added:', profile.first_name);
-                toast.success(`Prepared By signature auto-added: ${profile.first_name}`);
-              } else {
-                console.error('Failed to add prepared_by signature:', insertError);
-              }
-            }
-          }
-        }
-      } catch (sigError) {
-        console.log('Auto-signature skipped:', sigError);
-      }
-
-      // Fetch current signatures for the document (including the one we just added)
-      const { data: signatures } = await supabase
-        .from('document_approvals')
-        .select('*')
-        .eq('document_id', quotationId);
-
-      // Map signatures to the format expected by invoice generator
-      const signatureMap = {
-        preparedBy: signatures?.find(s => s.approval_type === 'prepared_by') ? {
-          approver_name: signatures.find(s => s.approval_type === 'prepared_by')?.approver_name || '',
-          signature_data: signatures.find(s => s.approval_type === 'prepared_by')?.signature_data,
-          approval_date: signatures.find(s => s.approval_type === 'prepared_by')?.approval_date || ''
-        } : undefined,
-        checkedBy: signatures?.find(s => s.approval_type === 'checked_by') ? {
-          approver_name: signatures.find(s => s.approval_type === 'checked_by')?.approver_name || '',
-          signature_data: signatures.find(s => s.approval_type === 'checked_by')?.signature_data,
-          approval_date: signatures.find(s => s.approval_type === 'checked_by')?.approval_date || ''
-        } : undefined,
-        approvedBy: signatures?.find(s => s.approval_type === 'approved_by') ? {
-          approver_name: signatures.find(s => s.approval_type === 'approved_by')?.approver_name || '',
-          signature_data: signatures.find(s => s.approval_type === 'approved_by')?.signature_data,
-          approval_date: signatures.find(s => s.approval_type === 'approved_by')?.approval_date || ''
-        } : undefined,
-      };
-
-      // Generate PDF with DRAFT status and current signatures
+      // Generate initial PDF (signatures will be added after document record is created)
       const draftInvoiceData = {
         ...invoiceData,
         invoice_status: 'draft' as const,
-        ...signatureMap
       };
 
       console.log('🔄 Calling generateInvoicePDF...', invoiceData.invoiceNo);
@@ -149,7 +76,45 @@ export const useDocumentManagement = () => {
         throw error;
       }
 
+      const actualDocumentId = data.id;
       console.log('✅ Document insertion successful:', data);
+
+      // Now auto-add prepared_by signature using the ACTUAL document ID
+      try {
+        const { data: setting } = await supabase
+          .from('special_hire_signature_settings')
+          .select('default_user_id, is_enabled')
+          .eq('signature_role', 'prepared_by')
+          .single();
+
+        if (setting?.is_enabled && setting.default_user_id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, signature_data, user_id')
+            .eq('user_id', setting.default_user_id)
+            .single();
+
+          if (profile?.signature_data) {
+            const { error: insertError } = await supabase.from('document_approvals').insert({
+              document_id: actualDocumentId,
+              approval_type: 'prepared_by',
+              approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+              signature_data: profile.signature_data,
+              approval_date: new Date().toISOString().split('T')[0],
+              user_id: profile.user_id,
+            });
+
+            if (!insertError) {
+              console.log('✅ Prepared By signature auto-added:', profile.first_name);
+              toast.success(`Prepared By signature auto-added: ${profile.first_name}`);
+            } else {
+              console.error('Failed to add prepared_by signature:', insertError);
+            }
+          }
+        }
+      } catch (sigError) {
+        console.log('Auto-signature skipped:', sigError);
+      }
       toast.success(`Draft ${invoiceData.document_type === 'sales_receipt' ? 'sales receipt' : 'invoice'} generated and stored.`);
       return { success: true, document: data };
     } catch (error) {
