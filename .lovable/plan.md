@@ -1,32 +1,55 @@
 
 
-# Fix: AP Payment Delete Fails Due to Cheque Register Foreign Key
+# Fix: COA Balance Out of Sync with Journal Entry Totals
 
-## Problem
-Deleting AP payments fails with a **409 Conflict** error:
-> "Key is still referenced from table 'cheque_register'" — `cheque_register_payment_id_fkey` on `ap_payments`
+## Problem Found
 
-The `useDeleteAPPayment` function deletes allocations, bank transactions, JE, and payment lines — but **never deletes the linked `cheque_register` row**. Since `cheque_register.payment_id` references `ap_payments.id`, the final delete fails.
+The Seylan Bank C/A account (13001001) shows **LKR 24,000** in the COA tree, but the DrillDown modal correctly calculates the **Net Movement as -LKR 200,000** from actual journal entry lines.
 
-## Fix
+**Root cause**: The `current_balance` field on `chart_of_accounts` is updated incrementally (add/subtract on each transaction). When transactions are deleted or reversed without properly reversing the balance adjustment, the stored balance drifts out of sync. The recent "force delete" feature for AP payments/invoices deletes JE lines but does NOT reverse the COA balance updates, causing this exact corruption.
 
-### File: `src/hooks/useAccountingMutations.ts`
+**Evidence from database**:
+- Account `9b3a2559` (NCG Holding): Total DR = 5,000,000 / Total CR = 5,200,000 → Net = -200,000. But `current_balance` = 24,000 (wrong)
+- Account `8a348132` (sub-company): Total DR = 36,200 / Total CR = 0 → Net = 36,200. But `current_balance` = 8,000 (also wrong)
 
-Add a new step between step 2 (delete allocations) and step 3 (delete bank transactions):
+## Two Fixes Needed
 
+### Fix 1: Force-delete must reverse COA balances before deleting JE lines
+
+**File**: `src/hooks/useAccountingMutations.ts`
+
+In `useDeleteAPPayment`, `useDeleteAPInvoice`, `useDeleteARInvoice`, and `useDeleteARReceipt`:
+- Before deleting journal entry lines, fetch them with their debit/credit amounts
+- Call `reverseAccountBalance(accountId, debit, credit)` for each line — this subtracts the original balance adjustment
+- Then proceed with line deletion
+
+Add a helper function:
+```typescript
+async function reverseCOABalancesForJE(journalEntryId: string) {
+  // Fetch all lines for this JE
+  // For each line, reverse the balance adjustment on the COA account
+  // (opposite of updateAccountBalance logic)
+}
 ```
-// 2b. Delete linked cheque register entries
-await supabase.from("cheque_register").delete().eq("payment_id", id);
-```
 
-Similarly, in `useDeleteARReceipt`, add:
-```
-// Delete linked cheque register entries (ar_receipt_id)
-await supabase.from("cheque_register").delete().eq("ar_receipt_id", id);
-```
+### Fix 2: Add a "Recalculate All Balances" action (already exists partially)
 
-This ensures the foreign key constraint is cleared before the parent payment/receipt row is deleted.
+**File**: `src/lib/gl-posting-utils.ts` — `recalculateCOABalances` already exists
+
+The existing Balance Reconciliation Tool can fix current corruption. But we should also:
+- Auto-run reconciliation after any force-delete operation, OR
+- At minimum, show a warning toast after delete: "COA balances have been updated"
+
+### Fix 3: Immediate data fix — recalculate all COA balances now
+
+After deploying Fix 1, trigger the existing `recalculateCOABalances` function (via the Balance Reconciliation Tool in Settings) to fix all currently corrupted balances across all accounts.
 
 ## Files
-- **Modify**: `src/hooks/useAccountingMutations.ts` — add cheque_register cleanup to both `useDeleteAPPayment` and `useDeleteARReceipt`
+- **Modify**: `src/hooks/useAccountingMutations.ts` — add COA balance reversal before JE line deletion in all delete mutations
+- **Modify**: `src/lib/gl-posting-utils.ts` — export a reusable `reverseCOABalancesForJE` helper
+
+## Result
+- Force-deleting AP/AR invoices and payments will properly reverse COA balance changes
+- Existing corrupted balances can be fixed via the Reconciliation Tool
+- COA tree balances will match the DrillDown net movement going forward
 
