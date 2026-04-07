@@ -765,6 +765,13 @@ const FleetManagementComponent = () => {
         }}
       />
 
+      {/* Vehicle Data Import */}
+      <FleetVehicleDataImport
+        open={vehicleImportOpen}
+        onOpenChange={setVehicleImportOpen}
+        onSuccess={fetchFleet}
+      />
+
       {/* Modals */}
       <BusDetailsModal
         open={detailsModalOpen}
