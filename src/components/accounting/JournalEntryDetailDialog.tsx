@@ -8,6 +8,9 @@ import { DateDisplay } from "./shared/DateDisplay";
 import { useJournalEntryLines } from "@/hooks/useAccountingData";
 import { useReverseJournalEntry } from "@/hooks/useAccountingMutations";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle, ArrowLeftRight, Info } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Eye, FileText, Info } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -35,10 +38,94 @@ interface JournalEntryDetailDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface RelatedDocument {
+  type: string;
+  documentType: string;
+  documentNumber: string;
+  amount: number;
+  date: string;
+  data: any;
+}
+
 export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalEntryDetailDialogProps) => {
   const { data: lines, isLoading } = useJournalEntryLines(entry?.id);
   const reverseEntry = useReverseJournalEntry();
   const [showConfirm, setShowConfirm] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<RelatedDocument | null>(null);
+
+  const { data: relatedDocs, isLoading: docsLoading } = useQuery({
+    queryKey: ["je-related-docs", entry?.id],
+    enabled: !!entry?.id && open,
+    queryFn: async () => {
+      const entryId = entry.id;
+      const docs: RelatedDocument[] = [];
+
+      const [arInv, apInv, arRec, apPay, spPay, bankTx] = await Promise.all([
+        supabase.from("ar_invoices").select("*, customers(name)").eq("journal_entry_id", entryId),
+        supabase.from("ap_invoices").select("*, vendors(name)").eq("journal_entry_id", entryId),
+        supabase.from("ar_receipts").select("*, customers(name)").eq("journal_entry_id", entryId),
+        supabase.from("ap_payments").select("*, vendors(name)").eq("journal_entry_id", entryId),
+        supabase.from("special_hire_payments").select("*").eq("journal_entry_id", entryId),
+        supabase.from("bank_transactions").select("*, bank_accounts(account_name)").eq("journal_entry_id", entryId),
+      ]);
+
+      arInv.data?.forEach((d: any) => docs.push({
+        type: "AR Invoice",
+        documentType: "ar_invoice",
+        documentNumber: d.invoice_number,
+        amount: d.total_amount,
+        date: d.invoice_date,
+        data: d,
+      }));
+
+      apInv.data?.forEach((d: any) => docs.push({
+        type: "AP Invoice",
+        documentType: "ap_invoice",
+        documentNumber: d.invoice_number,
+        amount: d.total_amount,
+        date: d.invoice_date,
+        data: d,
+      }));
+
+      arRec.data?.forEach((d: any) => docs.push({
+        type: "AR Receipt",
+        documentType: "ar_receipt",
+        documentNumber: d.receipt_number,
+        amount: d.amount,
+        date: d.receipt_date,
+        data: d,
+      }));
+
+      apPay.data?.forEach((d: any) => docs.push({
+        type: "AP Payment",
+        documentType: "ap_payment",
+        documentNumber: d.payment_number,
+        amount: d.amount,
+        date: d.payment_date,
+        data: d,
+      }));
+
+      spPay.data?.forEach((d: any) => docs.push({
+        type: "Special Hire Payment",
+        documentType: "special_hire_payment",
+        documentNumber: d.receipt_number || d.id?.slice(0, 8),
+        amount: d.amount,
+        date: d.payment_date,
+        data: d,
+      }));
+
+      bankTx.data?.forEach((d: any) => docs.push({
+        type: "Bank Transaction",
+        documentType: "bank_transaction",
+        documentNumber: d.reference || d.id?.slice(0, 8),
+        amount: d.amount,
+        date: d.transaction_date,
+        data: d,
+      }));
+
+      return docs;
+    },
+  });
 
   if (!entry) return null;
 
@@ -185,6 +272,59 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
               )}
             </div>
 
+            <Separator />
+
+            {/* Related Documents */}
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Related Documents
+              </h3>
+              {docsLoading ? (
+                <p className="text-muted-foreground text-sm">Searching for related documents...</p>
+              ) : !relatedDocs || relatedDocs.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No linked source documents found for this journal entry.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Document #</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-center">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {relatedDocs.map((doc, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">{doc.type}</Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{doc.documentNumber}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          <CurrencyDisplay amount={doc.amount} />
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <DateDisplay date={doc.date} />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => setPreviewDoc(doc)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+
             {/* Audit Info */}
             <div className="text-xs text-muted-foreground border-t pt-4">
               <div className="flex gap-6">
@@ -234,6 +374,17 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Document Preview Modal */}
+      {previewDoc && (
+        <FinanceDocumentPreviewModal
+          open={!!previewDoc}
+          onOpenChange={(open) => { if (!open) setPreviewDoc(null); }}
+          documentType={previewDoc.documentType}
+          documentData={previewDoc.data}
+          companyId={entry.company_id}
+        />
+      )}
     </>
   );
 };
