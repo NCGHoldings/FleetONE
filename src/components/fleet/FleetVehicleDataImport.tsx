@@ -45,6 +45,7 @@ interface ParsedRow {
     insurance_expiry?: string;
     default_driver_name?: string;
     driver_phone?: string;
+    documents_status?: string;
   };
   matchStatus: "matched" | "new" | "no_bus_no";
   matchedBusId?: string;
