@@ -265,10 +265,41 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
     setStep("importing");
     let updated = 0, created = 0, skipped = 0, deactivated = 0, deleted = 0;
 
-    // Fetch routes for matching new buses
-const { data: routes } = await supabase.from("routes").select("id, route_name");
+    // Fetch routes, categories, and sub-categories
+    const [{ data: routes }, { data: categories }, { data: subCategories }] = await Promise.all([
+      supabase.from("routes").select("id, route_name"),
+      supabase.from("bus_categories").select("id, name"),
+      supabase.from("bus_sub_categories").select("id, name, category_id"),
+    ]);
+
     const routeMap = new Map<string, string>();
     (routes || []).forEach(r => routeMap.set(r.route_name.toLowerCase().trim(), r.id));
+
+    // Build category lookup
+    const catByName = new Map<string, string>();
+    (categories || []).forEach(c => catByName.set(c.name.toLowerCase().trim(), c.id));
+
+    const subCatByName = new Map<string, string>();
+    (subCategories || []).forEach(sc => subCatByName.set(sc.name.toLowerCase().trim(), sc.id));
+
+    // Map usage type → category
+    const getCategoryId = (usageType?: string): string | undefined => {
+      if (!usageType) return catByName.get("public bus");
+      const u = usageType.toLowerCase().trim();
+      if (u.includes("school")) return catByName.get("school bus");
+      if (u.includes("special")) return catByName.get("special hire");
+      return catByName.get("public bus");
+    };
+
+    // Map permit category → sub-category
+    const getSubCategoryId = (permitCat?: string): string | undefined => {
+      if (!permitCat) return undefined;
+      const p = permitCat.toLowerCase().trim();
+      if (p.includes("super luxury") || p.includes("super lux")) return subCatByName.get("super luxury");
+      if (p.includes("semi")) return subCatByName.get("semi luxury");
+      // Try exact match
+      return subCatByName.get(p);
+    };
 
     for (const row of parsedRows) {
       const updateData: Record<string, any> = {};
@@ -279,13 +310,14 @@ const { data: routes } = await supabase.from("routes").select("id, route_name");
         }
       }
 
-      if (Object.keys(updateData).length === 0) {
-        skipped++;
-        continue;
-      }
+      // Auto-assign category from Excel usage type & permit category
+      const categoryId = getCategoryId(row.mapped.type);
+      const subCategoryId = getSubCategoryId(row.mapped.permit_category);
+      if (categoryId) updateData.category_id = categoryId;
+      if (subCategoryId) updateData.sub_category_id = subCategoryId;
 
       if (row.matchStatus === "matched" && row.matchedBusId) {
-        // Try to match route for existing buses too
+        if (Object.keys(updateData).length === 0) { skipped++; continue; }
         if (updateData.route && !updateData.route_id) {
           const routeId = routeMap.get(String(updateData.route).toLowerCase().trim());
           if (routeId) updateData.route_id = routeId;
@@ -302,14 +334,17 @@ const { data: routes } = await supabase.from("routes").select("id, route_name");
         updateData.status = "active";
         if (!updateData.model) updateData.model = updateData.vehicle_brand || "Unknown";
         if (!updateData.current_mileage) updateData.current_mileage = 0;
-        // Match route for new buses
+        // NOT NULL defaults — prevent constraint violations
+        if (!updateData.type) updateData.type = "Public Transport";
+        if (!updateData.year) updateData.year = 2000;
+        if (!updateData.capacity) updateData.capacity = 54;
         if (updateData.route) {
           const routeId = routeMap.get(String(updateData.route).toLowerCase().trim());
           if (routeId) updateData.route_id = routeId;
         }
         const { error } = await supabase.from("buses").insert(updateData as any);
         if (error) {
-          console.error("Insert error for", row.mapped.bus_no, error);
+          console.error("Insert error for", row.mapped.bus_no, error, JSON.stringify(updateData));
           skipped++;
         } else {
           created++;
