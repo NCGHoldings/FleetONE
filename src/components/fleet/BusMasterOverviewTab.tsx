@@ -4,7 +4,7 @@ import { BusMasterData } from "@/hooks/useBusMasterData";
 import { 
   Bus, User, MapPin, Gauge, Calendar, Shield, 
   FileText, AlertTriangle, CheckCircle, Clock,
-  CreditCard, Phone, KeyRound
+  CreditCard, Phone, KeyRound, Tag, Building2
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -14,17 +14,16 @@ interface BusMasterOverviewTabProps {
 
 export const BusMasterOverviewTab = ({ data }: BusMasterOverviewTabProps) => {
   const { bus, trips, financials, service, documents } = data;
+  const busAny = bus as any;
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 0 }).format(amount);
 
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('en-LK').format(num);
+  const formatNumber = (num: number) => new Intl.NumberFormat('en-LK').format(num);
+
+  const formatDate = (d: string | null | undefined) => {
+    if (!d) return 'N/A';
+    try { return format(new Date(d), 'MMM dd, yyyy'); } catch { return d; }
   };
 
   const getStatusColor = (status: 'valid' | 'expiring' | 'expired') => {
@@ -43,7 +42,12 @@ export const BusMasterOverviewTab = ({ data }: BusMasterOverviewTabProps) => {
     }
   };
 
-  const busAny = bus as any;
+  const Field = ({ label, value }: { label: string; value: any }) => (
+    <div>
+      <p className="text-muted-foreground text-xs">{label}</p>
+      <p className="font-medium text-sm">{value || 'N/A'}</p>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -108,177 +112,130 @@ export const BusMasterOverviewTab = ({ data }: BusMasterOverviewTabProps) => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Bus className="h-4 w-4" />
-              Bus Information
+              <Bus className="h-4 w-4" /> Bus Information
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">Bus Number</p>
-                <p className="font-medium">{bus.bus_no}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Model</p>
-                <p className="font-medium">{bus.model}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Vehicle Name</p>
-                <p className="font-medium">{busAny.vehicle_name || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Vehicle Brand</p>
-                <p className="font-medium">{busAny.vehicle_brand || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Year</p>
-                <p className="font-medium">{bus.year}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Capacity</p>
-                <p className="font-medium">{bus.capacity} seats</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Registration</p>
-                <p className="font-medium">{bus.registration_number || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Route</p>
-                <p className="font-medium">{bus.route || 'Not assigned'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Chassis Number</p>
-                <p className="font-medium text-xs">{bus.chassis_number || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Engine Number</p>
-                <p className="font-medium text-xs">{bus.engine_number || 'N/A'}</p>
-              </div>
+              <Field label="Bus Number" value={bus.bus_no} />
+              <Field label="Model" value={bus.model} />
+              <Field label="Vehicle Name" value={busAny.vehicle_name} />
+              <Field label="Vehicle Brand" value={busAny.vehicle_brand} />
+              <Field label="Year" value={bus.year} />
+              <Field label="Capacity" value={bus.capacity ? `${bus.capacity} seats` : undefined} />
+              <Field label="Registration" value={bus.registration_number} />
+              <Field label="Route" value={bus.route} />
+              <Field label="Chassis Number" value={bus.chassis_number} />
+              <Field label="Engine Number" value={bus.engine_number} />
+              <Field label="Usage Type" value={bus.type} />
+              <Field label="Documents Status" value={busAny.documents_status} />
             </div>
           </CardContent>
         </Card>
 
-        {/* Owner Information */}
+        {/* Category */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Owner Information
+              <Tag className="h-4 w-4" /> Category & Classification
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-1 gap-3 text-sm">
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <p className="text-muted-foreground text-xs">Owner Name</p>
-                <p className="font-medium">{bus.owner_name || 'Not specified'}</p>
+                <p className="text-muted-foreground text-xs">Category</p>
+                {busAny.bus_categories?.name ? (
+                  <Badge style={{ backgroundColor: busAny.bus_categories.color || undefined }} className="text-white mt-1">
+                    {busAny.bus_categories.name}
+                  </Badge>
+                ) : <p className="font-medium text-sm text-muted-foreground">Uncategorized</p>}
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">NIC</p>
-                <p className="font-medium">{bus.owner_nic || 'N/A'}</p>
+                <p className="text-muted-foreground text-xs">Sub-Category</p>
+                {busAny.bus_sub_categories?.name ? (
+                  <Badge variant="outline" className="mt-1">{busAny.bus_sub_categories.name}</Badge>
+                ) : <p className="font-medium text-sm text-muted-foreground">N/A</p>}
               </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Address</p>
-                <p className="font-medium text-xs">{bus.owner_address || 'N/A'}</p>
-              </div>
+              <Field label="Permit Category" value={busAny.permit_category} />
+              <Field label="Ownership Type" value={busAny.ownership_type} />
             </div>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        {/* Permit & Licensing */}
+        {/* Owner Information */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
-              <KeyRound className="h-4 w-4" />
-              Permit & Licensing
+              <User className="h-4 w-4" /> Owner Information
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">Permit No</p>
-                <p className="font-medium">{busAny.permit_no || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Permit Category</p>
-                <p className="font-medium">{busAny.permit_category || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Permit Expiry</p>
-                <p className="font-medium">
-                  {busAny.permit_expiry_date
-                    ? format(new Date(busAny.permit_expiry_date), 'MMM dd, yyyy')
-                    : 'N/A'}
-                </p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Revenue License Expiry</p>
-                <p className="font-medium">
-                  {documents.revenueLicenseExpiry
-                    ? format(new Date(documents.revenueLicenseExpiry), 'MMM dd, yyyy')
-                    : 'N/A'}
-                </p>
-              </div>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-3 text-sm">
+              <Field label="Owner Name" value={bus.owner_name} />
+              <Field label="NIC / ID" value={bus.owner_nic} />
+              <Field label="Address" value={bus.owner_address} />
             </div>
           </CardContent>
         </Card>
 
-        {/* Leasing & Finance */}
+        {/* Permit & Licensing */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Leasing & Finance
+              <KeyRound className="h-4 w-4" /> Permit & Licensing
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">Leasing Bank</p>
-                <p className="font-medium">{busAny.leasing_bank || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Leasing End Date</p>
-                <p className="font-medium">
-                  {busAny.leasing_end_date
-                    ? format(new Date(busAny.leasing_end_date), 'MMM dd, yyyy')
-                    : 'N/A'}
-                </p>
-              </div>
+              <Field label="Permit No" value={busAny.permit_no} />
+              <Field label="Permit Category" value={busAny.permit_category} />
+              <Field label="Permit Expiry" value={formatDate(busAny.permit_expiry_date)} />
+              <Field label="Revenue License Expiry" value={formatDate(documents.revenueLicenseExpiry)} />
+              <Field label="Revenue Amount" value={busAny.revenue_amount ? formatCurrency(busAny.revenue_amount) : 'N/A'} />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Driver Information */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Phone className="h-4 w-4" />
-            Driver Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-muted-foreground text-xs">Default Driver Name</p>
-              <p className="font-medium">{busAny.default_driver_name || 'Not assigned'}</p>
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Leasing & Finance */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Building2 className="h-4 w-4" /> Leasing & Finance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <Field label="Leasing Bank" value={busAny.leasing_bank} />
+              <Field label="Leasing End Date" value={formatDate(busAny.leasing_end_date)} />
             </div>
-            <div>
-              <p className="text-muted-foreground text-xs">Driver Phone</p>
-              <p className="font-medium">{busAny.driver_phone || 'N/A'}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Document Status */}
+        {/* Driver Information */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Phone className="h-4 w-4" /> Driver Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <Field label="Default Driver" value={busAny.default_driver_name} />
+              <Field label="Phone" value={busAny.driver_phone} />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Insurance & Document Status */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Document Status
+            <FileText className="h-4 w-4" /> Insurance & Document Status
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -289,10 +246,9 @@ export const BusMasterOverviewTab = ({ data }: BusMasterOverviewTabProps) => {
                 <div>
                   <p className="font-medium text-sm">Insurance</p>
                   <p className="text-xs text-muted-foreground">
-                    {busAny.insurance_company ? `${busAny.insurance_company} — ` : ''}
-                    {documents.insuranceExpiry 
-                      ? `Expires: ${format(new Date(documents.insuranceExpiry), 'MMM dd, yyyy')}`
-                      : 'No expiry date set'}
+                    {busAny.insurance_company ? `${busAny.insurance_company}` : ''}
+                    {busAny.insurance_month ? ` (${busAny.insurance_month})` : ''}
+                    {documents.insuranceExpiry ? ` — Expires: ${formatDate(documents.insuranceExpiry)}` : ' — No expiry set'}
                   </p>
                 </div>
               </div>
@@ -309,9 +265,7 @@ export const BusMasterOverviewTab = ({ data }: BusMasterOverviewTabProps) => {
                 <div>
                   <p className="font-medium text-sm">Revenue License</p>
                   <p className="text-xs text-muted-foreground">
-                    {documents.revenueLicenseExpiry 
-                      ? `Expires: ${format(new Date(documents.revenueLicenseExpiry), 'MMM dd, yyyy')}`
-                      : 'No expiry date set'}
+                    {documents.revenueLicenseExpiry ? `Expires: ${formatDate(documents.revenueLicenseExpiry)}` : 'No expiry date set'}
                   </p>
                 </div>
               </div>
@@ -330,36 +284,23 @@ export const BusMasterOverviewTab = ({ data }: BusMasterOverviewTabProps) => {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Gauge className="h-4 w-4" />
-            Service Status
+            <Gauge className="h-4 w-4" /> Service Status
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-3 gap-4 text-sm">
             <div className="p-3 bg-muted/50 rounded-lg">
               <p className="text-muted-foreground text-xs">Last Service</p>
-              <p className="font-medium">
-                {service.lastServiceDate 
-                  ? format(new Date(service.lastServiceDate), 'MMM dd, yyyy')
-                  : 'No record'}
-              </p>
+              <p className="font-medium">{formatDate(service.lastServiceDate)}</p>
               {service.lastServiceMileage && (
-                <p className="text-xs text-muted-foreground">
-                  at {formatNumber(service.lastServiceMileage)} km
-                </p>
+                <p className="text-xs text-muted-foreground">at {formatNumber(service.lastServiceMileage)} km</p>
               )}
             </div>
             <div className="p-3 bg-muted/50 rounded-lg">
               <p className="text-muted-foreground text-xs">Next Service Due</p>
-              <p className="font-medium">
-                {service.nextServiceDate 
-                  ? format(new Date(service.nextServiceDate), 'MMM dd, yyyy')
-                  : 'Not scheduled'}
-              </p>
+              <p className="font-medium">{formatDate(service.nextServiceDate)}</p>
               {service.nextServiceMileage && (
-                <p className="text-xs text-muted-foreground">
-                  at {formatNumber(service.nextServiceMileage)} km
-                </p>
+                <p className="text-xs text-muted-foreground">at {formatNumber(service.nextServiceMileage)} km</p>
               )}
             </div>
             <div className="p-3 bg-muted/50 rounded-lg">
@@ -367,16 +308,12 @@ export const BusMasterOverviewTab = ({ data }: BusMasterOverviewTabProps) => {
               {service.overdueKm ? (
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-red-500" />
-                  <p className="font-medium text-red-500">
-                    Overdue by {formatNumber(service.overdueKm)} km
-                  </p>
+                  <p className="font-medium text-red-500">Overdue by {formatNumber(service.overdueKm)} km</p>
                 </div>
               ) : service.nextServiceMileage ? (
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-green-500" />
-                  <p className="font-medium text-green-600">
-                    {formatNumber(service.nextServiceMileage - (bus.current_mileage || 0))} km remaining
-                  </p>
+                  <p className="font-medium text-green-600">{formatNumber(service.nextServiceMileage - (bus.current_mileage || 0))} km remaining</p>
                 </div>
               ) : (
                 <p className="font-medium text-muted-foreground">Not configured</p>
