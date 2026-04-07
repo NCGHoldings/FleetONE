@@ -1,50 +1,56 @@
 
 
-# Fix: Import ALL 217 Buses from Excel + Flag/Remove Fake DB Buses
+# Fix: Special Hire Payment Reminder & Invoice Document Improvements
 
-## Current Problem
+## Issues Found (from the screenshot)
 
-- Excel has **217 buses** (100% accurate source of truth)
-- Database has **76 buses** (68 matched to Excel, 8 did NOT match — likely fake/test data like NK-1234, NK-2847, NK-3456, NK-5678, NK-9012)
-- Import showed "68 updated, 0 created, **150 skipped**" — the 150 new buses were skipped because the "Auto-create" toggle was OFF by default
-- Even when toggled ON, user may not notice it — it should default to ON since Excel is the master source
+| Issue | Current | Should Be |
+|---|---|---|
+| **Mileage** | Shows `0` | Should show quotation distance (km_trip), or actual KM if post-trip adjustment exists |
+| **Invoice Number** | `REM-QUO-2026-1763-v1.0` (hardcoded prefix + quotation no) | Should use the centralized numbering system or the actual invoice number if one exists |
+| **Intermediate Stops** | Not shown | Should display `intermediate_stops` (jsonb) between pickup and drop locations |
+| **Vehicle/Driver/Conductor** | Has hardcoded fallbacks like `NE 2157`, `Tharindu`, `Kalpa` | Should show actual assigned values or leave blank |
+| **Amount** | Only shows quotation amount | Should include post-trip adjustment amount when finalized |
 
-## What I'll Change
+## Plan
 
-### 1. Auto-Create ON by Default
-Change `autoCreate` initial state from `false` to `true` so all 150 new buses get created automatically.
+### 1. Fix Payment Reminder Data Assembly (ConfirmedTripsTable.tsx)
 
-### 2. Add "Buses NOT in Excel" Warning Section
-After parsing, cross-reference DB buses against Excel. Show a red-highlighted section listing DB buses that have NO match in the Excel sheet (e.g., NK-1234, NK-3456). These are likely fake/test entries.
+In the "Send Payment Reminder" `onClick` handler (~line 1489):
 
-Add options:
-- **Flag as inactive**: Mark unmatched DB buses as `status = 'inactive'`
-- **Delete permanently**: Remove them from the database entirely
-- User can select which action to take before importing
+- **Mileage**: Add `tripDistance` from quotation's `km_trip` field and `totalKm` from `calculateTotalKm(trip)`. If trip has finalized adjustment, fetch `actual_km_traveled` from `special_hire_trip_adjustments`.
+- **Invoice Number**: Instead of `REM-${trip.quotation_no}`, check if an existing invoice exists in `trip.invoices` (balance type). If yes, use that `invoice_no`. If not, generate via `generate_entity_number` RPC with entity type `special_hire_payment_reminder`, or use a clean format like `PR-YYYY-NNNNN`.
+- **Intermediate Stops**: Pass `trip.intermediate_stops` to the invoice data as a new `intermediateStops` field.
+- **Post-trip adjustment**: Fetch from `special_hire_trip_adjustments` for the quotation and pass `hasAdjustments`, `extraKm`, `extraKmChargePerKm`, `extraKmTotalCharge`, `additionalExpenses`, `totalAdditionalExpenses`, `adjustmentNotes` to the reminder data. The `totalAmount` should already include `adjustment_amount` from `calculateTotalAmount`.
 
-### 3. Improve Import Button Text
-Show clear counts: "Import 68 Updates + Create 150 New Buses" and separately "Flag/Delete 8 Unmatched DB Buses"
+### 2. Fix Invoice Generator Template (invoice-generator.ts)
 
-### 4. Route Matching for New Buses
-When creating new buses, if the Excel has a route name, try to match it to existing routes in the `routes` table and set the `route_id`.
+- **Remove hardcoded fallbacks**: Line 296-297 has `'NE 2157'`, `'(D) Tharindu'`, `'(A) Kalpa'` as defaults. Replace with empty/blank when no data is assigned.
+- **Add `intermediateStops` to InvoiceData interface**: New optional field `intermediateStops?: Array<{ location: string }>`.
+- **Show route with stops**: In the Item Detail cell, render: `pickup → stop1 → stop2 → drop` instead of just `pickup to drop`.
+- **Add conductor display**: Show conductor name in the Remark row alongside driver if available.
+- **Mileage**: Already uses `tripDistance || totalKm || actualKmTraveled || 0` — just need to pass the data correctly.
+
+### 3. Fix Invoice Number for Payment Reminders
+
+- Use `generate_entity_number` RPC with a new entity type `sph_payment_reminder` (prefix: `PR`, with year).
+- Register this entity type in the numbering settings seed or use a fallback format `PR-YYYY-NNNNN`.
+- For actual invoices (not reminders), keep using the existing `INV-{quotation_no}-BAL` format.
 
 ## Technical Details
 
-- New state: `unmatchedDbBuses` — buses in DB but not in Excel
-- After parsing Excel, compute: `existingBuses.filter(b => !excelBusNos.has(normalizeBusNo(b.bus_no)))`
-- Show these in a separate warning table with checkboxes
-- During import, process selected unmatched buses (deactivate or delete)
-- `autoCreate` defaults to `true`
+- The `intermediate_stops` column is JSONB with structure: `[{"id":"...", "location":"Place Name", "lat":..., "lng":...}]`
+- The `special_hire_trip_adjustments` table has all post-trip data needed (extra KM, additional expenses, adjustment amount)
+- The `QuotationWithPayments` interface already includes `adjustment_amount` and `has_finalized_adjustment`
 
 ## Files
-- **Modify**: `src/components/fleet/FleetVehicleDataImport.tsx`
-  - Default `autoCreate = true`
-  - Add unmatched DB bus detection and display
-  - Add deactivate/delete options for unmatched buses
-  - Execute cleanup during import step
+- **Modify**: `src/lib/invoice-generator.ts` — add `intermediateStops` to `InvoiceData`, remove hardcoded fallbacks, show stops in route
+- **Modify**: `src/components/special-hire/ConfirmedTripsTable.tsx` — fix payment reminder data assembly (mileage, invoice number, stops, adjustments)
 
 ## Result
-- All 217 Excel buses will be imported (68 updated + 149 created)
-- 8 fake/test DB buses flagged and removable
-- Excel becomes the single source of truth for the fleet
+- Mileage shows actual distance from quotation or post-trip data
+- Invoice number uses proper sequential numbering
+- Route shows all intermediate stops
+- Vehicle/driver/conductor show real assigned values (no fake defaults)
+- Amounts correctly include post-trip adjustments when applicable
 
