@@ -154,14 +154,27 @@ export default function Complaints() {
     if (!dueDate) return <span className="text-muted-foreground">N/A</span>;
     
     const now = new Date();
-    const diff = dueDate.getTime() - now.getTime();
-    const hoursDiff = Math.floor(diff / (1000 * 60 * 60));
+    if (dueDate < now) return <span className="text-destructive font-semibold">Overdue</span>;
     
-    if (diff < 0) return <span className="text-destructive font-semibold">Overdue</span>;
-    if (hoursDiff < 8) return <span className="text-warning font-semibold">{hoursDiff}h left</span>;
+    // Count working days remaining (skip Sat/Sun)
+    let workingDays = 0;
+    const current = new Date(now);
+    current.setHours(0, 0, 0, 0);
+    const target = new Date(dueDate);
+    target.setHours(0, 0, 0, 0);
     
-    const daysDiff = Math.ceil(hoursDiff / 8);
-    return <span className="text-success">{daysDiff}d left</span>;
+    while (current < target) {
+      current.setDate(current.getDate() + 1);
+      const dow = current.getDay();
+      if (dow !== 0 && dow !== 6) workingDays++;
+    }
+    
+    if (workingDays === 0) {
+      const hoursLeft = Math.floor((dueDate.getTime() - now.getTime()) / 3600000);
+      return <span className="text-warning font-semibold">{hoursLeft}h left</span>;
+    }
+    if (workingDays <= 1) return <span className="text-warning font-semibold">{workingDays}d left</span>;
+    return <span className="text-success">{workingDays}d left</span>;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
