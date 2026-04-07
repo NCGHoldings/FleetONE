@@ -24,8 +24,8 @@ export const QuickApprovalButton = ({
     try {
       setIsProcessing(true);
 
-      // Auto-add approved_by signature (use quotationId for consistency)
-      const result = await autoAddSignature(quotationId, 'approved_by');
+      // Auto-add approved_by signature using the actual document ID
+      const result = await autoAddSignature(documentId, 'approved_by');
 
       if (!result.success) {
         if (result.skipped) {
