@@ -442,6 +442,7 @@ export const DrillDownModal = ({
                   <TableHead className="text-right">Credit</TableHead>
                    <TableHead className="text-right">Balance</TableHead>
                    <TableHead className="w-10"></TableHead>
+                 </TableRow>
               </TableHeader>
               <TableBody>
                 {transactionsWithBalance.map((t) => {
