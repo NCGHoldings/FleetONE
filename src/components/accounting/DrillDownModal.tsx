@@ -1,6 +1,6 @@
  
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -9,6 +9,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -30,8 +40,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Loader2, Download, X, Filter, Bus, Route } from "lucide-react";
+import { Loader2, Download, X, Filter, Bus, Route, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { reverseAndDeleteJournalEntry } from "@/lib/gl-posting-utils";
+import { toast } from "sonner";
 
 interface DrillDownModalProps {
   open: boolean;
@@ -56,12 +68,35 @@ export const DrillDownModal = ({
     : accountId
       ? [accountId]
       : [];
+  const queryClient = useQueryClient();
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>(initialDateRange || {});
   const [businessUnitFilter, setBusinessUnitFilter] = useState<string>("_all");
   const [transactionType, setTransactionType] = useState<string>("all");
   const [busFilter, setBusFilter] = useState<string>("_all");
   const [routeFilter, setRouteFilter] = useState<string>("_all");
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [deleteConfirmJEId, setDeleteConfirmJEId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteJE = async () => {
+    if (!deleteConfirmJEId) return;
+    setIsDeleting(true);
+    try {
+      const result = await reverseAndDeleteJournalEntry(deleteConfirmJEId);
+      if (result.success) {
+        toast.success("Journal entry deleted and COA balances reversed");
+        queryClient.invalidateQueries({ queryKey: ["account-transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      } else {
+        toast.error(result.error || "Failed to delete journal entry");
+      }
+    } catch (error) {
+      toast.error("Failed to delete journal entry");
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmJEId(null);
+    }
+  };
 
   // Fetch buses for filter
   const { data: buses } = useQuery({
