@@ -1,40 +1,30 @@
 
 
-# Fix: Force-Delete 8 Fake/Unmatched Buses (Total 226 → 218)
+# Fix: Signature Page Toggle Not Persisting
 
 ## Root Cause
 
-The importer's "Delete Permanently" button calls `supabase.from("buses").delete().eq("id", bus.id)` — but **30 tables** have foreign keys referencing `buses`. Some of these 8 buses have linked `daily_trips` and `daily_bus_expenses` records, so the delete silently fails with a FK constraint violation.
+The `special_hire_signature_settings` table has **no row** for `signature_page` — only `approved_by`, `checked_by`, `prepared_by` exist. When the page loads and can't find a `signature_page` row, it defaults to `true` (line 52-53).
 
-| Bus No | Trips | Expenses | Origin |
-|---|---|---|---|
-| NK-1234 | 1 | 0 | Fake/test |
-| NK-2847 | 1 | 0 | Fake/test |
-| NK-3456 | 1 | 0 | Fake/test |
-| NK-5678 | 1 | 0 | Fake/test |
-| NK-9012 | 1 | 0 | Fake/test |
-| NC 6915 | 1 | 0 | Not in Excel |
-| NC 8760 | 0 | 0 | Not in Excel |
-| NE 8243 | 3 | 2 | Not in Excel |
+The save function on line 107-116 tries to insert/update, but doesn't check for errors on that specific operation — so if the insert fails (e.g., due to a column constraint), it fails silently and the row never gets created.
 
 ## Plan
 
-### 1. Database migration to delete the 8 buses and their orphan data
-Write a migration that:
-- Deletes all `daily_trips` referencing these 8 bus IDs
-- Deletes all `daily_bus_expenses` referencing these 8 bus IDs
-- Deletes any other FK-linked rows (fleet_master_roster, bus_service_alerts, etc.) for these IDs
-- Finally deletes the 8 buses themselves
+### 1. Auto-create the `signature_page` row on first load
+In `loadSettings()`, when no `signature_page` row is found (line 51-54), immediately insert it into the database instead of just setting local state. This guarantees the row exists for future toggles.
 
-This is safe because these buses have no real operational data — just 1-2 test records each.
+### 2. Add error handling on the signature_page save
+In `handleSave()`, add proper error checking on the insert/update for the `signature_page` row (lines 107-116) so failures are reported to the user.
 
-### 2. Fix the importer's delete logic to handle FK constraints
-Update `FleetVehicleDataImport.tsx` so that when deleting unmatched buses, it first cleans up FK-linked records (trips, expenses, roster, etc.) before deleting the bus row. Show the actual error to the user if deletion still fails.
+### 3. Make the toggle save immediately (no need for Save button)
+Change the `Switch` for "Show Signature Page" to save directly to the database on toggle — similar to how most master toggles work. This eliminates the "toggle then forget to save" problem.
 
 ## Files
-- **New migration**: Delete 8 specific buses and their orphan FK records
-- **Modify**: `src/components/fleet/FleetVehicleDataImport.tsx` — cascade-delete FK records before bus deletion, show errors on failure
+- **Modify**: `src/components/settings/SpecialHireSignatureSettings.tsx`
+  - Auto-insert `signature_page` row on first load if missing
+  - Make the toggle save immediately via `onCheckedChange`
+  - Add error handling on the DB operations
 
 ## Result
-Fleet count drops from 226 to 218. Future imports can properly delete unmatched buses without silent FK failures.
+Toggling "Show Signature Page" off will persist immediately — no need to scroll down and click Save. Refreshing the page will show the correct state.
 
