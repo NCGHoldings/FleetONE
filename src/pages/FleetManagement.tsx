@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,7 @@ import { BusCategoryBadge } from "@/components/fleet/BusCategoryBadge";
 import { BusMasterDataSheet } from "@/components/fleet/BusMasterDataSheet";
 import { FleetAlertsPanel } from "@/components/fleet/FleetAlertsPanel";
 import { FleetVehicleDataImport } from "@/components/fleet/FleetVehicleDataImport";
+import { FleetFilterPanel, FleetFilters, defaultFilters } from "@/components/fleet/FleetFilterPanel";
 import { Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
