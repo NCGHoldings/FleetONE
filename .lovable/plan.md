@@ -1,52 +1,54 @@
 
 
-# Add "View Related Documents" to Journal Entry Detail Dialog
+# Add Remarks & Feedback System to Special Hire Calendar View
 
-## What the User Wants
-When viewing a Journal Entry's lines, add a "View" action that finds and shows all related source documents (AR Invoice, AP Invoice, AR Receipt, AP Payment, etc.) linked to that JE, with preview capability using the existing `FinanceDocumentPreviewModal`.
+## What You Get
 
-## How It Works
+Each hire card in the calendar view will show:
+- A small preview of the latest remark (e.g., "Customer called, confirmed 3pm pickup")
+- A speech bubble icon with remark count badge
+- Click to open a full remark history dialog — add new remarks with type tags (Call Note, Customer Feedback, Internal Note), timestamps, and user attribution
 
-The `journal_entries` table has a `journal_entry_id` foreign key from 7+ source tables (ar_invoices, ap_invoices, ar_receipts, ap_payments, special_hire_payments, yutong_customer_payments, sinotruck_customer_payments, etc.). By querying these tables for a matching `journal_entry_id`, we can find all related source documents and display them.
+## Database
 
-## Changes
+**New table: `special_hire_remarks`**
 
-### File: `src/components/accounting/JournalEntryDetailDialog.tsx`
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid PK | Auto-generated |
+| quotation_id | uuid FK → special_hire_quotations | Links to the hire |
+| remark_type | text | 'call_note', 'customer_feedback', 'internal_note', 'follow_up' |
+| content | text | The remark text |
+| created_by | uuid | User who added it |
+| created_by_name | text | Display name snapshot |
+| created_at | timestamptz | Auto timestamp |
 
-1. **Add "Related Documents" section** below the Entry Lines table:
-   - Query all source tables (`ar_invoices`, `ap_invoices`, `ar_receipts`, `ap_payments`, `bank_transactions`, `special_hire_payments`) by `journal_entry_id = entry.id`
-   - Display results as a list of clickable cards/rows showing: document type, document number, amount, date
-   - Each row has a "View" button (Eye icon)
+RLS: Authenticated users can select/insert. No public access.
 
-2. **Add document preview capability**:
-   - Import `FinanceDocumentPreviewModal`
-   - On clicking "View", open the preview modal with `documentType` mapped from the source table (e.g., `ar_invoices` → `"ar_invoice"`)
-   - Pass the full document data to the modal
+## UI Changes
 
-3. **Data fetching logic** (inside the dialog, using a new `useQuery`):
-   ```
-   - Query ar_invoices where journal_entry_id = entryId → label "AR Invoice"
-   - Query ap_invoices where journal_entry_id = entryId → label "AP Invoice"  
-   - Query ar_receipts where journal_entry_id = entryId → label "AR Receipt"
-   - Query ap_payments where journal_entry_id = entryId → label "AP Payment"
-   - Query special_hire_payments where journal_entry_id = entryId → label "Special Hire Payment"
-   - Query bank_transactions where journal_entry_id = entryId → label "Bank Transaction"
-   ```
-   All queries run in parallel via `Promise.all`, results merged into a unified list.
+### 1. Calendar Card (SpecialHireCalendarView.tsx)
 
-4. **UI**: Below the lines table, add a "Related Documents" section with a small table:
-   | Type | Document # | Amount | Date | Action |
-   |------|-----------|--------|------|--------|
-   | AR Invoice | INV-001 | 50,000 | 2026-01-15 | 👁 View |
+On each hire card, below the financial row:
+- Show a `MessageSquare` icon with count badge (e.g., "3")
+- If remarks exist, show the latest remark text truncated to 1 line with timestamp
+- Clicking the remark area opens the Remark Dialog (stops card click propagation)
 
-   Clicking "View" opens `FinanceDocumentPreviewModal` with the appropriate `documentType` and `documentData`.
+### 2. New Component: SpecialHireRemarkDialog.tsx
 
-### No other files need changes
-- `FinanceDocumentPreviewModal` already supports all document types
-- No database changes needed — all queries use existing `journal_entry_id` columns
+A Dialog containing:
+- **Header**: Quotation number + customer name
+- **Remark list**: Scrollable list of all remarks, newest first. Each shows: type badge (color-coded), content, user name, relative timestamp
+- **Add remark form**: At the bottom — remark type selector (dropdown) + textarea + "Add" button
+- Uses `useQuery` to fetch remarks, `useMutation` to insert
 
-## Result
-- Every JE detail dialog shows which source documents created it
-- Users can click "View" to preview the AR/AP invoice, receipt, or payment document directly
-- Works for all modules: manual AR/AP, Special Hire, Yutong, Sinotruck, School Bus
+### 3. Data Fetching
+
+- Batch-load remark counts + latest remark per quotation when loading the day's quotations (single query with `quotation_id` IN list)
+- Dialog fetches full history on open
+
+## Files
+- **New migration**: Create `special_hire_remarks` table with RLS
+- **New**: `src/components/special-hire/SpecialHireRemarkDialog.tsx` — remark history + add form
+- **Modify**: `src/components/special-hire/SpecialHireCalendarView.tsx` — add remark preview on cards + dialog trigger
 
