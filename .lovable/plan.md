@@ -1,25 +1,33 @@
 
+# Fix: Signature Page Toggle — CHECK Constraint Violation
 
-# Fix: Make Standard Rate (Std Rate) Editable in Fleet Spreadsheet
+## Root Cause
 
-## Problem
-The "Std Rate" column in the Fleet Master Spreadsheet is currently read-only — it displays `buses.expected_km_per_liter` (defaults to 8.00 for all buses) but cannot be changed inline. Users need to edit each bus individually via the Edit Bus modal to change this value.
+The `special_hire_signature_settings` table has a CHECK constraint:
+```
+CHECK (signature_role IN ('prepared_by', 'checked_by', 'approved_by'))
+```
+
+The code tries to insert a row with `signature_role = 'signature_page'`, which violates this constraint → **400 Bad Request** every time the page loads and every time the toggle is clicked.
 
 ## Plan
 
-### 1. Make the Std Rate cell an editable input (FleetMasterSpreadsheetCore.tsx)
-Replace the static text display at line 414-416 with an editable `<Input>` field (same pattern used for Start KM, End KM, Fuel fields). On blur or Enter, it saves the new value.
+### 1. Database migration — add `signature_page` to the CHECK constraint
+Drop the existing constraint and recreate it with the additional value:
+```sql
+ALTER TABLE special_hire_signature_settings 
+  DROP CONSTRAINT special_hire_signature_settings_signature_role_check;
 
-### 2. Add `updateStandardRate` handler (useFleetMasterSpreadsheet.ts)
-Add a new function that updates `buses.expected_km_per_liter` directly for the given bus ID. After saving, recalculate the performance value (standard_rate - fuel_consumption) and do a silent refresh to update the row.
+ALTER TABLE special_hire_signature_settings 
+  ADD CONSTRAINT special_hire_signature_settings_signature_role_check 
+  CHECK (signature_role = ANY (ARRAY['prepared_by','checked_by','approved_by','signature_page']));
+```
 
-### 3. Recalculate performance on change
-When the standard rate changes, the "Perform" column value must also update since `performance = standardRate - fuelConsumption`.
+### 2. No code changes needed
+The existing code in `SpecialHireSignatureSettings.tsx` already handles auto-creating the row and immediate toggle save — it just couldn't insert because the constraint blocked it.
 
 ## Files
-- **Modify**: `src/components/fleet/FleetMasterSpreadsheetCore.tsx` — replace static cell with editable input for Std Rate
-- **Modify**: `src/hooks/useFleetMasterSpreadsheet.ts` — add `updateStandardRate(busId, value)` that writes to `buses.expected_km_per_liter` and refreshes
+- **New migration**: Update CHECK constraint on `special_hire_signature_settings.signature_role`
 
 ## Result
-Users can click on any Std Rate cell, type a new value (e.g., 6.5, 9.0), and it saves immediately to the bus record. Performance column auto-recalculates.
-
+The toggle will persist correctly. When disabled, all Special Hire documents (invoices, receipts, payment reminders) will generate without the signature page.
