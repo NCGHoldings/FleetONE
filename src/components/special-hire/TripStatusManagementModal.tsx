@@ -59,6 +59,7 @@ export function TripStatusManagementModal({
   trip,
   onStatusChange,
   loading = false,
+  effectiveCompanyId,
 }: TripStatusManagementModalProps) {
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [reason, setReason] = useState<string>('');
@@ -95,7 +96,9 @@ export function TripStatusManagementModal({
     if (isCancellation && refundAmount > 0 && (refundStatus === 'processed' || refundStatus === 'completed')) {
       try {
         setIsPostingGL(true);
-        const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+        const NCG_HOLDING_FALLBACK = 'a0000000-0000-0000-0000-000000000001';
+        const companyIdToUse = effectiveCompanyId || NCG_HOLDING_FALLBACK;
+        const settings = await fetchSpecialHireFinanceSettings(companyIdToUse);
         
         if (settings) {
           const glResult = await postRefundToGLStandalone({
@@ -104,7 +107,7 @@ export function TripStatusManagementModal({
             refundAmount: refundAmount,
             reason: reason.trim(),
             settings,
-            effectiveCompanyId: NCG_HOLDING_ID,
+            effectiveCompanyId: companyIdToUse,
           });
           
           if (glResult) {
