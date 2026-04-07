@@ -263,9 +263,9 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
     let updated = 0, created = 0, skipped = 0, deactivated = 0, deleted = 0;
 
     // Fetch routes for matching new buses
-    const { data: routes } = await supabase.from("routes").select("id, name");
+const { data: routes } = await supabase.from("routes").select("id, route_name");
     const routeMap = new Map<string, string>();
-    (routes || []).forEach(r => routeMap.set(r.name.toLowerCase().trim(), r.id));
+    (routes || []).forEach(r => routeMap.set(r.route_name.toLowerCase().trim(), r.id));
 
     for (const row of parsedRows) {
       const updateData: Record<string, any> = {};
