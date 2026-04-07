@@ -52,6 +52,24 @@ interface Complaint {
   sla_due_date?: string;
 }
 
+const defaultFormData = {
+  title: '',
+  description: '',
+  category: '',
+  priority: 'medium',
+  type: 'complaint',
+  staff_group: '',
+  status: 'new',
+  assigned_to: '',
+  action_taken: '',
+  routeNumber: '',
+  busNumber: '',
+  incidentDate: '',
+  incidentTime: '',
+  location: '',
+  driverName: ''
+};
+
 export default function Complaints() {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
