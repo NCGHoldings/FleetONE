@@ -670,6 +670,33 @@ export function SpecialHireCalendarView() {
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* Remark Preview */}
+                                            {(() => {
+                                                const remarkData = remarkSummaries[q.id];
+                                                return (
+                                                    <div
+                                                        className="flex items-center gap-2 pt-2 border-t border-dashed cursor-pointer hover:bg-muted/50 rounded -mx-1 px-1 py-1 transition-colors"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setRemarkTarget({ id: q.id, quotationNo: q.quotation_no, customerName: q.customer_name });
+                                                            setRemarkDialogOpen(true);
+                                                        }}
+                                                    >
+                                                        <div className="relative flex-shrink-0">
+                                                            <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                                                            {remarkData && remarkData.count > 0 && (
+                                                                <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-[8px] font-bold rounded-full h-3.5 w-3.5 flex items-center justify-center">
+                                                                    {remarkData.count}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-[10px] text-muted-foreground truncate flex-1">
+                                                            {remarkData ? remarkData.latest : 'Add remark...'}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })()}
                                         </CardContent>
                                     </Card>
                                 );
@@ -688,6 +715,20 @@ export function SpecialHireCalendarView() {
                         setShowModal(open);
                         if (!open) setSelectedQuotation(null);
                     }}
+                />
+            )}
+
+            {/* Remark Dialog */}
+            {remarkTarget && (
+                <SpecialHireRemarkDialog
+                    open={remarkDialogOpen}
+                    onOpenChange={(open) => {
+                        setRemarkDialogOpen(open);
+                        if (!open) setRemarkTarget(null);
+                    }}
+                    quotationId={remarkTarget.id}
+                    quotationNo={remarkTarget.quotationNo}
+                    customerName={remarkTarget.customerName}
                 />
             )}
         </div>
