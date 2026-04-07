@@ -319,7 +319,6 @@ companyId: effectiveCompanyId,
             }
           }
         }
-        }
       } catch (sigError) {
         console.log('[SPH Finance] Auto-signature skipped:', sigError);
       }
