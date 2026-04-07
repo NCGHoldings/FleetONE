@@ -30,6 +30,7 @@ import { GenerateBalanceInvoiceModal } from './GenerateBalanceInvoiceModal';
 import { VehicleAssignmentModal } from './VehicleAssignmentModal';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { resolveBusType, calculateTotalKm, getTripDistance } from '@/lib/special-hire-invoice-helpers';
+import { getDocumentLabel } from '@/lib/special-hire-document-helpers';
 import { PaymentTimelineFresh } from './PaymentTimelineFresh';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -1923,15 +1924,7 @@ export function ConfirmedTripsTable() {
                           {doc.document_status === 'draft' ? 'DRAFT' : 'APPROVED'}
                         </Badge>
                         <span className="font-medium">
-                          {doc.document_type === 'sales_receipt' 
-                            ? 'Sales Receipt' 
-                            : doc.payment_type === 'balance'
-                            ? 'Final Balance Invoice'
-                            : doc.payment_type === 'advance'
-                            ? 'Advance Invoice'
-                            : doc.payment_type === 'full'
-                            ? 'Full Payment Invoice'
-                            : 'Invoice'}
+                          {getDocumentLabel(doc)}
                         </span>
                         <span className="text-muted-foreground">({doc.payment_type})</span>
                       </div>

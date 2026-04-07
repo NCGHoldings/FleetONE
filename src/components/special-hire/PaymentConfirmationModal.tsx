@@ -28,6 +28,7 @@ interface PaymentConfirmationModalProps {
     percentage_adjustment?: number;
     advance_paid?: number;
     balance_due?: number;
+    total_paid?: number;
     fuel_cost_fuel_only?: number;
     commission_pass_through_amount?: number;
     discount_amount_lkr?: number;
@@ -99,9 +100,9 @@ export const PaymentConfirmationModal = ({
   };
 
   const finalTotal = calculateFinalTotal();
-  const advancePaid = quotationData.advance_paid || 0;
-  const balanceDue = finalTotal - advancePaid;
-  const isAdvanceAlreadyPaid = advancePaid > 0;
+  const totalPaidSoFar = quotationData.total_paid || quotationData.advance_paid || 0;
+  const balanceDue = Math.max(finalTotal - totalPaidSoFar, 0);
+  const isAdvanceAlreadyPaid = totalPaidSoFar > 0;
   
   const [paymentType, setPaymentType] = useState<'advance' | 'balance' | 'full'>(
     isAdvanceAlreadyPaid ? 'balance' : 'advance'
@@ -399,8 +400,8 @@ export const PaymentConfirmationModal = ({
                 {isAdvanceAlreadyPaid && (
                   <>
                     <div>
-                      <p className="font-medium">Advance Paid:</p>
-                      <p className="text-green-600">LKR {advancePaid.toLocaleString()}</p>
+                      <p className="font-medium">Total Paid:</p>
+                      <p className="text-green-600">LKR {totalPaidSoFar.toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="font-medium">Balance Due:</p>
