@@ -52,6 +52,24 @@ interface Complaint {
   sla_due_date?: string;
 }
 
+const defaultFormData = {
+  title: '',
+  description: '',
+  category: '',
+  priority: 'medium',
+  type: 'complaint',
+  staff_group: '',
+  status: 'new',
+  assigned_to: '',
+  action_taken: '',
+  routeNumber: '',
+  busNumber: '',
+  incidentDate: '',
+  incidentTime: '',
+  location: '',
+  driverName: ''
+};
+
 export default function Complaints() {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -65,17 +83,7 @@ export default function Complaints() {
   const [relatedPersons, setRelatedPersons] = useState<RelatedPerson[]>([]);
   const [newPersonName, setNewPersonName] = useState('');
   const [newPersonRole, setNewPersonRole] = useState('');
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: '',
-    priority: 'medium',
-    type: 'complaint',
-    staff_group: '',
-    status: 'new',
-    assigned_to: '',
-    action_taken: ''
-  });
+  const [formData, setFormData] = useState({ ...defaultFormData });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -196,6 +204,14 @@ export default function Complaints() {
         return;
       }
       
+      const incidentDetails: Record<string, string> = {};
+      if (formData.routeNumber) incidentDetails.route_number = formData.routeNumber;
+      if (formData.busNumber) incidentDetails.bus_number = formData.busNumber;
+      if (formData.incidentDate) incidentDetails.incident_date = formData.incidentDate;
+      if (formData.incidentTime) incidentDetails.incident_time = formData.incidentTime;
+      if (formData.location) incidentDetails.location = formData.location;
+      if (formData.driverName) incidentDetails.driver_name = formData.driverName;
+
       const { error } = await supabase
         .from('feedback_complaints')
         .insert({
@@ -207,7 +223,8 @@ export default function Complaints() {
           staff_group: formData.staff_group || null,
           status: 'new',
           reported_by: profile.id,
-          escalation_level: 1
+          escalation_level: 1,
+          related_persons: Object.keys(incidentDetails).length > 0 ? incidentDetails : null
         });
 
       if (error) throw error;
@@ -218,17 +235,7 @@ export default function Complaints() {
       });
 
       // Reset form and close dialog
-      setFormData({
-        title: '',
-        description: '',
-        category: '',
-        priority: 'medium',
-        type: 'complaint',
-        staff_group: '',
-        status: 'new',
-        assigned_to: '',
-        action_taken: ''
-      });
+      setFormData({ ...defaultFormData });
       setShowAddDialog(false);
       
       // Refresh the complaints list
@@ -245,7 +252,9 @@ export default function Complaints() {
 
   const handleEdit = (complaint: Complaint) => {
     setEditingComplaint(complaint);
+    const rp = (complaint.related_persons as any) || {};
     setFormData({
+      ...defaultFormData,
       title: complaint.title,
       description: complaint.description,
       category: complaint.category,
@@ -254,7 +263,13 @@ export default function Complaints() {
       staff_group: complaint.staff_group || '',
       status: complaint.status || 'new',
       assigned_to: complaint.assigned_to || '',
-      action_taken: complaint.action_taken || ''
+      action_taken: complaint.action_taken || '',
+      routeNumber: rp.route_number || '',
+      busNumber: rp.bus_number || '',
+      incidentDate: rp.incident_date || '',
+      incidentTime: rp.incident_time || '',
+      location: rp.location || '',
+      driverName: rp.driver_name || ''
     });
     setShowEditDialog(true);
   };
@@ -272,6 +287,14 @@ export default function Complaints() {
     }
 
     try {
+      const editIncidentDetails: Record<string, string> = {};
+      if (formData.routeNumber) editIncidentDetails.route_number = formData.routeNumber;
+      if (formData.busNumber) editIncidentDetails.bus_number = formData.busNumber;
+      if (formData.incidentDate) editIncidentDetails.incident_date = formData.incidentDate;
+      if (formData.incidentTime) editIncidentDetails.incident_time = formData.incidentTime;
+      if (formData.location) editIncidentDetails.location = formData.location;
+      if (formData.driverName) editIncidentDetails.driver_name = formData.driverName;
+
       const { error } = await supabase
         .from('feedback_complaints')
         .update({
@@ -281,6 +304,7 @@ export default function Complaints() {
           priority: formData.priority,
           type: formData.type,
           staff_group: formData.staff_group || null,
+          related_persons: Object.keys(editIncidentDetails).length > 0 ? editIncidentDetails : null
         })
         .eq('id', editingComplaint.id);
 
@@ -291,17 +315,7 @@ export default function Complaints() {
         description: "Complaint updated successfully",
       });
 
-      setFormData({
-        title: '',
-        description: '',
-        category: '',
-        priority: 'medium',
-        type: 'complaint',
-        staff_group: '',
-        status: 'new',
-        assigned_to: '',
-        action_taken: ''
-      });
+      setFormData({ ...defaultFormData });
       setShowEditDialog(false);
       setEditingComplaint(null);
       fetchComplaints();
@@ -347,7 +361,9 @@ export default function Complaints() {
   const handleManage = (complaint: Complaint) => {
     setManagingComplaint(complaint);
     setRelatedPersons(complaint.related_persons || []);
+    const rpManage = (complaint.related_persons as any) || {};
     setFormData({
+      ...defaultFormData,
       title: complaint.title,
       description: complaint.description,
       category: complaint.category,
@@ -356,7 +372,13 @@ export default function Complaints() {
       staff_group: complaint.staff_group || '',
       status: complaint.status || 'new',
       assigned_to: complaint.assigned_to || '',
-      action_taken: complaint.action_taken || ''
+      action_taken: complaint.action_taken || '',
+      routeNumber: rpManage.route_number || '',
+      busNumber: rpManage.bus_number || '',
+      incidentDate: rpManage.incident_date || '',
+      incidentTime: rpManage.incident_time || '',
+      location: rpManage.location || '',
+      driverName: rpManage.driver_name || ''
     });
     setShowManageDialog(true);
   };
@@ -732,6 +754,37 @@ export default function Complaints() {
               </Select>
             </div>
 
+            {/* Incident Details */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <Label className="text-sm font-semibold">Incident Details</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="routeNumber" className="text-xs">Route Number</Label>
+                  <Input id="routeNumber" value={formData.routeNumber} onChange={(e) => setFormData(prev => ({ ...prev, routeNumber: e.target.value }))} placeholder="e.g. 138" />
+                </div>
+                <div>
+                  <Label htmlFor="busNumber" className="text-xs">Bus Number</Label>
+                  <Input id="busNumber" value={formData.busNumber} onChange={(e) => setFormData(prev => ({ ...prev, busNumber: e.target.value }))} placeholder="e.g. NB-1234" />
+                </div>
+                <div>
+                  <Label htmlFor="incidentDate" className="text-xs">Date of Incident</Label>
+                  <Input id="incidentDate" type="date" value={formData.incidentDate} onChange={(e) => setFormData(prev => ({ ...prev, incidentDate: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="incidentTime" className="text-xs">Time of Incident</Label>
+                  <Input id="incidentTime" type="time" value={formData.incidentTime} onChange={(e) => setFormData(prev => ({ ...prev, incidentTime: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="location" className="text-xs">Location / Bus Stop</Label>
+                  <Input id="location" value={formData.location} onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))} placeholder="e.g. Kaduwela Bus Stand" />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="driverName" className="text-xs">Driver Name (optional)</Label>
+                  <Input id="driverName" value={formData.driverName} onChange={(e) => setFormData(prev => ({ ...prev, driverName: e.target.value }))} placeholder="Driver name if known" />
+                </div>
+              </div>
+            </div>
+
             <div>
               <Label htmlFor="staff_group">Related Staff Group</Label>
               <Select value={formData.staff_group} onValueChange={(value) => setFormData(prev => ({ ...prev, staff_group: value }))}>
@@ -836,6 +889,37 @@ export default function Complaints() {
                   <SelectItem value="administration">Administration</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Incident Details */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <Label className="text-sm font-semibold">Incident Details</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="edit-routeNumber" className="text-xs">Route Number</Label>
+                  <Input id="edit-routeNumber" value={formData.routeNumber} onChange={(e) => setFormData(prev => ({ ...prev, routeNumber: e.target.value }))} placeholder="e.g. 138" />
+                </div>
+                <div>
+                  <Label htmlFor="edit-busNumber" className="text-xs">Bus Number</Label>
+                  <Input id="edit-busNumber" value={formData.busNumber} onChange={(e) => setFormData(prev => ({ ...prev, busNumber: e.target.value }))} placeholder="e.g. NB-1234" />
+                </div>
+                <div>
+                  <Label htmlFor="edit-incidentDate" className="text-xs">Date of Incident</Label>
+                  <Input id="edit-incidentDate" type="date" value={formData.incidentDate} onChange={(e) => setFormData(prev => ({ ...prev, incidentDate: e.target.value }))} />
+                </div>
+                <div>
+                  <Label htmlFor="edit-incidentTime" className="text-xs">Time of Incident</Label>
+                  <Input id="edit-incidentTime" type="time" value={formData.incidentTime} onChange={(e) => setFormData(prev => ({ ...prev, incidentTime: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="edit-location" className="text-xs">Location / Bus Stop</Label>
+                  <Input id="edit-location" value={formData.location} onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))} placeholder="e.g. Kaduwela Bus Stand" />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="edit-driverName" className="text-xs">Driver Name (optional)</Label>
+                  <Input id="edit-driverName" value={formData.driverName} onChange={(e) => setFormData(prev => ({ ...prev, driverName: e.target.value }))} placeholder="Driver name if known" />
+                </div>
+              </div>
             </div>
 
             <div>
