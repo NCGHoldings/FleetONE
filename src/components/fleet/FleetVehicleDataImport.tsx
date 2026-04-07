@@ -76,10 +76,11 @@ const HEADER_SYNONYMS: Record<string, string[]> = {
   leasing_bank: ["leasing bank", "leasing", "bank", "finance company"],
   leasing_end_date: ["leasing end date", "leasing end", "lease end", "lease end date"],
   permit_expiry_date: ["permit expiry date", "permit expiry", "permit expire"],
-  revenue_license_expiry: ["revenue expire", "revenue expiry", "revenue license", "revenue licence", "revenue license expiry", "amount revenue expire", "days to revenue"],
+  revenue_license_expiry: ["revenue expire", "revenue expiry", "revenue license", "revenue licence", "revenue license expiry", "amount revenue expire", "days to revenue", "licence", "license"],
   insurance_company: ["insurence company", "insurance company", "insurer", "insurance"],
   insurance_expiry: ["insurence expiry date", "insurance expiry date", "insurance expiry", "insurence expiry", "days to expire insurence", "insurence month"],
   default_driver_name: ["driver name", "driver"],
+  documents_status: ["documents", "document", "docs"],
   driver_phone: ["phone number", "phone", "driver phone", "contact", "contact number", "mobile"],
 };
 
