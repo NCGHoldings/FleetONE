@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, CheckCircle, XCircle, RotateCcw, Search, Download } from "lucide-react";
+import { Plus, Eye, CheckCircle, XCircle, RotateCcw, Search, Download, Trash2 } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "./shared/StatusBadge";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";

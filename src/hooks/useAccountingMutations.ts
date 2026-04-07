@@ -4273,3 +4273,26 @@ export const useUpdateARInvoice = () => {
     onError: (error) => toast.error(`Failed to update AR Invoice: ${error.message}`),
   });
 };
+
+// ============ Delete Journal Entry (Testing Mode) ============
+export const useDeleteJournalEntry = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { reverseAndDeleteJournalEntry } = await import("@/lib/gl-posting-utils");
+      const result = await reverseAndDeleteJournalEntry(id);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to delete journal entry");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      toast.success("Journal entry deleted and COA balances reversed");
+    },
+    onError: (error) => toast.error(`Failed to delete journal entry: ${error.message}`),
+  });
+};
