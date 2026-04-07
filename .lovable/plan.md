@@ -1,57 +1,40 @@
 
 
-# Add Advanced Filtering to Fleet Management Page
+# Add Missing Fields to Public Complaint Form (Match Google Form)
 
-## What You Get
+## Problem
+The public complaint form (`/public/complaint`) is missing key fields that exist in the NCG Express Google Form. Currently it only has: Name, Phone, Email, Subject, Category, Priority, Description. The Google Form has additional transport-specific fields needed for proper complaint handling.
 
-A collapsible filter panel above the Fleet Overview table with dropdown/multi-select filters for every key dimension. Users can combine filters freely (AND logic) and clear them with one click.
+## Fields to Add
 
-## Filter Dimensions
+| Field | Type | Required | Google Form Match |
+|-------|------|----------|-------------------|
+| Route Number | Text input | No | Yes (Page 2) |
+| Bus Number | Text input | No | Yes (Page 2) |
+| Date of Incident | Date picker | No | Yes (Page 2) |
+| Time of Incident | Time input | No | Yes (Page 2) |
+| Location / Stop | Text input | No | Yes (Page 2) |
+| Driver Name (if known) | Text input | No | Yes (Page 2) |
 
-| Filter | Type | Source |
-|--------|------|--------|
-| Category | Multi-select badges | `bus_categories` table |
-| Sub-Category | Multi-select badges | `bus_sub_categories` (filtered by selected categories) |
-| Type (Route) | Multi-select | Distinct `type` values from data (e.g., SBS PANADURA, School Hire, Parked) |
-| Model | Multi-select | Distinct `model` values from data |
-| Year | Range or multi-select | Distinct `year` values from data |
-| Status | Multi-select badges | active / maintenance / idle / retired |
-| Route | Multi-select | Distinct `route` values from data |
-| Insurance Expiry | Preset buttons | Expired, Expiring (30 days), This Month, Valid |
-| License Expiry | Preset buttons | Expired, Expiring (30 days), This Month, Valid |
-| Mileage Range | Min/Max inputs | `current_mileage` |
-| Running Days | Min/Max inputs | `running_days` |
-| Revenue | Min/Max inputs | `avg_daily_revenue` |
+## Storage Approach
+The `feedback_complaints` table already has a `related_persons` JSON column and `description` text field. We will:
+- Store the new structured fields in `related_persons` as JSON: `{ route_number, bus_number, incident_date, incident_time, location, driver_name, customer_name, customer_phone, customer_email }`
+- Keep the description field for the detailed complaint text
+- This avoids needing a DB migration
 
 ## Plan
 
-### 1. Create `FleetFilterPanel` component (`src/components/fleet/FleetFilterPanel.tsx`)
+### 1. Update `PublicComplaintForm.tsx`
+- Add new state fields: `routeNumber`, `busNumber`, `incidentDate`, `incidentTime`, `location`, `driverName`
+- Add a new "Incident Details" section between Contact Info and Complaint Details with these 6 fields in a grid layout
+- Store all structured data in `related_persons` JSON on insert instead of appending to description text
+- Make Contact No required (matching Google Form's required `*` marker)
 
-A collapsible card with:
-- Toggle button "Filters" with active filter count badge
-- Multi-select badge toggles for Category, Status, Type, Model, Year, Route
-- Date-based preset buttons for Insurance/License expiry (Expired / Expiring Soon / Valid)
-- "Clear All" button
-- Returns a filter state object; parent applies client-side filtering
-
-### 2. Extend `FleetManagement.tsx` data fetch to include insurance/license fields
-
-The `fetchFleet` query already uses `select('*')`, so `insurance_expiry` and `revenue_license_expiry` are already in the data. Add these to the `Fleet` interface and expose them for filtering.
-
-### 3. Add filter state and client-side filtering in `FleetManagement.tsx`
-
-- Import `FleetFilterPanel`
-- Add filter state (selected categories, statuses, types, models, years, routes, insurance/license presets, mileage/revenue ranges)
-- Compute `filteredData` from `data` based on active filters
-- Pass `filteredData` to `DataTable` instead of `data`
-- Update title to show filtered count vs total: `Fleet Overview (X of Y buses)`
-- Fetch `bus_categories` and `bus_sub_categories` on mount for the filter panel
-
-### 4. Upgrade search to multi-key
-
-Replace `searchKey="bus_no"` with `customSearch` that searches across bus_no, type, route, model, and owner_name simultaneously.
+### 2. Update validation schema (`src/lib/validation.ts`)
+- Add optional validation for the new fields (max lengths, date format)
+- Make `customerPhone` required (matches Google Form)
 
 ## Files
-- **New**: `src/components/fleet/FleetFilterPanel.tsx` — the filter UI component
-- **Modify**: `src/pages/FleetManagement.tsx` — add filter state, fetch categories, apply filters, upgrade search
+- **Modify**: `src/components/complaints/PublicComplaintForm.tsx` — add incident detail fields, store in `related_persons` JSON
+- **Modify**: `src/lib/validation.ts` — add validation for new fields, make phone required
 
