@@ -1,48 +1,57 @@
 
 
-# Fix: Sales Receipt Cumulative Balance & Payment History
+# Add Advanced Filtering to Fleet Management Page
 
-## Problem
+## What You Get
 
-Each Sales Receipt shows `Balance Due = Total - THIS payment only`, ignoring all prior payments. Screenshot shows:
-- Receipt 1: Paid 131,000 → Balance Due: 130,000 (correct, only 1 payment)
-- Receipt 2: Paid 132,974 → Balance Due: 131,974 (WRONG — should be 5,750 because 131,000 was already paid)
+A collapsible filter panel above the Fleet Overview table with dropdown/multi-select filters for every key dimension. Users can combine filters freely (AND logic) and clear them with one click.
 
-The root cause: `paidAmount` in `InvoiceData` is set to `paymentData.amount` (current payment only), and the HTML template computes `Balance Due = totalAmount - paidAmount`.
+## Filter Dimensions
+
+| Filter | Type | Source |
+|--------|------|--------|
+| Category | Multi-select badges | `bus_categories` table |
+| Sub-Category | Multi-select badges | `bus_sub_categories` (filtered by selected categories) |
+| Type (Route) | Multi-select | Distinct `type` values from data (e.g., SBS PANADURA, School Hire, Parked) |
+| Model | Multi-select | Distinct `model` values from data |
+| Year | Range or multi-select | Distinct `year` values from data |
+| Status | Multi-select badges | active / maintenance / idle / retired |
+| Route | Multi-select | Distinct `route` values from data |
+| Insurance Expiry | Preset buttons | Expired, Expiring (30 days), This Month, Valid |
+| License Expiry | Preset buttons | Expired, Expiring (30 days), This Month, Valid |
+| Mileage Range | Min/Max inputs | `current_mileage` |
+| Running Days | Min/Max inputs | `running_days` |
+| Revenue | Min/Max inputs | `avg_daily_revenue` |
 
 ## Plan
 
-### 1. Add `totalPaidToDate` field to InvoiceData (`src/lib/invoice-generator.ts`)
+### 1. Create `FleetFilterPanel` component (`src/components/fleet/FleetFilterPanel.tsx`)
 
-Add a new optional field `totalPaidToDate?: number` to the `InvoiceData` interface. This represents the cumulative sum of all approved payments up to and including the current one.
+A collapsible card with:
+- Toggle button "Filters" with active filter count badge
+- Multi-select badge toggles for Category, Status, Type, Model, Year, Route
+- Date-based preset buttons for Insurance/License expiry (Expired / Expiring Soon / Valid)
+- "Clear All" button
+- Returns a filter state object; parent applies client-side filtering
 
-Update the sales receipt HTML template (lines 146-156) to:
-- Show "This Payment" amount (current `paidAmount`)
-- Show "Total Paid to Date" (cumulative `totalPaidToDate`)
-- Calculate `Balance Due = totalAmount - totalPaidToDate` instead of `totalAmount - paidAmount`
-- Label the payment row correctly (ADVANCE PAYMENT vs BALANCE PAYMENT based on `invoiceType`)
+### 2. Extend `FleetManagement.tsx` data fetch to include insurance/license fields
 
-### 2. Pass cumulative total in ConfirmedTripsTable.tsx (draft generation)
+The `fetchFleet` query already uses `select('*')`, so `insurance_expiry` and `revenue_license_expiry` are already in the data. Add these to the `Fleet` interface and expose them for filtering.
 
-At line 427, after confirming a payment, query `special_hire_payments` for all approved + the new payment for this quotation to compute `totalPaidToDate`. Pass it alongside `paidAmount`.
+### 3. Add filter state and client-side filtering in `FleetManagement.tsx`
 
-### 3. Pass cumulative total in useFinanceApproval.ts (approval regeneration)
+- Import `FleetFilterPanel`
+- Add filter state (selected categories, statuses, types, models, years, routes, insurance/license presets, mileage/revenue ranges)
+- Compute `filteredData` from `data` based on active filters
+- Pass `filteredData` to `DataTable` instead of `data`
+- Update title to show filtered count vs total: `Fleet Overview (X of Y buses)`
+- Fetch `bus_categories` and `bus_sub_categories` on mount for the filter panel
 
-Line 448 already computes `totalApprovedPaid` — use it as `totalPaidToDate` for sales receipts too (currently only used for invoices). Change the line to always pass `totalPaidToDate: totalApprovedPaid`.
+### 4. Upgrade search to multi-key
 
-Also fix the other generation points (lines 374 and 596) to fetch and pass cumulative totals.
-
-### 4. Fix the "Regenerate Sales Receipt" path (useFinanceApproval.ts line ~590)
-
-The `generateApprovedInvoice` function also builds `InvoiceData` with just `paymentData.amount`. Add a query for all approved payments to compute `totalPaidToDate`.
+Replace `searchKey="bus_no"` with `customSearch` that searches across bus_no, type, route, model, and owner_name simultaneously.
 
 ## Files
-- **Modify**: `src/lib/invoice-generator.ts` — add `totalPaidToDate` to interface; update sales receipt HTML to show cumulative balance
-- **Modify**: `src/components/special-hire/ConfirmedTripsTable.tsx` — compute and pass `totalPaidToDate` when generating draft receipts
-- **Modify**: `src/hooks/useFinanceApproval.ts` — pass `totalPaidToDate` in all 3 generation paths (approval, fallback, regeneration)
-
-## Result
-- Receipt 1 (131,000): Balance Due = 269,724 - 131,000 = 138,724
-- Receipt 2 (132,974): Balance Due = 269,724 - 263,974 = 5,750
-- Each receipt shows the individual payment amount AND cumulative total paid to date
+- **New**: `src/components/fleet/FleetFilterPanel.tsx` — the filter UI component
+- **Modify**: `src/pages/FleetManagement.tsx` — add filter state, fetch categories, apply filters, upgrade search
 
