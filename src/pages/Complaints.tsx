@@ -251,17 +251,7 @@ export default function Complaints() {
       });
 
       // Reset form and close dialog
-      setFormData({
-        title: '',
-        description: '',
-        category: '',
-        priority: 'medium',
-        type: 'complaint',
-        staff_group: '',
-        status: 'new',
-        assigned_to: '',
-        action_taken: ''
-      });
+      setFormData({ ...defaultFormData });
       setShowAddDialog(false);
       
       // Refresh the complaints list
@@ -278,7 +268,9 @@ export default function Complaints() {
 
   const handleEdit = (complaint: Complaint) => {
     setEditingComplaint(complaint);
+    const rp = (complaint.related_persons as any) || {};
     setFormData({
+      ...defaultFormData,
       title: complaint.title,
       description: complaint.description,
       category: complaint.category,
@@ -287,7 +279,13 @@ export default function Complaints() {
       staff_group: complaint.staff_group || '',
       status: complaint.status || 'new',
       assigned_to: complaint.assigned_to || '',
-      action_taken: complaint.action_taken || ''
+      action_taken: complaint.action_taken || '',
+      routeNumber: rp.route_number || '',
+      busNumber: rp.bus_number || '',
+      incidentDate: rp.incident_date || '',
+      incidentTime: rp.incident_time || '',
+      location: rp.location || '',
+      driverName: rp.driver_name || ''
     });
     setShowEditDialog(true);
   };
@@ -324,17 +322,7 @@ export default function Complaints() {
         description: "Complaint updated successfully",
       });
 
-      setFormData({
-        title: '',
-        description: '',
-        category: '',
-        priority: 'medium',
-        type: 'complaint',
-        staff_group: '',
-        status: 'new',
-        assigned_to: '',
-        action_taken: ''
-      });
+      setFormData({ ...defaultFormData });
       setShowEditDialog(false);
       setEditingComplaint(null);
       fetchComplaints();
@@ -380,7 +368,9 @@ export default function Complaints() {
   const handleManage = (complaint: Complaint) => {
     setManagingComplaint(complaint);
     setRelatedPersons(complaint.related_persons || []);
+    const rpManage = (complaint.related_persons as any) || {};
     setFormData({
+      ...defaultFormData,
       title: complaint.title,
       description: complaint.description,
       category: complaint.category,
@@ -389,7 +379,13 @@ export default function Complaints() {
       staff_group: complaint.staff_group || '',
       status: complaint.status || 'new',
       assigned_to: complaint.assigned_to || '',
-      action_taken: complaint.action_taken || ''
+      action_taken: complaint.action_taken || '',
+      routeNumber: rpManage.route_number || '',
+      busNumber: rpManage.bus_number || '',
+      incidentDate: rpManage.incident_date || '',
+      incidentTime: rpManage.incident_time || '',
+      location: rpManage.location || '',
+      driverName: rpManage.driver_name || ''
     });
     setShowManageDialog(true);
   };
