@@ -1,54 +1,62 @@
 
 
-# Add Remarks & Feedback System to Special Hire Calendar View
+# Fix: Migrate All Accounting Document Numbers to Centralized Numbering System
 
-## What You Get
+## Problem
 
-Each hire card in the calendar view will show:
-- A small preview of the latest remark (e.g., "Customer called, confirmed 3pm pickup")
-- A speech bubble icon with remark count badge
-- Click to open a full remark history dialog — add new remarks with type tags (Call Note, Customer Feedback, Internal Note), timestamps, and user attribution
+Many accounting forms bypass the centralized `generate_entity_number` system and instead use `Date.now()` or `Math.random()` to generate document numbers. This produces unprofessional, non-sequential identifiers like `GRN-847291`, `RFQ-1712345678`, or `RCV-20260407-X8K2`.
 
-## Database
+**Forms already using centralized numbering** (correct):
+- AR Invoice, AP Invoice, AP Payment, Customer, Vendor, Item, Fixed Asset
 
-**New table: `special_hire_remarks`**
+**Forms using Date.now() / Math.random() (broken)**:
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid PK | Auto-generated |
-| quotation_id | uuid FK → special_hire_quotations | Links to the hire |
-| remark_type | text | 'call_note', 'customer_feedback', 'internal_note', 'follow_up' |
-| content | text | The remark text |
-| created_by | uuid | User who added it |
-| created_by_name | text | Display name snapshot |
-| created_at | timestamptz | Auto timestamp |
+| Form | Current Pattern | Fix |
+|------|----------------|-----|
+| AR Receipt | `RCV-YYYYMMDD-RANDOM` | Use `receipt` entity type (already configured) |
+| AR Credit Note | `CN-XXXXXX` | Add `credit_note` entity type |
+| AP Debit Note | `DN-XXXXXX` | Add `debit_note` entity type |
+| GRN | `GRN-XXXXXX` | Use `grn` entity type (already configured) |
+| Purchase Order | `PO-XXXXXX` | Use `po` entity type (already configured) |
+| RFQ | `RFQ-TIMESTAMP` | Add `rfq` entity type |
+| Sales Order | `SO-TIMESTAMP` | Add `so` entity type |
+| Quality Inspection | `QI-TIMESTAMP` | Add `qi` entity type |
+| Stock Transfer | `ST-TIMESTAMP` | Add `stock_transfer` entity type |
+| Budget | `BUD-YEAR-XXXX` | Add `budget` entity type |
+| Payment Batch | `PB-DATE-XXXX` | Add `payment_batch` entity type |
+| AP Invoice pay-now | `PAY-XXXXXXXX` | Use `payment` entity type |
 
-RLS: Authenticated users can select/insert. No public access.
+## Plan
 
-## UI Changes
+### Step 1: Add missing entity types to numbering_sequences table
+SQL migration to insert new sequences for: `credit_note`, `debit_note`, `rfq`, `so`, `qi`, `stock_transfer`, `budget`, `payment_batch` — with sensible prefixes and year inclusion.
 
-### 1. Calendar Card (SpecialHireCalendarView.tsx)
+### Step 2: Update entityTypeLabels in useNumbering.ts
+Add labels for the new entity types so they appear in the Numbering Settings UI.
 
-On each hire card, below the financial row:
-- Show a `MessageSquare` icon with count badge (e.g., "3")
-- If remarks exist, show the latest remark text truncated to 1 line with timestamp
-- Clicking the remark area opens the Remark Dialog (stops card click propagation)
+### Step 3: Fix each form to use `useGenerateNumber`
+For each of the 11 broken forms:
+- Import `useGenerateNumber`
+- Replace `Date.now()`/`Math.random()` default values with empty string
+- Add `useEffect` to call `generateNumber(entityType)` on form open
+- Add a loading spinner on the number field while generating
 
-### 2. New Component: SpecialHireRemarkDialog.tsx
+### Files
+- **New migration**: Insert missing `numbering_sequences` rows
+- **Modify**: `src/hooks/useNumbering.ts` — add new entity type labels
+- **Modify**: `src/components/accounting/ARReceiptForm.tsx`
+- **Modify**: `src/components/accounting/ARCreditNoteForm.tsx`
+- **Modify**: `src/components/accounting/APDebitNoteForm.tsx`
+- **Modify**: `src/components/accounting/GoodsReceiptForm.tsx`
+- **Modify**: `src/components/accounting/PurchaseOrderForm.tsx`
+- **Modify**: `src/components/accounting/RFQForm.tsx`
+- **Modify**: `src/components/accounting/SalesOrderForm.tsx`
+- **Modify**: `src/components/accounting/quality/QualityInspectionForm.tsx`
+- **Modify**: `src/components/accounting/inventory/StockTransferForm.tsx`
+- **Modify**: `src/components/accounting/BudgetForm.tsx`
+- **Modify**: `src/components/accounting/PaymentBatchView.tsx`
+- **Modify**: `src/components/accounting/APInvoiceForm.tsx` — fix pay-now fallback
 
-A Dialog containing:
-- **Header**: Quotation number + customer name
-- **Remark list**: Scrollable list of all remarks, newest first. Each shows: type badge (color-coded), content, user name, relative timestamp
-- **Add remark form**: At the bottom — remark type selector (dropdown) + textarea + "Add" button
-- Uses `useQuery` to fetch remarks, `useMutation` to insert
-
-### 3. Data Fetching
-
-- Batch-load remark counts + latest remark per quotation when loading the day's quotations (single query with `quotation_id` IN list)
-- Dialog fetches full history on open
-
-## Files
-- **New migration**: Create `special_hire_remarks` table with RLS
-- **New**: `src/components/special-hire/SpecialHireRemarkDialog.tsx` — remark history + add form
-- **Modify**: `src/components/special-hire/SpecialHireCalendarView.tsx` — add remark preview on cards + dialog trigger
+## Result
+All 20+ accounting document types will use the centralized, sequential numbering system — configurable per company via the Numbering Settings UI, with professional formats like `GRN-2026-00001`, `RFQ-2026-00001`, etc.
 
