@@ -1,40 +1,66 @@
 
-Fix: Public complaint form still fails to submit, and Date/Time must be mandatory.
 
-1. Fix the real submit blocker: public insert RLS
-- Add a new Supabase migration to replace the current public INSERT policy on `feedback_complaints`.
-- Keep staff insert access as-is.
-- Change the public branch to allow true unauthenticated complaint inserts using row rules instead of relying only on `auth.role() = 'anon'`, because Supabase logs show the current policy is still rejecting rows:
-  - `reported_by IS NULL`
-  - `type = 'complaint'`
-  - `status = 'new'`
-  - `escalation_level = 1`
-  - `related_persons` includes `customer_phone`, `incident_date`, and `incident_time`
+# Fix: SLA Display Shows "6d left" Instead of "2d left"
 
-2. Make Date and Time required in the public form
-- Update `src/lib/validation.ts` so `incidentDate` and `incidentTime` are required with clear validation messages.
-- Update `src/components/complaints/PublicComplaintForm.tsx` to mark both inputs as required in the UI.
+## Root Cause
 
-3. Make the submit path more reliable
-- In `PublicComplaintForm.tsx`, use a freshly created anonymous Supabase client for submission instead of the shared instance.
-- Keep the client-generated complaint reference ID.
-- Show the actual insert error message in the toast/log instead of only showing a generic failure message.
+The database `calculate_sla_due_date` function correctly computes the SLA due date as **2 working days** (48 business hours), skipping weekends and Sri Lankan holidays. The holidays table exists and is populated.
 
-4. Keep the current storage model
-- No new DB columns are needed.
-- Date and time will continue to be stored inside `related_persons`, but now they will be enforced both in the form and in the public insert policy.
+The bug is in the **frontend display** (`Complaints.tsx` line 163):
+```
+const daysDiff = Math.ceil(hoursDiff / 8);  // 48 hours / 8 = 6 days — WRONG
+```
+It divides remaining calendar hours by 8 (assuming 8-hour workdays), inflating the count by 3x.
 
-Technical details
-- Current code issue 1: `incidentDate` and `incidentTime` are still optional in `publicComplaintSchema`.
-- Current code issue 2: Supabase logs show `new row violates row-level security policy for table "feedback_complaints"`.
-- Important scope: make date/time mandatory for the public complaint flow only, so internal staff complaint creation does not break.
+## Fix
 
-Files
-- New migration: update public `feedback_complaints` INSERT policy
-- Modify: `src/lib/validation.ts`
-- Modify: `src/components/complaints/PublicComplaintForm.tsx`
+### Modify `src/pages/Complaints.tsx` — `calculateSLA` function
 
-Result
-- Public complaints will submit successfully.
-- Date and time will be mandatory.
-- If submission fails again, the UI will show the real reason instead of a generic error.
+Replace the naive `hoursDiff / 8` calculation with a proper **working days counter** that:
+1. Counts calendar days between now and the SLA due date
+2. Skips Saturdays (DOW=6) and Sundays (DOW=0)
+3. Returns working days remaining (e.g., Monday to Wednesday = 2 working days)
+
+For holidays: since the due date was already computed by the DB skipping holidays, the working-day count on the frontend only needs to skip weekends to be accurate. The due date itself already accounts for holidays.
+
+```typescript
+const calculateSLA = (complaint: Complaint) => {
+  if (complaint.status === 'resolved') return <span>Resolved</span>;
+  
+  const dueDate = complaint.sla_due_date ? new Date(complaint.sla_due_date) : null;
+  if (!dueDate) return <span>N/A</span>;
+  
+  const now = new Date();
+  if (dueDate < now) return <span>Overdue</span>;
+  
+  // Count working days remaining (skip Sat/Sun)
+  let workingDays = 0;
+  let current = new Date(now);
+  current.setHours(0,0,0,0);
+  const target = new Date(dueDate);
+  target.setHours(0,0,0,0);
+  
+  while (current < target) {
+    current.setDate(current.getDate() + 1);
+    const dow = current.getDay();
+    if (dow !== 0 && dow !== 6) workingDays++;
+  }
+  
+  if (workingDays === 0) {
+    // Same day — show hours
+    const hoursLeft = Math.floor((dueDate.getTime() - now.getTime()) / 3600000);
+    return <span>{hoursLeft}h left</span>;
+  }
+  return <span>{workingDays}d left</span>;
+};
+```
+
+## Result
+- A complaint created on Monday will show **"2d left"** (not "6d left")
+- Weekends are not counted in the remaining days display
+- "Overdue" still shows correctly for past-due complaints
+- Hours display for same-day deadlines remains
+
+## Files
+- **Modify**: `src/pages/Complaints.tsx` — fix `calculateSLA` working days calculation
+
