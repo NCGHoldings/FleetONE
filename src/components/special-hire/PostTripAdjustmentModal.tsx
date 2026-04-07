@@ -61,6 +61,7 @@ interface PostTripAdjustmentModalProps {
   originalOvernightCharge?: number;
   hourlyRate?: number;
   nightBlockFee?: number;
+  effectiveCompanyId?: string;
 }
 
 export const PostTripAdjustmentModal = ({

@@ -20,7 +20,7 @@ import {
   postDiscountToGLStandalone,
   updateSPHARInvoiceOnInvoiceSent,
 } from '@/hooks/useSpecialHireFinance';
-import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
+
 
 interface GenerateBalanceInvoiceModalProps {
   open: boolean;

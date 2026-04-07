@@ -12,7 +12,7 @@ import {
   fetchSpecialHireFinanceSettings, 
   postRefundToGLStandalone 
 } from '@/hooks/useSpecialHireFinance';
-import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
+
 
 export interface TripStatusData {
   status: string;
