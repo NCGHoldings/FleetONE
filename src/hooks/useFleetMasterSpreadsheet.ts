@@ -224,6 +224,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
 
   // Trip-level fields that should update daily_trips instead of fleet_master_roster
   const TRIP_FIELDS = ['odometer_start', 'odometer_end', 'fuel_liters'];
+  const BUS_DIRECT_FIELDS = ['standard_rate'];
 
   const updateField = async (rosterId: string, field: string, value: any) => {
     try {
