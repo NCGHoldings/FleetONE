@@ -1,36 +1,44 @@
 
 
-# Enhance Public Complaint Form: Type Toggle, Multi-Category, Route/Bus Validation
+# Fix Public Complaint Form URL and Security
 
-## Changes
+## Problem
+1. The QR generator and shared links use `window.location.origin`, so in preview they produce `https://preview--ncg-fleetone.lovable.app/public/complaint` — the "preview" URL leaks internal app context
+2. The published URL should be `https://ncg-fleetone.lovable.app/public/complaint` — clean, no "preview"
+3. Need to verify the public form cannot leak any data (SELECT queries, navigation to other pages, etc.)
 
-### 1. Add Type selector (Complaint / Good Feedback)
-- Add a "Type" toggle at the top of the public form (radio buttons or select) with options: **Complaint** and **Good Feedback**
-- When "Good Feedback" is selected: change the header icon/color to green, update title to "Submit Feedback", change button text, and store `type: 'good_feedback'` in the database
-- When "Complaint" is selected: keep current red/warning styling and store `type: 'complaint'`
-- Update the RLS INSERT policy to also allow `type = 'good_feedback'` (current policy only permits `type = 'complaint'`)
+## Security Audit (Already Confirmed)
+- The public form uses `createAnonymousClient()` with `persistSession: false`, no token storage — good
+- INSERT policy restricts anon to only `type IN ('complaint', 'good_feedback')`, `status = 'new'`, `reported_by IS NULL` — good, no data can be read back
+- The `.insert()` call does NOT use `.select()` — good, no SELECT needed
+- The `/public/complaint` route is outside `ProtectedRoute` — correct, it's a standalone page
+- No navigation links to internal pages exist on the public form — good
+- The anon key is a publishable key (read-only by design) — acceptable
 
-### 2. Allow multiple category selection
-- Replace the single `Select` dropdown for Category with a **multi-select checkbox list** (or badge-toggle approach)
-- Categories: Service Quality, Driver Behavior, Vehicle Condition, Scheduling Issues, Safety Concerns, Billing Issues, Customer Service, Other
-- Store as comma-separated string in the `category` column (e.g., `"driver,safety"`)
-- Update validation schema to accept an array of at least 1 category, then join before insert
+## Plan
 
-### 3. Make Route Number OR Bus Number mandatory (at least one)
-- Add a Zod `.refine()` to require at least one of `routeNumber` or `busNumber` to be filled
-- Add a helper text below the fields: "Please provide at least a Route Number or Bus Number"
-- Mark both labels with conditional asterisk styling
+### 1. Update QR Generator to use published domain
+**Modify `src/components/complaints/ComplaintQRGenerator.tsx`**
+- Replace `window.location.origin` with the published domain `https://ncg-fleetone.lovable.app`
+- Always generate QR code and URL pointing to `https://ncg-fleetone.lovable.app/public/complaint`
+- This ensures printed QR codes and copied links always use the clean published URL, regardless of whether staff generate them from preview or published site
 
-### 4. Update validation schema (`src/lib/validation.ts`)
-- Add `type` field: `z.enum(['complaint', 'good_feedback'])`
-- Change `category` from single string to `z.array(z.string()).min(1, 'At least one category is required')`
-- Add `.refine()` for route/bus: at least one must be non-empty
+### 2. Add security headers to the public form page
+**Modify `src/components/complaints/PublicComplaintForm.tsx`**
+- Add `useEffect` to set `document.title` to a generic "NCG Express - Submit Feedback" (no internal info)
+- Ensure no console.log statements leak internal data in production
 
-### 5. Update success screen
-- When type is "Good Feedback", show a different success message ("Thank you for your positive feedback!")
+### 3. No migration needed
+- RLS policies are already correctly configured
+- The anon INSERT policy properly restricts what can be submitted
+- No SELECT policy exists for anon — data cannot be read
+
+## Result
+- QR codes and shared links will always point to `https://ncg-fleetone.lovable.app/public/complaint`
+- The public form remains fully isolated — insert only, no data leakage
+- Staff can share the link/QR safely with customers
 
 ## Files
-- **Modify**: `src/components/complaints/PublicComplaintForm.tsx` — add type toggle, multi-category, route/bus validation UI
-- **Modify**: `src/lib/validation.ts` — update schema with type, multi-category array, route/bus refine
-- **New migration**: Update public INSERT RLS policy to allow `type = 'good_feedback'`
+- **Modify**: `src/components/complaints/ComplaintQRGenerator.tsx` — hardcode published domain
+- **Modify**: `src/components/complaints/PublicComplaintForm.tsx` — set proper page title
 
