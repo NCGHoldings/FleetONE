@@ -50,8 +50,9 @@ export const BusDocumentPreviewModal = ({
   const getPublicUrl = (fileName: string) => {
     const keyMatch = Object.keys(docMap).find(k =>
       k.replace(/\s+/g, '') === busNo.replace(/\s+/g, '')
-    );
-    return `/bus_details/${keyMatch}/${fileName}`;
+    ) || busNo;
+    const encodedPath = `${encodeURIComponent(keyMatch)}/${encodeURIComponent(fileName)}`;
+    return `https://wwjpdszkmtnzshbulkon.supabase.co/storage/v1/object/public/bus-documents/${encodedPath}`;
   };
 
   const getBusFolderLink = () => {
