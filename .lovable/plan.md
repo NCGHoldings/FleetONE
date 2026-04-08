@@ -1,52 +1,69 @@
 
 
-# Fix: Bulk Add Added School & Special Hire Buses — Revert and Filter
+# Fix Old Running Routes & Add Driver/Conductor Dropdowns
 
-## Problem
-You clicked "Bulk Add All" and it added all 218 buses from the fleet — including 93 School Buses and 6 Special Hire buses. The Fleet Sheet should only contain **Public Bus** category buses (119 buses).
+## Issues to Fix
 
-## Fix
+### 1. "OLD RUNNING ROUTES" buses should default to "Stopped"
+Currently buses under the "OLD RUNNING ROUTES" section show as "Running" — these are legacy/retired routes and should be marked "Stopped" by default so they don't count toward trip creation.
 
-### 1. Database Migration — Remove non-Public Bus roster entries
-Delete roster entries for buses that belong to "School Bus" or "Special Hire" categories:
+**Fix**: SQL migration to update `fleet_master_roster.remark = 'Stopped'` for all rows where `section = 'OLD RUNNING ROUTES'` and remark is currently 'Running'.
+
+### 2. Driver & Conductor fields are free-text — should be searchable dropdowns
+Currently Driver and Conductor are plain text inputs (click-to-edit). Users can type anything, leading to inconsistent names. These should be **combobox dropdowns** populated from the existing roster data (unique driver/conductor names already entered across all roster rows), similar to how the Route field works.
+
+**Fix**: In `FleetMasterSpreadsheetCore.tsx`:
+- Collect unique driver and conductor names from all roster rows
+- Replace `renderEditableCell` for driver/conductor with a combobox (like route selector)
+- Allow both selection from existing names AND typing new names
+- Show matching suggestions as the user types
+
+### 3. Odometer system location guide
+The odometer management is in **Real-Time Tracking** page (`/real-time-tracking`):
+- "Odometer Overview" button shows all buses' odometer status
+- Individual bus cards have "Set Odometer" for manual entry
+- "Adjust" button for corrections
+- The Fleet Sheet also has Start KM / End KM columns for daily entry
+
+No code change needed — just guidance (provided below).
+
+## Technical Details
+
+### File: New SQL migration
 ```sql
-DELETE FROM fleet_master_roster 
-WHERE bus_id IN (
-  SELECT id FROM buses 
-  WHERE category_id IN (
-    'd4accac9-0ff0-4147-9f03-b316920e3c73',  -- School Bus
-    '6193b18f-3d26-4392-a03d-e43aa36b05f8'   -- Special Hire
-  )
-);
+UPDATE fleet_master_roster 
+SET remark = 'Stopped' 
+WHERE section = 'OLD RUNNING ROUTES' 
+  AND (remark = 'Running' OR remark IS NULL);
 ```
-This removes ~99 incorrectly added entries and restores the roster to Public Bus only.
 
-### 2. Fix `bulkAddAllBuses` — Filter by Public Bus category only
-**File: `src/hooks/useFleetMasterSpreadsheet.ts` (line 629)**
+### File: `src/components/fleet/FleetMasterSpreadsheetCore.tsx`
 
-Change the query from:
+**Extract unique names from rows**:
 ```typescript
-supabase.from("buses").select("id, bus_no, route")
-```
-To:
-```typescript
-supabase.from("buses").select("id, bus_no, route, category_id")
-  .eq("category_id", "8ba0dd7b-c503-4c3e-86e0-ac68480f3f8c") // Public Bus only
+const uniqueDrivers = [...new Set(rows.map(r => r.default_driver).filter(Boolean))].sort();
+const uniqueConductors = [...new Set(rows.map(r => r.default_conductor).filter(Boolean))].sort();
 ```
 
-### 3. Fix `loadAvailableBuses` — Also filter by Public Bus
-**File: `src/components/fleet/FleetMasterSpreadsheet.tsx` (line 53-58)**
+**New `renderCrewCombobox` function** — reuse the same Popover+Command pattern as `renderRouteCell`:
+- Shows current name or placeholder
+- Searchable list of existing names from the roster
+- User can type and select, or type a completely new name
+- Replaces the current free-text `renderEditableCell` calls for `default_driver` and `default_conductor` (lines 393-394)
 
-Same filter — the "Add Bus" dropdown should only show Public Bus category buses.
+## Odometer System Location
+The odometer features are on the **Real-Time Tracking** page (sidebar → "Real-Time Tracking"). There you'll find:
+- **Odometer Overview** button — shows all buses with their current readings
+- Per-bus **Set Odometer** / **Adjust** buttons
+- The **Fleet Sheet** (Daily Trips → Fleet Sheet tab) also has Start KM and End KM columns for daily odometer entry
 
 ## Files to Change
-- New SQL migration — delete non-Public Bus roster entries
-- `src/hooks/useFleetMasterSpreadsheet.ts` — filter bulkAddAllBuses to Public Bus category
-- `src/components/fleet/FleetMasterSpreadsheet.tsx` — filter loadAvailableBuses to Public Bus category
+- New SQL migration — set "OLD RUNNING ROUTES" buses to "Stopped"
+- `src/components/fleet/FleetMasterSpreadsheetCore.tsx` — replace driver/conductor free-text with searchable combobox dropdowns
 
 ## Result
-- Roster reverts to ~119 Public Bus entries (your original 46 + any others)
-- "Bulk Add All" only adds Public Bus category buses going forward
-- "Add Bus" dropdown only shows Public Bus options
-- School Bus and Special Hire buses never appear in the Fleet Sheet
+- Old route buses automatically marked "Stopped" — won't generate trips
+- Driver/Conductor fields show searchable dropdowns with existing names
+- Users can still type new names not in the list
+- Consistent crew naming across the roster
 
