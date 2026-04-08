@@ -298,7 +298,7 @@ export const APPaymentsView = () => {
                         <Badge variant="outline" className="text-xs ml-1">Fees</Badge>
                       )}
                       {(payment as any).document_url && (
-                        <Paperclip className="h-3.5 w-3.5 text-primary ml-1" title="Has attachment" />
+                        <span title="Has attachment"><Paperclip className="h-3.5 w-3.5 text-primary ml-1" /></span>
                       )}
                     </div>
                   </TableCell>
