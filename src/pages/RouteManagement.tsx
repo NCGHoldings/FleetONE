@@ -4,13 +4,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit, Trash2, Map, MapPin, GitMerge } from "lucide-react";
+import { Plus, Edit, Trash2, Map, MapPin, GitMerge, Bus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
@@ -23,6 +22,8 @@ import {
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 
 interface FleetRoute {
   id: string;
@@ -33,6 +34,7 @@ interface FleetRoute {
   distance_km: number | null;
   fare_amount: number | null;
   is_active: boolean;
+  category: string | null;
 }
 
 export default function RouteManagement() {
@@ -40,6 +42,8 @@ export default function RouteManagement() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRoute, setEditingRoute] = useState<FleetRoute | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [busCountMap, setBusCountMap] = useState<Record<string, number>>({});
 
   // Merge state
   const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
@@ -55,6 +59,7 @@ export default function RouteManagement() {
     distance_km: "",
     fare_amount: "",
     is_active: true,
+    category: "Public Bus",
   });
 
   const fetchRoutes = async () => {
@@ -74,9 +79,57 @@ export default function RouteManagement() {
     }
   };
 
+  const fetchBusCounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("buses")
+        .select("route");
+
+      if (error) throw error;
+      
+      // Count buses per route name (normalize for matching)
+      const counts: Record<string, number> = {};
+      (data || []).forEach((bus: any) => {
+        if (bus.route) {
+          const normalized = bus.route.toLowerCase().replace(/[\s\-–]+/g, " ").trim();
+          counts[normalized] = (counts[normalized] || 0) + 1;
+        }
+      });
+      setBusCountMap(counts);
+    } catch (error: any) {
+      console.error("Error fetching bus counts:", error);
+    }
+  };
+
+  const getBusCount = (routeName: string): number => {
+    const normalized = routeName.toLowerCase().replace(/[\s\-–]+/g, " ").trim();
+    // Check exact and fuzzy matches
+    let count = busCountMap[normalized] || 0;
+    // Also check if any bus route contains this route name or vice versa
+    if (count === 0) {
+      Object.entries(busCountMap).forEach(([key, val]) => {
+        if (key.includes(normalized) || normalized.includes(key)) {
+          count += val;
+        }
+      });
+    }
+    return count;
+  };
+
   useEffect(() => {
     fetchRoutes();
+    fetchBusCounts();
   }, []);
+
+  const filteredRoutes = routes.filter((r) => {
+    if (categoryFilter === "all") return true;
+    if (categoryFilter === "public") return r.category === "Public Bus";
+    if (categoryFilter === "school") return r.category === "School Bus";
+    return true;
+  });
+
+  const publicCount = routes.filter(r => r.category === "Public Bus").length;
+  const schoolCount = routes.filter(r => r.category === "School Bus").length;
 
   const handleOpenEdit = (routeItem: FleetRoute) => {
     setFormData({
@@ -87,6 +140,7 @@ export default function RouteManagement() {
       distance_km: routeItem.distance_km ? String(routeItem.distance_km) : "",
       fare_amount: routeItem.fare_amount ? String(routeItem.fare_amount) : "",
       is_active: routeItem.is_active !== false,
+      category: routeItem.category || "Public Bus",
     });
     setEditingRoute(routeItem);
     setIsDialogOpen(true);
@@ -101,6 +155,7 @@ export default function RouteManagement() {
       distance_km: "",
       fare_amount: "",
       is_active: true,
+      category: "Public Bus",
     });
     setEditingRoute(null);
     setIsDialogOpen(true);
@@ -121,6 +176,7 @@ export default function RouteManagement() {
         distance_km: formData.distance_km ? parseFloat(formData.distance_km) : null,
         fare_amount: formData.fare_amount ? parseFloat(formData.fare_amount) : null,
         is_active: formData.is_active,
+        category: formData.category,
       };
 
       if (editingRoute) {
@@ -175,31 +231,22 @@ export default function RouteManagement() {
       const target = routes.find(r => r.id === mergeTargetId);
       if (!source || !target) throw new Error("Invalid routes selected");
 
-      // Update fleet_master_roster
       await supabase.from("fleet_master_roster")
         .update({ route_id: target.id, route_label: target.route_name })
         .or(`route_id.eq.${source.id},route_label.eq.${source.route_name}`);
 
-      // Update daily_trips
       await supabase.from("daily_trips")
         .update({ route_id: target.id, route_label: target.route_name })
         .or(`route_id.eq.${source.id},route_label.eq.${source.route_name}`);
 
-      // Update buses table route string
       await supabase.from("buses")
         .update({ route: target.route_name })
         .eq("route", source.route_name);
 
-      // Update other foreign key tables referencing routes.id
       const tablesWithRouteId = [
-        "ap_invoices",
-        "driver_allocations",
-        "journal_entry_lines",
-        "multi_day_route_config",
-        "real_time_tracking",
-        "route_permits",
-        "route_targets",
-        "staff_commissions"
+        "ap_invoices", "driver_allocations", "journal_entry_lines",
+        "multi_day_route_config", "real_time_tracking", "route_permits",
+        "route_targets", "staff_commissions"
       ];
       
       for (const tableName of tablesWithRouteId) {
@@ -208,7 +255,6 @@ export default function RouteManagement() {
           .eq("route_id", source.id);
       }
 
-      // Finally duplicate the source route to delete
       const { error: delError } = await supabase.from("routes").delete().eq("id", source.id);
       if (delError) throw delError;
 
@@ -217,6 +263,7 @@ export default function RouteManagement() {
       setMergeSourceId("");
       setMergeTargetId("");
       fetchRoutes();
+      fetchBusCounts();
     } catch (error: any) {
       console.error("Merge error:", error);
       toast.error(error.message || "Failed to merge routes.");
@@ -251,6 +298,7 @@ export default function RouteManagement() {
         </div>
       </div>
 
+      {/* Merge Dialog */}
       <Dialog open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -258,54 +306,41 @@ export default function RouteManagement() {
           </DialogHeader>
           <div className="space-y-4 py-4 text-sm text-muted-foreground">
             <p>
-              This tool helps clean up duplicate routing names (e.g., "Colombo-Badulla" and "Col-Badulla") by finding all references to a redundant route in the Roster, Daily Trips, and Bus data, porting them instantly to the Official Target Route, and safely deleting the redundant one.
+              This tool helps clean up duplicate routing names by finding all references to a redundant route and porting them to the Official Target Route, then safely deleting the redundant one.
             </p>
             <div className="space-y-2">
               <Label>Source Route (Duplicate to DELETE)</Label>
               <Select value={mergeSourceId} onValueChange={setMergeSourceId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select redundant route..." />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select redundant route..." /></SelectTrigger>
                 <SelectContent>
                   {routes.map(r => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.route_name}
-                    </SelectItem>
+                    <SelectItem key={r.id} value={r.id}>{r.route_name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            
             <div className="flex justify-center py-2">
               <GitMerge className="h-4 w-4 text-muted-foreground/50 rotate-90" />
             </div>
-
             <div className="space-y-2">
               <Label>Target Route (Official route to KEEP)</Label>
               <Select value={mergeTargetId} onValueChange={setMergeTargetId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select official canonical route..." />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select official canonical route..." /></SelectTrigger>
                 <SelectContent>
                   {routes.map(r => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.route_name}
-                    </SelectItem>
+                    <SelectItem key={r.id} value={r.id}>{r.route_name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <Button 
-              className="w-full mt-6" 
-              onClick={handleMerge} 
-              disabled={isMerging || !mergeSourceId || !mergeTargetId}
-            >
+            <Button className="w-full mt-6" onClick={handleMerge} disabled={isMerging || !mergeSourceId || !mergeTargetId}>
               {isMerging ? "Merging historical records..." : "Merge and Delete Source"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -314,74 +349,49 @@ export default function RouteManagement() {
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-4 gap-4 items-center">
               <Label htmlFor="route_no" className="text-right">Route No *</Label>
-              <Input
-                id="route_no"
-                placeholder="e.g. 99"
-                value={formData.route_no}
-                onChange={(e) => setFormData({ ...formData, route_no: e.target.value })}
-                className="col-span-3"
-              />
+              <Input id="route_no" placeholder="e.g. 99" value={formData.route_no}
+                onChange={(e) => setFormData({ ...formData, route_no: e.target.value })} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 gap-4 items-center">
               <Label htmlFor="route_name" className="text-right">Route Name *</Label>
-              <Input
-                id="route_name"
-                placeholder="e.g. Colombo - Badulla"
-                value={formData.route_name}
-                onChange={(e) => setFormData({ ...formData, route_name: e.target.value })}
-                className="col-span-3"
-              />
+              <Input id="route_name" placeholder="e.g. Colombo - Badulla" value={formData.route_name}
+                onChange={(e) => setFormData({ ...formData, route_name: e.target.value })} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 gap-4 items-center">
+              <Label htmlFor="category" className="text-right">Category</Label>
+              <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
+                <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Public Bus">Public Bus</SelectItem>
+                  <SelectItem value="School Bus">School Bus</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-4 gap-4 items-center">
               <Label htmlFor="start_location" className="text-right">Start Loc</Label>
-              <Input
-                id="start_location"
-                placeholder="Colombo"
-                value={formData.start_location}
-                onChange={(e) => setFormData({ ...formData, start_location: e.target.value })}
-                className="col-span-3"
-              />
+              <Input id="start_location" placeholder="Colombo" value={formData.start_location}
+                onChange={(e) => setFormData({ ...formData, start_location: e.target.value })} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 gap-4 items-center">
               <Label htmlFor="end_location" className="text-right">End Loc</Label>
-              <Input
-                id="end_location"
-                placeholder="Badulla"
-                value={formData.end_location}
-                onChange={(e) => setFormData({ ...formData, end_location: e.target.value })}
-                className="col-span-3"
-              />
+              <Input id="end_location" placeholder="Badulla" value={formData.end_location}
+                onChange={(e) => setFormData({ ...formData, end_location: e.target.value })} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 gap-4 items-center">
               <Label htmlFor="distance_km" className="text-right">Distance (km)</Label>
-              <Input
-                id="distance_km"
-                type="number"
-                placeholder="210"
-                value={formData.distance_km}
-                onChange={(e) => setFormData({ ...formData, distance_km: e.target.value })}
-                className="col-span-3"
-              />
+              <Input id="distance_km" type="number" placeholder="210" value={formData.distance_km}
+                onChange={(e) => setFormData({ ...formData, distance_km: e.target.value })} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 gap-4 items-center">
               <Label htmlFor="fare_amount" className="text-right">Fare (Rs)</Label>
-              <Input
-                id="fare_amount"
-                type="number"
-                placeholder="1500"
-                value={formData.fare_amount}
-                onChange={(e) => setFormData({ ...formData, fare_amount: e.target.value })}
-                className="col-span-3"
-              />
+              <Input id="fare_amount" type="number" placeholder="1500" value={formData.fare_amount}
+                onChange={(e) => setFormData({ ...formData, fare_amount: e.target.value })} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 gap-4 items-center">
               <Label htmlFor="is_active" className="text-right">Active?</Label>
               <div className="col-span-3 flex items-center">
-                <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                />
+                <Switch id="is_active" checked={formData.is_active}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
               </div>
             </div>
             <Button className="w-full mt-4" onClick={handleSubmit}>
@@ -391,81 +401,98 @@ export default function RouteManagement() {
         </DialogContent>
       </Dialog>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Route No</TableHead>
-                <TableHead>Route Name</TableHead>
-                <TableHead>Locations</TableHead>
-                <TableHead>Distance</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    Loading routes...
-                  </TableCell>
-                </TableRow>
-              ) : routes.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No routes defined. Add your first standardized route above.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                routes.map((route) => (
-                  <TableRow key={route.id} className="group">
-                    <TableCell className="font-semibold">{route.route_no}</TableCell>
-                    <TableCell className="font-medium text-primary">
-                      {route.route_name}
-                    </TableCell>
-                    <TableCell>
-                       <div className="flex items-center text-sm text-muted-foreground gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {route.start_location || "?"} <span className="mx-1">→</span> {route.end_location || "?"}
-                       </div>
-                    </TableCell>
-                    <TableCell>{route.distance_km ? `${route.distance_km} km` : "-"}</TableCell>
-                    <TableCell>
-                      {route.is_active ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
-                          Inactive
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenEdit(route)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDelete(route.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+      {/* Category Tabs */}
+      <Tabs value={categoryFilter} onValueChange={setCategoryFilter}>
+        <TabsList>
+          <TabsTrigger value="all">All Routes ({routes.length})</TabsTrigger>
+          <TabsTrigger value="public">Public Bus ({publicCount})</TabsTrigger>
+          <TabsTrigger value="school">School Bus ({schoolCount})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={categoryFilter}>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Route No</TableHead>
+                    <TableHead>Route Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Locations</TableHead>
+                    <TableHead>Distance</TableHead>
+                    <TableHead className="text-center">Buses</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8">Loading routes...</TableCell>
+                    </TableRow>
+                  ) : filteredRoutes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        No routes found for this category.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredRoutes.map((route) => {
+                      const busCount = getBusCount(route.route_name);
+                      return (
+                        <TableRow key={route.id} className="group">
+                          <TableCell className="font-semibold">{route.route_no}</TableCell>
+                          <TableCell className="font-medium text-primary">{route.route_name}</TableCell>
+                          <TableCell>
+                            <Badge variant={route.category === "School Bus" ? "secondary" : "outline"}
+                              className={route.category === "School Bus" 
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" 
+                                : "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"}>
+                              {route.category || "Public Bus"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center text-sm text-muted-foreground gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {route.start_location || "?"} <span className="mx-1">→</span> {route.end_location || "?"}
+                            </div>
+                          </TableCell>
+                          <TableCell>{route.distance_km ? `${route.distance_km} km` : "-"}</TableCell>
+                          <TableCell className="text-center">
+                            {busCount > 0 ? (
+                              <span className="inline-flex items-center gap-1 text-sm font-medium text-foreground">
+                                <Bus className="w-3.5 h-3.5 text-muted-foreground" />
+                                {busCount}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {route.is_active ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Active</span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">Inactive</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(route)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(route.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
