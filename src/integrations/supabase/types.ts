@@ -1014,6 +1014,7 @@ export type Database = {
           total_with_fees: number | null
           updated_at: string | null
           vendor_bank_account_id: string | null
+          vendor_bill_number: string | null
           vendor_id: string | null
         }
         Insert: {
@@ -1044,6 +1045,7 @@ export type Database = {
           total_with_fees?: number | null
           updated_at?: string | null
           vendor_bank_account_id?: string | null
+          vendor_bill_number?: string | null
           vendor_id?: string | null
         }
         Update: {
@@ -1074,6 +1076,7 @@ export type Database = {
           total_with_fees?: number | null
           updated_at?: string | null
           vendor_bank_account_id?: string | null
+          vendor_bill_number?: string | null
           vendor_id?: string | null
         }
         Relationships: [
