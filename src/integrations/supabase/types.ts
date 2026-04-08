@@ -17108,6 +17108,7 @@ export type Database = {
       }
       routes: {
         Row: {
+          category: string | null
           created_at: string
           distance_km: number | null
           end_location: string
@@ -17123,6 +17124,7 @@ export type Database = {
           via_locations: string[] | null
         }
         Insert: {
+          category?: string | null
           created_at?: string
           distance_km?: number | null
           end_location: string
@@ -17138,6 +17140,7 @@ export type Database = {
           via_locations?: string[] | null
         }
         Update: {
+          category?: string | null
           created_at?: string
           distance_km?: number | null
           end_location?: string
