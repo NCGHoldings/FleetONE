@@ -1,51 +1,77 @@
 
 
-# Add Document Upload to AP Payments + Fix Journal Entry Related Documents
+# Daily Trips Page — Structure Guide and Issues Found
 
-## Problems
+## How This Page Works
 
-### 1. AP Payment form has no document upload option
-When recording an AP Payment, there is no way to attach a supporting document (e.g., payment proof, bank slip, vendor receipt). The `ap_payments` table also lacks a column for storing the uploaded file path.
+The `/trips` page is the **NCG Express Operations** hub with 6 tabs:
 
-### 2. Journal Entry "Related Documents" shows wrong/incomplete links
-The `JournalEntryDetailDialog` finds related documents by querying `journal_entry_id` on finance tables (ar_invoices, ap_invoices, etc.), but:
-- It only shows finance-side records, not operation-side generated documents (e.g., Special Hire invoices/receipts stored in `document_storage`)
-- When clicking the eye icon, `FinanceDocumentPreviewModal` regenerates HTML from template — it does NOT show the actual stored PDF/document from operations
-- Special Hire payments link to `document_storage` records that have actual generated PDFs (`storage_path`), but these are never surfaced
+```text
+┌──────────────────────────────────────────────────────┐
+│  Daily Trips │ Fleet Sheet │ Bus P&L │ Route P&L │ ...│
+└──────────────────────────────────────────────────────┘
+```
 
-## Implementation
+1. **Daily Trips** — Shows bus-level trip summaries (table/card/crew views) with revenue, expenses, profit. Data comes from `daily_trips` + `daily_bus_expenses` tables.
+2. **Fleet Sheet** — The Master Roster spreadsheet (what you see in screenshot). Shows all rostered buses with routes, drivers, conductors, and allows inline editing.
+3. **Bus P&L / Route P&L** — Profitability reports.
+4. **Cashier Sett. / Bank Deposit** — Settlement and deposit dashboards.
 
-### Step 1: Add `document_url` column to `ap_payments`
-Migration to add a nullable `text` column for storing the Supabase Storage path of uploaded supporting documents.
+### Why KPIs Show Zero
 
-### Step 2: Add file upload to `APPaymentForm.tsx`
-- Add a file input field (after Notes) for uploading a supporting document (PDF, image)
-- Upload to Supabase Storage bucket `documents` under path `ap_payments/{payment_id}/{filename}`
-- Save the storage path to `ap_payments.document_url` after payment creation
-- Show file preview/name after selection
+The KPIs (Revenue, Expenses, Net Income, Mileage, Fuel) show LKR 0.00 because **no trips have been created for today (April 8th)**. The toast "No trip generated — You must click 'Create Trips' for today before you can override daily values" confirms this.
 
-### Step 3: Show uploaded document in AP Payments list
-In `APPaymentsView.tsx`, add a paperclip icon or document badge on payments that have a `document_url`, with click-to-view functionality.
+**Workflow**: Master Roster → Click "Create Trips" button → This generates `daily_trips` records for today → Then you can enter income/expense data → KPIs update.
 
-### Step 4: Fix Journal Entry Related Documents to show operational documents
-Update `JournalEntryDetailDialog.tsx` query to also fetch:
-- `document_storage` records linked via `special_hire_payments` → `payment_id` → `document_storage.payment_id`
-- When a related doc has a `storage_path` (actual PDF), show a "View PDF" button that opens the Supabase Storage URL directly, instead of trying to regenerate from template
-- For finance-side documents (AR/AP invoices etc.), keep current template-based preview
+## Issues Found
 
-### Step 5: Add AP Payment document preview in JE Related Docs
-When a related document is an `ap_payment` with a `document_url`, show both:
-- The template-based Payment Voucher preview (existing)
-- A "View Attachment" button to open the uploaded supporting document
+### Issue 1: Fleet Sheet has its own date picker that is separate from Daily Trips date picker
+The Fleet Sheet component (`FleetMasterSpreadsheet`) has its own internal `selectedDate` state (line 20) that is **independent** from the parent page's date. When you switch between tabs, the dates can be out of sync. The parent page's date controls only affect the Daily Trips tab, not Fleet Sheet.
+
+**Fix**: Pass the parent page's `selectedDate` down to `FleetMasterSpreadsheet` so both tabs use the same date.
+
+### Issue 2: "Buses Running" count only counts roster entries with remark = 'Running'
+Line 656: `roster.filter(r => r.remark === 'Running').length` — this works correctly, but if buses have no remark set, they won't be counted. Some roster entries may have null/empty remarks.
+
+**Fix**: Count buses where `remark === 'Running' || !remark` (default to counting if no remark set), or ensure all roster entries have a remark.
+
+### Issue 3: Daily mode edit shows confusing toast when no trips exist
+When editMode is 'daily' and you try to edit a field, it shows "No trip generated" toast (line 418). This is correct behavior but the user experience is confusing — it should be clearer that you need to create trips first.
+
+**Fix**: Add a visible banner/alert at the top of the Fleet Sheet when no trips exist for the selected date, with a prominent "Create Trips" CTA.
+
+### Issue 4: Excessive debug logging in production
+The `useDailyBusGroupedTrips` hook has ~15 `console.log` debug statements that run on every data fetch. These should be removed or gated behind a debug flag.
+
+**Fix**: Remove or wrap all debug console.log statements.
+
+## Implementation Plan
+
+### Step 1: Sync Fleet Sheet date with parent page date
+In `DailyTrips.tsx`, pass `selectedDate` to `FleetMasterSpreadsheet`:
+```tsx
+<FleetMasterSpreadsheet initialDate={selectedDate} />
+```
+Update `FleetMasterSpreadsheet` to accept and use `initialDate` prop.
+
+### Step 2: Add "No Trips" banner to Fleet Sheet
+When no trips exist for the selected date, show a clear alert with "Create Trips" button instead of relying on toast messages.
+
+### Step 3: Fix "Buses Running" count
+Default to counting buses that have remark = 'Running' OR null/empty remark (since most buses are running by default).
+
+### Step 4: Clean up debug logging
+Remove excessive `console.log` statements from `useDailyBusGroupedTrips.ts`.
 
 ## Files to Change
-- New migration: add `document_url` column to `ap_payments`
-- `src/components/accounting/APPaymentForm.tsx` — add file upload field + upload logic
-- `src/components/accounting/APPaymentsView.tsx` — show attachment indicator
-- `src/components/accounting/JournalEntryDetailDialog.tsx` — expand related docs query to include `document_storage` records and show actual stored PDFs
+- `src/pages/DailyTrips.tsx` — pass date to Fleet Sheet
+- `src/components/fleet/FleetMasterSpreadsheet.tsx` — accept initial date prop, add no-trips banner
+- `src/hooks/useFleetMasterSpreadsheet.ts` — fix bus count logic
+- `src/hooks/useDailyBusGroupedTrips.ts` — remove debug logs
 
 ## Result
-- AP Payment form supports document upload (bank slips, receipts)
-- Journal Entry detail shows both finance-side and operation-side documents
-- Stored PDFs from operations (Special Hire etc.) open directly instead of regenerating from template
+- Fleet Sheet and Daily Trips tabs share the same date
+- Clear visual indicator when trips haven't been created yet
+- Accurate "Buses Running" count
+- Clean console output without debug noise
 
