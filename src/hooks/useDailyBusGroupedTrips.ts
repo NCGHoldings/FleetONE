@@ -335,11 +335,20 @@ export function useDailyBusGroupedTrips(
         const netProfit = totalRevenue - totalExpenses;
         const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
         
+        // Calculate fuel liters and odometer range
+        const totalFuelLiters = trips.reduce((sum, t) => sum + (t.fuel_liters || 0), 0);
+        const dieselPrice = expense?.diesel_price_per_liter || 0;
+        
+        const startOdos = trips.map(t => t.start_odo).filter((v): v is number => v != null && v > 0);
+        const endOdos = trips.map(t => t.end_odo).filter((v): v is number => v != null && v > 0);
+        const minStartOdo = startOdos.length > 0 ? Math.min(...startOdos) : null;
+        const maxEndOdo = endOdos.length > 0 ? Math.max(...endOdos) : null;
+        
         // Calculate km/L (distance / fuel liters)
         let avgKmPerLiter = 0;
-        if (fuelCost > 0 && expense?.diesel_price_per_liter && totalDistance > 0) {
-          const liters = fuelCost / expense.diesel_price_per_liter;
-          avgKmPerLiter = totalDistance / liters;
+        const effectiveLiters = totalFuelLiters > 0 ? totalFuelLiters : (fuelCost > 0 && dieselPrice > 0 ? fuelCost / dieselPrice : 0);
+        if (effectiveLiters > 0 && totalDistance > 0) {
+          avgKmPerLiter = totalDistance / effectiveLiters;
         }
         
         const routes = [...new Set(trips.map(t => t.route_name).filter(Boolean))];
@@ -361,6 +370,10 @@ export function useDailyBusGroupedTrips(
           net_profit: netProfit,
           profit_margin: profitMargin,
           avg_km_per_liter: avgKmPerLiter,
+          total_fuel_liters: totalFuelLiters > 0 ? totalFuelLiters : effectiveLiters,
+          diesel_price_per_liter: dieselPrice,
+          min_start_odo: minStartOdo,
+          max_end_odo: maxEndOdo,
           routes,
           drivers,
           conductors,
