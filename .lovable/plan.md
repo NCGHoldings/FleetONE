@@ -1,69 +1,78 @@
 
 
-# Fix Old Running Routes & Add Driver/Conductor Dropdowns
+# Route Management Overhaul — Group Routes by Corridor & Clean Duplicates
 
-## Issues to Fix
+## Current Problem
 
-### 1. "OLD RUNNING ROUTES" buses should default to "Stopped"
-Currently buses under the "OLD RUNNING ROUTES" section show as "Running" — these are legacy/retired routes and should be marked "Stopped" by default so they don't count toward trip creation.
+The Route Dictionary has 33 public routes but many are duplicates or return-legs of the same corridor:
 
-**Fix**: SQL migration to update `fleet_master_roster.remark = 'Stopped'` for all rows where `section = 'OLD RUNNING ROUTES'` and remark is currently 'Running'.
+| Duplicate Pair | Should Be |
+|---|---|
+| "Jaffna To Moratuwa" (R17559903319470) + "Jaffna - Moratuwa" (87R) | Merge into "Jaffna - Moratuwa" (87R) |
+| "Moratuwa To Jaffna" (R17559903319471) + "Moratuwa - Jaffna" (87) | Merge into "Moratuwa - Jaffna" (87) |
+| "Colombo - Jaffna" (CJ-01) + "Colombo - Jaffna A9" (R105) | Merge into "Colombo - Jaffna" (CJ-01) |
+| "Colombo - Kandy" (CK-01) + "Colombo - Kandy Express" (R101) | Merge into "Colombo - Kandy" (CK-01) |
 
-### 2. Driver & Conductor fields are free-text — should be searchable dropdowns
-Currently Driver and Conductor are plain text inputs (click-to-edit). Users can type anything, leading to inconsistent names. These should be **combobox dropdowns** populated from the existing roster data (unique driver/conductor names already entered across all roster rows), similar to how the Route field works.
+Additionally, routes that are return-legs of the same corridor should be **grouped** visually:
 
-**Fix**: In `FleetMasterSpreadsheetCore.tsx`:
-- Collect unique driver and conductor names from all roster rows
-- Replace `renderEditableCell` for driver/conductor with a combobox (like route selector)
-- Allow both selection from existing names AND typing new names
-- Show matching suggestions as the user types
+```text
+📍 Badulla ↔ Makumbura Corridor
+   ├── Route 15:  Badulla to Makumbura
+   └── Route 15R: Makumbura to Badulla
 
-### 3. Odometer system location guide
-The odometer management is in **Real-Time Tracking** page (`/real-time-tracking`):
-- "Odometer Overview" button shows all buses' odometer status
-- Individual bus cards have "Set Odometer" for manual entry
-- "Adjust" button for corrections
-- The Fleet Sheet also has Start KM / End KM columns for daily entry
+📍 Moratuwa ↔ Jaffna Corridor
+   ├── Route 87:  Moratuwa - Jaffna
+   └── Route 87R: Jaffna - Moratuwa
+```
 
-No code change needed — just guidance (provided below).
+## Solution — Two Parts
 
-## Technical Details
+### Part 1: Add Route Grouping (corridor concept)
 
-### File: New SQL migration
+**Database**: Add a `route_group` column to the `routes` table. Routes sharing a corridor get the same group name (e.g., "Badulla - Makumbura"). This is optional — ungrouped routes display normally.
+
 ```sql
-UPDATE fleet_master_roster 
-SET remark = 'Stopped' 
-WHERE section = 'OLD RUNNING ROUTES' 
-  AND (remark = 'Running' OR remark IS NULL);
+ALTER TABLE routes ADD COLUMN route_group text;
+
+-- Group known corridors
+UPDATE routes SET route_group = 'Badulla - Makumbura' WHERE id IN ('2acef7d4-...', '086aabc2-...');
+UPDATE routes SET route_group = 'Moratuwa - Jaffna' WHERE id IN ('f8915451-...', 'ef2162a1-...');
+UPDATE routes SET route_group = 'Nittambuwa - Panadura' WHERE id IN ('5b37dea9-...', '4b8d9e0c-...');
+UPDATE routes SET route_group = 'Colombo - Rathnapura' WHERE id IN ('95ad6f87-...', '1526dfcc-...');
+UPDATE routes SET route_group = 'Kegalle - Colombo' WHERE id IN ('b2222712-...', 'c0342152-...');
 ```
 
-### File: `src/components/fleet/FleetMasterSpreadsheetCore.tsx`
+### Part 2: Merge true duplicates via migration
 
-**Extract unique names from rows**:
-```typescript
-const uniqueDrivers = [...new Set(rows.map(r => r.default_driver).filter(Boolean))].sort();
-const uniqueConductors = [...new Set(rows.map(r => r.default_conductor).filter(Boolean))].sort();
-```
+Merge duplicate routes (same corridor, just different naming) using the existing merge logic — update all referencing tables then delete the duplicate:
 
-**New `renderCrewCombobox` function** — reuse the same Popover+Command pattern as `renderRouteCell`:
-- Shows current name or placeholder
-- Searchable list of existing names from the roster
-- User can type and select, or type a completely new name
-- Replaces the current free-text `renderEditableCell` calls for `default_driver` and `default_conductor` (lines 393-394)
+- Merge "Jaffna To Moratuwa" → "Jaffna - Moratuwa" (87R)
+- Merge "Moratuwa To Jaffna" → "Moratuwa - Jaffna" (87)
+- Merge "Colombo - Jaffna A9" → "Colombo - Jaffna" (CJ-01)
+- Merge "Colombo - Kandy Express" → "Colombo - Kandy" (CK-01)
 
-## Odometer System Location
-The odometer features are on the **Real-Time Tracking** page (sidebar → "Real-Time Tracking"). There you'll find:
-- **Odometer Overview** button — shows all buses with their current readings
-- Per-bus **Set Odometer** / **Adjust** buttons
-- The **Fleet Sheet** (Daily Trips → Fleet Sheet tab) also has Start KM and End KM columns for daily odometer entry
+### Part 3: Enhance Route Dictionary UI
+
+Update `RouteManagement.tsx` to:
+1. **Group view**: Routes with the same `route_group` are displayed together under a corridor header with a collapsible section
+2. **Add route_group field** to the Add/Edit dialog so new routes can be assigned to an existing corridor
+3. **Auto-suggest grouping**: When adding a route, if start/end locations match an existing route's end/start, suggest linking them as a corridor
+4. **Corridor summary row**: Shows total buses, combined distance (round-trip), and both directions at a glance
+
+### Part 4: Fix "Colombo to Passara" bad data
+
+Route "Colombo to Passara" (8/1/99) has `start_location = "Colombo to Passara"` and `end_location = "Unknown"`. Fix to: `start_location = "Colombo"`, `end_location = "Passara"`.
 
 ## Files to Change
-- New SQL migration — set "OLD RUNNING ROUTES" buses to "Stopped"
-- `src/components/fleet/FleetMasterSpreadsheetCore.tsx` — replace driver/conductor free-text with searchable combobox dropdowns
+
+- **New SQL migration** — add `route_group` column, set groups for known corridors, merge true duplicates, fix bad data
+- **`src/pages/RouteManagement.tsx`** — add corridor grouping view, route_group field in add/edit dialog, auto-suggest grouping
 
 ## Result
-- Old route buses automatically marked "Stopped" — won't generate trips
-- Driver/Conductor fields show searchable dropdowns with existing names
-- Users can still type new names not in the list
-- Consistent crew naming across the roster
+
+- Duplicate routes cleaned up (33 → ~29 routes)
+- Related routes (forward/return) visually grouped under corridors
+- Route Dictionary becomes the single source of truth for all route management
+- Add/Edit dialog includes corridor assignment
+- Cleaner, more organized route list
 
