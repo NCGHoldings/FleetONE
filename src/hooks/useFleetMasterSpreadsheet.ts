@@ -414,10 +414,14 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
 
       if (editMode === 'daily') {
         const row = expandedRows.find(r => r.id === rosterId);
+        const rosterLevelFields = ['route_label', 'route_id', 'remark'];
         if (!row?.trip_id) {
-          toast({ title: "No trip generated", description: "You must click 'Create Trips' for today before you can override daily values.", variant: "destructive" });
-          return;
-        }
+          if (!rosterLevelFields.includes(field)) {
+            toast({ title: "No trip generated", description: "You must click 'Create Trips' for today before you can override daily values.", variant: "destructive" });
+            return;
+          }
+          // For roster-level fields, fall through to master roster update below
+        } else {
 
         const dailyUpdatePayload: Record<string, any> = {};
         
