@@ -29,6 +29,7 @@ const formSchema = z.object({
   referral_agent_id: z.string().optional(),
   representative_name: z.string().optional(),
   designation: z.string().optional(),
+  vehicle_year: z.number().min(2000).max(2100).default(new Date().getFullYear()),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.number().min(1, 'Unit price is required'),
   discount_amount: z.number().min(0).optional(),
@@ -78,6 +79,7 @@ interface YutongQuotation {
   curtain_colour?: string;
   body_colour?: string;
   seat_headrest_logo?: string;
+  vehicle_year?: number;
   status?: string;
   valid_until?: string;
   parent_quotation_id?: string;
@@ -178,6 +180,7 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
         referral_agent_id: quotation.referral_agent_id || '',
         representative_name: quotation.representative_name || '',
         designation: quotation.designation || '',
+        vehicle_year: (quotation as any).vehicle_year || new Date().getFullYear(),
         quantity: quotation.quantity || 1,
         unit_price: quotation.unit_price || 0,
         discount_amount: quotation.discount_amount || 0,
@@ -338,6 +341,7 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
           contact_person: data.contact_person || null,
           quantity: data.quantity,
           unit_price: data.unit_price,
+          vehicle_year: data.vehicle_year || new Date().getFullYear(),
           discount_amount: data.discount_amount || 0,
           total_price: totalPrice,
           special_features: data.special_features,
@@ -806,7 +810,24 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
                 <p className="text-xs text-muted-foreground mt-1">Bus model cannot be changed after quotation creation</p>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
+                <FormField
+                  control={form.control}
+                  name="vehicle_year"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Vehicle Year</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          onChange={(e) => field.onChange(Number(e.target.value))} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="quantity"
