@@ -449,8 +449,8 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                     <TableCell className="text-sm py-1 min-h-[40px]">{renderDropdownCell(row, 'permit_type', row.permit_type || '', PERMIT_TYPE_OPTIONS)}</TableCell>
                     <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'trips_per_day', row.trips_per_day, 'number')}</TableCell>
                     <TableCell className="text-sm py-1 min-h-[40px]">{renderDropdownCell(row, 'remark', row.remark || '', REMARK_OPTIONS)}</TableCell>
-                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'default_driver', editMode === 'daily' ? row.driver_name : row.default_driver)}</TableCell>
-                    <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'default_conductor', editMode === 'daily' ? row.conductor_name : row.default_conductor)}</TableCell>
+                    <TableCell className="text-sm py-1 min-h-[40px] p-0">{renderCrewCombobox(row, 'default_driver', (editMode === 'daily' ? row.driver_name : row.default_driver) || '')}</TableCell>
+                    <TableCell className="text-sm py-1 min-h-[40px] p-0">{renderCrewCombobox(row, 'default_conductor', (editMode === 'daily' ? row.conductor_name : row.default_conductor) || '')}</TableCell>
                     <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'turn_01_time', editMode === 'daily' ? (row as any).daily_turn_01_time ?? row.turn_01_time : row.turn_01_time)}</TableCell>
                     <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'turn_02_time', editMode === 'daily' ? (row as any).daily_turn_02_time ?? row.turn_02_time : row.turn_02_time)}</TableCell>
                     {/* Meter / Fuel cells */}
