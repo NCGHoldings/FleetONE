@@ -942,6 +942,7 @@ export const useCreateAPPayment = () => {
       vendor_bank_account_id?: string;
       bank_fee_amount?: number;
       bank_fee_type?: string;
+      vendor_bill_number?: string;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
@@ -990,6 +991,7 @@ export const useCreateAPPayment = () => {
           is_direct_payment: payment.is_direct_payment || false,
           bank_fee_amount: payment.bank_fee_amount || 0,
           bank_fee_type: payment.bank_fee_type || null,
+          vendor_bill_number: payment.vendor_bill_number || null,
           status: "posted",
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,
