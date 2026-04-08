@@ -20,11 +20,30 @@ interface BusStats {
   netIncome: number;
   lastTripDate: string;
   utilizationRate: number;
+  routes?: string[];
+  totalFuelCost?: number;
+  totalFuelLiters?: number;
+  fuelPercentage?: number;
+  stdFuelRate?: number;
+  incomePerKm?: number;
 }
 
 interface BusFleetSectionProps {
   busStats: BusStats[];
 }
+
+const getFuelPercentColor = (pct: number) => {
+  if (pct <= 0) return 'text-muted-foreground';
+  if (pct < 40) return 'text-emerald-600';
+  if (pct < 60) return 'text-amber-600';
+  return 'text-red-600';
+};
+
+const getGapColor = (gap: number) => {
+  if (gap > 0) return 'text-emerald-600';
+  if (gap < 0) return 'text-red-600';
+  return 'text-muted-foreground';
+};
 
 export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
   if (!busStats || busStats.length === 0) {
@@ -47,7 +66,6 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
   const totalFleetIncome = busStats.reduce((sum, b) => sum + (b.totalIncome ?? 0), 0);
   const totalFleetDistance = busStats.reduce((sum, b) => sum + (b.totalDistance ?? 0), 0);
   const avgFleetEfficiency = totalBuses > 0 ? busStats.reduce((sum, b) => sum + (b.avgEfficiency ?? 0), 0) / totalBuses : 0;
-  const topBus = busStats[0];
 
   // Utilization chart data
   const utilizationData = busStats.slice(0, 8).map(bus => ({
@@ -72,11 +90,7 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
     <div className="space-y-6">
       {/* Fleet Overview KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-500/20 shadow-lg">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -94,11 +108,7 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
           </Card>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <Card className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-500/20 shadow-lg">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -114,11 +124,7 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
           </Card>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
           <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20 shadow-lg">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -134,11 +140,7 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
           </Card>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
           <Card className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border-cyan-500/20 shadow-lg">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -157,7 +159,6 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Bus Utilization Pie Chart */}
         <Card className="shadow-lg">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
@@ -202,7 +203,6 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
           </CardContent>
         </Card>
 
-        {/* Distance Comparison Bar Chart */}
         <Card className="shadow-lg">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
@@ -291,56 +291,98 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead>Bus No</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Trips</TableHead>
-                  <TableHead className="text-right">Distance</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">Net Profit</TableHead>
-                  <TableHead className="text-right">Efficiency</TableHead>
-                  <TableHead className="text-right">Utilization</TableHead>
-                  <TableHead>Last Trip</TableHead>
+                  <TableHead className="whitespace-nowrap">Bus No</TableHead>
+                  <TableHead className="whitespace-nowrap">Model</TableHead>
+                  <TableHead className="whitespace-nowrap">Type</TableHead>
+                  <TableHead className="whitespace-nowrap">Route(s)</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Trips</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Distance</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Revenue</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Expenses</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Net Profit</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Fuel Cost</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Fuel %</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Km/L</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Income/km</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Utilization</TableHead>
+                  <TableHead className="whitespace-nowrap">Last Trip</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {busStats.map((bus, idx) => (
-                  <TableRow key={bus.busNo} className="hover:bg-muted/30">
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                        <span className="font-bold">{bus.busNo}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{bus.busType || 'Standard'}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">{bus.totalTrips}</TableCell>
-                    <TableCell className="text-right font-mono">{Number(bus.totalDistance ?? 0).toFixed(0)} km</TableCell>
-                    <TableCell className="text-right font-mono">Rs {(bus.totalIncome ?? 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">
-                      <span className={`font-bold ${(bus.netIncome ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        Rs {(bus.netIncome ?? 0).toLocaleString()}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant={(bus.avgEfficiency ?? 0) >= 12 ? 'default' : (bus.avgEfficiency ?? 0) >= 10 ? 'secondary' : 'destructive'}>
-                        {(bus.avgEfficiency ?? 0).toFixed(2)} km/L
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center gap-2 justify-end">
-                        <Progress value={bus.utilizationRate ?? 0} className="h-2 w-16" />
-                        <span className="text-xs">{(bus.utilizationRate ?? 0).toFixed(1)}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Calendar className="w-3 h-3" />
-                        {bus.lastTripDate || 'N/A'}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {busStats.map((bus, idx) => {
+                  const fuelPct = bus.fuelPercentage ?? 0;
+                  const stdRate = bus.stdFuelRate ?? 0;
+                  const iPerKm = bus.incomePerKm ?? 0;
+
+                  return (
+                    <TableRow 
+                      key={bus.busNo} 
+                      className={`hover:bg-muted/30 ${idx % 2 === 0 ? 'bg-sky-50/50 dark:bg-white/[0.02]' : 'bg-slate-50/50 dark:bg-white/[0.05]'}`}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+                          <span className="font-bold whitespace-nowrap">{bus.busNo}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{bus.busModel || '-'}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="whitespace-nowrap">{bus.busType || 'Std'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {bus.routes && bus.routes.length > 0 ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs whitespace-nowrap">{bus.routes[0]}</span>
+                            {bus.routes.length > 1 && (
+                              <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                                +{bus.routes.length - 1}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">{bus.totalTrips}</TableCell>
+                      <TableCell className="text-right font-mono whitespace-nowrap">{Number(bus.totalDistance ?? 0).toFixed(0)} km</TableCell>
+                      <TableCell className="text-right font-mono whitespace-nowrap">Rs {(bus.totalIncome ?? 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono whitespace-nowrap">Rs {(bus.totalExpenses ?? 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        <span className={`font-bold whitespace-nowrap ${(bus.netIncome ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          Rs {(bus.netIncome ?? 0).toLocaleString()}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono whitespace-nowrap">Rs {(bus.totalFuelCost ?? 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        <span className={`font-bold ${getFuelPercentColor(fuelPct)}`}>
+                          {fuelPct > 0 ? `${fuelPct.toFixed(1)}%` : '-'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={(bus.avgEfficiency ?? 0) >= 12 ? 'default' : (bus.avgEfficiency ?? 0) >= 10 ? 'secondary' : 'destructive'}>
+                          {(bus.avgEfficiency ?? 0).toFixed(2)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono whitespace-nowrap">
+                        {iPerKm > 0 ? `Rs ${iPerKm.toFixed(1)}` : '-'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center gap-2 justify-end">
+                          <Progress value={bus.utilizationRate ?? 0} className="h-2 w-16" />
+                          <span className="text-xs">{(bus.utilizationRate ?? 0).toFixed(1)}%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground whitespace-nowrap">
+                          <Calendar className="w-3 h-3" />
+                          {bus.lastTripDate || 'N/A'}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
