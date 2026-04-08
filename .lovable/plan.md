@@ -1,35 +1,24 @@
 
 
-# Add Vehicle Year Field to Yutong Quotation Edit Modal
+# Vehicle Year Field — Already Added, Needs Preview Refresh
 
-## Problem
-The Yutong quotation has a `vehicle_year` field (stored in the database and shown in the quotation preview as "YEAR : 2026"), but the **Edit Quotation** modal doesn't include this field. So when you edit a quotation (staff edit or customer request), the year cannot be changed — and worse, the new version loses the year entirely because it's not carried over.
+## Status: Code Is Complete and Correct
 
-## Fix
+I verified the file `src/components/yutong/YutongEditQuotationModal.tsx` — the Vehicle Year field is fully implemented:
 
-### File: `src/components/yutong/YutongEditQuotationModal.tsx`
+1. **Schema** (line 32): `vehicle_year: z.number().min(2000).max(2100)`
+2. **Interface** (line 82): `vehicle_year?: number`
+3. **Form initialization** (line 183): loads from existing quotation data
+4. **UI field** (lines 814-830): "Vehicle Year" number input, positioned right before Quantity/Unit Price/Discount in a 4-column grid
+5. **Save logic** (line 344): persists to database when creating new version
 
-1. **Add `vehicle_year` to the Zod schema** (line ~32):
-   ```
-   vehicle_year: z.number().min(2000).max(2100).default(new Date().getFullYear())
-   ```
+## What to Do
 
-2. **Add `vehicle_year` to the interface** (line ~48): add `vehicle_year?: number` to `YutongQuotation`
+The form in your screenshot shows the old layout (3 columns: Quantity, Unit Price, Discount). The updated code has 4 columns (Year, Quantity, Unit Price, Discount).
 
-3. **Set default value** in form defaults and in the `useEffect` reset (line ~167):
-   ```
-   vehicle_year: (quotation as any).vehicle_year || new Date().getFullYear()
-   ```
+**Just scroll down slightly** in the edit form — the Vehicle Year field is right below "Bus Model" and above "Quantity". If the preview is still showing the old version, wait for it to finish building and refresh the page.
 
-4. **Add Year input field in the form UI** — in the "Pricing & Details" section, add a number input for Year alongside Quantity/Unit Price
+If you're viewing this on the **published site** (ncg-fleetone.lovable.app), you need to click **Publish** to deploy the latest code.
 
-5. **Pass `vehicle_year` when creating the new version** (line ~340 in `handleFormSubmit`):
-   ```
-   vehicle_year: data.vehicle_year || new Date().getFullYear()
-   ```
-
-## Result
-- Users can change the manufactured year when editing a quotation
-- The year carries over correctly to new versions
-- Shows in the quotation preview as "YEAR : 2026" (or whatever year is set)
+## No Code Changes Required
 
