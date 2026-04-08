@@ -1,51 +1,46 @@
 
 
-# Fix: Payment Reminder Intermediate Stops & Show Both KM Values in Mileage
+# Fix: Bus Documents Visible in Development but Not on Published Site
 
-## Problems
+## Root Cause
 
-1. **Payment Reminder still passes `intermediateStops`** to the invoice generator (line 1518 in ConfirmedTripsTable.tsx). While the generator now ignores them, passing them is unnecessary and could cause issues if logic changes. Should be removed.
+The `public/bus_details/` folder contains **342 MB** of PDFs and images across 190+ bus folders. In development mode, Vite serves the `public/` directory directly, so everything works. However, when the app is **published/deployed**, this volume of static assets either:
 
-2. **Mileage shows only one value** — either actual KM or quoted KM. The user wants BOTH displayed when a post-trip adjustment exists: the original quoted KM and the actual KM traveled. For example: `54.5 (Quoted: 50 KM)` or `Quoted: 50 | Actual: 54.5`.
+1. Exceeds the deployment size limit (Lovable's build output is typically capped)
+2. Gets excluded or partially uploaded during the build process
+3. Causes build timeouts due to the sheer volume of files being copied
 
-## Implementation
+This is why documents render fine inside Lovable's preview but fail on the published site (ncg-fleetone.lovable.app).
 
-### File 1: `src/lib/invoice-generator.ts`
+## Solution: Move Documents to Supabase Storage
 
-**Line 294-297** — Update Mileage display to show both values when adjustments exist:
-```
-// BEFORE
-<td style="...">${mileage}</td>
+Instead of bundling 342 MB of files in the repo, store them in a **Supabase Storage bucket** where they are served via CDN and accessible from any deployment.
 
-// AFTER — show "Actual: X KM (Quoted: Y KM)" when adjustments exist, else just the number
-```
+### Step 1: Create a Supabase Storage bucket
+- Create a public bucket called `bus-documents`
+- Set up a folder structure: `bus-documents/{bus_no}/{filename}`
 
-**Line 231-236** — Update mileage variable to also prepare the original quoted value:
-```typescript
-const mileage = (data.hasAdjustments && data.actualKmTraveled)
-  ? data.actualKmTraveled
-  : (data.tripDistance || data.totalKm || 0);
-const originalKm = data.originalQuotedKm || data.tripDistance || data.totalKm || 0;
-```
+### Step 2: Upload script
+- Write a one-time migration script that reads all files from `public/bus_details/` and uploads them to the Supabase bucket
+- Preserve the folder structure (bus number → files)
 
-Then in the HTML (line 296), render conditionally:
-```
-${data.hasAdjustments && data.actualKmTraveled
-  ? `${mileage} KM (Quoted: ${originalKm} KM)`
-  : `${mileage}`}
-```
+### Step 3: Update `BusDocumentPreviewModal.tsx`
+- Change `getPublicUrl()` from returning `/bus_details/{busNo}/{fileName}` to returning the Supabase Storage public URL
+- Pattern: `https://{project}.supabase.co/storage/v1/object/public/bus-documents/{busNo}/{fileName}`
 
-### File 2: `src/components/special-hire/ConfirmedTripsTable.tsx`
+### Step 4: Remove `public/bus_details/`
+- After confirming uploads work, remove the 342 MB folder from the repo to keep builds fast
 
-**Line 1499-1518** — Remove `intermediateStops` parsing and passing from Payment Reminder data:
-- Delete lines 1499-1506 (intermediate stops parsing block)
-- Remove `intermediateStops,` from line 1518 in `reminderData`
+## Alternative (Quick Fix)
 
-Also check all other invoice data constructions in this file and remove `intermediateStops` from them, since the generator no longer uses them.
+If you prefer not to migrate to Supabase Storage right now, the documents can be served via the **Antigravity external links** that are already configured in `bus_folder_links.json`. The modal already has the "View on Antigravity" button — we could make that the primary viewing method instead of trying to serve files locally.
 
-## Result
-- Payment Reminder no longer passes unnecessary intermediate stops data
-- Mileage field shows both actual and quoted KM when post-trip adjustment exists (e.g., "54.5 KM (Quoted: 50 KM)")
-- Single KM value shown when no adjustments exist
-- Trips table already correctly shows only pickup and drop locations
+## Recommendation
+
+Supabase Storage is the proper long-term fix. 342 MB of binary files should not live in a Git repository — it slows down clones, builds, and deployments. The Antigravity links can remain as a secondary "View Original" option.
+
+## Files to Change
+- `src/components/fleet/BusDocumentPreviewModal.tsx` — update `getPublicUrl()` to use Supabase Storage URLs
+- New migration script to upload existing files
+- Remove `public/bus_details/` after migration
 
