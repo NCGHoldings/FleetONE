@@ -49,6 +49,7 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
     }
   }, [initialDate]);
 
+  const loadAvailableBuses = async () => {
     const { data } = await supabase
       .from("buses")
       .select("id, bus_no, route")
