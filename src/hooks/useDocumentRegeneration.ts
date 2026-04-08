@@ -71,6 +71,14 @@ export const useDocumentRegeneration = () => {
         console.log('Adjustment data for regeneration:', adjustmentData);
       }
 
+      // Check signature page visibility setting
+      const { data: sigPageSetting } = await supabase
+        .from('special_hire_signature_settings')
+        .select('is_enabled')
+        .eq('id', 'signature_page')
+        .maybeSingle();
+      const hideSignaturePage = sigPageSetting?.is_enabled === false;
+
       // Fetch current signatures for the document using actual document ID
       const { data: signatures } = await supabase
         .from('document_approvals')
