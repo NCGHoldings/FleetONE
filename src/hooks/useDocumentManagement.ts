@@ -39,9 +39,18 @@ export const useDocumentManagement = () => {
       }
 
       // Generate initial PDF (signatures will be added after document record is created)
+      // Check signature page visibility setting
+      const { data: sigPageSetting } = await supabase
+        .from('special_hire_signature_settings')
+        .select('is_enabled')
+        .eq('id', 'signature_page')
+        .maybeSingle();
+      const hideSignaturePage = sigPageSetting?.is_enabled === false;
+
       const draftInvoiceData = {
         ...invoiceData,
         invoice_status: 'draft' as const,
+        hideSignaturePage,
       };
 
       console.log('🔄 Calling generateInvoicePDF...', invoiceData.invoiceNo);
