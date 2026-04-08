@@ -18,6 +18,7 @@ import { useYutongFinanceManagement } from '@/hooks/useYutongFinanceManagement';
 import { YutongLCManagement } from './YutongLCManagement';
 import { YutongPaymentTracking } from './YutongPaymentTracking';
 import { YutongDeliveryOrderManagement } from './YutongDeliveryOrderManagement';
+import { YutongLandedCostView } from './YutongLandedCostView';
 import { format } from 'date-fns';
 
 interface FinancialSummary {
