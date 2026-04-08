@@ -227,6 +227,8 @@ export const useDocumentManagement = () => {
         conductorName: paymentData.quotation.assigned_conductor_name,
         invoice_status: 'approved',
         document_type: draftDoc.document_type as 'sales_receipt' | 'invoice',
+        tripDistance: Number(paymentData.quotation.km_trip) || 0,
+        totalKm: (Number(paymentData.quotation.km_parking_to_pickup) || 0) + (Number(paymentData.quotation.km_trip) || 0) + (Number(paymentData.quotation.km_drop_to_parking) || 0),
         ...signatureMap
       };
 
