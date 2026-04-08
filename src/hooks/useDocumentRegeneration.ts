@@ -178,6 +178,7 @@ export const useDocumentRegeneration = () => {
           adjustmentNotes: adjustmentData.notes || '',
         } : {}),
         
+        hideSignaturePage,
         ...signatureMap
       };
 
