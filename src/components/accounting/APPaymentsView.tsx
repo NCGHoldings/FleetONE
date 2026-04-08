@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, DollarSign, TrendingDown, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText, Trash2 } from "lucide-react";
+import { Plus, Search, DollarSign, TrendingDown, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText, Trash2, Paperclip } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 import { ChequePrintPreview } from "./ChequePrintPreview";
@@ -296,6 +296,9 @@ export const APPaymentsView = () => {
                       {payment.payment_number}
                       {hasLinkedFees(payment.id) && (
                         <Badge variant="outline" className="text-xs ml-1">Fees</Badge>
+                      )}
+                      {(payment as any).document_url && (
+                        <Paperclip className="h-3.5 w-3.5 text-primary ml-1" title="Has attachment" />
                       )}
                     </div>
                   </TableCell>
