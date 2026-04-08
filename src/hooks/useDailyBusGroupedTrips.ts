@@ -155,6 +155,8 @@ export function useDailyBusGroupedTrips(
           odometer_end,
           start_time,
           end_time,
+          fuel_liters,
+          diesel_price_per_liter,
           notes,
           gl_posted,
           journal_entry_id,
