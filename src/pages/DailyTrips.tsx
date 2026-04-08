@@ -364,7 +364,7 @@ export default function DailyTrips() {
                   {viewMode === "crew" ? (
                     <CrewConsolidatedView crewGroups={filteredCrewGroups} onRefresh={handleRefetch} />
                   ) : viewMode === "table" ? (
-                    <BusDailySummaryTable summaries={filteredBusSummaries} onRefresh={handleRefetch} />
+                    <BusDailySummaryTable summaries={filteredBusSummaries} onRefresh={handleRefetch} selectedDate={selectedDate} />
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {filteredBusSummaries.map((summary) => (
