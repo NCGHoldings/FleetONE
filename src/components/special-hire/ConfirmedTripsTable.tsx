@@ -1496,15 +1496,6 @@ export function ConfirmedTripsTable() {
                                           }
                                         }
 
-                                        // Parse intermediate stops
-                                        let intermediateStops: Array<{ location: string }> = [];
-                                        try {
-                                          const stops = (trip as any).intermediate_stops;
-                                          if (stops && Array.isArray(stops)) {
-                                            intermediateStops = stops.map((s: any) => ({ location: s.location || '' })).filter((s: any) => s.location);
-                                          }
-                                        } catch (e) { /* ignore */ }
-
                                         const reminderData: InvoiceData = {
                                           invoiceNo,
                                           invoiceType: 'balance',
@@ -1515,7 +1506,6 @@ export function ConfirmedTripsTable() {
                                           companyName: trip.company_name,
                                           pickupLocation: trip.pickup_location,
                                           dropLocation: trip.drop_location,
-                                          intermediateStops,
                                           pickupDate: new Date(trip.pickup_datetime),
                                           dropDate: new Date(trip.drop_datetime || trip.pickup_datetime),
                                           busType: resolveBusType(trip),
