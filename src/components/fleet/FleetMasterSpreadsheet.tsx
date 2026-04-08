@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFleetMasterSpreadsheet, EditMode } from '@/hooks/useFleetMasterSpreadsheet';
 import { FleetMasterSpreadsheetCore } from './FleetMasterSpreadsheetCore';
 import { Button } from '@/components/ui/button';
