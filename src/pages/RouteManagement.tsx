@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ export default function RouteManagement() {
   const [editingRoute, setEditingRoute] = useState<FleetRoute | null>(null);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [busCountMap, setBusCountMap] = useState<Record<string, number>>({});
-  const [collapsedCorridors, setCollapsedCorridors] = useState<Set<string>>(new Set());
+  const [collapsedCorridors, setCollapsedCorridors] = useState<string[]>([]);
 
   // Merge state
   const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
