@@ -361,7 +361,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
     const getCategoryId = (usageType?: string): string | undefined => {
       if (!usageType) return catByName.get("public bus");
       const u = usageType.toLowerCase().trim();
-      if (u.includes("school")) return catByName.get("school bus");
+      if (u.includes("school") || u.startsWith("sbs")) return catByName.get("school bus");
       if (u.includes("special")) return catByName.get("special hire");
       return catByName.get("public bus");
     };
