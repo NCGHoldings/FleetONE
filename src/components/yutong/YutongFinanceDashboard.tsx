@@ -184,11 +184,12 @@ export function YutongFinanceDashboard() {
 
       {/* Main Finance Management Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="lc-management">Letter of Credits</TabsTrigger>
           <TabsTrigger value="payments">Payment Tracking</TabsTrigger>
           <TabsTrigger value="delivery-orders">Delivery Orders</TabsTrigger>
+          <TabsTrigger value="landed-cost">Landed Cost</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
