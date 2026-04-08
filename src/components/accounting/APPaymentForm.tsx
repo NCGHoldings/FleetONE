@@ -106,6 +106,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const [bankFeeType, setBankFeeType] = useState("bank_charge");
   const [globalWriteOffAccountId, setGlobalWriteOffAccountId] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [vendorBillNumber, setVendorBillNumber] = useState("");
 
   const { data: vendorBankAccounts } = useVendorBankAccounts(selectedVendorId || undefined);
 
@@ -350,6 +351,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
         is_advance: isAdvance,
         is_direct_payment: isDirectPayment,
         vendor_bank_account_id: selectedBankAccountId || undefined,
+        vendor_bill_number: vendorBillNumber || undefined,
         bank_fee_amount: effectiveBankFee > 0 ? effectiveBankFee : undefined,
         bank_fee_type: effectiveBankFee > 0 ? bankFeeType : undefined,
         allocations: selectedAllocations.map((a) => ({
@@ -414,6 +416,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       setIncludeBankFee(false);
       setBankFeeAmount(0);
       setDocumentFile(null);
+      setVendorBillNumber("");
     } catch (error) {
       // Error handled by mutation
     }
@@ -558,6 +561,18 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                   </FormItem>
                 )}
               />
+
+              <FormItem>
+                <FormLabel>Vendor Bill #</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Vendor's bill/invoice number"
+                    value={vendorBillNumber}
+                    onChange={(e) => setVendorBillNumber(e.target.value)}
+                    className="font-mono"
+                  />
+                </FormControl>
+              </FormItem>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

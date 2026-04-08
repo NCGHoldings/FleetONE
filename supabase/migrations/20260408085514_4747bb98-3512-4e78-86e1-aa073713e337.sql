@@ -1,0 +1,1 @@
+ALTER TABLE public.ap_payments ADD COLUMN vendor_bill_number TEXT;

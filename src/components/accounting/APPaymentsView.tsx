@@ -267,6 +267,7 @@ export const APPaymentsView = () => {
               <TableHead>Vendor</TableHead>
               <TableHead>Method</TableHead>
               <TableHead>Cheque #</TableHead>
+              <TableHead>Vendor Bill #</TableHead>
               <TableHead>Reference</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead className="text-right">Bank Fee</TableHead>
@@ -278,13 +279,13 @@ export const APPaymentsView = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                 <TableCell colSpan={11} className="text-center py-8">
+                 <TableCell colSpan={12} className="text-center py-8">
                    Loading payments...
                 </TableCell>
               </TableRow>
             ) : filteredPayments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                   No payments found
                 </TableCell>
               </TableRow>
@@ -306,6 +307,7 @@ export const APPaymentsView = () => {
                   <TableCell>{getVendorName(payment.vendor_id)}</TableCell>
                   <TableCell>{getPaymentMethodLabel(payment.payment_method || "")}</TableCell>
                   <TableCell className="font-mono">{payment.cheque_number || "-"}</TableCell>
+                  <TableCell className="font-mono text-muted-foreground">{(payment as any).vendor_bill_number || "-"}</TableCell>
                   <TableCell className="text-muted-foreground">{payment.reference || "-"}</TableCell>
                   <TableCell className="text-right font-semibold">
                     <CurrencyDisplay amount={payment.amount} />
