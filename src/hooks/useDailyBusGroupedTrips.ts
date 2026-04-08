@@ -247,6 +247,8 @@ export function useDailyBusGroupedTrips(
           end_odo: trip.odometer_end,
           start_time: trip.start_time,
           end_time: trip.end_time,
+          fuel_liters: trip.fuel_liters,
+          diesel_price_per_liter: trip.diesel_price_per_liter,
           gl_posted: trip.gl_posted,
           journal_entry_id: trip.journal_entry_id,
         });
