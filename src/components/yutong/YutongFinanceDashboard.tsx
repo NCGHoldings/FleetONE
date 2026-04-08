@@ -11,7 +11,8 @@ import {
   TrendingUp,
   Plus,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Package
 } from 'lucide-react';
 import { useYutongFinanceManagement } from '@/hooks/useYutongFinanceManagement';
 import { YutongLCManagement } from './YutongLCManagement';
