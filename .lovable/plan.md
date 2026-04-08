@@ -1,51 +1,40 @@
 
 
-# Fix: Roster Data Gaps — Missing Buses and Incorrect trips_per_day
+# Fix: Cannot Set Route on Newly Added Bus in Daily Edit Mode
 
-## What the Database Shows
+## Problem
 
-| Metric | Expected | Actual | Gap |
-|--------|----------|--------|-----|
-| Active buses in roster | 46 | 43 | 3 missing |
-| Buses with trips_per_day=2 | 3 (8241, 8242, 2511) | 1 (NE 2511 only) | 2 not set |
-| Total eligible trips | 49 | 39 (from roster logic) | 10 short |
+When you add a new bus to the roster and try to select a route while in "Today Only" (daily) edit mode, the system blocks you with a "No trip generated" error. This happens because:
 
-### Non-running buses (correctly excluded):
-- NB 1946 — Repair
-- NC 8222 — Paint
-- NG 8229 — Repair
-- NG 8244 — Temporary Allocated
-- NG 8249 — Hire
+1. Line 415-419 in `useFleetMasterSpreadsheet.ts` checks if a `trip_id` exists for the row
+2. A newly added bus has no trip yet — trips haven't been created for it
+3. The function returns early without saving the route to **either** the daily trip or the master roster
+4. The route never gets saved, so you're stuck
 
-### Data issue 1: NG 8241 and NG 8242 have `trips_per_day = 1` but should be 2
-These two buses already have 2 trip records for April 1 (created manually or by an older logic), but the roster still says `trips_per_day = 1`. The "Create Remaining" logic uses the roster value, so it won't create their 2nd trips going forward.
+Fields like `route_label` and `remark` are fundamental roster-level fields that should **always** be saveable to the master roster, even in daily mode when no trip exists yet.
 
-**Fix**: Migration to set `trips_per_day = 2` for NG 8241 and NG 8242.
+## Fix
 
-### Data issue 2: 3 buses are missing from the roster entirely
-You expect 46 active buses but only 43 exist. Need to identify which 3 buses should be added.
+### In `useFleetMasterSpreadsheet.ts` (line 415-420)
 
-**Fix**: I need you to tell me which 3 buses are missing, OR I can query all buses in the `buses` table that are NOT in the roster so you can pick.
+When in daily mode and no `trip_id` exists, instead of blocking entirely, allow "roster-level" fields (`route_label`, `route_id`, `remark`) to fall through to the master roster update (line 486-489). Only block for trip-specific fields like `odometer_start`, `fuel_liters`, etc.
 
-## Implementation
+```text
+Current flow:
+  daily mode + no trip_id → ERROR (blocks everything)
 
-### Step 1: Fix trips_per_day for NG 8241 and NG 8242
-SQL migration to update `fleet_master_roster` setting `trips_per_day = 2` for these two buses.
+Fixed flow:
+  daily mode + no trip_id + roster field (route_label, remark) → update master roster
+  daily mode + no trip_id + trip field (odometer, fuel) → ERROR (correct behavior)
+```
 
-### Step 2: Identify and add missing 3 buses
-Query buses table to find active buses not in the roster, then add them.
-
-### Step 3: Verify count
-After fixes: 46 running buses × 1 trip + 3 buses × 1 extra trip = 49 total eligible trips.
-
-## The Trip Creation Logic Is Correct
-The code changes from the previous fix are working properly:
-- Only "Running" buses create trips
-- Non-running statuses (Hire, Repair, Paint, etc.) are excluded
-- Multi-trip sequences are handled correctly
-
-The problem is **data**, not code. Once the roster data is corrected, "Create Remaining" will show the correct count of 49.
+The change is ~5 lines: instead of returning immediately when `!row?.trip_id`, check if the field is a "roster-level" field. If yes, let it fall through to the master roster update at line 486. If no, show the error.
 
 ## Files to Change
-- New SQL migration — update `trips_per_day` for NG 8241, NG 8242; add missing buses to roster
+- `src/hooks/useFleetMasterSpreadsheet.ts` — modify the daily mode guard (line 415-420) to allow roster-level fields through when no trip exists
+
+## Result
+- New buses can have routes assigned immediately after being added, regardless of edit mode
+- Trip-specific fields (odometer, fuel) still correctly require trip creation first
+- Route changes in daily mode with existing trips continue to update both daily trip and master roster
 
