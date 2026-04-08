@@ -268,11 +268,26 @@ function processAnalyticsData(
   expenses.forEach(exp => {
     const key = `${exp.bus_id}_${exp.expense_date}`;
     const totalExpense = (exp.fuel_cost || 0) + 
-                        (exp.toll_cost || 0) + 
-                        (exp.repair_cost || 0) + 
-                        (exp.driver_salary || 0) + 
-                        (exp.conductor_salary || 0) + 
-                        (exp.other_expenses || 0);
+                        (exp.highway_charges || 0) + 
+                        (exp.repair || 0) + 
+                        (exp.tyre_tube || 0) + 
+                        (exp.salary || 0) + 
+                        (exp.food || 0) + 
+                        (exp.parking || 0) + 
+                        (exp.body_wash || 0) + 
+                        (exp.runner || 0) + 
+                        (exp.police || 0) + 
+                        (exp.log_sheet || 0) + 
+                        (exp.permits_renewal || 0) + 
+                        (exp.temporary_permit || 0) + 
+                        (exp.legal_court || 0) + 
+                        (exp.ntc || 0) + 
+                        (exp.emission_fitness || 0) + 
+                        (exp.accident_compensation || 0) + 
+                        (exp.staff_accommodation || 0) + 
+                        (exp.vehicle_hire || 0) + 
+                        (exp.short_misc || 0) + 
+                        (exp.other || 0);
     expenseMap.set(key, {
       ...exp,
       total: totalExpense
@@ -459,6 +474,19 @@ function processAnalyticsData(
         totalFuelLiters += expenseData.fuel_liters || 0;
       }
     });
+
+    // Derive fuel liters from cost when not explicitly recorded
+    let dieselPrice = 0;
+    busTrips.forEach(trip => {
+      const key = `${trip.bus_id}_${trip.trip_date}`;
+      const expenseData = expenseMap.get(key);
+      if (expenseData && expenseData.diesel_price_per_liter > 0) {
+        dieselPrice = expenseData.diesel_price_per_liter;
+      }
+    });
+    if (totalFuelLiters === 0 && totalFuelCost > 0 && dieselPrice > 0) {
+      totalFuelLiters = totalFuelCost / dieselPrice;
+    }
 
     const totalDist = sumBy(busTrips, 'distance_km') || 0;
     const fuelPercentage = busExpenses > 0 ? (totalFuelCost / busExpenses) * 100 : 0;
