@@ -19,6 +19,8 @@ export interface Trip {
   end_odo?: number;
   start_time?: string;
   end_time?: string;
+  fuel_liters?: number;
+  diesel_price_per_liter?: number;
   gl_posted?: boolean;
   journal_entry_id?: string;
 }
@@ -73,6 +75,12 @@ export interface BusDailySummary {
   net_profit: number;
   profit_margin: number;
   avg_km_per_liter: number;
+  
+  // Odometer & Fuel
+  total_fuel_liters: number;
+  diesel_price_per_liter: number;
+  min_start_odo: number | null;
+  max_end_odo: number | null;
   
   // Metadata
   routes: string[];
