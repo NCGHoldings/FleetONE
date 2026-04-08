@@ -53,7 +53,8 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
   const loadAvailableBuses = async () => {
     const { data } = await supabase
       .from("buses")
-      .select("id, bus_no, route")
+      .select("id, bus_no, route, category_id")
+      .eq("category_id", "8ba0dd7b-c503-4c3e-86e0-ac68480f3f8c")
       .order("bus_no");
     setAvailableBuses(data || []);
     setShowAddBus(true);
