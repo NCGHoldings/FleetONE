@@ -42,7 +42,13 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
   const [creating, setCreating] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
-  const loadAvailableBuses = async () => {
+  // Sync date when parent changes
+  useEffect(() => {
+    if (initialDate) {
+      setSelectedDate(initialDate);
+    }
+  }, [initialDate]);
+
     const { data } = await supabase
       .from("buses")
       .select("id, bus_no, route")
