@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle, ArrowLeftRight, Eye, FileText, Info } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Eye, ExternalLink, FileText, Info } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -45,6 +45,8 @@ interface RelatedDocument {
   amount: number;
   date: string;
   data: any;
+  storagePath?: string;  // For operational docs with actual stored PDFs
+  documentUrl?: string;  // For AP payment attachments
 }
 
 export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalEntryDetailDialogProps) => {
@@ -103,16 +105,32 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
         amount: d.amount,
         date: d.payment_date,
         data: d,
+        documentUrl: d.document_url || undefined,
       }));
 
-      spPay.data?.forEach((d: any) => docs.push({
-        type: "Special Hire Payment",
-        documentType: "special_hire_payment",
-        documentNumber: d.receipt_number || d.id?.slice(0, 8),
-        amount: d.amount,
-        date: d.payment_date,
-        data: d,
-      }));
+      // For special hire payments, also fetch linked document_storage records
+      if (spPay.data && spPay.data.length > 0) {
+        const paymentIds = spPay.data.map((p: any) => p.id);
+        const { data: storedDocs } = await supabase
+          .from("document_storage")
+          .select("id, payment_id, storage_path, document_status, created_at, document_type")
+          .in("payment_id", paymentIds)
+          .eq("document_status", "approved")
+          .order("created_at", { ascending: false });
+
+        spPay.data.forEach((d: any) => {
+          const linkedDoc = storedDocs?.find((sd: any) => sd.payment_id === d.id);
+          docs.push({
+            type: "Special Hire Payment",
+            documentType: "special_hire_payment",
+            documentNumber: d.receipt_number || d.id?.slice(0, 8),
+            amount: d.amount,
+            date: d.payment_date,
+            data: d,
+            storagePath: linkedDoc?.storage_path || undefined,
+          });
+        });
+      }
 
       bankTx.data?.forEach((d: any) => docs.push({
         type: "Bank Transaction",
@@ -309,14 +327,45 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
                           <DateDisplay date={doc.date} />
                         </TableCell>
                         <TableCell className="text-center">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => setPreviewDoc(doc)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <div className="flex justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => setPreviewDoc(doc)}
+                              title="Preview"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {doc.storagePath && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  const { data } = supabase.storage.from("generated-documents").getPublicUrl(doc.storagePath!);
+                                  window.open(data.publicUrl, "_blank");
+                                }}
+                                title="View Stored PDF"
+                              >
+                                <ExternalLink className="h-4 w-4 text-primary" />
+                              </Button>
+                            )}
+                            {doc.documentUrl && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  const { data } = supabase.storage.from("documents").getPublicUrl(doc.documentUrl!);
+                                  window.open(data.publicUrl, "_blank");
+                                }}
+                                title="View Attachment"
+                              >
+                                <ExternalLink className="h-4 w-4 text-primary" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
