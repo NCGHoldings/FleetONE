@@ -626,7 +626,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
 
   const bulkAddAllBuses = async () => {
     try {
-      const { data: allBuses } = await supabase.from("buses").select("id, bus_no, route").order("bus_no");
+      const { data: allBuses } = await supabase.from("buses").select("id, bus_no, route, category_id").eq("category_id", "8ba0dd7b-c503-4c3e-86e0-ac68480f3f8c").order("bus_no");
       if (!allBuses || allBuses.length === 0) {
         toast({ title: "No buses", description: "No buses found in the system", variant: "destructive" });
         return;
