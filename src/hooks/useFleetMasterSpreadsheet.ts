@@ -653,7 +653,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
   // Only count first trip_sequence for bus-level KPIs
   const uniqueRows = expandedRows.filter(r => r.trip_sequence === 1);
   const kpis = {
-    totalBuses: roster.filter(r => r.remark === 'Running').length,
+    totalBuses: roster.filter(r => r.remark === 'Running' || !r.remark).length,
     totalRevenue: expandedRows.reduce((s, r) => s + r.passenger_income + r.luggage_income, 0),
     totalExpenses: expandedRows.reduce((s, r) => s + r.total_expenses, 0),
     netIncome: expandedRows.reduce((s, r) => s + r.net_income, 0),

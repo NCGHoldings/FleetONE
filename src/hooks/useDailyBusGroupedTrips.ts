@@ -124,7 +124,6 @@ export function useDailyBusGroupedTrips(
         fromDateStr = format(dateRange.from, 'yyyy-MM-dd');
         toDateStr = format(dateRange.to, 'yyyy-MM-dd');
         isRangeQuery = true;
-        console.log('🔍 DEBUG: Date Range Query Details:', {
           isRangeQuery,
           fromDateStr,
           toDateStr,
@@ -135,7 +134,6 @@ export function useDailyBusGroupedTrips(
         });
       } else if (selectedDate) {
         fromDateStr = toDateStr = format(selectedDate, 'yyyy-MM-dd');
-        console.log('🔍 DEBUG: Single Date Query:', {
           selectedDate,
           dateStr: fromDateStr,
         });
@@ -182,7 +180,6 @@ export function useDailyBusGroupedTrips(
       const { data: tripsData, error: tripsError } = await tripsQuery;
       const queryEndTime = performance.now();
       
-      console.log(`⏱️ Query took ${(queryEndTime - queryStartTime).toFixed(2)}ms`);
       
       if (tripsError) {
         console.error('❌ Trips query error:', tripsError);
@@ -190,7 +187,6 @@ export function useDailyBusGroupedTrips(
       }
 
       // Data integrity check
-      console.log('📊 DEBUG: Query Results:', {
         tripsCount: tripsData?.length || 0,
         firstTrip: tripsData?.[0],
         lastTrip: tripsData?.[tripsData.length - 1],
@@ -204,7 +200,6 @@ export function useDailyBusGroupedTrips(
           min: Math.min(...tripsData.map(t => new Date(t.trip_date).getTime())),
           max: Math.max(...tripsData.map(t => new Date(t.trip_date).getTime())),
         };
-        console.log('📅 Date spread in results:', {
           from: new Date(dateSpread.min).toISOString().split('T')[0],
           to: new Date(dateSpread.max).toISOString().split('T')[0],
           expectedFrom: fromDateStr,
@@ -229,8 +224,6 @@ export function useDailyBusGroupedTrips(
       const { data: expensesData, error: expensesError } = await expensesQuery;
       if (expensesError) throw expensesError;
       
-      console.log('📊 Found trips:', tripsData?.length || 0);
-      console.log('💰 Found expenses:', expensesData?.length || 0);
 
       // Debug trip distribution by date
       if (isRangeQuery && tripsData && tripsData.length > 0) {
@@ -239,7 +232,6 @@ export function useDailyBusGroupedTrips(
           const date = trip.trip_date;
           tripsByDate.set(date, (tripsByDate.get(date) || 0) + 1);
         });
-        console.log('📅 Trip distribution by date:', Object.fromEntries(tripsByDate));
       }
 
       // Group trips by bus_id (and date if range query)
@@ -249,7 +241,6 @@ export function useDailyBusGroupedTrips(
         const busId = trip.bus_id;
         const tripDate = trip.trip_date;
         
-        console.log(`Processing trip ${trip.trip_no} for date ${tripDate}, bus ${trip.buses?.bus_no}`);
         
         if (!groupedByBus.has(busId)) {
           groupedByBus.set(busId, []);
@@ -286,7 +277,6 @@ export function useDailyBusGroupedTrips(
       });
 
       // Log grouped data
-      console.log('📦 Grouped trips by bus:', {
         busCount: groupedByBus.size,
         buses: Array.from(groupedByBus.entries()).map(([busId, trips]) => ({
           busId: busId.substring(0, 8),
@@ -434,7 +424,6 @@ export function useDailyBusGroupedTrips(
         ? efficiencies.reduce((sum, e) => sum + e, 0) / efficiencies.length 
         : 0;
 
-      console.log('✅ Fleet Summary:', {
         buses: summaries.length,
         totalRevenue: fleet.total_revenue,
         totalExpenses: fleet.total_expenses,

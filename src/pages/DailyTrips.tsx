@@ -48,19 +48,6 @@ export default function DailyTrips() {
     ? { from: dateRange.from, to: dateRange.to }
     : undefined;
 
-  // Debug logging
-  console.log('🔍 DEBUG: DailyTrips Component State:', {
-    dateMode,
-    selectedDate: selectedDate?.toISOString(),
-    dateRange: {
-      from: dateRange?.from?.toISOString(),
-      to: dateRange?.to?.toISOString(),
-    },
-    validDateRange: {
-      from: validDateRange?.from?.toISOString(),
-      to: validDateRange?.to?.toISOString(),
-    },
-  });
   
   const { busSummaries, fleetSummary, loading, refetch } = useDailyBusGroupedTrips(
     dateMode === "single" ? selectedDate : null,
@@ -392,7 +379,7 @@ export default function DailyTrips() {
         </div>
       ) : mainTab === "fleet-sheet" ? (
         <div className="container mx-auto p-4">
-          <FleetMasterSpreadsheet />
+          <FleetMasterSpreadsheet initialDate={selectedDate} />
         </div>
       ) : mainTab === "cash-settlement" ? (
         <div className="container mx-auto p-4">
