@@ -396,13 +396,13 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense, readOnly =
         <div className="space-y-4">
           <h3 className="font-semibold">💰 Common Expenses</h3>
           <div className="grid grid-cols-4 gap-4">
-            {[
+             {[
               { key: 'police', label: 'Police' },
               { key: 'food', label: 'Food' },
               { key: 'parking', label: 'Parking' },
               { key: 'highway_charges', label: 'Highway' }
-            ].map(({ key, label }) => (
-              <div key={key}>
+            ].map(({ key, label }, index) => (
+              <div key={key} className={`${index % 2 === 0 ? 'bg-muted/40 rounded-sm p-1' : 'p-1'}`}>
                 <Label>{label} (Rs.)</Label>
                 <Input
                   type="number"
@@ -441,8 +441,8 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense, readOnly =
                 { key: 'body_wash', label: 'Body Wash' },
                 { key: 'legal_court', label: 'Legal/Court' },
                 { key: 'other', label: 'Other' }
-              ].map(({ key, label }) => (
-                <div key={key}>
+              ].map(({ key, label }, index) => (
+                <div key={key} className={`${index % 2 === 0 ? 'bg-muted/40 rounded-sm p-1' : 'p-1'}`}>
                   <Label>{label} (Rs.)</Label>
                   <Input
                     type="number"

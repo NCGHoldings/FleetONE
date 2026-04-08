@@ -855,13 +855,13 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                   {/* Mapped Expenses (21 DB categories) */}
                   <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20">
                     <div className="space-y-1 text-xs max-h-[300px] overflow-y-auto">
-                      {DB_EXPENSE_CATEGORIES.map(({ key, label }) => {
+                      {DB_EXPENSE_CATEGORIES.map(({ key, label }, index) => {
                         const currentValue = mappedExpenses[key as keyof DBExpenseFields];
                         const originalValue = originalMappedExpenses[key as keyof DBExpenseFields];
                         const hasChanged = hasEdits && currentValue !== originalValue;
                         
                         return (currentValue > 0 || isEditing) ? (
-                          <div key={key} className="flex justify-between items-center">
+                          <div key={key} className={`flex justify-between items-center py-1.5 px-2 rounded-sm ${index % 2 === 0 ? 'bg-muted/40' : ''}`}>
                             <span className="text-muted-foreground">{label}:</span>
                             {isEditing ? (
                               <Input
