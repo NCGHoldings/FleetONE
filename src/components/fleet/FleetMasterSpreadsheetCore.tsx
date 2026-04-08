@@ -216,6 +216,13 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
   };
 
   const [openRouteComboboxFor, setOpenRouteComboboxFor] = useState<string | null>(null);
+  const [openCrewComboboxFor, setOpenCrewComboboxFor] = useState<string | null>(null);
+
+  // Extract unique driver and conductor names from roster
+  const uniqueDrivers = React.useMemo(() => 
+    [...new Set(rows.map(r => r.default_driver).filter(Boolean))].sort() as string[], [rows]);
+  const uniqueConductors = React.useMemo(() => 
+    [...new Set(rows.map(r => r.default_conductor).filter(Boolean))].sort() as string[], [rows]);
 
   const renderRouteCell = (row: ExpandedFleetRow) => {
     if (row.trip_sequence > 1) {
