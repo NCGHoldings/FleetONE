@@ -1,40 +1,46 @@
 
 
-# Fix: Cannot Set Route on Newly Added Bus in Daily Edit Mode
+# Pass Daily Trips Date to Quick Entry Page
 
 ## Problem
 
-When you add a new bus to the roster and try to select a route while in "Today Only" (daily) edit mode, the system blocks you with a "No trip generated" error. This happens because:
+When you select a date on the Daily Trips page (e.g., April 1st) and click "Quick Entry", the Quick Entry page opens with **today's date** instead of the selected date. The user expects the same date to carry over.
 
-1. Line 415-419 in `useFleetMasterSpreadsheet.ts` checks if a `trip_id` exists for the row
-2. A newly added bus has no trip yet — trips haven't been created for it
-3. The function returns early without saving the route to **either** the daily trip or the master roster
-4. The route never gets saved, so you're stuck
+## Root Cause
 
-Fields like `route_label` and `remark` are fundamental roster-level fields that should **always** be saveable to the master roster, even in daily mode when no trip exists yet.
+1. **DailyTrips.tsx line 262**: The "Quick Entry" button navigates to `/trips/quick-entry` without passing the selected date as a query parameter
+2. **QuickTripsEntry.tsx line 38**: The page always initializes with `new Date()` and never reads a `date` query parameter from the URL
 
 ## Fix
 
-### In `useFleetMasterSpreadsheet.ts` (line 415-420)
-
-When in daily mode and no `trip_id` exists, instead of blocking entirely, allow "roster-level" fields (`route_label`, `route_id`, `remark`) to fall through to the master roster update (line 486-489). Only block for trip-specific fields like `odometer_start`, `fuel_liters`, etc.
-
-```text
-Current flow:
-  daily mode + no trip_id → ERROR (blocks everything)
-
-Fixed flow:
-  daily mode + no trip_id + roster field (route_label, remark) → update master roster
-  daily mode + no trip_id + trip field (odometer, fuel) → ERROR (correct behavior)
+### Step 1: Pass date from Daily Trips to Quick Entry
+In `src/pages/DailyTrips.tsx`, update the Quick Entry navigation (lines 262 and 320) to include the selected date:
+```
+navigate(`/trips/quick-entry?date=${format(selectedDate, 'yyyy-MM-dd')}`)
 ```
 
-The change is ~5 lines: instead of returning immediately when `!row?.trip_id`, check if the field is a "roster-level" field. If yes, let it fall through to the master roster update at line 486. If no, show the error.
+### Step 2: Read date parameter in Quick Entry page
+In `src/pages/QuickTripsEntry.tsx`, use `useSearchParams` to read the `date` query parameter and initialize `selectedDate` from it instead of always using `new Date()`:
+```
+const [searchParams] = useSearchParams();
+const initialDate = searchParams.get('date') 
+  ? parseISO(searchParams.get('date')!) 
+  : new Date();
+const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
+```
+
+The user can still change the date on the Quick Entry page using the existing date picker.
+
+### Step 3: Also fix other Quick Entry navigations
+In `src/components/trips/BusDailySummaryTable.tsx`, the "Add Trips" button (line 151) also navigates without a date — fix it to pass the current date too.
 
 ## Files to Change
-- `src/hooks/useFleetMasterSpreadsheet.ts` — modify the daily mode guard (line 415-420) to allow roster-level fields through when no trip exists
+- `src/pages/DailyTrips.tsx` — add `?date=` param to Quick Entry navigation (2 places)
+- `src/pages/QuickTripsEntry.tsx` — read `date` from URL search params, use as initial date
+- `src/components/trips/BusDailySummaryTable.tsx` — add `?date=` param to "Add Trips" navigation (line 151)
 
 ## Result
-- New buses can have routes assigned immediately after being added, regardless of edit mode
-- Trip-specific fields (odometer, fuel) still correctly require trip creation first
-- Route changes in daily mode with existing trips continue to update both daily trip and master roster
+- Selecting April 1st on Daily Trips and clicking Quick Entry opens Quick Entry with April 1st pre-selected
+- User can still change the date on the Quick Entry page if needed
+- All navigation paths to Quick Entry consistently pass the date
 
