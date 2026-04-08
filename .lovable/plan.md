@@ -1,23 +1,47 @@
 
 
-# Bus Documents Not Showing on Published Site
+# Enhance Complete Fleet Performance Table with Additional Columns
 
-## Root Cause: Not a Code Issue — Needs Re-publish
+## What's Missing
 
-I investigated thoroughly and found:
+The "Complete Fleet Performance" table currently shows: Bus No, Type, Trips, Distance, Revenue, Net Profit, Efficiency, Utilization, Last Trip. But it's missing critical operational and financial columns.
 
-1. **Supabase Storage bucket `bus-documents`** exists, is public, and contains **751 files across 205 buses** — all accessible
-2. **The code is correct** — `getPublicUrl()` already builds Supabase Storage URLs (not local file paths)
-3. **The manifest `bus_documents.json`** is bundled correctly with 206 buses / 767 files
-4. **I verified a document URL works**: `https://wwjpdszkmtnzshbulkon.supabase.co/storage/v1/object/public/bus-documents/JC%202449/FITNESS.jpg` returns HTTP 200
+## New Columns to Add
 
-The published site (`https://ncg-fleetone.lovable.app`) is running an **older deployment**. The current code in your editor already has the fix (Supabase Storage URLs), but it hasn't been published yet.
+| Column | Source | Description |
+|--------|--------|-------------|
+| **Model** | `buses.model` | Bus model (already fetched but not displayed) |
+| **Route(s)** | `daily_trips.routes` | Distinct routes the bus ran during the period |
+| **Expenses** | `expenseMap` | Total expenses for the period |
+| **Fuel Cost** | `exp.fuel_cost` | Total fuel cost |
+| **Fuel %** | fuel / total expenses | Fuel as percentage of total expenses |
+| **Std Fuel Rate** | distance / fuel_liters | Standard rate based on expected consumption |
+| **Fuel Gap** | actual vs standard | Difference between actual and expected fuel cost |
+| **Income/km** | revenue / distance | Revenue efficiency per kilometer |
 
-## Fix
+## Technical Changes
 
-**Click the "Publish" button** in the top-right corner of Lovable to deploy the latest code. No code changes are needed — everything is already working correctly in the preview.
+### 1. `src/hooks/useTripsAnalytics.ts`
+- Expand `BusStats` interface with: `routes: string[]`, `totalFuelCost`, `totalFuelLiters`, `fuelPercentage`, `stdFuelRate`, `fuelGap`, `incomePerKm`
+- In `busStats` calculation (line 424-457): collect distinct route names from `busTrips`, sum `fuel_cost` and `fuel_liters` from `expenseMap`, compute fuel % and gap
 
-After publishing, the documents will load on the live site because they're served from Supabase Storage, not from local files.
+### 2. `src/components/trips-analytics/BusFleetSection.tsx`
+- Update `BusStats` interface to match
+- Add new table columns: Model, Route(s), Expenses, Fuel, Fuel %, Std Rate, Gap, Income/km
+- Add zebra striping to table rows for readability
+- Route(s) column shows comma-separated route names with a badge count if multiple
+- Fuel % shows color-coded (green if <40%, yellow 40-60%, red >60%)
+- Gap shows red if negative (over-consuming), green if positive (under-consuming)
 
-## No Code Changes Required
+### 3. Table will be horizontally scrollable
+Already has `overflow-x-auto` wrapper — the additional columns will scroll naturally on smaller screens.
+
+## Files to Change
+- `src/hooks/useTripsAnalytics.ts` — expand BusStats interface and computation
+- `src/components/trips-analytics/BusFleetSection.tsx` — add new columns to table
+
+## Result
+- Each bus row shows its route(s), model, expense breakdown, fuel analysis, and efficiency gaps
+- Color-coded fuel % and gap columns highlight problem buses immediately
+- Management can identify fuel-inefficient buses at a glance
 
