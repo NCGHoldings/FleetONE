@@ -1,56 +1,51 @@
 
 
-# Fix: "Create Remaining" Count and Trip Creation Logic
+# Fix: Roster Data Gaps — Missing Buses and Incorrect trips_per_day
 
-## Current Behavior (Your Understanding is Correct)
+## What the Database Shows
 
-Your logic is right:
-- 46 buses in the roster
-- 3 buses have `trips_per_day = 2`, so **49 total trip rows** in expandedRows
-- Only buses with remark = "Running" should create trips
-- Buses marked "Hire", "Repair", "Stopped", "Accident", "Sold" should NOT create trips
+| Metric | Expected | Actual | Gap |
+|--------|----------|--------|-----|
+| Active buses in roster | 46 | 43 | 3 missing |
+| Buses with trips_per_day=2 | 3 (8241, 8242, 2511) | 1 (NE 2511 only) | 2 not set |
+| Total eligible trips | 49 | 39 (from roster logic) | 10 short |
 
-## Issues Found
+### Non-running buses (correctly excluded):
+- NB 1946 — Repair
+- NC 8222 — Paint
+- NG 8229 — Repair
+- NG 8244 — Temporary Allocated
+- NG 8249 — Hire
 
-### Issue 1: "Create Remaining" count is wrong (shows 42)
-The count at line 75 of `FleetMasterSpreadsheet.tsx` filters `expandedRows` (which has 49 rows including multi-trip expansions) but only checks `remark === 'Running' || !remark`. It should match the **actual trip creation logic** which works on the `roster` level, not expanded rows.
+### Data issue 1: NG 8241 and NG 8242 have `trips_per_day = 1` but should be 2
+These two buses already have 2 trip records for April 1 (created manually or by an older logic), but the roster still says `trips_per_day = 1`. The "Create Remaining" logic uses the roster value, so it won't create their 2nd trips going forward.
 
-The trip creation function (line 509) correctly filters: `roster.filter(r => r.is_active && r.bus_id && r.remark === 'Running')` — only strict "Running", then creates `trips_per_day` trips per bus.
+**Fix**: Migration to set `trips_per_day = 2` for NG 8241 and NG 8242.
 
-The mismatch: the UI count uses `expandedRows` with a loose filter, but creation uses `roster` with a strict filter. They need to align.
+### Data issue 2: 3 buses are missing from the roster entirely
+You expect 46 active buses but only 43 exist. Need to identify which 3 buses should be added.
 
-### Issue 2: Trip creation skips entire bus if ANY trip exists
-Line 548: `if (existingBusTrips.has(row.bus_id!)) continue;` — this skips the bus entirely if it already has any trip. But if a bus has `trips_per_day = 2` and only trip 1 was created, clicking "Create Remaining" won't create trip 2. It should check per-trip-sequence, not per-bus.
+**Fix**: I need you to tell me which 3 buses are missing, OR I can query all buses in the `buses` table that are NOT in the roster so you can pick.
 
-## Fix
+## Implementation
 
-### Step 1: Align "Create Remaining" count with actual creation logic
-In `FleetMasterSpreadsheet.tsx`, calculate the count based on roster-level eligible buses and their `trips_per_day`, minus already-created trips — matching exactly what `confirmAndCreateTrips` would do.
+### Step 1: Fix trips_per_day for NG 8241 and NG 8242
+SQL migration to update `fleet_master_roster` setting `trips_per_day = 2` for these two buses.
 
-### Step 2: Fix trip creation to handle partial multi-trip buses
-In `useFleetMasterSpreadsheet.ts` line 524-548, instead of tracking which buses have ANY trip, track how many trips each bus already has. Then only create the missing trip sequences.
+### Step 2: Identify and add missing 3 buses
+Query buses table to find active buses not in the roster, then add them.
 
-Current (broken for multi-trip):
-```
-const existingBusTrips = new Set(existingTrips.map(t => t.bus_id));
-if (existingBusTrips.has(row.bus_id!)) continue; // skips entire bus
-```
+### Step 3: Verify count
+After fixes: 46 running buses × 1 trip + 3 buses × 1 extra trip = 49 total eligible trips.
 
-Fixed:
-```
-const existingTripCounts = {};
-existingTrips.forEach(t => { existingTripCounts[t.bus_id] = (existingTripCounts[t.bus_id] || 0) + 1; });
-// Then only create trips for sequences beyond existing count
-const existingCount = existingTripCounts[row.bus_id] || 0;
-for (let seq = existingCount + 1; seq <= row.trips_per_day; seq++) { ... }
-```
+## The Trip Creation Logic Is Correct
+The code changes from the previous fix are working properly:
+- Only "Running" buses create trips
+- Non-running statuses (Hire, Repair, Paint, etc.) are excluded
+- Multi-trip sequences are handled correctly
+
+The problem is **data**, not code. Once the roster data is corrected, "Create Remaining" will show the correct count of 49.
 
 ## Files to Change
-- `src/components/fleet/FleetMasterSpreadsheet.tsx` — fix eligible count to use roster-based calculation with trips_per_day
-- `src/hooks/useFleetMasterSpreadsheet.ts` — fix partial multi-trip creation (lines 524-548)
-
-## Result
-- "Create Remaining" shows correct number (e.g., 49 total eligible trips minus already created)
-- Changing remark to "Hire"/"Repair"/etc. excludes that bus from count and creation
-- Multi-trip buses (trips_per_day=2) correctly create remaining trips even if some already exist
+- New SQL migration — update `trips_per_day` for NG 8241, NG 8242; add missing buses to roster
 
