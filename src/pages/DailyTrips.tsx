@@ -259,7 +259,7 @@ export default function DailyTrips() {
                 <span className="hidden sm:inline">Route Codes</span>
               </Button>
 
-              <Button onClick={() => navigate('/trips/quick-entry')}>
+              <Button onClick={() => navigate(`/trips/quick-entry?date=${format(selectedDate, 'yyyy-MM-dd')}`)}>
                 <Plus className="mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Quick Entry</span>
               </Button>
@@ -317,7 +317,7 @@ export default function DailyTrips() {
                   )}
                 </p>
                 {dateMode === "single" && (
-                  <Button onClick={() => navigate('/trips/quick-entry')}>
+                  <Button onClick={() => navigate(`/trips/quick-entry?date=${format(selectedDate, 'yyyy-MM-dd')}`)}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add First Trip
                   </Button>
@@ -364,7 +364,7 @@ export default function DailyTrips() {
                   {viewMode === "crew" ? (
                     <CrewConsolidatedView crewGroups={filteredCrewGroups} onRefresh={handleRefetch} />
                   ) : viewMode === "table" ? (
-                    <BusDailySummaryTable summaries={filteredBusSummaries} onRefresh={handleRefetch} />
+                    <BusDailySummaryTable summaries={filteredBusSummaries} onRefresh={handleRefetch} selectedDate={selectedDate} />
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {filteredBusSummaries.map((summary) => (
