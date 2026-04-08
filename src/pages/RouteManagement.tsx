@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit, Trash2, Map, MapPin, GitMerge, Bus } from "lucide-react";
+import { Plus, Edit, Trash2, Map, MapPin, GitMerge, Bus, ChevronDown, ChevronRight, ArrowLeftRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,7 @@ interface FleetRoute {
   fare_amount: number | null;
   is_active: boolean;
   category: string | null;
+  route_group: string | null;
 }
 
 export default function RouteManagement() {
@@ -44,6 +45,7 @@ export default function RouteManagement() {
   const [editingRoute, setEditingRoute] = useState<FleetRoute | null>(null);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [busCountMap, setBusCountMap] = useState<Record<string, number>>({});
+  const [collapsedCorridors, setCollapsedCorridors] = useState<Set<string>>(new Set());
 
   // Merge state
   const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
@@ -60,6 +62,7 @@ export default function RouteManagement() {
     fare_amount: "",
     is_active: true,
     category: "Public Bus",
+    route_group: "",
   });
 
   const fetchRoutes = async () => {
@@ -87,7 +90,6 @@ export default function RouteManagement() {
 
       if (error) throw error;
       
-      // Count buses per route name (normalize for matching)
       const counts: Record<string, number> = {};
       (data || []).forEach((bus: any) => {
         if (bus.route) {
@@ -103,9 +105,7 @@ export default function RouteManagement() {
 
   const getBusCount = (routeName: string): number => {
     const normalized = routeName.toLowerCase().replace(/[\s\-–]+/g, " ").trim();
-    // Check exact and fuzzy matches
     let count = busCountMap[normalized] || 0;
-    // Also check if any bus route contains this route name or vice versa
     if (count === 0) {
       Object.entries(busCountMap).forEach(([key, val]) => {
         if (key.includes(normalized) || normalized.includes(key)) {
@@ -131,6 +131,62 @@ export default function RouteManagement() {
   const publicCount = routes.filter(r => r.category === "Public Bus").length;
   const schoolCount = routes.filter(r => r.category === "School Bus").length;
 
+  // Get unique corridor groups from existing routes
+  const existingGroups = useMemo(() => {
+    return [...new Set(routes.map(r => r.route_group).filter(Boolean))] as string[];
+  }, [routes]);
+
+  // Group routes by corridor
+  const groupedRoutes = useMemo(() => {
+    const corridors: { name: string; routes: FleetRoute[] }[] = [];
+    const ungrouped: FleetRoute[] = [];
+    const groupMap = new Map<string, FleetRoute[]>();
+
+    filteredRoutes.forEach(route => {
+      if (route.route_group) {
+        const existing = groupMap.get(route.route_group) || [];
+        existing.push(route);
+        groupMap.set(route.route_group, existing);
+      } else {
+        ungrouped.push(route);
+      }
+    });
+
+    groupMap.forEach((rts, name) => {
+      corridors.push({ name, routes: rts.sort((a, b) => a.route_no.localeCompare(b.route_no)) });
+    });
+    corridors.sort((a, b) => a.name.localeCompare(b.name));
+
+    return { corridors, ungrouped };
+  }, [filteredRoutes]);
+
+  const toggleCorridor = (name: string) => {
+    setCollapsedCorridors(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  // Auto-suggest corridor when start/end match an existing route's reverse
+  const suggestedGroup = useMemo(() => {
+    if (formData.route_group || !formData.start_location || !formData.end_location) return null;
+    const start = formData.start_location.toLowerCase().trim();
+    const end = formData.end_location.toLowerCase().trim();
+    
+    const match = routes.find(r => {
+      const rStart = (r.start_location || "").toLowerCase().trim();
+      const rEnd = (r.end_location || "").toLowerCase().trim();
+      return (rStart === end && rEnd === start) || (rStart === start && rEnd === end);
+    });
+    
+    if (match) {
+      return match.route_group || `${match.start_location} - ${match.end_location}`;
+    }
+    return null;
+  }, [formData.start_location, formData.end_location, formData.route_group, routes]);
+
   const handleOpenEdit = (routeItem: FleetRoute) => {
     setFormData({
       route_no: routeItem.route_no || "",
@@ -141,6 +197,7 @@ export default function RouteManagement() {
       fare_amount: routeItem.fare_amount ? String(routeItem.fare_amount) : "",
       is_active: routeItem.is_active !== false,
       category: routeItem.category || "Public Bus",
+      route_group: routeItem.route_group || "",
     });
     setEditingRoute(routeItem);
     setIsDialogOpen(true);
@@ -156,6 +213,7 @@ export default function RouteManagement() {
       fare_amount: "",
       is_active: true,
       category: "Public Bus",
+      route_group: "",
     });
     setEditingRoute(null);
     setIsDialogOpen(true);
@@ -168,7 +226,7 @@ export default function RouteManagement() {
         return;
       }
 
-      const payload = {
+      const payload: any = {
         route_no: formData.route_no,
         route_name: formData.route_name,
         start_location: formData.start_location || null,
@@ -177,6 +235,7 @@ export default function RouteManagement() {
         fare_amount: formData.fare_amount ? parseFloat(formData.fare_amount) : null,
         is_active: formData.is_active,
         category: formData.category,
+        route_group: formData.route_group || null,
       };
 
       if (editingRoute) {
@@ -272,6 +331,56 @@ export default function RouteManagement() {
     }
   };
 
+  const renderRouteRow = (route: FleetRoute, indent = false) => {
+    const busCount = getBusCount(route.route_name);
+    return (
+      <TableRow key={route.id} className="group">
+        <TableCell className={`font-semibold ${indent ? "pl-10" : ""}`}>{route.route_no}</TableCell>
+        <TableCell className="font-medium text-primary">{route.route_name}</TableCell>
+        <TableCell>
+          <Badge variant={route.category === "School Bus" ? "secondary" : "outline"}
+            className={route.category === "School Bus" 
+              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" 
+              : "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"}>
+            {route.category || "Public Bus"}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center text-sm text-muted-foreground gap-1">
+            <MapPin className="w-3 h-3" />
+            {route.start_location || "?"} <span className="mx-1">→</span> {route.end_location || "?"}
+          </div>
+        </TableCell>
+        <TableCell>{route.distance_km ? `${route.distance_km} km` : "-"}</TableCell>
+        <TableCell className="text-center">
+          {busCount > 0 ? (
+            <span className="inline-flex items-center gap-1 text-sm font-medium text-foreground">
+              <Bus className="w-3.5 h-3.5 text-muted-foreground" />
+              {busCount}
+            </span>
+          ) : (
+            <span className="text-muted-foreground text-sm">-</span>
+          )}
+        </TableCell>
+        <TableCell>
+          {route.is_active ? (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Active</span>
+          ) : (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">Inactive</span>
+          )}
+        </TableCell>
+        <TableCell className="text-right">
+          <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(route)}>
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(route.id)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
   return (
     <div className="space-y-6 animate-fade-in p-6">
       <div className="flex items-center justify-between">
@@ -314,7 +423,7 @@ export default function RouteManagement() {
                 <SelectTrigger><SelectValue placeholder="Select redundant route..." /></SelectTrigger>
                 <SelectContent>
                   {routes.map(r => (
-                    <SelectItem key={r.id} value={r.id}>{r.route_name}</SelectItem>
+                    <SelectItem key={r.id} value={r.id}>{r.route_name} ({r.route_no})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -328,7 +437,7 @@ export default function RouteManagement() {
                 <SelectTrigger><SelectValue placeholder="Select official canonical route..." /></SelectTrigger>
                 <SelectContent>
                   {routes.map(r => (
-                    <SelectItem key={r.id} value={r.id}>{r.route_name}</SelectItem>
+                    <SelectItem key={r.id} value={r.id}>{r.route_name} ({r.route_no})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -376,6 +485,30 @@ export default function RouteManagement() {
               <Label htmlFor="end_location" className="text-right">End Loc</Label>
               <Input id="end_location" placeholder="Badulla" value={formData.end_location}
                 onChange={(e) => setFormData({ ...formData, end_location: e.target.value })} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 gap-4 items-center">
+              <Label htmlFor="route_group" className="text-right">Corridor</Label>
+              <div className="col-span-3 space-y-1">
+                <Select value={formData.route_group || "__none__"} onValueChange={(val) => setFormData({ ...formData, route_group: val === "__none__" ? "" : val })}>
+                  <SelectTrigger><SelectValue placeholder="Select corridor group..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No corridor (standalone)</SelectItem>
+                    {existingGroups.map(g => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {suggestedGroup && (
+                  <button
+                    type="button"
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                    onClick={() => setFormData({ ...formData, route_group: suggestedGroup })}
+                  >
+                    <ArrowLeftRight className="w-3 h-3" />
+                    Auto-detected reverse route — link to "{suggestedGroup}"?
+                  </button>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-4 gap-4 items-center">
               <Label htmlFor="distance_km" className="text-right">Distance (km)</Label>
@@ -437,55 +570,61 @@ export default function RouteManagement() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredRoutes.map((route) => {
-                      const busCount = getBusCount(route.route_name);
-                      return (
-                        <TableRow key={route.id} className="group">
-                          <TableCell className="font-semibold">{route.route_no}</TableCell>
-                          <TableCell className="font-medium text-primary">{route.route_name}</TableCell>
-                          <TableCell>
-                            <Badge variant={route.category === "School Bus" ? "secondary" : "outline"}
-                              className={route.category === "School Bus" 
-                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" 
-                                : "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"}>
-                              {route.category || "Public Bus"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center text-sm text-muted-foreground gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {route.start_location || "?"} <span className="mx-1">→</span> {route.end_location || "?"}
-                            </div>
-                          </TableCell>
-                          <TableCell>{route.distance_km ? `${route.distance_km} km` : "-"}</TableCell>
-                          <TableCell className="text-center">
-                            {busCount > 0 ? (
-                              <span className="inline-flex items-center gap-1 text-sm font-medium text-foreground">
-                                <Bus className="w-3.5 h-3.5 text-muted-foreground" />
-                                {busCount}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {route.is_active ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Active</span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">Inactive</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(route)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(route.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                    <>
+                      {/* Corridor Groups */}
+                      {groupedRoutes.corridors.map(corridor => {
+                        const isCollapsed = collapsedCorridors.has(corridor.name);
+                        const totalBuses = corridor.routes.reduce((sum, r) => sum + getBusCount(r.route_name), 0);
+                        const totalDistance = corridor.routes.reduce((sum, r) => sum + (r.distance_km || 0), 0);
+                        return (
+                          <React.Fragment key={corridor.name}>
+                            <TableRow 
+                              className="bg-muted/50 hover:bg-muted/70 cursor-pointer border-t-2 border-border"
+                              onClick={() => toggleCorridor(corridor.name)}
+                            >
+                              <TableCell colSpan={2}>
+                                <div className="flex items-center gap-2 font-semibold text-foreground">
+                                  {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                  <ArrowLeftRight className="w-4 h-4 text-primary" />
+                                  <span>{corridor.name}</span>
+                                  <Badge variant="outline" className="ml-2 text-xs font-normal">
+                                    {corridor.routes.length} routes
+                                  </Badge>
+                                </div>
+                              </TableCell>
+                              <TableCell />
+                              <TableCell className="text-sm text-muted-foreground">
+                                Round-trip corridor
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {totalDistance > 0 ? `${totalDistance} km total` : "-"}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {totalBuses > 0 && (
+                                  <span className="inline-flex items-center gap-1 text-sm font-medium">
+                                    <Bus className="w-3.5 h-3.5 text-muted-foreground" />
+                                    {totalBuses}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell />
+                              <TableCell />
+                            </TableRow>
+                            {!isCollapsed && corridor.routes.map(route => renderRouteRow(route, true))}
+                          </React.Fragment>
+                        );
+                      })}
+
+                      {/* Ungrouped Routes */}
+                      {groupedRoutes.ungrouped.length > 0 && groupedRoutes.corridors.length > 0 && (
+                        <TableRow className="bg-muted/30 border-t-2 border-border">
+                          <TableCell colSpan={8} className="font-semibold text-muted-foreground text-sm py-2">
+                            Standalone Routes
                           </TableCell>
                         </TableRow>
-                      );
-                    })
+                      )}
+                      {groupedRoutes.ungrouped.map(route => renderRouteRow(route))}
+                    </>
                   )}
                 </TableBody>
               </Table>
