@@ -4,7 +4,7 @@ import { FleetMasterSpreadsheetCore } from './FleetMasterSpreadsheetCore';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, RefreshCw, Plus, FileSpreadsheet, Rocket, Bus, Upload, CheckCircle2 } from 'lucide-react';
+import { CalendarIcon, RefreshCw, Plus, FileSpreadsheet, Rocket, Bus, Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { formatLKR } from '@/lib/accounting-utils';
@@ -233,6 +233,22 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
           </Button>
         </div>
       </div>
+
+      {/* No Trips Banner */}
+      {editMode === 'daily' && tripsTotalCount > 0 && tripsCreatedCount === 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-800 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <div>
+              <p className="font-medium text-amber-800 dark:text-amber-300">No trips generated for {format(selectedDate, 'MMM do, yyyy')}</p>
+              <p className="text-sm text-amber-600 dark:text-amber-400">Click "Create Trips" to generate daily trip records before entering income/expense data.</p>
+            </div>
+          </div>
+          <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" onClick={handleCreateTrips} disabled={creating}>
+            <Rocket className="h-4 w-4 mr-1" /> {creating ? 'Creating...' : 'Create Trips'}
+          </Button>
+        </div>
+      )}
 
       {/* Spreadsheet */}
       <div className={cn("transition-colors rounded-md overflow-hidden", editMode === 'daily' ? 'ring-2 ring-primary/20' : '')}>
