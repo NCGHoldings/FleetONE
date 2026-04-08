@@ -250,6 +250,10 @@ export function YutongFinanceDashboard() {
         <TabsContent value="delivery-orders">
           <YutongDeliveryOrderManagement onRefresh={loadFinancialData} />
         </TabsContent>
+
+        <TabsContent value="landed-cost">
+          <YutongLandedCostView />
+        </TabsContent>
       </Tabs>
     </div>
   );
