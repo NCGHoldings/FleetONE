@@ -521,8 +521,11 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
         .eq("trip_date", dateStr)
         .in("bus_id", busIds);
 
-      // Track which buses already have trips for this date
-      const existingBusTrips = new Set((existingTrips || []).map(t => t.bus_id));
+      // Track how many trips each bus already has (not just existence)
+      const existingTripCounts: Record<string, number> = {};
+      (existingTrips || []).forEach(t => {
+        existingTripCounts[t.bus_id] = (existingTripCounts[t.bus_id] || 0) + 1;
+      });
 
       // Find the max trip counter for this date prefix to avoid collisions
       const datePrefix = dateStr.replace(/-/g, ''); // e.g. "20260322"
@@ -544,10 +547,11 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
       const tripsToInsert: any[] = [];
 
       for (const row of activeRoster) {
-        // Skip buses that already have trips for this date
-        if (existingBusTrips.has(row.bus_id!)) continue;
+        const existingCount = existingTripCounts[row.bus_id!] || 0;
+        // Only create trips for sequences beyond what already exists
+        if (existingCount >= row.trips_per_day) continue;
 
-        for (let seq = 1; seq <= row.trips_per_day; seq++) {
+        for (let seq = existingCount + 1; seq <= row.trips_per_day; seq++) {
           const tripNo = `${datePrefix}-${String(tripCounter).padStart(4, '0')}`;
 
           tripsToInsert.push({
