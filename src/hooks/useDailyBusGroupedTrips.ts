@@ -175,13 +175,6 @@ export function useDailyBusGroupedTrips(
         throw tripsError;
       }
 
-      // Data integrity check
-        tripsCount: tripsData?.length || 0,
-        firstTrip: tripsData?.[0],
-        lastTrip: tripsData?.[tripsData.length - 1],
-        uniqueDates: [...new Set(tripsData?.map(t => t.trip_date) || [])],
-        uniqueBuses: [...new Set(tripsData?.map(t => t.buses?.bus_no) || [])],
-      });
 
 
       // Build expenses query
