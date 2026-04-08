@@ -25,6 +25,7 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
   const [editMode, setEditMode] = useState<EditMode>('master');
   
   const { 
+    roster,
     expandedRows, 
     availableRoutes,
     loading, 
