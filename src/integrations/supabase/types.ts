@@ -17123,6 +17123,7 @@ export type Database = {
           gl_code: string | null
           id: string
           is_active: boolean | null
+          route_group: string | null
           route_name: string
           route_no: string
           start_location: string
@@ -17139,6 +17140,7 @@ export type Database = {
           gl_code?: string | null
           id?: string
           is_active?: boolean | null
+          route_group?: string | null
           route_name: string
           route_no: string
           start_location: string
@@ -17155,6 +17157,7 @@ export type Database = {
           gl_code?: string | null
           id?: string
           is_active?: boolean | null
+          route_group?: string | null
           route_name?: string
           route_no?: string
           start_location?: string
