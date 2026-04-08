@@ -72,7 +72,8 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
   };
 
   const tripsCreatedCount = expandedRows.filter(r => r.trip_id).length;
-  const tripsTotalCount = expandedRows.length;
+  const eligibleRows = expandedRows.filter(r => r.remark === 'Running' || !r.remark);
+  const tripsTotalCount = eligibleRows.length;
   const isAllTripsCreated = tripsTotalCount > 0 && tripsCreatedCount === tripsTotalCount;
   const isPartialTripsCreated = tripsTotalCount > 0 && tripsCreatedCount > 0 && tripsCreatedCount < tripsTotalCount;
 
