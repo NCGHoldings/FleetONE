@@ -1,52 +1,51 @@
 
 
-# Fix: Invoice Mileage, Route Display, and Driver/Conductor Data
+# Fix: Payment Reminder Intermediate Stops & Show Both KM Values in Mileage
 
 ## Problems
 
-1. **Mileage shows original KM, not adjusted KM**: Line 241 in `invoice-generator.ts` prioritizes `tripDistance` (original quoted KM) over `actualKmTraveled` (post-trip adjustment). When a post-trip adjustment exists, the mileage should reflect the actual KM traveled.
+1. **Payment Reminder still passes `intermediateStops`** to the invoice generator (line 1518 in ConfirmedTripsTable.tsx). While the generator now ignores them, passing them is unnecessary and could cause issues if logic changes. Should be removed.
 
-2. **Route shows all intermediate stops**: Lines 232-239 build the full route chain (`Pickup → Stop1 → Stop2 → Drop`). The user wants only `Pickup → Drop` in the invoice Item Detail column.
-
-3. **Driver/Conductor data missing in some generation paths**: The initial draft generation in `ConfirmedTripsTable.tsx` passes driver/conductor, but regeneration hooks (`useDocumentRegeneration.ts`, `useDocumentManagement.ts`, `useFinanceApproval.ts`) do not pass `tripDistance`, `totalKm`, `actualKmTraveled`, or `originalQuotedKm` — meaning mileage shows as 0 in regenerated documents.
+2. **Mileage shows only one value** — either actual KM or quoted KM. The user wants BOTH displayed when a post-trip adjustment exists: the original quoted KM and the actual KM traveled. For example: `54.5 (Quoted: 50 KM)` or `Quoted: 50 | Actual: 54.5`.
 
 ## Implementation
 
 ### File 1: `src/lib/invoice-generator.ts`
-**Line 231-241** — Fix route and mileage logic:
-- Remove intermediate stops from the `itemDetail` route string — only use `pickupLocation → dropLocation`
-- Change mileage priority: if post-trip adjustment exists (`hasAdjustments` and `actualKmTraveled`), use `actualKmTraveled` first; otherwise use `tripDistance` or `totalKm`
 
+**Line 294-297** — Update Mileage display to show both values when adjustments exist:
 ```
 // BEFORE
-const routeParts = [data.pickupLocation];
-if (data.intermediateStops && data.intermediateStops.length > 0) { ... }
-routeParts.push(data.dropLocation);
-const itemDetail = data.itemDetail || routeParts.join(' → ');
-const mileage = data.tripDistance || data.totalKm || data.actualKmTraveled || 0;
+<td style="...">${mileage}</td>
 
-// AFTER
-const itemDetail = data.itemDetail || `${data.pickupLocation} → ${data.dropLocation}`;
+// AFTER — show "Actual: X KM (Quoted: Y KM)" when adjustments exist, else just the number
+```
+
+**Line 231-236** — Update mileage variable to also prepare the original quoted value:
+```typescript
 const mileage = (data.hasAdjustments && data.actualKmTraveled)
   ? data.actualKmTraveled
   : (data.tripDistance || data.totalKm || 0);
+const originalKm = data.originalQuotedKm || data.tripDistance || data.totalKm || 0;
 ```
 
-### File 2: `src/hooks/useDocumentRegeneration.ts`
-**~Line 140-183** — Add missing fields to invoice data:
-- Add `tripDistance: getTripDistance(quotationData)` and `totalKm: calculateTotalKm(quotationData)`
-- When `hasAdjustments`, also add `originalQuotedKm` and `actualKmTraveled` from `adjustmentData`
-- Import `getTripDistance` and `calculateTotalKm` from `special-hire-invoice-helpers`
+Then in the HTML (line 296), render conditionally:
+```
+${data.hasAdjustments && data.actualKmTraveled
+  ? `${mileage} KM (Quoted: ${originalKm} KM)`
+  : `${mileage}`}
+```
 
-### File 3: `src/hooks/useDocumentManagement.ts`
-**Invoice data objects** — Add `tripDistance` and `totalKm` fields from the quotation data, similar to File 2.
+### File 2: `src/components/special-hire/ConfirmedTripsTable.tsx`
 
-### File 4: `src/hooks/useFinanceApproval.ts`
-**All invoice data objects** — Add `tripDistance`, `totalKm`, and adjustment KM fields where applicable.
+**Line 1499-1518** — Remove `intermediateStops` parsing and passing from Payment Reminder data:
+- Delete lines 1499-1506 (intermediate stops parsing block)
+- Remove `intermediateStops,` from line 1518 in `reminderData`
+
+Also check all other invoice data constructions in this file and remove `intermediateStops` from them, since the generator no longer uses them.
 
 ## Result
-- Mileage field shows actual KM traveled when a post-trip adjustment exists, otherwise shows original quoted KM
-- Item Detail shows only `Pickup → Drop` — no intermediate stops cluttering the invoice
-- Driver/conductor info continues to appear in the Remark line for each bus
-- All document generation paths (initial, regeneration, approval) produce consistent data
+- Payment Reminder no longer passes unnecessary intermediate stops data
+- Mileage field shows both actual and quoted KM when post-trip adjustment exists (e.g., "54.5 KM (Quoted: 50 KM)")
+- Single KM value shown when no adjustments exist
+- Trips table already correctly shows only pickup and drop locations
 
