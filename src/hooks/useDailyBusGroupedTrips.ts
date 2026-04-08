@@ -124,19 +124,8 @@ export function useDailyBusGroupedTrips(
         fromDateStr = format(dateRange.from, 'yyyy-MM-dd');
         toDateStr = format(dateRange.to, 'yyyy-MM-dd');
         isRangeQuery = true;
-          isRangeQuery,
-          fromDateStr,
-          toDateStr,
-          dateRangeFrom: dateRange?.from,
-          dateRangeTo: dateRange?.to,
-          fromDate: dateRange.from.toISOString(),
-          toDate: dateRange.to.toISOString(),
-        });
       } else if (selectedDate) {
         fromDateStr = toDateStr = format(selectedDate, 'yyyy-MM-dd');
-          selectedDate,
-          dateStr: fromDateStr,
-        });
       } else {
         console.warn('⚠️ No date or date range provided');
         return;
@@ -186,28 +175,7 @@ export function useDailyBusGroupedTrips(
         throw tripsError;
       }
 
-      // Data integrity check
-        tripsCount: tripsData?.length || 0,
-        firstTrip: tripsData?.[0],
-        lastTrip: tripsData?.[tripsData.length - 1],
-        uniqueDates: [...new Set(tripsData?.map(t => t.trip_date) || [])],
-        uniqueBuses: [...new Set(tripsData?.map(t => t.buses?.bus_no) || [])],
-      });
 
-      // Verify date spread
-      if (tripsData && tripsData.length > 0) {
-        const dateSpread = {
-          min: Math.min(...tripsData.map(t => new Date(t.trip_date).getTime())),
-          max: Math.max(...tripsData.map(t => new Date(t.trip_date).getTime())),
-        };
-          from: new Date(dateSpread.min).toISOString().split('T')[0],
-          to: new Date(dateSpread.max).toISOString().split('T')[0],
-          expectedFrom: fromDateStr,
-          expectedTo: toDateStr,
-        });
-      } else {
-        console.warn('⚠️ No trips found in database for this date range!');
-      }
 
       // Build expenses query
       let expensesQuery = supabase
@@ -276,14 +244,6 @@ export function useDailyBusGroupedTrips(
         });
       });
 
-      // Log grouped data
-        busCount: groupedByBus.size,
-        buses: Array.from(groupedByBus.entries()).map(([busId, trips]) => ({
-          busId: busId.substring(0, 8),
-          tripCount: trips.length,
-          dates: [...new Set(trips.map(t => t.trip_date))],
-        })),
-      });
 
       // Create expense lookup map (aggregate expenses for range queries)
       const expenseMap = new Map<string, any>();
@@ -424,11 +384,6 @@ export function useDailyBusGroupedTrips(
         ? efficiencies.reduce((sum, e) => sum + e, 0) / efficiencies.length 
         : 0;
 
-        buses: summaries.length,
-        totalRevenue: fleet.total_revenue,
-        totalExpenses: fleet.total_expenses,
-        profit: fleet.fleet_profit
-      });
 
       setBusSummaries(summaries);
       setFleetSummary(fleet);
