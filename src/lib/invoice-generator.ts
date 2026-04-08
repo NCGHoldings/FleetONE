@@ -228,17 +228,12 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const totalPaid = data.paidAmount || 0;
     // Use explicit balanceAmount when provided (balance invoices), else compute
     const balanceDue = data.balanceAmount != null ? data.balanceAmount : Math.max(0, priceAfterDiscount - totalPaid);
-    // Build route with intermediate stops
-    const routeParts = [data.pickupLocation];
-    if (data.intermediateStops && data.intermediateStops.length > 0) {
-      data.intermediateStops.forEach(stop => {
-        if (stop.location) routeParts.push(stop.location);
-      });
-    }
-    routeParts.push(data.dropLocation);
-    const itemDetail = data.itemDetail || routeParts.join(' → ');
-    // Use original trip distance from quotation first, then totalKm, then actual (post-trip) as fallback
-    const mileage = data.tripDistance || data.totalKm || data.actualKmTraveled || 0;
+    // Show only pickup → drop (no intermediate stops on invoice)
+    const itemDetail = data.itemDetail || `${data.pickupLocation || ''} → ${data.dropLocation || ''}`;
+    // Use actual KM from post-trip adjustment when available, otherwise original quoted KM
+    const mileage = (data.hasAdjustments && data.actualKmTraveled)
+      ? data.actualKmTraveled
+      : (data.tripDistance || data.totalKm || 0);
 
     return `
       <div id="invoice-root" style="font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; width: 210mm; box-sizing: border-box;">
