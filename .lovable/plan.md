@@ -1,77 +1,56 @@
 
 
-# Daily Trips Page — Structure Guide and Issues Found
+# Fix: "Create Remaining" Count and Trip Creation Logic
 
-## How This Page Works
+## Current Behavior (Your Understanding is Correct)
 
-The `/trips` page is the **NCG Express Operations** hub with 6 tabs:
-
-```text
-┌──────────────────────────────────────────────────────┐
-│  Daily Trips │ Fleet Sheet │ Bus P&L │ Route P&L │ ...│
-└──────────────────────────────────────────────────────┘
-```
-
-1. **Daily Trips** — Shows bus-level trip summaries (table/card/crew views) with revenue, expenses, profit. Data comes from `daily_trips` + `daily_bus_expenses` tables.
-2. **Fleet Sheet** — The Master Roster spreadsheet (what you see in screenshot). Shows all rostered buses with routes, drivers, conductors, and allows inline editing.
-3. **Bus P&L / Route P&L** — Profitability reports.
-4. **Cashier Sett. / Bank Deposit** — Settlement and deposit dashboards.
-
-### Why KPIs Show Zero
-
-The KPIs (Revenue, Expenses, Net Income, Mileage, Fuel) show LKR 0.00 because **no trips have been created for today (April 8th)**. The toast "No trip generated — You must click 'Create Trips' for today before you can override daily values" confirms this.
-
-**Workflow**: Master Roster → Click "Create Trips" button → This generates `daily_trips` records for today → Then you can enter income/expense data → KPIs update.
+Your logic is right:
+- 46 buses in the roster
+- 3 buses have `trips_per_day = 2`, so **49 total trip rows** in expandedRows
+- Only buses with remark = "Running" should create trips
+- Buses marked "Hire", "Repair", "Stopped", "Accident", "Sold" should NOT create trips
 
 ## Issues Found
 
-### Issue 1: Fleet Sheet has its own date picker that is separate from Daily Trips date picker
-The Fleet Sheet component (`FleetMasterSpreadsheet`) has its own internal `selectedDate` state (line 20) that is **independent** from the parent page's date. When you switch between tabs, the dates can be out of sync. The parent page's date controls only affect the Daily Trips tab, not Fleet Sheet.
+### Issue 1: "Create Remaining" count is wrong (shows 42)
+The count at line 75 of `FleetMasterSpreadsheet.tsx` filters `expandedRows` (which has 49 rows including multi-trip expansions) but only checks `remark === 'Running' || !remark`. It should match the **actual trip creation logic** which works on the `roster` level, not expanded rows.
 
-**Fix**: Pass the parent page's `selectedDate` down to `FleetMasterSpreadsheet` so both tabs use the same date.
+The trip creation function (line 509) correctly filters: `roster.filter(r => r.is_active && r.bus_id && r.remark === 'Running')` — only strict "Running", then creates `trips_per_day` trips per bus.
 
-### Issue 2: "Buses Running" count only counts roster entries with remark = 'Running'
-Line 656: `roster.filter(r => r.remark === 'Running').length` — this works correctly, but if buses have no remark set, they won't be counted. Some roster entries may have null/empty remarks.
+The mismatch: the UI count uses `expandedRows` with a loose filter, but creation uses `roster` with a strict filter. They need to align.
 
-**Fix**: Count buses where `remark === 'Running' || !remark` (default to counting if no remark set), or ensure all roster entries have a remark.
+### Issue 2: Trip creation skips entire bus if ANY trip exists
+Line 548: `if (existingBusTrips.has(row.bus_id!)) continue;` — this skips the bus entirely if it already has any trip. But if a bus has `trips_per_day = 2` and only trip 1 was created, clicking "Create Remaining" won't create trip 2. It should check per-trip-sequence, not per-bus.
 
-### Issue 3: Daily mode edit shows confusing toast when no trips exist
-When editMode is 'daily' and you try to edit a field, it shows "No trip generated" toast (line 418). This is correct behavior but the user experience is confusing — it should be clearer that you need to create trips first.
+## Fix
 
-**Fix**: Add a visible banner/alert at the top of the Fleet Sheet when no trips exist for the selected date, with a prominent "Create Trips" CTA.
+### Step 1: Align "Create Remaining" count with actual creation logic
+In `FleetMasterSpreadsheet.tsx`, calculate the count based on roster-level eligible buses and their `trips_per_day`, minus already-created trips — matching exactly what `confirmAndCreateTrips` would do.
 
-### Issue 4: Excessive debug logging in production
-The `useDailyBusGroupedTrips` hook has ~15 `console.log` debug statements that run on every data fetch. These should be removed or gated behind a debug flag.
+### Step 2: Fix trip creation to handle partial multi-trip buses
+In `useFleetMasterSpreadsheet.ts` line 524-548, instead of tracking which buses have ANY trip, track how many trips each bus already has. Then only create the missing trip sequences.
 
-**Fix**: Remove or wrap all debug console.log statements.
-
-## Implementation Plan
-
-### Step 1: Sync Fleet Sheet date with parent page date
-In `DailyTrips.tsx`, pass `selectedDate` to `FleetMasterSpreadsheet`:
-```tsx
-<FleetMasterSpreadsheet initialDate={selectedDate} />
+Current (broken for multi-trip):
 ```
-Update `FleetMasterSpreadsheet` to accept and use `initialDate` prop.
+const existingBusTrips = new Set(existingTrips.map(t => t.bus_id));
+if (existingBusTrips.has(row.bus_id!)) continue; // skips entire bus
+```
 
-### Step 2: Add "No Trips" banner to Fleet Sheet
-When no trips exist for the selected date, show a clear alert with "Create Trips" button instead of relying on toast messages.
-
-### Step 3: Fix "Buses Running" count
-Default to counting buses that have remark = 'Running' OR null/empty remark (since most buses are running by default).
-
-### Step 4: Clean up debug logging
-Remove excessive `console.log` statements from `useDailyBusGroupedTrips.ts`.
+Fixed:
+```
+const existingTripCounts = {};
+existingTrips.forEach(t => { existingTripCounts[t.bus_id] = (existingTripCounts[t.bus_id] || 0) + 1; });
+// Then only create trips for sequences beyond existing count
+const existingCount = existingTripCounts[row.bus_id] || 0;
+for (let seq = existingCount + 1; seq <= row.trips_per_day; seq++) { ... }
+```
 
 ## Files to Change
-- `src/pages/DailyTrips.tsx` — pass date to Fleet Sheet
-- `src/components/fleet/FleetMasterSpreadsheet.tsx` — accept initial date prop, add no-trips banner
-- `src/hooks/useFleetMasterSpreadsheet.ts` — fix bus count logic
-- `src/hooks/useDailyBusGroupedTrips.ts` — remove debug logs
+- `src/components/fleet/FleetMasterSpreadsheet.tsx` — fix eligible count to use roster-based calculation with trips_per_day
+- `src/hooks/useFleetMasterSpreadsheet.ts` — fix partial multi-trip creation (lines 524-548)
 
 ## Result
-- Fleet Sheet and Daily Trips tabs share the same date
-- Clear visual indicator when trips haven't been created yet
-- Accurate "Buses Running" count
-- Clean console output without debug noise
+- "Create Remaining" shows correct number (e.g., 49 total eligible trips minus already created)
+- Changing remark to "Hire"/"Repair"/etc. excludes that bus from count and creation
+- Multi-trip buses (trips_per_day=2) correctly create remaining trips even if some already exist
 
