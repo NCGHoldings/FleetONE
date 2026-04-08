@@ -414,68 +414,70 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
 
       if (editMode === 'daily') {
         const row = expandedRows.find(r => r.id === rosterId);
+        const rosterLevelFields = ['route_label', 'route_id', 'remark'];
         if (!row?.trip_id) {
-          toast({ title: "No trip generated", description: "You must click 'Create Trips' for today before you can override daily values.", variant: "destructive" });
-          return;
-        }
-
-        const dailyUpdatePayload: Record<string, any> = {};
-        
-        // Map master roster fields to daily_trips fields
-        if (field === 'route_label') dailyUpdatePayload.route_label = value;
-        if (field === 'route_id') dailyUpdatePayload.route_id = value;
-        if (field === 'remark') {
-          // You might store remark in `notes` or another field if available, but for now we'll update status if there's a status field
-          // Or just store it in notes. Let's append to notes.
-        }
-
-        // For driver/conductor/turn times, update the 'notes' JSON
-        if (field === 'default_driver' || field === 'default_conductor' || field === 'turn_01_time' || field === 'turn_02_time') {
-          if (!row.trip_id) {
-            toast({ title: "No trip", description: "Create trips first before overriding crew or times", variant: "destructive" });
+          if (!rosterLevelFields.includes(field)) {
+            toast({ title: "No trip generated", description: "You must click 'Create Trips' for today before you can override daily values.", variant: "destructive" });
             return;
           }
+          // For roster-level fields, fall through to master roster update below
+        } else {
+          const dailyUpdatePayload: Record<string, any> = {};
           
-          try {
-            // First fetch existing notes from the database for this trip
-            const { data: tripData } = await supabase
-              .from("daily_trips")
-              .select("notes")
-              .eq("id", row.trip_id)
-              .single();
-              
-            let currentNotes: Record<string, any> = {};
-            if (tripData?.notes) {
-              currentNotes = typeof tripData.notes === 'string' ? JSON.parse(tripData.notes) : tripData.notes;
+          // Map master roster fields to daily_trips fields
+          if (field === 'route_label') dailyUpdatePayload.route_label = value;
+          if (field === 'route_id') dailyUpdatePayload.route_id = value;
+          if (field === 'remark') {
+            // Remark is roster-level, handled below
+          }
+
+          // For driver/conductor/turn times, update the 'notes' JSON
+          if (field === 'default_driver' || field === 'default_conductor' || field === 'turn_01_time' || field === 'turn_02_time') {
+            if (!row.trip_id) {
+              toast({ title: "No trip", description: "Create trips first before overriding crew or times", variant: "destructive" });
+              return;
             }
             
-            if (field === 'default_driver') currentNotes['driver'] = value;
-            if (field === 'default_conductor') currentNotes['conductor'] = value;
-            if (field === 'turn_01_time') currentNotes['turn_01_time'] = value;
-            if (field === 'turn_02_time') currentNotes['turn_02_time'] = value;
-            
-            dailyUpdatePayload.notes = JSON.stringify(currentNotes);
-          } catch (e) {
-            console.error("Error formatting notes JSON:", e);
-            dailyUpdatePayload.notes = JSON.stringify({
-              driver: field === 'default_driver' ? value : row.driver_name,
-              conductor: field === 'default_conductor' ? value : row.conductor_name,
-              turn_01_time: field === 'turn_01_time' ? value : row.daily_turn_01_time,
-              turn_02_time: field === 'turn_02_time' ? value : row.daily_turn_02_time
-            });
+            try {
+              const { data: tripData } = await supabase
+                .from("daily_trips")
+                .select("notes")
+                .eq("id", row.trip_id)
+                .single();
+                
+              let currentNotes: Record<string, any> = {};
+              if (tripData?.notes) {
+                currentNotes = typeof tripData.notes === 'string' ? JSON.parse(tripData.notes) : tripData.notes;
+              }
+              
+              if (field === 'default_driver') currentNotes['driver'] = value;
+              if (field === 'default_conductor') currentNotes['conductor'] = value;
+              if (field === 'turn_01_time') currentNotes['turn_01_time'] = value;
+              if (field === 'turn_02_time') currentNotes['turn_02_time'] = value;
+              
+              dailyUpdatePayload.notes = JSON.stringify(currentNotes);
+            } catch (e) {
+              console.error("Error formatting notes JSON:", e);
+              dailyUpdatePayload.notes = JSON.stringify({
+                driver: field === 'default_driver' ? value : row.driver_name,
+                conductor: field === 'default_conductor' ? value : row.conductor_name,
+                turn_01_time: field === 'turn_01_time' ? value : row.daily_turn_01_time,
+                turn_02_time: field === 'turn_02_time' ? value : row.daily_turn_02_time
+              });
+            }
           }
-        }
 
-        if (Object.keys(dailyUpdatePayload).length > 0) {
-          const { error } = await supabase
-            .from("daily_trips")
-            .update(dailyUpdatePayload)
-            .eq("id", row.trip_id);
+          if (Object.keys(dailyUpdatePayload).length > 0) {
+            const { error } = await supabase
+              .from("daily_trips")
+              .update(dailyUpdatePayload)
+              .eq("id", row.trip_id);
 
-          if (error) throw error;
-          
-          await fetchRoster(true);
-          return;
+            if (error) throw error;
+            
+            await fetchRoster(true);
+            return;
+          }
         }
       }
 
