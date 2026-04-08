@@ -25,6 +25,7 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
   const [editMode, setEditMode] = useState<EditMode>('master');
   
   const { 
+    roster,
     expandedRows, 
     availableRoutes,
     loading, 
@@ -71,10 +72,12 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
     setCreating(false);
   };
 
+  // Calculate eligible trip count from roster (matching creation logic exactly)
   const tripsCreatedCount = expandedRows.filter(r => r.trip_id).length;
-  const eligibleRows = expandedRows.filter(r => r.remark === 'Running' || !r.remark);
-  const tripsTotalCount = eligibleRows.length;
-  const isAllTripsCreated = tripsTotalCount > 0 && tripsCreatedCount === tripsTotalCount;
+  const tripsTotalCount = roster
+    .filter(r => r.is_active && r.bus_id && r.remark === 'Running')
+    .reduce((sum, r) => sum + (r.trips_per_day || 1), 0);
+  const isAllTripsCreated = tripsTotalCount > 0 && tripsCreatedCount >= tripsTotalCount;
   const isPartialTripsCreated = tripsTotalCount > 0 && tripsCreatedCount > 0 && tripsCreatedCount < tripsTotalCount;
 
   const exportToExcel = () => {
