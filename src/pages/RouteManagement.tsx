@@ -569,7 +569,7 @@ export default function RouteManagement() {
                     <>
                       {/* Corridor Groups */}
                       {groupedRoutes.corridors.map(corridor => {
-                        const isCollapsed = collapsedCorridors.has(corridor.name);
+                        const isCollapsed = collapsedCorridors.includes(corridor.name);
                         const totalBuses = corridor.routes.reduce((sum, r) => sum + getBusCount(r.route_name), 0);
                         const totalDistance = corridor.routes.reduce((sum, r) => sum + (r.distance_km || 0), 0);
                         return (
