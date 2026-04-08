@@ -23,9 +23,10 @@ import { toast } from "@/hooks/use-toast";
 interface BusDailySummaryTableProps {
   summaries: BusDailySummary[];
   onRefresh: () => void;
+  selectedDate?: Date;
 }
 
-export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTableProps) {
+export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: BusDailySummaryTableProps) {
   const navigate = useNavigate();
   const [expandedBuses, setExpandedBuses] = useState<Set<string>>(new Set());
   const [postingBusId, setPostingBusId] = useState<string | null>(null);
@@ -148,7 +149,7 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
     return (
       <div className="text-center py-12 text-muted-foreground">
         <p className="text-lg mb-2">No trips found for this date</p>
-        <Button onClick={() => navigate('/trips/quick-entry')}>
+        <Button onClick={() => navigate(`/trips/quick-entry${selectedDate ? `?date=${format(selectedDate, 'yyyy-MM-dd')}` : ''}`)}>
           <Plus className="mr-2 h-4 w-4" />
           Add Trips
         </Button>
