@@ -140,19 +140,18 @@ export default function RouteManagement() {
   const groupedRoutes = useMemo(() => {
     const corridors: { name: string; routes: FleetRoute[] }[] = [];
     const ungrouped: FleetRoute[] = [];
-    const groupMap = new Map<string, FleetRoute[]>();
+    const groupMap: Record<string, FleetRoute[]> = {};
 
     filteredRoutes.forEach(route => {
       if (route.route_group) {
-        const existing = groupMap.get(route.route_group) || [];
-        existing.push(route);
-        groupMap.set(route.route_group, existing);
+        if (!groupMap[route.route_group]) groupMap[route.route_group] = [];
+        groupMap[route.route_group].push(route);
       } else {
         ungrouped.push(route);
       }
     });
 
-    groupMap.forEach((rts, name) => {
+    Object.entries(groupMap).forEach(([name, rts]) => {
       corridors.push({ name, routes: rts.sort((a, b) => a.route_no.localeCompare(b.route_no)) });
     });
     corridors.sort((a, b) => a.name.localeCompare(b.name));
@@ -161,12 +160,9 @@ export default function RouteManagement() {
   }, [filteredRoutes]);
 
   const toggleCorridor = (name: string) => {
-    setCollapsedCorridors(prev => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
+    setCollapsedCorridors(prev => 
+      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+    );
   };
 
   // Auto-suggest corridor when start/end match an existing route's reverse
