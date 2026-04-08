@@ -1,35 +1,39 @@
 
 
-# Improve Daily Expenses Row Readability with Zebra Striping
+# Add Bus Existence Indicator to OCR Bus Number Field
 
 ## Problem
-The daily expenses list (21 categories) in the Quick Entry / OCR card is hard to scan — all rows look the same with no visual separation.
+When a bus number is entered (via OCR or manually edited), there's no visual feedback telling the user whether that bus exists in the system. The user can't tell if the bus number is valid until they try to apply — which may fail silently or save to a wrong/missing bus.
 
 ## Fix
-Add alternating background colors (zebra striping) to expense category rows in `OCRExtractedDataCard.tsx`. This is a small CSS change.
 
-### In `src/components/trips/OCRExtractedDataCard.tsx` (line 864)
-Add `even:bg-muted/40` class to each expense row div to create alternating backgrounds, plus add some vertical padding for spacing:
+### In `src/components/trips/OCRExtractedDataCard.tsx`
 
+The component already fetches `busData` from the `buses` table (line 435-445) using `data.busNumber`. It just doesn't show the result to the user. The fix:
+
+1. **Also fetch on `editedData.busNumber` changes** — currently the useEffect depends on `data.busNumber` (original OCR value), not the edited value. Change the dependency to `editedData.busNumber` so it re-checks when the user types a new bus number.
+
+2. **Add a status indicator next to the bus number** (both in display and edit modes):
+   - **Bus found**: Green checkmark badge — "✓ Bus Found" with route name if available
+   - **Bus NOT found**: Red warning badge — "✗ Bus Not Found in System"
+   - **Loading**: Small spinner while checking
+
+3. **Show the indicator in the header area** (around line 473 for display mode, line 462-470 for edit mode) — a small badge right after the bus number.
+
+### Example UI
+```text
+🚌 NE-2200  ✓ Bus Found (Badulla)     ← green badge, bus exists
+🚌 XX-9999  ✗ Not Found in System      ← red badge, bus doesn't exist
+🚌 [____]   ⟳ Checking...              ← while typing
 ```
-// Before:
-<div key={key} className="flex justify-between items-center">
 
-// After:
-<div key={key} className={`flex justify-between items-center py-1.5 px-2 rounded-sm ${index % 2 === 0 ? 'bg-muted/40' : ''}`}>
-```
-
-Use the `.map` index parameter (already available via `DB_EXPENSE_CATEGORIES.map`) to determine even/odd rows. This gives a clean zebra stripe effect that makes rows easy to distinguish.
-
-### Also apply to `DailyBusExpensesForm.tsx`
-Check if the standalone daily expenses form has the same readability issue and apply consistent zebra styling there too.
+4. **Debounce the lookup** — add a 500ms debounce when the user is typing to avoid excessive DB queries.
 
 ## Files to Change
-- `src/components/trips/OCRExtractedDataCard.tsx` — add zebra striping to expense category rows (line 858-890)
-- `src/components/trips/DailyBusExpensesForm.tsx` — apply same styling if applicable
+- `src/components/trips/OCRExtractedDataCard.tsx` — update busData fetch to use editedData.busNumber, add visual status badge next to bus number in both view and edit modes
 
 ## Result
-- Expense rows alternate between white and light gray backgrounds
-- Each row has slightly more padding for better readability
-- Easy to visually track a label to its value across the row
+- Users instantly see whether a bus number exists in the system
+- Shows the bus route when found, helping confirm it's the right bus
+- Works for both OCR-detected and manually corrected bus numbers
 
