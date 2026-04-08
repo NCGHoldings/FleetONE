@@ -489,6 +489,21 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                         className="h-8 w-32 text-lg font-bold"
                         placeholder="Bus Number"
                       />
+                      {busLookupLoading ? (
+                        <Badge variant="outline" className="text-xs px-2 py-0.5 bg-muted">
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" /> Checking...
+                        </Badge>
+                      ) : editedData.busNumber?.trim() ? (
+                        busData ? (
+                          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700">
+                            <CheckCircle className="h-3 w-3 mr-1" /> Found{busData.route ? ` (${busData.route})` : ''}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700">
+                            <AlertCircle className="h-3 w-3 mr-1" /> Not Found
+                          </Badge>
+                        )
+                      ) : null}
                     </div>
                   ) : (
                     <span className="text-2xl font-bold">🚌 {editedData.busNumber}</span>
