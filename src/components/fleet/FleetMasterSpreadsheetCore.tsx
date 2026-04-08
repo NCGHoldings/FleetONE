@@ -295,6 +295,58 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
     );
   };
 
+  const renderCrewCombobox = (row: ExpandedFleetRow, field: 'default_driver' | 'default_conductor', value: string) => {
+    if (row.trip_sequence > 1 && !['default_driver', 'default_conductor'].includes(field)) {
+      return <span className="text-muted-foreground text-sm">↑</span>;
+    }
+    if (!isEditable(field)) {
+      return (
+        <span className="px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed"
+          title={String(value ?? '') + " (Master Edit Only)"}>
+          {value || '-'}
+        </span>
+      );
+    }
+    const names = field === 'default_driver' ? uniqueDrivers : uniqueConductors;
+    const cellKey = `${row.id}-${row.trip_sequence}-${field}`;
+    const isOpen = openCrewComboboxFor === cellKey;
+    const placeholder = field === 'default_driver' ? 'Select driver...' : 'Select conductor...';
+    return (
+      <Popover open={isOpen} onOpenChange={(open) => setOpenCrewComboboxFor(open ? cellKey : null)}>
+        <PopoverTrigger asChild>
+          <button className={cn(
+            "flex w-full items-center justify-between rounded px-3 py-2 text-sm min-h-[36px] hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary",
+            !value && "text-muted-foreground"
+          )}>
+            <span className="truncate pr-2">{value || placeholder}</span>
+            <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[250px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search or type new..." />
+            <CommandList>
+              <CommandEmpty>
+                <span className="text-xs text-muted-foreground">No match — type a name and press Enter</span>
+              </CommandEmpty>
+              <CommandGroup>
+                {names.map((name) => (
+                  <CommandItem key={name} value={name} onSelect={(currentValue) => {
+                    saveScrollPosition();
+                    onUpdate(row.id, field, currentValue);
+                    setOpenCrewComboboxFor(null);
+                  }}>
+                    <Check className={cn("mr-2 h-4 w-4", value === name ? "opacity-100" : "opacity-0")} />
+                    {name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    );
+  };
 
   const getPerformanceColor = (perf: number, hasFuel: boolean) => {
     if (!hasFuel) return '';
