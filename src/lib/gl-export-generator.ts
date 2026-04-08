@@ -135,6 +135,10 @@ export function aggregateMultiDateDataByBus(
         conductors: [],
         has_expenses: false,
         has_distance: false,
+        total_fuel_liters: 0,
+        diesel_price_per_liter: 0,
+        min_start_odo: null,
+        max_end_odo: null,
       });
     }
 

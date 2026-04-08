@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, MoreVertical, Edit, Plus, TrendingUp, AlertTriangle, Pencil, BookOpen, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreVertical, Edit, Plus, TrendingUp, AlertTriangle, Pencil, BookOpen, Loader2, Fuel, Gauge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -217,9 +217,21 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
 
                   <div className="col-span-2 text-right">
                     <div className="font-medium">{summary.total_distance.toFixed(1)} km</div>
+                    {summary.min_start_odo && summary.max_end_odo && (
+                      <div className="text-xs text-muted-foreground flex items-center justify-end gap-1">
+                        <Gauge className="h-3 w-3" />
+                        {summary.min_start_odo.toLocaleString()} → {summary.max_end_odo.toLocaleString()}
+                      </div>
+                    )}
                     {summary.avg_km_per_liter > 0 && (
                       <div className="text-xs text-muted-foreground">
                         {summary.avg_km_per_liter.toFixed(1)} km/L
+                      </div>
+                    )}
+                    {summary.diesel_price_per_liter > 0 && (
+                      <div className="text-xs text-muted-foreground flex items-center justify-end gap-1">
+                        <Fuel className="h-3 w-3" />
+                        Rs.{summary.diesel_price_per_liter}/L
                       </div>
                     )}
                   </div>
@@ -322,7 +334,7 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-4 gap-4 text-sm">
+                        <div className="grid grid-cols-5 gap-4 text-sm">
                           <div>
                             <div className="text-muted-foreground">Time</div>
                             <div className="font-medium">
@@ -330,6 +342,48 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
                                 ? `${trip.start_time} - ${trip.end_time}`
                                 : "N/A"}
                             </div>
+                          </div>
+
+                          <div>
+                            <div className="text-muted-foreground flex items-center gap-1">
+                              <Gauge className="h-3 w-3" />
+                              Odometer & Distance
+                            </div>
+                            {trip.start_odo || trip.end_odo ? (
+                              <>
+                                <div className="font-medium">
+                                  {(trip.start_odo || 0).toLocaleString()} → {(trip.end_odo || 0).toLocaleString()}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Distance: {trip.distance_km?.toFixed(1) || 0} km
+                                </div>
+                              </>
+                            ) : (
+                              <div className="font-medium">{trip.distance_km?.toFixed(1) || 0} km</div>
+                            )}
+                          </div>
+
+                          <div>
+                            <div className="text-muted-foreground flex items-center gap-1">
+                              <Fuel className="h-3 w-3" />
+                              Fuel
+                            </div>
+                            {trip.fuel_liters ? (
+                              <>
+                                <div className="font-medium">{trip.fuel_liters.toFixed(1)} L</div>
+                                {trip.diesel_price_per_liter ? (
+                                  <div className="text-xs text-muted-foreground">
+                                    @ Rs.{trip.diesel_price_per_liter}/L = {formatCurrency(trip.fuel_liters * trip.diesel_price_per_liter)}
+                                  </div>
+                                ) : summary.diesel_price_per_liter > 0 ? (
+                                  <div className="text-xs text-muted-foreground">
+                                    @ Rs.{summary.diesel_price_per_liter}/L = {formatCurrency(trip.fuel_liters * summary.diesel_price_per_liter)}
+                                  </div>
+                                ) : null}
+                              </>
+                            ) : (
+                              <div className="font-medium text-muted-foreground">—</div>
+                            )}
                           </div>
 
                           <div>
@@ -360,18 +414,6 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
                                 </Badge>
                               )}
                             </div>
-                          </div>
-
-                          <div>
-                            <div className="text-muted-foreground">Distance</div>
-                            <div className="font-medium">
-                              {trip.distance_km?.toFixed(1) || 0} km
-                            </div>
-                            {trip.start_odo && trip.end_odo && (
-                              <div className="text-xs text-muted-foreground">
-                                Odo: {trip.start_odo} → {trip.end_odo}
-                              </div>
-                            )}
                           </div>
 
                           <div>
