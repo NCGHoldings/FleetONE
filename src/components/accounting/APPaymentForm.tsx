@@ -23,7 +23,7 @@ import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen, Landmark, FileText, Plus, Trash2 } from "lucide-react";
+import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen, Landmark, FileText, Plus, Trash2, Upload, X } from "lucide-react";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 
 const paymentSchema = z.object({
@@ -105,6 +105,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const [bankFeeAmount, setBankFeeAmount] = useState(0);
   const [bankFeeType, setBankFeeType] = useState("bank_charge");
   const [globalWriteOffAccountId, setGlobalWriteOffAccountId] = useState("");
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
 
   const { data: vendorBankAccounts } = useVendorBankAccounts(selectedVendorId || undefined);
 
@@ -371,6 +372,17 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
           : undefined,
       });
 
+      // Upload supporting document if selected
+      if (documentFile && paymentResult?.id) {
+        const filePath = `ap_payments/${paymentResult.id}/${documentFile.name}`;
+        const { error: uploadErr } = await supabase.storage
+          .from("documents")
+          .upload(filePath, documentFile, { upsert: true });
+        if (!uploadErr) {
+          await supabase.from("ap_payments").update({ document_url: filePath }).eq("id", paymentResult.id);
+        }
+      }
+
       // Auto-create cheque register entry for cheque payments
       if (data.payment_method === "cheque" && data.cheque_number) {
         const vendorName = vendors?.find((v) => v.id === data.vendor_id)?.vendor_name || "Unknown";
@@ -401,6 +413,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       setAdvanceAmount(0);
       setIncludeBankFee(false);
       setBankFeeAmount(0);
+      setDocumentFile(null);
     } catch (error) {
       // Error handled by mutation
     }
@@ -1045,6 +1058,38 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                 </FormItem>
               )}
             />
+
+            {/* Supporting Document Upload */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                Supporting Document
+              </Label>
+              {documentFile ? (
+                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
+                  <FileText className="h-4 w-4 text-primary" />
+                  <span className="text-sm flex-1 truncate">{documentFile.name}</span>
+                  <span className="text-xs text-muted-foreground">{(documentFile.size / 1024).toFixed(0)} KB</span>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDocumentFile(null)}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                  <Upload className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Click to upload bank slip, receipt, or invoice</span>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setDocumentFile(file);
+                    }}
+                  />
+                </label>
+              )}
+            </div>
 
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
