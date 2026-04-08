@@ -1,46 +1,47 @@
 
 
-# Fix: Bus Documents Visible in Development but Not on Published Site
+# Fix: SBS Buses Incorrectly Categorized as Public Bus Instead of School Bus
 
-## Root Cause
+## Problem
 
-The `public/bus_details/` folder contains **342 MB** of PDFs and images across 190+ bus folders. In development mode, Vite serves the `public/` directory directly, so everything works. However, when the app is **published/deployed**, this volume of static assets either:
+85 buses with type starting with "SBS" (School Bus Service) — like "SBS KURUNEGALA", "SBS PANADURA", "SBS WATTALA", etc. — are all categorized as "Public Bus". They should be "School Bus".
 
-1. Exceeds the deployment size limit (Lovable's build output is typically capped)
-2. Gets excluded or partially uploaded during the build process
-3. Causes build timeouts due to the sheer volume of files being copied
+This happens because the import logic in `FleetVehicleDataImport.tsx` only checks if the type contains "school" or "special", and defaults everything else to "Public Bus". "SBS" doesn't match "school", so it falls through.
 
-This is why documents render fine inside Lovable's preview but fail on the published site (ncg-fleetone.lovable.app).
+**Affected buses**: 85 total across 7 SBS depots (Kurunegala: 27, Wattala: 21, Nugegoda: 12, Panadura: 11, Anuradhapura: 7, Nuwaraeliya: 5, Rathnapura: 2).
 
-## Solution: Move Documents to Supabase Storage
+## Implementation
 
-Instead of bundling 342 MB of files in the repo, store them in a **Supabase Storage bucket** where they are served via CDN and accessible from any deployment.
+### Step 1: Fix existing data — Migration to re-categorize SBS buses
+Create a migration that updates all buses where `type ILIKE 'SBS%'` to set `category_id` to the School Bus category ID (`d4accac9-0ff0-4147-9f03-b316920e3c73`).
 
-### Step 1: Create a Supabase Storage bucket
-- Create a public bucket called `bus-documents`
-- Set up a folder structure: `bus-documents/{bus_no}/{filename}`
+```sql
+UPDATE buses 
+SET category_id = 'd4accac9-0ff0-4147-9f03-b316920e3c73',
+    category_assignment_source = 'auto_sbs_fix'
+WHERE type ILIKE 'SBS%';
+```
 
-### Step 2: Upload script
-- Write a one-time migration script that reads all files from `public/bus_details/` and uploads them to the Supabase bucket
-- Preserve the folder structure (bus number → files)
+### Step 2: Fix import logic — `FleetVehicleDataImport.tsx`
+Update `getCategoryId()` (line 361-367) to recognize "SBS" prefix as School Bus:
 
-### Step 3: Update `BusDocumentPreviewModal.tsx`
-- Change `getPublicUrl()` from returning `/bus_details/{busNo}/{fileName}` to returning the Supabase Storage public URL
-- Pattern: `https://{project}.supabase.co/storage/v1/object/public/bus-documents/{busNo}/{fileName}`
+```typescript
+const getCategoryId = (usageType?: string): string | undefined => {
+  if (!usageType) return catByName.get("public bus");
+  const u = usageType.toLowerCase().trim();
+  if (u.includes("school") || u.startsWith("sbs")) return catByName.get("school bus");
+  if (u.includes("special")) return catByName.get("special hire");
+  return catByName.get("public bus");
+};
+```
 
-### Step 4: Remove `public/bus_details/`
-- After confirming uploads work, remove the 342 MB folder from the repo to keep builds fast
-
-## Alternative (Quick Fix)
-
-If you prefer not to migrate to Supabase Storage right now, the documents can be served via the **Antigravity external links** that are already configured in `bus_folder_links.json`. The modal already has the "View on Antigravity" button — we could make that the primary viewing method instead of trying to serve files locally.
-
-## Recommendation
-
-Supabase Storage is the proper long-term fix. 342 MB of binary files should not live in a Git repository — it slows down clones, builds, and deployments. The Antigravity links can remain as a secondary "View Original" option.
+This ensures future imports also correctly categorize SBS buses.
 
 ## Files to Change
-- `src/components/fleet/BusDocumentPreviewModal.tsx` — update `getPublicUrl()` to use Supabase Storage URLs
-- New migration script to upload existing files
-- Remove `public/bus_details/` after migration
+- New migration SQL — bulk update 85 buses to School Bus category
+- `src/components/fleet/FleetVehicleDataImport.tsx` — add `u.startsWith("sbs")` check in `getCategoryId()`
+
+## Result
+- All 85 SBS buses immediately show as "School Bus" in Fleet Management
+- Future Excel imports correctly auto-assign SBS buses to School Bus category
 
