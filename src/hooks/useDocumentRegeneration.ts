@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { uploadPdfToStorage } from '@/lib/document-storage-helpers';
+import { getTripDistance, calculateTotalKm } from '@/lib/special-hire-invoice-helpers';
 
 export const useDocumentRegeneration = () => {
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -167,6 +168,10 @@ export const useDocumentRegeneration = () => {
         invoice_status: existingDoc.document_status as 'draft' | 'approved',
         document_type: existingDoc.document_type as 'sales_receipt' | 'invoice',
         
+        // KM fields from quotation
+        tripDistance: getTripDistance(quotationData),
+        totalKm: calculateTotalKm(quotationData),
+
         // Include adjustment data if this is a balance invoice
         ...(hasAdjustments ? {
           hasAdjustments: true,
@@ -176,6 +181,8 @@ export const useDocumentRegeneration = () => {
           additionalExpenses: adjustmentData.additional_expenses || [],
           totalAdditionalExpenses: adjustmentData.total_additional_expenses || 0,
           adjustmentNotes: adjustmentData.notes || '',
+          actualKmTraveled: adjustmentData.actual_km_traveled || 0,
+          originalQuotedKm: adjustmentData.original_quoted_km || 0,
         } : {}),
         
         hideSignaturePage,
