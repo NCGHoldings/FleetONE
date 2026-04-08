@@ -1,46 +1,35 @@
 
 
-# Pass Daily Trips Date to Quick Entry Page
+# Improve Daily Expenses Row Readability with Zebra Striping
 
 ## Problem
-
-When you select a date on the Daily Trips page (e.g., April 1st) and click "Quick Entry", the Quick Entry page opens with **today's date** instead of the selected date. The user expects the same date to carry over.
-
-## Root Cause
-
-1. **DailyTrips.tsx line 262**: The "Quick Entry" button navigates to `/trips/quick-entry` without passing the selected date as a query parameter
-2. **QuickTripsEntry.tsx line 38**: The page always initializes with `new Date()` and never reads a `date` query parameter from the URL
+The daily expenses list (21 categories) in the Quick Entry / OCR card is hard to scan — all rows look the same with no visual separation.
 
 ## Fix
+Add alternating background colors (zebra striping) to expense category rows in `OCRExtractedDataCard.tsx`. This is a small CSS change.
 
-### Step 1: Pass date from Daily Trips to Quick Entry
-In `src/pages/DailyTrips.tsx`, update the Quick Entry navigation (lines 262 and 320) to include the selected date:
-```
-navigate(`/trips/quick-entry?date=${format(selectedDate, 'yyyy-MM-dd')}`)
-```
+### In `src/components/trips/OCRExtractedDataCard.tsx` (line 864)
+Add `even:bg-muted/40` class to each expense row div to create alternating backgrounds, plus add some vertical padding for spacing:
 
-### Step 2: Read date parameter in Quick Entry page
-In `src/pages/QuickTripsEntry.tsx`, use `useSearchParams` to read the `date` query parameter and initialize `selectedDate` from it instead of always using `new Date()`:
 ```
-const [searchParams] = useSearchParams();
-const initialDate = searchParams.get('date') 
-  ? parseISO(searchParams.get('date')!) 
-  : new Date();
-const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
+// Before:
+<div key={key} className="flex justify-between items-center">
+
+// After:
+<div key={key} className={`flex justify-between items-center py-1.5 px-2 rounded-sm ${index % 2 === 0 ? 'bg-muted/40' : ''}`}>
 ```
 
-The user can still change the date on the Quick Entry page using the existing date picker.
+Use the `.map` index parameter (already available via `DB_EXPENSE_CATEGORIES.map`) to determine even/odd rows. This gives a clean zebra stripe effect that makes rows easy to distinguish.
 
-### Step 3: Also fix other Quick Entry navigations
-In `src/components/trips/BusDailySummaryTable.tsx`, the "Add Trips" button (line 151) also navigates without a date — fix it to pass the current date too.
+### Also apply to `DailyBusExpensesForm.tsx`
+Check if the standalone daily expenses form has the same readability issue and apply consistent zebra styling there too.
 
 ## Files to Change
-- `src/pages/DailyTrips.tsx` — add `?date=` param to Quick Entry navigation (2 places)
-- `src/pages/QuickTripsEntry.tsx` — read `date` from URL search params, use as initial date
-- `src/components/trips/BusDailySummaryTable.tsx` — add `?date=` param to "Add Trips" navigation (line 151)
+- `src/components/trips/OCRExtractedDataCard.tsx` — add zebra striping to expense category rows (line 858-890)
+- `src/components/trips/DailyBusExpensesForm.tsx` — apply same styling if applicable
 
 ## Result
-- Selecting April 1st on Daily Trips and clicking Quick Entry opens Quick Entry with April 1st pre-selected
-- User can still change the date on the Quick Entry page if needed
-- All navigation paths to Quick Entry consistently pass the date
+- Expense rows alternate between white and light gray backgrounds
+- Each row has slightly more padding for better readability
+- Easy to visually track a label to its value across the row
 
