@@ -439,20 +439,52 @@ function processAnalyticsData(
     // Use bus_no as primary identifier (e.g., "NE 2520"), fallback to registration_number
     const busNumber = busInfo?.bus_no || busInfo?.registration_number || 'Unknown Bus';
     
+    // Collect distinct routes
+    const routeSet = new Set<string>();
+    busTrips.forEach(trip => {
+      if (trip.routes) {
+        routeSet.add(trip.routes.route_name || trip.routes.route_no || '');
+      }
+    });
+    const routes = Array.from(routeSet).filter(Boolean);
+
+    // Fuel metrics from expense map
+    let totalFuelCost = 0;
+    let totalFuelLiters = 0;
+    busTrips.forEach(trip => {
+      const key = `${trip.bus_id}_${trip.trip_date}`;
+      const expenseData = expenseMap.get(key);
+      if (expenseData) {
+        totalFuelCost += expenseData.fuel_cost || 0;
+        totalFuelLiters += expenseData.fuel_liters || 0;
+      }
+    });
+
+    const totalDist = sumBy(busTrips, 'distance_km') || 0;
+    const fuelPercentage = busExpenses > 0 ? (totalFuelCost / busExpenses) * 100 : 0;
+    const stdFuelRate = totalFuelLiters > 0 ? totalDist / totalFuelLiters : 0;
+    const incomePerKm = totalDist > 0 ? busIncome / totalDist : 0;
+
     return {
       busNo: busNumber,
       busModel: busInfo?.model || '',
       busType: busInfo?.type || '',
       busCapacity: busInfo?.capacity || 0,
       totalTrips: busTrips.length,
-      totalDistance: sumBy(busTrips, 'distance_km') || 0,
+      totalDistance: totalDist,
       currentOdo: busTrips[0]?.odo_end || 0,
       avgEfficiency: meanBy(busTrips.filter(t => t.km_per_liter > 0), 'km_per_liter') || 0,
       totalIncome: busIncome,
       totalExpenses: busExpenses,
       netIncome: busIncome - busExpenses,
       lastTripDate: busTrips[0]?.trip_date || '',
-      utilizationRate: totalTrips > 0 ? (busTrips.length / totalTrips) * 100 : 0
+      utilizationRate: totalTrips > 0 ? (busTrips.length / totalTrips) * 100 : 0,
+      routes,
+      totalFuelCost,
+      totalFuelLiters,
+      fuelPercentage,
+      stdFuelRate,
+      incomePerKm
     };
   });
 
