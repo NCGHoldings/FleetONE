@@ -113,9 +113,9 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
         const paymentIds = spPay.data.map((p: any) => p.id);
         const { data: storedDocs } = await supabase
           .from("document_storage")
-          .select("id, payment_id, storage_path, status, created_at, document_type")
+          .select("id, payment_id, storage_path, document_status, created_at, document_type")
           .in("payment_id", paymentIds)
-          .eq("status", "approved")
+          .eq("document_status", "approved")
           .order("created_at", { ascending: false });
 
         spPay.data.forEach((d: any) => {
