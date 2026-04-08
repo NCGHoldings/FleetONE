@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Edit, CheckCircle, Eye, Trash2, Plus, Minus, AlertCircle, AlertTriangle, CalendarIcon } from "lucide-react";
+import { ChevronDown, Edit, CheckCircle, Eye, Trash2, Plus, Minus, AlertCircle, AlertTriangle, CalendarIcon, Loader2 } from "lucide-react";
 import { SingleTrip, DailyExpenses } from "@/lib/ocr-processor";
 import { DB_EXPENSE_CATEGORIES, mapOCRExpensesToDB, DBExpenseFields, KNOWN_OCR_EXPENSE_KEYS } from "@/lib/ocr-expense-mapper";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -429,20 +429,41 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
     special_income: "Special (විශේෂ)",
   };
 
-  // Get bus data for route warning
+  // Get bus data for route warning — re-check on edited bus number with debounce
   const [busData, setBusData] = useState<any>(null);
+  const [busLookupLoading, setBusLookupLoading] = useState(false);
+  const busLookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   useEffect(() => {
-    const fetchBusData = async () => {
+    const busNo = editedData.busNumber?.trim();
+    if (!busNo) {
+      setBusData(null);
+      setBusLookupLoading(false);
+      return;
+    }
+    setBusLookupLoading(true);
+    if (busLookupTimer.current) clearTimeout(busLookupTimer.current);
+    busLookupTimer.current = setTimeout(async () => {
       const { data: busInfo } = await supabase
         .from('buses')
-        .select('route, id')
-        .eq('bus_no', data.busNumber)
+        .select('route, id, bus_no')
+        .ilike('bus_no', busNo.replace(/[-\s]/g, '%'))
         .maybeSingle();
-      setBusData(busInfo);
-    };
-    fetchBusData();
-  }, [data.busNumber]);
+      // If ilike didn't match, try exact
+      if (!busInfo) {
+        const { data: exact } = await supabase
+          .from('buses')
+          .select('route, id, bus_no')
+          .eq('bus_no', busNo)
+          .maybeSingle();
+        setBusData(exact);
+      } else {
+        setBusData(busInfo);
+      }
+      setBusLookupLoading(false);
+    }, 500);
+    return () => { if (busLookupTimer.current) clearTimeout(busLookupTimer.current); };
+  }, [editedData.busNumber]);
 
   return (
     <Card className={`mb-4 border-2 ${getBorderColor(data.confidence)}`}>
@@ -468,9 +489,41 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                         className="h-8 w-32 text-lg font-bold"
                         placeholder="Bus Number"
                       />
+                      {busLookupLoading ? (
+                        <Badge variant="outline" className="text-xs px-2 py-0.5 bg-muted">
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" /> Checking...
+                        </Badge>
+                      ) : editedData.busNumber?.trim() ? (
+                        busData ? (
+                          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700">
+                            <CheckCircle className="h-3 w-3 mr-1" /> Found{busData.route ? ` (${busData.route})` : ''}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700">
+                            <AlertCircle className="h-3 w-3 mr-1" /> Not Found
+                          </Badge>
+                        )
+                      ) : null}
                     </div>
                   ) : (
-                    <span className="text-2xl font-bold">🚌 {editedData.busNumber}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl font-bold">🚌 {editedData.busNumber}</span>
+                      {busLookupLoading ? (
+                        <Badge variant="outline" className="text-xs px-2 py-0.5 bg-muted">
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" /> Checking...
+                        </Badge>
+                      ) : editedData.busNumber?.trim() ? (
+                        busData ? (
+                          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700">
+                            <CheckCircle className="h-3 w-3 mr-1" /> Found{busData.route ? ` (${busData.route})` : ''}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs px-2 py-0.5 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700">
+                            <AlertCircle className="h-3 w-3 mr-1" /> Not Found
+                          </Badge>
+                        )
+                      ) : null}
+                    </div>
                   )}
                   
                   {/* MULTI-DAY DATE RANGE PREVIEW - COLLAPSED STATE */}
