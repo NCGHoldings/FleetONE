@@ -234,6 +234,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const mileage = (data.hasAdjustments && data.actualKmTraveled)
       ? data.actualKmTraveled
       : (data.tripDistance || data.totalKm || 0);
+    const originalKm = data.originalQuotedKm || data.tripDistance || data.totalKm || 0;
 
     return `
       <div id="invoice-root" style="font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; width: 210mm; box-sizing: border-box;">
@@ -293,7 +294,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             </tr>
             <tr>
               <td style="padding: 5px; vertical-align: top; font-weight: bold;">Mileage</td>
-              <td style="padding: 5px; vertical-align: top;">${mileage}</td>
+              <td style="padding: 5px; vertical-align: top;">${data.hasAdjustments && data.actualKmTraveled ? `${mileage} KM (Quoted: ${originalKm} KM)` : `${mileage} KM`}</td>
             </tr>
           </table>
 
