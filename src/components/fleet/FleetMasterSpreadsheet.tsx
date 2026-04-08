@@ -16,8 +16,12 @@ import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { FleetExcelImport } from './FleetExcelImport';
 
-export function FleetMasterSpreadsheet() {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+interface FleetMasterSpreadsheetProps {
+  initialDate?: Date;
+}
+
+export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetProps) {
+  const [selectedDate, setSelectedDate] = useState<Date>(initialDate || new Date());
   const [editMode, setEditMode] = useState<EditMode>('master');
   
   const { 
