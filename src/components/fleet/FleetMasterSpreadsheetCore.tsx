@@ -371,7 +371,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
       <Popover open={isOpen} onOpenChange={(open) => setOpenCrewComboboxFor(open ? cellKey : null)}>
         <PopoverTrigger asChild>
           <button className={cn(
-            "flex w-full items-center justify-between rounded px-3 py-2 text-sm min-h-[36px] hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary",
+            "flex w-full items-center justify-between rounded px-3 py-2.5 text-sm min-h-[40px] hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary",
             !value && "text-muted-foreground"
           )}>
             <span className="truncate pr-2">{value || placeholder}</span>
