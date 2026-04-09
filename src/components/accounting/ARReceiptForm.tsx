@@ -34,6 +34,7 @@ const receiptSchema = z.object({
   reference: z.string().optional(),
   notes: z.string().optional(),
   is_advance: z.boolean().optional(),
+  override_gl_account_id: z.string().optional(),
 });
 
 type ReceiptFormData = z.infer<typeof receiptSchema>;
@@ -78,6 +79,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const [globalWriteOffAccountId, setGlobalWriteOffAccountId] = useState("");
   const [partyOpen, setPartyOpen] = useState(false);
   const [resolvedGL, setResolvedGL] = useState<{ accountCode: string; accountName: string } | null>(null);
+  const [overrideGLAccountId, setOverrideGLAccountId] = useState("");
 
   // Build grouped party options
   const partyOptions = useMemo(() => {
@@ -412,10 +414,10 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0 z-[100] bg-popover border shadow-lg" align="start" sideOffset={4}>
+                      <PopoverContent className="w-[400px] p-0 z-[200] bg-popover border shadow-lg" align="start" sideOffset={4} style={{ pointerEvents: 'auto' }} onOpenAutoFocus={(e) => e.preventDefault()}>
                         <Command shouldFilter={true}>
                           <CommandInput placeholder="Search customer or vendor..." />
-                          <CommandList className="max-h-[300px] overflow-y-auto">
+                          <CommandList className="max-h-[400px] overflow-y-auto">
                             <CommandEmpty>No match found.</CommandEmpty>
                             {/* Customer groups */}
                             {Array.from(groupedOptions.customersByCategory.entries()).map(([category, items]) => (
