@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,18 +10,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { useCustomers, useARInvoices, useBankAccounts } from "@/hooks/useAccountingData";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useCustomers, useARInvoices, useBankAccounts, useVendors } from "@/hooks/useAccountingData";
 import { useCreateARReceipt } from "@/hooks/useAccountingMutations";
 import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, CheckCircle } from "lucide-react";
+import { Wallet, CheckCircle, ChevronsUpDown, Check, Info } from "lucide-react";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 import { useGenerateNumber } from "@/hooks/useNumbering";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const receiptSchema = z.object({
   receipt_number: z.string().min(1, "Receipt number is required"),
-  customer_id: z.string().min(1, "Customer is required"),
+  customer_id: z.string().min(1, "Customer/Vendor is required"),
   receipt_date: z.string().min(1, "Receipt date is required"),
   amount: z.number().min(0.01, "Amount must be greater than 0"),
   payment_method: z.string().min(1, "Payment method is required"),
@@ -50,17 +55,117 @@ interface ARReceiptFormProps {
   isAdvanceMode?: boolean;
 }
 
+interface PartyOption {
+  id: string;
+  name: string;
+  type: "customer" | "vendor";
+  categoryName: string;
+}
+
 export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdvanceMode = false }: ARReceiptFormProps) => {
   const { data: customers } = useCustomers();
+  const { data: vendors } = useVendors();
   const { data: bankAccounts } = useBankAccounts();
   const { data: allInvoices } = useARInvoices();
   const createReceipt = useCreateARReceipt();
   const generateNumber = useGenerateNumber();
+  const { getEffectiveCompanyId } = useCompany();
 
   const [allocations, setAllocations] = useState<InvoiceAllocation[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(preselectedCustomerId || "");
+  const [selectedPartyType, setSelectedPartyType] = useState<"customer" | "vendor">("customer");
   const [isAdvance, setIsAdvance] = useState(isAdvanceMode);
   const [globalWriteOffAccountId, setGlobalWriteOffAccountId] = useState("");
+  const [partyOpen, setPartyOpen] = useState(false);
+  const [resolvedGL, setResolvedGL] = useState<{ accountCode: string; accountName: string } | null>(null);
+
+  // Build grouped party options
+  const partyOptions = useMemo(() => {
+    const options: PartyOption[] = [];
+
+    // Group customers by category
+    if (customers) {
+      for (const c of customers) {
+        options.push({
+          id: c.id,
+          name: c.customer_name,
+          type: "customer",
+          categoryName: (c as any).customer_categories?.category_name || "Uncategorized",
+        });
+      }
+    }
+
+    // Group vendors by category
+    if (vendors) {
+      for (const v of vendors) {
+        options.push({
+          id: v.id,
+          name: v.vendor_name,
+          type: "vendor",
+          categoryName: (v as any).vendor_categories?.category_name || "Uncategorized",
+        });
+      }
+    }
+
+    return options;
+  }, [customers, vendors]);
+
+  // Group by type then category
+  const groupedOptions = useMemo(() => {
+    const customersByCategory = new Map<string, PartyOption[]>();
+    const vendorsByCategory = new Map<string, PartyOption[]>();
+
+    for (const opt of partyOptions) {
+      const map = opt.type === "customer" ? customersByCategory : vendorsByCategory;
+      if (!map.has(opt.categoryName)) map.set(opt.categoryName, []);
+      map.get(opt.categoryName)!.push(opt);
+    }
+
+    return { customersByCategory, vendorsByCategory };
+  }, [partyOptions]);
+
+  const selectedParty = partyOptions.find(p => p.id === selectedCustomerId);
+
+  // Resolve GL account when party changes
+  useEffect(() => {
+    if (!selectedCustomerId || !open) {
+      setResolvedGL(null);
+      return;
+    }
+
+    const resolveGL = async () => {
+      try {
+        const effectiveCompanyId = getEffectiveCompanyId();
+        if (selectedPartyType === "customer") {
+          const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
+          const resolved = await resolveCustomerARAccounts(selectedCustomerId, effectiveCompanyId);
+          if (resolved.arAccountId) {
+            const { data: account } = await supabase
+              .from("chart_of_accounts")
+              .select("account_code, account_name")
+              .eq("id", isAdvance && resolved.advanceAccountId ? resolved.advanceAccountId : resolved.arAccountId)
+              .single();
+            if (account) setResolvedGL({ accountCode: account.account_code, accountName: account.account_name });
+          }
+        } else {
+          const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
+          const resolved = await resolveVendorAPAccounts(selectedCustomerId, effectiveCompanyId);
+          if (resolved.apAccountId) {
+            const { data: account } = await supabase
+              .from("chart_of_accounts")
+              .select("account_code, account_name")
+              .eq("id", isAdvance && resolved.advanceAccountId ? resolved.advanceAccountId : resolved.apAccountId)
+              .single();
+            if (account) setResolvedGL({ accountCode: account.account_code, accountName: account.account_name });
+          }
+        }
+      } catch {
+        setResolvedGL(null);
+      }
+    };
+
+    resolveGL();
+  }, [selectedCustomerId, selectedPartyType, isAdvance, open]);
 
   const form = useForm<ReceiptFormData>({
     resolver: zodResolver(receiptSchema),
@@ -82,7 +187,6 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
     }
   }, [open]);
 
-  // Reset form when dialog opens
   useEffect(() => {
     if (open) {
       setIsAdvance(isAdvanceMode);
@@ -93,31 +197,41 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
     }
   }, [open, isAdvanceMode, form]);
 
-  // Filter invoices for selected customer
+  // Filter invoices for selected party
   useEffect(() => {
-    if (selectedCustomerId && allInvoices && !isAdvance) {
-      const customerInvoices = allInvoices.filter(
-        (inv) => inv.customer_id === selectedCustomerId && (inv.balance || 0) > 0
-      );
-      setAllocations(
-        customerInvoices.map((inv) => ({
-          invoice_id: inv.id,
-          invoice_number: inv.invoice_number,
-          due_date: inv.due_date,
-          balance: inv.balance || 0,
-          allocated_amount: 0,
-          write_off_amount: 0,
-          selected: false,
-        }))
-      );
+    if (selectedCustomerId && !isAdvance) {
+      if (selectedPartyType === "customer" && allInvoices) {
+        const customerInvoices = allInvoices.filter(
+          (inv) => inv.customer_id === selectedCustomerId && (inv.balance || 0) > 0
+        );
+        setAllocations(
+          customerInvoices.map((inv) => ({
+            invoice_id: inv.id,
+            invoice_number: inv.invoice_number,
+            due_date: inv.due_date,
+            balance: inv.balance || 0,
+            allocated_amount: 0,
+            write_off_amount: 0,
+            selected: false,
+          }))
+        );
+      } else {
+        // Vendor selected — no AR invoices to allocate
+        setAllocations([]);
+      }
     } else {
       setAllocations([]);
     }
-  }, [selectedCustomerId, allInvoices, isAdvance]);
+  }, [selectedCustomerId, selectedPartyType, allInvoices, isAdvance]);
 
-  const handleCustomerChange = (customerId: string) => {
-    setSelectedCustomerId(customerId);
-    form.setValue("customer_id", customerId);
+  const handlePartyChange = (partyId: string) => {
+    const party = partyOptions.find(p => p.id === partyId);
+    if (party) {
+      setSelectedCustomerId(partyId);
+      setSelectedPartyType(party.type);
+      form.setValue("customer_id", partyId);
+    }
+    setPartyOpen(false);
   };
 
   const toggleInvoice = (invoiceId: string) => {
@@ -151,7 +265,6 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
     );
   };
 
-  // Mark all as full payment
   const handleMarkFullPayment = () => {
     setAllocations(
       allocations.map((alloc) => ({
@@ -164,7 +277,6 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
 
   const totalAllocated = allocations.reduce((sum, a) => sum + a.allocated_amount, 0);
 
-  // Auto-update amount when allocations change (only if not advance mode)
   useEffect(() => {
     if (!isAdvance) {
       form.setValue("amount", totalAllocated);
@@ -175,7 +287,6 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
     setIsAdvance(checked);
     form.setValue("is_advance", checked);
     if (checked) {
-      // Clear allocations when switching to advance mode
       setAllocations([]);
     }
   };
@@ -196,6 +307,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
         reference: data.reference,
         notes: data.notes,
         is_advance: isAdvance,
+        party_type: selectedPartyType,
         allocations: selectedAllocations.map((a) => ({
           invoice_id: a.invoice_id,
           allocated_amount: a.allocated_amount,
@@ -207,6 +319,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
       form.reset();
       setAllocations([]);
       setIsAdvance(false);
+      setResolvedGL(null);
     } catch (error) {
       // Error handled by mutation
     }
@@ -270,23 +383,88 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
               <FormField
                 control={form.control}
                 name="customer_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Customer</FormLabel>
-                    <Select onValueChange={handleCustomerChange} value={selectedCustomerId}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select customer" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {customers?.map((customer) => (
-                          <SelectItem key={customer.id} value={customer.id}>
-                            {customer.customer_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                render={() => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Customer / Vendor</FormLabel>
+                    <Popover open={partyOpen} onOpenChange={setPartyOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={partyOpen}
+                          className={cn(
+                            "w-full justify-between font-normal",
+                            !selectedCustomerId && "text-muted-foreground"
+                          )}
+                        >
+                          <span className="truncate">
+                            {selectedParty ? (
+                              <span className="flex items-center gap-1.5">
+                                <Badge variant={selectedParty.type === "customer" ? "default" : "secondary"} className="text-[10px] px-1 py-0">
+                                  {selectedParty.type === "customer" ? "C" : "V"}
+                                </Badge>
+                                {selectedParty.name}
+                              </span>
+                            ) : "Select customer or vendor..."}
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0 z-[100] bg-popover border shadow-lg" align="start" sideOffset={4}>
+                        <Command shouldFilter={true}>
+                          <CommandInput placeholder="Search customer or vendor..." />
+                          <CommandList className="max-h-[300px] overflow-y-auto">
+                            <CommandEmpty>No match found.</CommandEmpty>
+                            {/* Customer groups */}
+                            {Array.from(groupedOptions.customersByCategory.entries()).map(([category, items]) => (
+                              <CommandGroup key={`c-${category}`} heading={`🟢 ${category}`}>
+                                {items.map(item => (
+                                  <CommandItem
+                                    key={item.id}
+                                    value={`customer ${item.name} ${category}`}
+                                    onSelect={() => handlePartyChange(item.id)}
+                                    className="cursor-pointer"
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4", selectedCustomerId === item.id ? "opacity-100" : "opacity-0")} />
+                                    {item.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            ))}
+                            {/* Vendor groups */}
+                            {Array.from(groupedOptions.vendorsByCategory.entries()).map(([category, items]) => (
+                              <CommandGroup key={`v-${category}`} heading={`🔵 ${category}`}>
+                                {items.map(item => (
+                                  <CommandItem
+                                    key={item.id}
+                                    value={`vendor ${item.name} ${category}`}
+                                    onSelect={() => handlePartyChange(item.id)}
+                                    className="cursor-pointer"
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4", selectedCustomerId === item.id ? "opacity-100" : "opacity-0")} />
+                                    {item.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            ))}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    {/* GL Code Badge */}
+                    {resolvedGL && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <Info className="h-3.5 w-3.5 text-blue-500" />
+                        <span className="text-xs text-blue-600 font-mono">
+                          GL: {resolvedGL.accountCode} - {resolvedGL.accountName}
+                        </span>
+                      </div>
+                    )}
+                    {selectedParty && (
+                      <Badge variant="outline" className="w-fit text-[10px] mt-0.5">
+                        {selectedParty.type === "customer" ? "Customer" : "Vendor"} • {selectedParty.categoryName}
+                      </Badge>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -407,7 +585,9 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
             {!isAdvance && selectedCustomerId && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Allocate to Invoices</h3>
+                  <h3 className="font-semibold">
+                    {selectedPartyType === "vendor" ? "Vendor Allocation (Manual)" : "Allocate to Invoices"}
+                  </h3>
                   {allocations.length > 0 && (
                     <Button 
                       type="button" 
@@ -420,7 +600,11 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                     </Button>
                   )}
                 </div>
-                {allocations.length > 0 ? (
+                {selectedPartyType === "vendor" ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center border rounded-lg">
+                    Vendor selected — enter amount directly or switch to Advance mode
+                  </p>
+                ) : allocations.length > 0 ? (
                   <div className="border rounded-lg overflow-hidden">
                     <table className="w-full">
                       <thead className="bg-muted">
@@ -511,11 +695,38 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                     <div className="flex items-center gap-4">
                       <span className="font-semibold">Total Receipt Amount:</span>
                       <span className="text-2xl font-bold text-primary">
-                        <CurrencyDisplay amount={totalAllocated} />
+                        <CurrencyDisplay amount={selectedPartyType === "vendor" ? form.watch("amount") : totalAllocated} />
                       </span>
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Direct amount for vendor non-advance */}
+            {!isAdvance && selectedPartyType === "vendor" && selectedCustomerId && (
+              <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                <FormField
+                  control={form.control}
+                  name="amount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg font-semibold">Receipt Amount</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          className="text-2xl h-14 font-bold"
+                          placeholder="Enter receipt amount"
+                          min={0}
+                          step="0.01"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             )}
 
