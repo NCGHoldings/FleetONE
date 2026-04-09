@@ -250,45 +250,42 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           : (typeof settings.custom_patterns === 'string'
             ? JSON.parse(settings.custom_patterns)
             : []);
-            
+        
+        // Build combined match text from description + reference + raw row fields
+        const matchParts = [txn.description, txn.reference];
+        // Also pull Tran ID / Tran Serial from raw row if available
+        if (txn.rawRow) {
+          for (const key of Object.keys(txn.rawRow)) {
+            const lk = key.toLowerCase();
+            if (lk.includes('tran') || lk.includes('ref') || lk.includes('serial')) {
+              const val = String(txn.rawRow[key] || '').trim();
+              if (val && !matchParts.includes(val)) matchParts.push(val);
+            }
+          }
+        }
+        const combinedMatchText = matchParts.filter(Boolean).join(' ');
+
+        // Extract admission tokens from combined text
+        const tokens = extractAdmissionTokens(combinedMatchText, prefixes);
+        
+        // Also run legacy extraction for backward compatibility
         const extraction = extractAdmissionNumbers(
-          txn.description,
+          combinedMatchText,
           prefixes,
           patterns
         );
+        
+        // Merge tokens
+        const allTokens = [...new Set([...tokens, ...extraction.admissionNumbers])];
 
-        // Smart matching: handles prefix variations (LNU14480 matches N14480)
-        const matchedStudents = students?.filter((s: any) => {
-          if (!s.admission_no) return false;
-          const dbNumeric = s.admission_no.replace(/[^0-9]/g, '');
-          
-          return extraction.admissionNumbers.some(extractedId => {
-            const extractedNumeric = extractedId.replace(/[^0-9]/g, '');
-            
-            // Match 1: Exact match (case-insensitive)
-            if (s.admission_no.toUpperCase() === extractedId.toUpperCase()) return true;
-            
-            // Match 2: Numeric portions match (LNU14480 → 14480 matches N14480 → 14480)
-            if (dbNumeric && extractedNumeric && dbNumeric === extractedNumeric) return true;
-            
-            // Match 3: Partial contains match (only if not too short)
-            if (extractedId.length >= 4) {
-              if (s.admission_no.toUpperCase().includes(extractedId.toUpperCase()) ||
-                  extractedId.toUpperCase().includes(s.admission_no.toUpperCase())) {
-                return true;
-              }
-            }
-            
-            return false;
-          });
-        }) || [];
+        // Use new matching that includes name-based fallback
+        const matchResult = matchStudentsFromTokens(allTokens, students || [], combinedMatchText);
+        const uniqueMatchedStudents = matchResult.matched;
+        const effectiveConfidence = Math.max(extraction.confidence, matchResult.confidence);
 
-        // Deduplicate matched students by ID
-        const uniqueMatchedStudents = [...new Map(matchedStudents.map((s: any) => [s.id, s])).values()];
-
-        // Classification logic — SAME as original:
+        // Classification logic
         let matchStatus = 'unmatched';
-        if (uniqueMatchedStudents.length === 1 && extraction.confidence >= settings.min_confidence_threshold) {
+        if (uniqueMatchedStudents.length === 1 && effectiveConfidence >= settings.min_confidence_threshold) {
           matchStatus = 'auto_matched';
           autoMatched++;
         } else if (uniqueMatchedStudents.length > 0) {
