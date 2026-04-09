@@ -245,7 +245,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
     if (!isEditable(field)) {
       return (
         <span
-          className="px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed"
+          className="px-3 py-2.5 rounded block text-sm min-h-[40px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap"
           title={String(value ?? '') + " (Master Edit Only)"}
         >
           {value || '-'}
@@ -261,7 +261,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
           onUpdate(row.id, field, v);
         }}
       >
-        <SelectTrigger className="h-9 text-sm border-0 bg-transparent px-2 focus:ring-0 shadow-none hover:bg-accent/50">
+        <SelectTrigger className="h-10 text-sm border-0 bg-transparent px-3 focus:ring-0 shadow-none hover:bg-accent/50 min-w-[100px]">
           <SelectValue placeholder="-" />
         </SelectTrigger>
         <SelectContent>
