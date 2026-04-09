@@ -45,7 +45,7 @@ type SectionKey = typeof FLEET_SECTIONS[number]['key'];
 export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode = 'master', selectedDate, availableRoutes = [] }: Props) {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
-  const [pendingTripsUpdate, setPendingTripsUpdate] = useState<PendingTripsUpdate | null>(null);
+  
   const [visibleSections, setVisibleSections] = useState<Set<SectionKey>>(new Set(FLEET_SECTIONS.map(s => s.key)));
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
