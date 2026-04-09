@@ -580,6 +580,8 @@ export const extractAdmissionNumbers = (
   prefixes: string[],
   customPatterns: any[] = []
 ): ExtractionResult => {
+  if (!description) return { admissionNumbers: [], confidence: 0, matchedPattern: '' };
+  
   const normalized = description.toUpperCase().replace(/\s+/g, ' ').trim();
   const extractedIds: string[] = [];
   let confidence = 0;
@@ -601,35 +603,28 @@ export const extractAdmissionNumbers = (
     }
   }
 
-  // If no custom pattern matched, try prefix-based extraction
+  // Use new token extraction if no custom match
+  if (extractedIds.length === 0) {
+    const tokens = extractAdmissionTokens(description, prefixes);
+    if (tokens.length > 0) {
+      extractedIds.push(...tokens);
+      confidence = 90;
+      matchedPattern = 'Token extraction';
+    }
+  }
+
+  // Legacy prefix-based fallback
   if (extractedIds.length === 0) {
     for (const prefix of prefixes) {
       const pattern1 = new RegExp(`${prefix}\\s*[-_]?\\s*(\\d{4,6})`, 'gi');
       const matches1 = Array.from(normalized.matchAll(pattern1));
-      
       if (matches1.length > 0) {
         matches1.forEach(match => {
           const id = `${prefix}${match[1]}`;
-          if (!extractedIds.includes(id)) {
-            extractedIds.push(id);
-          }
+          if (!extractedIds.includes(id)) extractedIds.push(id);
         });
         confidence = 90;
         matchedPattern = `Prefix: ${prefix}`;
-      }
-
-      const prefixIndex = normalized.indexOf(prefix);
-      if (prefixIndex !== -1) {
-        const afterPrefix = normalized.substring(prefixIndex + prefix.length);
-        const digitMatch = afterPrefix.match(/^\s*[-_]?\s*(\d{4,6})/);
-        if (digitMatch) {
-          const id = `${prefix}${digitMatch[1]}`;
-          if (!extractedIds.includes(id)) {
-            extractedIds.push(id);
-            confidence = Math.max(confidence, 85);
-            matchedPattern = matchedPattern || `Prefix: ${prefix}`;
-          }
-        }
       }
     }
   }
@@ -645,7 +640,7 @@ export const extractAdmissionNumbers = (
   }
 
   return {
-    admissionNumbers: extractedIds,
+    admissionNumbers: [...new Set(extractedIds)],
     confidence: Math.min(confidence, 100),
     matchedPattern,
   };

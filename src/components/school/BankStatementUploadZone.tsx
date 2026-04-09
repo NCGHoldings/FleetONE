@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, Building2, ArrowRight, Eye } from "lucide-react";
-import { parseBankStatement, detectBankFormat, BANK_FORMATS, extractAdmissionNumbers, getFileHeaders, parseBankStatementWithMapping, type ParseResult, type ColumnMapping } from "@/utils/bank-statement-processor";
+import { parseBankStatement, detectBankFormat, BANK_FORMATS, extractAdmissionNumbers, extractAdmissionTokens, matchStudentsFromTokens, getFileHeaders, parseBankStatementWithMapping, type ParseResult, type ColumnMapping } from "@/utils/bank-statement-processor";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
