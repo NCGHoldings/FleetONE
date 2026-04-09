@@ -33,6 +33,7 @@ export const APPaymentsView = () => {
   const { data: payments, isLoading } = useAPPayments();
   const { data: vendors } = useVendors();
   const deletePayment = useDeleteAPPayment();
+  const approvePayment = useApproveAPPayment();
   const { data: bankFees } = useBankFees();
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -327,6 +328,17 @@ export const APPaymentsView = () => {
                   <TableCell>{getStatusBadge(payment)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      {(payment as any).approval_status === "pending" && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                          onClick={() => approvePayment.mutate(payment.id)}
+                          title="Approve Payment"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => setDetailPayment(payment)} title="View Details">
                         <FileText className="h-4 w-4" />
                       </Button>
