@@ -49,12 +49,12 @@ export function useDocumentTemplates(documentTypeCode?: string) {
       setLoading(true);
       let query = (supabase as any)
         .from('document_templates')
-        .select('*')
+        .select('*, document_template_types(type_name, type_code, module)')
         .eq('is_active', true)
-        .order('document_type_code', { ascending: true });
+        .order('template_name', { ascending: true });
 
       if (documentTypeCode) {
-        query = query.eq('document_type_code', documentTypeCode);
+        query = query.eq('document_template_types.type_code', documentTypeCode);
       }
 
       const { data, error } = await query;
@@ -62,12 +62,22 @@ export function useDocumentTemplates(documentTypeCode?: string) {
       if (error) throw error;
       
       const parsedTemplates = (data || []).map((template: any) => {
-        if (template.html_template) {
-          const parsed = parseHTMLDocumentTemplate(template.html_template);
-          const topics = parsedSectionsToTopics(parsed.sections, template.document_type_code);
+        // Map current DB fields to expected interface shape
+        const htmlContent = template.html_content || template.html_template || '';
+        const typeCode = template.document_template_types?.type_code || template.document_type_code || '';
+        
+        const mapped = {
+          ...template,
+          html_template: htmlContent,
+          document_type_code: typeCode,
+        };
+
+        if (htmlContent) {
+          const parsed = parseHTMLDocumentTemplate(htmlContent);
+          const topics = parsedSectionsToTopics(parsed.sections, typeCode);
           
           return {
-            ...template,
+            ...mapped,
             parsed_topics: topics,
             parsed_sections: parsed.sections,
             section_mappings: {
@@ -77,7 +87,7 @@ export function useDocumentTemplates(documentTypeCode?: string) {
             }
           };
         }
-        return template;
+        return mapped;
       });
       
       setTemplates(parsedTemplates);

@@ -331,12 +331,13 @@ export const APPaymentsView = () => {
                       {(payment as any).approval_status === "pending" && (
                         <Button
                           variant="outline"
-                          size="icon"
-                          className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                          size="sm"
+                          className="text-emerald-600 border-emerald-300 hover:bg-emerald-50 gap-1"
                           onClick={() => approvePayment.mutate(payment.id)}
-                          title="Approve Payment"
+                          disabled={approvePayment.isPending}
                         >
                           <CheckCircle className="h-4 w-4" />
+                          Approve
                         </Button>
                       )}
                       <Button variant="ghost" size="icon" onClick={() => setDetailPayment(payment)} title="View Details">
