@@ -105,7 +105,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
   // Recalculate — remove the extra +4 duplication
   const TOTAL_COLUMNS = visibleColumnCount;
 
-  const cellMinWidth = singleSectionFocus ? 'min-w-[140px]' : 'min-w-[80px]';
+  const cellMinWidth = singleSectionFocus ? 'min-w-[160px]' : 'min-w-[100px]';
 
   useEffect(() => {
     if (editingCell && inputRef.current) {
