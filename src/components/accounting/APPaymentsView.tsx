@@ -494,6 +494,21 @@ export const APPaymentsView = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Payment Dialog */}
+      <APPaymentEditDialog
+        open={!!editingPayment}
+        onOpenChange={(open) => { if (!open) setEditingPayment(null); }}
+        payment={editingPayment}
+      />
+
+      {/* Edit History Dialog */}
+      <EditHistoryDialog
+        open={!!historyPayment}
+        onOpenChange={(open) => { if (!open) setHistoryPayment(null); }}
+        history={(historyPayment as any)?.edit_history || []}
+        documentNumber={historyPayment?.payment_number || ""}
+      />
     </div>
   );
 };
