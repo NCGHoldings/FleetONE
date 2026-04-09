@@ -535,9 +535,145 @@ export const mapDocumentToPlaceholders = (
       if (dnLogo) placeholders['{{company_logo}}'] = `<img src="${dnLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
       break;
     }
-  }
 
-  // ======== Universal Auto-Mapping ========
+    case 'advance_receipt': {
+      placeholders['{{receipt_number}}'] = documentData?.receipt_number || '';
+      placeholders['{{receipt_date}}'] = formatDate(documentData?.receipt_date);
+      placeholders['{{customer_name}}'] = documentData?.customers?.customer_name || '';
+      placeholders['{{customer_address}}'] = documentData?.customers?.billing_address || '';
+      placeholders['{{customer_code}}'] = documentData?.customers?.customer_code || '';
+      placeholders['{{amount}}'] = formatCurrency(documentData?.amount);
+      placeholders['{{total_amount}}'] = formatCurrency(documentData?.amount);
+      placeholders['{{amount_in_words}}'] = numberToWords(documentData?.amount || 0);
+      placeholders['{{payment_method}}'] = documentData?.payment_method?.replace(/_/g, ' ')?.toUpperCase() || '';
+      placeholders['{{reference}}'] = documentData?.reference || '';
+      placeholders['{{cheque_number}}'] = documentData?.cheque_number || '';
+      placeholders['{{notes}}'] = documentData?.notes || '';
+      placeholders['{{voucher_no}}'] = documentData?.receipt_number || '';
+      placeholders['{{voucher_date}}'] = formatDate(documentData?.receipt_date);
+      placeholders['{{payee_name}}'] = documentData?.customers?.customer_name || '';
+      placeholders['{{currency}}'] = 'LKR';
+      placeholders['{{narration}}'] = documentData?.notes || 'Advance payment received';
+      placeholders['{{system_uuid}}'] = documentData?.id || '';
+      placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
+      const arAdvLogo = companyData?.logo_url || headerImageUrl || '';
+      if (arAdvLogo) placeholders['{{company_logo}}'] = `<img src="${arAdvLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
+      break;
+    }
+
+    case 'advance_payment': {
+      placeholders['{{payment_number}}'] = documentData?.payment_number || '';
+      placeholders['{{payment_date}}'] = formatDate(documentData?.payment_date);
+      placeholders['{{vendor_name}}'] = documentData?.vendors?.vendor_name || '';
+      placeholders['{{vendor_address}}'] = documentData?.vendors?.address || '';
+      placeholders['{{vendor_code}}'] = documentData?.vendors?.vendor_code || '';
+      placeholders['{{amount}}'] = formatCurrency(documentData?.amount);
+      placeholders['{{total_amount}}'] = formatCurrency(documentData?.amount);
+      placeholders['{{amount_in_words}}'] = numberToWords(documentData?.amount || 0);
+      placeholders['{{payment_method}}'] = documentData?.payment_method?.replace(/_/g, ' ')?.toUpperCase() || '';
+      placeholders['{{reference}}'] = documentData?.reference || '';
+      placeholders['{{cheque_number}}'] = documentData?.cheque_number || '';
+      placeholders['{{notes}}'] = documentData?.notes || '';
+      placeholders['{{voucher_no}}'] = documentData?.payment_number || '';
+      placeholders['{{voucher_date}}'] = formatDate(documentData?.payment_date);
+      placeholders['{{payee_name}}'] = documentData?.vendors?.vendor_name || '';
+      placeholders['{{currency}}'] = 'LKR';
+      placeholders['{{narration}}'] = documentData?.notes || 'Advance payment made';
+      placeholders['{{system_uuid}}'] = documentData?.id || '';
+      placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
+      const apAdvLogo = companyData?.logo_url || headerImageUrl || '';
+      if (apAdvLogo) placeholders['{{company_logo}}'] = `<img src="${apAdvLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
+      break;
+    }
+
+    case 'journal_voucher': {
+      placeholders['{{voucher_no}}'] = documentData?.entry_number || documentData?.voucher_number || '';
+      placeholders['{{voucher_date}}'] = formatDate(documentData?.entry_date || documentData?.voucher_date);
+      placeholders['{{description}}'] = documentData?.description || '';
+      placeholders['{{reference}}'] = documentData?.reference || '';
+      placeholders['{{total_debit}}'] = formatCurrency(documentData?.total_debit);
+      placeholders['{{total_credit}}'] = formatCurrency(documentData?.total_credit);
+      placeholders['{{total_amount}}'] = formatCurrency(documentData?.total_debit || documentData?.total_credit);
+      placeholders['{{amount_in_words}}'] = numberToWords(documentData?.total_debit || 0);
+      placeholders['{{status}}'] = documentData?.status?.toUpperCase() || '';
+      placeholders['{{narration}}'] = documentData?.description || '';
+      placeholders['{{notes}}'] = documentData?.notes || documentData?.description || '';
+      placeholders['{{currency}}'] = 'LKR';
+      placeholders['{{system_uuid}}'] = documentData?.id || '';
+      placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
+      const jvLogo = companyData?.logo_url || headerImageUrl || '';
+      if (jvLogo) placeholders['{{company_logo}}'] = `<img src="${jvLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
+      break;
+    }
+
+    case 'cheque_voucher': {
+      placeholders['{{voucher_no}}'] = documentData?.payment_number || documentData?.cheque_number || '';
+      placeholders['{{voucher_date}}'] = formatDate(documentData?.payment_date || documentData?.cheque_date);
+      placeholders['{{cheque_number}}'] = documentData?.cheque_number || '';
+      placeholders['{{cheque_date}}'] = formatDate(documentData?.cheque_date);
+      placeholders['{{payee_name}}'] = documentData?.vendors?.vendor_name || documentData?.payee || '';
+      placeholders['{{amount}}'] = formatCurrency(documentData?.amount);
+      placeholders['{{total_amount}}'] = formatCurrency(documentData?.amount);
+      placeholders['{{amount_in_words}}'] = numberToWords(documentData?.amount || 0);
+      placeholders['{{payment_method}}'] = 'CHEQUE';
+      placeholders['{{reference}}'] = documentData?.reference || '';
+      placeholders['{{notes}}'] = documentData?.notes || '';
+      placeholders['{{narration}}'] = documentData?.notes || '';
+      placeholders['{{source_account}}'] = documentData?.bank_accounts?.account_name || '';
+      placeholders['{{source_bank}}'] = documentData?.bank_accounts?.bank_name || '';
+      placeholders['{{currency}}'] = 'LKR';
+      placeholders['{{system_uuid}}'] = documentData?.id || '';
+      placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
+      const cvLogo = companyData?.logo_url || headerImageUrl || '';
+      if (cvLogo) placeholders['{{company_logo}}'] = `<img src="${cvLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
+      break;
+    }
+
+    case 'wht_certificate': {
+      placeholders['{{certificate_number}}'] = documentData?.certificate_number || '';
+      placeholders['{{certificate_date}}'] = formatDate(documentData?.certificate_date || documentData?.payment_date);
+      placeholders['{{payee_name}}'] = documentData?.vendors?.vendor_name || documentData?.customers?.customer_name || '';
+      placeholders['{{payee_tax_id}}'] = documentData?.vendors?.tax_id || documentData?.customers?.tax_id || '';
+      placeholders['{{payee_address}}'] = documentData?.vendors?.address || documentData?.customers?.billing_address || '';
+      placeholders['{{gross_amount}}'] = formatCurrency(documentData?.gross_amount || documentData?.amount);
+      placeholders['{{wht_rate}}'] = documentData?.wht_rate ? `${documentData.wht_rate}%` : '';
+      placeholders['{{wht_amount}}'] = formatCurrency(documentData?.wht_amount);
+      placeholders['{{net_amount}}'] = formatCurrency(documentData?.net_amount || ((documentData?.gross_amount || 0) - (documentData?.wht_amount || 0)));
+      placeholders['{{amount}}'] = formatCurrency(documentData?.wht_amount || documentData?.amount);
+      placeholders['{{total_amount}}'] = formatCurrency(documentData?.gross_amount || documentData?.amount);
+      placeholders['{{amount_in_words}}'] = numberToWords(documentData?.wht_amount || 0);
+      placeholders['{{reference}}'] = documentData?.reference || '';
+      placeholders['{{notes}}'] = documentData?.notes || '';
+      placeholders['{{currency}}'] = 'LKR';
+      placeholders['{{system_uuid}}'] = documentData?.id || '';
+      placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
+      const whtLogo = companyData?.logo_url || headerImageUrl || '';
+      if (whtLogo) placeholders['{{company_logo}}'] = `<img src="${whtLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
+      break;
+    }
+
+    case 'grn': {
+      placeholders['{{grn_number}}'] = documentData?.grn_number || '';
+      placeholders['{{grn_date}}'] = formatDate(documentData?.grn_date || documentData?.received_date);
+      placeholders['{{vendor_name}}'] = documentData?.vendors?.vendor_name || '';
+      placeholders['{{vendor_code}}'] = documentData?.vendors?.vendor_code || '';
+      placeholders['{{vendor_address}}'] = documentData?.vendors?.address || '';
+      placeholders['{{po_number}}'] = documentData?.po_number || documentData?.purchase_order_number || '';
+      placeholders['{{invoice_number}}'] = documentData?.invoice_number || '';
+      placeholders['{{total_amount}}'] = formatCurrency(documentData?.total_amount);
+      placeholders['{{total_quantity}}'] = String(documentData?.total_quantity || '');
+      placeholders['{{reference}}'] = documentData?.reference || '';
+      placeholders['{{notes}}'] = documentData?.notes || '';
+      placeholders['{{status}}'] = documentData?.status?.toUpperCase() || '';
+      placeholders['{{line_items}}'] = generateLineItemsTable(lineItems || []);
+      placeholders['{{currency}}'] = 'LKR';
+      placeholders['{{system_uuid}}'] = documentData?.id || '';
+      placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
+      const grnLogo = companyData?.logo_url || headerImageUrl || '';
+      if (grnLogo) placeholders['{{company_logo}}'] = `<img src="${grnLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
+      break;
+    }
+  }
   // Automatically map ALL fields from documentData as {{field_name}} placeholders.
   // This ensures custom templates can reference any data field without explicit mapping.
   // Explicit mappings above take priority (won't be overwritten).
