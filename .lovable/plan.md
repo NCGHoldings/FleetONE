@@ -1,66 +1,75 @@
 
 
-# Cash Flow Statement — Audit Results & Improvement Plan
+# Special Hire Spreadsheet — Enhanced Sections, Fuel Logic, Efficiency Colors & Daily Trips Interconnection
 
-## Current Assessment
+## Problems Identified
 
-The Cash Flow Statement has a solid IAS 7 foundation with both Direct and Indirect methods, reconciliation checks, working capital analysis, and CSV export. However, there are **8 critical gaps** that prevent it from being "fully automated, any-company-ready, zero manual intervention":
+1. **Bus model/details not pulled from fleet**: The spreadsheet shows `bus_type_name` from the quotation's `bus_types` table, but doesn't fetch the actual fleet bus details (model, year, capacity) from the `buses` table based on `assigned_bus_no`
+2. **Section collapse not focused enough**: Collapsible groups exist but when expanding a section like "Meter / KM", ALL other sections also show — no "focus mode" where you see only Bus Info + the selected section
+3. **No fuel efficiency color coding**: When actual km/L is below the bus type's standard rate (`avg_km_per_l`), it should show red; green when at or above standard
+4. **No fuel cost → liters auto-calculation**: The spreadsheet has `fuel_cost_actual` but no fuel price field to derive liters automatically
+5. **No bidirectional sync with Daily Trips**: Special Hire data doesn't flow to/from the Daily Trips page
+6. **Fleet management cross-links missing**: No link to bus master data sheet or fleet analytics from this spreadsheet
 
-## Issues Found
+## Plan
 
-### 1. No Interest/Dividend/Tax Separation (IAS 7.31-35 Violation)
-IAS 7 **requires** separate disclosure of: Interest Paid, Interest Received, Dividends Paid, Dividends Received, and Income Taxes Paid. Currently these are lumped into "Other operating cash flows". Your COA already has dedicated accounts (e.g., 41104001 INTEREST ON SAVINGS, 22501001 INCOME TAX PAYABLE) but the classifier doesn't extract them.
+### 1. Fetch Bus Details from Fleet (`useSpecialHireSpreadsheetData.ts`)
 
-### 2. Direct Method Classification Too Simplistic
-The direct method only looks at `nonCashLines[0]` (the first non-cash line) to classify each journal entry. Multi-line entries (e.g., a payment covering supplier + tax + bank fee) get classified based on just one line, misclassifying the rest.
+- After fetching quotations, collect all unique `assigned_bus_no` values
+- Query `buses` table to get `id, bus_no, model, year, capacity, type`
+- Query `bus_types` to get `avg_km_per_l` (standard fuel efficiency rate)
+- Map bus details onto each hire row: add fields `bus_model`, `bus_year`, `bus_capacity`, `standard_km_per_l`
 
-### 3. Employee Cost Detection by Keyword Only
-Employee payments are identified by searching for "salary/wage/payroll" in the JE description or account name. This misses accounts like "CASUAL WAGES PAYABLE" (code 22201004) and "SALARY ADVANCE" accounts. Should classify by account code prefix instead (222xx = salary-related).
+### 2. Add Fuel Price & Auto-Calculate Liters (`useSpecialHireSpreadsheetData.ts`)
 
-### 4. No Scalability Guard — Fetches ALL Journal Entries
-The hook fetches every posted JE (`journal_entries.select('*, lines:...')`) without any date filtering at the query level. With 465 JEs now, it works. At 10,000+ JEs (any medium company after 2 years), this will timeout. The date filter happens in-memory after fetching everything.
+- Read `fuel_price_per_liter` from `special_hire_quotations` (column already exists)
+- Add new fields to `SpreadsheetHire`: `fuel_price_per_liter`, `fuel_liters_calculated`, `actual_km_per_l`
+- Auto-compute: `fuel_liters = fuel_cost_actual / fuel_price_per_liter`
+- Auto-compute: `actual_km_per_l = actual_km / fuel_liters`
+- In `updateField`: when `fuel_price_per_liter` changes, save to quotation table directly
 
-### 5. No Business Unit Filtering
-Only filters by `company_id`. The NCG sub-company architecture requires `business_unit_code` filtering for isolated cash flow reports per sub-company (SBO, YUT, etc.).
+### 3. Section Focus Mode (`SpecialHireSpreadsheetCore.tsx`)
 
-### 6. Opening Balance Logic Flaw
-Uses `acc.opening_balance || acc.current_balance || 0` as the static opening balance, then adds pre-period movements. If `current_balance` is used as fallback, it includes ALL movements (including the current period), double-counting.
+- Add a "Focus" toggle alongside existing collapse buttons
+- When Focus mode is active and a section is clicked: show only "Hire Info" (first 3-4 identity columns: #, Quotation No, Bus No) + the selected section
+- This gives maximum space for data entry in the focused section
+- Regular toggle mode still works as before (show/hide individual sections)
 
-### 7. No Non-Cash Transaction Disclosures
-IAS 7.43 requires disclosure of significant non-cash investing/financing activities (e.g., asset acquisitions via lease, debt-to-equity conversions). These should be listed as a supplementary note.
+### 4. Fuel Efficiency Color Coding (`SpecialHireSpreadsheetCore.tsx`)
 
-### 8. No Comparative Period
-Professional cash flow statements show current period vs prior period side by side. Currently shows only one period.
+- Add new columns in the Expenses section: "Price/L", "Liters", "KM/L"
+- Color the KM/L cell:
+  - **Green** when `actual_km_per_l >= standard_km_per_l` (good performance)
+  - **Red** when `actual_km_per_l < standard_km_per_l` (negative performance)
+  - Show the gap: e.g., "3.0 (Std: 4.0)" in red
 
-## Fix Plan
+### 5. Bidirectional Daily Trips Sync
 
-### File 1: `src/hooks/useCashFlowData.ts` — Core Data Engine Fixes
+**Special Hire → Daily Trips direction:**
+- When a special hire trip is marked "completed" with bus/date/revenue data, auto-create or link a `daily_trips` record tagged with `source = 'special_hire'` and `source_id = quotation_id`
+- Pass: bus_id, date, income (gross_revenue), distance (actual_km), fuel_cost, start/end odometer
 
-- **Add IAS 7 required line items**: Extract interest paid/received, dividends, taxes paid from JE lines using account code classification (41104xxx = interest income, 22501xxx = income tax, 222xx = salary/wages)
-- **Fix direct method**: Analyze ALL non-cash lines proportionally, not just the first one
-- **Server-side date filtering**: Add `.gte('entry_date', preStartDate)` to the JE query to avoid fetching ancient data. Use a reasonable lookback (e.g., 2 years before period start for opening balances)
-- **Add business_unit_code filter**: Accept optional `businessUnitCode` param and apply to JE query
-- **Fix opening balance**: Use only `opening_balance` (never `current_balance`) as the static base; compute everything else from JE movements
-- **Add comparative period support**: Accept optional `comparativeStart/End` dates and return a second `CashFlowData` object
+**Daily Trips → Special Hire direction:**
+- In `fetchData`, also query `daily_trips` where `source = 'special_hire'` to pull back any revenue/expense updates made from the Daily Trips page
+- Show synced data with a badge indicator
 
-### File 2: `src/components/accounting/CashFlowView.tsx` — UI Enhancements
+### 6. Fleet Cross-Links
 
-- **Add IAS 7 required disclosures**: Show Interest Paid, Interest Received, Dividends, Income Tax Paid as separate lines in both Direct and Indirect operating sections
-- **Add "Non-Cash Activities" supplementary section**: List entries that don't touch cash accounts but are investing/financing (e.g., depreciation is already handled; add lease acquisitions, asset swaps)
-- **Add comparative column**: Show prior period amounts side-by-side
-- **Add business unit selector**: Dropdown for sub-company filtering when under NCG Holding
+- Make the "Bus No" cell clickable → opens Bus Master Data Sheet dialog
+- Show bus model/year/capacity as read-only info columns in the Operations section
+- Link fuel efficiency data to the fleet performance analytics
 
 ## Files to Change
 
-- `src/hooks/useCashFlowData.ts` — fix classification engine, add date-filtered queries, IAS 7 required items, business unit filter, comparative period support
-- `src/components/accounting/CashFlowView.tsx` — add IAS 7 disclosure lines, comparative columns, business unit selector, non-cash activities section
+- **`src/hooks/useSpecialHireSpreadsheetData.ts`** — fetch bus details from `buses` table, add fuel price/liters/efficiency fields, add daily_trips sync logic
+- **`src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`** — add focus mode, fuel efficiency columns with color coding, bus detail columns, clickable bus no linking to fleet
+- **`src/hooks/useSpecialHireSpreadsheetData.ts`** (updateField) — handle fuel_price_per_liter saves, auto-create daily_trips on completion
 
 ## Result
 
-- IAS 7 fully compliant with all required disclosures (interest, tax, dividends)
-- Direct method correctly classifies multi-line journal entries
-- Scales to 100,000+ journal entries via server-side date filtering
-- Works per sub-company (business unit) or consolidated
-- Comparative period for professional reporting
-- Zero manual intervention — all data derived from posted GL entries automatically
+- Bus model, year, capacity auto-populated from fleet management when bus is assigned
+- Focus mode lets you work on one section at a time with full space
+- Fuel cost + price/L → auto-calculated liters and km/L with red/green performance indicators
+- Bidirectional data flow between Special Hire sheet and Daily Trips page
+- Clicking bus number opens the fleet master data sheet for full vehicle details
 
