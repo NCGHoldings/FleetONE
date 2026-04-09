@@ -184,8 +184,14 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
           const standardRate = row.expected_km_per_liter;
           const performance = fuelConsumption > 0 ? standardRate - fuelConsumption : 0;
 
+          // Use per-trip route from daily_trips if available (daily mode), else roster default
+          const tripRouteLabel = matchedTrip?.route_label || row.route_label;
+          const tripRouteId = matchedTrip?.route_id || row.route_id;
+
           expanded.push({
             ...row,
+            route_label: tripRouteLabel,
+            route_id: tripRouteId,
             trip_sequence: seq,
             trip_id: matchedTrip?.id || null,
             trip_no: matchedTrip?.trip_no || `${String(seq).padStart(4, '0')}`,
@@ -198,6 +204,8 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
             daily_turn_01_time: tripTurn01,
             daily_turn_02_time: tripTurn02,
             _isExpanded: effectiveTripsPerDay > 1,
+            // In daily mode, show actual trip count from daily_trips
+            trips_per_day: busTrips.length > 0 ? Math.max(row.trips_per_day, busTrips.length) : row.trips_per_day,
             start_meter: startMeter,
             end_meter: endMeter,
             total_mileage: totalMileage,
@@ -228,6 +236,18 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
 
   const updateField = async (rosterId: string, field: string, value: any) => {
     try {
+      // Handle per-trip route updates: field format is "route_label__trip:<trip_id>"
+      const tripRouteMatch = field.match(/^route_label__trip:(.+)$/);
+      if (tripRouteMatch) {
+        const tripId = tripRouteMatch[1];
+        const { error } = await supabase
+          .from("daily_trips")
+          .update({ route_label: value })
+          .eq("id", tripId);
+        if (error) throw error;
+        await fetchRoster(true);
+        return;
+      }
       // Standard rate updates the buses table directly
       if (BUS_DIRECT_FIELDS.includes(field)) {
         const row = expandedRows.find(r => r.id === rosterId);
@@ -413,7 +433,8 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
       }
 
       if (editMode === 'daily') {
-        const row = expandedRows.find(r => r.id === rosterId);
+        // For per-trip route updates, find the exact expanded row (matching trip_sequence)
+        const row = expandedRows.find(r => r.id === rosterId && (r.trip_id || r.trip_sequence === 1));
         const rosterLevelFields = ['route_label', 'route_id', 'remark'];
         if (!row?.trip_id) {
           if (!rosterLevelFields.includes(field)) {
@@ -424,7 +445,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
         } else {
           const dailyUpdatePayload: Record<string, any> = {};
           
-          // Map master roster fields to daily_trips fields
+          // Map master roster fields to daily_trips fields — route updates go to the specific trip
           if (field === 'route_label') dailyUpdatePayload.route_label = value;
           if (field === 'route_id') dailyUpdatePayload.route_id = value;
           if (field === 'remark') {
@@ -590,13 +611,14 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
     }
   };
 
-  const addRosterEntry = async (busId: string) => {
+  const addRosterEntry = async (busId: string, routeId?: string, routeLabel?: string) => {
     try {
       const { data: bus } = await supabase.from("buses").select("bus_no, route").eq("id", busId).single();
       
       const { error } = await supabase.from("fleet_master_roster").insert({
         bus_id: busId,
-        route_label: bus?.route || '',
+        route_id: routeId || null,
+        route_label: routeLabel || bus?.route || '',
         sort_order: roster.length + 1,
         is_active: true,
         trips_per_day: 1,
