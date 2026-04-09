@@ -333,3 +333,34 @@ export const useDeleteExpenseRequest = () => {
     },
   });
 };
+
+// Hook to get filtered expense categories based on company settings
+export const useCompanyExpenseCategories = () => {
+  const { selectedCompanyId } = useCompany();
+
+  const { data: settings } = useQuery({
+    queryKey: ["company-expense-categories", selectedCompanyId],
+    queryFn: async () => {
+      if (!selectedCompanyId) return [];
+      const { data, error } = await supabase
+        .from("company_expense_categories")
+        .select("category_value, is_enabled")
+        .eq("company_id", selectedCompanyId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedCompanyId,
+  });
+
+  // If no settings exist for this company, return all categories (backward compatible)
+  if (!settings || settings.length === 0) {
+    return EXPENSE_CATEGORIES;
+  }
+
+  // Filter to only enabled categories
+  const enabledValues = new Set(
+    settings.filter((s: any) => s.is_enabled).map((s: any) => s.category_value)
+  );
+
+  return EXPENSE_CATEGORIES.filter((cat) => enabledValues.has(cat.value));
+};
