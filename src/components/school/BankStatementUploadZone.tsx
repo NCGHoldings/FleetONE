@@ -90,6 +90,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           typeCol: guess(['cr/dr', 'dr/cr', 'type']),
           referenceCol: guess(['reference', 'ref', 'tran id']),
           balanceCol: guess(['balance']),
+          matchFromCol: 'combined',
         });
         setStep("column_mapping");
         toast({
