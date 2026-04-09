@@ -131,7 +131,11 @@ const findHeader = (headers: string[], ...candidates: string[]): string | null =
     const normalized = normalizeHeader(candidate);
     const found = headers.find(h => normalizeHeader(h) === normalized);
     if (found) return found;
-    // Partial match
+  }
+  // Partial match pass — but skip short candidates (≤3 chars) to avoid "Dr" matching "Cr/Dr"
+  for (const candidate of candidates) {
+    const normalized = normalizeHeader(candidate);
+    if (normalized.length <= 3) continue; // Short candidates must match exactly
     const partial = headers.find(h => normalizeHeader(h).includes(normalized) || normalized.includes(normalizeHeader(h)));
     if (partial) return partial;
   }
@@ -297,15 +301,21 @@ const genericFormat: BankFormat = {
   parse: (rows: any[], headers: string[]) => {
     const dateCol = findHeader(headers, 'Date', 'Transaction Date', 'Txn Date', 'Value Date', 'Trans Date');
     const descCol = findHeader(headers, 'Description', 'Narration', 'Particulars', 'Details', 'Remarks', 'Transaction Details');
-    const refCol = findHeader(headers, 'Reference', 'Ref No', 'Trans Ref', 'Reference No');
+    const refCol = findHeader(headers, 'Reference', 'Ref No', 'Trans Ref', 'Reference No', 'Tran ID', 'Tran Serial');
     const chequeCol = findHeader(headers, 'Cheque No', 'Chq No', 'Cheque Number', 'Instrument');
     
     // Try debit/credit split columns
-    const debitCol = findHeader(headers, 'Debit', 'Withdrawal', 'Dr', 'Debit Amount');
-    const creditCol = findHeader(headers, 'Credit', 'Deposit', 'Cr', 'Credit Amount');
+    let debitCol = findHeader(headers, 'Debit', 'Withdrawal', 'Dr', 'Debit Amount');
+    let creditCol = findHeader(headers, 'Credit', 'Deposit', 'Cr', 'Credit Amount');
+    
+    // Safety: if debit and credit resolved to the same column, clear both and fall back
+    if (debitCol && creditCol && debitCol === creditCol) {
+      debitCol = null;
+      creditCol = null;
+    }
     
     // Or combined amount column
-    const amountCol = findHeader(headers, 'Amount', 'Transaction Amount', 'Cr/Dr');
+    const amountCol = findHeader(headers, 'Amount', 'Transaction Amount');
     const typeCol = findHeader(headers, 'Type', 'Transaction Type', 'Dr/Cr', 'Cr/Dr');
     
     const balanceCol = findHeader(headers, 'Balance', 'Running Balance', 'Closing Balance', 'Available Balance');
