@@ -4,8 +4,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, Building2, ArrowRight, Eye } from "lucide-react";
-import { parseBankStatement, detectBankFormat, BANK_FORMATS, extractAdmissionNumbers, extractAdmissionTokens, matchStudentsFromTokens, getFileHeaders, parseBankStatementWithMapping, type ParseResult, type ColumnMapping } from "@/utils/bank-statement-processor";
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, Building2, ArrowRight, Eye, AlertTriangle } from "lucide-react";
+import {
+  parseBankStatement, detectBankFormat, BANK_FORMATS,
+  extractAdmissionNumbers, extractAdmissionTokens, matchStudentsFromTokens,
+  buildCanonicalStudentMap, buildMatchText, validateImportData,
+  getFileHeaders, parseBankStatementWithMapping,
+  type ParseResult, type ColumnMapping, type ImportValidationResult,
+} from "@/utils/bank-statement-processor";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
@@ -18,7 +24,7 @@ interface BankStatementUploadZoneProps {
 
 const fmt = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-type Step = "upload" | "column_mapping" | "preview" | "processing" | "done";
+type Step = "upload" | "column_mapping" | "preview" | "validation" | "processing" | "done";
 
 export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStatementUploadZoneProps) {
   const { toast } = useToast();
@@ -33,6 +39,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
   const [fileHeaders, setFileHeaders] = useState<string[]>([]);
   const [sampleRows, setSampleRows] = useState<Record<string, any>[]>([]);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({ dateCol: '', descriptionCol: '', amountCol: '' });
+  const [validationResult, setValidationResult] = useState<ImportValidationResult | null>(null);
 
   const resetState = () => {
     setStep("upload");
@@ -46,6 +53,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
     setFileHeaders([]);
     setSampleRows([]);
     setColumnMapping({ dateCol: '', descriptionCol: '', amountCol: '' });
+    setValidationResult(null);
   };
 
   // ===== STEP 1: FILE SELECT + AUTO-DETECT =====
@@ -71,11 +79,9 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
       const result = await parseBankStatement(file, forcedBank);
       
       if (result.transactions.length === 0) {
-        // Auto-parse failed — show manual column mapping
         const { headers, sampleRows: samples } = await getFileHeaders(file);
         setFileHeaders(headers);
         setSampleRows(samples);
-        // Auto-guess mapping from headers
         const guess = (candidates: string[]) => {
           for (const c of candidates) {
             const found = headers.find(h => h.toLowerCase().includes(c.toLowerCase()));
@@ -135,7 +141,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
     }
   }, [file, columnMapping, toast]);
 
-  // ===== STEP 3: PROCESS & MATCH (preserves existing auto-match, payment, AR flows) =====
+  // ===== STEP 3: PROCESS & MATCH =====
   const handleProcess = useCallback(async () => {
     if (!parseResult || parseResult.transactions.length === 0) return;
 
@@ -154,7 +160,6 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
       let settings = fetchedSettings;
 
       if (!settings) {
-        // Auto-create default settings for new branches
         const { data: newSettings, error: createError } = await supabase
           .from('school_payment_import_settings')
           .insert([{
@@ -170,7 +175,6 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           .single();
 
         if (createError) {
-          // If duplicate/conflict, re-fetch the existing row
           if (createError.code === '23505') {
             const { data: refetched } = await supabase
               .from('school_payment_import_settings')
@@ -215,15 +219,36 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
 
       setProgress(35);
 
-      // Fetch all students for this branch
-      const { data: students } = await (supabase as any)
+      // *** KEY FIX: Fetch ONLY ACTIVE students for this branch ***
+      const { data: allStudents } = await (supabase as any)
         .from('school_students')
         .select('*')
-        .eq('branch_id', branchId);
+        .eq('branch_id', branchId)
+        .in('status', ['active', 'Active']);
+
+      const students = allStudents || [];
+
+      setProgress(45);
+
+      // Build canonical student map (deduped by normalized admission number)
+      const studentMap = buildCanonicalStudentMap(students);
 
       setProgress(50);
 
-      // Auto-detect admission prefixes from actual student data and merge with configured ones
+      // Fetch learned patterns for this branch
+      const { data: learnedPatterns } = await supabase
+        .from('school_payment_pattern_history')
+        .select('*')
+        .eq('branch_id', branchId);
+
+      const patternMap = new Map<string, string>();
+      (learnedPatterns || []).forEach((p: any) => {
+        if (p.original_description && p.matched_admission_no) {
+          patternMap.set(p.original_description.toUpperCase().trim(), p.matched_admission_no);
+        }
+      });
+
+      // Auto-detect admission prefixes
       const configuredPrefixes = Array.isArray(settings.admission_prefixes) 
         ? settings.admission_prefixes 
         : (typeof settings.admission_prefixes === 'string' 
@@ -231,17 +256,23 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           : ['N', 'LNU']);
 
       const detectedPrefixes = new Set<string>();
-      students?.forEach((s: any) => {
+      students.forEach((s: any) => {
         const match = s.admission_no?.match(/^([A-Za-z]+)/);
         if (match) detectedPrefixes.add(match[1].toUpperCase());
       });
       const mergedPrefixes = [...new Set([...configuredPrefixes.map((p: string) => p.toUpperCase()), ...detectedPrefixes])];
 
-      // Process each transaction — SAME matching logic as before, using new parser output
+      // Get the matchFromCol setting
+      const matchFromCol = columnMapping.matchFromCol || 'combined';
+
+      // Process each transaction
       const importItems = [];
       let autoMatched = 0;
       let needsReview = 0;
       let unmatched = 0;
+
+      const allTokensPerTxn: string[][] = [];
+      const allMatchResults: { matched: any[]; confidence: number }[] = [];
 
       for (const txn of parseResult.transactions) {
         const prefixes = mergedPrefixes;
@@ -252,69 +283,85 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
             ? JSON.parse(settings.custom_patterns)
             : []);
         
-        // Build combined match text from description + reference + raw row fields
-        const matchParts = [txn.description, txn.reference];
-        // Also pull Tran ID / Tran Serial from raw row if available
-        if (txn.rawRow) {
-          for (const key of Object.keys(txn.rawRow)) {
-            const lk = key.toLowerCase();
-            if (lk.includes('tran') || lk.includes('ref') || lk.includes('serial')) {
-              const val = String(txn.rawRow[key] || '').trim();
-              if (val && !matchParts.includes(val)) matchParts.push(val);
-            }
+        // *** KEY FIX: Use matchFromCol to control match source ***
+        const matchText = buildMatchText(txn, matchFromCol);
+
+        // Check learned patterns first
+        let learnedStudentMatch: any[] = [];
+        const descKey = txn.description.toUpperCase().trim();
+        const learnedAdmission = patternMap.get(descKey);
+        if (learnedAdmission) {
+          const learnedStudent = studentMap.activeStudents.find(s =>
+            s.admission_no && s.admission_no.toUpperCase().replace(/[\s\-_./]+/g, '') === learnedAdmission.toUpperCase().replace(/[\s\-_./]+/g, '')
+          );
+          if (learnedStudent) {
+            learnedStudentMatch = [learnedStudent];
           }
         }
-        const combinedMatchText = matchParts.filter(Boolean).join(' ');
 
-        // Extract admission tokens from combined text
-        const tokens = extractAdmissionTokens(combinedMatchText, prefixes);
+        // Extract admission tokens from the correct match text
+        const tokens = extractAdmissionTokens(matchText, prefixes);
         
-        // Also run legacy extraction for backward compatibility
-        const extraction = extractAdmissionNumbers(
-          combinedMatchText,
-          prefixes,
-          patterns
-        );
+        // Also run legacy extraction
+        const extraction = extractAdmissionNumbers(matchText, prefixes, patterns);
         
-        // Merge tokens
+        // Merge tokens (deduped)
         const allTokens = [...new Set([...tokens, ...extraction.admissionNumbers])];
+        allTokensPerTxn.push(allTokens);
 
-        // Use new matching that includes name-based fallback
-        const matchResult = matchStudentsFromTokens(allTokens, students || [], combinedMatchText);
+        // *** KEY FIX: Use ranked matching with canonical student map ***
+        let matchResult: { matched: any[]; confidence: number; pattern: string };
+
+        if (learnedStudentMatch.length === 1) {
+          matchResult = { matched: learnedStudentMatch, confidence: 95, pattern: 'Learned pattern match' };
+        } else {
+          matchResult = matchStudentsFromTokens(allTokens, students, matchText, studentMap);
+        }
+
+        allMatchResults.push(matchResult);
+
         const uniqueMatchedStudents = matchResult.matched;
         const effectiveConfidence = Math.max(extraction.confidence, matchResult.confidence);
 
-        // Classification logic
+        // Classification — stricter rules
         let matchStatus = 'unmatched';
         if (uniqueMatchedStudents.length === 1 && effectiveConfidence >= settings.min_confidence_threshold) {
           matchStatus = 'auto_matched';
           autoMatched++;
-        } else if (uniqueMatchedStudents.length > 0) {
+        } else if (uniqueMatchedStudents.length > 0 && uniqueMatchedStudents.length <= 5) {
+          // Only mark as partial_match if reasonable number of candidates
           matchStatus = 'partial_match';
           needsReview++;
+        } else if (uniqueMatchedStudents.length > 5) {
+          // Too many candidates = essentially unmatched (ambiguous)
+          matchStatus = 'unmatched';
+          unmatched++;
         } else {
           unmatched++;
         }
 
-        // Use credit amount (deposits are income) — handle both debit/credit format
         const amount = txn.credit > 0 ? txn.credit : txn.debit;
 
         importItems.push({
           import_id: importRecord.id,
-          txn_date: format(txn.txnDate, "yyyy-MM-dd"),
+          txn_date: isNaN(txn.txnDate.getTime()) ? format(new Date(), "yyyy-MM-dd") : format(txn.txnDate, "yyyy-MM-dd"),
           description: txn.description,
           amount: amount,
           extracted_ids: allTokens,
           matched_student_ids: (uniqueMatchedStudents as any[]).map(s => s.id),
           match_status: matchStatus,
           match_confidence: effectiveConfidence,
-          suggested_students: (uniqueMatchedStudents as any[]).map(s => ({
+          suggested_students: (uniqueMatchedStudents as any[]).slice(0, 5).map(s => ({
             id: s.id,
             admission_no: s.admission_no,
             student_name: s.student_name,
           })),
         });
       }
+
+      // Run validation
+      const validation = validateImportData(parseResult.transactions, allTokensPerTxn, allMatchResults);
+      setValidationResult(validation);
 
       setProgress(80);
 
@@ -365,7 +412,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
     } finally {
       setProcessing(false);
     }
-  }, [parseResult, branchId, file, toast, onUploadComplete]);
+  }, [parseResult, branchId, file, toast, onUploadComplete, columnMapping]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleFileSelect,
@@ -385,7 +432,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
         <div className="flex items-center gap-2 mb-4">
           {["Upload", "Map Columns", "Preview", "Process"].map((label, idx) => {
             const stepNum = idx + 1;
-            const stepOrder = { upload: 1, column_mapping: 2, preview: 3, processing: 4, done: 4 };
+            const stepOrder: Record<string, number> = { upload: 1, column_mapping: 2, preview: 3, validation: 3, processing: 4, done: 4 };
             const currentStepNum = stepOrder[step] || 1;
             const isActive = stepNum <= currentStepNum;
             return (
@@ -425,7 +472,6 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
               </div>
             </div>
 
-            {/* Bank Format + Detect */}
             {file && (
               <div className="flex items-center gap-4 mt-4">
                 <div className="flex-1">
@@ -454,14 +500,13 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
               </div>
             )}
 
-            {/* File Requirements */}
             <div className="mt-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
               <div className="flex gap-2">
                 <AlertCircle className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-blue-900 dark:text-blue-300">
                   <p className="font-semibold mb-1">Supports multiple bank formats:</p>
                   <p>Commercial Bank, Sampath Bank, HNB, BOC, People's Bank, or any generic Excel/CSV with Date, Description, Amount columns.</p>
-                  <p className="mt-1">Admission numbers will be auto-extracted from descriptions for matching.</p>
+                  <p className="mt-1">Matches <strong>active students only</strong> using admission numbers from selected columns.</p>
                 </div>
               </div>
             </div>
@@ -568,7 +613,6 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
 
         {step === "preview" && parseResult && (
           <div className="space-y-4">
-            {/* Summary Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 text-center">
                 <p className="text-xs text-muted-foreground">Bank</p>
@@ -588,7 +632,6 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
               </div>
             </div>
 
-            {/* Warnings */}
             {parseResult.parseWarnings.length > 0 && (
               <div className="flex items-center gap-2 p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 rounded-lg">
                 <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
@@ -596,7 +639,6 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
               </div>
             )}
 
-            {/* Transaction Preview Table */}
             <div className="max-h-[300px] overflow-auto border rounded-lg">
               <table className="w-full text-xs">
                 <thead className="bg-muted sticky top-0">
@@ -611,7 +653,11 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
                   {parseResult.transactions.slice(0, 100).map((t, i) => (
                     <tr key={i} className="border-b hover:bg-accent/30">
                       <td className="p-2 text-muted-foreground">{i + 1}</td>
-                      <td className="p-2 whitespace-nowrap">{format(t.txnDate, "dd/MM/yyyy")}</td>
+                      <td className="p-2 whitespace-nowrap">
+                        {isNaN(t.txnDate.getTime()) ? (
+                          <span className="text-red-500">Invalid date</span>
+                        ) : format(t.txnDate, "dd/MM/yyyy")}
+                      </td>
                       <td className="p-2 max-w-[400px] truncate" title={t.description}>{t.description}</td>
                       <td className="p-2 text-right font-mono text-green-600">
                         LKR {fmt(t.credit > 0 ? t.credit : t.debit)}
@@ -627,7 +673,6 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
               )}
             </div>
 
-            {/* Action Buttons */}
             <div className="flex justify-between items-center pt-2">
               <Button variant="outline" size="sm" onClick={resetState}>← Back to Upload</Button>
               <Button size="sm" onClick={handleProcess} disabled={parseResult.transactions.length === 0}>
@@ -636,16 +681,16 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
               </Button>
             </div>
 
-            {/* Safe Import Notice */}
             <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
               <div className="flex gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-green-900 dark:text-green-300">
-                  <p className="font-semibold">Safe Import — Existing flows are protected:</p>
+                  <p className="font-semibold">Improved Matching:</p>
                   <ul className="list-disc list-inside mt-1 space-y-0.5">
-                    <li>Auto-match admission numbers → same logic preserved</li>
-                    <li>Payment recording & AR invoice updates → unchanged</li>
-                    <li>Balance calculations → not affected by import</li>
+                    <li>Only matches against <strong>active students</strong> in this branch</li>
+                    <li>Ranked matching: Exact ID → Numeric suffix → Name fallback</li>
+                    <li>Learned patterns from previous manual matches applied automatically</li>
+                    <li>Ambiguous matches (5+ candidates) sent to review, not auto-confirmed</li>
                   </ul>
                 </div>
               </div>
@@ -658,7 +703,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           <div className="flex flex-col items-center py-10 gap-4">
             <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
             <p className="font-semibold text-sm">Processing & Matching Transactions...</p>
-            <p className="text-xs text-muted-foreground">Auto-matching admission numbers against student database</p>
+            <p className="text-xs text-muted-foreground">Matching against active students only • Using ranked matching</p>
             <div className="w-full max-w-md">
               <Progress value={progress} className="w-full" />
               <p className="text-xs text-muted-foreground text-center mt-1">{progress}% complete</p>
@@ -689,6 +734,24 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
                 <p className="font-bold text-lg text-red-600">{importStats.unmatched}</p>
               </div>
             </div>
+
+            {/* Validation warnings */}
+            {validationResult && validationResult.warnings.length > 0 && (
+              <div className="w-full max-w-md bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 rounded-lg p-3">
+                <div className="flex gap-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-yellow-800 dark:text-yellow-300">
+                    <p className="font-semibold mb-1">Data Quality Notes:</p>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {validationResult.warnings.map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <Button variant="outline" size="sm" onClick={resetState}>Import Another File</Button>
           </div>
         )}
