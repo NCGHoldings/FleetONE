@@ -1,65 +1,73 @@
 
 
-# Fix AR Receipt Form — Scroll Issue, GL Code Override & Category Display
+# Add Vehicle Number to AP Payments & AR Receipts — Fleet Integration
 
-## Problems
+## Problem
 
-1. **Dropdown can't scroll**: The `CommandList` inside the `Popover` has `max-h-[300px]` but the `PopoverContent` may be clipped by the dialog's `overflow-y-auto`. The popover needs higher z-index and portal behavior to escape the dialog's overflow container.
-
-2. **No GL code override option**: Users want to manually select a GL account that overrides the auto-resolved one. Currently there's no field for this. The system should allow a manual GL account selector with priority: **Manual override > Category mapping > Global settings**.
-
-3. **Category not showing for all entries**: The customer/vendor queries need to properly join category tables to show category names in the grouped dropdown.
+The AP Payment form (both Direct Payment and normal modes) has no option to record which vehicle/bus the expense is for. This makes it impossible to track vehicle-level costs from payments. The same gap exists in AR Receipts. AP Invoices already have `bus_id`, `bus_no`, `bus_type` columns — payments and receipts need parity.
 
 ## Plan
 
-### 1. Fix Dropdown Scroll — Escape Dialog Overflow
+### 1. Database Migration — Add Vehicle Fields
+
+Add columns to both `ap_payments` and `ar_receipts`:
+
+```sql
+ALTER TABLE ap_payments ADD COLUMN bus_id UUID REFERENCES buses(id);
+ALTER TABLE ap_payments ADD COLUMN bus_no TEXT;
+ALTER TABLE ap_payments ADD COLUMN vehicle_type TEXT; -- 'fleet' or 'external'
+
+ALTER TABLE ar_receipts ADD COLUMN bus_id UUID REFERENCES buses(id);
+ALTER TABLE ar_receipts ADD COLUMN bus_no TEXT;
+ALTER TABLE ar_receipts ADD COLUMN vehicle_type TEXT;
+```
+
+### 2. AP Payment Form — Vehicle Selector
+
+**File: `src/components/accounting/APPaymentForm.tsx`**
+
+- Add a "Vehicle / Bus No" section below the vendor fields
+- Searchable combobox that:
+  - Loads all buses from `buses` table (fleet vehicles)
+  - Groups by type/category if available
+  - Allows free-text entry for non-fleet vehicles (e.g., hired vehicles)
+- When a fleet bus is selected: stores `bus_id` + `bus_no`, sets `vehicle_type = 'fleet'`
+- When typed manually: stores only `bus_no`, sets `vehicle_type = 'external'`
+- Optional field — not required for every payment
+
+### 3. AR Receipt Form — Same Vehicle Selector
 
 **File: `src/components/accounting/ARReceiptForm.tsx`**
 
-- Add `portal` container or use `PopoverContent` with `sideOffset` and explicit `style={{ pointerEvents: 'auto' }}` to ensure the popover renders above the dialog
-- Increase `CommandList` max height to `max-h-[400px]`  
-- Add `onOpenAutoFocus` to prevent dialog from stealing focus from the command input
+- Add the same vehicle selector component
+- Same logic: fleet bus dropdown + free-text option
 
-### 2. Add Manual GL Account Override Selector
-
-**File: `src/components/accounting/ARReceiptForm.tsx`**
-
-- Add a new optional field below the Customer/Vendor selector: "GL Account Override" using the existing `SearchableAccountSelector` component
-- New state: `overrideGLAccountId`
-- When set, the GL badge shows the override account instead of the auto-resolved one
-- When cleared, falls back to the category/global resolution
+### 4. Mutation Updates
 
 **File: `src/hooks/useAccountingMutations.ts`**
 
-- Accept an optional `override_gl_account_id` in the receipt mutation
-- Priority logic in `useCreateARReceipt`:
-  ```
-  GL account = override_gl_account_id || resolvedFromCategory || globalSetting
-  ```
+- `useCreateAPPayment`: Accept `bus_id`, `bus_no`, `vehicle_type` and pass to insert
+- `useCreateARReceipt`: Same addition
+- GL journal entries: Pass `bus_id` to journal entry metadata for fleet cost analytics
 
-### 3. Add DB Column for GL Override
+### 5. Fleet Integration Bridge
 
-**New SQL migration**
-
-- Add `override_gl_account_id UUID REFERENCES chart_of_accounts(id)` to `ar_receipts` table
-- This persists the user's manual GL choice for audit trail
-
-### 4. Ensure Category Names Display Correctly
-
-**File: `src/hooks/useAccountingData.ts`**
-
-- Verify the `useCustomers` and `useVendors` queries join `customer_categories` and `vendor_categories` correctly (already added in previous work — just confirm it works)
+When a payment records a `bus_id`:
+- The existing Vehicle Operating Cost Dashboard (`useFleetFinancials`) can query `ap_payments` by `bus_id` to include payment-based expenses alongside `daily_bus_expenses`
+- Journal entries tagged with `bus_id` already flow into route-wise P&L
 
 ## Files to Change
 
-- `src/components/accounting/ARReceiptForm.tsx` — fix popover scroll/z-index, add GL override selector, update GL badge priority
-- `src/hooks/useAccountingMutations.ts` — accept `override_gl_account_id` in receipt creation, use it as top priority in GL resolution
-- New SQL migration — add `override_gl_account_id` column to `ar_receipts`
+- **New SQL migration** — add `bus_id`, `bus_no`, `vehicle_type` to `ap_payments` and `ar_receipts`
+- **`src/components/accounting/APPaymentForm.tsx`** — add vehicle selector with fleet lookup + free-text
+- **`src/components/accounting/ARReceiptForm.tsx`** — add vehicle selector
+- **`src/hooks/useAccountingMutations.ts`** — pass vehicle fields in create mutations and to journal entries
 
 ## Result
 
-- Dropdown scrolls properly within the dialog
-- Users can optionally pick a specific GL account that overrides category/global defaults
-- GL badge shows the effective account (override > category > global)
-- Categories display correctly as group headers in the dropdown
+- Every AP payment and AR receipt can optionally record which vehicle it's for
+- Fleet vehicles are selectable from a dropdown (linked via `bus_id`)
+- Non-fleet vehicles can be typed manually (stored as `bus_no` with `vehicle_type = 'external'`)
+- Vehicle-tagged payments feed into fleet operating cost analytics
+- Full interconnection: Payment → Vehicle → Fleet Analytics → GL
 
