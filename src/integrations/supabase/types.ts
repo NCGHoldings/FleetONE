@@ -14743,6 +14743,7 @@ export type Database = {
           created_at: string | null
           current_balance: number
           custodian_id: string | null
+          custodian_name: string | null
           fund_code: string | null
           fund_limit: number | null
           fund_name: string
@@ -14764,6 +14765,7 @@ export type Database = {
           created_at?: string | null
           current_balance?: number
           custodian_id?: string | null
+          custodian_name?: string | null
           fund_code?: string | null
           fund_limit?: number | null
           fund_name: string
@@ -14785,6 +14787,7 @@ export type Database = {
           created_at?: string | null
           current_balance?: number
           custodian_id?: string | null
+          custodian_name?: string | null
           fund_code?: string | null
           fund_limit?: number | null
           fund_name?: string
