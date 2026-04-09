@@ -7,7 +7,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CalendarIcon, FileSpreadsheet, Users, DollarSign, AlertCircle, CheckCircle, Loader2, AlertTriangle, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { CalendarIcon, FileSpreadsheet, Users, DollarSign, AlertCircle, CheckCircle, Loader2, AlertTriangle, Trash2, Percent } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useStudentsForBulkAR, useGenerateBulkARInvoices, useBranchFinanceSettings, useExistingBatch, useDeleteARBatch } from "@/hooks/useSchoolBusFinance";
@@ -24,6 +27,7 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
   const [invoiceMonth, setInvoiceMonth] = useState<Date>(new Date());
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [step, setStep] = useState<"select" | "confirm" | "processing" | "complete">("select");
+  const [billingPercentage, setBillingPercentage] = useState<number>(80);
 
   const { data: students, isLoading: studentsLoading } = useStudentsForBulkAR(branchId);
   const { data: settings, isLoading: settingsLoading } = useBranchFinanceSettings(branchId);
@@ -32,6 +36,13 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
   const deleteARBatch = useDeleteARBatch();
 
   const effectiveSettings = settings;
+
+  // Load default billing percentage from settings
+  useEffect(() => {
+    if (effectiveSettings?.billing_percentage) {
+      setBillingPercentage(effectiveSettings.billing_percentage);
+    }
+  }, [effectiveSettings]);
 
   // Select all students by default when dialog opens
   useEffect(() => {
@@ -60,7 +71,17 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
   };
 
   const selectedStudentsList = students?.filter((s) => selectedStudents.has(s.id)) || [];
-  const totalAmount = selectedStudentsList.reduce((sum, s) => sum + (s.current_amount_due || s.fixed_monthly_amount || 0), 0);
+
+  // Calculate amount per student with billing percentage
+  const calculateStudentAmount = (s: any) => {
+    const fixedAmount = s.fixed_monthly_amount || 0;
+    const chargeAmount = fixedAmount * (billingPercentage / 100);
+    const outstanding = Math.abs(Math.min(s.payment_balance || 0, 0));
+    const credit = s.payment_balance > 0 ? s.payment_balance : 0;
+    return Math.max(0, chargeAmount + outstanding - credit);
+  };
+
+  const totalAmount = selectedStudentsList.reduce((sum, s) => sum + calculateStudentAmount(s), 0);
 
   const handleDeleteAndRegenerate = async () => {
     if (!existingBatch) return;
@@ -82,6 +103,7 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
       await generateBulkAR.mutateAsync({
         branchId,
         invoiceMonth,
+        billingPercentage,
         students: selectedStudentsList.map((s) => ({
           id: s.id,
           student_name: s.student_name,
@@ -164,25 +186,64 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
               </div>
             )}
 
-            {/* Invoice Month Selector */}
-            <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
-              <span className="font-medium">Invoice Month:</span>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-[200px] justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(invoiceMonth, "MMMM yyyy")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={invoiceMonth}
-                    onSelect={(date) => date && setInvoiceMonth(date)}
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
+            {/* Invoice Month + Billing Percentage */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                <span className="font-medium">Invoice Month:</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-[200px] justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(invoiceMonth, "MMMM yyyy")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={invoiceMonth}
+                      onSelect={(date) => date && setInvoiceMonth(date)}
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Billing Percentage Control */}
+              <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Percent className="h-4 w-4 text-primary" />
+                    <Label className="font-medium">Monthly Charge %</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={billingPercentage}
+                      onChange={(e) => setBillingPercentage(Math.min(100, Math.max(1, Number(e.target.value) || 80)))}
+                      className="w-20 h-8 text-center font-semibold"
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
+                </div>
+                <Slider
+                  value={[billingPercentage]}
+                  onValueChange={([val]) => setBillingPercentage(val)}
+                  min={1}
+                  max={100}
+                  step={5}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Charges {billingPercentage}% of each student's fixed monthly amount + any outstanding balance.
+                  {billingPercentage < 100 && (
+                    <span className="text-primary font-medium">
+                      {" "}Example: Fixed LKR 10,000 × {billingPercentage}% = LKR {(10000 * billingPercentage / 100).toLocaleString()} + Outstanding
+                    </span>
+                  )}
+                </p>
+              </div>
             </div>
 
             {/* Summary Cards */}
@@ -247,40 +308,42 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
                   </div>
                 ) : (
                   <div className="divide-y">
-                    {students?.map((student) => (
-                      <div
-                        key={student.id}
-                        className={cn(
-                          "flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer",
-                          selectedStudents.has(student.id) && "bg-primary/5"
-                        )}
-                        onClick={() => toggleStudent(student.id)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Checkbox
-                            checked={selectedStudents.has(student.id)}
-                            onCheckedChange={() => toggleStudent(student.id)}
-                          />
-                          <div>
-                            <p className="font-medium">{student.student_name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {student.admission_no} • Grade {student.grade}
+                    {students?.map((student) => {
+                      const invoiceAmount = calculateStudentAmount(student);
+                      const outstandingBal = Math.abs(Math.min(student.payment_balance || 0, 0));
+                      return (
+                        <div
+                          key={student.id}
+                          className={cn(
+                            "flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer",
+                            selectedStudents.has(student.id) && "bg-primary/5"
+                          )}
+                          onClick={() => toggleStudent(student.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={selectedStudents.has(student.id)}
+                              onCheckedChange={() => toggleStudent(student.id)}
+                            />
+                            <div>
+                              <p className="font-medium">{student.student_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {student.admission_no} • Grade {student.grade}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-primary">
+                              LKR {invoiceAmount.toLocaleString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {billingPercentage}% of {(student.fixed_monthly_amount || 0).toLocaleString()}
+                              {outstandingBal > 0 && ` + ${outstandingBal.toLocaleString()} outstanding`}
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-primary">
-                            LKR {(student.current_amount_due || student.fixed_monthly_amount || 0).toLocaleString()}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Amount Due</p>
-                          {student.payment_balance < 0 && (
-                            <p className="text-xs text-destructive">
-                              Balance: LKR {Math.abs(student.payment_balance).toLocaleString()}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </ScrollArea>
@@ -313,6 +376,10 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
                   <div>
                     <span className="text-muted-foreground">Students:</span>
                     <span className="ml-2 font-medium">{selectedStudents.size}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Monthly Charge:</span>
+                    <span className="ml-2 font-medium">{billingPercentage}% of fixed amount</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Total Amount:</span>
@@ -379,7 +446,7 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
               {selectedStudents.size} AR invoices have been created for {branchName}
             </p>
             <p className="text-sm text-muted-foreground">
-              Total Amount: LKR {totalAmount.toLocaleString()}
+              Total Amount: LKR {totalAmount.toLocaleString()} ({billingPercentage}% charge rate)
             </p>
             <Button onClick={handleClose} className="mt-4">
               Close
