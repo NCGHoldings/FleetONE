@@ -99,6 +99,11 @@ export const BankFeeForm = ({
             </Select>
           </div>
 
+          <div className="space-y-2">
+            <Label>Reference</Label>
+            <Input value={reference} readOnly className="bg-muted" />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Fee Date *</Label>

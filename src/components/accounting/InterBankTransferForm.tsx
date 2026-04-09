@@ -248,7 +248,7 @@ export function InterBankTransferForm({ open, onOpenChange }: InterBankTransferF
                 <FormItem>
                   <FormLabel>Reference</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., FUEL-TOPUP-JAN" {...field} />
+                    <Input {...field} readOnly className="bg-muted" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
