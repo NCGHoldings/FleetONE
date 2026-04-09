@@ -523,6 +523,7 @@ export const useCreateARReceipt = () => {
       reference?: string;
       notes?: string;
       is_advance?: boolean;
+      party_type?: "customer" | "vendor";
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
