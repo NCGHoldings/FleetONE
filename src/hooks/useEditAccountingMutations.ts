@@ -159,6 +159,20 @@ export const useEditAPPayment = () => {
         }
       }
 
+      // Step 2b: Delete old bank transactions linked to this payment
+      await supabase
+        .from("bank_transactions")
+        .delete()
+        .eq("reference_id", id)
+        .in("source_type", ["ap_payment", "bank_fee"]);
+
+      // Step 2c: Delete old bank fee records
+      await supabase
+        .from("bank_fee_charges")
+        .delete()
+        .eq("source_id", id)
+        .eq("source_type", "ap_payment");
+
       // Step 3: Update payment record
       const oldValues = {
         amount: existing.amount,
@@ -176,7 +190,7 @@ export const useEditAPPayment = () => {
         })
         .eq("id", id);
 
-      // Step 4: Re-run GL posting
+      // Step 4: Re-run GL posting (now supports BOTH normal and direct payments)
       let newJeId: string | null = null;
       let bankGLAccountId: string | null = null;
       if (updates.bank_account_id) {
@@ -188,35 +202,132 @@ export const useEditAPPayment = () => {
         bankGLAccountId = bankAccount?.gl_account_id || null;
       }
 
-      if (bankGLAccountId && updates.amount > 0 && !existing.is_direct_payment) {
-        const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
-        const resolved = await resolveVendorAPAccounts(existing.vendor_id, effectiveCompanyId);
-        const tradePayableId = existing.is_advance
-          ? (resolved.advanceAccountId || resolved.apAccountId)
-          : resolved.apAccountId;
+      if (bankGLAccountId && updates.amount > 0) {
+        if (existing.is_direct_payment) {
+          // Direct payment: rebuild JE from ap_payment_lines
+          const { data: paymentLines } = await supabase
+            .from("ap_payment_lines")
+            .select("*, chart_of_accounts(account_code, account_name)")
+            .eq("payment_id", id);
 
-        if (tradePayableId) {
-          const { data: vendorData } = await supabase.from("vendors").select("vendor_name").eq("id", existing.vendor_id).single();
-          const { postAPPaymentToGL } = await import("@/lib/gl-posting-utils");
-          const glResult = await postAPPaymentToGL({
-            paymentNumber: existing.payment_number,
-            paymentDate: updates.payment_date,
-            amount: updates.amount,
-            bankAccountId: bankGLAccountId,
-            tradePayableId,
-            companyId: effectiveCompanyId,
-            businessUnitCode: businessUnitCode || undefined,
-            vendorName: vendorData?.vendor_name || "",
-          });
-          if (glResult.success && glResult.journalEntryId) {
-            newJeId = glResult.journalEntryId;
-            await supabase.from("ap_payments").update({ journal_entry_id: newJeId }).eq("id", id);
+          if (paymentLines?.length) {
+            const { postDirectPaymentToGL } = await import("@/lib/gl-posting-utils");
+            const glResult = await postDirectPaymentToGL({
+              paymentNumber: existing.payment_number,
+              paymentDate: updates.payment_date,
+              amount: updates.amount,
+              bankAccountId: bankGLAccountId,
+              lines: paymentLines,
+              companyId: effectiveCompanyId,
+              businessUnitCode: businessUnitCode || undefined,
+              vendorName: existing.vendor_id ? (await supabase.from("vendors").select("vendor_name").eq("id", existing.vendor_id).single()).data?.vendor_name || "" : "",
+            });
+            if (glResult.success && glResult.journalEntryId) {
+              newJeId = glResult.journalEntryId;
+              await supabase.from("ap_payments").update({ journal_entry_id: newJeId }).eq("id", id);
+            }
+          }
+        } else {
+          // Normal payment: use vendor AP account resolution
+          const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
+          const resolved = await resolveVendorAPAccounts(existing.vendor_id, effectiveCompanyId);
+          const tradePayableId = existing.is_advance
+            ? (resolved.advanceAccountId || resolved.apAccountId)
+            : resolved.apAccountId;
+
+          if (tradePayableId) {
+            const { data: vendorData } = await supabase.from("vendors").select("vendor_name").eq("id", existing.vendor_id).single();
+            const { postAPPaymentToGL } = await import("@/lib/gl-posting-utils");
+            const glResult = await postAPPaymentToGL({
+              paymentNumber: existing.payment_number,
+              paymentDate: updates.payment_date,
+              amount: updates.amount,
+              bankAccountId: bankGLAccountId,
+              tradePayableId,
+              companyId: effectiveCompanyId,
+              businessUnitCode: businessUnitCode || undefined,
+              vendorName: vendorData?.vendor_name || "",
+            });
+            if (glResult.success && glResult.journalEntryId) {
+              newJeId = glResult.journalEntryId;
+              await supabase.from("ap_payments").update({ journal_entry_id: newJeId }).eq("id", id);
+            }
+          }
+        }
+
+        // Step 4b: Handle bank fee re-posting if fee exists
+        if (existing.bank_fee_amount && existing.bank_fee_amount > 0) {
+          try {
+            const { data: glSettings } = await supabase
+              .from("gl_settings")
+              .select("setting_value")
+              .eq("company_id", effectiveCompanyId)
+              .eq("setting_key", "bank_charges_account_id")
+              .single();
+            const bankChargesAccountId = glSettings?.setting_value;
+            if (bankChargesAccountId && newJeId) {
+              // Append fee lines to the existing JE
+              await supabase.from("journal_entry_lines").insert([
+                {
+                  journal_entry_id: newJeId,
+                  account_id: bankChargesAccountId,
+                  description: "Bank charges",
+                  debit: existing.bank_fee_amount,
+                  credit: 0,
+                  company_id: effectiveCompanyId,
+                },
+                {
+                  journal_entry_id: newJeId,
+                  account_id: bankGLAccountId,
+                  description: "Bank charges - bank",
+                  debit: 0,
+                  credit: existing.bank_fee_amount,
+                  company_id: effectiveCompanyId,
+                },
+              ]);
+              // Update JE totals
+              const { data: jeData } = await supabase.from("journal_entries").select("total_debit, total_credit").eq("id", newJeId).single();
+              if (jeData) {
+                await supabase.from("journal_entries").update({
+                  total_debit: (jeData.total_debit || 0) + existing.bank_fee_amount,
+                  total_credit: (jeData.total_credit || 0) + existing.bank_fee_amount,
+                }).eq("id", newJeId);
+              }
+              // Update COA for fee accounts
+              const { data: chargesAcc } = await supabase.from("chart_of_accounts").select("current_balance, account_type").eq("id", bankChargesAccountId).single();
+              if (chargesAcc) {
+                const isDebitNormal = ["asset", "expense"].includes(chargesAcc.account_type);
+                await supabase.from("chart_of_accounts").update({
+                  current_balance: (chargesAcc.current_balance || 0) + (isDebitNormal ? existing.bank_fee_amount : -existing.bank_fee_amount),
+                }).eq("id", bankChargesAccountId);
+              }
+              const { data: bankGLAcc } = await supabase.from("chart_of_accounts").select("current_balance, account_type").eq("id", bankGLAccountId).single();
+              if (bankGLAcc) {
+                const isDebitNormal = ["asset", "expense"].includes(bankGLAcc.account_type);
+                await supabase.from("chart_of_accounts").update({
+                  current_balance: (bankGLAcc.current_balance || 0) + (isDebitNormal ? -existing.bank_fee_amount : existing.bank_fee_amount),
+                }).eq("id", bankGLAccountId);
+              }
+              // Re-create bank fee charge record
+              await supabase.from("bank_fee_charges").insert({
+                source_id: id,
+                source_type: "ap_payment",
+                fee_amount: existing.bank_fee_amount,
+                fee_type: existing.bank_fee_type || "bank_charge",
+                bank_account_id: updates.bank_account_id,
+                company_id: effectiveCompanyId,
+                status: "posted",
+              });
+            }
+          } catch (e) {
+            console.error("[Edit AP Payment - Bank Fee]", e);
           }
         }
       }
 
       // Step 5: Apply new bank balance
       if (updates.bank_account_id && updates.amount > 0) {
+        const totalNew = updates.amount + (existing.bank_fee_amount || 0);
         const { data: bankAcc } = await supabase
           .from("bank_accounts")
           .select("current_balance")
@@ -225,8 +336,37 @@ export const useEditAPPayment = () => {
         if (bankAcc) {
           await supabase
             .from("bank_accounts")
-            .update({ current_balance: (bankAcc.current_balance || 0) - updates.amount })
+            .update({ current_balance: (bankAcc.current_balance || 0) - totalNew })
             .eq("id", updates.bank_account_id);
+        }
+      }
+
+      // Step 5b: Re-create bank transaction record
+      if (updates.bank_account_id && updates.amount > 0) {
+        await supabase.from("bank_transactions").insert({
+          bank_account_id: updates.bank_account_id,
+          transaction_date: updates.payment_date,
+          description: `AP Payment ${existing.payment_number}`,
+          debit: 0,
+          credit: updates.amount,
+          reference: updates.reference || existing.payment_number,
+          source_type: "ap_payment",
+          reference_id: id,
+          company_id: effectiveCompanyId,
+        });
+        // Bank fee transaction
+        if (existing.bank_fee_amount && existing.bank_fee_amount > 0) {
+          await supabase.from("bank_transactions").insert({
+            bank_account_id: updates.bank_account_id,
+            transaction_date: updates.payment_date,
+            description: `Bank fee for ${existing.payment_number}`,
+            debit: 0,
+            credit: existing.bank_fee_amount,
+            reference: `FEE-${existing.payment_number}`,
+            source_type: "bank_fee",
+            reference_id: id,
+            company_id: effectiveCompanyId,
+          });
         }
       }
 
@@ -241,6 +381,7 @@ export const useEditAPPayment = () => {
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       toast.success("Payment updated with auto GL reversal & re-posting");
     },
@@ -283,7 +424,7 @@ export const useEditARReceipt = () => {
         reversedJeId = await reverseJournalEntry(existing.journal_entry_id, effectiveCompanyId);
       }
 
-      // Step 2: Reverse old bank balance
+      // Step 2: Reverse old bank balance (receipts ADD to bank, so reverse = subtract)
       if (existing.bank_account_id && existing.amount > 0) {
         const { data: bankAcc } = await supabase
           .from("bank_accounts")
@@ -297,6 +438,20 @@ export const useEditARReceipt = () => {
             .eq("id", existing.bank_account_id);
         }
       }
+
+      // Step 2b: Delete old bank transactions linked to this receipt
+      await supabase
+        .from("bank_transactions")
+        .delete()
+        .eq("reference_id", id)
+        .in("source_type", ["ar_receipt", "bank_fee"]);
+
+      // Step 2c: Delete old bank fee records
+      await supabase
+        .from("bank_fee_charges")
+        .delete()
+        .eq("source_id", id)
+        .eq("source_type", "ar_receipt");
 
       // Step 3: Update record
       const oldValues = {
@@ -340,6 +495,8 @@ export const useEditARReceipt = () => {
           const resolved = await resolveCustomerARAccounts(existing.customer_id, effectiveCompanyId);
           tradeReceivableId = resolved.arAccountId;
           advanceAccountId = resolved.advanceAccountId || null;
+          const { data: custData } = await supabase.from("customers").select("customer_name").eq("id", existing.customer_id).single();
+          partyName = custData?.customer_name || "";
         }
 
         if (existing.is_advance && advanceAccountId) {
@@ -375,6 +532,73 @@ export const useEditARReceipt = () => {
             await supabase.from("ar_receipts").update({ journal_entry_id: newJeId }).eq("id", id);
           }
         }
+
+        // Step 4b: Handle bank fee re-posting if fee exists on the receipt
+        const bankFeeAmount = (existing as any).bank_fee_amount || 0;
+        if (bankFeeAmount > 0 && bankGLAccountId) {
+          try {
+            const { data: glSettings } = await supabase
+              .from("gl_settings")
+              .select("setting_value")
+              .eq("company_id", effectiveCompanyId)
+              .eq("setting_key", "bank_charges_account_id")
+              .single();
+            const bankChargesAccountId = glSettings?.setting_value;
+            if (bankChargesAccountId && newJeId) {
+              await supabase.from("journal_entry_lines").insert([
+                {
+                  journal_entry_id: newJeId,
+                  account_id: bankChargesAccountId,
+                  description: "Bank charges",
+                  debit: bankFeeAmount,
+                  credit: 0,
+                  company_id: effectiveCompanyId,
+                },
+                {
+                  journal_entry_id: newJeId,
+                  account_id: bankGLAccountId,
+                  description: "Bank charges - bank",
+                  debit: 0,
+                  credit: bankFeeAmount,
+                  company_id: effectiveCompanyId,
+                },
+              ]);
+              const { data: jeData } = await supabase.from("journal_entries").select("total_debit, total_credit").eq("id", newJeId).single();
+              if (jeData) {
+                await supabase.from("journal_entries").update({
+                  total_debit: (jeData.total_debit || 0) + bankFeeAmount,
+                  total_credit: (jeData.total_credit || 0) + bankFeeAmount,
+                }).eq("id", newJeId);
+              }
+              // Update COA for fee accounts
+              const { data: chargesAcc } = await supabase.from("chart_of_accounts").select("current_balance, account_type").eq("id", bankChargesAccountId).single();
+              if (chargesAcc) {
+                const isDebitNormal = ["asset", "expense"].includes(chargesAcc.account_type);
+                await supabase.from("chart_of_accounts").update({
+                  current_balance: (chargesAcc.current_balance || 0) + (isDebitNormal ? bankFeeAmount : -bankFeeAmount),
+                }).eq("id", bankChargesAccountId);
+              }
+              const { data: bankGLAcc } = await supabase.from("chart_of_accounts").select("current_balance, account_type").eq("id", bankGLAccountId).single();
+              if (bankGLAcc) {
+                const isDebitNormal = ["asset", "expense"].includes(bankGLAcc.account_type);
+                await supabase.from("chart_of_accounts").update({
+                  current_balance: (bankGLAcc.current_balance || 0) + (isDebitNormal ? -bankFeeAmount : bankFeeAmount),
+                }).eq("id", bankGLAccountId);
+              }
+              await supabase.from("bank_fee_charges").insert({
+                source_id: id,
+                source_type: "ar_receipt",
+                fee_amount: bankFeeAmount,
+                fee_type: (existing as any).bank_fee_type || "bank_charge",
+                bank_account_id: updates.bank_account_id,
+                company_id: effectiveCompanyId,
+                status: "posted",
+              });
+            }
+          } catch (e) {
+            console.error("[Edit AR Receipt - Bank Fee]", e);
+          }
+        }
       }
 
       // Step 5: Apply new bank balance
@@ -392,6 +616,36 @@ export const useEditARReceipt = () => {
         }
       }
 
+      // Step 5b: Re-create bank transaction record
+      if (updates.bank_account_id && updates.amount > 0) {
+        await supabase.from("bank_transactions").insert({
+          bank_account_id: updates.bank_account_id,
+          transaction_date: updates.receipt_date,
+          description: `AR Receipt ${existing.receipt_number}`,
+          debit: updates.amount,
+          credit: 0,
+          reference: updates.reference || existing.receipt_number,
+          source_type: "ar_receipt",
+          reference_id: id,
+          company_id: effectiveCompanyId,
+        });
+        // Bank fee transaction
+        const bankFeeAmount = (existing as any).bank_fee_amount || 0;
+        if (bankFeeAmount > 0) {
+          await supabase.from("bank_transactions").insert({
+            bank_account_id: updates.bank_account_id,
+            transaction_date: updates.receipt_date,
+            description: `Bank fee for ${existing.receipt_number}`,
+            debit: 0,
+            credit: bankFeeAmount,
+            reference: `FEE-${existing.receipt_number}`,
+            source_type: "bank_fee",
+            reference_id: id,
+            company_id: effectiveCompanyId,
+          });
+        }
+      }
+
       await appendEditHistory("ar_receipts", id, oldValues, updates, reversedJeId, newJeId);
 
       return { id, reversedJeId, newJeId };
@@ -402,6 +656,7 @@ export const useEditARReceipt = () => {
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       toast.success("Receipt updated with auto GL reversal & re-posting");
     },
