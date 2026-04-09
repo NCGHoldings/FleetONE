@@ -509,6 +509,15 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
               </div>
             )}
 
+            {/* Vehicle Selector */}
+            <VehicleSelector
+              busId={selectedBusId}
+              busNo={selectedBusNo}
+              vehicleType={selectedVehicleType}
+              onSelect={(bId, bNo, vType) => { setSelectedBusId(bId); setSelectedBusNo(bNo); setSelectedVehicleType(vType); }}
+              onClear={() => { setSelectedBusId(""); setSelectedBusNo(""); setSelectedVehicleType(""); }}
+            />
+
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
