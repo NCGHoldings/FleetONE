@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -55,7 +56,7 @@ export const BankTransactionForm = ({ open, onOpenChange, preselectedBankId }: B
 
   // Auto-generate reference when dialog opens
   const [isGeneratingRef, setIsGeneratingRef] = useState(false);
-  useState(() => {
+  useEffect(() => {
     if (open && !form.getValues("reference")) {
       setIsGeneratingRef(true);
       generateNumber("bank_transaction").then((num) => {
@@ -63,7 +64,7 @@ export const BankTransactionForm = ({ open, onOpenChange, preselectedBankId }: B
         setIsGeneratingRef(false);
       });
     }
-  });
+  }, [open]);
 
   const onSubmit = async (data: TransactionFormData) => {
     const isDebit = ["withdrawal", "payment", "transfer_out", "bank_charge"].includes(data.transaction_type);
