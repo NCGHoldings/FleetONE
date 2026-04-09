@@ -10,10 +10,6 @@ import { Loader2, Check, ChevronsUpDown, MapPin, Settings, Activity, Users, Cloc
 import { formatLKR } from "@/lib/accounting-utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
-} from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
 
 interface Props {
