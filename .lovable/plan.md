@@ -1,54 +1,44 @@
 
 
-# Fix Balance vs Amount Due — Make Outstanding Correct at Import
+# Fix Student Balance to Match Amount Due at Import
 
 ## The Problem
 
-Your imported students show **Balance = LKR 12,200 (credit)** when they actually **owe** LKR 12,200. The system treats positive `payment_balance` as credit (overpayment) and negative as outstanding debt. The import stored the value as positive, so every student appears to have a credit instead of an outstanding balance.
+Your data shows **1,380 students** with `payment_balance = 0` but `current_amount_due > 0`. These students owe money but their balance shows zero — so they don't appear in the Outstanding tab and stats are wrong.
 
-That's why stats show "Advance Paid: LKR 7,453,925 Credit" and "Total Owed: LKR 0".
+This happened because the balance fix migration only flipped students who already had positive balances (559 students). The other 1,380 were imported before the `payment_balance` mapping was added, so they never got a balance set.
+
+**Current data breakdown (2,929 active students):**
+- 559 with negative balance (correctly showing as owed) ✓
+- 1,380 with zero balance but amount due > 0 ✗ — these need fixing
+- 0 with positive balance ✓
 
 ## The Fix
 
-### Edge Function (`process-school-excel/index.ts`)
+### Migration: Set balance = -(amount_due) for unset students
 
-Change the `payment_balance` logic at line 163:
-
-**Current**: Stores `payment_balance` as-is from Excel (positive = credit)
-
-**New**: Always negate the amount due to create outstanding debt:
-```
-payment_balance = -(current_amount_due)
-```
-
-So if Excel has Amount Due = 12,200 → `payment_balance = -12,200` → UI shows "LKR 12,200 (outstanding)"
-
-Priority logic:
-1. If user explicitly mapped "Outstanding Balance" column → negate that value (since Excel has positive numbers meaning debt)
-2. If only "Amount Due" mapped → use `-(current_amount_due)`
-3. If neither → 0
-
-### Also: Fix Existing 536 Students
-
-Run a one-time SQL migration to flip the sign on all students who were imported with wrong positive balances:
 ```sql
 UPDATE school_students 
-SET payment_balance = -(payment_balance) 
-WHERE payment_balance > 0 AND is_active = true;
+SET payment_balance = -(current_amount_due) 
+WHERE payment_balance = 0 
+  AND current_amount_due > 0 
+  AND is_active = true;
 ```
 
-This converts all current "credit" balances to "outstanding" balances.
+This sets the outstanding balance to match what they owe for all 1,380 students.
+
+### Edge Function: Already fixed
+
+The `process-school-excel/index.ts` already correctly sets `payment_balance = -(paymentAmountValue)` at import time (line 163). No code change needed — only the historical data needs correction.
 
 ## Files to Change
 
-- `supabase/functions/process-school-excel/index.ts` — fix `payment_balance` to always store as negative (outstanding)
-- New SQL migration — flip existing positive balances to negative
+- **New SQL migration** — single UPDATE to set `payment_balance = -(current_amount_due)` for students with zero balance but outstanding amount due
 
 ## Result
 
-- Balance column shows "LKR 12,200 (outstanding)" in red instead of "(credit)" in green
-- Amount Due and Balance match: both show the same amount the student owes
-- Stats cards show correct Total Owed and zero Advance Paid
-- When payments come in, balance reduces toward zero (then goes positive = credit if overpaid)
-- Future AR invoice generation works correctly against the outstanding balance
+- All 2,929 students will have Balance matching their Amount Due
+- Outstanding tab and stats cards show correct totals
+- AR invoice generation works against the correct balance
+- Future imports automatically set balance correctly (already fixed)
 
