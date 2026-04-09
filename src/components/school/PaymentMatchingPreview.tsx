@@ -83,7 +83,7 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
       const studentMap = new Map(students?.map(s => [s.id, s]) || []);
 
       // Create payment transactions for all matched items
-      const transactions = items.flatMap(item => {
+      const transactions = confirmableItems.flatMap(item => {
         const matchedStudents = item.matched_student_ids || [];
         const splitAmount = item.amount / matchedStudents.length;
         
@@ -160,7 +160,7 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
       }
 
       // Update import items as processed
-      const itemIds = items.map(i => i.id);
+      const itemIds = confirmableItems.map(i => i.id);
       await supabase
         .from('school_payment_import_items')
         .update({
@@ -180,8 +180,8 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
         await supabase
           .from('school_payment_imports')
           .update({
-            manual_matched_count: importData.manual_matched_count + items.length,
-            unmatched_count: importData.unmatched_count - items.length,
+            manual_matched_count: importData.manual_matched_count + confirmableItems.length,
+            unmatched_count: importData.unmatched_count - confirmableItems.length,
           })
           .eq('id', importId);
 
@@ -189,13 +189,13 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
           total: importData.auto_matched_count + importData.manual_matched_count + importData.unmatched_count,
           autoMatched: importData.auto_matched_count,
           needsReview: 0,
-          unmatched: importData.unmatched_count - items.length,
+          unmatched: importData.unmatched_count - confirmableItems.length,
         });
       }
 
       toast({
         title: "Success",
-        description: `Confirmed ${items.length} payment${items.length > 1 ? 's' : ''}`,
+        description: `Confirmed ${confirmableItems.length} payment${confirmableItems.length > 1 ? 's' : ''}`,
       });
 
       fetchItems();
