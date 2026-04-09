@@ -3,45 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
-  Printer,
-  Download,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Activity,
-  Landmark,
-  Building2,
-  CheckCircle,
-  AlertCircle,
-  ArrowUpRight,
-  ArrowDownRight,
-  CalendarDays,
-  Wallet,
-  BarChart3,
-  PieChart,
-  Layers,
-  RefreshCw,
-  Info,
-  ChevronRight,
+  Printer, Download, TrendingUp, TrendingDown, DollarSign, Activity,
+  Landmark, Building2, CheckCircle, AlertCircle, ArrowUpRight, ArrowDownRight,
+  CalendarDays, Wallet, BarChart3, PieChart, Layers, RefreshCw, Info,
+  ChevronRight, FileText,
 } from "lucide-react";
-import { useCashFlowData, CashFlowLineItem } from "@/hooks/useCashFlowData";
+import { useCashFlowData, CashFlowLineItem, CashFlowData } from "@/hooks/useCashFlowData";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 
 // ────────── Helpers ──────────
@@ -50,8 +25,7 @@ const formatCurrency = (num: number): string => {
   if (Math.abs(num) < 0.01) return "—";
   const negative = num < 0;
   const formatted = Math.abs(num).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
   });
   return negative ? `(${formatted})` : formatted;
 };
@@ -64,15 +38,11 @@ const formatCompact = (num: number): string => {
 };
 
 const AmountCell = ({ amount, bold }: { amount: number; bold?: boolean }) => (
-  <span
-    className={`font-mono text-sm ${bold ? "font-bold text-base" : ""} ${
-      amount < -0.01
-        ? "text-red-600 dark:text-red-400"
-        : amount > 0.01
-        ? "text-emerald-600 dark:text-emerald-400"
-        : "text-muted-foreground"
-    }`}
-  >
+  <span className={`font-mono text-sm ${bold ? "font-bold text-base" : ""} ${
+    amount < -0.01 ? "text-red-600 dark:text-red-400"
+      : amount > 0.01 ? "text-emerald-600 dark:text-emerald-400"
+      : "text-muted-foreground"
+  }`}>
     {formatCurrency(amount)}
   </span>
 );
@@ -80,12 +50,8 @@ const AmountCell = ({ amount, bold }: { amount: number; bold?: boolean }) => (
 // ────────── KPI Card ──────────
 
 interface KPICardProps {
-  title: string;
-  value: number;
-  subtitle?: string;
-  icon: React.ReactNode;
-  trend?: "up" | "down" | "neutral";
-  color: string;
+  title: string; value: number; subtitle?: string;
+  icon: React.ReactNode; trend?: "up" | "down" | "neutral"; color: string;
 }
 
 const KPICard = ({ title, value, subtitle, icon, trend, color }: KPICardProps) => (
@@ -98,21 +64,14 @@ const KPICard = ({ title, value, subtitle, icon, trend, color }: KPICardProps) =
           <p className={`text-xl font-bold font-mono ${value < 0 ? "text-red-600" : "text-foreground"}`}>
             {formatCompact(value)}
           </p>
-          {subtitle && (
-            <p className="text-xs text-muted-foreground">{subtitle}</p>
-          )}
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
-        <div className={`p-2 rounded-lg bg-muted/50`}>
-          {icon}
-        </div>
+        <div className="p-2 rounded-lg bg-muted/50">{icon}</div>
       </div>
       {trend && (
         <div className="flex items-center mt-2 text-xs">
-          {trend === "up" ? (
-            <ArrowUpRight className="h-3 w-3 text-emerald-500 mr-1" />
-          ) : trend === "down" ? (
-            <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
-          ) : null}
+          {trend === "up" ? <ArrowUpRight className="h-3 w-3 text-emerald-500 mr-1" />
+            : trend === "down" ? <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" /> : null}
           <span className={trend === "up" ? "text-emerald-500" : trend === "down" ? "text-red-500" : "text-muted-foreground"}>
             {trend === "up" ? "Positive" : trend === "down" ? "Negative" : "Neutral"} cash flow
           </span>
@@ -122,16 +81,16 @@ const KPICard = ({ title, value, subtitle, icon, trend, color }: KPICardProps) =
   </Card>
 );
 
-// ────────── Section Renderer ──────────
+// ────────── Section Renderer with optional comparative ──────────
 
 interface SectionProps {
-  title: string;
-  icon: React.ReactNode;
-  items: CashFlowLineItem[];
-  color: string;
+  title: string; icon: React.ReactNode;
+  items: CashFlowLineItem[]; color: string;
+  showComparative?: boolean;
+  comparativeItems?: CashFlowLineItem[];
 }
 
-const CashFlowSection = ({ title, icon, items, color }: SectionProps) => (
+const CashFlowSection = ({ title, icon, items, color, showComparative, comparativeItems }: SectionProps) => (
   <Card className="overflow-hidden">
     <div className={`h-1 ${color}`} />
     <CardHeader className="py-3 px-4">
@@ -142,36 +101,42 @@ const CashFlowSection = ({ title, icon, items, color }: SectionProps) => (
     </CardHeader>
     <CardContent className="p-0">
       <Table>
+        {showComparative && (
+          <TableHeader>
+            <TableRow className="bg-muted/20">
+              <TableHead className="font-semibold">Description</TableHead>
+              <TableHead className="text-right w-40 font-semibold">Current Period</TableHead>
+              <TableHead className="text-right w-40 font-semibold">Prior Period</TableHead>
+            </TableRow>
+          </TableHeader>
+        )}
         <TableBody>
           {items.map((item, idx) => (
-            <TableRow
-              key={idx}
-              className={`${
-                item.isSubtotal || item.isTotal
-                  ? "bg-muted/40 border-t-2"
-                  : ""
-              } hover:bg-muted/20 transition-colors`}
-            >
+            <TableRow key={idx} className={`${
+              item.isSubtotal || item.isTotal ? "bg-muted/40 border-t-2" : ""
+            } hover:bg-muted/20 transition-colors`}>
               <TableCell
                 className={`py-2 ${item.isSubtotal || item.isTotal ? "font-semibold" : ""}`}
                 style={{ paddingLeft: `${(item.indent || 0) * 20 + 16}px` }}
               >
                 {item.isSubtotal || item.isTotal ? (
                   <div className="flex items-center gap-1">
-                    <ChevronRight className="h-3 w-3" />
-                    {item.label}
+                    <ChevronRight className="h-3 w-3" />{item.label}
                   </div>
-                ) : (
-                  item.label
-                )}
+                ) : item.label}
               </TableCell>
               <TableCell className="text-right py-2 pr-4 w-40">
                 {Math.abs(item.amount) > 0.001 ? (
                   <AmountCell amount={item.amount} bold={item.isSubtotal || item.isTotal} />
-                ) : item.isSubtotal || item.isTotal ? (
-                  <AmountCell amount={0} bold />
-                ) : null}
+                ) : item.isSubtotal || item.isTotal ? <AmountCell amount={0} bold /> : null}
               </TableCell>
+              {showComparative && (
+                <TableCell className="text-right py-2 pr-4 w-40">
+                  {comparativeItems && comparativeItems[idx] ? (
+                    <AmountCell amount={comparativeItems[idx].amount} bold={item.isSubtotal || item.isTotal} />
+                  ) : <span className="text-muted-foreground">—</span>}
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
@@ -184,13 +149,12 @@ const CashFlowSection = ({ title, icon, items, color }: SectionProps) => (
 
 export const CashFlowView = () => {
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
-  const [customDateRange, setCustomDateRange] = useState<{
-    from?: Date;
-    to?: Date;
-  }>({});
+  const [customDateRange, setCustomDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [method, setMethod] = useState<string>("indirect");
+  const [businessUnit, setBusinessUnit] = useState<string>("all");
+  const [showComparative, setShowComparative] = useState(false);
 
-  // Compute effective dates from state (not from hook results)
+  // Compute effective dates
   const effectiveDates = useMemo(() => {
     if (customDateRange.from && customDateRange.to) {
       return { start: customDateRange.from, end: customDateRange.to };
@@ -198,32 +162,38 @@ export const CashFlowView = () => {
     return { start: null as Date | null, end: null as Date | null };
   }, [customDateRange]);
 
-  // Fetch data — pass dates only when we have them
-  const { cashFlowData: data, periods, isLoading } = useCashFlowData(
+  // Compute comparative dates (prior period of same length)
+  const comparativeDates = useMemo(() => {
+    if (!showComparative || !effectiveDates.start || !effectiveDates.end) return { start: null, end: null };
+    const diff = effectiveDates.end.getTime() - effectiveDates.start.getTime();
+    const compEnd = new Date(effectiveDates.start.getTime() - 1); // day before current start
+    const compStart = new Date(compEnd.getTime() - diff);
+    return { start: compStart, end: compEnd };
+  }, [showComparative, effectiveDates]);
+
+  const { cashFlowData: data, comparativeData, periods, isLoading } = useCashFlowData(
     effectiveDates.start,
-    effectiveDates.end
+    effectiveDates.end,
+    {
+      businessUnitCode: businessUnit !== "all" ? businessUnit : undefined,
+      comparativeStartDate: comparativeDates.start,
+      comparativeEndDate: comparativeDates.end,
+    }
   );
 
-  // When a period is selected, set the dates from the period
   const handlePeriodChange = (value: string) => {
     setSelectedPeriodId(value);
     const period = (periods as any[]).find((p: any) => p.id === value);
     if (period) {
-      setCustomDateRange({
-        from: new Date(period.start_date),
-        to: new Date(period.end_date),
-      });
+      setCustomDateRange({ from: new Date(period.start_date), to: new Date(period.end_date) });
     }
   };
 
   const handleDateRangeChange = (range: { from?: Date; to?: Date } | undefined) => {
     setCustomDateRange(range || {});
-    if (range?.from && range?.to) {
-      setSelectedPeriodId(""); // clear period when custom range is set
-    }
+    if (range?.from && range?.to) setSelectedPeriodId("");
   };
 
-  // Reconciliation check
   const isReconciled = useMemo(() => {
     if (!data) return false;
     return Math.abs(data.openingCash + data.netCashChange - data.closingCash) < 0.01;
@@ -234,39 +204,47 @@ export const CashFlowView = () => {
     if (!data) return;
     const rows: string[][] = [
       ["Cash Flow Statement", `"${data.periodLabel}"`],
-      [],
-      ["Section", "Item", "Amount"],
+      [], ["Section", "Item", "Amount", ...(comparativeData ? ["Prior Period"] : [])],
     ];
-
-    const addSection = (title: string, items: CashFlowLineItem[]) => {
-      rows.push([title, "", ""]);
-      items.forEach((item) => {
-        rows.push(["", item.label, item.amount.toFixed(2)]);
+    const addSection = (title: string, items: CashFlowLineItem[], compItems?: CashFlowLineItem[]) => {
+      rows.push([title, "", "", ...(comparativeData ? [""] : [])]);
+      items.forEach((item, i) => {
+        rows.push(["", item.label, item.amount.toFixed(2), ...(compItems?.[i] ? [compItems[i].amount.toFixed(2)] : comparativeData ? [""] : [])]);
       });
       rows.push([]);
     };
-
     if (method === "direct") {
-      addSection("Operating Activities (Direct)", data.directOperating);
+      addSection("Operating Activities (Direct)", data.directOperating, comparativeData?.directOperating);
     } else {
-      addSection("Operating Activities (Indirect)", data.indirectOperating);
+      addSection("Operating Activities (Indirect)", data.indirectOperating, comparativeData?.indirectOperating);
     }
-    addSection("Investing Activities", data.investingItems);
-    addSection("Financing Activities", data.financingItems);
-
+    addSection("Investing Activities", data.investingItems, comparativeData?.investingItems);
+    addSection("Financing Activities", data.financingItems, comparativeData?.financingItems);
     rows.push(["Net Cash Change", "", data.netCashChange.toFixed(2)]);
     rows.push(["Opening Cash", "", data.openingCash.toFixed(2)]);
     rows.push(["Closing Cash", "", data.closingCash.toFixed(2)]);
     rows.push([]);
+
+    // IAS 7 disclosures
+    rows.push(["IAS 7 Required Disclosures"]);
+    if (data.interestPaid > 0) rows.push(["", "Interest Paid", (-data.interestPaid).toFixed(2)]);
+    if (data.interestReceived > 0) rows.push(["", "Interest Received", data.interestReceived.toFixed(2)]);
+    if (data.incomeTaxPaid > 0) rows.push(["", "Income Taxes Paid", (-data.incomeTaxPaid).toFixed(2)]);
+    if (data.dividendsPaid > 0) rows.push(["", "Dividends Paid", (-data.dividendsPaid).toFixed(2)]);
+    if (data.dividendsReceived > 0) rows.push(["", "Dividends Received", data.dividendsReceived.toFixed(2)]);
+    rows.push([]);
+
+    // Non-cash activities
+    if (data.nonCashActivities.length > 0) {
+      rows.push(["Significant Non-Cash Activities (IAS 7.43)"]);
+      data.nonCashActivities.forEach((nc) => rows.push(["", nc.label, nc.amount.toFixed(2)]));
+      rows.push([]);
+    }
+
     rows.push(["Working Capital Changes"]);
     rows.push(["Item", "Opening", "Closing", "Change"]);
     data.workingCapital.forEach((wc) => {
-      rows.push([
-        wc.label,
-        wc.opening.toFixed(2),
-        wc.closing.toFixed(2),
-        wc.change.toFixed(2),
-      ]);
+      rows.push([wc.label, wc.opening.toFixed(2), wc.closing.toFixed(2), wc.change.toFixed(2)]);
     });
 
     const csv = rows.map((r) => r.join(",")).join("\n");
@@ -279,7 +257,16 @@ export const CashFlowView = () => {
     URL.revokeObjectURL(url);
   };
 
-  // ────────── Render ──────────
+  const hasComparativeData = showComparative && comparativeData;
+  const businessUnits = [
+    { value: "all", label: "All (Consolidated)" },
+    { value: "SBO", label: "SBO — School Bus" },
+    { value: "YUT", label: "YUT — Yutong Sales" },
+    { value: "SNT", label: "SNT — Sinotruck" },
+    { value: "LTV", label: "LTV — Light Vehicle" },
+    { value: "SPH", label: "SPH — Spare Parts" },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -292,12 +279,10 @@ export const CashFlowView = () => {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => window.print()}>
-            <Printer className="h-4 w-4 mr-2" />
-            Print
+            <Printer className="h-4 w-4 mr-2" />Print
           </Button>
           <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
+            <Download className="h-4 w-4 mr-2" />Export CSV
           </Button>
         </div>
       </div>
@@ -305,27 +290,22 @@ export const CashFlowView = () => {
       {/* Report Parameters */}
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
             {/* Financial Period */}
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground">Financial Period</Label>
               {(periods as any[]).length > 0 ? (
                 <Select value={selectedPeriodId} onValueChange={handlePeriodChange}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select period" />
-                  </SelectTrigger>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Select period" /></SelectTrigger>
                   <SelectContent>
                     {(periods as any[]).map((p: any) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.period_name}
-                      </SelectItem>
+                      <SelectItem key={p.id} value={p.id}>{p.period_name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               ) : (
                 <div className="h-9 flex items-center px-3 border rounded-md bg-muted/30 text-xs text-muted-foreground">
-                  <CalendarDays className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                  No periods — use date range →
+                  <CalendarDays className="h-3.5 w-3.5 mr-1.5 shrink-0" />No periods — use date range →
                 </div>
               )}
             </div>
@@ -338,14 +318,37 @@ export const CashFlowView = () => {
 
             {/* Method Toggle */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Reporting Method</Label>
+              <Label className="text-xs font-medium text-muted-foreground">Method</Label>
               <Select value={method} onValueChange={setMethod}>
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="indirect">Indirect Method</SelectItem>
                   <SelectItem value="direct">Direct Method</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Business Unit */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">Business Unit</Label>
+              <Select value={businessUnit} onValueChange={setBusinessUnit}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {businessUnits.map((bu) => (
+                    <SelectItem key={bu.value} value={bu.value}>{bu.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Comparative Toggle */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">Comparative</Label>
+              <Select value={showComparative ? "yes" : "no"} onValueChange={(v) => setShowComparative(v === "yes")}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no">Single Period</SelectItem>
+                  <SelectItem value="yes">With Prior Period</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -405,107 +408,94 @@ export const CashFlowView = () => {
         <>
           {/* KPI Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            <KPICard
-              title="Operating"
+            <KPICard title="Operating"
               value={method === "indirect" ? data.netIndirectOperating : data.netDirectOperating}
               icon={<Activity className="h-4 w-4 text-blue-500" />}
-              trend={
-                (method === "indirect" ? data.netIndirectOperating : data.netDirectOperating) > 0
-                  ? "up" : "down"
-              }
+              trend={(method === "indirect" ? data.netIndirectOperating : data.netDirectOperating) > 0 ? "up" : "down"}
               color="bg-blue-500"
             />
-            <KPICard
-              title="Investing"
-              value={data.netInvesting}
+            <KPICard title="Investing" value={data.netInvesting}
               icon={<Building2 className="h-4 w-4 text-amber-500" />}
               trend={data.netInvesting > 0 ? "up" : data.netInvesting < 0 ? "down" : "neutral"}
               color="bg-amber-500"
             />
-            <KPICard
-              title="Financing"
-              value={data.netFinancing}
+            <KPICard title="Financing" value={data.netFinancing}
               icon={<Landmark className="h-4 w-4 text-purple-500" />}
               trend={data.netFinancing > 0 ? "up" : data.netFinancing < 0 ? "down" : "neutral"}
               color="bg-purple-500"
             />
-            <KPICard
-              title="Net Change"
-              value={data.netCashChange}
+            <KPICard title="Net Change" value={data.netCashChange}
               subtitle={data.periodLabel}
               icon={<TrendingUp className="h-4 w-4 text-teal-500" />}
-              trend={data.netCashChange > 0 ? "up" : "down"}
-              color="bg-teal-500"
+              trend={data.netCashChange > 0 ? "up" : "down"} color="bg-teal-500"
             />
-            <KPICard
-              title="Opening Cash"
-              value={data.openingCash}
-              icon={<Wallet className="h-4 w-4 text-slate-500" />}
-              color="bg-slate-400"
+            <KPICard title="Opening Cash" value={data.openingCash}
+              icon={<Wallet className="h-4 w-4 text-slate-500" />} color="bg-slate-400"
             />
-            <KPICard
-              title="Closing Cash"
-              value={data.closingCash}
+            <KPICard title="Closing Cash" value={data.closingCash}
               icon={<DollarSign className="h-4 w-4 text-emerald-500" />}
-              trend={data.closingCash > data.openingCash ? "up" : "down"}
-              color="bg-emerald-500"
+              trend={data.closingCash > data.openingCash ? "up" : "down"} color="bg-emerald-500"
             />
           </div>
 
           {/* Main Tabs */}
           <Tabs defaultValue="statement" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="statement" className="gap-1.5">
-                <Layers className="h-3.5 w-3.5" />
-                Statement
+                <Layers className="h-3.5 w-3.5" />Statement
+              </TabsTrigger>
+              <TabsTrigger value="disclosures" className="gap-1.5">
+                <FileText className="h-3.5 w-3.5" />IAS 7 Notes
               </TabsTrigger>
               <TabsTrigger value="working-capital" className="gap-1.5">
-                <BarChart3 className="h-3.5 w-3.5" />
-                Working Capital
+                <BarChart3 className="h-3.5 w-3.5" />Working Capital
               </TabsTrigger>
               <TabsTrigger value="breakdown" className="gap-1.5">
-                <PieChart className="h-3.5 w-3.5" />
-                Breakdown
+                <PieChart className="h-3.5 w-3.5" />Breakdown
               </TabsTrigger>
               <TabsTrigger value="reconciliation" className="gap-1.5">
-                <CheckCircle className="h-3.5 w-3.5" />
-                Reconciliation
+                <CheckCircle className="h-3.5 w-3.5" />Reconciliation
               </TabsTrigger>
             </TabsList>
 
             {/* Statement Tab */}
             <TabsContent value="statement" className="space-y-4">
-              {/* Period Header */}
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
                 <div className="flex items-center gap-2">
                   <CalendarDays className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-medium">{data.periodLabel}</span>
+                  {hasComparativeData && (
+                    <span className="text-xs text-muted-foreground ml-2">vs {comparativeData.periodLabel}</span>
+                  )}
                 </div>
                 <Badge variant="outline" className="text-xs">
                   {method === "indirect" ? "Indirect Method (IAS 7.18b)" : "Direct Method (IAS 7.18a)"}
                 </Badge>
               </div>
 
-              {/* Cash Flow Sections */}
               <CashFlowSection
                 title="A. Cash Flows from Operating Activities"
                 icon={<Activity className="h-4 w-4 text-blue-500" />}
                 items={method === "indirect" ? data.indirectOperating : data.directOperating}
                 color="bg-blue-500"
+                showComparative={!!hasComparativeData}
+                comparativeItems={hasComparativeData ? (method === "indirect" ? comparativeData.indirectOperating : comparativeData.directOperating) : undefined}
               />
 
               <CashFlowSection
                 title="B. Cash Flows from Investing Activities"
                 icon={<Building2 className="h-4 w-4 text-amber-500" />}
-                items={data.investingItems}
-                color="bg-amber-500"
+                items={data.investingItems} color="bg-amber-500"
+                showComparative={!!hasComparativeData}
+                comparativeItems={hasComparativeData ? comparativeData.investingItems : undefined}
               />
 
               <CashFlowSection
                 title="C. Cash Flows from Financing Activities"
                 icon={<Landmark className="h-4 w-4 text-purple-500" />}
-                items={data.financingItems}
-                color="bg-purple-500"
+                items={data.financingItems} color="bg-purple-500"
+                showComparative={!!hasComparativeData}
+                comparativeItems={hasComparativeData ? comparativeData.financingItems : undefined}
               />
 
               {/* Net Change & Closing Cash */}
@@ -524,12 +514,18 @@ export const CashFlowView = () => {
                         <TableCell className="text-right pr-4 w-40">
                           <AmountCell amount={data.netCashChange} bold />
                         </TableCell>
+                        {hasComparativeData && (
+                          <TableCell className="text-right pr-4 w-40">
+                            <AmountCell amount={comparativeData.netCashChange} bold />
+                          </TableCell>
+                        )}
                       </TableRow>
                       <TableRow>
                         <TableCell className="py-2.5">Cash and Cash Equivalents at Beginning of Period</TableCell>
-                        <TableCell className="text-right pr-4 w-40">
-                          <AmountCell amount={data.openingCash} />
-                        </TableCell>
+                        <TableCell className="text-right pr-4 w-40"><AmountCell amount={data.openingCash} /></TableCell>
+                        {hasComparativeData && (
+                          <TableCell className="text-right pr-4 w-40"><AmountCell amount={comparativeData.openingCash} /></TableCell>
+                        )}
                       </TableRow>
                       <TableRow className="bg-emerald-50 dark:bg-emerald-950/20 border-t-2">
                         <TableCell className="font-bold py-3">
@@ -538,12 +534,126 @@ export const CashFlowView = () => {
                             Cash and Cash Equivalents at End of Period
                           </div>
                         </TableCell>
-                        <TableCell className="text-right pr-4 w-40">
-                          <AmountCell amount={data.closingCash} bold />
-                        </TableCell>
+                        <TableCell className="text-right pr-4 w-40"><AmountCell amount={data.closingCash} bold /></TableCell>
+                        {hasComparativeData && (
+                          <TableCell className="text-right pr-4 w-40"><AmountCell amount={comparativeData.closingCash} bold /></TableCell>
+                        )}
                       </TableRow>
                     </TableBody>
                   </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* IAS 7 Disclosures Tab */}
+            <TabsContent value="disclosures" className="space-y-4">
+              {/* Required Separate Disclosures (IAS 7.31-35) */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Required Disclosures — IAS 7.31-35</CardTitle>
+                    <Badge variant="outline" className="text-xs">Auto-classified from GL</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/40">
+                        <TableHead className="font-semibold">Disclosure Item</TableHead>
+                        <TableHead className="font-semibold">IAS 7 Reference</TableHead>
+                        <TableHead className="text-right font-semibold w-40">Amount</TableHead>
+                        {hasComparativeData && <TableHead className="text-right font-semibold w-40">Prior Period</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="py-2.5 font-medium">Interest Paid</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">Para 31</TableCell>
+                        <TableCell className="text-right pr-4"><AmountCell amount={-data.interestPaid} /></TableCell>
+                        {hasComparativeData && <TableCell className="text-right pr-4"><AmountCell amount={-comparativeData.interestPaid} /></TableCell>}
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="py-2.5 font-medium">Interest Received</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">Para 31</TableCell>
+                        <TableCell className="text-right pr-4"><AmountCell amount={data.interestReceived} /></TableCell>
+                        {hasComparativeData && <TableCell className="text-right pr-4"><AmountCell amount={comparativeData.interestReceived} /></TableCell>}
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="py-2.5 font-medium">Dividends Paid</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">Para 34</TableCell>
+                        <TableCell className="text-right pr-4"><AmountCell amount={-data.dividendsPaid} /></TableCell>
+                        {hasComparativeData && <TableCell className="text-right pr-4"><AmountCell amount={-comparativeData.dividendsPaid} /></TableCell>}
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="py-2.5 font-medium">Dividends Received</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">Para 34</TableCell>
+                        <TableCell className="text-right pr-4"><AmountCell amount={data.dividendsReceived} /></TableCell>
+                        {hasComparativeData && <TableCell className="text-right pr-4"><AmountCell amount={comparativeData.dividendsReceived} /></TableCell>}
+                      </TableRow>
+                      <TableRow className="border-t">
+                        <TableCell className="py-2.5 font-medium">Income Taxes Paid</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">Para 35</TableCell>
+                        <TableCell className="text-right pr-4"><AmountCell amount={-data.incomeTaxPaid} /></TableCell>
+                        {hasComparativeData && <TableCell className="text-right pr-4"><AmountCell amount={-comparativeData.incomeTaxPaid} /></TableCell>}
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Non-Cash Activities (IAS 7.43) */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Significant Non-Cash Activities — IAS 7.43</CardTitle>
+                    <Badge variant="outline" className="text-xs">Supplementary Disclosure</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {data.nonCashActivities.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/40">
+                          <TableHead className="font-semibold">Description</TableHead>
+                          <TableHead className="font-semibold">JE Number</TableHead>
+                          <TableHead className="text-right font-semibold w-40">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {data.nonCashActivities.map((nc, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="py-2.5">{nc.label}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{nc.jeNumber || '—'}</TableCell>
+                            <TableCell className="text-right pr-4"><AmountCell amount={nc.amount} /></TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="p-6 text-center text-sm text-muted-foreground">
+                      No significant non-cash investing or financing activities detected in this period.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Classification Note */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <p><strong>Classification Policy:</strong> Interest and dividends are classified as follows:</p>
+                      <ul className="list-disc pl-5 space-y-0.5">
+                        <li>Interest paid — Operating activities (IAS 7.33)</li>
+                        <li>Interest received — Operating activities (IAS 7.33)</li>
+                        <li>Dividends paid — Financing activities (IAS 7.34)</li>
+                        <li>Dividends received — Operating activities (IAS 7.33)</li>
+                        <li>Income taxes — Operating activities unless specifically identified with financing or investing (IAS 7.35)</li>
+                      </ul>
+                      <p className="mt-2">All classifications are derived automatically from GL account codes. No manual intervention required.</p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -572,16 +682,10 @@ export const CashFlowView = () => {
                       {data.workingCapital.map((wc, idx) => (
                         <TableRow key={idx} className="hover:bg-muted/20 transition-colors">
                           <TableCell className="font-medium py-2.5">{wc.label}</TableCell>
+                          <TableCell className="text-right"><span className="font-mono text-sm">{formatCurrency(wc.opening)}</span></TableCell>
+                          <TableCell className="text-right"><span className="font-mono text-sm">{formatCurrency(wc.closing)}</span></TableCell>
                           <TableCell className="text-right">
-                            <span className="font-mono text-sm">{formatCurrency(wc.opening)}</span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className="font-mono text-sm">{formatCurrency(wc.closing)}</span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className={`font-mono text-sm font-medium ${
-                              wc.change > 0 ? "text-emerald-600" : wc.change < 0 ? "text-red-600" : ""
-                            }`}>
+                            <span className={`font-mono text-sm font-medium ${wc.change > 0 ? "text-emerald-600" : wc.change < 0 ? "text-red-600" : ""}`}>
                               {formatCurrency(wc.change)}
                             </span>
                           </TableCell>
@@ -594,9 +698,7 @@ export const CashFlowView = () => {
                               <Badge variant="outline" className="text-xs text-red-600 border-red-300">
                                 <ArrowDownRight className="h-3 w-3 mr-0.5" /> Outflow
                               </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
+                            ) : <span className="text-xs text-muted-foreground">—</span>}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -618,11 +720,8 @@ export const CashFlowView = () => {
             {/* Breakdown Tab */}
             <TabsContent value="breakdown" className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Revenue vs Expense */}
                 <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Income Summary</CardTitle>
-                  </CardHeader>
+                  <CardHeader className="pb-2"><CardTitle className="text-base">Income Summary</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg">
                       <div className="flex items-center gap-2">
@@ -655,11 +754,8 @@ export const CashFlowView = () => {
                   </CardContent>
                 </Card>
 
-                {/* Direct Method Breakdown */}
                 <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Cash Flow Composition (Direct)</CardTitle>
-                  </CardHeader>
+                  <CardHeader className="pb-2"><CardTitle className="text-base">Cash Flow Composition (Direct)</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
                       <div className="flex items-center gap-2">
@@ -694,45 +790,35 @@ export const CashFlowView = () => {
 
                 {/* Cash Position */}
                 <Card className="md:col-span-2">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Cash Position Movement</CardTitle>
-                  </CardHeader>
+                  <CardHeader className="pb-2"><CardTitle className="text-base">Cash Position Movement</CardTitle></CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-4 overflow-x-auto">
                       <div className="flex-1 text-center p-4 bg-muted/30 rounded-lg min-w-[120px]">
                         <p className="text-xs text-muted-foreground mb-1">Opening Cash</p>
                         <p className="font-mono font-bold text-lg">{formatCompact(data.openingCash)}</p>
                       </div>
-                      <div className="flex items-center gap-1 text-muted-foreground shrink-0">
-                        <span className="text-xs">+</span>
-                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">+</span>
                       <div className="flex-1 text-center p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg min-w-[100px]">
                         <p className="text-xs text-blue-600 mb-1">Operating</p>
                         <p className={`font-mono font-bold ${(method === "indirect" ? data.netIndirectOperating : data.netDirectOperating) >= 0 ? "text-blue-600" : "text-red-600"}`}>
                           {formatCompact(method === "indirect" ? data.netIndirectOperating : data.netDirectOperating)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1 text-muted-foreground shrink-0">
-                        <span className="text-xs">+</span>
-                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">+</span>
                       <div className="flex-1 text-center p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg min-w-[100px]">
                         <p className="text-xs text-amber-600 mb-1">Investing</p>
                         <p className={`font-mono font-bold ${data.netInvesting >= 0 ? "text-amber-600" : "text-red-600"}`}>
                           {formatCompact(data.netInvesting)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1 text-muted-foreground shrink-0">
-                        <span className="text-xs">+</span>
-                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">+</span>
                       <div className="flex-1 text-center p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg min-w-[100px]">
                         <p className="text-xs text-purple-600 mb-1">Financing</p>
                         <p className={`font-mono font-bold ${data.netFinancing >= 0 ? "text-purple-600" : "text-red-600"}`}>
                           {formatCompact(data.netFinancing)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1 text-muted-foreground shrink-0">
-                        <span className="text-xs">=</span>
-                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">=</span>
                       <div className="flex-1 text-center p-4 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border-2 border-emerald-300 min-w-[120px]">
                         <p className="text-xs text-emerald-600 mb-1">Closing Cash</p>
                         <p className="font-mono font-bold text-lg text-emerald-600">{formatCompact(data.closingCash)}</p>
@@ -765,9 +851,7 @@ export const CashFlowView = () => {
                     <TableBody>
                       <TableRow>
                         <TableCell className="py-3 font-medium">Opening Cash Balance</TableCell>
-                        <TableCell className="text-right pr-4">
-                          <AmountCell amount={data.openingCash} />
-                        </TableCell>
+                        <TableCell className="text-right pr-4"><AmountCell amount={data.openingCash} /></TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="py-3 pl-8">+ Net Operating Cash Flow</TableCell>
@@ -777,15 +861,11 @@ export const CashFlowView = () => {
                       </TableRow>
                       <TableRow>
                         <TableCell className="py-3 pl-8">+ Net Investing Cash Flow</TableCell>
-                        <TableCell className="text-right pr-4">
-                          <AmountCell amount={data.netInvesting} />
-                        </TableCell>
+                        <TableCell className="text-right pr-4"><AmountCell amount={data.netInvesting} /></TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="py-3 pl-8">+ Net Financing Cash Flow</TableCell>
-                        <TableCell className="text-right pr-4">
-                          <AmountCell amount={data.netFinancing} />
-                        </TableCell>
+                        <TableCell className="text-right pr-4"><AmountCell amount={data.netFinancing} /></TableCell>
                       </TableRow>
                       <TableRow className="border-t-2 bg-muted/40">
                         <TableCell className="py-3 font-bold">Computed Closing Cash</TableCell>
@@ -795,19 +875,12 @@ export const CashFlowView = () => {
                       </TableRow>
                       <TableRow>
                         <TableCell className="py-3 font-medium">Actual Closing Cash (GL)</TableCell>
-                        <TableCell className="text-right pr-4">
-                          <AmountCell amount={data.closingCash} />
-                        </TableCell>
+                        <TableCell className="text-right pr-4"><AmountCell amount={data.closingCash} /></TableCell>
                       </TableRow>
                       <TableRow className={`border-t-2 ${isReconciled ? "bg-emerald-50 dark:bg-emerald-950/20" : "bg-red-50 dark:bg-red-950/20"}`}>
-                        <TableCell className="py-3 font-bold">
-                          Difference (Variance)
-                        </TableCell>
+                        <TableCell className="py-3 font-bold">Difference (Variance)</TableCell>
                         <TableCell className="text-right pr-4">
-                          <AmountCell
-                            amount={data.closingCash - (data.openingCash + data.netCashChange)}
-                            bold
-                          />
+                          <AmountCell amount={data.closingCash - (data.openingCash + data.netCashChange)} bold />
                         </TableCell>
                       </TableRow>
                     </TableBody>
@@ -827,24 +900,16 @@ export const CashFlowView = () => {
                         <Info className="h-4 w-4 text-blue-500" />
                         <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Direct Method (IAS 7.18a)</span>
                       </div>
-                      <p className="font-mono text-2xl font-bold">
-                        <AmountCell amount={data.netDirectOperating} bold />
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Analyzes actual cash receipts and payments
-                      </p>
+                      <p className="font-mono text-2xl font-bold"><AmountCell amount={data.netDirectOperating} bold /></p>
+                      <p className="text-xs text-muted-foreground mt-1">Analyzes actual cash receipts and payments</p>
                     </div>
                     <div className="p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <Info className="h-4 w-4 text-purple-500" />
                         <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">Indirect Method (IAS 7.18b)</span>
                       </div>
-                      <p className="font-mono text-2xl font-bold">
-                        <AmountCell amount={data.netIndirectOperating} bold />
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Adjusts net income for non-cash items
-                      </p>
+                      <p className="font-mono text-2xl font-bold"><AmountCell amount={data.netIndirectOperating} bold /></p>
+                      <p className="text-xs text-muted-foreground mt-1">Adjusts net income for non-cash items</p>
                     </div>
                   </div>
                   <div className="mt-3 p-3 bg-muted/30 rounded-lg">
