@@ -131,7 +131,11 @@ const findHeader = (headers: string[], ...candidates: string[]): string | null =
     const normalized = normalizeHeader(candidate);
     const found = headers.find(h => normalizeHeader(h) === normalized);
     if (found) return found;
-    // Partial match
+  }
+  // Partial match pass — but skip short candidates (≤3 chars) to avoid "Dr" matching "Cr/Dr"
+  for (const candidate of candidates) {
+    const normalized = normalizeHeader(candidate);
+    if (normalized.length <= 3) continue; // Short candidates must match exactly
     const partial = headers.find(h => normalizeHeader(h).includes(normalized) || normalized.includes(normalizeHeader(h)));
     if (partial) return partial;
   }
@@ -297,15 +301,21 @@ const genericFormat: BankFormat = {
   parse: (rows: any[], headers: string[]) => {
     const dateCol = findHeader(headers, 'Date', 'Transaction Date', 'Txn Date', 'Value Date', 'Trans Date');
     const descCol = findHeader(headers, 'Description', 'Narration', 'Particulars', 'Details', 'Remarks', 'Transaction Details');
-    const refCol = findHeader(headers, 'Reference', 'Ref No', 'Trans Ref', 'Reference No');
+    const refCol = findHeader(headers, 'Reference', 'Ref No', 'Trans Ref', 'Reference No', 'Tran ID', 'Tran Serial');
     const chequeCol = findHeader(headers, 'Cheque No', 'Chq No', 'Cheque Number', 'Instrument');
     
     // Try debit/credit split columns
-    const debitCol = findHeader(headers, 'Debit', 'Withdrawal', 'Dr', 'Debit Amount');
-    const creditCol = findHeader(headers, 'Credit', 'Deposit', 'Cr', 'Credit Amount');
+    let debitCol = findHeader(headers, 'Debit', 'Withdrawal', 'Dr', 'Debit Amount');
+    let creditCol = findHeader(headers, 'Credit', 'Deposit', 'Cr', 'Credit Amount');
+    
+    // Safety: if debit and credit resolved to the same column, clear both and fall back
+    if (debitCol && creditCol && debitCol === creditCol) {
+      debitCol = null;
+      creditCol = null;
+    }
     
     // Or combined amount column
-    const amountCol = findHeader(headers, 'Amount', 'Transaction Amount', 'Cr/Dr');
+    const amountCol = findHeader(headers, 'Amount', 'Transaction Amount');
     const typeCol = findHeader(headers, 'Type', 'Transaction Type', 'Dr/Cr', 'Cr/Dr');
     
     const balanceCol = findHeader(headers, 'Balance', 'Running Balance', 'Closing Balance', 'Available Balance');
@@ -541,4 +551,80 @@ export const checkDuplicatePayment = (
     const sameStudent = payment.student_id === studentId;
     return sameDate && sameAmount && sameStudent;
   });
+};
+
+// =========== COLUMN MAPPING TYPES & PARSER ===========
+export interface ColumnMapping {
+  dateCol: string;
+  descriptionCol: string;
+  amountCol: string;
+  typeCol?: string; // Cr/Dr indicator column
+  referenceCol?: string;
+  balanceCol?: string;
+}
+
+export const getFileHeaders = async (file: File): Promise<{ headers: string[]; sampleRows: Record<string, any>[] }> => {
+  const data = await file.arrayBuffer();
+  const workbook = XLSX.read(data);
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+  const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+  const headers = jsonData.length > 0 ? Object.keys(jsonData[0]) : [];
+  return { headers, sampleRows: jsonData.slice(0, 5) };
+};
+
+export const parseBankStatementWithMapping = async (file: File, mapping: ColumnMapping): Promise<ParseResult> => {
+  const data = await file.arrayBuffer();
+  const workbook = XLSX.read(data);
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+  const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+  const warnings: string[] = [];
+
+  if (jsonData.length === 0) {
+    return {
+      transactions: [], bankName: 'Manual Mapping', accountNumber: '', statementPeriod: '',
+      openingBalance: 0, closingBalance: 0, totalDebits: 0, totalCredits: 0,
+      parseWarnings: ['No data found in file'],
+    };
+  }
+
+  const transactions: BankStatementTransaction[] = jsonData.map((row, idx) => {
+    let debit = 0, credit = 0;
+    const amount = cleanAmount(row[mapping.amountCol]);
+
+    if (mapping.typeCol) {
+      const typeVal = String(row[mapping.typeCol] || '').toLowerCase().trim();
+      if (typeVal.includes('dr') || typeVal.includes('debit') || typeVal.includes('withdrawal')) {
+        debit = amount;
+      } else {
+        credit = amount;
+      }
+    } else {
+      credit = amount; // Default: treat as credit/deposit
+    }
+
+    return {
+      rowNumber: idx + 2,
+      txnDate: parseDate(row[mapping.dateCol]),
+      description: String(row[mapping.descriptionCol] || '').trim(),
+      reference: String(row[mapping.referenceCol || ''] || '').trim(),
+      debit, credit,
+      balance: cleanAmount(row[mapping.balanceCol || '']),
+      type: (debit > 0 ? 'payment' : 'deposit') as 'payment' | 'deposit',
+      rawRow: row,
+    };
+  }).filter(t => t.description && (t.debit > 0 || t.credit > 0));
+
+  const totalDebits = transactions.reduce((sum, t) => sum + t.debit, 0);
+  const totalCredits = transactions.reduce((sum, t) => sum + t.credit, 0);
+  const dates = transactions.map(t => t.txnDate).filter(d => !isNaN(d.getTime())).sort((a, b) => a.getTime() - b.getTime());
+  const periodStart = dates.length > 0 ? dates[0] : new Date();
+  const periodEnd = dates.length > 0 ? dates[dates.length - 1] : new Date();
+
+  if (transactions.length === 0) warnings.push('No valid transactions parsed with given column mapping');
+
+  return {
+    transactions, bankName: 'Manual Mapping', accountNumber: '',
+    statementPeriod: `${periodStart.toLocaleDateString('en-GB')} - ${periodEnd.toLocaleDateString('en-GB')}`,
+    openingBalance: 0, closingBalance: 0, totalDebits, totalCredits, parseWarnings: warnings,
+  };
 };

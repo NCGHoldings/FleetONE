@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, Building2, ArrowRight, Eye } from "lucide-react";
-import { parseBankStatement, detectBankFormat, BANK_FORMATS, extractAdmissionNumbers, type ParseResult } from "@/utils/bank-statement-processor";
+import { parseBankStatement, detectBankFormat, BANK_FORMATS, extractAdmissionNumbers, getFileHeaders, parseBankStatementWithMapping, type ParseResult, type ColumnMapping } from "@/utils/bank-statement-processor";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
@@ -18,7 +18,7 @@ interface BankStatementUploadZoneProps {
 
 const fmt = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-type Step = "upload" | "preview" | "processing" | "done";
+type Step = "upload" | "column_mapping" | "preview" | "processing" | "done";
 
 export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStatementUploadZoneProps) {
   const { toast } = useToast();
@@ -30,6 +30,9 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [importStats, setImportStats] = useState({ total: 0, autoMatched: 0, needsReview: 0, unmatched: 0 });
+  const [fileHeaders, setFileHeaders] = useState<string[]>([]);
+  const [sampleRows, setSampleRows] = useState<Record<string, any>[]>([]);
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({ dateCol: '', descriptionCol: '', amountCol: '' });
 
   const resetState = () => {
     setStep("upload");
@@ -40,6 +43,9 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
     setProcessing(false);
     setProgress(0);
     setImportStats({ total: 0, autoMatched: 0, needsReview: 0, unmatched: 0 });
+    setFileHeaders([]);
+    setSampleRows([]);
+    setColumnMapping({ dateCol: '', descriptionCol: '', amountCol: '' });
   };
 
   // ===== STEP 1: FILE SELECT + AUTO-DETECT =====
@@ -63,17 +69,38 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
     try {
       const forcedBank = bankId === "auto" ? undefined : bankId;
       const result = await parseBankStatement(file, forcedBank);
-      setParseResult(result);
-      setStep("preview");
-
+      
       if (result.transactions.length === 0) {
+        // Auto-parse failed — show manual column mapping
+        const { headers, sampleRows: samples } = await getFileHeaders(file);
+        setFileHeaders(headers);
+        setSampleRows(samples);
+        // Auto-guess mapping from headers
+        const guess = (candidates: string[]) => {
+          for (const c of candidates) {
+            const found = headers.find(h => h.toLowerCase().includes(c.toLowerCase()));
+            if (found) return found;
+          }
+          return '';
+        };
+        setColumnMapping({
+          dateCol: guess(['date', 'txn date', 'trans date']),
+          descriptionCol: guess(['description', 'narration', 'particulars', 'details']),
+          amountCol: guess(['amount']),
+          typeCol: guess(['cr/dr', 'dr/cr', 'type']),
+          referenceCol: guess(['reference', 'ref', 'tran id']),
+          balanceCol: guess(['balance']),
+        });
+        setStep("column_mapping");
         toast({
-          title: "No Transactions Found",
-          description: "The uploaded file contains no valid transactions",
-          variant: "destructive",
+          title: "Auto-detection found 0 transactions",
+          description: "Please map columns manually from your file",
         });
         return;
       }
+
+      setParseResult(result);
+      setStep("preview");
 
       if (result.parseWarnings.length > 0) {
         toast({
@@ -89,6 +116,23 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
       });
     }
   }, [file, bankId, toast]);
+
+  const handleMappingParse = useCallback(async () => {
+    if (!file || !columnMapping.dateCol || !columnMapping.descriptionCol || !columnMapping.amountCol) {
+      toast({ title: "Missing columns", description: "Please map Date, Description, and Amount columns", variant: "destructive" });
+      return;
+    }
+    try {
+      const result = await parseBankStatementWithMapping(file, columnMapping);
+      setParseResult(result);
+      setStep("preview");
+      if (result.transactions.length === 0) {
+        toast({ title: "No Transactions Found", description: "No valid transactions with given column mapping", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Parse Failed", description: err.message || "Failed to parse", variant: "destructive" });
+    }
+  }, [file, columnMapping, toast]);
 
   // ===== STEP 3: PROCESS & MATCH (preserves existing auto-match, payment, AR flows) =====
   const handleProcess = useCallback(async () => {
@@ -341,9 +385,10 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
       <CardContent className="p-6">
         {/* ===== STEP INDICATOR ===== */}
         <div className="flex items-center gap-2 mb-4">
-          {["Upload", "Preview", "Process"].map((label, idx) => {
+          {["Upload", "Map Columns", "Preview", "Process"].map((label, idx) => {
             const stepNum = idx + 1;
-            const currentStepNum = step === "upload" ? 1 : step === "preview" ? 2 : 3;
+            const stepOrder = { upload: 1, column_mapping: 2, preview: 3, processing: 4, done: 4 };
+            const currentStepNum = stepOrder[step] || 1;
             const isActive = stepNum <= currentStepNum;
             return (
               <div key={label} className="flex items-center gap-2">
@@ -425,7 +470,82 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           </>
         )}
 
-        {/* ===== STEP: PREVIEW ===== */}
+        {/* ===== STEP: COLUMN MAPPING ===== */}
+        {step === "column_mapping" && fileHeaders.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+              <span className="text-xs text-yellow-700 dark:text-yellow-300">
+                Auto-detection couldn't parse transactions. Map your file columns below.
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { key: 'dateCol' as const, label: 'Date Column *', required: true },
+                { key: 'descriptionCol' as const, label: 'Description Column *', required: true },
+                { key: 'amountCol' as const, label: 'Amount Column *', required: true },
+                { key: 'typeCol' as const, label: 'Type (Cr/Dr) Column', required: false },
+                { key: 'referenceCol' as const, label: 'Reference Column', required: false },
+                { key: 'balanceCol' as const, label: 'Balance Column', required: false },
+              ].map(({ key, label, required }) => (
+                <div key={key}>
+                  <label className="text-xs font-semibold text-muted-foreground mb-1 block">{label}</label>
+                  <Select
+                    value={columnMapping[key] || '__none__'}
+                    onValueChange={(v) => setColumnMapping(prev => ({ ...prev, [key]: v === '__none__' ? '' : v }))}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder={required ? 'Select column' : 'Optional'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {!required && <SelectItem value="__none__">— None —</SelectItem>}
+                      {fileHeaders.map(h => (
+                        <SelectItem key={h} value={h}>{h}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+
+            {/* Sample Data Preview */}
+            {sampleRows.length > 0 && (
+              <div className="border rounded-lg overflow-auto max-h-[180px]">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      {fileHeaders.map(h => (
+                        <th key={h} className="p-2 text-left whitespace-nowrap font-medium">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sampleRows.map((row, i) => (
+                      <tr key={i} className="border-b">
+                        {fileHeaders.map(h => (
+                          <td key={h} className="p-2 whitespace-nowrap">{String(row[h] ?? '')}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center pt-2">
+              <Button variant="outline" size="sm" onClick={resetState}>← Back</Button>
+              <Button
+                size="sm"
+                onClick={handleMappingParse}
+                disabled={!columnMapping.dateCol || !columnMapping.descriptionCol || !columnMapping.amountCol}
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-1" /> Parse with Mapping
+              </Button>
+            </div>
+          </div>
+        )}
+
         {step === "preview" && parseResult && (
           <div className="space-y-4">
             {/* Summary Cards */}
