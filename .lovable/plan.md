@@ -1,107 +1,66 @@
 
 
-# Bank Charge System — How It Works & Current Gaps
+# Cash Flow Statement — Audit Results & Improvement Plan
 
-## How Bank Fees Are Currently Mapped and Connected
+## Current Assessment
 
-Here's the complete flow when you toggle "Include Bank Fee" on an AP Payment:
+The Cash Flow Statement has a solid IAS 7 foundation with both Direct and Indirect methods, reconciliation checks, working capital analysis, and CSV export. However, there are **8 critical gaps** that prevent it from being "fully automated, any-company-ready, zero manual intervention":
 
-```text
-AP Payment (PAY-2026-25648, LKR 100,000 + Fee LKR 500)
-  │
-  ├── 1. AP Payment Record
-  │     └── Stores: bank_fee_amount=500, bank_fee_type="bank_charge"
-  │
-  ├── 2. Bank Transaction (auto-created)
-  │     └── Debit: LKR 100,500 (payment + fee combined)
-  │     └── Description: "AP Payment... (Payment: 100,000, Bank Fee: 500)"
-  │     └── Shows in Banking > Transactions tab
-  │
-  ├── 3. Bank Fee Charge Record (auto-created)
-  │     └── Table: bank_fee_charges
-  │     └── Links: ap_payment_id → this payment
-  │     └── Links: bank_account_id → source bank
-  │     └── Status: "draft" (NOT auto-posted to GL)
-  │     └── Shows in Banking > Bank Fees tab
-  │
-  ├── 4. Bank Balance Updated
-  │     └── Deducted: LKR 100,500 (payment + fee)
-  │
-  └── 5. GL Journal Entry
-        └── Only posts the PAYMENT amount (LKR 100,000)
-        └── The fee's GL posting happens separately when you
-            manually "Post" the fee from Banking > Bank Fees tab
-```
+## Issues Found
 
-## Current Bridges That Work
+### 1. No Interest/Dividend/Tax Separation (IAS 7.31-35 Violation)
+IAS 7 **requires** separate disclosure of: Interest Paid, Interest Received, Dividends Paid, Dividends Received, and Income Taxes Paid. Currently these are lumped into "Other operating cash flows". Your COA already has dedicated accounts (e.g., 41104001 INTEREST ON SAVINGS, 22501001 INCOME TAX PAYABLE) but the classifier doesn't extract them.
 
-| From | To | Status |
-|---|---|---|
-| AP Payment → bank_fee_charges | Links via `ap_payment_id` | Working |
-| AR Receipt → bank_fee_charges | Links via `ar_receipt_id` | Working |
-| bank_fee_charges → bank_transactions | Links via `bank_transaction_id` | Working (standalone fees only) |
-| bank_fee_charges → journal_entries | Links via `journal_entry_id` | Working (when posted) |
-| Bank Fees tab → view/post fees | BankFeesList component | Working |
-| AP Payment list → shows fee column | APPaymentsView | Working |
+### 2. Direct Method Classification Too Simplistic
+The direct method only looks at `nonCashLines[0]` (the first non-cash line) to classify each journal entry. Multi-line entries (e.g., a payment covering supplier + tax + bank fee) get classified based on just one line, misclassifying the rest.
 
-## Current Gaps
+### 3. Employee Cost Detection by Keyword Only
+Employee payments are identified by searching for "salary/wage/payroll" in the JE description or account name. This misses accounts like "CASUAL WAGES PAYABLE" (code 22201004) and "SALARY ADVANCE" accounts. Should classify by account code prefix instead (222xx = salary-related).
 
-1. **Inline fee NOT auto-posted to GL** — When you add a bank fee inside an AP payment, the fee record is created as "draft". The GL entry (DR Bank Charges Expense / CR Bank) is NOT created automatically. You must go to Banking > Bank Fees tab and click "Post" manually.
+### 4. No Scalability Guard — Fetches ALL Journal Entries
+The hook fetches every posted JE (`journal_entries.select('*, lines:...')`) without any date filtering at the query level. With 465 JEs now, it works. At 10,000+ JEs (any medium company after 2 years), this will timeout. The date filter happens in-memory after fetching everything.
 
-2. **No fee GL in the payment's journal entry** — The payment JE only has the vendor payment lines (DR Payable / CR Bank). The fee should add extra lines (DR Bank Charges / CR Bank) in the same JE or a linked JE.
+### 5. No Business Unit Filtering
+Only filters by `company_id`. The NCG sub-company architecture requires `business_unit_code` filtering for isolated cash flow reports per sub-company (SBO, YUT, etc.).
 
-3. **Bank reconciliation** — The bank transaction shows the combined amount (payment + fee), but the fee's own bank_transaction is not created when it comes from an inline AP payment. Only standalone fees from the Bank Fee form get their own bank_transaction.
+### 6. Opening Balance Logic Flaw
+Uses `acc.opening_balance || acc.current_balance || 0` as the static opening balance, then adds pre-period movements. If `current_balance` is used as fallback, it includes ALL movements (including the current period), double-counting.
 
-4. **No fee display on AR Receipts** — AR Receipt form doesn't have the "Include Bank Fee" toggle at all.
+### 7. No Non-Cash Transaction Disclosures
+IAS 7.43 requires disclosure of significant non-cash investing/financing activities (e.g., asset acquisitions via lease, debt-to-equity conversions). These should be listed as a supplementary note.
 
-5. **Payment detail/invoice view** — When viewing a payment's details, the linked bank fees aren't shown inline.
+### 8. No Comparative Period
+Professional cash flow statements show current period vs prior period side by side. Currently shows only one period.
 
-## Recommended Fix Plan
+## Fix Plan
 
-### 1. Auto-Post Bank Fee GL When Included in AP Payment
+### File 1: `src/hooks/useCashFlowData.ts` — Core Data Engine Fixes
 
-**File: `src/hooks/useAccountingMutations.ts`** (line ~1287)
+- **Add IAS 7 required line items**: Extract interest paid/received, dividends, taxes paid from JE lines using account code classification (41104xxx = interest income, 22501xxx = income tax, 222xx = salary/wages)
+- **Fix direct method**: Analyze ALL non-cash lines proportionally, not just the first one
+- **Server-side date filtering**: Add `.gte('entry_date', preStartDate)` to the JE query to avoid fetching ancient data. Use a reasonable lookback (e.g., 2 years before period start for opening balances)
+- **Add business_unit_code filter**: Accept optional `businessUnitCode` param and apply to JE query
+- **Fix opening balance**: Use only `opening_balance` (never `current_balance`) as the static base; compute everything else from JE movements
+- **Add comparative period support**: Accept optional `comparativeStart/End` dates and return a second `CashFlowData` object
 
-When `bank_fee_amount > 0` in an AP payment, after inserting the `bank_fee_charges` record:
-- Find the "Bank Charges" expense account (already have this logic in `useBankFees.ts`)
-- Add 2 extra lines to the SAME journal entry: DR Bank Charges Expense / CR Bank GL
-- Set the fee record status to "posted" with `journal_entry_id` linked
-- This ensures the fee hits the GL immediately, not as a separate manual step
+### File 2: `src/components/accounting/CashFlowView.tsx` — UI Enhancements
 
-### 2. Add "Include Bank Fee" Toggle to AR Receipt Form
-
-**File: `src/components/accounting/ARReceiptForm.tsx`**
-
-- Add the same bank fee section that AP Payment has (toggle, amount, fee type)
-- On submit, create `bank_fee_charges` record with `ar_receipt_id`
-- Auto-post fee GL lines in the receipt's journal entry
-
-### 3. Show Linked Bank Fees in Payment/Receipt Detail Views
-
-**Files: `APPaymentsView.tsx`, `ARReceiptsView.tsx`**
-
-- When expanding or viewing a payment that has `bank_fee_amount > 0`, show a "Bank Fee" badge/row with the fee details
-- Link to the fee record in Banking > Bank Fees for drill-down
-
-### 4. Fix Bank Transaction for Inline Fees
-
-**File: `src/hooks/useAccountingMutations.ts`**
-
-- When creating an inline bank fee, also create a separate `bank_transaction` for the fee amount (source_type: "bank_fee") and link it to the fee record via `bank_transaction_id`
-- This ensures bank reconciliation can match the fee separately from the payment
+- **Add IAS 7 required disclosures**: Show Interest Paid, Interest Received, Dividends, Income Tax Paid as separate lines in both Direct and Indirect operating sections
+- **Add "Non-Cash Activities" supplementary section**: List entries that don't touch cash accounts but are investing/financing (e.g., depreciation is already handled; add lease acquisitions, asset swaps)
+- **Add comparative column**: Show prior period amounts side-by-side
+- **Add business unit selector**: Dropdown for sub-company filtering when under NCG Holding
 
 ## Files to Change
 
-- `src/hooks/useAccountingMutations.ts` — auto-post fee GL lines in AP payment JE, create fee bank_transaction, same for AR receipt
-- `src/components/accounting/ARReceiptForm.tsx` — add bank fee toggle/amount/type fields
-- `src/components/accounting/APPaymentsView.tsx` — show fee details in expanded view
-- `src/components/accounting/ARReceiptsView.tsx` — show fee details in expanded view
+- `src/hooks/useCashFlowData.ts` — fix classification engine, add date-filtered queries, IAS 7 required items, business unit filter, comparative period support
+- `src/components/accounting/CashFlowView.tsx` — add IAS 7 disclosure lines, comparative columns, business unit selector, non-cash activities section
 
 ## Result
 
-- Bank fees included in payments auto-post to GL immediately (no manual "Post" step)
-- AR Receipts support bank fees just like AP Payments
-- Fee GL entries are part of the same journal entry as the payment
-- Bank reconciliation can match fees as separate tagged transactions
-- Full audit trail: Payment → Fee → Bank Transaction → Journal Entry
+- IAS 7 fully compliant with all required disclosures (interest, tax, dividends)
+- Direct method correctly classifies multi-line journal entries
+- Scales to 100,000+ journal entries via server-side date filtering
+- Works per sub-company (business unit) or consolidated
+- Comparative period for professional reporting
+- Zero manual intervention — all data derived from posted GL entries automatically
 
