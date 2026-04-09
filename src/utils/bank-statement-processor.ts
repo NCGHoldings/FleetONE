@@ -552,3 +552,79 @@ export const checkDuplicatePayment = (
     return sameDate && sameAmount && sameStudent;
   });
 };
+
+// =========== COLUMN MAPPING TYPES & PARSER ===========
+export interface ColumnMapping {
+  dateCol: string;
+  descriptionCol: string;
+  amountCol: string;
+  typeCol?: string; // Cr/Dr indicator column
+  referenceCol?: string;
+  balanceCol?: string;
+}
+
+export const getFileHeaders = async (file: File): Promise<{ headers: string[]; sampleRows: Record<string, any>[] }> => {
+  const data = await file.arrayBuffer();
+  const workbook = XLSX.read(data);
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+  const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+  const headers = jsonData.length > 0 ? Object.keys(jsonData[0]) : [];
+  return { headers, sampleRows: jsonData.slice(0, 5) };
+};
+
+export const parseBankStatementWithMapping = async (file: File, mapping: ColumnMapping): Promise<ParseResult> => {
+  const data = await file.arrayBuffer();
+  const workbook = XLSX.read(data);
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+  const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+  const warnings: string[] = [];
+
+  if (jsonData.length === 0) {
+    return {
+      transactions: [], bankName: 'Manual Mapping', accountNumber: '', statementPeriod: '',
+      openingBalance: 0, closingBalance: 0, totalDebits: 0, totalCredits: 0,
+      parseWarnings: ['No data found in file'],
+    };
+  }
+
+  const transactions: BankStatementTransaction[] = jsonData.map((row, idx) => {
+    let debit = 0, credit = 0;
+    const amount = cleanAmount(row[mapping.amountCol]);
+
+    if (mapping.typeCol) {
+      const typeVal = String(row[mapping.typeCol] || '').toLowerCase().trim();
+      if (typeVal.includes('dr') || typeVal.includes('debit') || typeVal.includes('withdrawal')) {
+        debit = amount;
+      } else {
+        credit = amount;
+      }
+    } else {
+      credit = amount; // Default: treat as credit/deposit
+    }
+
+    return {
+      rowNumber: idx + 2,
+      txnDate: parseDate(row[mapping.dateCol]),
+      description: String(row[mapping.descriptionCol] || '').trim(),
+      reference: String(row[mapping.referenceCol || ''] || '').trim(),
+      debit, credit,
+      balance: cleanAmount(row[mapping.balanceCol || '']),
+      type: (debit > 0 ? 'payment' : 'deposit') as 'payment' | 'deposit',
+      rawRow: row,
+    };
+  }).filter(t => t.description && (t.debit > 0 || t.credit > 0));
+
+  const totalDebits = transactions.reduce((sum, t) => sum + t.debit, 0);
+  const totalCredits = transactions.reduce((sum, t) => sum + t.credit, 0);
+  const dates = transactions.map(t => t.txnDate).filter(d => !isNaN(d.getTime())).sort((a, b) => a.getTime() - b.getTime());
+  const periodStart = dates.length > 0 ? dates[0] : new Date();
+  const periodEnd = dates.length > 0 ? dates[dates.length - 1] : new Date();
+
+  if (transactions.length === 0) warnings.push('No valid transactions parsed with given column mapping');
+
+  return {
+    transactions, bankName: 'Manual Mapping', accountNumber: '',
+    statementPeriod: `${periodStart.toLocaleDateString('en-GB')} - ${periodEnd.toLocaleDateString('en-GB')}`,
+    openingBalance: 0, closingBalance: 0, totalDebits, totalCredits, parseWarnings: warnings,
+  };
+};
