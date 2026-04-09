@@ -528,6 +528,8 @@ export const useCreateARReceipt = () => {
       bus_id?: string;
       bus_no?: string;
       vehicle_type?: string;
+      bank_fee_amount?: number;
+      bank_fee_type?: string;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
@@ -724,13 +726,18 @@ export const useCreateARReceipt = () => {
 
       // ========== BANK TRANSACTION ==========
       // Create bank transaction record if bank account is selected
+      const receiptBankFeeAmount = receipt.bank_fee_amount || 0;
+      const receiptTotalWithFees = receipt.amount - receiptBankFeeAmount; // Net amount after fee deduction
       if (receipt.bank_account_id && receipt.amount > 0) {
+        const feeBreakdown = receiptBankFeeAmount > 0
+          ? ` (Receipt: ${receipt.amount.toLocaleString()}, Bank Fee: ${receiptBankFeeAmount.toLocaleString()})`
+          : '';
         await supabase.from("bank_transactions").insert([{
           bank_account_id: receipt.bank_account_id,
           transaction_date: receipt.receipt_date,
           transaction_type: "receipt",
-          description: `AR Receipt from ${customerName || "Customer"} - ${receipt.receipt_number}`,
-          debit_amount: receipt.amount,
+          description: `AR Receipt from ${customerName || "Customer"} - ${receipt.receipt_number}${feeBreakdown}`,
+          debit_amount: receiptTotalWithFees > 0 ? receiptTotalWithFees : receipt.amount,
           credit_amount: 0,
           reference: receipt.reference || receipt.receipt_number,
           company_id: selectedCompanyId,
@@ -738,7 +745,7 @@ export const useCreateARReceipt = () => {
           source_id: data.id,
         }]);
 
-        // Update bank account balance (increase on receipt)
+        // Update bank account balance (increase on receipt, minus fee)
         const { data: bankAccount } = await supabase
           .from("bank_accounts")
           .select("current_balance")
@@ -746,11 +753,101 @@ export const useCreateARReceipt = () => {
           .single();
 
         if (bankAccount) {
-          const newBalance = (bankAccount.current_balance || 0) + receipt.amount;
+          const netDeposit = receiptBankFeeAmount > 0 ? receiptTotalWithFees : receipt.amount;
+          const newBalance = (bankAccount.current_balance || 0) + netDeposit;
           await supabase
             .from("bank_accounts")
             .update({ current_balance: newBalance })
             .eq("id", receipt.bank_account_id);
+        }
+
+        // Auto-create bank fee for AR Receipt if included
+        if (receiptBankFeeAmount > 0) {
+          // Find Bank Charges expense account
+          let bankChargesAccountId: string | null = null;
+          const { data: bankChargesAccounts } = await supabase
+            .from("chart_of_accounts")
+            .select("id")
+            .eq("company_id", effectiveCompanyId)
+            .eq("is_active", true)
+            .or("account_name.ilike.%bank charge%,account_name.ilike.%bank fee%")
+            .eq("account_type", "expense")
+            .limit(1);
+          bankChargesAccountId = bankChargesAccounts?.[0]?.id || null;
+
+          // Auto-post fee GL lines to receipt's journal entry
+          let feeJournalEntryId: string | null = null;
+          const { data: receiptRecord } = await supabase
+            .from("ar_receipts")
+            .select("journal_entry_id")
+            .eq("id", data.id)
+            .single();
+
+          if (bankChargesAccountId && bankGLAccountId && receiptRecord?.journal_entry_id) {
+            await supabase.from("journal_entry_lines").insert([
+              {
+                journal_entry_id: receiptRecord.journal_entry_id,
+                account_id: bankChargesAccountId,
+                description: `Bank fee - ${receipt.bank_fee_type || "bank_charge"} for ${receipt.receipt_number}`,
+                debit: receiptBankFeeAmount,
+                credit: 0,
+                company_id: effectiveCompanyId,
+                business_unit_code: businessUnitCode,
+              },
+              {
+                journal_entry_id: receiptRecord.journal_entry_id,
+                account_id: bankGLAccountId,
+                description: `Bank fee deduction from receipt - ${receipt.receipt_number}`,
+                debit: 0,
+                credit: receiptBankFeeAmount,
+                company_id: effectiveCompanyId,
+                business_unit_code: businessUnitCode,
+              },
+            ]);
+
+            // Update JE totals
+            const { data: jeData } = await supabase
+              .from("journal_entries")
+              .select("total_debit, total_credit")
+              .eq("id", receiptRecord.journal_entry_id)
+              .single();
+            if (jeData) {
+              await supabase.from("journal_entries").update({
+                total_debit: (jeData.total_debit || 0) + receiptBankFeeAmount,
+                total_credit: (jeData.total_credit || 0) + receiptBankFeeAmount,
+              }).eq("id", receiptRecord.journal_entry_id);
+            }
+
+            feeJournalEntryId = receiptRecord.journal_entry_id;
+          }
+
+          // Create separate bank_transaction for the fee
+          const { data: feeTxn } = await supabase.from("bank_transactions").insert([{
+            bank_account_id: receipt.bank_account_id,
+            transaction_date: receipt.receipt_date,
+            transaction_type: "fee",
+            description: `Bank fee (${receipt.bank_fee_type || "bank_charge"}) - AR Receipt ${receipt.receipt_number}`,
+            credit_amount: receiptBankFeeAmount,
+            debit_amount: 0,
+            reference: `FEE-${receipt.receipt_number}`,
+            company_id: selectedCompanyId,
+            source_type: "bank_fee",
+            source_id: data.id,
+          }]).select().single();
+
+          // Insert bank_fee_charges record as "posted"
+          await supabase.from("bank_fee_charges").insert([{
+            bank_account_id: receipt.bank_account_id,
+            fee_date: receipt.receipt_date,
+            amount: receiptBankFeeAmount,
+            fee_type: receipt.bank_fee_type || "bank_charge",
+            description: `Bank fee for AR Receipt ${receipt.receipt_number} from ${customerName}`,
+            ar_receipt_id: data.id,
+            company_id: selectedCompanyId,
+            status: feeJournalEntryId ? "posted" : "draft",
+            journal_entry_id: feeJournalEntryId,
+            bank_transaction_id: feeTxn?.id || null,
+          } as any]);
         }
       }
 
@@ -1285,6 +1382,83 @@ export const useCreateAPPayment = () => {
 
         // Auto-create bank_fee_charges record if bank fee is included
         if (payment.bank_fee_amount && payment.bank_fee_amount > 0) {
+          // 1. Find Bank Charges expense account for GL posting
+          let bankChargesAccountId: string | null = null;
+          const { data: bankChargesAccounts } = await supabase
+            .from("chart_of_accounts")
+            .select("id")
+            .eq("company_id", effectiveCompanyId)
+            .eq("is_active", true)
+            .or("account_name.ilike.%bank charge%,account_name.ilike.%bank fee%")
+            .eq("account_type", "expense")
+            .limit(1);
+          bankChargesAccountId = bankChargesAccounts?.[0]?.id || null;
+
+          // 2. Auto-post fee GL lines to the SAME journal entry if possible
+          let feeJournalEntryId: string | null = null;
+          if (bankChargesAccountId && bankGLAccountId) {
+            // Get the payment's journal entry to add fee lines
+            const { data: paymentRecord } = await supabase
+              .from("ap_payments")
+              .select("journal_entry_id")
+              .eq("id", data.id)
+              .single();
+
+            if (paymentRecord?.journal_entry_id) {
+              // Add fee lines to existing JE
+              await supabase.from("journal_entry_lines").insert([
+                {
+                  journal_entry_id: paymentRecord.journal_entry_id,
+                  account_id: bankChargesAccountId,
+                  description: `Bank fee - ${payment.bank_fee_type || "bank_charge"} for ${payment.payment_number}`,
+                  debit: payment.bank_fee_amount,
+                  credit: 0,
+                  company_id: effectiveCompanyId,
+                  business_unit_code: businessUnitCode,
+                },
+                {
+                  journal_entry_id: paymentRecord.journal_entry_id,
+                  account_id: bankGLAccountId,
+                  description: `Bank fee deduction - ${payment.payment_number}`,
+                  debit: 0,
+                  credit: payment.bank_fee_amount,
+                  company_id: effectiveCompanyId,
+                  business_unit_code: businessUnitCode,
+                },
+              ]);
+
+              // Update JE totals
+              const { data: jeData } = await supabase
+                .from("journal_entries")
+                .select("total_debit, total_credit")
+                .eq("id", paymentRecord.journal_entry_id)
+                .single();
+              if (jeData) {
+                await supabase.from("journal_entries").update({
+                  total_debit: (jeData.total_debit || 0) + payment.bank_fee_amount,
+                  total_credit: (jeData.total_credit || 0) + payment.bank_fee_amount,
+                }).eq("id", paymentRecord.journal_entry_id);
+              }
+
+              feeJournalEntryId = paymentRecord.journal_entry_id;
+            }
+          }
+
+          // 3. Create a separate bank_transaction for the fee (for reconciliation)
+          const { data: feeTxn } = await supabase.from("bank_transactions").insert([{
+            bank_account_id: payment.bank_account_id,
+            transaction_date: payment.payment_date,
+            transaction_type: "fee",
+            description: `Bank fee (${payment.bank_fee_type || "bank_charge"}) - AP Payment ${payment.payment_number}`,
+            credit_amount: payment.bank_fee_amount,
+            debit_amount: 0,
+            reference: `FEE-${payment.payment_number}`,
+            company_id: selectedCompanyId,
+            source_type: "bank_fee",
+            source_id: data.id,
+          }]).select().single();
+
+          // 4. Insert bank_fee_charges record as "posted" (not draft)
           await supabase.from("bank_fee_charges").insert([{
             bank_account_id: payment.bank_account_id,
             fee_date: payment.payment_date,
@@ -1293,6 +1467,9 @@ export const useCreateAPPayment = () => {
             description: `Bank fee for AP Payment ${payment.payment_number} to ${vendorName}`,
             ap_payment_id: data.id,
             company_id: selectedCompanyId,
+            status: feeJournalEntryId ? "posted" : "draft",
+            journal_entry_id: feeJournalEntryId,
+            bank_transaction_id: feeTxn?.id || null,
           } as any]);
         }
       }

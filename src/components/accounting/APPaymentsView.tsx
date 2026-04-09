@@ -461,6 +461,27 @@ export const APPaymentsView = () => {
                 </div>
               </div>
 
+              {/* Bank Fee Details */}
+              {(detailPayment as any).bank_fee_amount > 0 && (
+                <>
+                  <Separator />
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Bank Fee</p>
+                      <p className="font-bold"><CurrencyDisplay amount={(detailPayment as any).bank_fee_amount} /></p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Fee Type</p>
+                      <p className="font-medium capitalize">{((detailPayment as any).bank_fee_type || "bank_charge").replace("_", " ")}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total (incl. Fee)</p>
+                      <p className="font-bold text-lg"><CurrencyDisplay amount={(detailPayment as any).total_with_fees || detailPayment.amount} /></p>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {detailPayment.cheque_number && (
                 <>
                   <Separator />
