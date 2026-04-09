@@ -282,7 +282,8 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
     [...new Set(rows.map(r => r.default_conductor).filter(Boolean))].sort() as string[], [rows]);
 
   const renderRouteCell = (row: ExpandedFleetRow) => {
-    if (row.trip_sequence > 1) {
+    // In master mode, sub-rows inherit parent route
+    if (row.trip_sequence > 1 && editMode === 'master') {
       return <span className="text-muted-foreground text-sm">↑</span>;
     }
 
@@ -297,7 +298,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
       );
     }
 
-    const rowKey = `${row.id}-route`;
+    const rowKey = `${row.id}-${row.trip_sequence}-route`;
     const isOpen = openRouteComboboxFor === rowKey;
 
     return (
