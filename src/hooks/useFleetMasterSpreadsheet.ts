@@ -184,8 +184,14 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
           const standardRate = row.expected_km_per_liter;
           const performance = fuelConsumption > 0 ? standardRate - fuelConsumption : 0;
 
+          // Use per-trip route from daily_trips if available (daily mode), else roster default
+          const tripRouteLabel = matchedTrip?.route_label || row.route_label;
+          const tripRouteId = matchedTrip?.route_id || row.route_id;
+
           expanded.push({
             ...row,
+            route_label: tripRouteLabel,
+            route_id: tripRouteId,
             trip_sequence: seq,
             trip_id: matchedTrip?.id || null,
             trip_no: matchedTrip?.trip_no || `${String(seq).padStart(4, '0')}`,
@@ -198,6 +204,8 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
             daily_turn_01_time: tripTurn01,
             daily_turn_02_time: tripTurn02,
             _isExpanded: effectiveTripsPerDay > 1,
+            // In daily mode, show actual trip count from daily_trips
+            trips_per_day: busTrips.length > 0 ? Math.max(row.trips_per_day, busTrips.length) : row.trips_per_day,
             start_meter: startMeter,
             end_meter: endMeter,
             total_mileage: totalMileage,
