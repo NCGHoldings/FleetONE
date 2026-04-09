@@ -523,6 +523,7 @@ export const useCreateARReceipt = () => {
       reference?: string;
       notes?: string;
       is_advance?: boolean;
+      party_type?: "customer" | "vendor";
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
@@ -603,22 +604,38 @@ export const useCreateARReceipt = () => {
         bankGLAccountId = bankAccount?.gl_account_id || null;
       }
 
-      // Find Trade Receivable and Advance accounts via customer category resolution
-      const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
-      const resolved = await resolveCustomerARAccounts(receipt.customer_id, effectiveCompanyId);
-      const tradeReceivableId = resolved.arAccountId;
-
-      // Get customer name for GL posting description
+      // Find Trade Receivable/Payable and Advance accounts via category resolution
+      const partyType = receipt.party_type || "customer";
+      let tradeReceivableId: string | null = null;
+      let advanceAccountId: string | null = null;
       let customerName = "";
-      try {
-        const { data: customerData } = await supabase
-          .from("customers")
-          .select("customer_name")
-          .eq("id", receipt.customer_id)
-          .single();
-        customerName = customerData?.customer_name || "";
-      } catch {
-        // Non-blocking
+
+      if (partyType === "vendor") {
+        const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
+        const resolved = await resolveVendorAPAccounts(receipt.customer_id, effectiveCompanyId);
+        tradeReceivableId = resolved.apAccountId;
+        advanceAccountId = resolved.advanceAccountId || null;
+        try {
+          const { data: vendorData } = await supabase
+            .from("vendors")
+            .select("vendor_name")
+            .eq("id", receipt.customer_id)
+            .single();
+          customerName = vendorData?.vendor_name || "";
+        } catch { /* Non-blocking */ }
+      } else {
+        const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
+        const resolved = await resolveCustomerARAccounts(receipt.customer_id, effectiveCompanyId);
+        tradeReceivableId = resolved.arAccountId;
+        advanceAccountId = resolved.advanceAccountId || null;
+        try {
+          const { data: customerData } = await supabase
+            .from("customers")
+            .select("customer_name")
+            .eq("id", receipt.customer_id)
+            .single();
+          customerName = customerData?.customer_name || "";
+        } catch { /* Non-blocking */ }
       }
 
       // Only post to GL if we have the required accounts
@@ -629,7 +646,7 @@ export const useCreateARReceipt = () => {
 
         if (receipt.is_advance) {
           // Use resolved advance account or fallback to COA search
-          let customerAdvanceId = resolved.advanceAccountId;
+          let customerAdvanceId = advanceAccountId;
           if (!customerAdvanceId) {
             const { data: advanceAccounts } = await supabase
               .from("chart_of_accounts")
