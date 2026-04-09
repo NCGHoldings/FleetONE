@@ -303,10 +303,10 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           txn_date: format(txn.txnDate, "yyyy-MM-dd"),
           description: txn.description,
           amount: amount,
-          extracted_ids: extraction.admissionNumbers,
+          extracted_ids: allTokens,
           matched_student_ids: (uniqueMatchedStudents as any[]).map(s => s.id),
           match_status: matchStatus,
-          match_confidence: extraction.confidence,
+          match_confidence: effectiveConfidence,
           suggested_students: (uniqueMatchedStudents as any[]).map(s => ({
             id: s.id,
             admission_no: s.admission_no,
