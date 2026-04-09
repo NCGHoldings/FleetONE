@@ -400,6 +400,21 @@ export const ARReceiptsView = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Receipt Dialog */}
+      <ARReceiptEditDialog
+        open={!!editingReceipt}
+        onOpenChange={(open) => { if (!open) setEditingReceipt(null); }}
+        receipt={editingReceipt}
+      />
+
+      {/* Edit History Dialog */}
+      <EditHistoryDialog
+        open={!!historyReceipt}
+        onOpenChange={(open) => { if (!open) setHistoryReceipt(null); }}
+        history={(historyReceipt as any)?.edit_history || []}
+        documentNumber={historyReceipt?.receipt_number || ""}
+      />
     </div>
   );
 };
