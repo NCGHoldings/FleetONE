@@ -424,6 +424,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       setBankFeeAmount(0);
       setDocumentFile(null);
       setVendorBillNumber("");
+      setSelectedBusId("");
+      setSelectedBusNo("");
+      setSelectedVehicleType("");
     } catch (error) {
       // Error handled by mutation
     }
