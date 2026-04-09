@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { normalizeBusNo } from '@/lib/bus-utils';
 
 export interface SpreadsheetHire {
   id: string;
@@ -31,6 +32,11 @@ export interface SpreadsheetHire {
   pickup_time: string;
   drop_time: string;
   operation_remark: string;
+  // Fleet details (from buses table)
+  bus_id: string;
+  bus_model: string;
+  bus_year: number;
+  bus_capacity: number;
   // Invoice
   invoice_number: string;
   invoiced_km: number;
@@ -45,6 +51,10 @@ export interface SpreadsheetHire {
   additional_hours_charge: number;
   // Expenses (stored in other_expenses JSONB)
   fuel_cost_actual: number;
+  fuel_price_per_liter: number;
+  fuel_liters_calculated: number;
+  actual_km_per_l: number;
+  standard_km_per_l: number;
   driver_wages: number;
   assistant_wages: number;
   driver_meal_allowance: number;
@@ -97,8 +107,8 @@ export function useSpecialHireSpreadsheetData() {
             number_of_buses, km_trip, gross_revenue, total_paid, advance_paid, balance_due,
             special_request, assigned_bus_no, assigned_driver_name, assigned_conductor_name,
             other_expenses, discount_amount_lkr, bus_type_id, exceeding_distance_charge,
-            overtime_charge, overnight_charge,
-            bus_types:bus_type_id(name)
+            overtime_charge, overnight_charge, fuel_price_per_liter,
+            bus_types:bus_type_id(name, avg_km_per_l)
           `)
           .eq('is_active_version', true)
           .order('created_at', { ascending: false })
@@ -122,57 +132,76 @@ export function useSpecialHireSpreadsheetData() {
         }
       }
 
-      // Fetch payments
-      const quotationIds = (quotations || []).map(q => q.id);
-      
+      // Collect unique bus numbers from quotations
+      const busNos = new Set<string>();
+      quotations.forEach(q => {
+        if (q.assigned_bus_no) {
+          // Handle comma-separated multi-bus
+          q.assigned_bus_no.split(',').forEach((b: string) => {
+            const trimmed = b.trim();
+            if (trimmed) busNos.add(trimmed);
+          });
+        }
+      });
+
+      // Fetch fleet bus details
+      let busDetailsMap = new Map<string, { id: string; model: string; year: number; capacity: number }>();
+      if (busNos.size > 0) {
+        const { data: buses } = await supabase
+          .from('buses')
+          .select('id, bus_no, model, year, capacity')
+          .limit(500);
+
+        (buses || []).forEach((bus: any) => {
+          const normalized = normalizeBusNo(bus.bus_no);
+          busDetailsMap.set(normalized, {
+            id: bus.id,
+            model: bus.model || '',
+            year: bus.year || 0,
+            capacity: bus.capacity || 0,
+          });
+        });
+      }
+
+      const quotationIds = quotations.map(q => q.id);
+
+      // Fetch payments, invoices, adjustments in parallel
+      const [paymentsResult, invoicesResult, adjustmentsResult] = await Promise.all([
+        quotationIds.length > 0
+          ? supabase.from('special_hire_payments').select('quotation_id, amount, payment_type, payment_date, status').in('quotation_id', quotationIds).eq('status', 'approved')
+          : Promise.resolve({ data: [] }),
+        quotationIds.length > 0
+          ? supabase.from('special_hire_invoices').select('quotation_id, invoice_number, total_amount').in('quotation_id', quotationIds)
+          : Promise.resolve({ data: [] }),
+        quotationIds.length > 0
+          ? supabase.from('special_hire_trip_adjustments').select('quotation_id, actual_km, check_in_meter, check_out_meter, additional_distance_charge, additional_hours_charge').in('quotation_id', quotationIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+
       let paymentsMap = new Map<string, { advance: number; advanceDate: string; balance: number; balanceDate: string }>();
-      if (quotationIds.length > 0) {
-        const { data: payments } = await supabase
-          .from('special_hire_payments')
-          .select('quotation_id, amount, payment_type, payment_date, status')
-          .in('quotation_id', quotationIds)
-          .eq('status', 'approved');
+      ((paymentsResult as any).data || []).forEach((p: any) => {
+        const existing = paymentsMap.get(p.quotation_id) || { advance: 0, advanceDate: '', balance: 0, balanceDate: '' };
+        if (p.payment_type === 'advance') {
+          existing.advance += p.amount || 0;
+          if (!existing.advanceDate || p.payment_date > existing.advanceDate) existing.advanceDate = p.payment_date;
+        } else {
+          existing.balance += p.amount || 0;
+          if (!existing.balanceDate || p.payment_date > existing.balanceDate) existing.balanceDate = p.payment_date;
+        }
+        paymentsMap.set(p.quotation_id, existing);
+      });
 
-        (payments || []).forEach((p: any) => {
-          const existing = paymentsMap.get(p.quotation_id) || { advance: 0, advanceDate: '', balance: 0, balanceDate: '' };
-          if (p.payment_type === 'advance') {
-            existing.advance += p.amount || 0;
-            if (!existing.advanceDate || p.payment_date > existing.advanceDate) existing.advanceDate = p.payment_date;
-          } else {
-            existing.balance += p.amount || 0;
-            if (!existing.balanceDate || p.payment_date > existing.balanceDate) existing.balanceDate = p.payment_date;
-          }
-          paymentsMap.set(p.quotation_id, existing);
-        });
-      }
-
-      // Fetch invoices
       let invoiceMap = new Map<string, { number: string; amount: number }>();
-      if (quotationIds.length > 0) {
-        const { data: invoices } = await supabase
-          .from('special_hire_invoices')
-          .select('quotation_id, invoice_number, total_amount')
-          .in('quotation_id', quotationIds);
+      ((invoicesResult as any).data || []).forEach((inv: any) => {
+        invoiceMap.set(inv.quotation_id, { number: inv.invoice_number || '', amount: inv.total_amount || 0 });
+      });
 
-        (invoices || []).forEach((inv: any) => {
-          invoiceMap.set(inv.quotation_id, { number: inv.invoice_number || '', amount: inv.total_amount || 0 });
-        });
-      }
-
-      // Fetch trip adjustments
       let adjustmentMap = new Map<string, any>();
-      if (quotationIds.length > 0) {
-        const { data: adjustments } = await supabase
-          .from('special_hire_trip_adjustments')
-          .select('quotation_id, actual_km, check_in_meter, check_out_meter, additional_distance_charge, additional_hours_charge')
-          .in('quotation_id', quotationIds);
+      ((adjustmentsResult as any).data || []).forEach((adj: any) => {
+        adjustmentMap.set(adj.quotation_id, adj);
+      });
 
-        (adjustments || []).forEach((adj: any) => {
-          adjustmentMap.set(adj.quotation_id, adj);
-        });
-      }
-
-      const mapped: SpreadsheetHire[] = (quotations || []).map((q: any, idx: number) => {
+      const mapped: SpreadsheetHire[] = quotations.map((q: any, idx: number) => {
         const expenses = q.other_expenses || {};
         const payment = paymentsMap.get(q.id) || { advance: 0, advanceDate: '', balance: 0, balanceDate: '' };
         const invoice = invoiceMap.get(q.id) || { number: '', amount: 0 };
@@ -180,7 +209,13 @@ export function useSpecialHireSpreadsheetData() {
         const busType = q.bus_types as any;
         const days = calculateDays(q.pickup_datetime, q.drop_datetime);
 
+        // Fleet bus lookup (use first bus if multi-bus)
+        const primaryBusNo = (q.assigned_bus_no || '').split(',')[0]?.trim() || '';
+        const normalizedPrimary = normalizeBusNo(primaryBusNo);
+        const fleetBus = busDetailsMap.get(normalizedPrimary);
+
         const fuelActual = getExpenseField(expenses, 'fuel_cost_actual');
+        const fuelPricePerLiter = q.fuel_price_per_liter || getExpenseField(expenses, 'fuel_price_per_liter') || 0;
         const driverWages = getExpenseField(expenses, 'driver_wages');
         const assistantWages = getExpenseField(expenses, 'assistant_wages');
         const driverMeal = getExpenseField(expenses, 'driver_meal_allowance');
@@ -189,9 +224,14 @@ export function useSpecialHireSpreadsheetData() {
         const maint = getExpenseField(expenses, 'maintenance');
         const otherPermits = getExpenseField(expenses, 'other_permits_highway');
         const totalExpenses = fuelActual + driverWages + assistantWages + driverMeal + assistantMeal + wagesTotal + maint + otherPermits;
-        
+
         const invoiceAmt = invoice.amount || (q.gross_revenue || 0);
         const discount = q.discount_amount_lkr || 0;
+
+        const actualKm = adj.actual_km || 0;
+        const standardKmPerL = busType?.avg_km_per_l || 0;
+        const fuelLiters = fuelPricePerLiter > 0 && fuelActual > 0 ? fuelActual / fuelPricePerLiter : 0;
+        const actualKmPerL = fuelLiters > 0 && actualKm > 0 ? actualKm / fuelLiters : 0;
 
         return {
           id: q.id,
@@ -220,6 +260,11 @@ export function useSpecialHireSpreadsheetData() {
           pickup_time: q.pickup_datetime ? new Date(q.pickup_datetime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
           drop_time: q.drop_datetime ? new Date(q.drop_datetime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
           operation_remark: (expenses as any)?.operation_remark || '',
+          // Fleet details
+          bus_id: fleetBus?.id || '',
+          bus_model: fleetBus?.model || '',
+          bus_year: fleetBus?.year || 0,
+          bus_capacity: fleetBus?.capacity || 0,
           invoice_number: invoice.number,
           invoiced_km: adj.actual_km || q.km_trip || 0,
           invoice_amount: invoiceAmt,
@@ -227,10 +272,14 @@ export function useSpecialHireSpreadsheetData() {
           price_after_discount: invoiceAmt - discount,
           check_in_meter: adj.check_in_meter || 0,
           check_out_meter: adj.check_out_meter || 0,
-          actual_km: adj.actual_km || 0,
+          actual_km: actualKm,
           additional_distance_charge: adj.additional_distance_charge || q.exceeding_distance_charge || 0,
           additional_hours_charge: adj.additional_hours_charge || q.overtime_charge || 0,
           fuel_cost_actual: fuelActual,
+          fuel_price_per_liter: fuelPricePerLiter,
+          fuel_liters_calculated: Math.round(fuelLiters * 100) / 100,
+          actual_km_per_l: Math.round(actualKmPerL * 100) / 100,
+          standard_km_per_l: standardKmPerL,
           driver_wages: driverWages,
           assistant_wages: assistantWages,
           driver_meal_allowance: driverMeal,
@@ -266,7 +315,7 @@ export function useSpecialHireSpreadsheetData() {
       const expenseFields = [
         'fuel_cost_actual', 'driver_wages', 'assistant_wages', 'driver_meal_allowance',
         'assistant_meal_allowance', 'wages_total', 'maintenance', 'other_permits_highway',
-        'buses_deployed', 'operation_remark', 'remark'
+        'buses_deployed', 'operation_remark', 'remark', 'fuel_price_per_liter'
       ];
 
       const quotationDirectFields = [
@@ -279,7 +328,24 @@ export function useSpecialHireSpreadsheetData() {
       const meterFields = ['check_in_meter', 'check_out_meter', 'actual_km', 'additional_distance_charge', 'additional_hours_charge'];
       const invoiceFields = ['invoice_number', 'invoice_amount', 'invoiced_km'];
 
-      if (expenseFields.includes(field)) {
+      if (field === 'fuel_price_per_liter') {
+        // Save fuel price to both quotation column and other_expenses
+        const { data: current } = await supabase
+          .from('special_hire_quotations')
+          .select('other_expenses')
+          .eq('id', hireId)
+          .single();
+
+        const currentExpenses = (current?.other_expenses as any) || {};
+        const updated = { ...currentExpenses, fuel_price_per_liter: value };
+
+        const { error } = await supabase
+          .from('special_hire_quotations')
+          .update({ other_expenses: updated, fuel_price_per_liter: Number(value) || null })
+          .eq('id', hireId);
+
+        if (error) throw error;
+      } else if (expenseFields.includes(field)) {
         // Update via other_expenses JSONB
         const { data: current } = await supabase
           .from('special_hire_quotations')
@@ -340,14 +406,14 @@ export function useSpecialHireSpreadsheetData() {
             .eq('id', existing.id);
           if (error) throw error;
         } else {
-          const insertData: any = { 
-            quotation_id: hireId, 
+          const insertData: any = {
+            quotation_id: hireId,
             invoice_type: 'standard',
             invoice_no: field === 'invoice_number' ? String(value) : `INV-${Date.now()}`,
             amount: field === 'invoice_amount' ? Number(value) : 0,
           };
           if (field === 'invoice_number') insertData.invoice_no = String(value);
-          if (field === 'invoiced_km') insertData.amount = 0; // placeholder
+          if (field === 'invoiced_km') insertData.amount = 0;
           const { error } = await supabase
             .from('special_hire_invoices')
             .insert(insertData);
