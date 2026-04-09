@@ -5414,6 +5414,41 @@ export type Database = {
           },
         ]
       }
+      company_expense_categories: {
+        Row: {
+          category_value: string
+          company_id: string
+          created_at: string
+          id: string
+          is_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          category_value: string
+          company_id: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          category_value?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_expense_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       completed_trips: {
         Row: {
           avg_speed_kmh: number | null

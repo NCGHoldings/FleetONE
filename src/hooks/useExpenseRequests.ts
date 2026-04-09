@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
+
 export const EXPENSE_CATEGORIES = [
   { value: "fuel", label: "Fuel/Diesel", group: "Operational" },
   { value: "highway", label: "Highway Charges", group: "Operational" },
@@ -219,6 +220,36 @@ export const useCreateExpenseRequest = () => {
         }
       }
 
+      // Auto-settle IOU when payment method is "iou"
+      if (data.payment_method === "iou" && data.iou_id && (data.amount || 0) > 0) {
+        try {
+          const amount = data.amount || 0;
+          const { data: iou } = await supabase
+            .from("iou_records")
+            .select("amount, settled_amount, balance")
+            .eq("id", data.iou_id)
+            .single();
+
+          if (iou) {
+            const newSettledAmount = (iou.settled_amount || 0) + amount;
+            const newBalance = (iou.amount || 0) - newSettledAmount;
+            const newStatus = newBalance <= 0 ? "settled" : "partially_settled";
+
+            await supabase
+              .from("iou_records")
+              .update({
+                settled_amount: newSettledAmount,
+                balance: Math.max(0, newBalance),
+                status: newStatus,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", data.iou_id);
+          }
+        } catch (iouErr) {
+          console.error("IOU auto-settlement failed (expense still saved):", iouErr);
+        }
+      }
+
       return result;
     },
     onSuccess: () => {
@@ -226,6 +257,7 @@ export const useCreateExpenseRequest = () => {
       queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });
       queryClient.invalidateQueries({ queryKey: ["petty-cash-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["petty-cash-all-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["iou-records"] });
       toast({
         title: "Expense Request Created",
         description: "The expense request has been submitted successfully.",
@@ -300,4 +332,35 @@ export const useDeleteExpenseRequest = () => {
       });
     },
   });
+};
+
+// Hook to get filtered expense categories based on company settings
+export const useCompanyExpenseCategories = () => {
+  const { selectedCompanyId } = useCompany();
+
+  const { data: settings } = useQuery({
+    queryKey: ["company-expense-categories", selectedCompanyId],
+    queryFn: async () => {
+      if (!selectedCompanyId) return [];
+      const { data, error } = await supabase
+        .from("company_expense_categories")
+        .select("category_value, is_enabled")
+        .eq("company_id", selectedCompanyId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedCompanyId,
+  });
+
+  // If no settings exist for this company, return all categories (backward compatible)
+  if (!settings || settings.length === 0) {
+    return EXPENSE_CATEGORIES;
+  }
+
+  // Filter to only enabled categories
+  const enabledValues = new Set(
+    settings.filter((s: any) => s.is_enabled).map((s: any) => s.category_value)
+  );
+
+  return EXPENSE_CATEGORIES.filter((cat) => enabledValues.has(cat.value));
 };

@@ -31,6 +31,8 @@ export const IOUManagementView = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreateIOU, setShowCreateIOU] = useState(false);
   const [selectedIOU, setSelectedIOU] = useState<IOURecord | null>(null);
+  const [showSettleDialog, setShowSettleDialog] = useState(false);
+  const [settleAmount, setSettleAmount] = useState(0);
 
   // New IOU form state
   const [newStaffId, setNewStaffId] = useState("");
@@ -73,12 +75,25 @@ export const IOUManagementView = () => {
     setNewUnit("");
   };
 
-  const handleMarkSettled = async (iou: IOURecord) => {
+  const openSettleDialog = (iou: IOURecord) => {
+    setSelectedIOU(iou);
+    setSettleAmount(iou.balance);
+    setShowSettleDialog(true);
+  };
+
+  const handleSettle = async () => {
+    if (!selectedIOU || settleAmount <= 0) return;
+    const newSettledAmount = (selectedIOU.settled_amount || 0) + settleAmount;
+    const newBalance = selectedIOU.amount - newSettledAmount;
+    const newStatus = newBalance <= 0 ? "settled" : "partially_settled";
+    
     await updateIOU.mutateAsync({
-      id: iou.id,
-      settled_amount: iou.amount,
-      status: "settled",
+      id: selectedIOU.id,
+      settled_amount: newSettledAmount,
+      status: newStatus,
     });
+    setShowSettleDialog(false);
+    setSelectedIOU(null);
   };
 
   // Stats
@@ -259,7 +274,7 @@ export const IOUManagementView = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleMarkSettled(iou)}
+                          onClick={() => openSettleDialog(iou)}
                           disabled={updateIOU.isPending}
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
@@ -349,6 +364,71 @@ export const IOUManagementView = () => {
             >
               {createIOU.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Issue IOU
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Settle IOU Dialog */}
+      <Dialog open={showSettleDialog} onOpenChange={setShowSettleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Settle IOU</DialogTitle>
+          </DialogHeader>
+          {selectedIOU && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">IOU Number</p>
+                  <p className="font-mono font-semibold">{selectedIOU.iou_number}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Staff</p>
+                  <p className="font-semibold">{selectedIOU.staff?.staff_name || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Total Amount</p>
+                  <p className="font-semibold"><CurrencyDisplay amount={selectedIOU.amount} /></p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Outstanding Balance</p>
+                  <p className="font-semibold text-destructive"><CurrencyDisplay amount={selectedIOU.balance} /></p>
+                </div>
+              </div>
+              <div>
+                <Label>Settlement Amount (LKR)</Label>
+                <Input
+                  type="number"
+                  value={settleAmount}
+                  onChange={(e) => setSettleAmount(parseFloat(e.target.value) || 0)}
+                  className="text-lg font-semibold"
+                  max={selectedIOU.balance}
+                />
+                {settleAmount < selectedIOU.balance && settleAmount > 0 && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    Partial settlement — remaining balance: LKR {(selectedIOU.balance - settleAmount).toLocaleString()}
+                  </p>
+                )}
+                {settleAmount > selectedIOU.balance && (
+                  <p className="text-xs text-destructive mt-1">Amount exceeds outstanding balance</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setSettleAmount(selectedIOU.balance)}>
+                  Full Settlement
+                </Button>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSettleDialog(false)}>Cancel</Button>
+            <Button
+              onClick={handleSettle}
+              disabled={settleAmount <= 0 || (selectedIOU ? settleAmount > selectedIOU.balance : true) || updateIOU.isPending}
+            >
+              {updateIOU.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Confirm Settlement
             </Button>
           </DialogFooter>
         </DialogContent>
