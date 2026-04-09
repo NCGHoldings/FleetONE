@@ -57,6 +57,7 @@ const REQUIRED_COLUMNS = [
   { dbColumn: "service_type", label: "OneWay / BothWay", required: false },
   { dbColumn: "update_new", label: "Fixed Amount (New Fee)", required: false },
   { dbColumn: "payment_amount", label: "Amount Due (Paid)", required: false },
+  { dbColumn: "payment_balance", label: "Outstanding Balance", required: false },
 ];
 
 interface Props {
