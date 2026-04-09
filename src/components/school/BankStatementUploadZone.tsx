@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, Building2, ArrowRight, Eye } from "lucide-react";
-import { parseBankStatement, detectBankFormat, BANK_FORMATS, extractAdmissionNumbers, type ParseResult } from "@/utils/bank-statement-processor";
+import { parseBankStatement, detectBankFormat, BANK_FORMATS, extractAdmissionNumbers, getFileHeaders, parseBankStatementWithMapping, type ParseResult, type ColumnMapping } from "@/utils/bank-statement-processor";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
@@ -18,7 +18,7 @@ interface BankStatementUploadZoneProps {
 
 const fmt = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-type Step = "upload" | "preview" | "processing" | "done";
+type Step = "upload" | "column_mapping" | "preview" | "processing" | "done";
 
 export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStatementUploadZoneProps) {
   const { toast } = useToast();
@@ -30,6 +30,9 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [importStats, setImportStats] = useState({ total: 0, autoMatched: 0, needsReview: 0, unmatched: 0 });
+  const [fileHeaders, setFileHeaders] = useState<string[]>([]);
+  const [sampleRows, setSampleRows] = useState<Record<string, any>[]>([]);
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({ dateCol: '', descriptionCol: '', amountCol: '' });
 
   const resetState = () => {
     setStep("upload");
@@ -40,6 +43,9 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
     setProcessing(false);
     setProgress(0);
     setImportStats({ total: 0, autoMatched: 0, needsReview: 0, unmatched: 0 });
+    setFileHeaders([]);
+    setSampleRows([]);
+    setColumnMapping({ dateCol: '', descriptionCol: '', amountCol: '' });
   };
 
   // ===== STEP 1: FILE SELECT + AUTO-DETECT =====
