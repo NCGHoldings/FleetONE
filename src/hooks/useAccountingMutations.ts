@@ -524,6 +524,7 @@ export const useCreateARReceipt = () => {
       notes?: string;
       is_advance?: boolean;
       party_type?: "customer" | "vendor";
+      override_gl_account_id?: string;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;

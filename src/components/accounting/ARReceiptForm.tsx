@@ -310,6 +310,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
         notes: data.notes,
         is_advance: isAdvance,
         party_type: selectedPartyType,
+        override_gl_account_id: overrideGLAccountId || undefined,
         allocations: selectedAllocations.map((a) => ({
           invoice_id: a.invoice_id,
           allocated_amount: a.allocated_amount,
