@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -10,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateBankTransaction } from "@/hooks/useAccountingMutations";
 import { useBankAccounts, useChartOfAccounts } from "@/hooks/useAccountingData";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 import { Loader2 } from "lucide-react";
 
 const transactionSchema = z.object({
@@ -35,6 +37,7 @@ export const BankTransactionForm = ({ open, onOpenChange, preselectedBankId }: B
   const { data: bankAccounts } = useBankAccounts();
   const { data: accounts } = useChartOfAccounts();
   const createTransaction = useCreateBankTransaction();
+  const generateNumber = useGenerateNumber();
 
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
@@ -50,6 +53,18 @@ export const BankTransactionForm = ({ open, onOpenChange, preselectedBankId }: B
   });
 
   const transactionType = form.watch("transaction_type");
+
+  // Auto-generate reference when dialog opens
+  const [isGeneratingRef, setIsGeneratingRef] = useState(false);
+  useEffect(() => {
+    if (open && !form.getValues("reference")) {
+      setIsGeneratingRef(true);
+      generateNumber("bank_transaction").then((num) => {
+        form.setValue("reference", num);
+        setIsGeneratingRef(false);
+      });
+    }
+  }, [open]);
 
   const onSubmit = async (data: TransactionFormData) => {
     const isDebit = ["withdrawal", "payment", "transfer_out", "bank_charge"].includes(data.transaction_type);
@@ -163,7 +178,8 @@ export const BankTransactionForm = ({ open, onOpenChange, preselectedBankId }: B
               <Input 
                 id="reference" 
                 {...form.register("reference")} 
-                placeholder="Cheque #, Receipt #"
+                readOnly
+                className="bg-muted"
               />
             </div>
           </div>

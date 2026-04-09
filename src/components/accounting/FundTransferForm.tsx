@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,7 @@ import { ArrowRightLeft, Plus, Building } from "lucide-react";
 import { useBankAccounts, useFundTransfers } from "@/hooks/useAccountingData";
 import { useCreateFundTransfer } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 import { format } from "date-fns";
 
 export const FundTransferForm = () => {
@@ -45,7 +46,13 @@ export const FundTransferForm = () => {
   const { data: bankAccounts = [] } = useBankAccounts();
   const { data: transfers = [] } = useFundTransfers();
   const createTransfer = useCreateFundTransfer();
+  const generateNumber = useGenerateNumber();
 
+  useEffect(() => {
+    if (dialogOpen && !reference) {
+      generateNumber("fund_transfer").then((num) => setReference(num));
+    }
+  }, [dialogOpen]);
   const handleSubmit = async () => {
     if (!fromAccount || !toAccount || !amount || fromAccount === toAccount) {
       return;
@@ -163,8 +170,8 @@ export const FundTransferForm = () => {
                 <Label>Reference</Label>
                 <Input
                   value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  placeholder="Transfer reference"
+                  readOnly
+                  className="bg-muted"
                 />
               </div>
 
