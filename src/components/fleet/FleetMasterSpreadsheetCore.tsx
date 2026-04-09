@@ -105,7 +105,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
   // Recalculate — remove the extra +4 duplication
   const TOTAL_COLUMNS = visibleColumnCount;
 
-  const cellMinWidth = singleSectionFocus ? 'min-w-[140px]' : 'min-w-[80px]';
+  const cellMinWidth = singleSectionFocus ? 'min-w-[160px]' : 'min-w-[100px]';
 
   useEffect(() => {
     if (editingCell && inputRef.current) {
@@ -201,22 +201,24 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
 
     if (editingCell === cellKey) {
       return (
-        <input
-          ref={inputRef}
-          type={type}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={() => commitEdit(row.id, field)}
-          onKeyDown={(e) => handleKeyDown(e, row.id, field)}
-          className="w-full h-9 px-3 text-sm border-2 border-primary rounded bg-background focus:ring-2 focus:ring-primary focus:outline-none"
-        />
+        <div className="relative w-full h-full flex items-center">
+          <input
+            ref={inputRef}
+            type={type}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={() => commitEdit(row.id, field)}
+            onKeyDown={(e) => handleKeyDown(e, row.id, field)}
+            className="absolute left-0 top-1/2 -translate-y-1/2 min-w-[200px] h-10 px-3 text-sm border-2 border-primary rounded bg-background shadow-lg focus:ring-2 focus:ring-primary focus:outline-none z-50"
+          />
+        </div>
       );
     }
 
     if (!isEditable(field)) {
       return (
         <span
-          className="px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed"
+          className="px-3 py-2.5 rounded block text-sm min-h-[40px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap"
           title={String(value ?? '') + " (Master Edit Only)"}
         >
           {value || '-'}
@@ -226,7 +228,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
 
     return (
       <span
-        className="cursor-pointer hover:bg-accent/50 px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center"
+        className="cursor-pointer hover:bg-accent/50 px-3 py-2.5 rounded block text-sm min-h-[40px] flex items-center overflow-hidden text-ellipsis whitespace-nowrap"
         onClick={() => startEdit(cellKey, value)}
         title={String(value ?? '')}
       >
@@ -243,7 +245,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
     if (!isEditable(field)) {
       return (
         <span
-          className="px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed"
+          className="px-3 py-2.5 rounded block text-sm min-h-[40px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap"
           title={String(value ?? '') + " (Master Edit Only)"}
         >
           {value || '-'}
@@ -259,7 +261,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
           onUpdate(row.id, field, v);
         }}
       >
-        <SelectTrigger className="h-9 text-sm border-0 bg-transparent px-2 focus:ring-0 shadow-none hover:bg-accent/50">
+        <SelectTrigger className="h-10 text-sm border-0 bg-transparent px-3 focus:ring-0 shadow-none hover:bg-accent/50 min-w-[100px]">
           <SelectValue placeholder="-" />
         </SelectTrigger>
         <SelectContent>
@@ -287,7 +289,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
     if (!isEditable('route_label')) {
       return (
         <span
-          className="px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed"
+          className="px-3 py-2.5 rounded block text-sm min-h-[40px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap"
           title={String(row.route_label ?? '') + " (Master Edit Only)"}
         >
           {row.route_label || '-'}
@@ -303,7 +305,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
         <PopoverTrigger asChild>
           <button
             className={cn(
-              "flex w-full items-center justify-between rounded px-3 py-2 text-sm min-h-[36px] hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary",
+              "flex w-full items-center justify-between rounded px-3 py-2.5 text-sm min-h-[40px] hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary",
               !row.route_label && "text-muted-foreground"
             )}
             onClick={() => {
@@ -355,7 +357,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
     }
     if (!isEditable(field)) {
       return (
-        <span className="px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed"
+        <span className="px-3 py-2.5 rounded block text-sm min-h-[40px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap"
           title={String(value ?? '') + " (Master Edit Only)"}>
           {value || '-'}
         </span>
@@ -369,7 +371,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
       <Popover open={isOpen} onOpenChange={(open) => setOpenCrewComboboxFor(open ? cellKey : null)}>
         <PopoverTrigger asChild>
           <button className={cn(
-            "flex w-full items-center justify-between rounded px-3 py-2 text-sm min-h-[36px] hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary",
+            "flex w-full items-center justify-between rounded px-3 py-2.5 text-sm min-h-[40px] hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary",
             !value && "text-muted-foreground"
           )}>
             <span className="truncate pr-2">{value || placeholder}</span>
@@ -633,54 +635,54 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                     {/* Route & Type */}
                     {visibleSections.has('route_type') && (
                       <>
-                        <TableCell className="text-sm py-1 min-h-[40px] p-0">{renderRouteCell(row)}</TableCell>
+                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderRouteCell(row)}</TableCell>
                         <TableCell className="text-sm font-mono text-center py-2 min-h-[40px]">{row.trip_sequence}</TableCell>
-                        <TableCell className="text-sm py-1 min-h-[40px]">{renderDropdownCell(row, 'bus_type', row.bus_type || '', BUS_TYPE_OPTIONS)}</TableCell>
-                        <TableCell className="text-sm py-1 min-h-[40px]">{renderDropdownCell(row, 'permit_type', row.permit_type || '', PERMIT_TYPE_OPTIONS)}</TableCell>
+                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderDropdownCell(row, 'bus_type', row.bus_type || '', BUS_TYPE_OPTIONS)}</TableCell>
+                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderDropdownCell(row, 'permit_type', row.permit_type || '', PERMIT_TYPE_OPTIONS)}</TableCell>
                       </>
                     )}
                     {/* Config */}
                     {visibleSections.has('config') && (
-                      <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'trips_per_day', row.trips_per_day, 'number')}</TableCell>
+                      <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderEditableCell(row, 'trips_per_day', row.trips_per_day, 'number')}</TableCell>
                     )}
                     {/* Status */}
                     {visibleSections.has('status') && (
-                      <TableCell className="text-sm py-1 min-h-[40px]">{renderDropdownCell(row, 'remark', row.remark || '', REMARK_OPTIONS)}</TableCell>
+                      <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderDropdownCell(row, 'remark', row.remark || '', REMARK_OPTIONS)}</TableCell>
                     )}
                     {/* Crew */}
                     {visibleSections.has('crew') && (
                       <>
-                        <TableCell className="text-sm py-1 min-h-[40px] p-0">{renderCrewCombobox(row, 'default_driver', (editMode === 'daily' ? row.driver_name : row.default_driver) || '')}</TableCell>
-                        <TableCell className="text-sm py-1 min-h-[40px] p-0">{renderCrewCombobox(row, 'default_conductor', (editMode === 'daily' ? row.conductor_name : row.default_conductor) || '')}</TableCell>
+                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderCrewCombobox(row, 'default_driver', (editMode === 'daily' ? row.driver_name : row.default_driver) || '')}</TableCell>
+                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderCrewCombobox(row, 'default_conductor', (editMode === 'daily' ? row.conductor_name : row.default_conductor) || '')}</TableCell>
                       </>
                     )}
                     {/* Turns */}
                     {visibleSections.has('turns') && (
                       <>
-                        <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'turn_01_time', editMode === 'daily' ? (row as any).daily_turn_01_time ?? row.turn_01_time : row.turn_01_time)}</TableCell>
-                        <TableCell className="text-sm py-1 min-h-[40px]">{renderEditableCell(row, 'turn_02_time', editMode === 'daily' ? (row as any).daily_turn_02_time ?? row.turn_02_time : row.turn_02_time)}</TableCell>
+                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderEditableCell(row, 'turn_01_time', editMode === 'daily' ? (row as any).daily_turn_01_time ?? row.turn_01_time : row.turn_01_time)}</TableCell>
+                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderEditableCell(row, 'turn_02_time', editMode === 'daily' ? (row as any).daily_turn_02_time ?? row.turn_02_time : row.turn_02_time)}</TableCell>
                       </>
                     )}
                     {/* Meter / Fuel */}
                     {visibleSections.has('meter') && (
                       <>
                         <TableCell className="text-sm text-muted-foreground py-2 min-h-[40px]">{isSubRow ? '' : row.bus_model || '-'}</TableCell>
-                        <TableCell className="text-sm text-right font-mono py-1 min-h-[40px]">
+                        <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">
                           {renderEditableCell(row, 'odometer_start', row.start_meter || '', 'number')}
                         </TableCell>
-                        <TableCell className="text-sm text-right font-mono py-1 min-h-[40px]">
+                        <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">
                           {renderEditableCell(row, 'odometer_end', row.end_meter || '', 'number')}
                         </TableCell>
                         <TableCell className="text-sm text-right font-mono font-semibold py-2 min-h-[40px]">
                           {row.total_mileage > 0 ? row.total_mileage.toLocaleString() : '-'}
                         </TableCell>
-                        <TableCell className="text-sm text-right font-mono py-1 min-h-[40px]">
+                        <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">
                           {renderEditableCell(row, 'fuel_liters', row.fuel_liters || '', 'number')}
                         </TableCell>
                         <TableCell className="text-sm text-right font-mono py-2 min-h-[40px]">
                           {hasFuelData ? row.fuel_consumption.toFixed(2) : '-'}
                         </TableCell>
-                        <TableCell className="text-sm text-right font-mono py-1 min-h-[40px]">
+                        <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">
                           {isSubRow ? '' : renderEditableCell(row, 'standard_rate', row.standard_rate || '', 'number')}
                         </TableCell>
                         <TableCell className={`text-sm text-right font-mono font-bold py-2 min-h-[40px] ${getPerformanceColor(row.performance, hasFuelData)}`}>
@@ -691,7 +693,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                     {/* Financials */}
                     {visibleSections.has('financials') && (
                       <>
-                        <TableCell className="text-sm text-right font-mono py-1 min-h-[40px]">{renderEditableCell(row, 'day_target', row.day_target, 'number')}</TableCell>
+                        <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">{renderEditableCell(row, 'day_target', row.day_target, 'number')}</TableCell>
                         <TableCell className="text-sm text-right font-mono text-green-700 dark:text-green-400 py-2 min-h-[40px]">
                           {row.passenger_income > 0 ? formatLKR(row.passenger_income) : '-'}
                         </TableCell>
