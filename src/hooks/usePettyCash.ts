@@ -609,10 +609,17 @@ export const useCreateIOU = () => {
 
   return useMutation({
     mutationFn: async (data: Partial<IOURecord>) => {
+      // Generate IOU number
+      const { data: numData } = await supabase.rpc("generate_entity_number", {
+        p_entity_type: "iou",
+        p_company_id: selectedCompanyId,
+      });
+      const iouNumber = numData || `IOU-${Date.now().toString().slice(-6)}`;
+
       const { data: result, error } = await supabase
         .from("iou_records")
         .insert([{
-          iou_number: "",
+          iou_number: iouNumber,
           business_unit_code: data.business_unit_code || "SBO",
           company_id: selectedCompanyId,
           staff_id: data.staff_id,
@@ -765,18 +772,32 @@ export const useUpdateIOU = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...data }: Partial<IOURecord> & { id: string }) => {
+      // Calculate balance if settling partially
+      const updateData: any = { ...data };
+      if (data.settled_amount !== undefined && data.status !== undefined) {
+        // Get original IOU for proper balance calc
+        const { data: origIou } = await supabase
+          .from("iou_records")
+          .select("amount")
+          .eq("id", id)
+          .single();
+        if (origIou) {
+          updateData.balance = Math.max(0, (origIou.amount || 0) - (data.settled_amount || 0));
+        }
+      }
+
       const { data: result, error } = await supabase
         .from("iou_records")
-        .update(data)
+        .update(updateData)
         .eq("id", id)
         .select()
         .single();
 
       if (error) throw error;
 
-      // Auto-create GL reversal when IOU is settled
-      // Settlement reverses the advance: DR Cash/Bank / CR Staff Advance
-      if (data.status === "settled" && selectedCompanyId) {
+      // Auto-create GL reversal when IOU is settled or partially settled
+      const shouldPostGL = (data.status === "settled" || data.status === "partially_settled") && selectedCompanyId;
+      if (shouldPostGL) {
         try {
           // Get the original IOU to know the amount
           const settledAmount = (result as any).amount || data.settled_amount || 0;

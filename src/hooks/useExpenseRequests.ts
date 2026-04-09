@@ -219,6 +219,36 @@ export const useCreateExpenseRequest = () => {
         }
       }
 
+      // Auto-settle IOU when payment method is "iou"
+      if (data.payment_method === "iou" && data.iou_id && (data.amount || 0) > 0) {
+        try {
+          const amount = data.amount || 0;
+          const { data: iou } = await supabase
+            .from("iou_records")
+            .select("amount, settled_amount, balance")
+            .eq("id", data.iou_id)
+            .single();
+
+          if (iou) {
+            const newSettledAmount = (iou.settled_amount || 0) + amount;
+            const newBalance = (iou.amount || 0) - newSettledAmount;
+            const newStatus = newBalance <= 0 ? "settled" : "partially_settled";
+
+            await supabase
+              .from("iou_records")
+              .update({
+                settled_amount: newSettledAmount,
+                balance: Math.max(0, newBalance),
+                status: newStatus,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", data.iou_id);
+          }
+        } catch (iouErr) {
+          console.error("IOU auto-settlement failed (expense still saved):", iouErr);
+        }
+      }
+
       return result;
     },
     onSuccess: () => {
@@ -226,6 +256,7 @@ export const useCreateExpenseRequest = () => {
       queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });
       queryClient.invalidateQueries({ queryKey: ["petty-cash-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["petty-cash-all-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["iou-records"] });
       toast({
         title: "Expense Request Created",
         description: "The expense request has been submitted successfully.",

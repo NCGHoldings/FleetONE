@@ -42,6 +42,8 @@ export const entityTypeLabels: Record<string, string> = {
   bank_fee: "Bank Fee",
   inter_bank_transfer: "Inter-Bank Transfer",
   fund_transfer: "Fund Transfer",
+  iou: "IOU",
+  expense_request: "Expense Request",
 };
 
 export function useNumberingSequences() {
