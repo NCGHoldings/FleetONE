@@ -59,8 +59,11 @@ export function useSchoolAnalytics(branchId?: string, timeRange: string = "6mont
 
       // Calculate overall statistics
       const totalStudents = students?.length || 0;
-      const paidStudents = students?.filter(s => s.payment_status === "paid") || [];
-      const totalRevenue = paidStudents.reduce((sum, s) => sum + (Number(s.payment_amount) || 0), 0);
+      const paidStudents = students?.filter(s => (s.payment_balance as number) >= 0 && (Number(s.current_amount_due) || 0) > 0) || [];
+      const outstandingStudents = students?.filter(s => (s.payment_balance as number) < 0) || [];
+      const totalRevenue = outstandingStudents.length > 0 
+        ? students!.reduce((sum, s) => sum + (Number(s.payment_amount) || 0), 0) 
+        : 0;
       const paymentRate = totalStudents > 0 ? (paidStudents.length / totalStudents) * 100 : 0;
 
       // Calculate monthly growth (mock data for now)
