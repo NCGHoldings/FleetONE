@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2 } from "lucide-react";
 import { useBankAccounts } from "@/hooks/useAccountingData";
 import { useCreateBankFee } from "@/hooks/useBankFees";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 import { format } from "date-fns";
 
 interface BankFeeFormProps {
@@ -36,13 +37,21 @@ export const BankFeeForm = ({
 }: BankFeeFormProps) => {
   const { data: bankAccounts } = useBankAccounts();
   const createBankFee = useCreateBankFee();
+  const generateNumber = useGenerateNumber();
 
   const [bankAccountId, setBankAccountId] = useState(defaultBankAccountId || "");
   const [feeDate, setFeeDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [amount, setAmount] = useState("");
   const [feeType, setFeeType] = useState("bank_charge");
   const [description, setDescription] = useState("");
+  const [reference, setReference] = useState("");
   const [postImmediately, setPostImmediately] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      generateNumber("bank_fee").then((num) => setReference(num));
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

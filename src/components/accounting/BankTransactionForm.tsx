@@ -178,7 +178,8 @@ export const BankTransactionForm = ({ open, onOpenChange, preselectedBankId }: B
               <Input 
                 id="reference" 
                 {...form.register("reference")} 
-                placeholder="Cheque #, Receipt #"
+                readOnly
+                className="bg-muted"
               />
             </div>
           </div>
