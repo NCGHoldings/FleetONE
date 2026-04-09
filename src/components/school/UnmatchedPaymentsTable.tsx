@@ -63,19 +63,27 @@ export function UnmatchedPaymentsTable({ importId, branchId, onStatsUpdate }: Un
     const item = items.find(i => i.id === itemId);
     if (!item) return;
 
+    // Validate student belongs to current branch
+    const student = students.find(s => s.id === studentId);
+    if (!student || student.branch_id !== branchId) {
+      toast({ title: "Error", description: "Student does not belong to this branch", variant: "destructive" });
+      return;
+    }
+
     try {
       // Fetch student details including current balance
-      const { data: student, error: studentError } = await supabase
+      const { data: studentData, error: studentError } = await supabase
         .from('school_students')
         .select('fixed_monthly_amount, payment_balance')
         .eq('id', studentId)
+        .eq('branch_id', branchId)
         .single();
 
-      if (studentError || !student) throw new Error('Student not found');
+      if (studentError || !studentData) throw new Error('Student not found in this branch');
 
       const amountPaid = item.amount;
-      const fixedAmount = student.fixed_monthly_amount || 0;
-      const balanceBefore = student.payment_balance || 0;
+      const fixedAmount = studentData.fixed_monthly_amount || 0;
+      const balanceBefore = studentData.payment_balance || 0;
       const difference = amountPaid - fixedAmount;
       const balanceAfter = balanceBefore + difference;
       
@@ -117,6 +125,20 @@ export function UnmatchedPaymentsTable({ importId, branchId, onStatsUpdate }: Un
           processed_at: new Date().toISOString(),
         })
         .eq('id', itemId);
+
+      // Save pattern for future learning
+      try {
+        await supabase
+          .from('school_payment_pattern_history')
+          .insert([{
+            branch_id: branchId,
+            original_description: item.description,
+            matched_admission_no: student.admission_no || studentId,
+            pattern_type: 'manual_match',
+          }]);
+      } catch (e) {
+        console.warn('Pattern learning save failed (non-critical):', e);
+      }
 
       toast({
         title: "Payment Matched",
@@ -191,13 +213,15 @@ export function UnmatchedPaymentsTable({ importId, branchId, onStatsUpdate }: Un
             </SelectTrigger>
             <SelectContent>
               {students
-                .filter(s =>
-                  s.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  s.admission_no.toLowerCase().includes(searchTerm.toLowerCase())
-                )
+                .filter(s => {
+                  const name = (s.student_name || '').toLowerCase();
+                  const admNo = (s.admission_no || '').toLowerCase();
+                  const term = searchTerm.toLowerCase();
+                  return name.includes(term) || admNo.includes(term);
+                })
                 .map(student => (
                   <SelectItem key={student.id} value={student.id}>
-                    {student.admission_no} - {student.student_name}
+                    {student.admission_no || 'N/A'} - {student.student_name}
                   </SelectItem>
                 ))}
             </SelectContent>

@@ -48,6 +48,120 @@ export interface ProcessedTransaction extends BankStatementTransaction {
   nameBasedSuggestions?: any[];
 }
 
+// =========== ADMISSION NUMBER NORMALIZATION ===========
+/**
+ * Normalize an admission-like token for comparison.
+ * Handles: N14929, N 14929, LNU-14502, NEX-000W14929, W14929
+ * Returns { full: uppercased stripped token, numeric: trailing digit run }
+ */
+export const normalizeAdmissionToken = (token: string): { full: string; numeric: string } => {
+  const upper = token.toUpperCase().replace(/[\s\-_./]+/g, '');
+  // Extract trailing 4-6 digit run
+  const trailingDigits = upper.match(/(\d{4,6})$/);
+  return {
+    full: upper,
+    numeric: trailingDigits ? trailingDigits[1] : upper.replace(/[^0-9]/g, ''),
+  };
+};
+
+/**
+ * Extract all plausible admission-number-like tokens from a combined text string.
+ * Works on description, reference, tran ID — any text.
+ */
+export const extractAdmissionTokens = (text: string, prefixes: string[]): string[] => {
+  if (!text) return [];
+  const upper = text.toUpperCase().replace(/\s+/g, ' ').trim();
+  const tokens: string[] = [];
+
+  // 1. Prefix-based: find PREFIX followed by optional separators and digits
+  for (const prefix of prefixes) {
+    const p = prefix.toUpperCase();
+    const re = new RegExp(`${p}[\\s\\-_./]*\\d{3,6}`, 'g');
+    const matches = upper.match(re);
+    if (matches) tokens.push(...matches.map(m => m.replace(/[\s\-_./]+/g, '')));
+  }
+
+  // 2. Wrapped IDs like NEX-000W14929 → extract trailing letter+digits portion
+  const wrappedRe = /[A-Z]{2,5}[\-_.]?[0-9A-Z]*?([A-Z]\d{4,6})/g;
+  let m;
+  while ((m = wrappedRe.exec(upper)) !== null) {
+    if (!tokens.includes(m[1])) tokens.push(m[1]);
+  }
+
+  // 3. Standalone 5-6 digit numbers
+  const standalone = upper.match(/\b\d{5,6}\b/g);
+  if (standalone) {
+    for (const s of standalone) {
+      if (!tokens.includes(s)) tokens.push(s);
+    }
+  }
+
+  return [...new Set(tokens)];
+};
+
+/**
+ * Match students from a list against extracted tokens.
+ * Returns matched students with confidence info.
+ */
+export const matchStudentsFromTokens = (
+  tokens: string[],
+  students: any[],
+  matchText: string
+): { matched: any[]; confidence: number; pattern: string } => {
+  if (!students || students.length === 0) return { matched: [], confidence: 0, pattern: '' };
+
+  const normalizedTokens = tokens.map(normalizeAdmissionToken);
+  const matched: any[] = [];
+  let confidence = 0;
+  let pattern = '';
+
+  for (const student of students) {
+    if (!student.admission_no) continue;
+    const studentNorm = normalizeAdmissionToken(student.admission_no);
+
+    const isMatch = normalizedTokens.some(token => {
+      // Exact full match
+      if (token.full === studentNorm.full) return true;
+      // Numeric-only match (LNU14480 → 14480 matches N14480 → 14480)
+      if (token.numeric && studentNorm.numeric && token.numeric.length >= 4 && token.numeric === studentNorm.numeric) return true;
+      // Partial contains (only for longer tokens)
+      if (token.full.length >= 5 && (token.full.includes(studentNorm.full) || studentNorm.full.includes(token.full))) return true;
+      return false;
+    });
+
+    if (isMatch) {
+      matched.push(student);
+      confidence = Math.max(confidence, 90);
+      pattern = 'Admission number match';
+    }
+  }
+
+  // Name-based fallback if no ID match
+  if (matched.length === 0 && matchText) {
+    const upperText = matchText.toUpperCase().replace(/\s+/g, ' ').trim();
+    for (const student of students) {
+      const name = (student.student_name || '').toUpperCase().trim();
+      const parent = (student.parent_name || '').toUpperCase().trim();
+      if (!name) continue;
+
+      // Exact name match
+      if (name.length >= 4 && upperText.includes(name)) {
+        matched.push(student);
+        confidence = Math.max(confidence, 70);
+        pattern = 'Student name match';
+      } else if (parent && parent.length >= 4 && upperText.includes(parent)) {
+        matched.push(student);
+        confidence = Math.max(confidence, 60);
+        pattern = 'Parent name match';
+      }
+    }
+  }
+
+  // Deduplicate
+  const unique = [...new Map(matched.map(s => [s.id, s])).values()];
+  return { matched: unique, confidence, pattern };
+};
+
 // =========== HELPERS ===========
 const parseDate = (dateValue: any): Date => {
   if (!dateValue) return new Date();
@@ -466,6 +580,8 @@ export const extractAdmissionNumbers = (
   prefixes: string[],
   customPatterns: any[] = []
 ): ExtractionResult => {
+  if (!description) return { admissionNumbers: [], confidence: 0, matchedPattern: '' };
+  
   const normalized = description.toUpperCase().replace(/\s+/g, ' ').trim();
   const extractedIds: string[] = [];
   let confidence = 0;
@@ -487,35 +603,28 @@ export const extractAdmissionNumbers = (
     }
   }
 
-  // If no custom pattern matched, try prefix-based extraction
+  // Use new token extraction if no custom match
+  if (extractedIds.length === 0) {
+    const tokens = extractAdmissionTokens(description, prefixes);
+    if (tokens.length > 0) {
+      extractedIds.push(...tokens);
+      confidence = 90;
+      matchedPattern = 'Token extraction';
+    }
+  }
+
+  // Legacy prefix-based fallback
   if (extractedIds.length === 0) {
     for (const prefix of prefixes) {
       const pattern1 = new RegExp(`${prefix}\\s*[-_]?\\s*(\\d{4,6})`, 'gi');
       const matches1 = Array.from(normalized.matchAll(pattern1));
-      
       if (matches1.length > 0) {
         matches1.forEach(match => {
           const id = `${prefix}${match[1]}`;
-          if (!extractedIds.includes(id)) {
-            extractedIds.push(id);
-          }
+          if (!extractedIds.includes(id)) extractedIds.push(id);
         });
         confidence = 90;
         matchedPattern = `Prefix: ${prefix}`;
-      }
-
-      const prefixIndex = normalized.indexOf(prefix);
-      if (prefixIndex !== -1) {
-        const afterPrefix = normalized.substring(prefixIndex + prefix.length);
-        const digitMatch = afterPrefix.match(/^\s*[-_]?\s*(\d{4,6})/);
-        if (digitMatch) {
-          const id = `${prefix}${digitMatch[1]}`;
-          if (!extractedIds.includes(id)) {
-            extractedIds.push(id);
-            confidence = Math.max(confidence, 85);
-            matchedPattern = matchedPattern || `Prefix: ${prefix}`;
-          }
-        }
       }
     }
   }
@@ -531,7 +640,7 @@ export const extractAdmissionNumbers = (
   }
 
   return {
-    admissionNumbers: extractedIds,
+    admissionNumbers: [...new Set(extractedIds)],
     confidence: Math.min(confidence, 100),
     matchedPattern,
   };
@@ -561,6 +670,7 @@ export interface ColumnMapping {
   typeCol?: string; // Cr/Dr indicator column
   referenceCol?: string;
   balanceCol?: string;
+  matchFromCol?: string; // Which column(s) to use for student matching: 'description', 'reference', 'combined', or a specific header name
 }
 
 export const getFileHeaders = async (file: File): Promise<{ headers: string[]; sampleRows: Record<string, any>[] }> => {
