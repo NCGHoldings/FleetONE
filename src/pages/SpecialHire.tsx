@@ -620,16 +620,7 @@ export default function SpecialHire() {
             </TabsContent>
 
             <TabsContent value="reports" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Reports & Analytics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Comprehensive reporting dashboard coming soon...
-                  </p>
-                </CardContent>
-              </Card>
+              <SpecialHireReportsTab />
             </TabsContent>
           </>
         )}
