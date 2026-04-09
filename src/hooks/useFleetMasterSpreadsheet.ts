@@ -236,6 +236,18 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
 
   const updateField = async (rosterId: string, field: string, value: any) => {
     try {
+      // Handle per-trip route updates: field format is "route_label__trip:<trip_id>"
+      const tripRouteMatch = field.match(/^route_label__trip:(.+)$/);
+      if (tripRouteMatch) {
+        const tripId = tripRouteMatch[1];
+        const { error } = await supabase
+          .from("daily_trips")
+          .update({ route_label: value })
+          .eq("id", tripId);
+        if (error) throw error;
+        await fetchRoster(true);
+        return;
+      }
       // Standard rate updates the buses table directly
       if (BUS_DIRECT_FIELDS.includes(field)) {
         const row = expandedRows.find(r => r.id === rosterId);
