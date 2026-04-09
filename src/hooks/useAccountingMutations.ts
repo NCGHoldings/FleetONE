@@ -524,6 +524,7 @@ export const useCreateARReceipt = () => {
       notes?: string;
       is_advance?: boolean;
       party_type?: "customer" | "vendor";
+      override_gl_account_id?: string;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
@@ -552,6 +553,7 @@ export const useCreateARReceipt = () => {
           status: "posted",
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,
+          override_gl_account_id: receipt.override_gl_account_id || null,
         }])
         .select()
         .single();
@@ -636,6 +638,11 @@ export const useCreateARReceipt = () => {
             .single();
           customerName = customerData?.customer_name || "";
         } catch { /* Non-blocking */ }
+      }
+
+      // Apply GL override: manual override > category mapping > global settings
+      if (receipt.override_gl_account_id) {
+        tradeReceivableId = receipt.override_gl_account_id;
       }
 
       // Only post to GL if we have the required accounts

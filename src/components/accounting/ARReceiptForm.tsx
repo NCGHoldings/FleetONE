@@ -34,6 +34,7 @@ const receiptSchema = z.object({
   reference: z.string().optional(),
   notes: z.string().optional(),
   is_advance: z.boolean().optional(),
+  override_gl_account_id: z.string().optional(),
 });
 
 type ReceiptFormData = z.infer<typeof receiptSchema>;
@@ -78,6 +79,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const [globalWriteOffAccountId, setGlobalWriteOffAccountId] = useState("");
   const [partyOpen, setPartyOpen] = useState(false);
   const [resolvedGL, setResolvedGL] = useState<{ accountCode: string; accountName: string } | null>(null);
+  const [overrideGLAccountId, setOverrideGLAccountId] = useState("");
 
   // Build grouped party options
   const partyOptions = useMemo(() => {
@@ -308,6 +310,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
         notes: data.notes,
         is_advance: isAdvance,
         party_type: selectedPartyType,
+        override_gl_account_id: overrideGLAccountId || undefined,
         allocations: selectedAllocations.map((a) => ({
           invoice_id: a.invoice_id,
           allocated_amount: a.allocated_amount,
@@ -412,10 +415,10 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0 z-[100] bg-popover border shadow-lg" align="start" sideOffset={4}>
+                      <PopoverContent className="w-[400px] p-0 z-[200] bg-popover border shadow-lg" align="start" sideOffset={4} style={{ pointerEvents: 'auto' }} onOpenAutoFocus={(e) => e.preventDefault()}>
                         <Command shouldFilter={true}>
                           <CommandInput placeholder="Search customer or vendor..." />
-                          <CommandList className="max-h-[300px] overflow-y-auto">
+                          <CommandList className="max-h-[400px] overflow-y-auto">
                             <CommandEmpty>No match found.</CommandEmpty>
                             {/* Customer groups */}
                             {Array.from(groupedOptions.customersByCategory.entries()).map(([category, items]) => (
@@ -453,12 +456,12 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                         </Command>
                       </PopoverContent>
                     </Popover>
-                    {/* GL Code Badge */}
-                    {resolvedGL && (
+                    {/* GL Code Badge — shows override if set, otherwise auto-resolved */}
+                    {(overrideGLAccountId || resolvedGL) && (
                       <div className="flex items-center gap-1.5 mt-1">
                         <Info className="h-3.5 w-3.5 text-blue-500" />
                         <span className="text-xs text-blue-600 font-mono">
-                          GL: {resolvedGL.accountCode} - {resolvedGL.accountName}
+                          {overrideGLAccountId ? "GL Override Applied" : `GL: ${resolvedGL?.accountCode} - ${resolvedGL?.accountName}`}
                         </span>
                       </div>
                     )}
@@ -486,6 +489,21 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                 )}
               />
             </div>
+
+            {/* GL Account Override */}
+            {selectedCustomerId && (
+              <div className="p-3 border rounded-lg bg-muted/30">
+                <FormLabel className="text-sm font-medium mb-2 block">GL Account Override (Optional)</FormLabel>
+                <SearchableAccountSelector
+                  value={overrideGLAccountId}
+                  onValueChange={setOverrideGLAccountId}
+                  placeholder="Leave empty to use auto-resolved GL account..."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Override takes priority over category mapping and global settings
+                </p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <FormField
