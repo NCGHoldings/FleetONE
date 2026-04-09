@@ -40,6 +40,8 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
   const [showAddBus, setShowAddBus] = useState(false);
   const [availableBuses, setAvailableBuses] = useState<any[]>([]);
   const [selectedBusId, setSelectedBusId] = useState('');
+  const [selectedRouteId, setSelectedRouteId] = useState('');
+  const [selectedRouteLabel, setSelectedRouteLabel] = useState('');
   const [creating, setCreating] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
@@ -62,9 +64,11 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
 
   const handleAddBus = async () => {
     if (!selectedBusId) return;
-    await addRosterEntry(selectedBusId);
+    await addRosterEntry(selectedBusId, selectedRouteId || undefined, selectedRouteLabel || undefined);
     setShowAddBus(false);
     setSelectedBusId('');
+    setSelectedRouteId('');
+    setSelectedRouteLabel('');
   };
 
   const handleCreateTrips = async () => {
@@ -279,37 +283,74 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
             <DialogTitle>Add Bus to Fleet Roster</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between">
-                  {selectedBusId
-                    ? (() => {
-                        const bus = availableBuses.find(b => b.id === selectedBusId);
-                        return bus ? `${bus.bus_no}${bus.route ? ` — ${bus.route}` : ''}` : 'Select a bus...';
-                      })()
-                    : 'Select a bus...'}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0 z-[100]" align="start">
-                <Command>
-                  <CommandInput placeholder="Search bus number or route..." className="border-b" />
-                  <CommandEmpty>No bus found.</CommandEmpty>
-                  <CommandGroup className="max-h-60 overflow-y-auto">
-                    {availableBuses.map(b => (
-                      <CommandItem
-                        key={b.id}
-                        value={`${b.bus_no} ${b.route || ''}`}
-                        onSelect={() => setSelectedBusId(b.id)}
-                      >
-                        <Check className={cn("mr-2 h-4 w-4", selectedBusId === b.id ? "opacity-100" : "opacity-0")} />
-                        {b.bus_no} {b.route ? `— ${b.route}` : ''}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Bus</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-full justify-between">
+                    {selectedBusId
+                      ? (() => {
+                          const bus = availableBuses.find(b => b.id === selectedBusId);
+                          return bus ? `${bus.bus_no}${bus.route ? ` — ${bus.route}` : ''}` : 'Select a bus...';
+                        })()
+                      : 'Select a bus...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0 z-[100]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search bus number or route..." className="border-b" />
+                    <CommandEmpty>No bus found.</CommandEmpty>
+                    <CommandGroup className="max-h-60 overflow-y-auto">
+                      {availableBuses.map(b => (
+                        <CommandItem
+                          key={b.id}
+                          value={`${b.bus_no} ${b.route || ''}`}
+                          onSelect={() => setSelectedBusId(b.id)}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", selectedBusId === b.id ? "opacity-100" : "opacity-0")} />
+                          {b.bus_no} {b.route ? `— ${b.route}` : ''}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1 block">Route</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-full justify-between">
+                    {selectedRouteLabel || 'Select a route (optional)...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0 z-[100]" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search route..." className="border-b" />
+                    <CommandEmpty>No route found.</CommandEmpty>
+                    <CommandGroup className="max-h-60 overflow-y-auto">
+                      {availableRoutes.map(r => (
+                        <CommandItem
+                          key={r.id}
+                          value={r.route_name}
+                          onSelect={() => {
+                            setSelectedRouteId(r.id);
+                            setSelectedRouteLabel(r.route_name);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", selectedRouteId === r.id ? "opacity-100" : "opacity-0")} />
+                          {r.route_name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
             <Button onClick={handleAddBus} disabled={!selectedBusId} className="w-full">
               <Bus className="h-4 w-4 mr-2" /> Add to Roster
             </Button>
