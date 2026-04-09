@@ -470,7 +470,82 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           </>
         )}
 
-        {/* ===== STEP: PREVIEW ===== */}
+        {/* ===== STEP: COLUMN MAPPING ===== */}
+        {step === "column_mapping" && fileHeaders.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+              <span className="text-xs text-yellow-700 dark:text-yellow-300">
+                Auto-detection couldn't parse transactions. Map your file columns below.
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { key: 'dateCol' as const, label: 'Date Column *', required: true },
+                { key: 'descriptionCol' as const, label: 'Description Column *', required: true },
+                { key: 'amountCol' as const, label: 'Amount Column *', required: true },
+                { key: 'typeCol' as const, label: 'Type (Cr/Dr) Column', required: false },
+                { key: 'referenceCol' as const, label: 'Reference Column', required: false },
+                { key: 'balanceCol' as const, label: 'Balance Column', required: false },
+              ].map(({ key, label, required }) => (
+                <div key={key}>
+                  <label className="text-xs font-semibold text-muted-foreground mb-1 block">{label}</label>
+                  <Select
+                    value={columnMapping[key] || '__none__'}
+                    onValueChange={(v) => setColumnMapping(prev => ({ ...prev, [key]: v === '__none__' ? '' : v }))}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder={required ? 'Select column' : 'Optional'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {!required && <SelectItem value="__none__">— None —</SelectItem>}
+                      {fileHeaders.map(h => (
+                        <SelectItem key={h} value={h}>{h}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+
+            {/* Sample Data Preview */}
+            {sampleRows.length > 0 && (
+              <div className="border rounded-lg overflow-auto max-h-[180px]">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      {fileHeaders.map(h => (
+                        <th key={h} className="p-2 text-left whitespace-nowrap font-medium">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sampleRows.map((row, i) => (
+                      <tr key={i} className="border-b">
+                        {fileHeaders.map(h => (
+                          <td key={h} className="p-2 whitespace-nowrap">{String(row[h] ?? '')}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center pt-2">
+              <Button variant="outline" size="sm" onClick={resetState}>← Back</Button>
+              <Button
+                size="sm"
+                onClick={handleMappingParse}
+                disabled={!columnMapping.dateCol || !columnMapping.descriptionCol || !columnMapping.amountCol}
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-1" /> Parse with Mapping
+              </Button>
+            </div>
+          </div>
+        )}
+
         {step === "preview" && parseResult && (
           <div className="space-y-4">
             {/* Summary Cards */}
