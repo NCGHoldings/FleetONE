@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, DollarSign, TrendingDown, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText, Trash2, Paperclip, Pencil, Clock } from "lucide-react";
+import { Plus, Search, DollarSign, TrendingDown, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText, Trash2, Paperclip, Pencil, Clock, CheckCircle } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { EditHistoryDialog } from "./shared/EditHistoryDialog";
 import { APPaymentEditDialog } from "./APPaymentEditDialog";
@@ -13,7 +13,7 @@ import { APPaymentEditDialog } from "./APPaymentEditDialog";
 import { ChequePrintPreview } from "./ChequePrintPreview";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
 import { useAPPayments, useVendors } from "@/hooks/useAccountingData";
-import { useDeleteAPPayment } from "@/hooks/useAccountingMutations";
+import { useDeleteAPPayment, useApproveAPPayment } from "@/hooks/useAccountingMutations";
 import { useBankFees } from "@/hooks/useBankFees";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { APPaymentForm } from "./APPaymentForm";
@@ -33,6 +33,7 @@ export const APPaymentsView = () => {
   const { data: payments, isLoading } = useAPPayments();
   const { data: vendors } = useVendors();
   const deletePayment = useDeleteAPPayment();
+  const approvePayment = useApproveAPPayment();
   const { data: bankFees } = useBankFees();
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -327,6 +328,17 @@ export const APPaymentsView = () => {
                   <TableCell>{getStatusBadge(payment)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      {(payment as any).approval_status === "pending" && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                          onClick={() => approvePayment.mutate(payment.id)}
+                          title="Approve Payment"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => setDetailPayment(payment)} title="View Details">
                         <FileText className="h-4 w-4" />
                       </Button>

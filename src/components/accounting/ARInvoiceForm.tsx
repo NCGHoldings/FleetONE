@@ -489,7 +489,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                             value={line.account_id || ""}
                             onValueChange={(val) => updateLine(line.id, "account_id", val)}
                             placeholder="Auto from category"
-                            accountTypes={["revenue", "income"]}
+                            accountTypes={["revenue", "income", "equity"]}
                             className="h-9 text-sm"
                           />
                         </td>
