@@ -113,6 +113,7 @@ export function SchoolBusFinanceSettings() {
           auto_post_payments: defaultSetting.auto_post_payments || false,
           auto_post_expenses: defaultSetting.auto_post_expenses || false,
           invoice_prefix: defaultSetting.invoice_prefix || "SBS-INV",
+          billing_percentage: defaultSetting.billing_percentage ?? 80,
           // Expense accounts
           expense_account_id: defaultSetting.expense_account_id || "",
           fuel_expense_account_id: defaultSetting.fuel_expense_account_id || "",
