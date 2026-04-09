@@ -528,6 +528,8 @@ export const useCreateARReceipt = () => {
       bus_id?: string;
       bus_no?: string;
       vehicle_type?: string;
+      bank_fee_amount?: number;
+      bank_fee_type?: string;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
