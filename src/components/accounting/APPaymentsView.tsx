@@ -5,8 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, DollarSign, TrendingDown, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText, Trash2, Paperclip } from "lucide-react";
+import { Plus, Search, DollarSign, TrendingDown, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText, Trash2, Paperclip, Pencil, Clock } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { EditHistoryDialog } from "./shared/EditHistoryDialog";
+import { APPaymentEditDialog } from "./APPaymentEditDialog";
 
 import { ChequePrintPreview } from "./ChequePrintPreview";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
@@ -47,6 +49,8 @@ export const APPaymentsView = () => {
   const [chequePrintOpen, setChequePrintOpen] = useState(false);
   const [printCheque, setPrintCheque] = useState<any>(null);
   const [detailPayment, setDetailPayment] = useState<any>(null);
+  const [editingPayment, setEditingPayment] = useState<any>(null);
+  const [historyPayment, setHistoryPayment] = useState<any>(null);
 
   // Get vendor name helper
   const getVendorName = (vendorId: string) => {
