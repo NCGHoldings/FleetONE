@@ -1,80 +1,76 @@
 
 
-# Build Full LC Management, Delivery Orders & Landed Cost System
+# Update Fleet Roster with Actual Bus Route Schedule Data
 
-## Current State
+## What We're Doing
 
-- **YutongLCManagement.tsx** — placeholder "coming soon"
-- **YutongDeliveryOrderManagement.tsx** — placeholder "coming soon"
-- **SinotrukLCManagement.tsx** — placeholder "coming soon"
-- **LightVehicleLCManagement.tsx** — placeholder "coming soon"
-- **Hook `useYutongFinanceManagement.ts`** — all CRUD functions already built (createLC, updateLCStatus, addLCAmendment, createDO, updateDOStatus, getLetterOfCredits, getDeliveryOrders)
-- **Database tables** — `yutong_letter_of_credits` (23 columns), `yutong_delivery_orders` (21 columns), `landed_cost_vouchers/charges/items` all exist with proper schemas
-- **Sinotruck & Light Vehicle** hooks already have identical LC/DO functions
+Your "BUS ROUTE DATA" spreadsheet has the real operational schedule for 70 buses across ~25 routes, with correct trips per day, time slots, start locations, and seat capacity. The current fleet roster has many mismatches — buses marked "Stopped" that are actually running, wrong trip counts (e.g., NG 8223 shows 1 trip but actually does 2), and missing time slots.
 
-The backend is 100% ready. Only the UI components are empty placeholders.
+We'll write a SQL migration to bulk-update all roster entries and also update the `buses` table capacity where provided. Plus we'll organize the roster by route sections matching your spreadsheet groupings.
 
-## Plan
+## Data Mapping (Spreadsheet → Roster)
 
-### 1. Build YutongLCManagement.tsx — Full LC Interface
+From your spreadsheet, each bus gets:
 
-Replace the placeholder with a complete management screen:
+| Spreadsheet Field | Updates To |
+|---|---|
+| Route name (e.g., "Colombo - Jaffna") | `route_label` + `section` |
+| Trip count per bus | `trips_per_day` |
+| Time Slot / End Time | `turn_01_time` / `turn_02_time` |
+| Seat Capacity | `buses.capacity` |
+| Running status | `remark = 'Running'` (or 'Stopped' for NOT RUNNING buses) |
+| Sort order | `sort_order` by route section sequence |
 
-- **LC List Table**: LC No, Order (bus model + qty), Bank, Amount (USD), Status badge, Issue/Expiry dates, Utilized/Remaining, Amendment count
-- **Create LC Dialog**: Form with fields — select order (dropdown of Yutong orders), issuing bank name/branch/contact, beneficiary bank, LC amount, currency, LC type, issue date, expiry date, latest shipment date, notes
-- **LC Detail View**: Click a row to expand/view full LC details
-- **Status Actions**: Update status (issued → negotiating → utilized → expired/closed), record utilized amount
-- **Amendment Dialog**: Add amendments with type, description, old/new values, date — appends to JSONB array
-- **Color-coded status badges**: draft=gray, issued=blue, amended=yellow, utilized=green, expired=red
+## Key Corrections
 
-Uses existing `useYutongFinanceManagement` hook — no new backend code needed.
+**Buses changing from Stopped → Running** (currently wrong):
+- NI 8222, NI 8223, NI 8244, NI 8229, NI 8250, NI 8251, NI 8253, NI 8254, NI 8255, NI 8256
+- NG 8256, NG 8259, NG 8260, NG 8261
 
-### 2. Build YutongDeliveryOrderManagement.tsx — Full DO Interface
+**Buses staying Stopped** (NOT RUNNING per your data):
+- NG 8244 (Nuwara Eliya — not running), NG 8255 (Meegoda-Pettah — not running), NG 8257 (Panadura-Pettah — not running)
 
-Replace the placeholder with:
+**Trips per day corrections** (examples):
+- NG 8220: 1 → 2 (Jaffna + Kandy XL)
+- NG 8223: 1 → 2 (Jaffna + Passara)
+- NI 8222: 1 → 2 (Jaffna + Passara)
+- NG 8256: 1 → 4 (Kaduwela-Moratuwa, 4 round trips)
+- NG 8259: 1 → 3 (Horana-Kaduwela, 3 round trips)
+- NI 8229: 1 → 4 (Mirigama-Panadura, 4 legs)
 
-- **DO List Table**: DO No, Order, LC (linked), Bank, Amount, Vehicle Count, Status, Issue/Release/Collection dates
-- **Create DO Dialog**: Select order, optionally link to LC, bank, amount, chassis/engine numbers (multi-input), vehicle count, commercial invoice no, bill of lading no, packing list no
-- **Status Workflow**: pending → issued → released → collected (with release_date and collection_date auto-fill)
-- **Collection tracking**: Record who collected (collected_by field)
+**Section groupings**: Routes will be organized into sections matching the spreadsheet order (Colombo-Jaffna, Colombo-Badulla Highway, Passara-Colombo, etc.)
 
-Uses existing `useYutongFinanceManagement` hook.
+## Implementation
 
-### 3. Build Landed Cost Integration Tab
+### 1. SQL Migration — Bulk Update Roster
 
-Add a "Landed Cost" tab to the Finance Dashboard showing:
+One large migration that:
 
-- **Voucher List**: From `landed_cost_vouchers` table — voucher number, posting date, total additional cost, allocation method, status
-- **Charges breakdown**: From `landed_cost_charges` — charge type, description, amount, vendor
-- **Item allocation view**: From `landed_cost_items` — original cost, allocated cost, final cost per item
-- **Link to orders**: Connect landed cost vouchers to Yutong orders for full cost tracking
+a) Updates `route_label`, `trips_per_day`, `turn_01_time`, `turn_02_time`, `remark`, `section`, `sort_order` for each bus in `fleet_master_roster` (matching by bus_no → bus_id)
 
-### 4. Apply Same Pattern to Sinotruck & Light Vehicle
+b) Updates `buses.capacity` where seat capacity is provided in the spreadsheet
 
-Copy the Yutong LC/DO components and adapt for:
-- `SinotrukLCManagement.tsx` — uses `useSinotrukFinanceManagement` hook, queries `sinotruck_letter_of_credits`
-- `LightVehicleLCManagement.tsx` — uses `useLightVehicleFinanceManagement` hook, queries `lightvehicle_letter_of_credits`
+c) Sets correct route sections for visual grouping in the Fleet Sheet
 
-### 5. Add Finance Dashboard Interconnections
+### 2. No Code Changes Needed
 
-Update `YutongFinanceDashboard.tsx`:
-- Add "Landed Cost" as 5th tab
-- Overview tab: show LC utilization chart, payment vs outstanding breakdown, DO status summary
-- Cross-link: clicking an LC shows related DOs, clicking a DO shows related LC and order
+The Fleet Sheet UI already:
+- Groups by `section` headers
+- Expands rows based on `trips_per_day`
+- Shows turn times in the grid
+- Creates trips per `trips_per_day` count
+
+The data update alone will make the Fleet Sheet match your actual operations.
 
 ## Files to Change
 
-- `src/components/yutong/YutongLCManagement.tsx` — build full LC CRUD interface
-- `src/components/yutong/YutongDeliveryOrderManagement.tsx` — build full DO CRUD interface
-- `src/components/yutong/YutongFinanceDashboard.tsx` — add Landed Cost tab, improve overview
-- `src/components/sinotruck/SinotrukLCManagement.tsx` — build full LC interface for Sinotruck
-- `src/components/lightvehicle/LightVehicleLCManagement.tsx` — build full LC interface for Light Vehicle
+- **New SQL migration** — bulk UPDATE statements for ~70 buses in `fleet_master_roster` + capacity updates in `buses`
 
 ## Result
 
-- All three vehicle sales modules get working LC management (create, amend, track status, utilization)
-- Delivery Orders fully trackable from issuance to collection
-- Landed cost charges visible and linked to orders
-- Finance dashboard becomes the single source of truth for import finance operations
-- Full interconnection: Order → LC → DO → Landed Cost → GL
+- Fleet Sheet shows correct trips per bus (e.g., NG 8223 shows 2 trip rows, NG 8256 shows 4)
+- All running buses marked "Running" with correct time slots
+- Route sections organized by corridor (Colombo-Jaffna, Badulla Highway, Kandy XL, etc.)
+- Seat capacity updated in bus master data
+- "Create Remaining" will generate the right number of daily trips per bus
 
