@@ -201,22 +201,24 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
 
     if (editingCell === cellKey) {
       return (
-        <input
-          ref={inputRef}
-          type={type}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={() => commitEdit(row.id, field)}
-          onKeyDown={(e) => handleKeyDown(e, row.id, field)}
-          className="w-full h-9 px-3 text-sm border-2 border-primary rounded bg-background focus:ring-2 focus:ring-primary focus:outline-none"
-        />
+        <div className="relative w-full h-full flex items-center">
+          <input
+            ref={inputRef}
+            type={type}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={() => commitEdit(row.id, field)}
+            onKeyDown={(e) => handleKeyDown(e, row.id, field)}
+            className="absolute left-0 top-1/2 -translate-y-1/2 min-w-[200px] h-10 px-3 text-sm border-2 border-primary rounded bg-background shadow-lg focus:ring-2 focus:ring-primary focus:outline-none z-50"
+          />
+        </div>
       );
     }
 
     if (!isEditable(field)) {
       return (
         <span
-          className="px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed"
+          className="px-3 py-2.5 rounded block text-sm min-h-[40px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap"
           title={String(value ?? '') + " (Master Edit Only)"}
         >
           {value || '-'}
@@ -226,7 +228,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
 
     return (
       <span
-        className="cursor-pointer hover:bg-accent/50 px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center"
+        className="cursor-pointer hover:bg-accent/50 px-3 py-2.5 rounded block text-sm min-h-[40px] flex items-center overflow-hidden text-ellipsis whitespace-nowrap"
         onClick={() => startEdit(cellKey, value)}
         title={String(value ?? '')}
       >
