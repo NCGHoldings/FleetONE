@@ -1976,6 +1976,7 @@ export type Database = {
           is_advance: boolean | null
           journal_entry_id: string | null
           notes: string | null
+          override_gl_account_id: string | null
           payment_method: string | null
           receipt_date: string
           receipt_number: string
@@ -1998,6 +1999,7 @@ export type Database = {
           is_advance?: boolean | null
           journal_entry_id?: string | null
           notes?: string | null
+          override_gl_account_id?: string | null
           payment_method?: string | null
           receipt_date: string
           receipt_number: string
@@ -2020,6 +2022,7 @@ export type Database = {
           is_advance?: boolean | null
           journal_entry_id?: string | null
           notes?: string | null
+          override_gl_account_id?: string | null
           payment_method?: string | null
           receipt_date?: string
           receipt_number?: string
@@ -2047,6 +2050,13 @@ export type Database = {
             columns: ["journal_entry_id"]
             isOneToOne: false
             referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_receipts_override_gl_account_id_fkey"
+            columns: ["override_gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
         ]
