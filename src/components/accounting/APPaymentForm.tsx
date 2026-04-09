@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen, Landmark, FileText, Plus, Trash2, Upload, X } from "lucide-react";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
+import { VehicleSelector } from "./shared/VehicleSelector";
 
 const paymentSchema = z.object({
   payment_number: z.string().min(1, "Payment number is required"),
@@ -107,6 +108,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const [globalWriteOffAccountId, setGlobalWriteOffAccountId] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [vendorBillNumber, setVendorBillNumber] = useState("");
+  const [selectedBusId, setSelectedBusId] = useState("");
+  const [selectedBusNo, setSelectedBusNo] = useState("");
+  const [selectedVehicleType, setSelectedVehicleType] = useState<"fleet" | "external" | "">("");
 
   const { data: vendorBankAccounts } = useVendorBankAccounts(selectedVendorId || undefined);
 
