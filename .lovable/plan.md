@@ -1,52 +1,54 @@
 
 
-# Add payment_balance to Student Import — Minimal Fix
+# Fix Balance vs Amount Due — Make Outstanding Correct at Import
 
-## The Gap
+## The Problem
 
-Your Excel "Amount Due" column maps to `payment_amount` in the edge function (line 159). But `payment_balance` (the field that drives the Outstanding tab, stats cards, and payment tracking) is **never written** during import. It stays at 0 for all imported students.
+Your imported students show **Balance = LKR 12,200 (credit)** when they actually **owe** LKR 12,200. The system treats positive `payment_balance` as credit (overpayment) and negative as outstanding debt. The import stored the value as positive, so every student appears to have a credit instead of an outstanding balance.
 
-## Fix — 1 Line Change
+That's why stats show "Advance Paid: LKR 7,453,925 Credit" and "Total Owed: LKR 0".
 
-### File: `supabase/functions/process-school-excel/index.ts`
+## The Fix
 
-At line 162, after `current_amount_due: updateNewValue`, add:
+### Edge Function (`process-school-excel/index.ts`)
 
+Change the `payment_balance` logic at line 163:
+
+**Current**: Stores `payment_balance` as-is from Excel (positive = credit)
+
+**New**: Always negate the amount due to create outstanding debt:
 ```
-payment_balance: paymentAmountValue ? -(paymentAmountValue) : 0
-```
-
-This takes the "Amount Due" value from your Excel and sets it as a negative `payment_balance` (negative = outstanding debt).
-
-**Logic**: If a student owes LKR 5,000, your Excel has `5000` in the Amount Due column → system stores `payment_balance = -5000` → Outstanding tab shows them correctly.
-
-### Also add to the column mapping UI (`SchoolExcelImport.tsx`)
-
-Add one more option to `REQUIRED_COLUMNS` (line 59):
-```
-{ dbColumn: "payment_balance", label: "Outstanding Balance", required: false }
+payment_balance = -(current_amount_due)
 ```
 
-This gives you **two ways** to set the balance:
-1. **Amount Due column** → auto-converts to negative balance (for your current workflow)
-2. **Direct Outstanding Balance column** → if your Excel already has negative/positive values
+So if Excel has Amount Due = 12,200 → `payment_balance = -12,200` → UI shows "LKR 12,200 (outstanding)"
 
-### Priority logic in edge function:
+Priority logic:
+1. If user explicitly mapped "Outstanding Balance" column → negate that value (since Excel has positive numbers meaning debt)
+2. If only "Amount Due" mapped → use `-(current_amount_due)`
+3. If neither → 0
+
+### Also: Fix Existing 536 Students
+
+Run a one-time SQL migration to flip the sign on all students who were imported with wrong positive balances:
+```sql
+UPDATE school_students 
+SET payment_balance = -(payment_balance) 
+WHERE payment_balance > 0 AND is_active = true;
 ```
-payment_balance: normalizedData.payment_balance ?? (paymentAmountValue ? -(paymentAmountValue) : 0)
-```
-- If you map a dedicated "Outstanding Balance" column → uses that directly
-- If not, but "Amount Due" is mapped → converts to negative balance
-- If neither → stays 0
+
+This converts all current "credit" balances to "outstanding" balances.
 
 ## Files to Change
 
-- `supabase/functions/process-school-excel/index.ts` — add `payment_balance` to record mapping (1 line)
-- `src/components/school/SchoolExcelImport.tsx` — add "Outstanding Balance" to column options (1 line)
+- `supabase/functions/process-school-excel/index.ts` — fix `payment_balance` to always store as negative (outstanding)
+- New SQL migration — flip existing positive balances to negative
 
 ## Result
 
-- Import your Excel with the Amount Due column mapped → all 536 students get correct outstanding balances immediately
-- Outstanding tab, stats cards, and payment tracking all work from day one
-- No need for any bulk update tool — the import handles it
+- Balance column shows "LKR 12,200 (outstanding)" in red instead of "(credit)" in green
+- Amount Due and Balance match: both show the same amount the student owes
+- Stats cards show correct Total Owed and zero Advance Paid
+- When payments come in, balance reduces toward zero (then goes positive = credit if overpaid)
+- Future AR invoice generation works correctly against the outstanding balance
 
