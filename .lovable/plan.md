@@ -1,70 +1,79 @@
 
 
-# Fix School Bus KPI Cards — Data & Calculation Corrections
+# Monthly Billing Percentage — Charge 80% (or Custom %) of Fixed Amount
 
-## Problem
+## How It Works Today
 
-The KPI cards on the Payment Management page show mostly zeros because:
+When you generate bulk AR invoices, each student is charged their full `current_amount_due` (which equals `fixed_monthly_amount` + any outstanding balance). There is **no way** to charge a partial percentage of the fixed amount for a given month.
 
-1. **567 students still have `payment_balance = 0`** despite having `current_amount_due` values (5.1M LKR total for this branch alone). The previous migration fixed some students but missed these — likely imported after the migration ran.
+## Your Scenario
 
-2. **"Paid Students" = 0** because `payment_status` is 'pending' for all 536 students in this branch. No logic updates the status when payments are recorded.
-
-3. **"Total Revenue" = 0** because it reads from `payment_amount` (which is NULL). Actual revenue exists in `school_payment_transactions.amount_paid` (LKR 20,200 for 2 transactions in this branch).
-
-4. **"Total Owed" = 0** because it checks `payment_balance < 0`, but balance is 0 for this branch.
-
-5. **"Overdue Amount" = 0** because no students have `payment_status = 'overdue'`.
+- Student fixed amount: LKR 100
+- This month you only want to charge 80% = LKR 80
+- Plus any outstanding balance carried forward
+- The percentage should default to 80% but be adjustable each month before generating invoices
 
 ## Solution
 
-### 1. New SQL migration — fix remaining zero balances
+### 1. Add `billing_percentage` to settings table
+
+Add a new column `billing_percentage` (default 80) to `school_bus_finance_settings`. This is the default percentage applied each month but can be overridden at invoice generation time.
 
 ```sql
-UPDATE public.school_students 
-SET payment_balance = -(current_amount_due) 
-WHERE payment_balance = 0 
-  AND current_amount_due > 0 
-  AND is_active = true;
+ALTER TABLE school_bus_finance_settings 
+ADD COLUMN billing_percentage numeric DEFAULT 80;
 ```
 
-This fixes the remaining 567 students globally.
+### 2. Add percentage input to the Invoice Generation UI
 
-### 2. Fix `calculateStats` to use correct data sources
+In the bulk invoice generation dialog/form, add a slider or number input:
+- Label: **"Monthly Charge %"**
+- Default: 80% (from settings)
+- Range: 1–100
+- Shows preview: "Fixed LKR 100 × 80% = LKR 80 + Outstanding"
 
-**File**: `src/pages/SchoolPayments.tsx` — `calculateStats` function (lines 113-135)
+### 3. Update invoice amount calculation
 
-Current logic is broken — fix each KPI:
+**File**: `src/hooks/useSchoolBusFinance.ts` — `generateBulkInvoices` function
 
-| KPI | Current (broken) | Fixed |
-|-----|------------------|-------|
-| Paid Students | `payment_status === 'paid'` | `payment_balance >= 0 AND current_amount_due > 0` (settled or overpaid) |
-| Pending | `payment_status === 'pending'` | `payment_balance < 0` (still owes money) |
-| Total Revenue | `SUM(payment_amount) where status='paid'` | Fetch from `school_payment_transactions` SUM(amount_paid) for this branch |
-| Overdue Amount | `SUM(current_amount_due) where status='overdue'` | `SUM(current_amount_due) where payment_balance < 0` (all outstanding) |
-| Total Owed | `SUM(abs(payment_balance)) where balance < 0` | Same logic but now works because migration fixes the data |
-| Advance Paid | `SUM(payment_balance) where balance > 0` | Correct, works after data fix |
+Current calculation (line 464):
+```typescript
+const rawAmount = student.current_amount_due || student.fixed_monthly_amount || 0;
+```
 
-### 3. Fetch actual revenue from transactions table
+New calculation:
+```typescript
+const fixedAmount = student.fixed_monthly_amount || 0;
+const chargeAmount = fixedAmount * (billingPercentage / 100);
+const outstanding = Math.abs(Math.min(student.payment_balance, 0));
+const rawAmount = chargeAmount + outstanding;
+```
 
-Add a separate Supabase query in `fetchStudents` to get total revenue from `school_payment_transactions` joined with students in this branch, instead of relying on the broken `payment_amount` field.
+This separates:
+- **This month's charge**: fixed amount × percentage (e.g., 100 × 80% = 80)
+- **Carried forward outstanding**: any unpaid balance from previous months
+- **Total invoice amount**: charge + outstanding - any credit
 
-### 4. Derive payment status dynamically
+### 4. Update settings UI
 
-Instead of relying on the static `payment_status` column, derive it in `calculateStats`:
-- **Paid/Settled**: `payment_balance >= 0`
-- **Pending/Outstanding**: `payment_balance < 0`
-- Use `current_amount_due` as fallback when `payment_balance` is still 0
+Add the billing percentage field to the School Bus Finance Settings panel so admins can change the default (currently in the finance settings component).
+
+### 5. Update `current_amount_due` on students after invoice generation
+
+After invoices are generated, update each student's `current_amount_due` to reflect the actual invoiced amount (charge + outstanding), so the Outstanding tab and KPI cards match the invoices.
 
 ## Files to Change
 
-- **New SQL migration** — UPDATE remaining 567 students with zero balance
-- **`src/pages/SchoolPayments.tsx`** — fix `calculateStats` to derive stats from balance fields + fetch revenue from transactions table
+- **New SQL migration** — add `billing_percentage` column to `school_bus_finance_settings`
+- **`src/hooks/useSchoolBusFinance.ts`** — update `generateBulkInvoices` to apply percentage to fixed amount, add outstanding separately
+- **Invoice generation UI component** — add percentage input with default from settings
+- **Finance settings UI** — add default billing percentage field
 
 ## Result
 
-- Total Owed correctly shows ~LKR 5.1M for this branch
-- Revenue reflects actual payments received (LKR 20,200)
-- Paid/Pending counts derived from actual financial data, not stale status field
-- All 7 KPI cards show accurate, interconnected data
+- Default 80% charge applied to fixed monthly amount
+- Outstanding balance always added on top (never reduced by percentage)
+- Adjustable per month before generating invoices
+- Preview shows breakdown: "Fixed × 80% + Outstanding = Invoice Amount"
+- Settings stores the default so you don't have to enter it every month
 
