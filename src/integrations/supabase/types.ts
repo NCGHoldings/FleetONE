@@ -17798,6 +17798,7 @@ export type Database = {
           auto_post_invoices: boolean | null
           auto_post_payments: boolean | null
           bank_account_id: string | null
+          billing_percentage: number | null
           branch_gl_account_id: string | null
           branch_id: string | null
           cash_account_id: string | null
@@ -17822,6 +17823,7 @@ export type Database = {
           auto_post_invoices?: boolean | null
           auto_post_payments?: boolean | null
           bank_account_id?: string | null
+          billing_percentage?: number | null
           branch_gl_account_id?: string | null
           branch_id?: string | null
           cash_account_id?: string | null
@@ -17846,6 +17848,7 @@ export type Database = {
           auto_post_invoices?: boolean | null
           auto_post_payments?: boolean | null
           bank_account_id?: string | null
+          billing_percentage?: number | null
           branch_gl_account_id?: string | null
           branch_id?: string | null
           cash_account_id?: string | null
