@@ -525,6 +525,9 @@ export const useCreateARReceipt = () => {
       is_advance?: boolean;
       party_type?: "customer" | "vendor";
       override_gl_account_id?: string;
+      bus_id?: string;
+      bus_no?: string;
+      vehicle_type?: string;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
@@ -967,6 +970,9 @@ export const useCreateAPPayment = () => {
       bank_fee_amount?: number;
       bank_fee_type?: string;
       vendor_bill_number?: string;
+      bus_id?: string;
+      bus_no?: string;
+      vehicle_type?: string;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
