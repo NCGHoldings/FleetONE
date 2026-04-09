@@ -357,7 +357,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
     }
     if (!isEditable(field)) {
       return (
-        <span className="px-3 py-2 rounded block truncate text-sm min-h-[36px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed"
+        <span className="px-3 py-2.5 rounded block text-sm min-h-[40px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap"
           title={String(value ?? '') + " (Master Edit Only)"}>
           {value || '-'}
         </span>
