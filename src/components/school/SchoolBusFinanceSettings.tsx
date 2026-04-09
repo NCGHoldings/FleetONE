@@ -60,6 +60,7 @@ export function SchoolBusFinanceSettings() {
     auto_post_payments: false,
     auto_post_expenses: false,
     invoice_prefix: "SBS-INV",
+    billing_percentage: 80,
     // Expense accounts
     expense_account_id: "",
     fuel_expense_account_id: "",
