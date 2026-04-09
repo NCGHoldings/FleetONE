@@ -40,8 +40,8 @@ export const VehicleSelector = ({ busId, busNo, vehicleType, onSelect, onClear }
     queryFn: async () => {
       const { data, error } = await supabase
         .from("buses")
-        .select("id, bus_number, model, type, status")
-        .order("bus_number");
+        .select("id, bus_no, model, type, status")
+        .order("bus_no");
       if (error) throw error;
       return data || [];
     },
