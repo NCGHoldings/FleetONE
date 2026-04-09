@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line } from "recharts";
 import type { MonthlyData } from "@/hooks/useSpecialHireReports";
 
 interface Props {
@@ -45,7 +45,7 @@ export default function PaymentCollectionReport({ totalAdvance, totalBalance, co
               <Bar dataKey="value" name="Outstanding" radius={[4, 4, 0, 0]}>
                 {paymentAging.map((_, i) => {
                   const colors = ["hsl(142, 76%, 36%)", "hsl(45, 93%, 47%)", "hsl(25, 95%, 53%)", "hsl(0, 84%, 60%)"];
-                  return <rect key={i} fill={colors[i]} />;
+                  return <Cell key={i} fill={colors[i]} />;
                 })}
               </Bar>
             </BarChart>
