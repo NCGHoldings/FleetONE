@@ -23,6 +23,7 @@ import { SubmissionsList } from "@/components/special-hire/SubmissionsList";
 import { SpecialHireQRGenerator } from "@/components/special-hire/SpecialHireQRGenerator";
 import { RateCoverageMaps } from "@/components/special-hire/RateCoverageMaps";
 import { ReferralAgentsManagement } from "@/components/special-hire/ReferralAgentsManagement";
+import SpecialHireReportsTab from "@/components/special-hire/reports/SpecialHireReportsTab";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
