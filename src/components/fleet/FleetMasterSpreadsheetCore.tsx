@@ -10,18 +10,7 @@ import { Loader2, Check, ChevronsUpDown, MapPin, Settings, Activity, Users, Cloc
 import { formatLKR } from "@/lib/accounting-utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
-} from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
-
-interface PendingTripsUpdate {
-  rosterId: string;
-  busNo: string;
-  currentTrips: number;
-  newTrips: number;
-}
 
 interface Props {
   rows: ExpandedFleetRow[];
@@ -52,7 +41,7 @@ type SectionKey = typeof FLEET_SECTIONS[number]['key'];
 export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode = 'master', selectedDate, availableRoutes = [] }: Props) {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
-  const [pendingTripsUpdate, setPendingTripsUpdate] = useState<PendingTripsUpdate | null>(null);
+  
   const [visibleSections, setVisibleSections] = useState<Set<SectionKey>>(new Set(FLEET_SECTIONS.map(s => s.key)));
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -145,33 +134,11 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
       const numericFields = ['trips_per_day', 'day_target', 'sort_order', 'odometer_start', 'odometer_end', 'fuel_liters'];
       const val = numericFields.includes(field) ? Number(editValue) || 0 : editValue;
       
-      if (editMode === 'daily' && field === 'trips_per_day') {
-        const row = rows.find(r => r.id === rosterId && r.trip_sequence === 1);
-        const currentTrips = row?.trips_per_day || 0;
-        const newTrips = Number(val) || 0;
-        if (newTrips !== currentTrips) {
-          setPendingTripsUpdate({
-            rosterId,
-            busNo: row?.bus_no || 'Unknown',
-            currentTrips,
-            newTrips,
-          });
-          setEditingCell(null);
-          return;
-        }
-      }
-      
       onUpdate(rosterId, field, val);
       setEditingCell(null);
     }
   };
 
-  const confirmTripsUpdate = () => {
-    if (pendingTripsUpdate) {
-      onUpdate(pendingTripsUpdate.rosterId, 'trips_per_day', pendingTripsUpdate.newTrips);
-      setPendingTripsUpdate(null);
-    }
-  };
 
   const cancelEdit = () => setEditingCell(null);
 
@@ -730,43 +697,6 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
       </Table>
     </div>
 
-    {/* Trips/Day confirmation dialog */}
-    <AlertDialog open={!!pendingTripsUpdate} onOpenChange={(open) => !open && setPendingTripsUpdate(null)}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            Change Trips for {pendingTripsUpdate?.busNo}?
-          </AlertDialogTitle>
-          <AlertDialogDescription asChild>
-            <div className="space-y-2">
-              <p>
-                <strong>Date:</strong> {selectedDate ? format(selectedDate, 'EEEE, MMM do yyyy') : 'Today'}
-              </p>
-              <p>
-                <strong>Current:</strong> {pendingTripsUpdate?.currentTrips} trip(s) → <strong>New:</strong> {pendingTripsUpdate?.newTrips} trip(s)
-              </p>
-              {pendingTripsUpdate && pendingTripsUpdate.newTrips > pendingTripsUpdate.currentTrips && (
-                <p className="text-primary font-medium">
-                  {pendingTripsUpdate.newTrips - pendingTripsUpdate.currentTrips} new trip record(s) will be created for this date only.
-                </p>
-              )}
-              {pendingTripsUpdate && pendingTripsUpdate.newTrips < pendingTripsUpdate.currentTrips && (
-                <p className="text-destructive font-medium">
-                  {pendingTripsUpdate.currentTrips - pendingTripsUpdate.newTrips} trip record(s) will be removed (only if they have no income/odometer data).
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Master roster will not be changed.
-              </p>
-            </div>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={confirmTripsUpdate}>Confirm</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
     </>
   );
 }
