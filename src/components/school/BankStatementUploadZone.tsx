@@ -385,9 +385,10 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
       <CardContent className="p-6">
         {/* ===== STEP INDICATOR ===== */}
         <div className="flex items-center gap-2 mb-4">
-          {["Upload", "Preview", "Process"].map((label, idx) => {
+          {["Upload", "Map Columns", "Preview", "Process"].map((label, idx) => {
             const stepNum = idx + 1;
-            const currentStepNum = step === "upload" ? 1 : step === "preview" ? 2 : 3;
+            const stepOrder = { upload: 1, column_mapping: 2, preview: 3, processing: 4, done: 4 };
+            const currentStepNum = stepOrder[step] || 1;
             const isActive = stepNum <= currentStepNum;
             return (
               <div key={label} className="flex items-center gap-2">
