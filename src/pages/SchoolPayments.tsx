@@ -96,8 +96,16 @@ export default function SchoolPayments() {
 
       if (error) throw error;
 
+      // Fetch actual revenue from transactions table
+      const { data: txData } = await supabase
+        .from('school_payment_transactions')
+        .select('amount_paid, student_id, school_students!inner(branch_id)')
+        .eq('school_students.branch_id', branchId);
+
+      const actualRevenue = (txData || []).reduce((sum: number, tx: any) => sum + (Number(tx.amount_paid) || 0), 0);
+
       setStudents(data || []);
-      calculateStats(data || []);
+      calculateStats(data || [], actualRevenue);
     } catch (error) {
       console.error('Error fetching students:', error);
       toast({
@@ -110,17 +118,25 @@ export default function SchoolPayments() {
     }
   };
 
-  const calculateStats = (studentData: Student[]) => {
+  const calculateStats = (studentData: Student[], actualRevenue: number = 0) => {
     const totalStudents = studentData.length;
-    const paidStudents = studentData.filter(s => s.payment_status === 'paid').length;
-    const pendingPayments = studentData.filter(s => s.payment_status === 'pending').length;
-    const totalRevenue = studentData
-      .filter(s => s.payment_status === 'paid')
-      .reduce((sum, s) => sum + (s.payment_amount || 0), 0);
+    
+    // Derive status from balance: paid = balance >= 0 with amount due > 0, pending = balance < 0
+    const paidStudents = studentData.filter(s => s.payment_balance >= 0 && (s.current_amount_due || 0) > 0).length;
+    const pendingPayments = studentData.filter(s => s.payment_balance < 0).length;
+    
+    // Revenue from actual transactions, not stale payment_amount field
+    const totalRevenue = actualRevenue;
+    
+    // Overdue = all outstanding (balance < 0)
     const overdueAmount = studentData
-      .filter(s => s.payment_status === 'overdue')
-      .reduce((sum, s) => sum + (s.current_amount_due || s.update_new || 0), 0);
+      .filter(s => s.payment_balance < 0)
+      .reduce((sum, s) => sum + (s.current_amount_due || Math.abs(s.payment_balance) || 0), 0);
+    
+    // Total owed = sum of negative balances
     const totalOwed = studentData.reduce((sum, s) => sum + (s.payment_balance < 0 ? Math.abs(s.payment_balance) : 0), 0);
+    
+    // Advance/credit = sum of positive balances
     const totalCredit = studentData.reduce((sum, s) => sum + (s.payment_balance > 0 ? s.payment_balance : 0), 0);
 
     setStats({
