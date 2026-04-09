@@ -160,18 +160,17 @@ export const useEditAPPayment = () => {
       }
 
       // Step 2b: Delete old bank transactions linked to this payment
-      await supabase
+      await (supabase as any)
         .from("bank_transactions")
         .delete()
-        .eq("reference_id", id)
+        .eq("source_id", id)
         .in("source_type", ["ap_payment", "bank_fee"]);
 
       // Step 2c: Delete old bank fee records
-      await supabase
+      await (supabase as any)
         .from("bank_fee_charges")
         .delete()
-        .eq("source_id", id)
-        .eq("source_type", "ap_payment");
+        .eq("ap_payment_id", id);
 
       // Step 3: Update payment record
       const oldValues = {
