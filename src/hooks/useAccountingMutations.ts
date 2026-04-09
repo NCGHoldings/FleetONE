@@ -640,6 +640,11 @@ export const useCreateARReceipt = () => {
         } catch { /* Non-blocking */ }
       }
 
+      // Apply GL override: manual override > category mapping > global settings
+      if (receipt.override_gl_account_id) {
+        tradeReceivableId = receipt.override_gl_account_id;
+      }
+
       // Only post to GL if we have the required accounts
       if (bankGLAccountId && receipt.amount > 0) {
         const { postARReceiptToGL, postAdvanceReceiptToGL } = await import("@/lib/gl-posting-utils");
