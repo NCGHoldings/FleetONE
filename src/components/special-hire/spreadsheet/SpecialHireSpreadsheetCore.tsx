@@ -1,9 +1,9 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Download, RefreshCw, TrendingUp, DollarSign, Bus, Banknote, Focus, Layers } from 'lucide-react';
+import { Search, Download, RefreshCw, TrendingUp, DollarSign, Bus, Banknote, Eye, EyeOff, Settings, FileText, Gauge, Wallet, BarChart3, LayoutGrid } from 'lucide-react';
 import { SpreadsheetHire } from '@/hooks/useSpecialHireSpreadsheetData';
 import * as XLSX from 'xlsx';
 
@@ -24,23 +24,29 @@ const formatDate = (val: string) => {
   catch { return val; }
 };
 
-// Column group definitions with colors
-const COLUMN_GROUPS = [
-  { label: 'Hire Info', color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200', cols: 15 },
-  { label: 'Operations', color: 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200', cols: 12 },
-  { label: 'Invoice', color: 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-200', cols: 5 },
-  { label: 'Meter / KM', color: 'bg-slate-100 dark:bg-slate-800/40 text-slate-800 dark:text-slate-200', cols: 5 },
-  { label: 'Expenses', color: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200', cols: 11 },
-  { label: 'Summary', color: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200', cols: 7 },
+// Section definitions with icons
+const SECTIONS = [
+  { key: 'Hire Info', icon: Bus, color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200', activeColor: 'bg-blue-500 text-white' },
+  { key: 'Operations', icon: Settings, color: 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200', activeColor: 'bg-green-500 text-white' },
+  { key: 'Invoice', icon: FileText, color: 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-200', activeColor: 'bg-cyan-500 text-white' },
+  { key: 'Meter / KM', icon: Gauge, color: 'bg-slate-100 dark:bg-slate-800/40 text-slate-800 dark:text-slate-200', activeColor: 'bg-slate-500 text-white' },
+  { key: 'Expenses', icon: Wallet, color: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200', activeColor: 'bg-orange-500 text-white' },
+  { key: 'Summary', icon: BarChart3, color: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200', activeColor: 'bg-yellow-500 text-white' },
 ];
+
+// Frozen column widths
+const FROZEN_COL_1 = 40;  // #
+const FROZEN_COL_2 = 120; // Quotation No
+const FROZEN_COL_3 = 100; // Bus No
+const FROZEN_TOTAL = FROZEN_COL_1 + FROZEN_COL_2 + FROZEN_COL_3;
 
 export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh }: Props) {
   const [search, setSearch] = useState('');
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [focusMode, setFocusMode] = useState(false);
-  const [focusedSection, setFocusedSection] = useState<string | null>(null);
+  const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set(SECTIONS.map(s => s.key)));
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const savedScrollRef = useRef<{ top: number; left: number }>({ top: 0, left: 0 });
 
   const filtered = useMemo(() => {
     if (!search.trim()) return hires;
@@ -55,6 +61,22 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
     );
   }, [hires, search]);
 
+  // Restore scroll position after data changes
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (el && (savedScrollRef.current.top || savedScrollRef.current.left)) {
+      el.scrollTop = savedScrollRef.current.top;
+      el.scrollLeft = savedScrollRef.current.left;
+    }
+  }, [hires]);
+
+  const saveScrollPosition = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      savedScrollRef.current = { top: el.scrollTop, left: el.scrollLeft };
+    }
+  }, []);
+
   // KPIs
   const totalHires = hires.length;
   const totalRevenue = hires.reduce((s, h) => s + h.gross_revenue, 0);
@@ -68,6 +90,7 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
 
   const commitEdit = useCallback(() => {
     if (!editingCell) return;
+    saveScrollPosition();
     const { id, field } = editingCell;
     const numericFields = [
       'fuel_cost_actual', 'driver_wages', 'assistant_wages', 'driver_meal_allowance',
@@ -80,7 +103,6 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
     let val: any = editValue;
     if (numericFields.includes(field)) val = Number(val) || 0;
 
-    // Auto-compute actual_km when check_in or check_out changes
     if (field === 'check_in_meter' || field === 'check_out_meter') {
       const hire = hires.find(h => h.id === id);
       if (hire) {
@@ -93,7 +115,6 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
       }
     }
 
-    // Auto-compute price_after_discount when invoice_amount or discount changes
     if (field === 'discount' || field === 'discount_amount_lkr') {
       onUpdate(id, 'discount_amount_lkr', val);
       setEditingCell(null);
@@ -102,33 +123,37 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
 
     onUpdate(id, field, val === '' ? null : val);
     setEditingCell(null);
-  }, [editingCell, editValue, onUpdate, hires]);
+  }, [editingCell, editValue, onUpdate, hires, saveScrollPosition]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') commitEdit();
     if (e.key === 'Escape') setEditingCell(null);
   }, [commitEdit]);
 
-  const toggleGroup = (label: string) => {
-    if (focusMode) {
-      // In focus mode, clicking a section focuses on it
-      setFocusedSection(prev => prev === label ? null : label);
-      return;
-    }
-    setCollapsedGroups(prev => {
+  const toggleSection = (key: string) => {
+    setVisibleSections(prev => {
       const next = new Set(prev);
-      if (next.has(label)) next.delete(label); else next.add(label);
+      if (next.has(key)) {
+        if (next.size <= 1) return prev; // Keep at least one
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
       return next;
     });
   };
 
-  const isGroupVisible = (label: string): boolean => {
-    if (focusMode) {
-      if (label === 'Hire Info') return true; // Always show identity columns
-      return focusedSection === label;
-    }
-    return !collapsedGroups.has(label);
+  const showOnlySection = (key: string) => {
+    setVisibleSections(new Set([key]));
   };
+
+  const showAllSections = () => {
+    setVisibleSections(new Set(SECTIONS.map(s => s.key)));
+  };
+
+  const isSectionVisible = (key: string) => visibleSections.has(key);
+  const isSingleSection = visibleSections.size === 1;
+  const cellMinW = isSingleSection ? 'min-w-[140px]' : 'min-w-[80px]';
 
   const exportToExcel = useCallback(() => {
     const data = filtered.map((h, i) => ({
@@ -227,7 +252,7 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
   const renderDropdownCell = (hire: SpreadsheetHire, field: string, options: string[]) => {
     const value = (hire as any)[field];
     return (
-      <Select value={value || ''} onValueChange={(v) => onUpdate(hire.id, field, v)}>
+      <Select value={value || ''} onValueChange={(v) => { saveScrollPosition(); onUpdate(hire.id, field, v); }}>
         <SelectTrigger className="h-6 text-[11px] border-0 bg-transparent shadow-none p-0.5 min-w-[80px]">
           <SelectValue placeholder="-" />
         </SelectTrigger>
@@ -259,27 +284,28 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
     );
   };
 
-  // Build visible columns per group — focus mode shows only identity + focused section
-  const hireInfoHeaders = focusMode && focusedSection
-    ? ['#', 'Q.No', 'Bus No', 'Status']
-    : ['#', 'Quotation No', 'Status', 'Company', 'Customer', 'Phone', 'Route', 'Bus Type', 'Buses', 'KM', 'Quot. Amt', 'Paid', 'Date', 'Request', 'Days'];
-
+  // Section column definitions
+  const hireInfoHeaders = ['Status', 'Company', 'Customer', 'Phone', 'Route', 'Bus Type', 'Buses', 'KM', 'Quot. Amt', 'Paid', 'Date', 'Request', 'Days'];
   const opsHeaders = ['Deployed', 'Bus No', 'Model', 'Year', 'Cap.', 'Driver', 'Assistant', 'From', 'To', 'Pickup', 'Drop', 'Op Remark'];
   const invoiceHeaders = ['Inv No', 'Inv KM', 'Inv Amt', 'Discount', 'After Disc'];
   const meterHeaders = ['Check In', 'Check Out', 'Actual KM', 'Dist Charge', 'Hrs Charge'];
   const expenseHeaders = ['Fuel Cost', 'Price/L', 'Liters', 'KM/L', 'Drv Wages', 'Ast Wages', 'Drv Meal', 'Ast Meal', 'Wages', 'Maint.', 'Other'];
   const summaryHeaders = ['Net Income', 'Day Buses', 'Advance', 'Adv Date', 'Balance', 'Bal Date', 'Remark'];
 
-  const allGroupHeaders = [
-    { group: COLUMN_GROUPS[0], headers: hireInfoHeaders },
-    { group: COLUMN_GROUPS[1], headers: opsHeaders },
-    { group: COLUMN_GROUPS[2], headers: invoiceHeaders },
-    { group: COLUMN_GROUPS[3], headers: meterHeaders },
-    { group: COLUMN_GROUPS[4], headers: expenseHeaders },
-    { group: COLUMN_GROUPS[5], headers: summaryHeaders },
-  ];
+  const sectionHeaders: Record<string, string[]> = {
+    'Hire Info': hireInfoHeaders,
+    'Operations': opsHeaders,
+    'Invoice': invoiceHeaders,
+    'Meter / KM': meterHeaders,
+    'Expenses': expenseHeaders,
+    'Summary': summaryHeaders,
+  };
 
-  const visibleGroups = allGroupHeaders.filter(g => isGroupVisible(g.group.label));
+  const visibleSectionList = SECTIONS.filter(s => isSectionVisible(s.key));
+
+  // Frozen column styles
+  const frozenBg = 'bg-card dark:bg-card';
+  const frozenHeaderBg = 'bg-muted dark:bg-muted';
 
   return (
     <div className="space-y-4">
@@ -345,66 +371,86 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
         <Button variant="outline" size="sm" onClick={exportToExcel} className="gap-1">
           <Download className="h-3.5 w-3.5" /> Export
         </Button>
-        <Button
-          variant={focusMode ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => { setFocusMode(!focusMode); setFocusedSection(null); }}
-          className="gap-1"
-        >
-          {focusMode ? <Focus className="h-3.5 w-3.5" /> : <Layers className="h-3.5 w-3.5" />}
-          {focusMode ? 'Focus ON' : 'Focus'}
-        </Button>
-        <div className="flex gap-1 ml-2 flex-wrap">
-          {COLUMN_GROUPS.map(g => {
-            const isVisible = isGroupVisible(g.label);
-            const isFocused = focusMode && focusedSection === g.label;
-            return (
-              <button
-                key={g.label}
-                onClick={() => toggleGroup(g.label)}
-                className={`text-[10px] px-1.5 py-0.5 rounded transition-all ${g.color} ${
-                  !isVisible ? 'opacity-40 line-through' : ''
-                } ${isFocused ? 'ring-2 ring-primary ring-offset-1' : ''}`}
-              >
-                {g.label}
-              </button>
-            );
-          })}
-        </div>
         <span className="text-xs text-muted-foreground ml-auto">{filtered.length} of {hires.length}</span>
       </div>
 
-      {focusMode && !focusedSection && (
-        <div className="text-xs text-muted-foreground bg-muted/50 rounded px-3 py-2">
-          📌 Focus Mode: Click a section above to show only that section alongside bus identity columns for easier data entry.
-        </div>
-      )}
+      {/* Section Toggle Bar */}
+      <div className="flex flex-wrap items-center gap-2 p-2 bg-muted/30 rounded-lg border">
+        <span className="text-xs font-semibold text-muted-foreground mr-1">Sections:</span>
+        {SECTIONS.map(section => {
+          const Icon = section.icon;
+          const isActive = isSectionVisible(section.key);
+          return (
+            <div key={section.key} className="relative group">
+              <button
+                onClick={() => toggleSection(section.key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  isActive ? section.activeColor + ' shadow-sm' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {section.key}
+                {isActive ? <Eye className="h-3 w-3 opacity-70" /> : <EyeOff className="h-3 w-3 opacity-50" />}
+              </button>
+              {/* Show Only on double-click or right area */}
+              <button
+                onClick={(e) => { e.stopPropagation(); showOnlySection(section.key); }}
+                className="absolute -top-1 -right-1 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground text-[8px] font-bold shadow"
+                title={`Show only ${section.key}`}
+              >
+                1
+              </button>
+            </div>
+          );
+        })}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={showAllSections}
+          className="gap-1 text-xs h-7 ml-1"
+        >
+          <LayoutGrid className="h-3.5 w-3.5" /> All
+        </Button>
+      </div>
 
       {/* Grid */}
-      <div className="border rounded-lg overflow-auto max-h-[75vh] bg-card">
+      <div ref={scrollContainerRef} className="border rounded-lg overflow-auto max-h-[75vh] bg-card relative">
         {loading ? (
           <div className="flex items-center justify-center h-48 text-muted-foreground">Loading...</div>
         ) : (
           <table className="w-full text-[11px] border-collapse">
-            {/* Group header row */}
-            <thead className="sticky top-0 z-20">
+            <thead className="sticky top-0 z-30">
+              {/* Group header row */}
               <tr>
-                {visibleGroups.map(({ group, headers }) => (
+                {/* Frozen group header */}
+                <th
+                  colSpan={3}
+                  className={`px-2 py-1 text-center font-bold border-b border-r bg-primary/10 text-primary sticky left-0 z-40`}
+                  style={{ minWidth: FROZEN_TOTAL }}
+                >
+                  Identity
+                </th>
+                {visibleSectionList.map(section => (
                   <th
-                    key={group.label}
-                    colSpan={headers.length}
-                    className={`px-2 py-1 text-center font-bold border-b border-r ${group.color} cursor-pointer`}
-                    onClick={() => toggleGroup(group.label)}
+                    key={section.key}
+                    colSpan={sectionHeaders[section.key].length}
+                    className={`px-2 py-1 text-center font-bold border-b border-r ${section.color} cursor-pointer`}
+                    onClick={() => toggleSection(section.key)}
                   >
-                    {group.label}
+                    {section.key}
                   </th>
                 ))}
               </tr>
               {/* Column headers */}
-              <tr className="bg-muted/80 backdrop-blur-sm">
-                {visibleGroups.map(({ group, headers }) =>
-                  headers.map((h) => (
-                    <th key={group.label + '-' + h} className="px-1.5 py-1.5 text-left font-semibold text-muted-foreground border-b border-r whitespace-nowrap select-none">
+              <tr className={`${frozenHeaderBg} backdrop-blur-sm`}>
+                {/* Frozen headers */}
+                <th className={`px-1.5 py-1.5 text-left font-semibold text-muted-foreground border-b border-r whitespace-nowrap sticky left-0 z-40 ${frozenHeaderBg}`} style={{ width: FROZEN_COL_1, minWidth: FROZEN_COL_1 }}>#</th>
+                <th className={`px-1.5 py-1.5 text-left font-semibold text-muted-foreground border-b border-r whitespace-nowrap sticky z-40 ${frozenHeaderBg}`} style={{ left: FROZEN_COL_1, width: FROZEN_COL_2, minWidth: FROZEN_COL_2 }}>Quotation No</th>
+                <th className={`px-1.5 py-1.5 text-left font-semibold text-muted-foreground border-b border-r whitespace-nowrap sticky z-40 ${frozenHeaderBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`} style={{ left: FROZEN_COL_1 + FROZEN_COL_2, width: FROZEN_COL_3, minWidth: FROZEN_COL_3 }}>Bus No</th>
+                {/* Section headers */}
+                {visibleSectionList.map(section =>
+                  sectionHeaders[section.key].map(h => (
+                    <th key={section.key + '-' + h} className={`px-1.5 py-1.5 text-left font-semibold text-muted-foreground border-b border-r whitespace-nowrap select-none ${isSingleSection ? 'min-w-[140px]' : ''}`}>
                       {h}
                     </th>
                   ))
@@ -414,72 +460,60 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
             <tbody>
               {filtered.map((hire) => (
                 <tr key={hire.id} className="border-b hover:bg-muted/30 transition-colors">
-                  {/* Hire Info */}
-                  {isGroupVisible('Hire Info') && (
-                    focusMode && focusedSection ? (
-                      <>
-                        <td className="px-1.5 py-1 border-r text-muted-foreground">{hire.row_num}</td>
-                        <td className="px-1.5 py-1 border-r font-mono font-medium whitespace-nowrap text-[10px]">{hire.quotation_no}</td>
-                        <td className="px-1 py-1 border-r font-medium whitespace-nowrap">{hire.assigned_bus_no || '-'}</td>
-                        <td className="px-1 py-1 border-r min-w-[80px]">{renderDropdownCell(hire, 'status', STATUS_OPTIONS)}</td>
-                      </>
+                  {/* Frozen identity columns */}
+                  <td className={`px-1.5 py-1 border-r text-muted-foreground sticky left-0 z-10 ${frozenBg}`} style={{ width: FROZEN_COL_1, minWidth: FROZEN_COL_1 }}>{hire.row_num}</td>
+                  <td className={`px-1.5 py-1 border-r font-mono font-medium whitespace-nowrap text-[10px] sticky z-10 ${frozenBg}`} style={{ left: FROZEN_COL_1, width: FROZEN_COL_2, minWidth: FROZEN_COL_2 }}>{hire.quotation_no}</td>
+                  <td className={`px-1 py-1 border-r font-medium whitespace-nowrap sticky z-10 ${frozenBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`} style={{ left: FROZEN_COL_1 + FROZEN_COL_2, width: FROZEN_COL_3, minWidth: FROZEN_COL_3 }}>
+                    {hire.bus_id ? (
+                      <a href={`/fleet?bus=${hire.bus_id}`} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 text-[11px]" title="Open in Fleet Management">
+                        {hire.assigned_bus_no || '-'}
+                      </a>
                     ) : (
-                      <>
-                        <td className="px-1.5 py-1 border-r text-muted-foreground">{hire.row_num}</td>
-                        <td className="px-1.5 py-1 border-r font-mono font-medium whitespace-nowrap">{hire.quotation_no}</td>
-                        <td className="px-1 py-1 border-r min-w-[90px]">{renderDropdownCell(hire, 'status', STATUS_OPTIONS)}</td>
-                        <td className="px-1 py-1 border-r min-w-[100px]">{renderEditableCell(hire, 'company_name')}</td>
-                        <td className="px-1 py-1 border-r min-w-[100px]">{renderEditableCell(hire, 'customer_name')}</td>
-                        <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'customer_phone')}</td>
-                        <td className="px-1.5 py-1 border-r max-w-[150px] truncate" title={hire.route}>{hire.route}</td>
-                        <td className="px-1.5 py-1 border-r">{hire.bus_type_name || '-'}</td>
-                        <td className="px-1.5 py-1 border-r text-center">{hire.number_of_buses}</td>
-                        <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'km_trip', 'number')}</td>
-                        <td className="px-1.5 py-1 border-r text-right font-medium">{formatCurrency(hire.gross_revenue)}</td>
-                        <td className="px-1.5 py-1 border-r text-right">{formatCurrency(hire.total_paid)}</td>
-                        <td className="px-1.5 py-1 border-r whitespace-nowrap">{formatDate(hire.pickup_datetime)}</td>
-                        <td className="px-1 py-1 border-r min-w-[80px]">{renderEditableCell(hire, 'special_request')}</td>
-                        <td className="px-1.5 py-1 border-r text-center">{hire.number_of_days}</td>
-                      </>
-                    )
+                      hire.assigned_bus_no || '-'
+                    )}
+                  </td>
+
+                  {/* Hire Info */}
+                  {isSectionVisible('Hire Info') && (
+                    <>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderDropdownCell(hire, 'status', STATUS_OPTIONS)}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'company_name')}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'customer_name')}</td>
+                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'customer_phone')}</td>
+                      <td className="px-1.5 py-1 border-r max-w-[150px] truncate" title={hire.route}>{hire.route}</td>
+                      <td className="px-1.5 py-1 border-r">{hire.bus_type_name || '-'}</td>
+                      <td className="px-1.5 py-1 border-r text-center">{hire.number_of_buses}</td>
+                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'km_trip', 'number')}</td>
+                      <td className="px-1.5 py-1 border-r text-right font-medium">{formatCurrency(hire.gross_revenue)}</td>
+                      <td className="px-1.5 py-1 border-r text-right">{formatCurrency(hire.total_paid)}</td>
+                      <td className="px-1.5 py-1 border-r whitespace-nowrap">{formatDate(hire.pickup_datetime)}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'special_request')}</td>
+                      <td className="px-1.5 py-1 border-r text-center">{hire.number_of_days}</td>
+                    </>
                   )}
 
-                  {/* Operations — with fleet details */}
-                  {isGroupVisible('Operations') && (
+                  {/* Operations */}
+                  {isSectionVisible('Operations') && (
                     <>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'buses_deployed', 'number')}</td>
-                      <td className="px-1 py-1 border-r">
-                        {hire.bus_id ? (
-                          <a
-                            href={`/fleet?bus=${hire.bus_id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary underline hover:text-primary/80 text-[11px]"
-                            title="Open in Fleet Management"
-                          >
-                            {hire.assigned_bus_no || '-'}
-                          </a>
-                        ) : (
-                          renderEditableCell(hire, 'assigned_bus_no')
-                        )}
-                      </td>
+                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'assigned_bus_no')}</td>
                       <td className="px-1.5 py-1 border-r text-muted-foreground">{hire.bus_model || '-'}</td>
                       <td className="px-1.5 py-1 border-r text-muted-foreground text-center">{hire.bus_year || '-'}</td>
                       <td className="px-1.5 py-1 border-r text-muted-foreground text-center">{hire.bus_capacity || '-'}</td>
-                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'assigned_driver_name')}</td>
-                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'assigned_conductor_name')}</td>
-                      <td className="px-1 py-1 border-r min-w-[80px]">{renderEditableCell(hire, 'pickup_location')}</td>
-                      <td className="px-1 py-1 border-r min-w-[80px]">{renderEditableCell(hire, 'drop_location')}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'assigned_driver_name')}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'assigned_conductor_name')}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'pickup_location')}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'drop_location')}</td>
                       <td className="px-1.5 py-1 border-r whitespace-nowrap">{hire.pickup_time}</td>
                       <td className="px-1.5 py-1 border-r whitespace-nowrap">{hire.drop_time}</td>
-                      <td className="px-1 py-1 border-r min-w-[80px]">{renderEditableCell(hire, 'operation_remark')}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'operation_remark')}</td>
                     </>
                   )}
 
                   {/* Invoice */}
-                  {isGroupVisible('Invoice') && (
+                  {isSectionVisible('Invoice') && (
                     <>
-                      <td className="px-1 py-1 border-r min-w-[80px]">{renderEditableCell(hire, 'invoice_number')}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'invoice_number')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'invoiced_km', 'number')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'invoice_amount', 'number')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'discount', 'number')}</td>
@@ -488,7 +522,7 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
                   )}
 
                   {/* Meter / KM */}
-                  {isGroupVisible('Meter / KM') && (
+                  {isSectionVisible('Meter / KM') && (
                     <>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'check_in_meter', 'number')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'check_out_meter', 'number')}</td>
@@ -498,8 +532,8 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
                     </>
                   )}
 
-                  {/* Expenses — with fuel efficiency */}
-                  {isGroupVisible('Expenses') && (
+                  {/* Expenses */}
+                  {isSectionVisible('Expenses') && (
                     <>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'fuel_cost_actual', 'number')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'fuel_price_per_liter', 'number')}</td>
@@ -518,7 +552,7 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
                   )}
 
                   {/* Summary */}
-                  {isGroupVisible('Summary') && (
+                  {isSectionVisible('Summary') && (
                     <>
                       <td className={`px-1.5 py-1 border-r text-right font-bold ${hire.net_income >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                         {formatCurrency(hire.net_income)}
@@ -528,7 +562,7 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
                       <td className="px-1.5 py-1 border-r whitespace-nowrap">{formatDate(hire.advance_payment_date)}</td>
                       <td className="px-1.5 py-1 border-r text-right">{formatCurrency(hire.balance_payment)}</td>
                       <td className="px-1.5 py-1 border-r whitespace-nowrap">{formatDate(hire.balance_payment_date)}</td>
-                      <td className="px-1 py-1 border-r min-w-[80px]">{renderEditableCell(hire, 'remark')}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'remark')}</td>
                     </>
                   )}
                 </tr>
