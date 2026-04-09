@@ -408,8 +408,15 @@ export function useGenerateBulkARInvoices() {
       const { data: batchData } = await supabase.rpc("generate_sbs_batch_number");
       const batchNumber = batchData || `SBS-BATCH-${format(new Date(), "yyyyMMdd")}-0001`;
 
-      // Calculate totals using current_amount_due
-      const totalAmount = students.reduce((sum, s) => sum + (s.current_amount_due || s.fixed_monthly_amount || 0), 0);
+      // Calculate totals using billing percentage
+      const effectivePercentage = billingPercentage ?? settings.billing_percentage ?? 80;
+      const totalAmount = students.reduce((sum, s) => {
+        const fixedAmount = s.fixed_monthly_amount || 0;
+        const chargeAmount = fixedAmount * (effectivePercentage / 100);
+        const outstanding = Math.abs(Math.min(s.payment_balance || 0, 0));
+        const credit = s.payment_balance > 0 ? s.payment_balance : 0;
+        return sum + Math.max(0, chargeAmount + outstanding - credit);
+      }, 0);
 
       // Create batch record for tracking
       const { data: batch, error: batchError } = await supabase
@@ -464,9 +471,12 @@ export function useGenerateBulkARInvoices() {
         const invoicePromises = students.map(async (student, index) => {
           const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(startInvoiceCounter + index).padStart(5, "0")}`;
           // Net of existing credit balance
-          const rawAmount = student.current_amount_due || student.fixed_monthly_amount || 0;
+          // Apply billing percentage to fixed amount, then add outstanding
+          const fixedAmount = student.fixed_monthly_amount || 0;
+          const chargeAmount = fixedAmount * (effectivePercentage / 100);
+          const outstanding = Math.abs(Math.min(student.payment_balance || 0, 0));
           const credit = student.payment_balance > 0 ? student.payment_balance : 0;
-          const amount = Math.max(0, rawAmount - credit);
+          const amount = Math.max(0, chargeAmount + outstanding - credit);
 
           const { data, error } = await supabase
             .from("school_ar_invoices")
@@ -531,9 +541,12 @@ export function useGenerateBulkARInvoices() {
           const invoiceCounter = startInvoiceCounter + processedCount + indexInChunk;
           
           // Net of existing credit balance
-          const rawAmount = student.current_amount_due || student.fixed_monthly_amount || 0;
+          // Apply billing percentage to fixed amount, then add outstanding
+          const fixedAmount = student.fixed_monthly_amount || 0;
+          const chargeAmount = fixedAmount * (effectivePercentage / 100);
+          const outstanding = Math.abs(Math.min(student.payment_balance || 0, 0));
           const credit = student.payment_balance > 0 ? student.payment_balance : 0;
-          const amount = Math.max(0, rawAmount - credit);
+          const amount = Math.max(0, chargeAmount + outstanding - credit);
           
           // Generate unique identifiers for this student
           const uniqueSuffix = `${String(invoiceCounter).padStart(5, "0")}-${student.id.substring(0, 4).toUpperCase()}`;
