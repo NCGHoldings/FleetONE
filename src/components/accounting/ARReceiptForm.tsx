@@ -780,7 +780,55 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
               </div>
             )}
 
-            <FormField
+            {/* Bank Fee Section */}
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
+              <div className="flex items-center gap-3">
+                <Landmark className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium">Include Bank Fee</p>
+                  <p className="text-sm text-muted-foreground">
+                    Deduct bank charges from this receipt
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={includeBankFee}
+                onCheckedChange={setIncludeBankFee}
+              />
+            </div>
+
+            {includeBankFee && (
+              <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
+                <div>
+                  <Label className="text-sm font-medium">Fee Amount</Label>
+                  <Input
+                    type="number"
+                    value={bankFeeAmount}
+                    onChange={(e) => setBankFeeAmount(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    min={0}
+                    step="0.01"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Fee Type</Label>
+                  <Select value={bankFeeType} onValueChange={setBankFeeType}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bank_charge">Bank Charge</SelectItem>
+                      <SelectItem value="swift_fee">SWIFT Fee</SelectItem>
+                      <SelectItem value="stamp_duty">Stamp Duty</SelectItem>
+                      <SelectItem value="commission">Commission</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
               control={form.control}
               name="notes"
               render={({ field }) => (
