@@ -499,18 +499,17 @@ export const useEditARReceipt = () => {
       }
 
       // Step 2b: Delete old bank transactions linked to this receipt
-      await supabase
+      await (supabase as any)
         .from("bank_transactions")
         .delete()
-        .eq("reference_id", id)
+        .eq("source_id", id)
         .in("source_type", ["ar_receipt", "bank_fee"]);
 
       // Step 2c: Delete old bank fee records
-      await supabase
+      await (supabase as any)
         .from("bank_fee_charges")
         .delete()
-        .eq("source_id", id)
-        .eq("source_type", "ar_receipt");
+        .eq("ar_receipt_id", id);
 
       // Step 3: Update record
       const oldValues = {
@@ -596,13 +595,17 @@ export const useEditARReceipt = () => {
         const bankFeeAmount = (existing as any).bank_fee_amount || 0;
         if (bankFeeAmount > 0 && bankGLAccountId) {
           try {
-            const { data: glSettings } = await supabase
-              .from("gl_settings")
-              .select("setting_value")
+            // Find bank charges expense account (same as create flow)
+            const { data: bankChargesAccounts } = await supabase
+              .from("chart_of_accounts")
+              .select("id")
               .eq("company_id", effectiveCompanyId)
-              .eq("setting_key", "bank_charges_account_id")
-              .single();
-            const bankChargesAccountId = glSettings?.setting_value;
+              .eq("is_active", true)
+              .or("account_name.ilike.%bank charge%,account_name.ilike.%bank fee%")
+              .eq("account_type", "expense")
+              .limit(1);
+            const bankChargesAccountId = bankChargesAccounts?.[0]?.id || null;
+
             if (bankChargesAccountId && newJeId) {
               await supabase.from("journal_entry_lines").insert([
                 {
@@ -644,15 +647,18 @@ export const useEditARReceipt = () => {
                   current_balance: (bankGLAcc.current_balance || 0) + (isDebitNormal ? -bankFeeAmount : bankFeeAmount),
                 }).eq("id", bankGLAccountId);
               }
-              await supabase.from("bank_fee_charges").insert({
-                source_id: id,
-                source_type: "ar_receipt",
-                fee_amount: bankFeeAmount,
-                fee_type: (existing as any).bank_fee_type || "bank_charge",
+              // Re-create bank fee charge record (matching create flow schema)
+              await (supabase as any).from("bank_fee_charges").insert([{
                 bank_account_id: updates.bank_account_id,
+                fee_date: updates.receipt_date,
+                amount: bankFeeAmount,
+                fee_type: (existing as any).bank_fee_type || "bank_charge",
+                description: `Bank fee for AR Receipt ${existing.receipt_number}`,
+                ar_receipt_id: id,
                 company_id: effectiveCompanyId,
                 status: "posted",
-              });
+                journal_entry_id: newJeId,
+              }]);
             }
           } catch (e) {
             console.error("[Edit AR Receipt - Bank Fee]", e);
@@ -675,33 +681,35 @@ export const useEditARReceipt = () => {
         }
       }
 
-      // Step 5b: Re-create bank transaction record
+      // Step 5b: Re-create bank transaction records (matching create flow schema)
       if (updates.bank_account_id && updates.amount > 0) {
-        await supabase.from("bank_transactions").insert({
+        await (supabase as any).from("bank_transactions").insert([{
           bank_account_id: updates.bank_account_id,
           transaction_date: updates.receipt_date,
+          transaction_type: "receipt",
           description: `AR Receipt ${existing.receipt_number}`,
-          debit: updates.amount,
-          credit: 0,
+          debit_amount: updates.amount,
+          credit_amount: 0,
           reference: updates.reference || existing.receipt_number,
           source_type: "ar_receipt",
-          reference_id: id,
+          source_id: id,
           company_id: effectiveCompanyId,
-        });
+        }]);
         // Bank fee transaction
-        const bankFeeAmount = (existing as any).bank_fee_amount || 0;
-        if (bankFeeAmount > 0) {
-          await supabase.from("bank_transactions").insert({
+        const bankFeeAmount2 = (existing as any).bank_fee_amount || 0;
+        if (bankFeeAmount2 > 0) {
+          await (supabase as any).from("bank_transactions").insert([{
             bank_account_id: updates.bank_account_id,
             transaction_date: updates.receipt_date,
-            description: `Bank fee for ${existing.receipt_number}`,
-            debit: 0,
-            credit: bankFeeAmount,
+            transaction_type: "fee",
+            description: `Bank fee - AR Receipt ${existing.receipt_number}`,
+            debit_amount: 0,
+            credit_amount: bankFeeAmount2,
             reference: `FEE-${existing.receipt_number}`,
             source_type: "bank_fee",
-            reference_id: id,
+            source_id: id,
             company_id: effectiveCompanyId,
-          });
+          }]);
         }
       }
 
