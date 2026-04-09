@@ -36,7 +36,7 @@ export function useSpecialHireReports() {
       while (true) {
         let query = supabase
           .from("special_hire_quotations")
-          .select("id, quotation_no, pickup_datetime, pickup_location, drop_location, assigned_bus_no, hire_charge, extra_charges, overtime_charge, overnight_charge, gross_revenue, fuel_cost_fuel_only, driver_charge, commission_amount, referral_commission_amount, total_expenses, net_profit, advance_paid, balance_due, total_paid, status, trip_status, km_trip, km_parking_to_pickup, km_drop_to_parking, bus_type_id, customer_total_with_fuel, created_at, number_of_buses, actual_km_traveled, fuel_price_per_liter, actual_fuel_liters, referral_agent_id")
+          .select("id, quotation_no, pickup_datetime, pickup_location, drop_location, assigned_bus_no, hire_charge, extra_charges, overtime_charge, overnight_charge, gross_revenue, fuel_cost_fuel_only, driver_charge, commission_amount, referral_commission_amount, total_expenses, net_profit, advance_paid, balance_due, total_paid, status, trip_status, km_trip, km_parking_to_pickup, km_drop_to_parking, bus_type_id, customer_total_with_fuel, created_at, number_of_buses, fuel_price_per_liter, referral_agent_id")
           .gte("pickup_datetime", filters.dateFrom.toISOString())
           .lte("pickup_datetime", filters.dateTo.toISOString())
           .eq("is_active_version", true)
