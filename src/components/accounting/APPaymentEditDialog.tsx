@@ -85,7 +85,7 @@ export const APPaymentEditDialog = ({ open, onOpenChange, payment }: APPaymentEd
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Amount</Label>
-              <CurrencyInput value={amount} onChange={setAmount} />
+              <CurrencyInput value={amount} onValueChange={setAmount} />
             </div>
             <div>
               <Label>Payment Date</Label>

@@ -76,7 +76,7 @@ export const ARReceiptEditDialog = ({ open, onOpenChange, receipt }: ARReceiptEd
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Amount</Label>
-              <CurrencyInput value={amount} onChange={setAmount} />
+              <CurrencyInput value={amount} onValueChange={setAmount} />
             </div>
             <div>
               <Label>Receipt Date</Label>
