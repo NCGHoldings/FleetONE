@@ -215,6 +215,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
 
         // Smart matching: handles prefix variations (LNU14480 matches N14480)
         const matchedStudents = students?.filter((s: any) => {
+          if (!s.admission_no) return false;
           const dbNumeric = s.admission_no.replace(/[^0-9]/g, '');
           
           return extraction.admissionNumbers.some(extractedId => {
