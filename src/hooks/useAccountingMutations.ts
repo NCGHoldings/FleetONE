@@ -553,6 +553,7 @@ export const useCreateARReceipt = () => {
           status: "posted",
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,
+          override_gl_account_id: receipt.override_gl_account_id || null,
         }])
         .select()
         .single();
