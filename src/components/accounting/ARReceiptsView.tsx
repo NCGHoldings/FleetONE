@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, DollarSign, TrendingUp, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText, Trash2 } from "lucide-react";
+import { Plus, Search, DollarSign, TrendingUp, Wallet, Eye, Printer, ArrowRightLeft, Landmark, FileText, Trash2, Pencil, Clock } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-
+import { EditHistoryDialog } from "./shared/EditHistoryDialog";
+import { ARReceiptEditDialog } from "./ARReceiptEditDialog";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
 import { useARReceipts, useCustomers } from "@/hooks/useAccountingData";
 import { useDeleteARReceipt } from "@/hooks/useAccountingMutations";
@@ -44,6 +45,8 @@ export const ARReceiptsView = () => {
   const [feeReceiptId, setFeeReceiptId] = useState<string | undefined>();
   const [feeBankAccountId, setFeeBankAccountId] = useState<string | undefined>();
   const [detailReceipt, setDetailReceipt] = useState<any>(null);
+  const [editingReceipt, setEditingReceipt] = useState<any>(null);
+  const [historyReceipt, setHistoryReceipt] = useState<any>(null);
 
   const getCustomerName = (customerId: string) => {
     const customer = customers?.find(c => c.id === customerId);
@@ -263,6 +266,12 @@ export const ARReceiptsView = () => {
                      <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon" onClick={() => setDetailReceipt(receipt)} title="View Details">
                         <FileText className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => setEditingReceipt(receipt)} title="Edit Receipt">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => setHistoryReceipt(receipt)} title="Edit History">
+                        <Clock className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleViewReceipt(receipt)}>
                         <Eye className="h-4 w-4" />
