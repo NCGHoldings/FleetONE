@@ -1,76 +1,71 @@
 
 
-# Update Fleet Roster with Actual Bus Route Schedule Data
+# Enhance AR Receipt Form — Add Vendor Selection, Category Grouping & GL Code Link
 
-## What We're Doing
+## Problem
 
-Your "BUS ROUTE DATA" spreadsheet has the real operational schedule for 70 buses across ~25 routes, with correct trips per day, time slots, start locations, and seat capacity. The current fleet roster has many mismatches — buses marked "Stopped" that are actually running, wrong trip counts (e.g., NG 8223 shows 1 trip but actually does 2), and missing time slots.
+1. **Customer-only dropdown**: The AR Receipt form only shows customers. Vendors should also be selectable (e.g., for inter-company receipts, vendor refunds, employee advances).
+2. **No category grouping**: The dropdown is a flat list. Both customers and vendors have categories (External Customer, Internal, Inter Company, Employee, Supplier Local, etc.) that should be shown as grouped headers.
+3. **No GL code visibility**: When recording a receipt, users can't see which GL account will be hit. The system resolves GL accounts behind the scenes but doesn't show this to the user.
 
-We'll write a SQL migration to bulk-update all roster entries and also update the `buses` table capacity where provided. Plus we'll organize the roster by route sections matching your spreadsheet groupings.
+## Plan
 
-## Data Mapping (Spreadsheet → Roster)
+### 1. Combine Customers + Vendors in Dropdown with Category Groups
 
-From your spreadsheet, each bus gets:
+**File: `src/components/accounting/ARReceiptForm.tsx`**
 
-| Spreadsheet Field | Updates To |
-|---|---|
-| Route name (e.g., "Colombo - Jaffna") | `route_label` + `section` |
-| Trip count per bus | `trips_per_day` |
-| Time Slot / End Time | `turn_01_time` / `turn_02_time` |
-| Seat Capacity | `buses.capacity` |
-| Running status | `remark = 'Running'` (or 'Stopped' for NOT RUNNING buses) |
-| Sort order | `sort_order` by route section sequence |
+- Import `useVendors` alongside `useCustomers`
+- Add a `partyType` state: `'customer' | 'vendor'` to track which type was selected
+- Replace the basic `<Select>` dropdown with a searchable `Command`-based combobox (like the existing `SearchableAccountSelector` pattern)
+- Group entries by category:
+  ```
+  ── Customers ──
+    External Customer
+      Ms.Kanthi Perera
+      Mr.Anjula
+    Internal Customer
+      Mr.Hasith
+  ── Vendors ──
+    Employee
+      A E H Kumara
+      K M Darshana
+    Supplier Local
+      Chairman Sri Lanka...
+    Inter Company
+      NCG Express...
+  ```
+- Each item stores both the entity ID and type (customer/vendor)
+- Update `customer_id` field in form schema to `party_id` conceptually but keep DB column as `customer_id` (since the `ar_receipts` table uses `customer_id`)
 
-## Key Corrections
+### 2. Show Resolved GL Account on the Form
 
-**Buses changing from Stopped → Running** (currently wrong):
-- NI 8222, NI 8223, NI 8244, NI 8229, NI 8250, NI 8251, NI 8253, NI 8254, NI 8255, NI 8256
-- NG 8256, NG 8259, NG 8260, NG 8261
+**File: `src/components/accounting/ARReceiptForm.tsx`**
 
-**Buses staying Stopped** (NOT RUNNING per your data):
-- NG 8244 (Nuwara Eliya — not running), NG 8255 (Meegoda-Pettah — not running), NG 8257 (Panadura-Pettah — not running)
+- After a customer/vendor is selected, call `resolveCustomerARAccounts` (or equivalent for vendors) to get the AR account
+- Display a small info badge below the dropdown: "GL: 11201001 - Trade Receivable" (or "Advance Account: 11201002")
+- When in Advance mode, show the advance GL account instead
+- This gives users visibility into which GL code the receipt will hit
 
-**Trips per day corrections** (examples):
-- NG 8220: 1 → 2 (Jaffna + Kandy XL)
-- NG 8223: 1 → 2 (Jaffna + Passara)
-- NI 8222: 1 → 2 (Jaffna + Passara)
-- NG 8256: 1 → 4 (Kaduwela-Moratuwa, 4 round trips)
-- NG 8259: 1 → 3 (Horana-Kaduwela, 3 round trips)
-- NI 8229: 1 → 4 (Mirigama-Panadura, 4 legs)
+### 3. Update GL Posting Logic for Vendor Selection
 
-**Section groupings**: Routes will be organized into sections matching the spreadsheet order (Colombo-Jaffna, Colombo-Badulla Highway, Passara-Colombo, etc.)
+**File: `src/hooks/useAccountingMutations.ts`**
 
-## Implementation
+- The `useCreateARReceipt` mutation currently resolves GL via `resolveCustomerARAccounts`
+- Add fallback: if the selected party is a vendor, use `resolveVendorAPAccounts` instead to get the appropriate GL account
+- This ensures correct GL posting regardless of whether a customer or vendor is selected
 
-### 1. SQL Migration — Bulk Update Roster
+### 4. Invoice Allocation — Show Vendor Invoices Too
 
-One large migration that:
-
-a) Updates `route_label`, `trips_per_day`, `turn_01_time`, `turn_02_time`, `remark`, `section`, `sort_order` for each bus in `fleet_master_roster` (matching by bus_no → bus_id)
-
-b) Updates `buses.capacity` where seat capacity is provided in the spreadsheet
-
-c) Sets correct route sections for visual grouping in the Fleet Sheet
-
-### 2. No Code Changes Needed
-
-The Fleet Sheet UI already:
-- Groups by `section` headers
-- Expands rows based on `trips_per_day`
-- Shows turn times in the grid
-- Creates trips per `trips_per_day` count
-
-The data update alone will make the Fleet Sheet match your actual operations.
+When a vendor is selected and advance mode is OFF, fetch AP invoices with outstanding balances (from `ap_invoices` table) instead of AR invoices, allowing allocation against vendor credit notes or refund invoices.
 
 ## Files to Change
 
-- **New SQL migration** — bulk UPDATE statements for ~70 buses in `fleet_master_roster` + capacity updates in `buses`
+- `src/components/accounting/ARReceiptForm.tsx` — replace customer Select with grouped searchable combobox showing both customers and vendors by category, add GL code display badge
+- `src/hooks/useAccountingMutations.ts` — handle vendor party type in GL resolution
 
 ## Result
 
-- Fleet Sheet shows correct trips per bus (e.g., NG 8223 shows 2 trip rows, NG 8256 shows 4)
-- All running buses marked "Running" with correct time slots
-- Route sections organized by corridor (Colombo-Jaffna, Badulla Highway, Kandy XL, etc.)
-- Seat capacity updated in bus master data
-- "Create Remaining" will generate the right number of daily trips per bus
+- Dropdown shows both customers and vendors, grouped by their categories
+- Users can see which GL account will be hit before recording
+- Correct GL posting for both customer and vendor receipts
 
