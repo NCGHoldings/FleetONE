@@ -327,7 +327,9 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
 
   const canSubmit = isAdvance 
     ? form.watch("amount") > 0 && selectedCustomerId 
-    : totalAllocated > 0;
+    : selectedPartyType === "vendor" 
+      ? form.watch("amount") > 0 && selectedCustomerId
+      : totalAllocated > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
