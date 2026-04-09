@@ -1,106 +1,65 @@
 
 
-# Add Edit Functionality for AR/AP Receipts & Payments with Auto GL Reversal
+# Fix AR Receipt Form — Scroll Issue, GL Code Override & Category Display
 
-## What We're Building
+## Problems
 
-Currently, AR Receipts, AP Payments, AR Invoices, and AP Invoices only support "Delete" (force delete with reversal). There is no **Edit** option. We need to add an "Edit" button that:
+1. **Dropdown can't scroll**: The `CommandList` inside the `Popover` has `max-h-[300px]` but the `PopoverContent` may be clipped by the dialog's `overflow-y-auto`. The popover needs higher z-index and portal behavior to escape the dialog's overflow container.
 
-1. Opens the existing form pre-filled with current data
-2. On save: **auto-reverses** the old GL journal entry, creates a **new GL posting** with updated values
-3. Maintains a full **edit history/audit trail** so every change is traceable
+2. **No GL code override option**: Users want to manually select a GL account that overrides the auto-resolved one. Currently there's no field for this. The system should allow a manual GL account selector with priority: **Manual override > Category mapping > Global settings**.
 
-## How the Edit-with-Reversal Mechanism Works
+3. **Category not showing for all entries**: The customer/vendor queries need to properly join category tables to show category names in the grouped dropdown.
 
-```text
-Original Record (PAY-2026-25583, LKR 123,344)
-  └── JE-001 (DR Expense / CR Bank) ← Posted
+## Plan
 
-User clicks "Edit" → Changes amount to LKR 130,000
+### 1. Fix Dropdown Scroll — Escape Dialog Overflow
 
-System does:
-  1. Auto-reverse JE-001 → creates REV-JE-001 (DR Bank / CR Expense)
-  2. Create new JE-002 (DR Expense / CR Bank) with LKR 130,000
-  3. Update AP Payment record with new values
-  4. Log edit in edit_history JSONB: { old_amount: 123344, new_amount: 130000, edited_by, edited_at, reversal_je, new_je }
-```
+**File: `src/components/accounting/ARReceiptForm.tsx`**
 
-This reuses the existing `useReverseJournalEntry` logic already in `useAccountingMutations.ts`.
+- Add `portal` container or use `PopoverContent` with `sideOffset` and explicit `style={{ pointerEvents: 'auto' }}` to ensure the popover renders above the dialog
+- Increase `CommandList` max height to `max-h-[400px]`  
+- Add `onOpenAutoFocus` to prevent dialog from stealing focus from the command input
 
-## Implementation Plan
+### 2. Add Manual GL Account Override Selector
 
-### 1. Add `edit_history` JSONB Column (SQL Migration)
+**File: `src/components/accounting/ARReceiptForm.tsx`**
 
-Add a `edit_history` JSONB array column to 4 tables:
-- `ap_payments` 
-- `ar_receipts`
-- `ap_invoices`
-- `ar_invoices`
+- Add a new optional field below the Customer/Vendor selector: "GL Account Override" using the existing `SearchableAccountSelector` component
+- New state: `overrideGLAccountId`
+- When set, the GL badge shows the override account instead of the auto-resolved one
+- When cleared, falls back to the category/global resolution
 
-Each edit appends: `{ edited_at, edited_by, old_values, new_values, reversed_je_id, new_je_id, reason }`
+**File: `src/hooks/useAccountingMutations.ts`**
 
-### 2. Create Edit Mutations in `useAccountingMutations.ts`
+- Accept an optional `override_gl_account_id` in the receipt mutation
+- Priority logic in `useCreateARReceipt`:
+  ```
+  GL account = override_gl_account_id || resolvedFromCategory || globalSetting
+  ```
 
-Add 4 new hooks:
-- `useEditAPPayment` — reverses old JE, updates payment record, creates new JE, appends to edit_history
-- `useEditARReceipt` — same pattern for receipts
-- `useEditAPInvoice` — reverses old JE, updates invoice, creates new JE
-- `useEditARInvoice` — same pattern
+### 3. Add DB Column for GL Override
 
-Each mutation follows this sequence:
-1. Fetch the existing record + its `journal_entry_id`
-2. Call the existing reversal logic to reverse that JE
-3. Update the record fields (amount, date, vendor/customer, method, etc.)
-4. Re-run the GL posting logic (reuse existing create mutation's posting code)
-5. Append edit history entry to the JSONB array
-6. Invalidate all relevant query keys
+**New SQL migration**
 
-### 3. Update Form Components to Support Edit Mode
+- Add `override_gl_account_id UUID REFERENCES chart_of_accounts(id)` to `ar_receipts` table
+- This persists the user's manual GL choice for audit trail
 
-**`APPaymentForm.tsx`**: Add optional `editingPayment` prop. When provided:
-- Pre-fill all fields from existing payment data
-- Show "Update Payment" instead of "Record Payment"
-- On submit: call `useEditAPPayment` instead of `useCreateAPPayment`
+### 4. Ensure Category Names Display Correctly
 
-**`ARReceiptForm.tsx`**: Same pattern with `editingReceipt` prop
+**File: `src/hooks/useAccountingData.ts`**
 
-**`APInvoiceForm.tsx`**: Same with `editingInvoice` prop
-
-**`ARInvoiceForm.tsx`**: Same with `editingInvoice` prop
-
-### 4. Add Edit Buttons to List Views
-
-**`APPaymentsView.tsx`**: Add Edit (pencil) icon button in Actions column → opens `APPaymentForm` with `editingPayment={selectedPayment}`
-
-**`ARReceiptsView.tsx`**: Same for receipts
-
-**`AccountsPayableView.tsx`** (invoices tab): Add Edit button
-
-**`AccountsReceivableView.tsx`** (invoices tab): Add Edit button
-
-### 5. Edit History Viewer
-
-Add a small "History" button (clock icon) on each record that opens a dialog showing the edit trail:
-- Timestamp, who edited, what changed (old → new values), linked reversal JE number
+- Verify the `useCustomers` and `useVendors` queries join `customer_categories` and `vendor_categories` correctly (already added in previous work — just confirm it works)
 
 ## Files to Change
 
-- **New SQL migration** — add `edit_history jsonb default '[]'` to `ap_payments`, `ar_receipts`, `ap_invoices`, `ar_invoices`
-- **`src/hooks/useAccountingMutations.ts`** — add `useEditAPPayment`, `useEditARReceipt`, `useEditAPInvoice`, `useEditARInvoice` hooks
-- **`src/components/accounting/APPaymentForm.tsx`** — accept `editingPayment` prop, pre-fill form, call edit mutation
-- **`src/components/accounting/ARReceiptForm.tsx`** — accept `editingReceipt` prop, pre-fill form, call edit mutation
-- **`src/components/accounting/APInvoiceForm.tsx`** — accept `editingInvoice` prop
-- **`src/components/accounting/ARInvoiceForm.tsx`** — accept `editingInvoice` prop
-- **`src/components/accounting/APPaymentsView.tsx`** — add Edit button in actions
-- **`src/components/accounting/ARReceiptsView.tsx`** — add Edit button in actions
-- **`src/components/accounting/AccountsPayableView.tsx`** — add Edit button for invoices
-- **`src/components/accounting/AccountsReceivableView.tsx`** — add Edit button for invoices
-- **`src/components/accounting/shared/EditHistoryDialog.tsx`** — new component showing edit trail
+- `src/components/accounting/ARReceiptForm.tsx` — fix popover scroll/z-index, add GL override selector, update GL badge priority
+- `src/hooks/useAccountingMutations.ts` — accept `override_gl_account_id` in receipt creation, use it as top priority in GL resolution
+- New SQL migration — add `override_gl_account_id` column to `ar_receipts`
 
 ## Result
 
-- All 4 transaction types (AR Receipt, AP Payment, AR Invoice, AP Invoice) have Edit buttons
-- Editing auto-reverses the old GL posting and creates a new one — no manual journal correction needed
-- Full audit trail preserved in `edit_history` JSONB — who changed what, when, and which JEs were reversed/created
-- Original records are never deleted — only updated with linked reversal entries
+- Dropdown scrolls properly within the dialog
+- Users can optionally pick a specific GL account that overrides category/global defaults
+- GL badge shows the effective account (override > category > global)
+- Categories display correctly as group headers in the dropdown
 
