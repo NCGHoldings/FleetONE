@@ -318,13 +318,20 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
           <CardTitle>
             {matchStatus === 'auto_matched' ? 'Auto-Matched' : 'Needs Review'} Payments ({items.length})
           </CardTitle>
-          <Button
-            onClick={handleConfirmAll}
-            disabled={processing}
-          >
-            <CheckCircle className="h-4 w-4 mr-2" />
-            Confirm All {items.length} Payment{items.length > 1 ? 's' : ''}
-          </Button>
+          <div className="flex items-center gap-2">
+            {matchStatus === 'partial_match' && confirmableItems.length < items.length && (
+              <span className="text-xs text-muted-foreground">
+                {items.length - confirmableItems.length} ambiguous — resolve in Unmatched tab
+              </span>
+            )}
+            <Button
+              onClick={handleConfirmAll}
+              disabled={processing || confirmableItems.length === 0}
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Confirm {confirmableItems.length} Payment{confirmableItems.length !== 1 ? 's' : ''}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
