@@ -1,44 +1,59 @@
 
 
-# Fix Student Balance to Match Amount Due at Import
+# Special Hire Spreadsheet — Improved Section-Based View with Frozen Columns
 
-## The Problem
+## Problem
 
-Your data shows **1,380 students** with `payment_balance = 0` but `current_amount_due > 0`. These students owe money but their balance shows zero — so they don't appear in the Outstanding tab and stats are wrong.
+The Special Hire spreadsheet has 55+ columns across 6 sections. The existing Focus Mode and section toggle buttons are too subtle — users still can't easily find what they've typed, and there's no frozen column behavior like the Fleet Sheet. The section pills at the top are tiny and easy to miss.
 
-This happened because the balance fix migration only flipped students who already had positive balances (559 students). The other 1,380 were imported before the `payment_balance` mapping was added, so they never got a balance set.
+## Solution
 
-**Current data breakdown (2,929 active students):**
-- 559 with negative balance (correctly showing as owed) ✓
-- 1,380 with zero balance but amount due > 0 ✗ — these need fixing
-- 0 with positive balance ✓
+### 1. Freeze first 3 identity columns (sticky left)
 
-## The Fix
+Make columns `#`, `Quotation No`, and `Bus No` sticky on the left side so they remain visible while scrolling horizontally through any section. This matches how the Fleet Sheet keeps `No` and `Bus` visible.
 
-### Migration: Set balance = -(amount_due) for unset students
+**File**: `SpecialHireSpreadsheetCore.tsx`
+- Add `sticky left-0 z-10 bg-card` to the first 3 `<td>` and `<th>` elements
+- Use incremental `left-[Xpx]` values for each frozen column
+- Add a subtle right border/shadow on the last frozen column
 
-```sql
-UPDATE school_students 
-SET payment_balance = -(current_amount_due) 
-WHERE payment_balance = 0 
-  AND current_amount_due > 0 
-  AND is_active = true;
-```
+### 2. Replace tiny pills with proper section selector dropdown + toggle chips
 
-This sets the outstanding balance to match what they owe for all 1,380 students.
+Replace the current small pills with:
+- A proper **multi-select chip bar** with larger, clickable section toggles that clearly show ON/OFF state
+- A **"Show All" / "Show Only"** quick action per section
+- Keep Focus Mode but rename to **"Section View"** with a proper Select dropdown to pick which section to focus on
 
-### Edge Function: Already fixed
+**File**: `SpecialHireSpreadsheetCore.tsx`
+- Larger toggle buttons with icons per section (Bus icon for Hire Info, Settings for Operations, FileText for Invoice, Gauge for Meter, Wallet for Expenses, BarChart for Summary)
+- Active sections are solid-colored, inactive are ghost/outline
+- "All Sections" button to reset
 
-The `process-school-excel/index.ts` already correctly sets `payment_balance = -(paymentAmountValue)` at import time (line 163). No code change needed — only the historical data needs correction.
+### 3. Wider cells in Focus/Section mode
+
+When only one section is active alongside identity columns, give each editable cell more width (`min-w-[120px]` instead of `min-w-[80px]`) so there's more room for data entry.
+
+**File**: `SpecialHireSpreadsheetCore.tsx`
+- Add conditional `min-w` classes based on whether `focusMode && focusedSection` is active
+- In focus mode, the identity columns shrink to just `#`, `Q.No`, `Bus No`, `Status` (already done)
+
+### 4. Scroll position preservation
+
+Like the Fleet Sheet, save and restore scroll position when data updates so users don't lose their place after editing a cell.
+
+**File**: `SpecialHireSpreadsheetCore.tsx`
+- Add `scrollContainerRef` and `savedScrollRef` pattern from FleetMasterSpreadsheetCore
+- Save position before `onUpdate`, restore after re-render
 
 ## Files to Change
 
-- **New SQL migration** — single UPDATE to set `payment_balance = -(current_amount_due)` for students with zero balance but outstanding amount due
+- **`src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`** — frozen columns, improved section toggles, wider cells in focus mode, scroll preservation
 
 ## Result
 
-- All 2,929 students will have Balance matching their Amount Due
-- Outstanding tab and stats cards show correct totals
-- AR invoice generation works against the correct balance
-- Future imports automatically set balance correctly (already fixed)
+- First 3 columns (row number, quotation, bus) stay visible while scrolling horizontally
+- Section toggles are large, clear, and easy to use
+- Focus/Section mode gives much more editing space per cell
+- Scroll position preserved after edits — no jumping back to top
+- Same data, same functionality, just much more user-friendly navigation
 
