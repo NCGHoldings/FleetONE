@@ -69,17 +69,38 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
     try {
       const forcedBank = bankId === "auto" ? undefined : bankId;
       const result = await parseBankStatement(file, forcedBank);
-      setParseResult(result);
-      setStep("preview");
-
+      
       if (result.transactions.length === 0) {
+        // Auto-parse failed — show manual column mapping
+        const { headers, sampleRows: samples } = await getFileHeaders(file);
+        setFileHeaders(headers);
+        setSampleRows(samples);
+        // Auto-guess mapping from headers
+        const guess = (candidates: string[]) => {
+          for (const c of candidates) {
+            const found = headers.find(h => h.toLowerCase().includes(c.toLowerCase()));
+            if (found) return found;
+          }
+          return '';
+        };
+        setColumnMapping({
+          dateCol: guess(['date', 'txn date', 'trans date']),
+          descriptionCol: guess(['description', 'narration', 'particulars', 'details']),
+          amountCol: guess(['amount']),
+          typeCol: guess(['cr/dr', 'dr/cr', 'type']),
+          referenceCol: guess(['reference', 'ref', 'tran id']),
+          balanceCol: guess(['balance']),
+        });
+        setStep("column_mapping");
         toast({
-          title: "No Transactions Found",
-          description: "The uploaded file contains no valid transactions",
-          variant: "destructive",
+          title: "Auto-detection found 0 transactions",
+          description: "Please map columns manually from your file",
         });
         return;
       }
+
+      setParseResult(result);
+      setStep("preview");
 
       if (result.parseWarnings.length > 0) {
         toast({
@@ -95,6 +116,23 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
       });
     }
   }, [file, bankId, toast]);
+
+  const handleMappingParse = useCallback(async () => {
+    if (!file || !columnMapping.dateCol || !columnMapping.descriptionCol || !columnMapping.amountCol) {
+      toast({ title: "Missing columns", description: "Please map Date, Description, and Amount columns", variant: "destructive" });
+      return;
+    }
+    try {
+      const result = await parseBankStatementWithMapping(file, columnMapping);
+      setParseResult(result);
+      setStep("preview");
+      if (result.transactions.length === 0) {
+        toast({ title: "No Transactions Found", description: "No valid transactions with given column mapping", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Parse Failed", description: err.message || "Failed to parse", variant: "destructive" });
+    }
+  }, [file, columnMapping, toast]);
 
   // ===== STEP 3: PROCESS & MATCH (preserves existing auto-match, payment, AR flows) =====
   const handleProcess = useCallback(async () => {
