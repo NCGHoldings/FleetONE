@@ -19,6 +19,7 @@ import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, CheckCircle, ChevronsUpDown, Check, Info } from "lucide-react";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
+import { VehicleSelector } from "./shared/VehicleSelector";
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -80,6 +81,9 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const [partyOpen, setPartyOpen] = useState(false);
   const [resolvedGL, setResolvedGL] = useState<{ accountCode: string; accountName: string } | null>(null);
   const [overrideGLAccountId, setOverrideGLAccountId] = useState("");
+  const [selectedBusId, setSelectedBusId] = useState("");
+  const [selectedBusNo, setSelectedBusNo] = useState("");
+  const [selectedVehicleType, setSelectedVehicleType] = useState<"fleet" | "external" | "">("");
 
   // Build grouped party options
   const partyOptions = useMemo(() => {
