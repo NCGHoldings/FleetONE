@@ -455,12 +455,12 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                         </Command>
                       </PopoverContent>
                     </Popover>
-                    {/* GL Code Badge */}
-                    {resolvedGL && (
+                    {/* GL Code Badge — shows override if set, otherwise auto-resolved */}
+                    {(overrideGLAccountId || resolvedGL) && (
                       <div className="flex items-center gap-1.5 mt-1">
                         <Info className="h-3.5 w-3.5 text-blue-500" />
                         <span className="text-xs text-blue-600 font-mono">
-                          GL: {resolvedGL.accountCode} - {resolvedGL.accountName}
+                          {overrideGLAccountId ? "GL Override Applied" : `GL: ${resolvedGL?.accountCode} - ${resolvedGL?.accountName}`}
                         </span>
                       </div>
                     )}
@@ -488,6 +488,21 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                 )}
               />
             </div>
+
+            {/* GL Account Override */}
+            {selectedCustomerId && (
+              <div className="p-3 border rounded-lg bg-muted/30">
+                <FormLabel className="text-sm font-medium mb-2 block">GL Account Override (Optional)</FormLabel>
+                <SearchableAccountSelector
+                  value={overrideGLAccountId}
+                  onValueChange={setOverrideGLAccountId}
+                  placeholder="Leave empty to use auto-resolved GL account..."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Override takes priority over category mapping and global settings
+                </p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <FormField
