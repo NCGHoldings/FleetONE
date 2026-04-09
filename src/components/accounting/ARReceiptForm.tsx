@@ -315,6 +315,9 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
         is_advance: isAdvance,
         party_type: selectedPartyType,
         override_gl_account_id: overrideGLAccountId || undefined,
+        bus_id: selectedBusId || undefined,
+        bus_no: selectedBusNo || undefined,
+        vehicle_type: selectedVehicleType || undefined,
         allocations: selectedAllocations.map((a) => ({
           invoice_id: a.invoice_id,
           allocated_amount: a.allocated_amount,
@@ -327,6 +330,9 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
       setAllocations([]);
       setIsAdvance(false);
       setResolvedGL(null);
+      setSelectedBusId("");
+      setSelectedBusNo("");
+      setSelectedVehicleType("");
     } catch (error) {
       // Error handled by mutation
     }
