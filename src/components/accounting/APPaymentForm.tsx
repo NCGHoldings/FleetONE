@@ -356,6 +356,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
         is_direct_payment: isDirectPayment,
         vendor_bank_account_id: selectedBankAccountId || undefined,
         vendor_bill_number: vendorBillNumber || undefined,
+        bus_id: selectedBusId || undefined,
+        bus_no: selectedBusNo || undefined,
+        vehicle_type: selectedVehicleType || undefined,
         bank_fee_amount: effectiveBankFee > 0 ? effectiveBankFee : undefined,
         bank_fee_type: effectiveBankFee > 0 ? bankFeeType : undefined,
         allocations: selectedAllocations.map((a) => ({
