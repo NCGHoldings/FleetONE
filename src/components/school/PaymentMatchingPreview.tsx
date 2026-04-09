@@ -68,11 +68,20 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
     }
   };
 
+  // For partial_match, only allow confirming items with exactly 1 matched student
+  const confirmableItems = matchStatus === 'partial_match'
+    ? items.filter(item => (item.matched_student_ids || []).length === 1)
+    : items;
+
   const handleConfirmAll = async () => {
+    if (confirmableItems.length === 0) {
+      toast({ title: "No confirmable items", description: "Partial matches with multiple students must be resolved individually.", variant: "destructive" });
+      return;
+    }
     setProcessing(true);
     try {
       // Fetch student details for all matched students
-      const studentIds = [...new Set(items.flatMap(item => item.matched_student_ids || []))];
+      const studentIds = [...new Set(confirmableItems.flatMap(item => item.matched_student_ids || []))];
       const { data: students, error: studentsError } = await supabase
         .from('school_students')
         .select('id, fixed_monthly_amount, payment_balance')
