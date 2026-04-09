@@ -829,6 +829,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
               </div>
             )}
 
+            <FormField
               control={form.control}
               name="notes"
               render={({ field }) => (
