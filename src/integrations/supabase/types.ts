@@ -733,6 +733,7 @@ export type Database = {
           created_by: string | null
           discount_amount: number | null
           due_date: string
+          edit_history: Json | null
           grn_id: string | null
           id: string
           invoice_date: string
@@ -764,6 +765,7 @@ export type Database = {
           created_by?: string | null
           discount_amount?: number | null
           due_date: string
+          edit_history?: Json | null
           grn_id?: string | null
           id?: string
           invoice_date: string
@@ -795,6 +797,7 @@ export type Database = {
           created_by?: string | null
           discount_amount?: number | null
           due_date?: string
+          edit_history?: Json | null
           grn_id?: string | null
           id?: string
           invoice_date?: string
@@ -1001,6 +1004,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           document_url: string | null
+          edit_history: Json | null
           id: string
           is_advance: boolean | null
           is_direct_payment: boolean | null
@@ -1032,6 +1036,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           document_url?: string | null
+          edit_history?: Json | null
           id?: string
           is_advance?: boolean | null
           is_direct_payment?: boolean | null
@@ -1063,6 +1068,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           document_url?: string | null
+          edit_history?: Json | null
           id?: string
           is_advance?: boolean | null
           is_direct_payment?: boolean | null
@@ -1777,6 +1783,7 @@ export type Database = {
           customer_id: string | null
           discount_amount: number | null
           due_date: string
+          edit_history: Json | null
           id: string
           invoice_date: string
           invoice_number: string
@@ -1805,6 +1812,7 @@ export type Database = {
           customer_id?: string | null
           discount_amount?: number | null
           due_date: string
+          edit_history?: Json | null
           id?: string
           invoice_date: string
           invoice_number: string
@@ -1833,6 +1841,7 @@ export type Database = {
           customer_id?: string | null
           discount_amount?: number | null
           due_date?: string
+          edit_history?: Json | null
           id?: string
           invoice_date?: string
           invoice_number?: string
@@ -1962,6 +1971,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           customer_id: string | null
+          edit_history: Json | null
           id: string
           is_advance: boolean | null
           journal_entry_id: string | null
@@ -1983,6 +1993,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
+          edit_history?: Json | null
           id?: string
           is_advance?: boolean | null
           journal_entry_id?: string | null
@@ -2004,6 +2015,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
+          edit_history?: Json | null
           id?: string
           is_advance?: boolean | null
           journal_entry_id?: string | null
