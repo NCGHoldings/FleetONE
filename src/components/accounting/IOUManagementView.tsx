@@ -31,6 +31,8 @@ export const IOUManagementView = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreateIOU, setShowCreateIOU] = useState(false);
   const [selectedIOU, setSelectedIOU] = useState<IOURecord | null>(null);
+  const [showSettleDialog, setShowSettleDialog] = useState(false);
+  const [settleAmount, setSettleAmount] = useState(0);
 
   // New IOU form state
   const [newStaffId, setNewStaffId] = useState("");
@@ -73,12 +75,25 @@ export const IOUManagementView = () => {
     setNewUnit("");
   };
 
-  const handleMarkSettled = async (iou: IOURecord) => {
+  const openSettleDialog = (iou: IOURecord) => {
+    setSelectedIOU(iou);
+    setSettleAmount(iou.balance);
+    setShowSettleDialog(true);
+  };
+
+  const handleSettle = async () => {
+    if (!selectedIOU || settleAmount <= 0) return;
+    const newSettledAmount = (selectedIOU.settled_amount || 0) + settleAmount;
+    const newBalance = selectedIOU.amount - newSettledAmount;
+    const newStatus = newBalance <= 0 ? "settled" : "partially_settled";
+    
     await updateIOU.mutateAsync({
-      id: iou.id,
-      settled_amount: iou.amount,
-      status: "settled",
+      id: selectedIOU.id,
+      settled_amount: newSettledAmount,
+      status: newStatus,
     });
+    setShowSettleDialog(false);
+    setSelectedIOU(null);
   };
 
   // Stats
@@ -259,7 +274,7 @@ export const IOUManagementView = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleMarkSettled(iou)}
+                          onClick={() => openSettleDialog(iou)}
                           disabled={updateIOU.isPending}
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
