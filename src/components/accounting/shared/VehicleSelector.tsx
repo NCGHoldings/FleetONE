@@ -61,7 +61,7 @@ export const VehicleSelector = ({ busId, busNo, vehicleType, onSelect, onClear }
   const selectedBus = buses?.find(b => b.id === busId);
 
   const displayValue = vehicleType === "fleet" && selectedBus
-    ? `${selectedBus.bus_number} (${selectedBus.model || "N/A"})`
+    ? `${selectedBus.bus_no} (${selectedBus.model || "N/A"})`
     : vehicleType === "external" && busNo
     ? busNo
     : "";
@@ -125,18 +125,18 @@ export const VehicleSelector = ({ busId, busNo, vehicleType, onSelect, onClear }
                     {typeBuses.map((bus) => (
                       <CommandItem
                         key={bus.id}
-                        value={`${bus.bus_number} ${bus.model || ""}`}
+                        value={`${bus.bus_no} ${bus.model || ""}`}
                         onSelect={() => {
-                          onSelect(bus.id, bus.bus_number, "fleet");
+                          onSelect(bus.id, bus.bus_no, "fleet");
                           setOpen(false);
                         }}
                         className="cursor-pointer"
                       >
                         <Check className={cn("mr-2 h-4 w-4", busId === bus.id ? "opacity-100" : "opacity-0")} />
-                        <span className="font-mono text-xs mr-2">{bus.bus_number}</span>
+                        <span className="font-mono text-xs mr-2">{bus.bus_no}</span>
                         <span className="text-muted-foreground text-xs truncate">{bus.model || ""}</span>
                         {bus.status && (
-                          <Badge variant={bus.status === "Running" ? "default" : "secondary"} className="ml-auto text-[10px]">
+                          <Badge variant={bus.status === "active" ? "default" : "secondary"} className="ml-auto text-[10px]">
                             {bus.status}
                           </Badge>
                         )}
