@@ -353,7 +353,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
     ? form.watch("amount") > 0 && selectedCustomerId 
     : selectedPartyType === "vendor" 
       ? form.watch("amount") > 0 && selectedCustomerId
-      : totalAllocated > 0;
+      : totalAllocated > 0 || (form.watch("amount") > 0 && selectedCustomerId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -715,9 +715,34 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                     </table>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground py-4 text-center border rounded-lg">
-                    No outstanding invoices for this customer
-                  </p>
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground py-4 text-center border rounded-lg">
+                      No outstanding invoices for this customer
+                    </p>
+                    <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                      <FormField
+                        control={form.control}
+                        name="amount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-lg font-semibold">Receipt Amount</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                className="text-2xl h-14 font-bold"
+                                placeholder="Enter receipt amount"
+                                min={0}
+                                step="0.01"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
                 )}
 
                 <div className="flex justify-end gap-6">
@@ -745,7 +770,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                     <div className="flex items-center gap-4">
                       <span className="font-semibold">Total Receipt Amount:</span>
                       <span className="text-2xl font-bold text-primary">
-                        <CurrencyDisplay amount={selectedPartyType === "vendor" ? form.watch("amount") : totalAllocated} />
+                        <CurrencyDisplay amount={selectedPartyType === "vendor" ? form.watch("amount") : (totalAllocated > 0 ? totalAllocated : form.watch("amount"))} />
                       </span>
                     </div>
                   </div>
