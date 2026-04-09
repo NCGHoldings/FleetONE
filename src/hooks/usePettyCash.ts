@@ -10,6 +10,7 @@ export interface PettyCashFund {
   business_unit_code: string;
   company_id: string | null;
   custodian_id: string | null;
+  custodian_name: string | null;
   opening_balance: number;
   current_balance: number;
   gl_account_id: string | null;
@@ -88,7 +89,6 @@ export const usePettyCashFunds = (filters?: { branchId?: string; fundType?: stri
         .from("petty_cash_funds")
         .select(`
           *,
-          custodian:staff_registry(staff_name),
           branch:school_branches(branch_name)
         `)
         .eq("is_active", true)
@@ -210,6 +210,7 @@ export const useCreatePettyCashFund = () => {
           business_unit_code: data.business_unit_code || "SBO",
           company_id: selectedCompanyId,
           custodian_id: data.custodian_id,
+          custodian_name: data.custodian_name || null,
           opening_balance: data.opening_balance || 0,
           current_balance: data.opening_balance || 0,
           gl_account_id: data.gl_account_id,
@@ -247,6 +248,7 @@ export const useUpdatePettyCashFund = () => {
           fund_name: data.fund_name,
           business_unit_code: data.business_unit_code,
           custodian_id: data.custodian_id,
+          custodian_name: data.custodian_name || null,
           gl_account_id: data.gl_account_id,
           branch_id: data.branch_id as string | undefined,
           fund_limit: data.fund_limit,

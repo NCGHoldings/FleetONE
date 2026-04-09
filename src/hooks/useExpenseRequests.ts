@@ -33,6 +33,7 @@ export const BUSINESS_UNITS = [
   { value: "SNT", label: "Sinotruck Sales" },
   { value: "LTV", label: "Light Vehicles" },
   { value: "NCGE", label: "NCG Express" },
+  { value: "NCGH", label: "NCG Holding" },
 ];
 
 export const PAYMENT_METHODS = [
@@ -175,10 +176,56 @@ export const useCreateExpenseRequest = () => {
         .single();
 
       if (error) throw error;
+
+      // Auto-deduct from petty cash fund if payment_method is petty_cash
+      if (data.payment_method === "petty_cash" && data.petty_cash_fund_id && (data.amount || 0) > 0) {
+        try {
+          const amount = data.amount || 0;
+
+          // Get fund details
+          const { data: fund } = await supabase
+            .from("petty_cash_funds")
+            .select("gl_account_id, current_balance, fund_name")
+            .eq("id", data.petty_cash_fund_id)
+            .single();
+
+          if (fund) {
+            // Create petty cash disbursement transaction
+            const newBalance = (fund.current_balance || 0) - amount;
+            
+            await supabase
+              .from("petty_cash_transactions")
+              .insert({
+                petty_cash_fund_id: data.petty_cash_fund_id,
+                transaction_type: "disbursement",
+                expense_request_id: result.id,
+                amount,
+                balance_after: newBalance,
+                description: `Expense: ${data.description || data.expense_category || "Petty Cash Payment"}`,
+                expense_category: data.expense_category || null,
+                payment_method: "cash",
+                status: "approved",
+                company_id: selectedCompanyId,
+              });
+
+            // Update fund balance
+            await supabase
+              .from("petty_cash_funds")
+              .update({ current_balance: newBalance, updated_at: new Date().toISOString() })
+              .eq("id", data.petty_cash_fund_id);
+          }
+        } catch (pcErr) {
+          console.error("Petty cash auto-deduction failed (expense still saved):", pcErr);
+        }
+      }
+
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expense-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-all-transactions"] });
       toast({
         title: "Expense Request Created",
         description: "The expense request has been submitted successfully.",
