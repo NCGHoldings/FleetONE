@@ -49,12 +49,12 @@ export function useDocumentTemplates(documentTypeCode?: string) {
       setLoading(true);
       let query = (supabase as any)
         .from('document_templates')
-        .select('*')
+        .select('*, document_template_types(type_name, type_code, module)')
         .eq('is_active', true)
-        .order('document_type_code', { ascending: true });
+        .order('template_name', { ascending: true });
 
       if (documentTypeCode) {
-        query = query.eq('document_type_code', documentTypeCode);
+        query = query.eq('document_template_types.type_code', documentTypeCode);
       }
 
       const { data, error } = await query;
