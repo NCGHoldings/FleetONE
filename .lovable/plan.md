@@ -1,59 +1,60 @@
 
 
-# Special Hire Spreadsheet — Improved Section-Based View with Frozen Columns
+# Fleet Master Spreadsheet — Section Toggle & Frozen Columns (Like Special Hire)
 
 ## Problem
 
-The Special Hire spreadsheet has 55+ columns across 6 sections. The existing Focus Mode and section toggle buttons are too subtle — users still can't easily find what they've typed, and there's no frozen column behavior like the Fleet Sheet. The section pills at the top are tiny and easy to miss.
+The Fleet Sheet has 25 columns across 6 groups but no way to hide/show sections. All columns are always visible, making it hard to focus on data entry (e.g., just Meter/Fuel or just Financials). Only the `No` column is sticky — `Bus` scrolls off screen. The Special Hire sheet now has section toggles, frozen columns, and focus mode, but Fleet Sheet has none of this.
 
 ## Solution
 
-### 1. Freeze first 3 identity columns (sticky left)
+### 1. Freeze first 2 identity columns (No + Bus)
 
-Make columns `#`, `Quotation No`, and `Bus No` sticky on the left side so they remain visible while scrolling horizontally through any section. This matches how the Fleet Sheet keeps `No` and `Bus` visible.
+Make `No` and `Bus` sticky left so they're always visible while scrolling horizontally.
 
-**File**: `SpecialHireSpreadsheetCore.tsx`
-- Add `sticky left-0 z-10 bg-card` to the first 3 `<td>` and `<th>` elements
-- Use incremental `left-[Xpx]` values for each frozen column
-- Add a subtle right border/shadow on the last frozen column
+- `No` → `sticky left-0 z-30` (width: 56px)
+- `Bus` → `sticky left-[56px] z-30` with right shadow on last frozen column
+- Apply same sticky to both `<TableHead>` and `<TableCell>` rows
+- Both group header row cells for "Bus Info" also get sticky treatment
 
-### 2. Replace tiny pills with proper section selector dropdown + toggle chips
+### 2. Add section toggle chip bar (same pattern as Special Hire)
 
-Replace the current small pills with:
-- A proper **multi-select chip bar** with larger, clickable section toggles that clearly show ON/OFF state
-- A **"Show All" / "Show Only"** quick action per section
-- Keep Focus Mode but rename to **"Section View"** with a proper Select dropdown to pick which section to focus on
+Add a row of toggle chips above the table for the 6 column groups:
 
-**File**: `SpecialHireSpreadsheetCore.tsx`
-- Larger toggle buttons with icons per section (Bus icon for Hire Info, Settings for Operations, FileText for Invoice, Gauge for Meter, Wallet for Expenses, BarChart for Summary)
-- Active sections are solid-colored, inactive are ghost/outline
-- "All Sections" button to reset
+| Chip | Columns | Icon |
+|------|---------|------|
+| Route & Type | Route, Trip, Bus Type, Permit | MapPin |
+| Config | Trips/Day | Settings |
+| Status | Remark | Activity |
+| Crew | Driver, Conductor | Users |
+| Turns | Turn 01, Turn 02 | Clock |
+| Meter / Fuel | Model, Start KM, End KM, Mileage, Fuel, KM/L, Std Rate, Perform | Gauge |
+| Financials | Target, Passenger, Luggage, Expenses, Net | Wallet |
 
-### 3. Wider cells in Focus/Section mode
+- "All" button to show everything (default)
+- Click a chip to toggle that section on/off
+- Active = solid colored, inactive = outline/ghost
+- Section group header `colSpan` values adjust dynamically based on visible sections
 
-When only one section is active alongside identity columns, give each editable cell more width (`min-w-[120px]` instead of `min-w-[80px]`) so there's more room for data entry.
+### 3. Focus mode — single section with wider cells
 
-**File**: `SpecialHireSpreadsheetCore.tsx`
-- Add conditional `min-w` classes based on whether `focusMode && focusedSection` is active
-- In focus mode, the identity columns shrink to just `#`, `Q.No`, `Bus No`, `Status` (already done)
+When only 1 section is active:
+- Cell min-width increases from default to `140px`
+- More room for data entry
+- Identity columns (No + Bus) always shown
 
-### 4. Scroll position preservation
+### 4. Adjust frozen column backgrounds
 
-Like the Fleet Sheet, save and restore scroll position when data updates so users don't lose their place after editing a cell.
-
-**File**: `SpecialHireSpreadsheetCore.tsx`
-- Add `scrollContainerRef` and `savedScrollRef` pattern from FleetMasterSpreadsheetCore
-- Save position before `onUpdate`, restore after re-render
+Both header and body frozen cells need proper `bg-card` / `bg-background` classes so content doesn't bleed through when scrolling.
 
 ## Files to Change
 
-- **`src/components/special-hire/spreadsheet/SpecialHireSpreadsheetCore.tsx`** — frozen columns, improved section toggles, wider cells in focus mode, scroll preservation
+- **`src/components/fleet/FleetMasterSpreadsheetCore.tsx`** — add section toggle state, conditional column rendering, sticky Bus column, focus mode wider cells
 
 ## Result
 
-- First 3 columns (row number, quotation, bus) stay visible while scrolling horizontally
-- Section toggles are large, clear, and easy to use
-- Focus/Section mode gives much more editing space per cell
-- Scroll position preserved after edits — no jumping back to top
-- Same data, same functionality, just much more user-friendly navigation
+- No + Bus columns always visible while scrolling horizontally
+- Users can toggle which column groups are visible (same UX as Special Hire)
+- Focus on just Meter/Fuel for odometer entry, or just Financials for income review
+- Same data, same editing — just much easier to navigate
 
