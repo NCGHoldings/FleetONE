@@ -507,6 +507,28 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
               ))}
             </div>
 
+            {/* Match From selector */}
+            <div className="mt-3">
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Match Students From</label>
+              <Select
+                value={columnMapping.matchFromCol || 'combined'}
+                onValueChange={(v) => setColumnMapping(prev => ({ ...prev, matchFromCol: v }))}
+              >
+                <SelectTrigger className="h-9 text-xs w-full sm:w-[300px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="combined">Combined (Description + Reference + Tran ID)</SelectItem>
+                  <SelectItem value="description">Description only</SelectItem>
+                  <SelectItem value="reference">Reference / Tran ID only</SelectItem>
+                  {fileHeaders.map(h => (
+                    <SelectItem key={`match_${h}`} value={`col:${h}`}>{h}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">Choose which column(s) contain admission numbers or student names for matching</p>
+            </div>
+
             {/* Sample Data Preview */}
             {sampleRows.length > 0 && (
               <div className="border rounded-lg overflow-auto max-h-[180px]">
