@@ -997,6 +997,8 @@ export type Database = {
           bank_account_id: string | null
           bank_fee_amount: number | null
           bank_fee_type: string | null
+          bus_id: string | null
+          bus_no: string | null
           business_unit_code: string | null
           cheque_date: string | null
           cheque_number: string | null
@@ -1017,6 +1019,7 @@ export type Database = {
           status: string | null
           total_with_fees: number | null
           updated_at: string | null
+          vehicle_type: string | null
           vendor_bank_account_id: string | null
           vendor_bill_number: string | null
           vendor_id: string | null
@@ -1029,6 +1032,8 @@ export type Database = {
           bank_account_id?: string | null
           bank_fee_amount?: number | null
           bank_fee_type?: string | null
+          bus_id?: string | null
+          bus_no?: string | null
           business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
@@ -1049,6 +1054,7 @@ export type Database = {
           status?: string | null
           total_with_fees?: number | null
           updated_at?: string | null
+          vehicle_type?: string | null
           vendor_bank_account_id?: string | null
           vendor_bill_number?: string | null
           vendor_id?: string | null
@@ -1061,6 +1067,8 @@ export type Database = {
           bank_account_id?: string | null
           bank_fee_amount?: number | null
           bank_fee_type?: string | null
+          bus_id?: string | null
+          bus_no?: string | null
           business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
@@ -1081,6 +1089,7 @@ export type Database = {
           status?: string | null
           total_with_fees?: number | null
           updated_at?: string | null
+          vehicle_type?: string | null
           vendor_bank_account_id?: string | null
           vendor_bill_number?: string | null
           vendor_id?: string | null
@@ -1091,6 +1100,13 @@ export type Database = {
             columns: ["bank_account_id"]
             isOneToOne: false
             referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payments_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
             referencedColumns: ["id"]
           },
           {
@@ -1964,6 +1980,8 @@ export type Database = {
         Row: {
           amount: number
           bank_account_id: string | null
+          bus_id: string | null
+          bus_no: string | null
           business_unit_code: string | null
           cheque_date: string | null
           cheque_number: string | null
@@ -1983,10 +2001,13 @@ export type Database = {
           reference: string | null
           status: string | null
           updated_at: string | null
+          vehicle_type: string | null
         }
         Insert: {
           amount: number
           bank_account_id?: string | null
+          bus_id?: string | null
+          bus_no?: string | null
           business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
@@ -2006,10 +2027,13 @@ export type Database = {
           reference?: string | null
           status?: string | null
           updated_at?: string | null
+          vehicle_type?: string | null
         }
         Update: {
           amount?: number
           bank_account_id?: string | null
+          bus_id?: string | null
+          bus_no?: string | null
           business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
@@ -2029,8 +2053,16 @@ export type Database = {
           reference?: string | null
           status?: string | null
           updated_at?: string | null
+          vehicle_type?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ar_receipts_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ar_receipts_company_id_fkey"
             columns: ["company_id"]

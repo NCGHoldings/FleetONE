@@ -19,6 +19,7 @@ import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, CheckCircle, ChevronsUpDown, Check, Info } from "lucide-react";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
+import { VehicleSelector } from "./shared/VehicleSelector";
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -80,6 +81,9 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const [partyOpen, setPartyOpen] = useState(false);
   const [resolvedGL, setResolvedGL] = useState<{ accountCode: string; accountName: string } | null>(null);
   const [overrideGLAccountId, setOverrideGLAccountId] = useState("");
+  const [selectedBusId, setSelectedBusId] = useState("");
+  const [selectedBusNo, setSelectedBusNo] = useState("");
+  const [selectedVehicleType, setSelectedVehicleType] = useState<"fleet" | "external" | "">("");
 
   // Build grouped party options
   const partyOptions = useMemo(() => {
@@ -311,6 +315,9 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
         is_advance: isAdvance,
         party_type: selectedPartyType,
         override_gl_account_id: overrideGLAccountId || undefined,
+        bus_id: selectedBusId || undefined,
+        bus_no: selectedBusNo || undefined,
+        vehicle_type: selectedVehicleType || undefined,
         allocations: selectedAllocations.map((a) => ({
           invoice_id: a.invoice_id,
           allocated_amount: a.allocated_amount,
@@ -323,6 +330,9 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
       setAllocations([]);
       setIsAdvance(false);
       setResolvedGL(null);
+      setSelectedBusId("");
+      setSelectedBusNo("");
+      setSelectedVehicleType("");
     } catch (error) {
       // Error handled by mutation
     }
@@ -504,6 +514,15 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                 </p>
               </div>
             )}
+
+            {/* Vehicle Selector */}
+            <VehicleSelector
+              busId={selectedBusId}
+              busNo={selectedBusNo}
+              vehicleType={selectedVehicleType}
+              onSelect={(bId, bNo, vType) => { setSelectedBusId(bId); setSelectedBusNo(bNo); setSelectedVehicleType(vType); }}
+              onClear={() => { setSelectedBusId(""); setSelectedBusNo(""); setSelectedVehicleType(""); }}
+            />
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <FormField

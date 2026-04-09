@@ -525,6 +525,9 @@ export const useCreateARReceipt = () => {
       is_advance?: boolean;
       party_type?: "customer" | "vendor";
       override_gl_account_id?: string;
+      bus_id?: string;
+      bus_no?: string;
+      vehicle_type?: string;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
@@ -554,6 +557,9 @@ export const useCreateARReceipt = () => {
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,
           override_gl_account_id: receipt.override_gl_account_id || null,
+          bus_id: receipt.bus_id || null,
+          bus_no: receipt.bus_no || null,
+          vehicle_type: receipt.vehicle_type || null,
         }])
         .select()
         .single();
@@ -967,6 +973,9 @@ export const useCreateAPPayment = () => {
       bank_fee_amount?: number;
       bank_fee_type?: string;
       vendor_bill_number?: string;
+      bus_id?: string;
+      bus_no?: string;
+      vehicle_type?: string;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
@@ -1016,6 +1025,9 @@ export const useCreateAPPayment = () => {
           bank_fee_amount: payment.bank_fee_amount || 0,
           bank_fee_type: payment.bank_fee_type || null,
           vendor_bill_number: payment.vendor_bill_number || null,
+          bus_id: payment.bus_id || null,
+          bus_no: payment.bus_no || null,
+          vehicle_type: payment.vehicle_type || null,
           status: "posted",
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,

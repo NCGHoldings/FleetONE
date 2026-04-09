@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen, Landmark, FileText, Plus, Trash2, Upload, X } from "lucide-react";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
+import { VehicleSelector } from "./shared/VehicleSelector";
 
 const paymentSchema = z.object({
   payment_number: z.string().min(1, "Payment number is required"),
@@ -107,6 +108,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const [globalWriteOffAccountId, setGlobalWriteOffAccountId] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [vendorBillNumber, setVendorBillNumber] = useState("");
+  const [selectedBusId, setSelectedBusId] = useState("");
+  const [selectedBusNo, setSelectedBusNo] = useState("");
+  const [selectedVehicleType, setSelectedVehicleType] = useState<"fleet" | "external" | "">("");
 
   const { data: vendorBankAccounts } = useVendorBankAccounts(selectedVendorId || undefined);
 
@@ -352,6 +356,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
         is_direct_payment: isDirectPayment,
         vendor_bank_account_id: selectedBankAccountId || undefined,
         vendor_bill_number: vendorBillNumber || undefined,
+        bus_id: selectedBusId || undefined,
+        bus_no: selectedBusNo || undefined,
+        vehicle_type: selectedVehicleType || undefined,
         bank_fee_amount: effectiveBankFee > 0 ? effectiveBankFee : undefined,
         bank_fee_type: effectiveBankFee > 0 ? bankFeeType : undefined,
         allocations: selectedAllocations.map((a) => ({
@@ -417,6 +424,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       setBankFeeAmount(0);
       setDocumentFile(null);
       setVendorBillNumber("");
+      setSelectedBusId("");
+      setSelectedBusNo("");
+      setSelectedVehicleType("");
     } catch (error) {
       // Error handled by mutation
     }
@@ -574,6 +584,15 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                 </FormControl>
               </FormItem>
             </div>
+
+            {/* Vehicle Selector */}
+            <VehicleSelector
+              busId={selectedBusId}
+              busNo={selectedBusNo}
+              vehicleType={selectedVehicleType}
+              onSelect={(bId, bNo, vType) => { setSelectedBusId(bId); setSelectedBusNo(bNo); setSelectedVehicleType(vType); }}
+              onClear={() => { setSelectedBusId(""); setSelectedBusNo(""); setSelectedVehicleType(""); }}
+            />
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <FormField
