@@ -229,9 +229,11 @@ export function useSpecialHireReports() {
       if (!btId) return;
       const name = busTypeMap[btId] || "Unknown";
       if (!map[btId]) map[btId] = { name, totalKm: 0, totalLiters: 0, totalCost: 0, trips: 0 };
-      map[btId].totalKm += Number(r.actual_km_traveled) || Number(r.km_trip) || 0;
-      map[btId].totalLiters += Number(r.actual_fuel_liters) || 0;
-      map[btId].totalCost += Number(r.fuel_cost_fuel_only) || 0;
+      map[btId].totalKm += Number(r.km_trip) || 0;
+      const fuelCost = Number(r.fuel_cost_fuel_only) || 0;
+      const fuelPrice = Number(r.fuel_price_per_liter) || 0;
+      map[btId].totalLiters += fuelPrice > 0 ? fuelCost / fuelPrice : 0;
+      map[btId].totalCost += fuelCost;
       map[btId].trips += 1;
     });
     return Object.values(map).map(v => ({
