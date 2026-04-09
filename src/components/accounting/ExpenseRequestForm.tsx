@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Receipt, Bus, Building2, FileText, Loader2, Fuel, Camera, Landmark, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
-import { useCreateExpenseRequest, EXPENSE_CATEGORIES, BUSINESS_UNITS, PAYMENT_METHODS } from "@/hooks/useExpenseRequests";
+import { useCreateExpenseRequest, EXPENSE_CATEGORIES, BUSINESS_UNITS, PAYMENT_METHODS, useCompanyExpenseCategories } from "@/hooks/useExpenseRequests";
 import { usePettyCashFunds, useIOURecords } from "@/hooks/usePettyCash";
 import { useVendors } from "@/hooks/useAccountingData";
 import { useQuery } from "@tanstack/react-query";
@@ -51,6 +51,7 @@ interface ExpenseRequestFormProps {
 }
 
 export const ExpenseRequestForm = ({ open, onOpenChange, defaultBusinessUnit, defaultSchoolRouteId }: ExpenseRequestFormProps) => {
+  const filteredCategories = useCompanyExpenseCategories();
   const createExpense = useCreateExpenseRequest();
   const { data: vendors } = useVendors();
   const { data: pettyCashFunds } = usePettyCashFunds();
@@ -174,7 +175,7 @@ export const ExpenseRequestForm = ({ open, onOpenChange, defaultBusinessUnit, de
   };
 
   // Group categories for better UX
-  const groupedCategories = EXPENSE_CATEGORIES.reduce((acc, cat) => {
+  const groupedCategories = filteredCategories.reduce((acc, cat) => {
     if (!acc[cat.group]) acc[cat.group] = [];
     acc[cat.group].push(cat);
     return acc;
