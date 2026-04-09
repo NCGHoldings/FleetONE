@@ -1,159 +1,27 @@
 
-# Fix Bank Statement Matching, Admission Number Precision, and Import Validation
 
-## Do I know what the issue is?
-Yes.
+# Fix: Missing Amount Input When No Invoices Available
 
-I cross-checked the current code and the recent imported data. The problem is not one single bug; it is a combination of matching logic + duplicated student master data + missing validation.
+## Problem
 
-## What is actually wrong
+When recording an AR Receipt for a customer who has no outstanding invoices (like Ms. Kanthi Perera in the screenshot), the form shows "No outstanding invoices for this customer" but provides **no way to enter an amount**. The Total Receipt Amount stays at LKR 0.00 and the form cannot be submitted.
 
-### 1. The “Match From” option is not really being used
-In `BankStatementUploadZone.tsx`, the UI stores `matchFromCol`, but `handleProcess()` still always builds one combined text and ignores the user’s actual choice.
+Currently, a direct amount input only appears in two cases:
+1. Advance mode is ON
+2. A Vendor is selected (not a customer)
 
-### 2. Admission matching is too loose
-In `bank-statement-processor.ts`, token extraction for values like `NEX-000W13235` produces broad tokens such as `NEX000` and `W13235`.
+For a **Customer with zero outstanding invoices**, neither condition is met, so the amount field is hidden.
 
-Then `matchStudentsFromTokens()` uses a loose `includes()` rule, so `NEX000` matches almost every `NEX-000Wxxxxx` student.
+## Solution
 
-That is why one import row is currently getting massive false matches instead of one exact student.
+Add a direct amount input for customers when there are no outstanding invoices to allocate against. This covers the common case where a customer pays but their invoice hasn't been created yet, or the payment is a general receipt.
 
-### 3. The matcher is using all branch students, including old inactive duplicates
-Current import logic fetches all students in the branch, not only active/canonical students.
+## File to Change
 
-I checked the branch data:
-- Total students: 2,765
-- Active: 536
-- Inactive: 2,229
+**`src/components/accounting/ARReceiptForm.tsx`** — after the "No outstanding invoices" message (around line 717-721), add a direct amount input field similar to the vendor amount input. Also update `canSubmit` logic (line 352-356) so customer receipts with a manually entered amount and no allocations can still be submitted.
 
-There are many repeated admission numbers in the same branch. Example: the same admission no appears 5 times, with only 1 active row and several inactive old rows.
+Specific changes:
+- After `"No outstanding invoices for this customer"` text, render a direct amount input so users can type the receipt amount
+- Update `canSubmit`: for customer non-advance with 0 allocations, allow submit if `form.watch("amount") > 0`
+- Update Total Receipt Amount display to show the manual amount when no allocations exist
 
-This turns exact matches into “partial match” lists.
-
-### 4. Zero-padded admission numbers are not normalized properly
-Example case:
-```text
-Bank file:    NEX-000W7304
-Student DB:   NEX-000W08304
-```
-
-These should be treated as the same logical ID when there is one clear active candidate, but current normalization does not handle that safely.
-
-### 5. Validation is too weak before posting
-Current import flow does not properly stop bad or risky data:
-- invalid dates silently fall back to today
-- no strong pre-check for duplicate payment rows in the file
-- no strong pre-check for duplicate student master records
-- no guard against huge ambiguous match lists
-- “Needs Review” still offers bulk confirm behavior, which is dangerous for ambiguous matches
-
-### 6. Earlier branch isolation is incomplete
-The recent migration tightened import tables, but `school_students` branch-level DB protection still needs to be completed to fully guarantee cross-branch isolation at the database layer.
-
----
-
-## Implementation plan
-
-### 1. Build a canonical student list before matching
-Update the import flow to match only against a clean branch-safe candidate set:
-- current branch only
-- active students only
-- dedupe by normalized admission number
-- if multiple active students share the same admission no, treat that as a data issue, not an auto-match
-
-This will remove old inactive duplicates from matching.
-
-### 2. Tighten admission token extraction and comparison
-Refactor the matcher so it ranks matches safely instead of using broad partial contains:
-- exact full normalized admission match
-- exact normalized suffix match
-- zero-padded numeric suffix equivalence
-- exact student name fallback
-- parent name fallback
-
-Also remove generic tokens like `NEX000` from being treated as standalone match keys.
-
-### 3. Make “Match From” actually control the match source
-Use `columnMapping.matchFromCol` during processing:
-- Description only
-- Reference / Tran ID only
-- specific mapped column
-- combined mode when chosen
-
-So the system matches from the column the user selected, not from a hardcoded combined source.
-
-### 4. Add a real pre-import validation step
-Before saving import items, show a validation summary:
-- invalid / missing dates
-- zero or suspicious amounts
-- duplicate rows inside the uploaded file
-- rows with no extractable ID/name
-- rows producing too many candidate students
-- duplicate admission numbers in branch master data
-- probable duplicate payments already recorded
-
-Critical errors should block processing. Warnings should let the user continue with review.
-
-### 5. Fix the review flow so ambiguous rows are not bulk-confirmed
-Change the confirmation behavior:
-- auto-confirm only rows with exactly 1 canonical student
-- for partial matches, let the user choose one ranked student
-- remove or disable unsafe “Confirm All” behavior for ambiguous rows
-- re-check branch + active student status before inserting payment transactions
-
-### 6. Finish branch-safe data protection
-Add the missing DB hardening for `school_students`:
-- branch-scoped RLS using the same branch access function
-- keep all import reads/writes branch-validated server-side
-- ensure review/confirm queries cannot resolve students from another branch
-
-### 7. Use learned patterns during import
-The app currently saves manual matches into `school_payment_pattern_history`, but the main importer is not using them.
-
-I will wire that in so recurring descriptions can auto-match correctly in future imports.
-
----
-
-## Files to change
-
-- `src/utils/bank-statement-processor.ts`
-- `src/components/school/BankStatementUploadZone.tsx`
-- `src/components/school/PaymentMatchingPreview.tsx`
-- `src/components/school/UnmatchedPaymentsTable.tsx`
-- new Supabase migration for `school_students` branch RLS and import-safety hardening
-
----
-
-## Technical notes
-
-### Current proven root causes
-- `matchFromCol` is stored but ignored during processing
-- loose token/contains matching is causing false positives
-- branch student query includes inactive duplicate records
-- this branch currently has heavy duplicate admissions
-- recent import rows are getting extremely large match lists instead of one student
-
-### Matching rule I will use
-```text
-1. exact active admission match
-2. exact normalized admission match
-3. safe zero-padding equivalence
-4. exact student name
-5. exact parent name
-6. otherwise send to review
-```
-
-### Important safety rule
-If more than one active student still matches the same normalized admission number, I will not guess. That row will be flagged as a master-data issue for review.
-
----
-
-## Expected result
-
-After this fix:
-- admission numbers match accurately instead of returning huge student lists
-- values like `NEX-000W14929` map to the correct student
-- short/zero-padded variants like `W7304` can resolve safely when unambiguous
-- invalid rows are caught before posting
-- partial matches are reviewed safely instead of bulk-confirmed
-- cross-branch student data remains protected at the DB level
