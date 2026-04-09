@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
+
 export const EXPENSE_CATEGORIES = [
   { value: "fuel", label: "Fuel/Diesel", group: "Operational" },
   { value: "highway", label: "Highway Charges", group: "Operational" },
