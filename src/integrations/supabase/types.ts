@@ -23327,6 +23327,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_school_branch_access: {
+        Row: {
+          branch_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       vat_returns: {
         Row: {
           adjustments: number | null
@@ -28235,6 +28256,10 @@ export type Database = {
         Returns: string
       }
       calculate_tyre_condition: { Args: { p_tyre_id: string }; Returns: number }
+      can_access_school_branch: {
+        Args: { _branch_id: string }
+        Returns: boolean
+      }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       create_admin_user: { Args: never; Returns: undefined }
       create_or_get_sph_customer: {
