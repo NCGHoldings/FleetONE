@@ -1,79 +1,98 @@
 
 
-# Monthly Billing Percentage — Charge 80% (or Custom %) of Fixed Amount
+# Special Hire Reports & Analytics — Fully Automated Dashboard
 
-## How It Works Today
+## What You Have
 
-When you generate bulk AR invoices, each student is charged their full `current_amount_due` (which equals `fixed_monthly_amount` + any outstanding balance). There is **no way** to charge a partial percentage of the fixed amount for a given month.
+2,459 quotations with rich data: revenue (LKR 468M), profit (LKR 458M), fuel costs (LKR 28M), commissions (LKR 344K), advance payments (LKR 7.9M), balance due (LKR 45.9M). Monthly trends spanning Jan 2026 to Feb 2027. All the data needed for comprehensive automated reports already exists.
 
-## Your Scenario
+## Reports to Build (8 Sections, All Auto-Generated)
 
-- Student fixed amount: LKR 100
-- This month you only want to charge 80% = LKR 80
-- Plus any outstanding balance carried forward
-- The percentage should default to 80% but be adjustable each month before generating invoices
+### 1. Revenue & Profit Overview
+- KPI cards: Total Revenue, Total Profit, Profit Margin %, Average Trip Value
+- Revenue vs Profit trend line chart (monthly)
+- Period selector (This Month / Quarter / Year / Custom)
 
-## Solution
+### 2. Trip Performance Analytics
+- Total trips by status (confirmed, completed, cancelled, on-hold)
+- Trips per month bar chart with growth trend
+- Average revenue per trip over time
+- Busiest months/days heatmap
 
-### 1. Add `billing_percentage` to settings table
+### 3. Financial Summary
+- Revenue breakdown: Hire Charge vs Extra Charges vs Overtime vs Overnight
+- Expense breakdown: Fuel + Driver + Commission + Other Expenses (pie chart)
+- Net profit margin trend (line chart)
+- Cost-per-KM analysis
 
-Add a new column `billing_percentage` (default 80) to `school_bus_finance_settings`. This is the default percentage applied each month but can be overridden at invoice generation time.
+### 4. Fuel & Efficiency Report
+- Total fuel cost vs revenue ratio
+- Average fuel cost per trip
+- KM/L performance per bus type (green/red color coding against standard)
+- Fuel cost trend over months
 
-```sql
-ALTER TABLE school_bus_finance_settings 
-ADD COLUMN billing_percentage numeric DEFAULT 80;
-```
+### 5. Payment & Collection Status
+- Total Advance Collected (LKR 7.9M) vs Balance Due (LKR 45.9M)
+- Collection rate % (advance/gross revenue)
+- Outstanding receivables aging (0-30, 30-60, 60-90, 90+ days)
+- Payment timeline chart
 
-### 2. Add percentage input to the Invoice Generation UI
+### 6. Bus & Route Analytics
+- Top 10 most-used buses by trip count and revenue
+- Top 10 most popular routes (pickup→drop)
+- Revenue by bus type (bar chart)
+- Bus utilization rate
 
-In the bulk invoice generation dialog/form, add a slider or number input:
-- Label: **"Monthly Charge %"**
-- Default: 80% (from settings)
-- Range: 1–100
-- Shows preview: "Fixed LKR 100 × 80% = LKR 80 + Outstanding"
+### 7. Commission & Referral Report
+- Total commissions paid (LKR 344K)
+- Commission as % of revenue
+- Top referral agents by trips and commission earned
+- Commission trend over months
 
-### 3. Update invoice amount calculation
+### 8. Executive Summary (Auto-PDF Export)
+- One-page summary with all key KPIs
+- Auto-generated insights (top performing month, highest revenue bus, collection gap)
+- Export to PDF button for management reporting
+- Date range filter applied across all sections
 
-**File**: `src/hooks/useSchoolBusFinance.ts` — `generateBulkInvoices` function
+## Technical Approach
 
-Current calculation (line 464):
-```typescript
-const rawAmount = student.current_amount_due || student.fixed_monthly_amount || 0;
-```
+### New Component: `SpecialHireReportsTab.tsx`
+- Replaces the "coming soon" placeholder in SpecialHire.tsx
+- Queries `special_hire_quotations` with date range filters
+- All calculations done client-side from the fetched data
+- Uses Recharts (already in project) for all charts
+- Responsive grid layout with collapsible sections
 
-New calculation:
-```typescript
-const fixedAmount = student.fixed_monthly_amount || 0;
-const chargeAmount = fixedAmount * (billingPercentage / 100);
-const outstanding = Math.abs(Math.min(student.payment_balance, 0));
-const rawAmount = chargeAmount + outstanding;
-```
+### Data Fetching
+- Single query with date range filter fetches all quotations
+- Client-side aggregation for monthly trends, bus stats, route stats
+- No edge functions needed — all data already in the quotations table
+- Memoized calculations to handle 2,459+ records efficiently
 
-This separates:
-- **This month's charge**: fixed amount × percentage (e.g., 100 × 80% = 80)
-- **Carried forward outstanding**: any unpaid balance from previous months
-- **Total invoice amount**: charge + outstanding - any credit
+### Export
+- PDF export using the same pattern as NSP/Yutong reports (html2canvas)
+- CSV export for raw data tables
 
-### 4. Update settings UI
+## Files to Create/Change
 
-Add the billing percentage field to the School Bus Finance Settings panel so admins can change the default (currently in the finance settings component).
-
-### 5. Update `current_amount_due` on students after invoice generation
-
-After invoices are generated, update each student's `current_amount_due` to reflect the actual invoiced amount (charge + outstanding), so the Outstanding tab and KPI cards match the invoices.
-
-## Files to Change
-
-- **New SQL migration** — add `billing_percentage` column to `school_bus_finance_settings`
-- **`src/hooks/useSchoolBusFinance.ts`** — update `generateBulkInvoices` to apply percentage to fixed amount, add outstanding separately
-- **Invoice generation UI component** — add percentage input with default from settings
-- **Finance settings UI** — add default billing percentage field
+- **Create** `src/components/special-hire/reports/SpecialHireReportsTab.tsx` — main reports container with date filters
+- **Create** `src/components/special-hire/reports/RevenueOverview.tsx` — KPI cards + revenue/profit charts
+- **Create** `src/components/special-hire/reports/TripPerformance.tsx` — trip counts, status breakdown, trends
+- **Create** `src/components/special-hire/reports/FinancialSummary.tsx` — expense breakdown, profit margins
+- **Create** `src/components/special-hire/reports/FuelEfficiencyReport.tsx` — fuel costs, KM/L analysis
+- **Create** `src/components/special-hire/reports/PaymentCollectionReport.tsx` — advances, outstanding, aging
+- **Create** `src/components/special-hire/reports/BusRouteAnalytics.tsx` — top buses, routes, utilization
+- **Create** `src/components/special-hire/reports/CommissionReport.tsx` — referral agent performance
+- **Create** `src/hooks/useSpecialHireReports.ts` — data fetching + aggregation hook
+- **Edit** `src/pages/SpecialHire.tsx` — replace "coming soon" with `SpecialHireReportsTab`
 
 ## Result
 
-- Default 80% charge applied to fixed monthly amount
-- Outstanding balance always added on top (never reduced by percentage)
-- Adjustable per month before generating invoices
-- Preview shows breakdown: "Fixed × 80% + Outstanding = Invoice Amount"
-- Settings stores the default so you don't have to enter it every month
+- 8 fully automated report sections — zero manual work
+- All data pulled directly from existing quotation records
+- Date range filtering across all reports
+- PDF + CSV export for management sharing
+- Color-coded performance indicators (fuel efficiency, collection rates)
+- Works for any volume — from 10 trips to 10,000+
 
