@@ -79,6 +79,7 @@ export interface SchoolBusFinanceSettings {
   auto_post_invoices: boolean;
   auto_post_payments: boolean;
   invoice_prefix: string;
+  billing_percentage: number; // Default monthly charge percentage (e.g., 80 = charge 80% of fixed amount)
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -370,6 +371,7 @@ export function useGenerateBulkARInvoices() {
       invoiceMonth,
       students,
       settings,
+      billingPercentage,
       onProgress,
     }: {
       branchId: string;
@@ -382,6 +384,7 @@ export function useGenerateBulkARInvoices() {
         fixed_monthly_amount?: number;
       }>;
       settings: SchoolBusFinanceSettings;
+      billingPercentage?: number;
       onProgress?: (processed: number, total: number) => void;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
