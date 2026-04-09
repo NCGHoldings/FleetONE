@@ -130,12 +130,12 @@ export function UnmatchedPaymentsTable({ importId, branchId, onStatsUpdate }: Un
       try {
         await supabase
           .from('school_payment_pattern_history')
-          .upsert([{
+          .insert([{
             branch_id: branchId,
-            description_pattern: item.description,
-            matched_student_id: studentId,
-            match_count: 1,
-          }], { onConflict: 'branch_id,description_pattern' });
+            original_description: item.description,
+            matched_admission_no: student.admission_no || studentId,
+            pattern_type: 'manual_match',
+          }]);
       } catch (e) {
         console.warn('Pattern learning save failed (non-critical):', e);
       }
