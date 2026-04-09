@@ -646,7 +646,7 @@ export const useCreateARReceipt = () => {
 
         if (receipt.is_advance) {
           // Use resolved advance account or fallback to COA search
-          let customerAdvanceId = resolved.advanceAccountId;
+          let customerAdvanceId = advanceAccountId;
           if (!customerAdvanceId) {
             const { data: advanceAccounts } = await supabase
               .from("chart_of_accounts")
