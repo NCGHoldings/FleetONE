@@ -1263,11 +1263,11 @@ export default function Complaints() {
                     Incident Report — {selectedComplaint.feedback_id}
                   </DialogTitle>
                   <div className="flex items-center gap-2">
-                    <Badge className={getPriorityColor(selectedComplaint.priority)} className2="text-sm px-3 py-1">
+                    <Badge className={`${getPriorityColor(selectedComplaint.priority)} text-sm px-3 py-1`}>
                       <Flag className="h-3.5 w-3.5 mr-1" />
                       {selectedComplaint.priority?.toUpperCase()}
                     </Badge>
-                    <Badge className={getStatusColor(selectedComplaint.status)} className2="text-sm px-3 py-1">
+                    <Badge className={`${getStatusColor(selectedComplaint.status)} text-sm px-3 py-1`}>
                       {selectedComplaint.status?.toUpperCase()}
                     </Badge>
                   </div>
