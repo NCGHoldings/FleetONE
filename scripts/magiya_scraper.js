@@ -13,7 +13,7 @@ async function runMagiyaScraper() {
   
   // 1. Launch Headless Browser
   const browser = await puppeteer.launch({
-    headless: "new", // Run entirely invisibly in the background
+    protocolTimeout: 240000, headless: "new", // Run entirely invisibly in the background
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
