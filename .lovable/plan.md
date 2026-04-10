@@ -1,31 +1,56 @@
 
 
-# Fix "Today Only" Mode — Trips/Day Should Work Like Master Sheet
+# Fix Two Issues: Per-Trip Route Independence + Complaint Details View
 
-## Problem
+## Issue 1: Route Change Cascading to All Trips
 
-In "Today Only" mode, when you change Trips/Day (e.g., from 2 to 1), it **immediately creates or deletes trip records** in the `daily_trips` table. This is wrong — you want the same behavior as Master mode:
+**Problem**: In daily mode, when you change the route on trip sequence 1 (the first trip), it updates the master roster's `route_label` which cascades to ALL trips for that bus. Only `trip_sequence > 1` uses the per-trip `route_label__trip:` update path.
 
-1. Change Trips/Day values for multiple buses first
-2. Then click **"Create Remaining"** to generate all trips at once
+**Root cause** (line 302-305 in `FleetMasterSpreadsheetCore.tsx`):
+```
+if (editMode === 'daily' && row.trip_id && row.trip_sequence > 1) {
+  onUpdate(row.id, `route_label__trip:${row.trip_id}`, currentValue);
+} else {
+  onUpdate(row.id, 'route_label', currentValue);  // <-- THIS updates master roster for ALL trips
+}
+```
 
-Currently the daily mode `trips_per_day` edit triggers a confirmation dialog and instantly adds/removes `daily_trips` rows. The user wants to just update the roster's `trips_per_day` value and use "Create Remaining" to batch-create trips.
+**Fix**: In daily mode, ALL trip sequences (including sequence 1) should use the per-trip update path when a `trip_id` exists. Only fall back to roster update when no trip has been created yet.
 
-## Fix
+### File: `src/components/fleet/FleetMasterSpreadsheetCore.tsx`
+- Change the route select `onSelect` handler (line 302): use `route_label__trip:` for ALL sequences in daily mode when `trip_id` exists, not just `> 1`
 
-### `src/hooks/useFleetMasterSpreadsheet.ts`
-- **Remove the entire daily-mode special handling** for `trips_per_day` (lines 309-399). In both master and daily mode, `trips_per_day` should just update the `fleet_master_roster` table — same as master mode already does (lines 402-413).
-- The "Create Remaining" function already compares `existingTripCounts` vs `row.trips_per_day` and creates missing trips. So after updating `trips_per_day` on the roster, "Create Remaining" will handle the actual trip generation.
+### File: `src/hooks/useFleetMasterSpreadsheet.ts`
+- The `route_label__trip:` handler already correctly updates the specific `daily_trips` row -- no change needed here
 
-### `src/components/fleet/FleetMasterSpreadsheetCore.tsx`
-- **Remove the confirmation dialog** for daily-mode trips changes (lines 148-161 in `commitEdit` and lines 733-769 dialog). Since changing Trips/Day now just updates the roster number, no confirmation is needed — trips are only created when "Create Remaining" is clicked.
-- Remove the `pendingTripsUpdate` state and `PendingTripsUpdate` interface entirely.
-- The `commitEdit` function simply calls `onUpdate(rosterId, 'trips_per_day', val)` directly — same path as all other fields.
+---
+
+## Issue 2: Complaint Management Page Missing Details
+
+**Problem**: The public complaint form collects bus number, route number, customer phone, customer name, incident date/time, location, driver name -- all stored in `related_persons` JSON. But the complaints table and detail view dialog don't show any of these fields. Management team can't see critical incident info.
+
+**Fix**: Redesign the complaints page to show all form details prominently.
+
+### File: `src/pages/Complaints.tsx`
+
+**Table columns** -- Add new columns visible in the data table:
+- Bus Number (from `related_persons.bus_number`)
+- Route Number (from `related_persons.route_number`)  
+- Customer Phone (from `related_persons.customer_phone`)
+- Location (from `related_persons.location`)
+
+**Detail view dialog** (the "View" button dialog, lines 1114-1206) -- Complete redesign:
+- Add a prominent incident info section showing: Bus Number, Route Number, Date & Time, Location, Driver Name
+- Add customer info section: Customer Name, Phone, Email
+- Use a card-based layout with icons and color-coded sections
+- Show priority and status as large colored badges
+- Add a timeline showing created date, escalation, resolution
+- Make it visually attractive for the management team with proper spacing and visual hierarchy
+
+**Manage dialog** -- Add a read-only "Incident Summary" tab showing all the `related_persons` data so managers can see full context while managing
 
 ## Result
-
-- Changing Trips/Day in "Today Only" mode updates the roster value only (no trips created/deleted)
-- Click "Create Remaining" to batch-generate all trips based on the updated Trips/Day values
-- Same workflow as Master mode — consistent and predictable
-- Reducing trips does NOT auto-delete existing trip records (safe)
+- Changing route on any trip (including trip 1) in daily mode only affects that specific trip
+- Complaint management page shows bus number, route, customer phone, location in the table
+- Detail view shows ALL form fields in an attractive, organized layout for management review
 
