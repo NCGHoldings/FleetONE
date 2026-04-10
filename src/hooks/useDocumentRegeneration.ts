@@ -186,6 +186,18 @@ export const useDocumentRegeneration = () => {
         } : {}),
         
         hideSignaturePage,
+        hireType: quotationData.hire_type || 'External',
+        intermediateStops: (() => {
+          try {
+            if (quotationData.intermediate_stops) {
+              const parsed = typeof quotationData.intermediate_stops === 'string'
+                ? JSON.parse(quotationData.intermediate_stops)
+                : quotationData.intermediate_stops;
+              return Array.isArray(parsed) ? parsed : [];
+            }
+          } catch {}
+          return [];
+        })(),
         ...signatureMap
       };
 

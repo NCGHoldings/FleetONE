@@ -42,6 +42,9 @@ export interface QuotationWithPayments {
   assigned_conductor_name?: string;
   assigned_bus_no?: string;
   created_at: string;
+  // Route details
+  intermediate_stops?: string;
+  hire_type?: string;
   // Post-trip adjustment fields
   adjustment_amount?: number;
   has_finalized_adjustment?: boolean;

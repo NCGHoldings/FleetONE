@@ -54,6 +54,8 @@ interface GenerateBalanceInvoiceModalProps {
     bus_no?: string;
     tripDistance?: number;
     totalKm?: number;
+    hire_type?: string;
+    intermediate_stops?: string;
   };
   adjustmentData: {
     id: string;
@@ -251,6 +253,18 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       additionalExpenses: hasRealAdjustment ? effectiveAdjustment.additional_expenses : undefined,
       totalAdditionalExpenses: hasRealAdjustment ? effectiveAdjustment.total_additional_expenses : undefined,
       adjustmentNotes: hasRealAdjustment ? effectiveAdjustment.adjustment_notes : undefined,
+      hireType: quotationData.hire_type || 'External',
+      intermediateStops: (() => {
+        try {
+          if (quotationData.intermediate_stops) {
+            const parsed = typeof quotationData.intermediate_stops === 'string'
+              ? JSON.parse(quotationData.intermediate_stops)
+              : quotationData.intermediate_stops;
+            return Array.isArray(parsed) ? parsed : [];
+          }
+        } catch {}
+        return [];
+      })(),
     };
   };
 

@@ -442,6 +442,18 @@ export function ConfirmedTripsTable() {
         invoice_status: 'draft' as const,
         document_type: 'sales_receipt' as const,
         hideSignaturePage,
+        hireType: tripForDoc.hire_type || 'External',
+        intermediateStops: (() => {
+          try {
+            if (tripForDoc.intermediate_stops) {
+              const parsed = typeof tripForDoc.intermediate_stops === 'string'
+                ? JSON.parse(tripForDoc.intermediate_stops)
+                : tripForDoc.intermediate_stops;
+              return Array.isArray(parsed) ? parsed : [];
+            }
+          } catch {}
+          return [];
+        })(),
       };
 
       console.log('🚀 Triggering run-in-background document generation for:', draftInvoiceData.invoiceNo);
@@ -1166,6 +1178,23 @@ export function ConfirmedTripsTable() {
                               <MapPin className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
                               <div className="truncate">{trip.pickup_location}</div>
                             </div>
+                            {(() => {
+                              let stops: Array<{ location: string }> = [];
+                              try {
+                                if (trip.intermediate_stops) {
+                                  const parsed = typeof trip.intermediate_stops === 'string' 
+                                    ? JSON.parse(trip.intermediate_stops) 
+                                    : trip.intermediate_stops;
+                                  if (Array.isArray(parsed)) stops = parsed;
+                                }
+                              } catch {}
+                              return stops.map((stop, idx) => (
+                                <div key={idx} className="flex items-start space-x-2 text-xs">
+                                  <MapPin className="w-3 h-3 text-orange-500 mt-0.5 flex-shrink-0" />
+                                  <div className="truncate">{stop.location}</div>
+                                </div>
+                              ));
+                            })()}
                             <div className="flex items-start space-x-2 text-xs">
                               <MapPin className="w-3 h-3 text-red-500 mt-0.5 flex-shrink-0" />
                               <div className="truncate">{trip.drop_location}</div>

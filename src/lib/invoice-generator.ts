@@ -43,6 +43,8 @@ export interface InvoiceData {
   forCustomer?: boolean; // Flag to generate clean invoice for customer (no signatures, no draft text)
   // Intermediate stops for route display
   intermediateStops?: Array<{ location: string; id?: string; lat?: number; lng?: number }>;
+  // Hire type (Outside, Internal, Lyceum)
+  hireType?: string;
   // Post-trip adjustment fields
   hasAdjustments?: boolean;
   originalQuotedKm?: number;
@@ -228,8 +230,14 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const totalPaid = data.paidAmount || 0;
     // Use explicit balanceAmount when provided (balance invoices), else compute
     const balanceDue = data.balanceAmount != null ? data.balanceAmount : Math.max(0, priceAfterDiscount - totalPaid);
-    // Show only pickup → drop (no intermediate stops on invoice)
-    const itemDetail = data.itemDetail || `${data.pickupLocation || ''} → ${data.dropLocation || ''}`;
+    // Build route with intermediate stops if available
+    const itemDetail = data.itemDetail || (() => {
+      if (data.intermediateStops && data.intermediateStops.length > 0) {
+        const stops = data.intermediateStops.map(s => s.location).join(' → ');
+        return `${data.pickupLocation || ''} → ${stops} → ${data.dropLocation || ''}`;
+      }
+      return `${data.pickupLocation || ''} → ${data.dropLocation || ''}`;
+    })();
     // Use actual KM from post-trip adjustment when available, otherwise original quoted KM
     const mileage = (data.hasAdjustments && data.actualKmTraveled)
       ? data.actualKmTraveled
@@ -317,7 +325,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                   const driver = driverList[idx] || '';
                   const conductor = conductorList[idx] || '';
                   return `<tr>
-                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- External</td>
+                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- ${data.hireType || 'External'}</td>
                     <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${itemDetail}<br><br>Remark: ${vNo} ${driver ? `(D) ${driver}` : ''} ${conductor ? `(C) ${conductor}` : ''}</td>
                     <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${vNo}</td>
                     <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-weight: bold;">${perBusAmount.toLocaleString()}.00</td>
@@ -325,7 +333,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                 }).join('');
               } else {
                 return `<tr>
-                  <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- External</td>
+                  <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- ${data.hireType || 'External'}</td>
                   <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${itemDetail}<br><br>Remark: ${data.vehicleNo || '-'} ${data.driverName ? `(D) ${data.driverName}` : ''} ${data.conductorName ? `(C) ${data.conductorName}` : ''}</td>
                   <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${data.vehicleNo || '-'}</td>
                   <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-weight: bold;">${subTotal.toLocaleString()}.00</td>
