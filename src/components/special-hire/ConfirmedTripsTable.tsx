@@ -1564,6 +1564,18 @@ export function ConfirmedTripsTable() {
                                           totalAdditionalExpenses: adjustment?.total_additional_expenses,
                                           adjustmentNotes: adjustment?.notes,
                                           hideSignaturePage,
+                                          hireType: trip.hire_type || 'External',
+                                          intermediateStops: (() => {
+                                            try {
+                                              if (trip.intermediate_stops) {
+                                                const parsed = typeof trip.intermediate_stops === 'string'
+                                                  ? JSON.parse(trip.intermediate_stops)
+                                                  : trip.intermediate_stops;
+                                                return Array.isArray(parsed) ? parsed : [];
+                                              }
+                                            } catch {}
+                                            return [];
+                                          })(),
                                         };
 
                                         const pdfBlob = await generateInvoicePDF(reminderData);
