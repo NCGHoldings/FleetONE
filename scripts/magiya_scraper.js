@@ -22,7 +22,7 @@ async function runMagiyaScraper() {
     await page.setViewport({ width: 1280, height: 800 });
 
     console.log('Navigate to Login...');
-    await page.goto('https://magiyaoperator.zuselab.dev/login', { waitUntil: 'networkidle2' });
+    await page.goto('https://magiyaoperator.zuselab.dev/login', { waitUntil: 'domcontentloaded' });
 
     // 2. Perform Login via UI mimicking
     console.log('Entering credentials...');
@@ -32,11 +32,11 @@ async function runMagiyaScraper() {
     await page.click('button[type="submit"]');
 
     console.log('Waiting for authentication to complete...');
-    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+    await page.waitForNavigation({ waitUntil: 'domcontentloaded' });
 
     // 3. Navigate to Reports 
     console.log('Navigating to Reports Section...');
-    await page.goto('https://magiyaoperator.zuselab.dev/reports', { waitUntil: 'networkidle2' });
+    await page.goto('https://magiyaoperator.zuselab.dev/reports', { waitUntil: 'domcontentloaded' });
 
     // 4. Form Date Selection (Today's Date)
     const todayStr = new Date().toISOString().split('T')[0];
