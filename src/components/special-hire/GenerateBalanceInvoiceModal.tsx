@@ -764,11 +764,18 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
           {/* Invoice HTML Preview */}
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-6 bg-muted/30">
               <div
-                className="invoice-preview border rounded-lg p-4 bg-white"
+                className="invoice-preview"
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}
                 dangerouslySetInnerHTML={{ __html: sanitizeHTML(generateInvoiceHTML(invoiceData)) }}
               />
+              <style>{`
+                .invoice-preview [data-pdf-page] {
+                  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+                  border-radius: 4px;
+                }
+              `}</style>
             </CardContent>
           </Card>
 
