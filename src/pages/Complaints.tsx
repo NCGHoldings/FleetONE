@@ -13,7 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { DocumentUpload } from "@/components/documents/DocumentUpload";
 import { useToast } from "@/hooks/use-toast";
 import ComplaintQRGenerator from "@/components/complaints/ComplaintQRGenerator";
-import { Clock, FileText, AlertTriangle, CheckCircle, XCircle, User, Plus, X, UserPlus, Smile, Frown, Calendar, Flag } from "lucide-react";
+import { Clock, FileText, AlertTriangle, CheckCircle, XCircle, User, Plus, X, UserPlus, Smile, Frown, Calendar, Flag, Bus, MapPin, Phone, Route } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { ColumnDef } from "@tanstack/react-table";
 
 interface RelatedPerson {

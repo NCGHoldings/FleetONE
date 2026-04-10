@@ -299,7 +299,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                     onSelect={(currentValue) => {
                       saveScrollPosition();
                       // For per-trip route updates in daily mode, pass trip_id context
-                      if (editMode === 'daily' && row.trip_id && row.trip_sequence > 1) {
+                      if (editMode === 'daily' && row.trip_id) {
                         onUpdate(row.id, `route_label__trip:${row.trip_id}`, currentValue);
                       } else {
                         onUpdate(row.id, 'route_label', currentValue);
