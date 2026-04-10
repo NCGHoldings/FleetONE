@@ -1,41 +1,48 @@
 
+Fix the special hire invoice system at the source so long multi-bus invoices paginate correctly in both preview and PDF, while keeping route details and hire type accurate everywhere.
 
-# Fix Missing hireType and intermediateStops on Payment Reminder Invoice
+1. Refactor the shared generator
+- Update `src/lib/invoice-generator.ts` to build a normalized list of invoice rows first.
+- Generate multiple `data-pdf-page` sections dynamically instead of forcing all bus rows into page 1.
+- Put header/customer info on page 1, continue bus rows onto page 2/3/etc automatically, and keep totals/payment info on the last item page.
+- Keep the optional signature page separate after the item pages.
 
-## Problem
+2. Make multi-bus rows compact and readable
+- For trips where all buses share the same route, show the full route once and avoid repeating the same long route block for every row.
+- Use a compact continuation style for extra bus rows (same route / shared trip details, individual vehicle + driver/conductor + amount per row).
+- This reduces vertical space and helps more buses fit cleanly across pages.
 
-The invoice generator code is correct — it already supports `hireType` and `intermediateStops`. Three of the four invoice data construction paths already pass these fields:
-- Draft invoice (line 445) — has both fields
-- Document regeneration (`useDocumentRegeneration.ts` line 189) — has both fields
-- Balance invoice modal (`GenerateBalanceInvoiceModal.tsx` line 256) — has both fields
+3. Fix preview to match the real PDF
+- Update the invoice preview entry points to display the new paginated HTML clearly:
+  - `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
+  - `src/components/special-hire/InvoiceViewer.tsx`
+  - `src/components/special-hire/BalanceInvoicePreview.tsx` if needed for consistency
+- Show separate page blocks with spacing/shadow in preview so management can actually see page 1, page 2, etc.
 
-But the **payment reminder** invoice (lines 1528-1567 in `ConfirmedTripsTable.tsx`) is missing both `hireType` and `intermediateStops`. This is why the screenshot shows "External" and no intermediate stops on the payment reminder PDF.
+4. Cross-check all invoice paths
+- Verify every special hire invoice path uses the same shared generator and passes the same fields:
+  - draft invoice
+  - final/balance invoice
+  - payment reminder invoice
+  - regenerated invoice
+  - finance-approved/stored invoice
+- Re-check `hireType` and `intermediateStops` mapping in the construction paths so no path falls back to `External` unless the source data is truly missing.
 
-## Fix
+5. Technical details
+- Main file: `src/lib/invoice-generator.ts`
+- Likely supporting files:
+  - `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
+  - `src/components/special-hire/InvoiceViewer.tsx`
+  - `src/components/special-hire/BalanceInvoicePreview.tsx`
+  - audit only: `src/components/special-hire/ConfirmedTripsTable.tsx`, `src/hooks/useDocumentRegeneration.ts`, `src/hooks/useDocumentManagement.ts`, `src/hooks/useFinanceApproval.ts`
+- Preferred implementation: dynamic page chunking in HTML generation, not just PDF slicing, so both on-screen preview and downloaded PDF behave the same.
 
-### `src/components/special-hire/ConfirmedTripsTable.tsx`
-
-Add two fields to the `reminderData` object (after line 1566, before the closing `};`):
-
-```typescript
-hireType: trip.hire_type || 'External',
-intermediateStops: (() => {
-  try {
-    if (trip.intermediate_stops) {
-      const parsed = typeof trip.intermediate_stops === 'string'
-        ? JSON.parse(trip.intermediate_stops)
-        : trip.intermediate_stops;
-      return Array.isArray(parsed) ? parsed : [];
-    }
-  } catch {}
-  return [];
-})(),
-```
-
-This is the exact same pattern used in the draft invoice data construction (line 445-456) in the same file.
-
-## Result
-
-- Payment reminder invoices will show the actual hire type (Outside/Internal/Lyceum) instead of "External"
-- Payment reminder invoices will show full route with intermediate stops (e.g., "Galle → Cholaw → Jaffna → Kandy → Galle") instead of just pickup → drop
-
+6. QA after implementation
+- Test a quotation with many buses and a long route with multiple intermediate stops.
+- Confirm:
+  - preview shows page 2/page 3
+  - downloaded PDF also continues to page 2/page 3
+  - no rows are cut off
+  - route/intermediate stops appear correctly
+  - hire type shows Internal / Outside / Lyceum correctly
+  - payment reminder invoice matches the final invoice behavior
