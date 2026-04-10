@@ -1,50 +1,41 @@
 
 
-# Fix Intermediate Stops Display + Hire Type on Invoices
+# Fix Missing hireType and intermediateStops on Payment Reminder Invoice
 
-## Issue 1: Intermediate Stops Not Showing
+## Problem
 
-**Problem**: Quotations store intermediate stops (e.g., Galle → Cholaw → Jaffna → Kandy → Galle) but they don't appear in:
-- The Trips page table (only shows pickup and drop)
-- The invoice Item Detail column (only shows pickup → drop)
+The invoice generator code is correct — it already supports `hireType` and `intermediateStops`. Three of the four invoice data construction paths already pass these fields:
+- Draft invoice (line 445) — has both fields
+- Document regeneration (`useDocumentRegeneration.ts` line 189) — has both fields
+- Balance invoice modal (`GenerateBalanceInvoiceModal.tsx` line 256) — has both fields
 
-**Root cause**:
-- `ConfirmedTripsTable.tsx` Trip Information cell (lines 1162-1187) only renders pickup and drop locations
-- Invoice data construction in `ConfirmedTripsTable.tsx` (line 420-445) and `useDocumentRegeneration.ts` (line 141-190) never passes `intermediateStops` to `InvoiceData`
-- `invoice-generator.ts` line 232 explicitly says "no intermediate stops on invoice" and only shows pickup → drop
+But the **payment reminder** invoice (lines 1528-1567 in `ConfirmedTripsTable.tsx`) is missing both `hireType` and `intermediateStops`. This is why the screenshot shows "External" and no intermediate stops on the payment reminder PDF.
 
-**Fix**:
+## Fix
 
 ### `src/components/special-hire/ConfirmedTripsTable.tsx`
-- In the Trip Information table cell (line 1164-1187): Parse and display intermediate stops between pickup and drop markers (orange dots)
-- In the draft invoice data construction (line 420-445): Add `intermediateStops` parsed from `tripForDoc.intermediate_stops`
-- Add `hireType` field (see Issue 2)
 
-### `src/lib/invoice-generator.ts`
-- Add `hireType` field to `InvoiceData` interface
-- Line 232: Change `itemDetail` to include intermediate stops when available (e.g., "Galle → Cholaw → Jaffna → Kandy → Galle")
-- Lines 320, 328: Replace hardcoded `- External` with the actual `hireType` value
+Add two fields to the `reminderData` object (after line 1566, before the closing `};`):
 
-### `src/hooks/useDocumentRegeneration.ts`
-- Line 141-190: Add `intermediateStops` (parsed from quotation's `intermediate_stops`) and `hireType` (from `quotation.hire_type`) to the regenerated `InvoiceData`
+```typescript
+hireType: trip.hire_type || 'External',
+intermediateStops: (() => {
+  try {
+    if (trip.intermediate_stops) {
+      const parsed = typeof trip.intermediate_stops === 'string'
+        ? JSON.parse(trip.intermediate_stops)
+        : trip.intermediate_stops;
+      return Array.isArray(parsed) ? parsed : [];
+    }
+  } catch {}
+  return [];
+})(),
+```
 
-### `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
-- Pass `intermediateStops` and `hireType` through to invoice data
+This is the exact same pattern used in the draft invoice data construction (line 445-456) in the same file.
 
----
+## Result
 
-## Issue 2: All Invoices Show "External" Instead of Actual Hire Type
-
-**Problem**: The invoice Description column hardcodes `- External` for every invoice (lines 320, 328 in `invoice-generator.ts`). Quotations have `hire_type` values like "Outside", "Internal", or "Lyceum" but this is never passed to the invoice generator.
-
-**Fix** (covered in changes above):
-- Add `hireType?: string` to `InvoiceData` interface
-- Replace `- External` with `- ${data.hireType || 'External'}` in lines 320 and 328
-- Pass `hire_type` from quotation data in all invoice creation paths
-
-## Files to Modify
-1. `src/lib/invoice-generator.ts` — Add `hireType` field, include intermediate stops in item detail, use hire type in description
-2. `src/components/special-hire/ConfirmedTripsTable.tsx` — Show intermediate stops in trip info cell, pass `intermediateStops` and `hireType` to invoice data
-3. `src/hooks/useDocumentRegeneration.ts` — Pass `intermediateStops` and `hireType` when regenerating documents
-4. `src/components/special-hire/GenerateBalanceInvoiceModal.tsx` — Pass through intermediate stops and hire type
+- Payment reminder invoices will show the actual hire type (Outside/Internal/Lyceum) instead of "External"
+- Payment reminder invoices will show full route with intermediate stops (e.g., "Galle → Cholaw → Jaffna → Kandy → Galle") instead of just pickup → drop
 
