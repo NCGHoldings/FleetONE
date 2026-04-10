@@ -12,32 +12,15 @@ export interface DocumentTemplate {
   template_code: string;
   template_name: string;
   html_template: string;
-  html_content?: string;
-  header_image_url?: string;
-  header_mode?: HeaderMode;
-  footer_text?: string;
-  css_styles?: string;
-  paper_size?: string;
-  orientation?: string;
-  margins?: Record<string, number>;
-  is_default?: boolean;
-  is_active: boolean;
-  created_at: string;
-  updated_at?: string;
-  version?: number;
-  company_id?: string;
-  template_type_id?: string;
-  default_workflow_id?: string;
-  companies?: { name: string; short_code?: string } | null;
-  document_template_types?: { type_name: string; type_code: string; module?: string } | null;
   section_mappings: {
     sections: ParsedDocumentSection[];
     systemPlaceholders: string[];
     hasHierarchicalNumbering: boolean;
   };
+  is_active: boolean;
+  created_at: string;
+  default_workflow_id?: string;
 }
-
-export type HeaderMode = 'header_image' | 'logo_only' | 'html_only' | 'logo_and_html';
 
 export function useDocumentTemplates(documentTypeCode?: string) {
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
@@ -47,7 +30,7 @@ export function useDocumentTemplates(documentTypeCode?: string) {
   const fetchTemplates = async () => {
     try {
       setLoading(true);
-      let query = (supabase as any)
+      let query = supabase
         .from('document_templates')
         .select('*')
         .eq('is_active', true)
@@ -120,7 +103,10 @@ export const useDocumentTemplateTypes = () => {
   });
 };
 
-// Header mode re-exported from interface above
+// Header mode type for document templates
+export type HeaderMode = 'header_image' | 'logo_only' | 'html_only' | 'logo_and_html';
+
+// Create a new template
 export const useCreateDocumentTemplate = () => {
   const queryClient = useQueryClient();
   

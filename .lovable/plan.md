@@ -78,3 +78,7 @@ Update `YutongFinanceDashboard.tsx`:
 - Finance dashboard becomes the single source of truth for import finance operations
 - Full interconnection: Order → LC → DO → Landed Cost → GL
 
+
+## Files
+- **Modify**: `src/components/accounting/DrillDownModal.tsx` — add per-row delete button + confirmation
+- **Modify**: `src/components/accounting/settings/BalanceReconciliationTool.tsx` — add orphaned JE scanner section

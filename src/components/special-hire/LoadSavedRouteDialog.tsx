@@ -37,7 +37,7 @@ export function LoadSavedRouteDialog({ open, onOpenChange, onRouteSelected }: Pr
   const fetchRoutes = async () => {
     setLoading(true);
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("saved_routes")
         .select("*")
         .order("created_at", { ascending: false });
