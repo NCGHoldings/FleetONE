@@ -12507,6 +12507,39 @@ export type Database = {
         }
         Relationships: []
       }
+      magiya_daily_reports: {
+        Row: {
+          bus_number: string | null
+          extracted_at: string | null
+          id: string
+          report_date: string
+          route_name: string | null
+          status: string | null
+          total_passengers: number | null
+          total_revenue_lkr: number | null
+        }
+        Insert: {
+          bus_number?: string | null
+          extracted_at?: string | null
+          id?: string
+          report_date: string
+          route_name?: string | null
+          status?: string | null
+          total_passengers?: number | null
+          total_revenue_lkr?: number | null
+        }
+        Update: {
+          bus_number?: string | null
+          extracted_at?: string | null
+          id?: string
+          report_date?: string
+          route_name?: string | null
+          status?: string | null
+          total_passengers?: number | null
+          total_revenue_lkr?: number | null
+        }
+        Relationships: []
+      }
       maintenance_bays: {
         Row: {
           bay_name: string
