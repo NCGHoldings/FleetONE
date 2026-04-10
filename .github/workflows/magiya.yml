@@ -22,7 +22,7 @@ jobs:
         run: |
           npm ci || npm install --legacy-peer-deps
           # Ensure puppeteer is definitely installed
-          npm install puppeteer dotenv @supabase/supabase-js
+          npm install puppeteer dotenv @supabase/supabase-js --legacy-peer-deps
 
       - name: Run Scraper
         env:
