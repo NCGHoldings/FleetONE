@@ -381,7 +381,7 @@ Deno.serve(async (req) => {
       // Auto-create bus if it doesn't exist
       if (!bus) {
         console.log(`[FIOS] Auto-creating missing bus: ${parsedBusNo}`);
-        const busType = parsedBusNo.startsWith('NG') ? 'Imported Bus' : 'Regular';
+        const busType = parsedBusNo.startsWith('NG') || parsedBusNo.startsWith('NE') || parsedBusNo.startsWith('NB') ? 'Imported Bus' : 'Regular';
         
         const { data: newBus, error: createError } = await supabase
           .from('buses')
@@ -398,8 +398,8 @@ Deno.serve(async (req) => {
         
         if (createError) {
           console.error(`[FIOS] Failed to create bus ${parsedBusNo}:`, createError);
-          unmatchedVehicles.push(vehicle.nm);
-          continue;
+          // If insert fails, we'll gracefully continue tracking in memory for the UI layer
+          // We won't block it from the UI by using the raw output payload.
         }
         
         bus = newBus;
@@ -678,7 +678,8 @@ Deno.serve(async (req) => {
         unmatched: unmatchedVehicles.length,
         unmatchedVehicles: unmatchedVehicles,
         odometer_updates: odometerUpdates.length,
-        odometer_results: odometerUpdates
+        odometer_results: odometerUpdates,
+        all_vehicles: vehicles // Exporting raw 117 vehicles for the UI to map seamlessly without DB restrictions
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/fios-api/:path*",
+      "destination": "https://fios-api.kloudip.com/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

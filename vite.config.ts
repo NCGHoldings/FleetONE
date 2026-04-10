@@ -9,6 +9,13 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      '/fios-api': {
+        target: 'https://fios-api.kloudip.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/fios-api/, '')
+      }
+    }
   },
   build: {
     target: "esnext",

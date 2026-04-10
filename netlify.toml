@@ -1,0 +1,10 @@
+[[redirects]]
+  from = "/fios-api/*"
+  to = "https://fios-api.kloudip.com/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

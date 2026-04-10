@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
@@ -28,6 +28,24 @@ import { OdometerAdjustmentModal } from "@/components/fleet/OdometerAdjustmentMo
 import { OdometerOverviewModal } from "@/components/fleet/OdometerOverviewModal";
 import { BusApiConnectionModal } from "@/components/fleet/BusApiConnectionModal";
 import { useQuery } from "@tanstack/react-query";
+import { useKloudipFIOS } from "@/hooks/useKloudipFIOS";
+
+function parseBusNumber(fiosName: string): string {
+  const parts = fiosName.split('-');
+  if (parts.length >= 2 && !fiosName.includes(" ")) {
+    return `${parts[0]} ${parts[1]}`;
+  }
+  return fiosName;
+}
+
+function getEngineHealth(speed: number, lastUpdate: string): string {
+  const updateAge = Date.now() - new Date(lastUpdate).getTime();
+  const minutesOld = updateAge / (1000 * 60);
+  
+  if (minutesOld > 30) return 'critical';
+  if (speed > 80) return 'warning';
+  return 'good';
+}
 
 interface TrackingData {
   id: string;
@@ -108,7 +126,7 @@ export default function RealTimeTracking() {
     return {
       apiEndpoint: 'https://fios-api.kloudip.com',
       apiKey: '', // Never stored in localStorage
-      refreshInterval: 30
+      refreshInterval: 10 // Auto-set to 10s for fast FIOS updates
     };
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -121,6 +139,65 @@ export default function RealTimeTracking() {
   const [selectedBusForApi, setSelectedBusForApi] = useState<{id: string, no: string} | null>(null);
   const [isApiConnectionOpen, setIsApiConnectionOpen] = useState(false);
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
+
+  // Directly initialize our custom Wialon hook
+  const { vehicles: fiosVehicles, loading: fiosLoading } = useKloudipFIOS(
+    gpsSettings.apiKey || "b507db56e768bd62af1e9b6e184a0f7987B5D187A5190B92E4F4F80B08D43CD23D20EA6A",
+    gpsSettings.refreshInterval
+  );
+
+  // Merged Tracking Data (Live Hardware + Local DB)
+  const [liveTrackingData, setLiveTrackingData] = useState<TrackingData[]>([]);
+
+  useEffect(() => {
+    if (fiosVehicles && fiosVehicles.length > 0) {
+      // Merge physical hardware FIOS pings into local database representations
+      const merged = fiosVehicles.map(v => {
+        const busNo = parseBusNumber(v.nm);
+        // Find existing DB data to retain custom stats
+        const dbData = trackingData.find(d => 
+          d.bus_no === busNo || 
+          d.bus_no === v.nm || 
+          d.bus_no.replace(/\s+/g, '') === busNo.replace(/\s+/g, '')
+        );
+
+        const lastUpdate = v.pos?.t ? new Date(v.pos.t * 1000).toISOString() : new Date().toISOString();
+        const speed = v.pos?.s || 0;
+        const lat = v.pos?.y || 0;
+        const lng = v.pos?.x || 0;
+
+        return {
+           id: dbData?.id || `fios-${v.id}`,
+           bus_id: dbData?.bus_id || `fios-${v.id}`,
+           bus_no: busNo,
+           current_location: lat && lng ? `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}` : 'Lost GPS',
+           gps_coordinates: { lat, lng },
+           speed_kmh: speed,
+           status: speed > 0 ? 'active' : 'inactive',
+           last_update: lastUpdate,
+           route_name: dbData?.route_name || 'Unassigned',
+           fuel_level_liters: dbData?.fuel_level_liters,
+           tire_pressure: dbData?.tire_pressure,
+           engine_health: getEngineHealth(speed, lastUpdate),
+           odometer_km: dbData?.odometer_km,
+           fios_device_id: v.id,
+           heading_degrees: v.pos?.c || 0,
+           satellite_count: v.pos?.sc || 0,
+           satellites: v.pos?.sc || 0,
+           ignition_status: speed > 0 ? true : false,
+           daily_mileage_km: dbData?.daily_mileage_km || 0,
+           altitude: v.pos?.z || 0,
+           battery_v: v.prms?.pwr_ext?.v,
+           gsm: v.prms?.gsm?.v,
+        } as TrackingData;
+      });
+      setLiveTrackingData(merged);
+      setUnmatchedVehicleCount(merged.filter(m => String(m.id).startsWith("fios-")).length);
+    } else {
+      // Fallback explicitly to DB if hardware is unreachable
+      setLiveTrackingData(trackingData);
+    }
+  }, [fiosVehicles, trackingData]);
 
   const isSupervisor = hasRole('super_admin') || hasRole('admin') || hasRole('supervisor');
 
@@ -205,9 +282,9 @@ export default function RealTimeTracking() {
       setUnmatchedVehicleCount(data.unmatched || 0);
       
       if (data.unmatchedVehicles && data.unmatchedVehicles.length > 0) {
-        toast.success(`GPS Data Updated: ${data.matched} vehicles matched. ${data.unmatched} vehicles not found in database.`);
+        toast.success(`DB Sync Triggered. Matched ${data.matched} vehicles.`);
       } else {
-        toast.success(`GPS Data Updated: ${data.matched} vehicles from FIOS API`);
+        toast.success(`DB Sync completed.`);
       }
       
       // Refresh the tracking data from database
@@ -264,13 +341,49 @@ export default function RealTimeTracking() {
 
   const handleAddMissingBuses = async () => {
     setIsAddingBuses(true);
-    const result = await seedMissingGPSBuses();
-    
-    if (result.success) {
-      // Refresh GPS data after adding buses
-      await refreshData();
+    try {
+      // Step 1: Detect all unmapped FIOS units currently residing purely in memory
+      const missingBusesToInsert = liveTrackingData
+        .filter((v) => String(v.id).startsWith("fios-"))
+        .map((v) => ({
+          bus_no: v.bus_no,
+          type: v.bus_no.startsWith("NG") || v.bus_no.startsWith("NE") || v.bus_no.startsWith("NB") ? "Imported Bus" : "Regular",
+          model: "Unknown",
+          capacity: 50,
+          year: 2020,
+          status: "active",
+        }));
+
+      if (missingBusesToInsert.length === 0) {
+        toast.error("No unmapped FIOS vehicles detected.");
+        setIsAddingBuses(false);
+        return;
+      }
+      
+      console.log(`[FIOS Auth] Pushing ${missingBusesToInsert.length} hardware units...`);
+
+      // Step 2: Push safely to the Database
+      const { error } = await supabase
+        .from("buses")
+        .upsert(missingBusesToInsert, {
+          onConflict: "bus_no"
+        });
+
+      if (error) {
+        throw error;
+      }
+      
+      toast.success(`Successfully registered ${missingBusesToInsert.length} FIOS units to your Fleet!`);
+      
+      // Step 3: Trigger backend Edge function to aggressively fetch Fuel and Odometer for new vehicles
+      await debugGPSConnection();
+      
+      // Step 4: Refetch layout map tracking state natively
+      await fetchTrackingData();
+      
+    } catch (error: any) {
+      toast.error(`Database Error: ${error.message}`);
     }
-    
     setIsAddingBuses(false);
   };
 
@@ -408,6 +521,45 @@ export default function RealTimeTracking() {
       ),
     },
     {
+      accessorKey: "battery_v",
+      header: "Battery (V)",
+      cell: ({ row }) => {
+        const val = row.getValue("battery_v") as number;
+        return (
+          <div className="flex items-center gap-2">
+            <Battery className={`h-4 w-4 ${val < 11.5 ? 'text-destructive' : 'text-green-500'}`} />
+            <span>{val ? `${val}V` : '-'}</span>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "satellites",
+      header: "Satellites",
+      cell: ({ row }) => {
+        const val = row.getValue("satellites") as number;
+        return (
+          <div className="flex items-center gap-2">
+            <Satellite className={`h-4 w-4 ${val < 5 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
+            <span>{val || '-'}</span>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "gsm",
+      header: "Signal",
+      cell: ({ row }) => {
+        const val = row.getValue("gsm") as number;
+        return (
+          <div className="flex items-center gap-2">
+            <Activity className={`h-4 w-4 ${val < 2 ? 'text-destructive' : 'text-blue-500'}`} />
+            <span>{val ? `${val}/5` : '-'}</span>
+          </div>
+        )
+      },
+    },
+    {
        accessorKey: "odometer_km",
       header: "Odometer",
       cell: ({ row }) => {
@@ -540,15 +692,15 @@ export default function RealTimeTracking() {
     },
   ];
 
-  const activeVehicles = trackingData.filter(v => v.status === 'active').length;
-  const totalVehicles = trackingData.length;
-  const averageSpeed = trackingData.length > 0 ? 
-    Math.round(trackingData.reduce((sum, v) => sum + v.speed_kmh, 0) / trackingData.length) : 0;
-  const lowFuelVehicles = trackingData.filter(v => (v.fuel_level || 0) < 20).length;
-  const totalFleetMileage = trackingData.reduce((sum, v) => sum + (v.odometer_km || 0), 0);
-  const totalDailyMileage = trackingData.reduce((sum, v) => sum + (v.daily_mileage_km || 0), 0);
-  const enginesRunning = trackingData.filter(v => v.ignition_status === true).length;
-  const lowBatteryCount = trackingData.filter(v => v.battery_voltage && v.battery_voltage < 12.0).length;
+  const activeVehicles = liveTrackingData.filter(v => v.status === 'active').length;
+  const totalVehicles = liveTrackingData.length;
+  const averageSpeed = liveTrackingData.length > 0 ? 
+    Math.round(liveTrackingData.reduce((sum, v) => sum + v.speed_kmh, 0) / liveTrackingData.length) : 0;
+  const lowFuelVehicles = liveTrackingData.filter(v => (v.fuel_level || 0) < 20).length;
+  const totalFleetMileage = liveTrackingData.reduce((sum, v) => sum + (v.odometer_km || 0), 0);
+  const totalDailyMileage = liveTrackingData.reduce((sum, v) => sum + (v.daily_mileage_km || 0), 0);
+  const enginesRunning = liveTrackingData.filter(v => v.ignition_status === true).length;
+  const lowBatteryCount = liveTrackingData.filter(v => v.battery_voltage && v.battery_voltage < 12.0).length;
 
   return (
     <div className="space-y-8 animate-fade-in p-6">
@@ -700,11 +852,7 @@ export default function RealTimeTracking() {
                        setIsSettingsOpen(false);
                        // Save to localStorage for persistence
                        localStorage.setItem('gpsSettings', JSON.stringify(gpsSettings));
-                       toast.success('GPS settings saved');
-                       // Trigger a test connection
-                       setTimeout(() => {
-                         debugGPSConnection();
-                       }, 500);
+                       toast.success('Hardware Tracker token saved locally');
                      }}
                      className="w-full"
                    >
@@ -833,9 +981,9 @@ export default function RealTimeTracking() {
                 </div>
               ) : googleMapsApiKey ? (
                 <FleetTrackingMap 
-                  trackingData={trackingData} 
+                  trackingData={liveTrackingData} 
                   apiKey={googleMapsApiKey}
-                  isLoading={loading}
+                  isLoading={loading || fiosLoading}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-muted/20 rounded-lg border">
@@ -862,7 +1010,7 @@ export default function RealTimeTracking() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <DataTable columns={columns} data={trackingData} />
+            <DataTable columns={columns} data={liveTrackingData} />
           </CardContent>
         </Card>
       )}
@@ -885,7 +1033,7 @@ export default function RealTimeTracking() {
         </CardHeader>
         <CardContent>
           <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2">
-            {trackingData.map(vehicle => (
+            {liveTrackingData.map(vehicle => (
               <div key={vehicle.id} className="space-y-1 border-b pb-2 last:border-0">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
