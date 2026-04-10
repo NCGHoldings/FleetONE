@@ -453,6 +453,21 @@ export default function Complaints() {
     setRelatedPersons(relatedPersons.filter((_, i) => i !== index));
   };
 
+  const getRelatedPersonsData = (complaint: Complaint) => {
+    const rp = (complaint.related_persons as any) || {};
+    return {
+      bus_number: rp.bus_number || '',
+      route_number: rp.route_number || '',
+      customer_phone: rp.customer_phone || rp.phone || '',
+      customer_name: rp.customer_name || rp.name || '',
+      customer_email: rp.customer_email || rp.email || '',
+      location: rp.location || '',
+      driver_name: rp.driver_name || '',
+      incident_date: rp.incident_date || '',
+      incident_time: rp.incident_time || '',
+    };
+  };
+
   const columns: ColumnDef<Complaint>[] = [
     {
       accessorKey: "type",
@@ -503,6 +518,45 @@ export default function Complaints() {
       cell: ({ row }) => (
         <div className="max-w-[200px] truncate font-medium">{row.getValue("title")}</div>
       ),
+    },
+    {
+      id: "bus_number",
+      header: "Bus No",
+      cell: ({ row }) => {
+        const rp = getRelatedPersonsData(row.original);
+        return rp.bus_number ? (
+          <Badge variant="outline" className="font-mono">
+            <Bus className="h-3 w-3 mr-1" />
+            {rp.bus_number}
+          </Badge>
+        ) : <span className="text-muted-foreground text-xs">—</span>;
+      },
+    },
+    {
+      id: "route_number",
+      header: "Route",
+      cell: ({ row }) => {
+        const rp = getRelatedPersonsData(row.original);
+        return rp.route_number ? (
+          <Badge variant="secondary" className="font-mono">
+            <Route className="h-3 w-3 mr-1" />
+            {rp.route_number}
+          </Badge>
+        ) : <span className="text-muted-foreground text-xs">—</span>;
+      },
+    },
+    {
+      id: "location",
+      header: "Location",
+      cell: ({ row }) => {
+        const rp = getRelatedPersonsData(row.original);
+        return rp.location ? (
+          <div className="flex items-center gap-1 max-w-[150px] truncate text-sm">
+            <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+            {rp.location}
+          </div>
+        ) : <span className="text-muted-foreground text-xs">—</span>;
+      },
     },
     {
       accessorKey: "category",
