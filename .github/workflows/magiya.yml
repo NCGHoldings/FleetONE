@@ -21,8 +21,8 @@ jobs:
       - name: Install Dependencies
         run: |
           npm install --force --legacy-peer-deps
-          # Install pdfjs-dist (Mozilla official PDF.js — works in Node 20 ESM)
-          npm install pdfjs-dist --no-save --force
+          # Ensure all scraper dependencies are available
+          PUPPETEER_SKIP_DOWNLOAD=true npm install puppeteer@21.11.0 pdfjs-dist dotenv @supabase/supabase-js --no-save --force
 
       - name: Run Scraper
         env:
