@@ -5,7 +5,8 @@ import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const pdf = require('pdf-parse');
+const _pdfMod = require('pdf-parse');
+const pdfParse = typeof _pdfMod === 'function' ? _pdfMod : (_pdfMod.default || _pdfMod);
 
 dotenv.config();
 
@@ -260,7 +261,7 @@ async function runMagiyaScraper() {
 
     // ===== STEP 9: Parse PDF =====
     console.log('🔍 Parsing PDF text...');
-    const pdfData = await pdf(pdfBuffer);
+    const pdfData = await pdfParse(pdfBuffer);
     console.log('\n================= RAW PDF TEXT =================');
     console.log(pdfData.text);
     console.log('================= END PDF TEXT =================\n');
