@@ -3,11 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
-const _pdfMod = require('pdf-parse');
-const pdfParse = typeof _pdfMod === 'function' ? _pdfMod : (_pdfMod.default || _pdfMod);
+import pdfParseLib from 'pdf-parse';
+const pdfParse = typeof pdfParseLib === 'function' ? pdfParseLib : (pdfParseLib.default || pdfParseLib);
 
 dotenv.config();
 
@@ -41,12 +38,12 @@ async function runMagiyaScraper() {
     });
 
     console.log('🚪 Logging in...');
-    await page.goto('https://magiyaoperator.zuselab.dev/login', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+    await page.goto('https://magiyaoperator.zuselab.dev/login', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => { });
     await sleep(3000);
     await page.type('input[type="email"]', 'ncgexpress@magiya.lk', { delay: 30 });
     await page.type('input[type="password"]', '0770455981', { delay: 30 });
     await Promise.all([
-      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {}),
+      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => { }),
       page.click('button[type="submit"]')
     ]);
     console.log('✅ Logged in.');
@@ -58,7 +55,7 @@ async function runMagiyaScraper() {
     console.log(`📅 Target date: ${dateStr}`);
 
     console.log('📄 Going to Reports page...');
-    await page.goto('https://magiyaoperator.zuselab.dev/reports', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+    await page.goto('https://magiyaoperator.zuselab.dev/reports', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => { });
     await sleep(8000);
 
     console.log('📋 Selecting Daily Bookings Report...');
@@ -136,8 +133,8 @@ async function runMagiyaScraper() {
           const body = document.body.innerText;
           return body.includes('Download PDF') || body.includes('Share PDF');
         });
-        if (check) { pdfReady = true; console.log(`   ✅ PDF ready after ~${(i+1)*5}s`); break; }
-      } catch(e) {}
+        if (check) { pdfReady = true; console.log(`   ✅ PDF ready after ~${(i + 1) * 5}s`); break; }
+      } catch (e) { }
     }
 
     if (!pdfReady) throw new Error('Download button never appeared');
@@ -174,62 +171,62 @@ async function runMagiyaScraper() {
     // A robust regex to find booking rows based exactly on your screenshot format
     // It captures: Seat (e.g. 3-M, 4-M) | Phone (e.g. 0760309820) | Route parts | Booking Date
     // Note: PDF text parsing often strips horizontal whitespace into spaces or newlines.
-    
+
     const passengerRows = [];
-    
+
     // We split by standard phone numbers lengths (9-10 digits) which are unique anchors
     const lines = text.split('\n').filter(l => l.trim().length > 0);
-    
+
     let totalPassengersCount = 0;
-    
+
     // Fallback heuristic line scanning
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       // If line contains a phone number e.g. 0760309820
       const phoneMatch = line.match(/(07\d{8})/);
-      
+
       if (phoneMatch) {
-         // The seat number is usually right before it
-         const phoneStr = phoneMatch[1];
-         let seatStr = line.substring(0, line.indexOf(phoneStr)).trim();
-         
-         // Sometimes seat is on previous line
-         if (seatStr.length === 0 && i > 0) {
-            seatStr = lines[i-1].trim();
-         }
-         
-         // Looking ahead for Location (e.g. Makumbura - 10:15 AM)
-         const remaining = line.substring(line.indexOf(phoneStr) + phoneStr.length).trim();
-         let locationStr = remaining;
-         let bookingType = "Unknown";
-         
-         // In PDF parsing, "NCG Express", "Online Booking" often end up on the next 1-3 lines
-         for (let j = 1; j <= 4; j++) {
-             if (i + j < lines.length) {
-                 const nextText = lines[i+j].trim();
-                 if (nextText.includes("NCG Express") || nextText.includes("Online Booking") || nextText.includes("Agent Booking")) {
-                     bookingType = nextText;
-                 } else if (nextText.includes("Badulla") || nextText.includes("Makumbura")) {
-                     locationStr = locationStr + " " + nextText;
-                 }
-             }
-         }
-         
-         passengerRows.push({
-             seat_number: seatStr,
-             contact: phoneStr,
-             location_route: locationStr || "Unknown",
-             booking_type: bookingType,
-             remarks: ""
-         });
-         
-         // Count individual seats (e.g., "3-M, 4-M" -> 2 seats)
-         if (seatStr) {
-             const seats = seatStr.split(',');
-             totalPassengersCount += seats.length;
-         } else {
-             totalPassengersCount += 1;
-         }
+        // The seat number is usually right before it
+        const phoneStr = phoneMatch[1];
+        let seatStr = line.substring(0, line.indexOf(phoneStr)).trim();
+
+        // Sometimes seat is on previous line
+        if (seatStr.length === 0 && i > 0) {
+          seatStr = lines[i - 1].trim();
+        }
+
+        // Looking ahead for Location (e.g. Makumbura - 10:15 AM)
+        const remaining = line.substring(line.indexOf(phoneStr) + phoneStr.length).trim();
+        let locationStr = remaining;
+        let bookingType = "Unknown";
+
+        // In PDF parsing, "NCG Express", "Online Booking" often end up on the next 1-3 lines
+        for (let j = 1; j <= 4; j++) {
+          if (i + j < lines.length) {
+            const nextText = lines[i + j].trim();
+            if (nextText.includes("NCG Express") || nextText.includes("Online Booking") || nextText.includes("Agent Booking")) {
+              bookingType = nextText;
+            } else if (nextText.includes("Badulla") || nextText.includes("Makumbura")) {
+              locationStr = locationStr + " " + nextText;
+            }
+          }
+        }
+
+        passengerRows.push({
+          seat_number: seatStr,
+          contact: phoneStr,
+          location_route: locationStr || "Unknown",
+          booking_type: bookingType,
+          remarks: ""
+        });
+
+        // Count individual seats (e.g., "3-M, 4-M" -> 2 seats)
+        if (seatStr) {
+          const seats = seatStr.split(',');
+          totalPassengersCount += seats.length;
+        } else {
+          totalPassengersCount += 1;
+        }
       }
     }
 
@@ -241,7 +238,7 @@ async function runMagiyaScraper() {
       route_name: selectedRoute || 'Unknown Route',
       report_date: dateStr,
       status: 'completed',
-      bus_number: 'NG 8241', 
+      bus_number: 'NG 8241',
       total_passengers: totalPassengersCount,
       total_revenue_lkr: totalPassengersCount > 0 ? 0 : 0 // Needs separate logic if calculating
     };
@@ -261,28 +258,28 @@ async function runMagiyaScraper() {
     const reportId = parentRecord.id;
 
     if (passengerRows.length > 0) {
-       console.log(`   Saving ${passengerRows.length} passenger records to magiya_passenger_bookings...`);
-       
-       // Assign the parent FK
-       const rowsToInsert = passengerRows.map(row => ({
-           ...row,
-           report_id: reportId
-       }));
-       
-       // Clear old rows for this report to prevent duplicates if rerunning
-       await supabase.from('magiya_passenger_bookings').delete().eq('report_id', reportId);
-       
-       const { error: childrenErr } = await supabase
-          .from('magiya_passenger_bookings')
-          .insert(rowsToInsert);
-          
-       if (childrenErr) {
-          console.error(`   ❌ DB Error (Passengers): ${childrenErr.message}`);
-       } else {
-          console.log(`   ✅ Successfully saved all detailed data rows to Supabase.`);
-       }
+      console.log(`   Saving ${passengerRows.length} passenger records to magiya_passenger_bookings...`);
+
+      // Assign the parent FK
+      const rowsToInsert = passengerRows.map(row => ({
+        ...row,
+        report_id: reportId
+      }));
+
+      // Clear old rows for this report to prevent duplicates if rerunning
+      await supabase.from('magiya_passenger_bookings').delete().eq('report_id', reportId);
+
+      const { error: childrenErr } = await supabase
+        .from('magiya_passenger_bookings')
+        .insert(rowsToInsert);
+
+      if (childrenErr) {
+        console.error(`   ❌ DB Error (Passengers): ${childrenErr.message}`);
+      } else {
+        console.log(`   ✅ Successfully saved all detailed data rows to Supabase.`);
+      }
     } else {
-       console.log(`   ⚠️ No passenger rows could be parsed. Is the report empty?`);
+      console.log(`   ⚠️ No passenger rows could be parsed. Is the report empty?`);
     }
 
     console.log('\n🎉 Scraper V8 complete!');

@@ -90,7 +90,7 @@ import SystemIssueTracker from "./pages/SystemIssueTracker";
 import PublicYutongReport from "./pages/PublicYutongReport";
 import PublicYutongSpreadsheet from "./pages/PublicYutongSpreadsheet";
 import RouteManagement from "./pages/RouteManagement";
-
+import MagiyaReports from "./pages/MagiyaReports";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -212,6 +212,16 @@ const App = () => (
                       <DailyTrips />
                     </AppLayout>
                   </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/partner-reports" 
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <MagiyaReports />
+                  </AppLayout>
                 </ProtectedRoute>
               } 
             />
