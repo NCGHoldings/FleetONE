@@ -176,57 +176,96 @@ async function runMagiyaScraper() {
       });
       console.log(`   📎 PDF URL: ${pdfUrl}`);
 
-      // ✅ SCRAPE DATA — TreeWalker approach works on Angular Material and any framework
-      console.log(`   📊 Extracting passenger data from live DOM...`);
-      const passengers = await page.evaluate(() => {
-        const phoneRegex = /^07\d{8}$/;
-        const rows = [];
-        const seen = new Set();
+      // ✅ Download PDF using authenticated browser session (has cookies/auth)
+      console.log(`   📥 Downloading PDF via authenticated session...`);
+      let passengers = [];
+      let totalPassengers = 0;
 
-        // Walk every text node looking for phone numbers
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
-        let node;
-        while ((node = walker.nextNode())) {
-          const text = node.textContent.trim();
-          if (!phoneRegex.test(text) || seen.has(text)) continue;
-          seen.add(text);
+      try {
+        // Use page.evaluate + fetch to download PDF bytes WITH the browser's auth cookies
+        const pdfBase64 = await page.evaluate(async (url) => {
+          const resp = await fetch(url, { credentials: 'include' });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const buffer = await resp.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+          return btoa(binary);
+        }, pdfUrl);
 
-          // Walk up to find a row-like container (tr, mat-row, [role=row], etc.)
-          let el = node.parentElement;
-          let rowEl = null;
-          for (let i = 0; i < 6; i++) {
-            if (!el) break;
-            const tag = el.tagName.toLowerCase();
-            const role = el.getAttribute('role') || '';
-            if (tag === 'tr' || tag === 'mat-row' || role === 'row' || el.className.includes('row')) {
-              rowEl = el; break;
+        const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+        console.log(`   📄 PDF downloaded: ${Math.round(pdfBuffer.length / 1024)} KB`);
+
+        // Parse using pdfjs-dist (Mozilla's official PDF.js — works in Node 20 ESM perfectly)
+        const pdfjsMod = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        const pdfjsLib = pdfjsMod.default || pdfjsMod;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = false; // disable worker for Node
+
+        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfBuffer), verbosity: 0 });
+        const pdfDoc = await loadingTask.promise;
+        console.log(`   📖 PDF loaded: ${pdfDoc.numPages} pages`);
+
+        // Extract all text items with positions across all pages  
+        const allItems = [];
+        for (let p = 1; p <= pdfDoc.numPages; p++) {
+          const pg = await pdfDoc.getPage(p);
+          const textContent = await pg.getTextContent();
+          for (const item of textContent.items) {
+            if (item.str && item.str.trim()) {
+              allItems.push({ str: item.str.trim(), x: item.transform[4], y: item.transform[5] });
             }
-            el = el.parentElement;
           }
+        }
 
-          if (!rowEl) continue;
+        // Group items into rows by Y coordinate (within ±4 pt tolerance)
+        const rowMap = {};
+        for (const item of allItems) {
+          const rowY = Math.round(item.y / 4) * 4; // snap to 4pt grid
+          if (!rowMap[rowY]) rowMap[rowY] = [];
+          rowMap[rowY].push(item);
+        }
 
-          // Get all cell-like children
-          const cells = rowEl.querySelectorAll('td, mat-cell, [role="cell"]');
-          const texts = Array.from(cells).map(c => c.textContent.trim()).filter(Boolean);
+        // Sort each row's items by X position (left to right)
+        const sortedRows = Object.values(rowMap)
+          .map(items => items.sort((a, b) => a.x - b.x))
+          .sort((a, b) => b[0].y - a[0].y); // top to bottom (Y decreases downward in PDF)
 
-          rows.push({
-            seat_number: texts[0] || '',
-            contact: text,
-            location_route: texts[2] || texts[1] || '',
-            booking_type: texts[3] || 'Unknown',
-            remarks: texts[4] || ''
+        // Magiya PDF fixed columns (from left, px approx):
+        // Col0: Seat Number (~50-110)
+        // Col1: Contact phone (~130-200)  
+        // Col2: Location (~200-330)
+        // Col3: Booking Type + Date (~330-500)
+        // Col4: Remarks (~500+)
+        const PHONE_RE = /^07\d{8}$/;
+
+        for (const rowItems of sortedRows) {
+          const rowTexts = rowItems.map(i => i.str);
+          // A data row must contain a phone number
+          const phone = rowTexts.find(t => PHONE_RE.test(t));
+          if (!phone) continue;
+
+          const seat = rowTexts[0] || '';
+          const phoneIdx = rowTexts.indexOf(phone);
+          const location = rowTexts.slice(phoneIdx + 1).find(t => t.includes('–') || t.includes('-') || t.match(/\d{1,2}:\d{2}/)) || '';
+          const bookingType = rowTexts.find(t => t.includes('NCG') || t.includes('Online') || t.includes('Agent')) || 'Unknown';
+          const dateStr2 = rowTexts.find(t => /\d{4}-\d{2}-\d{2}/.test(t)) || '';
+
+          passengers.push({
+            seat_number: seat,
+            contact: phone,
+            location_route: location,
+            booking_type: `${bookingType}${dateStr2 ? ' ' + dateStr2 : ''}`,
+            remarks: ''
           });
         }
-        return rows;
-      });
 
-      console.log(`   👥 Found ${passengers.length} passenger rows`);
+        console.log(`   👥 Extracted ${passengers.length} passenger rows from PDF`);
+        for (const p of passengers) {
+          totalPassengers += p.seat_number ? p.seat_number.split(',').filter(Boolean).length : 1;
+        }
 
-      // Count individual seats (e.g. "3-M, 4-M" = 2)
-      let totalPassengers = 0;
-      for (const p of passengers) {
-        totalPassengers += p.seat_number ? p.seat_number.split(',').length : 1;
+      } catch (pdfErr) {
+        console.log(`   ⚠️ PDF extraction error: ${pdfErr.message}`);
       }
 
       savedReports.push({ routeName, pdfUrl: pdfUrl || '', passengers, totalPassengers });
