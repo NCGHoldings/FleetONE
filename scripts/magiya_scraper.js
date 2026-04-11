@@ -3,8 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import pdfParseLib from 'pdf-parse';
-const pdfParse = typeof pdfParseLib === 'function' ? pdfParseLib : (pdfParseLib.default || pdfParseLib);
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const pdfParseExport = require('pdf-parse');
+const pdfParse = typeof pdfParseExport === 'function' ? pdfParseExport : pdfParseExport.default;
 
 dotenv.config();
 
