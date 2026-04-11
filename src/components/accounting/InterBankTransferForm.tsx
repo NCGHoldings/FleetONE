@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -34,6 +34,7 @@ import { useBankAccounts } from "@/hooks/useAccountingData";
 import { useCreateInterBankTransfer } from "@/hooks/useInterBankTransfer";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 const formSchema = z.object({
   fromBankAccountId: z.string().min(1, "Source bank account is required"),
@@ -57,7 +58,15 @@ interface InterBankTransferFormProps {
 export function InterBankTransferForm({ open, onOpenChange }: InterBankTransferFormProps) {
   const { data: bankAccounts } = useBankAccounts();
   const createTransfer = useCreateInterBankTransfer();
+  const generateNumber = useGenerateNumber();
 
+  useEffect(() => {
+    if (open && !form.getValues("reference")) {
+      generateNumber("inter_bank_transfer").then((num) => {
+        form.setValue("reference", num);
+      });
+    }
+  }, [open]);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -239,7 +248,7 @@ export function InterBankTransferForm({ open, onOpenChange }: InterBankTransferF
                 <FormItem>
                   <FormLabel>Reference</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., FUEL-TOPUP-JAN" {...field} />
+                    <Input {...field} readOnly className="bg-muted" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

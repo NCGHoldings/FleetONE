@@ -68,11 +68,20 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
     }
   };
 
+  // For partial_match, only allow confirming items with exactly 1 matched student
+  const confirmableItems = matchStatus === 'partial_match'
+    ? items.filter(item => (item.matched_student_ids || []).length === 1)
+    : items;
+
   const handleConfirmAll = async () => {
+    if (confirmableItems.length === 0) {
+      toast({ title: "No confirmable items", description: "Partial matches with multiple students must be resolved individually.", variant: "destructive" });
+      return;
+    }
     setProcessing(true);
     try {
       // Fetch student details for all matched students
-      const studentIds = [...new Set(items.flatMap(item => item.matched_student_ids || []))];
+      const studentIds = [...new Set(confirmableItems.flatMap(item => item.matched_student_ids || []))];
       const { data: students, error: studentsError } = await supabase
         .from('school_students')
         .select('id, fixed_monthly_amount, payment_balance')
@@ -83,7 +92,7 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
       const studentMap = new Map(students?.map(s => [s.id, s]) || []);
 
       // Create payment transactions for all matched items
-      const transactions = items.flatMap(item => {
+      const transactions = confirmableItems.flatMap(item => {
         const matchedStudents = item.matched_student_ids || [];
         const splitAmount = item.amount / matchedStudents.length;
         
@@ -160,7 +169,7 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
       }
 
       // Update import items as processed
-      const itemIds = items.map(i => i.id);
+      const itemIds = confirmableItems.map(i => i.id);
       await supabase
         .from('school_payment_import_items')
         .update({
@@ -180,8 +189,8 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
         await supabase
           .from('school_payment_imports')
           .update({
-            manual_matched_count: importData.manual_matched_count + items.length,
-            unmatched_count: importData.unmatched_count - items.length,
+            manual_matched_count: importData.manual_matched_count + confirmableItems.length,
+            unmatched_count: importData.unmatched_count - confirmableItems.length,
           })
           .eq('id', importId);
 
@@ -189,13 +198,13 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
           total: importData.auto_matched_count + importData.manual_matched_count + importData.unmatched_count,
           autoMatched: importData.auto_matched_count,
           needsReview: 0,
-          unmatched: importData.unmatched_count - items.length,
+          unmatched: importData.unmatched_count - confirmableItems.length,
         });
       }
 
       toast({
         title: "Success",
-        description: `Confirmed ${items.length} payment${items.length > 1 ? 's' : ''}`,
+        description: `Confirmed ${confirmableItems.length} payment${confirmableItems.length > 1 ? 's' : ''}`,
       });
 
       fetchItems();
@@ -309,13 +318,20 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
           <CardTitle>
             {matchStatus === 'auto_matched' ? 'Auto-Matched' : 'Needs Review'} Payments ({items.length})
           </CardTitle>
-          <Button
-            onClick={handleConfirmAll}
-            disabled={processing}
-          >
-            <CheckCircle className="h-4 w-4 mr-2" />
-            Confirm All {items.length} Payment{items.length > 1 ? 's' : ''}
-          </Button>
+          <div className="flex items-center gap-2">
+            {matchStatus === 'partial_match' && confirmableItems.length < items.length && (
+              <span className="text-xs text-muted-foreground">
+                {items.length - confirmableItems.length} ambiguous — resolve in Unmatched tab
+              </span>
+            )}
+            <Button
+              onClick={handleConfirmAll}
+              disabled={processing || confirmableItems.length === 0}
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Confirm {confirmableItems.length} Payment{confirmableItems.length !== 1 ? 's' : ''}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>

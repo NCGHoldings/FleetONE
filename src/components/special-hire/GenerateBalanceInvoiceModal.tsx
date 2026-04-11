@@ -54,6 +54,8 @@ interface GenerateBalanceInvoiceModalProps {
     bus_no?: string;
     tripDistance?: number;
     totalKm?: number;
+    hire_type?: string;
+    intermediate_stops?: string;
   };
   adjustmentData: {
     id: string;
@@ -251,6 +253,18 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       additionalExpenses: hasRealAdjustment ? effectiveAdjustment.additional_expenses : undefined,
       totalAdditionalExpenses: hasRealAdjustment ? effectiveAdjustment.total_additional_expenses : undefined,
       adjustmentNotes: hasRealAdjustment ? effectiveAdjustment.adjustment_notes : undefined,
+      hireType: quotationData.hire_type || 'External',
+      intermediateStops: (() => {
+        try {
+          if (quotationData.intermediate_stops) {
+            const parsed = typeof quotationData.intermediate_stops === 'string'
+              ? JSON.parse(quotationData.intermediate_stops)
+              : quotationData.intermediate_stops;
+            return Array.isArray(parsed) ? parsed : [];
+          }
+        } catch {}
+        return [];
+      })(),
     };
   };
 
@@ -750,11 +764,18 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
           {/* Invoice HTML Preview */}
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-6 bg-muted/30">
               <div
-                className="invoice-preview border rounded-lg p-4 bg-white"
+                className="invoice-preview"
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}
                 dangerouslySetInnerHTML={{ __html: sanitizeHTML(generateInvoiceHTML(invoiceData)) }}
               />
+              <style>{`
+                .invoice-preview [data-pdf-page] {
+                  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+                  border-radius: 4px;
+                }
+              `}</style>
             </CardContent>
           </Card>
 

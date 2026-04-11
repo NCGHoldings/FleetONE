@@ -1,0 +1,1 @@
+ALTER TABLE public.ar_receipts ADD COLUMN IF NOT EXISTS override_gl_account_id UUID REFERENCES public.chart_of_accounts(id);

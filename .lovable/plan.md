@@ -1,84 +1,48 @@
 
+Fix the special hire invoice system at the source so long multi-bus invoices paginate correctly in both preview and PDF, while keeping route details and hire type accurate everywhere.
 
-# Build Full LC Management, Delivery Orders & Landed Cost System
+1. Refactor the shared generator
+- Update `src/lib/invoice-generator.ts` to build a normalized list of invoice rows first.
+- Generate multiple `data-pdf-page` sections dynamically instead of forcing all bus rows into page 1.
+- Put header/customer info on page 1, continue bus rows onto page 2/3/etc automatically, and keep totals/payment info on the last item page.
+- Keep the optional signature page separate after the item pages.
 
-## Current State
+2. Make multi-bus rows compact and readable
+- For trips where all buses share the same route, show the full route once and avoid repeating the same long route block for every row.
+- Use a compact continuation style for extra bus rows (same route / shared trip details, individual vehicle + driver/conductor + amount per row).
+- This reduces vertical space and helps more buses fit cleanly across pages.
 
-- **YutongLCManagement.tsx** — placeholder "coming soon"
-- **YutongDeliveryOrderManagement.tsx** — placeholder "coming soon"
-- **SinotrukLCManagement.tsx** — placeholder "coming soon"
-- **LightVehicleLCManagement.tsx** — placeholder "coming soon"
-- **Hook `useYutongFinanceManagement.ts`** — all CRUD functions already built (createLC, updateLCStatus, addLCAmendment, createDO, updateDOStatus, getLetterOfCredits, getDeliveryOrders)
-- **Database tables** — `yutong_letter_of_credits` (23 columns), `yutong_delivery_orders` (21 columns), `landed_cost_vouchers/charges/items` all exist with proper schemas
-- **Sinotruck & Light Vehicle** hooks already have identical LC/DO functions
+3. Fix preview to match the real PDF
+- Update the invoice preview entry points to display the new paginated HTML clearly:
+  - `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
+  - `src/components/special-hire/InvoiceViewer.tsx`
+  - `src/components/special-hire/BalanceInvoicePreview.tsx` if needed for consistency
+- Show separate page blocks with spacing/shadow in preview so management can actually see page 1, page 2, etc.
 
-The backend is 100% ready. Only the UI components are empty placeholders.
+4. Cross-check all invoice paths
+- Verify every special hire invoice path uses the same shared generator and passes the same fields:
+  - draft invoice
+  - final/balance invoice
+  - payment reminder invoice
+  - regenerated invoice
+  - finance-approved/stored invoice
+- Re-check `hireType` and `intermediateStops` mapping in the construction paths so no path falls back to `External` unless the source data is truly missing.
 
-## Plan
+5. Technical details
+- Main file: `src/lib/invoice-generator.ts`
+- Likely supporting files:
+  - `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
+  - `src/components/special-hire/InvoiceViewer.tsx`
+  - `src/components/special-hire/BalanceInvoicePreview.tsx`
+  - audit only: `src/components/special-hire/ConfirmedTripsTable.tsx`, `src/hooks/useDocumentRegeneration.ts`, `src/hooks/useDocumentManagement.ts`, `src/hooks/useFinanceApproval.ts`
+- Preferred implementation: dynamic page chunking in HTML generation, not just PDF slicing, so both on-screen preview and downloaded PDF behave the same.
 
-### 1. Build YutongLCManagement.tsx — Full LC Interface
-
-Replace the placeholder with a complete management screen:
-
-- **LC List Table**: LC No, Order (bus model + qty), Bank, Amount (USD), Status badge, Issue/Expiry dates, Utilized/Remaining, Amendment count
-- **Create LC Dialog**: Form with fields — select order (dropdown of Yutong orders), issuing bank name/branch/contact, beneficiary bank, LC amount, currency, LC type, issue date, expiry date, latest shipment date, notes
-- **LC Detail View**: Click a row to expand/view full LC details
-- **Status Actions**: Update status (issued → negotiating → utilized → expired/closed), record utilized amount
-- **Amendment Dialog**: Add amendments with type, description, old/new values, date — appends to JSONB array
-- **Color-coded status badges**: draft=gray, issued=blue, amended=yellow, utilized=green, expired=red
-
-Uses existing `useYutongFinanceManagement` hook — no new backend code needed.
-
-### 2. Build YutongDeliveryOrderManagement.tsx — Full DO Interface
-
-Replace the placeholder with:
-
-- **DO List Table**: DO No, Order, LC (linked), Bank, Amount, Vehicle Count, Status, Issue/Release/Collection dates
-- **Create DO Dialog**: Select order, optionally link to LC, bank, amount, chassis/engine numbers (multi-input), vehicle count, commercial invoice no, bill of lading no, packing list no
-- **Status Workflow**: pending → issued → released → collected (with release_date and collection_date auto-fill)
-- **Collection tracking**: Record who collected (collected_by field)
-
-Uses existing `useYutongFinanceManagement` hook.
-
-### 3. Build Landed Cost Integration Tab
-
-Add a "Landed Cost" tab to the Finance Dashboard showing:
-
-- **Voucher List**: From `landed_cost_vouchers` table — voucher number, posting date, total additional cost, allocation method, status
-- **Charges breakdown**: From `landed_cost_charges` — charge type, description, amount, vendor
-- **Item allocation view**: From `landed_cost_items` — original cost, allocated cost, final cost per item
-- **Link to orders**: Connect landed cost vouchers to Yutong orders for full cost tracking
-
-### 4. Apply Same Pattern to Sinotruck & Light Vehicle
-
-Copy the Yutong LC/DO components and adapt for:
-- `SinotrukLCManagement.tsx` — uses `useSinotrukFinanceManagement` hook, queries `sinotruck_letter_of_credits`
-- `LightVehicleLCManagement.tsx` — uses `useLightVehicleFinanceManagement` hook, queries `lightvehicle_letter_of_credits`
-
-### 5. Add Finance Dashboard Interconnections
-
-Update `YutongFinanceDashboard.tsx`:
-- Add "Landed Cost" as 5th tab
-- Overview tab: show LC utilization chart, payment vs outstanding breakdown, DO status summary
-- Cross-link: clicking an LC shows related DOs, clicking a DO shows related LC and order
-
-## Files to Change
-
-- `src/components/yutong/YutongLCManagement.tsx` — build full LC CRUD interface
-- `src/components/yutong/YutongDeliveryOrderManagement.tsx` — build full DO CRUD interface
-- `src/components/yutong/YutongFinanceDashboard.tsx` — add Landed Cost tab, improve overview
-- `src/components/sinotruck/SinotrukLCManagement.tsx` — build full LC interface for Sinotruck
-- `src/components/lightvehicle/LightVehicleLCManagement.tsx` — build full LC interface for Light Vehicle
-
-## Result
-
-- All three vehicle sales modules get working LC management (create, amend, track status, utilization)
-- Delivery Orders fully trackable from issuance to collection
-- Landed cost charges visible and linked to orders
-- Finance dashboard becomes the single source of truth for import finance operations
-- Full interconnection: Order → LC → DO → Landed Cost → GL
-
-
-## Files
-- **Modify**: `src/components/accounting/DrillDownModal.tsx` — add per-row delete button + confirmation
-- **Modify**: `src/components/accounting/settings/BalanceReconciliationTool.tsx` — add orphaned JE scanner section
+6. QA after implementation
+- Test a quotation with many buses and a long route with multiple intermediate stops.
+- Confirm:
+  - preview shows page 2/page 3
+  - downloaded PDF also continues to page 2/page 3
+  - no rows are cut off
+  - route/intermediate stops appear correctly
+  - hire type shows Internal / Outside / Lyceum correctly
+  - payment reminder invoice matches the final invoice behavior

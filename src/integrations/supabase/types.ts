@@ -733,6 +733,7 @@ export type Database = {
           created_by: string | null
           discount_amount: number | null
           due_date: string
+          edit_history: Json | null
           grn_id: string | null
           id: string
           invoice_date: string
@@ -764,6 +765,7 @@ export type Database = {
           created_by?: string | null
           discount_amount?: number | null
           due_date: string
+          edit_history?: Json | null
           grn_id?: string | null
           id?: string
           invoice_date: string
@@ -795,6 +797,7 @@ export type Database = {
           created_by?: string | null
           discount_amount?: number | null
           due_date?: string
+          edit_history?: Json | null
           grn_id?: string | null
           id?: string
           invoice_date?: string
@@ -994,6 +997,8 @@ export type Database = {
           bank_account_id: string | null
           bank_fee_amount: number | null
           bank_fee_type: string | null
+          bus_id: string | null
+          bus_no: string | null
           business_unit_code: string | null
           cheque_date: string | null
           cheque_number: string | null
@@ -1001,6 +1006,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           document_url: string | null
+          edit_history: Json | null
           id: string
           is_advance: boolean | null
           is_direct_payment: boolean | null
@@ -1013,6 +1019,7 @@ export type Database = {
           status: string | null
           total_with_fees: number | null
           updated_at: string | null
+          vehicle_type: string | null
           vendor_bank_account_id: string | null
           vendor_bill_number: string | null
           vendor_id: string | null
@@ -1025,6 +1032,8 @@ export type Database = {
           bank_account_id?: string | null
           bank_fee_amount?: number | null
           bank_fee_type?: string | null
+          bus_id?: string | null
+          bus_no?: string | null
           business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
@@ -1032,6 +1041,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           document_url?: string | null
+          edit_history?: Json | null
           id?: string
           is_advance?: boolean | null
           is_direct_payment?: boolean | null
@@ -1044,6 +1054,7 @@ export type Database = {
           status?: string | null
           total_with_fees?: number | null
           updated_at?: string | null
+          vehicle_type?: string | null
           vendor_bank_account_id?: string | null
           vendor_bill_number?: string | null
           vendor_id?: string | null
@@ -1056,6 +1067,8 @@ export type Database = {
           bank_account_id?: string | null
           bank_fee_amount?: number | null
           bank_fee_type?: string | null
+          bus_id?: string | null
+          bus_no?: string | null
           business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
@@ -1063,6 +1076,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           document_url?: string | null
+          edit_history?: Json | null
           id?: string
           is_advance?: boolean | null
           is_direct_payment?: boolean | null
@@ -1075,6 +1089,7 @@ export type Database = {
           status?: string | null
           total_with_fees?: number | null
           updated_at?: string | null
+          vehicle_type?: string | null
           vendor_bank_account_id?: string | null
           vendor_bill_number?: string | null
           vendor_id?: string | null
@@ -1085,6 +1100,13 @@ export type Database = {
             columns: ["bank_account_id"]
             isOneToOne: false
             referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payments_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
             referencedColumns: ["id"]
           },
           {
@@ -1777,6 +1799,7 @@ export type Database = {
           customer_id: string | null
           discount_amount: number | null
           due_date: string
+          edit_history: Json | null
           id: string
           invoice_date: string
           invoice_number: string
@@ -1805,6 +1828,7 @@ export type Database = {
           customer_id?: string | null
           discount_amount?: number | null
           due_date: string
+          edit_history?: Json | null
           id?: string
           invoice_date: string
           invoice_number: string
@@ -1833,6 +1857,7 @@ export type Database = {
           customer_id?: string | null
           discount_amount?: number | null
           due_date?: string
+          edit_history?: Json | null
           id?: string
           invoice_date?: string
           invoice_number?: string
@@ -1955,6 +1980,8 @@ export type Database = {
         Row: {
           amount: number
           bank_account_id: string | null
+          bus_id: string | null
+          bus_no: string | null
           business_unit_code: string | null
           cheque_date: string | null
           cheque_number: string | null
@@ -1962,20 +1989,25 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           customer_id: string | null
+          edit_history: Json | null
           id: string
           is_advance: boolean | null
           journal_entry_id: string | null
           notes: string | null
+          override_gl_account_id: string | null
           payment_method: string | null
           receipt_date: string
           receipt_number: string
           reference: string | null
           status: string | null
           updated_at: string | null
+          vehicle_type: string | null
         }
         Insert: {
           amount: number
           bank_account_id?: string | null
+          bus_id?: string | null
+          bus_no?: string | null
           business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
@@ -1983,20 +2015,25 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
+          edit_history?: Json | null
           id?: string
           is_advance?: boolean | null
           journal_entry_id?: string | null
           notes?: string | null
+          override_gl_account_id?: string | null
           payment_method?: string | null
           receipt_date: string
           receipt_number: string
           reference?: string | null
           status?: string | null
           updated_at?: string | null
+          vehicle_type?: string | null
         }
         Update: {
           amount?: number
           bank_account_id?: string | null
+          bus_id?: string | null
+          bus_no?: string | null
           business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
@@ -2004,18 +2041,28 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
+          edit_history?: Json | null
           id?: string
           is_advance?: boolean | null
           journal_entry_id?: string | null
           notes?: string | null
+          override_gl_account_id?: string | null
           payment_method?: string | null
           receipt_date?: string
           receipt_number?: string
           reference?: string | null
           status?: string | null
           updated_at?: string | null
+          vehicle_type?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ar_receipts_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ar_receipts_company_id_fkey"
             columns: ["company_id"]
@@ -2035,6 +2082,13 @@ export type Database = {
             columns: ["journal_entry_id"]
             isOneToOne: false
             referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_receipts_override_gl_account_id_fkey"
+            columns: ["override_gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -5354,6 +5408,41 @@ export type Database = {
           {
             foreignKeyName: "companies_parent_company_id_fkey"
             columns: ["parent_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_expense_categories: {
+        Row: {
+          category_value: string
+          company_id: string
+          created_at: string
+          id: string
+          is_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          category_value: string
+          company_id: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          category_value?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_expense_categories_company_id_fkey"
+            columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
@@ -12418,6 +12507,39 @@ export type Database = {
         }
         Relationships: []
       }
+      magiya_daily_reports: {
+        Row: {
+          bus_number: string | null
+          extracted_at: string | null
+          id: string
+          report_date: string
+          route_name: string | null
+          status: string | null
+          total_passengers: number | null
+          total_revenue_lkr: number | null
+        }
+        Insert: {
+          bus_number?: string | null
+          extracted_at?: string | null
+          id?: string
+          report_date: string
+          route_name?: string | null
+          status?: string | null
+          total_passengers?: number | null
+          total_revenue_lkr?: number | null
+        }
+        Update: {
+          bus_number?: string | null
+          extracted_at?: string | null
+          id?: string
+          report_date?: string
+          route_name?: string | null
+          status?: string | null
+          total_passengers?: number | null
+          total_revenue_lkr?: number | null
+        }
+        Relationships: []
+      }
       maintenance_bays: {
         Row: {
           bay_name: string
@@ -14689,6 +14811,7 @@ export type Database = {
           created_at: string | null
           current_balance: number
           custodian_id: string | null
+          custodian_name: string | null
           fund_code: string | null
           fund_limit: number | null
           fund_name: string
@@ -14710,6 +14833,7 @@ export type Database = {
           created_at?: string | null
           current_balance?: number
           custodian_id?: string | null
+          custodian_name?: string | null
           fund_code?: string | null
           fund_limit?: number | null
           fund_name: string
@@ -14731,6 +14855,7 @@ export type Database = {
           created_at?: string | null
           current_balance?: number
           custodian_id?: string | null
+          custodian_name?: string | null
           fund_code?: string | null
           fund_limit?: number | null
           fund_name?: string
@@ -17744,6 +17869,7 @@ export type Database = {
           auto_post_invoices: boolean | null
           auto_post_payments: boolean | null
           bank_account_id: string | null
+          billing_percentage: number | null
           branch_gl_account_id: string | null
           branch_id: string | null
           cash_account_id: string | null
@@ -17768,6 +17894,7 @@ export type Database = {
           auto_post_invoices?: boolean | null
           auto_post_payments?: boolean | null
           bank_account_id?: string | null
+          billing_percentage?: number | null
           branch_gl_account_id?: string | null
           branch_id?: string | null
           cash_account_id?: string | null
@@ -17792,6 +17919,7 @@ export type Database = {
           auto_post_invoices?: boolean | null
           auto_post_payments?: boolean | null
           bank_account_id?: string | null
+          billing_percentage?: number | null
           branch_gl_account_id?: string | null
           branch_id?: string | null
           cash_account_id?: string | null
@@ -23270,6 +23398,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_school_branch_access: {
+        Row: {
+          branch_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       vat_returns: {
         Row: {
           adjustments: number | null
@@ -28178,6 +28327,10 @@ export type Database = {
         Returns: string
       }
       calculate_tyre_condition: { Args: { p_tyre_id: string }; Returns: number }
+      can_access_school_branch: {
+        Args: { _branch_id: string }
+        Returns: boolean
+      }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       create_admin_user: { Args: never; Returns: undefined }
       create_or_get_sph_customer: {

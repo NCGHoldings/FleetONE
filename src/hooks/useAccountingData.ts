@@ -197,7 +197,7 @@ export const useCustomers = () => {
     queryFn: async () => {
       let query = supabase
         .from("customers")
-        .select("*")
+        .select("*, customer_categories(category_name)")
         .order("customer_name");
 
       if (effectiveCompanyId) {
@@ -253,7 +253,7 @@ export const useVendors = () => {
     queryFn: async () => {
       let query = supabase
         .from("vendors")
-        .select("*")
+        .select("*, vendor_categories(category_name)")
         .order("vendor_name");
 
       if (effectiveCompanyId) {

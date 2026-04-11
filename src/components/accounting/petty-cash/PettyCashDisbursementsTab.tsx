@@ -13,11 +13,12 @@ import {
   usePettyCashFunds, useAllPettyCashTransactions, useCreatePettyCashTransaction,
   PettyCashFund
 } from "@/hooks/usePettyCash";
-import { EXPENSE_CATEGORIES, BUSINESS_UNITS } from "@/hooks/useExpenseRequests";
+import { EXPENSE_CATEGORIES, BUSINESS_UNITS, useCompanyExpenseCategories } from "@/hooks/useExpenseRequests";
 import { CurrencyDisplay } from "../shared/CurrencyDisplay";
 import { SearchableAccountSelector } from "../shared/SearchableAccountSelector";
 
 export const PettyCashDisbursementsTab = () => {
+  const filteredCategories = useCompanyExpenseCategories();
   const [showForm, setShowForm] = useState(false);
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -97,7 +98,7 @@ export const PettyCashDisbursementsTab = () => {
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Categories" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              {EXPENSE_CATEGORIES.map((c) => (
+              {filteredCategories.map((c) => (
                 <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
               ))}
             </SelectContent>
@@ -211,7 +212,7 @@ export const PettyCashDisbursementsTab = () => {
                 <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No Category</SelectItem>
-                  {EXPENSE_CATEGORIES.map((c) => (
+                  {filteredCategories.map((c) => (
                     <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                   ))}
                 </SelectContent>

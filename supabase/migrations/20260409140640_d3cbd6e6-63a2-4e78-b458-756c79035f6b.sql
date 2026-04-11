@@ -1,0 +1,1 @@
+ALTER TABLE public.petty_cash_funds ADD COLUMN IF NOT EXISTS custodian_name text;

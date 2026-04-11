@@ -542,15 +542,17 @@ export const AccountsPayableView = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Document Print Preview Modal */}
-      <FinanceDocumentPreviewModal
-        open={printDocumentOpen}
-        onOpenChange={setPrintDocumentOpen}
-        documentType={printDocumentType}
-        documentData={printDocumentData}
-        companyId={printDocumentData?.company_id}
-        businessUnitCode={printDocumentData?.business_unit_code}
-      />
+      {/* Document Print Preview Modal - only mount when open */}
+      {printDocumentOpen && (
+        <FinanceDocumentPreviewModal
+          open={printDocumentOpen}
+          onOpenChange={setPrintDocumentOpen}
+          documentType={printDocumentType}
+          documentData={printDocumentData}
+          companyId={printDocumentData?.company_id}
+          businessUnitCode={printDocumentData?.business_unit_code}
+        />
+      )}
     </div>
   );
 };

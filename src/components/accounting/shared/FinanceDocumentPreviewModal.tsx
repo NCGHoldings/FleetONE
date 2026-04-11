@@ -13,6 +13,7 @@ import { mapDocumentToPlaceholders, replacePlaceholders, generatePrintableDocume
 import { defaultTemplates } from "@/lib/document-template-seeder";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { canvasToMultiPagePDF } from "@/lib/pdf-multi-page";
 import { toast } from "sonner";
 
 interface FinanceDocumentPreviewModalProps {
@@ -371,37 +372,32 @@ export const FinanceDocumentPreviewModal = ({
     setIsGeneratingPdf(true);
     try {
       const body = iframeRef.current.contentDocument.body;
+      
+      // Set a fixed width on the body so html2canvas renders at A4 proportions
+      const originalWidth = body.style.width;
+      body.style.width = "794px"; // A4 at 96dpi
+      
       const canvas = await html2canvas(body, {
-        scale: 1.5,
+        scale: 2,
         useCORS: true,
         logging: false,
+        windowWidth: 794,
       });
+      
+      // Restore original width
+      body.style.width = originalWidth;
 
-      const imgData = canvas.toDataURL("image/jpeg", 0.85);
-      const pdf = new jsPDF({
-        orientation: selectedTemplate?.orientation === "landscape" ? "landscape" : "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 10;
-
-      pdf.addImage(imgData, "JPEG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      // Use multi-page utility for proper pagination instead of single-page shrinking
+      const pdf = canvasToMultiPagePDF(canvas);
       
       // Generate filename
-      const docNumber = documentData?.invoice_number || 
+      const docNum = documentData?.invoice_number || 
                         documentData?.receipt_number || 
                         documentData?.payment_number ||
                         documentData?.credit_note_number ||
                         documentData?.debit_note_number ||
                         "document";
-      pdf.save(`${docNumber}.pdf`);
+      pdf.save(`${docNum}.pdf`);
       toast.success("PDF downloaded successfully");
     } catch (error) {
       console.error("PDF generation error:", error);

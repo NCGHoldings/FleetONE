@@ -13,7 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { DocumentUpload } from "@/components/documents/DocumentUpload";
 import { useToast } from "@/hooks/use-toast";
 import ComplaintQRGenerator from "@/components/complaints/ComplaintQRGenerator";
-import { Clock, FileText, AlertTriangle, CheckCircle, XCircle, User, Plus, X, UserPlus, Smile, Frown, Calendar, Flag } from "lucide-react";
+import { Clock, FileText, AlertTriangle, CheckCircle, XCircle, User, Plus, X, UserPlus, Smile, Frown, Calendar, Flag, Bus, MapPin, Phone, Route } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { ColumnDef } from "@tanstack/react-table";
 
 interface RelatedPerson {
@@ -452,6 +453,21 @@ export default function Complaints() {
     setRelatedPersons(relatedPersons.filter((_, i) => i !== index));
   };
 
+  const getRelatedPersonsData = (complaint: Complaint) => {
+    const rp = (complaint.related_persons as any) || {};
+    return {
+      bus_number: rp.bus_number || '',
+      route_number: rp.route_number || '',
+      customer_phone: rp.customer_phone || rp.phone || '',
+      customer_name: rp.customer_name || rp.name || '',
+      customer_email: rp.customer_email || rp.email || '',
+      location: rp.location || '',
+      driver_name: rp.driver_name || '',
+      incident_date: rp.incident_date || '',
+      incident_time: rp.incident_time || '',
+    };
+  };
+
   const columns: ColumnDef<Complaint>[] = [
     {
       accessorKey: "type",
@@ -502,6 +518,45 @@ export default function Complaints() {
       cell: ({ row }) => (
         <div className="max-w-[200px] truncate font-medium">{row.getValue("title")}</div>
       ),
+    },
+    {
+      id: "bus_number",
+      header: "Bus No",
+      cell: ({ row }) => {
+        const rp = getRelatedPersonsData(row.original);
+        return rp.bus_number ? (
+          <Badge variant="outline" className="font-mono">
+            <Bus className="h-3 w-3 mr-1" />
+            {rp.bus_number}
+          </Badge>
+        ) : <span className="text-muted-foreground text-xs">—</span>;
+      },
+    },
+    {
+      id: "route_number",
+      header: "Route",
+      cell: ({ row }) => {
+        const rp = getRelatedPersonsData(row.original);
+        return rp.route_number ? (
+          <Badge variant="secondary" className="font-mono">
+            <Route className="h-3 w-3 mr-1" />
+            {rp.route_number}
+          </Badge>
+        ) : <span className="text-muted-foreground text-xs">—</span>;
+      },
+    },
+    {
+      id: "location",
+      header: "Location",
+      cell: ({ row }) => {
+        const rp = getRelatedPersonsData(row.original);
+        return rp.location ? (
+          <div className="flex items-center gap-1 max-w-[150px] truncate text-sm">
+            <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+            {rp.location}
+          </div>
+        ) : <span className="text-muted-foreground text-xs">—</span>;
+      },
     },
     {
       accessorKey: "category",
@@ -965,12 +1020,97 @@ export default function Complaints() {
           <DialogHeader>
             <DialogTitle>Manage {managingComplaint?.type === 'feedback' ? 'Feedback' : 'Complaint'} - {managingComplaint?.feedback_id}</DialogTitle>
           </DialogHeader>
-          <Tabs defaultValue="status" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+          <Tabs defaultValue="incident" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="incident">Incident Summary</TabsTrigger>
               <TabsTrigger value="status">Status & Assignment</TabsTrigger>
               <TabsTrigger value="action">Action Taken</TabsTrigger>
               <TabsTrigger value="persons">Related Persons</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="incident" className="space-y-4 mt-4">
+              {managingComplaint && (() => {
+                const rp = getRelatedPersonsData(managingComplaint);
+                return (
+                  <div className="grid grid-cols-2 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Bus className="h-4 w-4 text-primary" />
+                          Vehicle Info
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Bus Number</span>
+                          <span className="font-medium">{rp.bus_number || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Route</span>
+                          <span className="font-medium">{rp.route_number || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Driver</span>
+                          <span className="font-medium">{rp.driver_name || '—'}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-primary" />
+                          Incident Info
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Date</span>
+                          <span className="font-medium">{rp.incident_date || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Time</span>
+                          <span className="font-medium">{rp.incident_time || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Location</span>
+                          <span className="font-medium">{rp.location || '—'}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="col-span-2">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-primary" />
+                          Customer Info
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Name</span>
+                          <p className="font-medium">{rp.customer_name || '—'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Phone</span>
+                          <p className="font-medium">{rp.customer_phone || '—'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Email</span>
+                          <p className="font-medium">{rp.customer_email || '—'}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="col-span-2">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Description</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground">{managingComplaint.description}</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })()}
+            </TabsContent>
 
             <TabsContent value="status" className="space-y-4 mt-4">
               <div>
@@ -1111,99 +1251,181 @@ export default function Complaints() {
         </DialogContent>
       </Dialog>
 
-      {/* View Complaint Dialog */}
-      {selectedComplaint && (
-        <Dialog open={!!selectedComplaint} onOpenChange={() => setSelectedComplaint(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {selectedComplaint.type === 'feedback' ? 'Feedback' : 'Complaint'} Details - {selectedComplaint.feedback_id}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium">Type</Label>
+      {/* View Complaint Dialog - Redesigned for Management */}
+      {selectedComplaint && (() => {
+        const rp = getRelatedPersonsData(selectedComplaint);
+        return (
+          <Dialog open={!!selectedComplaint} onOpenChange={() => setSelectedComplaint(null)}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <div className="flex items-center justify-between">
+                  <DialogTitle className="text-xl">
+                    Incident Report — {selectedComplaint.feedback_id}
+                  </DialogTitle>
+                  <div className="flex items-center gap-2">
+                    <Badge className={`${getPriorityColor(selectedComplaint.priority)} text-sm px-3 py-1`}>
+                      <Flag className="h-3.5 w-3.5 mr-1" />
+                      {selectedComplaint.priority?.toUpperCase()}
+                    </Badge>
+                    <Badge className={`${getStatusColor(selectedComplaint.status)} text-sm px-3 py-1`}>
+                      {selectedComplaint.status?.toUpperCase()}
+                    </Badge>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-5">
+                {/* Title & Type */}
+                <div className="flex items-center gap-3">
                   {selectedComplaint.type === 'feedback' ? (
-                    <Badge className="bg-success text-success-foreground mt-1">
-                      <Smile className="h-3 w-3 mr-1" />
+                    <Badge className="bg-success text-success-foreground text-sm px-3 py-1">
+                      <Smile className="h-4 w-4 mr-1" />
                       Good Feedback
                     </Badge>
                   ) : (
-                    <Badge className="bg-destructive text-destructive-foreground mt-1">
-                      <Frown className="h-3 w-3 mr-1" />
+                    <Badge className="bg-destructive text-destructive-foreground text-sm px-3 py-1">
+                      <Frown className="h-4 w-4 mr-1" />
                       Complaint
                     </Badge>
                   )}
+                  <h3 className="text-lg font-semibold">{selectedComplaint.title}</h3>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium">Status</Label>
-                  <div className="mt-1">
-                    <Badge className={getStatusColor(selectedComplaint.status)}>
-                      {selectedComplaint.status}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Category</Label>
-                  <p>{selectedComplaint.category}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Priority</Label>
-                  <Badge className={getPriorityColor(selectedComplaint.priority)}>
-                    {selectedComplaint.priority}
-                  </Badge>
-                </div>
-              </div>
 
-              <div>
-                <Label className="text-sm font-medium">Assigned To</Label>
-                <p className="mt-1">{selectedComplaint.assigned_to_name || 'Unassigned'}</p>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium">Description</Label>
-                <p className="mt-1 text-sm text-muted-foreground">{selectedComplaint.description}</p>
-              </div>
-
-              {selectedComplaint.action_taken && (
-                <div>
-                  <Label className="text-sm font-medium">Action Taken</Label>
-                  <p className="mt-1 text-sm text-muted-foreground">{selectedComplaint.action_taken}</p>
-                </div>
-              )}
-
-              {selectedComplaint.related_persons && selectedComplaint.related_persons.length > 0 && (
-                <div>
-                  <Label className="text-sm font-medium">Related Persons</Label>
-                  <div className="mt-2 space-y-2">
-                    {selectedComplaint.related_persons.map((person, index) => (
-                      <div key={index} className="p-2 border rounded-md bg-muted/50">
-                        <p className="font-medium">{person.name}</p>
-                        <p className="text-sm text-muted-foreground">{person.role}</p>
+                {/* Incident Details Cards */}
+                <div className="grid grid-cols-3 gap-4">
+                  <Card className="bg-muted/30">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+                        <Bus className="h-4 w-4" />
+                        Vehicle Details
                       </div>
-                    ))}
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground text-xs">Bus Number</span>
+                          <p className="font-bold text-lg">{rp.bus_number || '—'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground text-xs">Route</span>
+                          <p className="font-medium">{rp.route_number || '—'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground text-xs">Driver</span>
+                          <p className="font-medium">{rp.driver_name || '—'}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-muted/30">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+                        <Calendar className="h-4 w-4" />
+                        Incident Info
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground text-xs">Date</span>
+                          <p className="font-medium">{rp.incident_date || new Date(selectedComplaint.feedback_date).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground text-xs">Time</span>
+                          <p className="font-medium">{rp.incident_time || '—'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground text-xs">Location</span>
+                          <p className="font-medium">{rp.location || '—'}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-muted/30">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+                        <User className="h-4 w-4" />
+                        Customer Info
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground text-xs">Name</span>
+                          <p className="font-medium">{rp.customer_name || '—'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground text-xs">Phone</span>
+                          <p className="font-medium">{rp.customer_phone || '—'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground text-xs">Email</span>
+                          <p className="font-medium">{rp.customer_email || '—'}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Separator />
+
+                {/* Description */}
+                <div>
+                  <Label className="text-sm font-semibold">Description</Label>
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed bg-muted/20 p-4 rounded-lg">
+                    {selectedComplaint.description}
+                  </p>
+                </div>
+
+                {/* Management Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-semibold">Category</Label>
+                    <div className="mt-1">
+                      <Badge variant="outline">{selectedComplaint.category}</Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold">Assigned To</Label>
+                    <p className="mt-1 text-sm">{selectedComplaint.assigned_to_name || 'Unassigned'}</p>
                   </div>
                 </div>
-              )}
 
-              {selectedComplaint.resolution && (
-                <div>
-                  <Label className="text-sm font-medium">Resolution</Label>
-                  <p className="mt-1 text-sm text-muted-foreground">{selectedComplaint.resolution}</p>
-                </div>
-              )}
-
-              <div className="flex items-center gap-4 text-sm border-t pt-4">
-                <span>Created: {new Date(selectedComplaint.created_at).toLocaleString()}</span>
-                {selectedComplaint.resolved_at && (
-                  <span>Resolved: {new Date(selectedComplaint.resolved_at).toLocaleString()}</span>
+                {selectedComplaint.action_taken && (
+                  <div>
+                    <Label className="text-sm font-semibold">Action Taken</Label>
+                    <p className="mt-2 text-sm text-muted-foreground bg-success/10 p-4 rounded-lg border border-success/20">
+                      {selectedComplaint.action_taken}
+                    </p>
+                  </div>
                 )}
+
+                {selectedComplaint.resolution && (
+                  <div>
+                    <Label className="text-sm font-semibold">Resolution</Label>
+                    <p className="mt-2 text-sm text-muted-foreground">{selectedComplaint.resolution}</p>
+                  </div>
+                )}
+
+                <Separator />
+
+                {/* Timeline */}
+                <div className="flex items-center gap-6 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Created: {new Date(selectedComplaint.created_at).toLocaleString()}
+                  </div>
+                  {selectedComplaint.resolved_at && (
+                    <div className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3 text-success" />
+                      Resolved: {new Date(selectedComplaint.resolved_at).toLocaleString()}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1">
+                    SLA: {calculateSLA(selectedComplaint)}
+                  </div>
+                </div>
               </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }

@@ -41,15 +41,6 @@ export const PettyCashFundsTab = () => {
   const updateFund = useUpdatePettyCashFund();
   const deactivateFund = useDeactivatePettyCashFund();
 
-  const { data: staff } = useQuery({
-    queryKey: ["staff-list"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("staff_registry").select("id, staff_name").eq("is_active", true).order("staff_name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const { data: branches } = useQuery({
     queryKey: ["school-branches"],
     queryFn: async () => {
@@ -64,7 +55,7 @@ export const PettyCashFundsTab = () => {
     fund_name: "",
     business_unit_code: "",
     opening_balance: 0,
-    custodian_id: "",
+    custodian_name: "",
     gl_account_id: "",
     branch_id: "",
     fund_limit: 0,
@@ -76,7 +67,7 @@ export const PettyCashFundsTab = () => {
 
   const resetForm = () => {
     setForm({
-      fund_name: "", business_unit_code: "", opening_balance: 0, custodian_id: "",
+      fund_name: "", business_unit_code: "", opening_balance: 0, custodian_name: "",
       gl_account_id: "", branch_id: "", fund_limit: 0, low_balance_threshold: 0,
       fund_type: "main", approval_required_above: 0, notes: "",
     });
@@ -94,7 +85,7 @@ export const PettyCashFundsTab = () => {
       fund_name: fund.fund_name,
       business_unit_code: fund.business_unit_code,
       opening_balance: fund.opening_balance,
-      custodian_id: fund.custodian_id || "",
+      custodian_name: fund.custodian_name || "",
       gl_account_id: fund.gl_account_id || "",
       branch_id: fund.branch_id || "",
       fund_limit: fund.fund_limit || 0,
@@ -191,9 +182,9 @@ export const PettyCashFundsTab = () => {
                   </TableCell>
                   <TableCell><Badge variant="secondary">{fund.business_unit_code}</Badge></TableCell>
                   <TableCell>
-                    {fund.custodian ? (
+                    {fund.custodian_name ? (
                       <span className="flex items-center gap-1 text-sm">
-                        <User className="h-3 w-3" /> {fund.custodian.staff_name}
+                        <User className="h-3 w-3" /> {fund.custodian_name}
                       </span>
                     ) : "-"}
                   </TableCell>
@@ -266,13 +257,7 @@ export const PettyCashFundsTab = () => {
             </div>
             <div>
               <Label>Custodian</Label>
-              <Select value={form.custodian_id || "none"} onValueChange={(v) => setForm({ ...form, custodian_id: v === "none" ? "" : v })}>
-                <SelectTrigger><SelectValue placeholder="Select custodian" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Custodian</SelectItem>
-                  {staff?.map((s) => (<SelectItem key={s.id} value={s.id}>{s.staff_name}</SelectItem>))}
-                </SelectContent>
-              </Select>
+              <Input value={form.custodian_name} onChange={(e) => setForm({ ...form, custodian_name: e.target.value })} placeholder="Enter custodian name" />
             </div>
             {!editingFund && (
               <div>

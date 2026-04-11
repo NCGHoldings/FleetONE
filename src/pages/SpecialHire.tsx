@@ -23,6 +23,7 @@ import { SubmissionsList } from "@/components/special-hire/SubmissionsList";
 import { SpecialHireQRGenerator } from "@/components/special-hire/SpecialHireQRGenerator";
 import { RateCoverageMaps } from "@/components/special-hire/RateCoverageMaps";
 import { ReferralAgentsManagement } from "@/components/special-hire/ReferralAgentsManagement";
+import SpecialHireReportsTab from "@/components/special-hire/reports/SpecialHireReportsTab";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -620,16 +621,7 @@ export default function SpecialHire() {
             </TabsContent>
 
             <TabsContent value="reports" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Reports & Analytics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Comprehensive reporting dashboard coming soon...
-                  </p>
-                </CardContent>
-              </Card>
+              <SpecialHireReportsTab />
             </TabsContent>
           </>
         )}

@@ -159,7 +159,8 @@ serve(async (req) => {
           payment_amount: paymentAmountValue,
           update_new: updateNewValue,
           fixed_monthly_amount: updateNewValue,
-          current_amount_due: updateNewValue
+          current_amount_due: updateNewValue,
+          payment_balance: normalizedData.payment_balance ? -Math.abs(Number(normalizedData.payment_balance)) : (paymentAmountValue ? -Math.abs(Number(paymentAmountValue)) : 0)
         };
 
         validatedRecords.push(record);

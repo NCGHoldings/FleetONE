@@ -199,11 +199,19 @@ export const InvoiceViewer = ({ isOpen, onClose, invoiceData }: InvoiceViewerPro
               <TabsTrigger value="signatures">Signatures</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="preview" className="flex-1 overflow-auto border rounded-lg bg-background mt-2">
+            <TabsContent value="preview" className="flex-1 overflow-auto border rounded-lg bg-muted/30 mt-2 p-4">
               <div 
-                className="text-foreground p-4"
+                className="text-foreground invoice-paginated-preview"
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}
                 dangerouslySetInnerHTML={{ __html: sanitizeHTML(generateInvoiceHTML(displayData)) }}
               />
+              <style>{`
+                .invoice-paginated-preview [data-pdf-page] {
+                  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+                  border-radius: 4px;
+                  margin: 0 auto;
+                }
+              `}</style>
             </TabsContent>
 
             <TabsContent value="signatures" className="flex-1 mt-2">

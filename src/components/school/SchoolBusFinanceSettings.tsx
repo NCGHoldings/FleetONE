@@ -60,6 +60,7 @@ export function SchoolBusFinanceSettings() {
     auto_post_payments: false,
     auto_post_expenses: false,
     invoice_prefix: "SBS-INV",
+    billing_percentage: 80,
     // Expense accounts
     expense_account_id: "",
     fuel_expense_account_id: "",
@@ -112,6 +113,7 @@ export function SchoolBusFinanceSettings() {
           auto_post_payments: defaultSetting.auto_post_payments || false,
           auto_post_expenses: defaultSetting.auto_post_expenses || false,
           invoice_prefix: defaultSetting.invoice_prefix || "SBS-INV",
+          billing_percentage: defaultSetting.billing_percentage ?? 80,
           // Expense accounts
           expense_account_id: defaultSetting.expense_account_id || "",
           fuel_expense_account_id: defaultSetting.fuel_expense_account_id || "",
@@ -390,6 +392,27 @@ export function SchoolBusFinanceSettings() {
               />
               <p className="text-xs text-muted-foreground">
                 Preview: {defaultSettings.invoice_prefix}-202601-00001
+              </p>
+            </div>
+
+            {/* Default Billing Percentage */}
+            <div className="space-y-2">
+              <Label>Default Billing Percentage</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={defaultSettings.billing_percentage}
+                  onChange={(e) =>
+                    setDefaultSettings({ ...defaultSettings, billing_percentage: Math.min(100, Math.max(1, Number(e.target.value) || 80)) })
+                  }
+                  className="w-24"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Default % of fixed monthly amount charged each billing cycle. Can be overridden per invoice batch. Example: 80% of LKR 10,000 = LKR 8,000
               </p>
             </div>
           </div>

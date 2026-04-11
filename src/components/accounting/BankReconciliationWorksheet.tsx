@@ -448,8 +448,8 @@ const BankReconciliationWorksheet = () => {
                 <th className="w-[100px]">Date</th>
                 <th>Trans. No.</th>
                 <th>Ref. 1</th>
-                <th className="num-col">Payment</th>
                 <th className="num-col">Deposit</th>
+                <th className="num-col">Payment</th>
                 <th className="num-col w-[120px]">Cleared Amt</th>
                 <th>Remarks</th>
               </tr>
@@ -492,8 +492,8 @@ const BankReconciliationWorksheet = () => {
                     <td>{t.transaction_date ? format(new Date(t.transaction_date), "dd/MM/yyyy") : "—"}</td>
                     <td className="font-mono text-xs">{t.reference || t.id.substring(0, 8)}</td>
                     <td>{t.cheque_number || "—"}</td>
-                    <td className="num-col">{payment > 0 ? `LKR ${fmt(payment)}` : "—"}</td>
                     <td className="num-col">{deposit > 0 ? `LKR ${fmt(deposit)}` : "—"}</td>
+                    <td className="num-col">{payment > 0 ? `LKR ${fmt(payment)}` : "—"}</td>
                     <td className="num-col">
                       {isCleared ? (
                         isAlreadyReconciled ? (

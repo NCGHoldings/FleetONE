@@ -10,6 +10,7 @@ export interface PettyCashFund {
   business_unit_code: string;
   company_id: string | null;
   custodian_id: string | null;
+  custodian_name: string | null;
   opening_balance: number;
   current_balance: number;
   gl_account_id: string | null;
@@ -88,7 +89,6 @@ export const usePettyCashFunds = (filters?: { branchId?: string; fundType?: stri
         .from("petty_cash_funds")
         .select(`
           *,
-          custodian:staff_registry(staff_name),
           branch:school_branches(branch_name)
         `)
         .eq("is_active", true)
@@ -210,6 +210,7 @@ export const useCreatePettyCashFund = () => {
           business_unit_code: data.business_unit_code || "SBO",
           company_id: selectedCompanyId,
           custodian_id: data.custodian_id,
+          custodian_name: data.custodian_name || null,
           opening_balance: data.opening_balance || 0,
           current_balance: data.opening_balance || 0,
           gl_account_id: data.gl_account_id,
@@ -247,6 +248,7 @@ export const useUpdatePettyCashFund = () => {
           fund_name: data.fund_name,
           business_unit_code: data.business_unit_code,
           custodian_id: data.custodian_id,
+          custodian_name: data.custodian_name || null,
           gl_account_id: data.gl_account_id,
           branch_id: data.branch_id as string | undefined,
           fund_limit: data.fund_limit,
@@ -607,10 +609,17 @@ export const useCreateIOU = () => {
 
   return useMutation({
     mutationFn: async (data: Partial<IOURecord>) => {
+      // Generate IOU number
+      const { data: numData } = await supabase.rpc("generate_entity_number", {
+        p_entity_type: "iou",
+        p_company_id: selectedCompanyId,
+      });
+      const iouNumber = numData || `IOU-${Date.now().toString().slice(-6)}`;
+
       const { data: result, error } = await supabase
         .from("iou_records")
         .insert([{
-          iou_number: "",
+          iou_number: iouNumber,
           business_unit_code: data.business_unit_code || "SBO",
           company_id: selectedCompanyId,
           staff_id: data.staff_id,
@@ -763,18 +772,32 @@ export const useUpdateIOU = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...data }: Partial<IOURecord> & { id: string }) => {
+      // Calculate balance if settling partially
+      const updateData: any = { ...data };
+      if (data.settled_amount !== undefined && data.status !== undefined) {
+        // Get original IOU for proper balance calc
+        const { data: origIou } = await supabase
+          .from("iou_records")
+          .select("amount")
+          .eq("id", id)
+          .single();
+        if (origIou) {
+          updateData.balance = Math.max(0, (origIou.amount || 0) - (data.settled_amount || 0));
+        }
+      }
+
       const { data: result, error } = await supabase
         .from("iou_records")
-        .update(data)
+        .update(updateData)
         .eq("id", id)
         .select()
         .single();
 
       if (error) throw error;
 
-      // Auto-create GL reversal when IOU is settled
-      // Settlement reverses the advance: DR Cash/Bank / CR Staff Advance
-      if (data.status === "settled" && selectedCompanyId) {
+      // Auto-create GL reversal when IOU is settled or partially settled
+      const shouldPostGL = (data.status === "settled" || data.status === "partially_settled") && selectedCompanyId;
+      if (shouldPostGL) {
         try {
           // Get the original IOU to know the amount
           const settledAmount = (result as any).amount || data.settled_amount || 0;
