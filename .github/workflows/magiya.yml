@@ -22,7 +22,7 @@ jobs:
         run: |
           npm install --force --legacy-peer-deps
           # Ensure puppeteer is definitely installed
-          npm install puppeteer@21.11.0 dotenv pdf-parse @supabase/supabase-js --no-save --force
+          PUPPETEER_SKIP_DOWNLOAD=true npm install puppeteer@21.11.0 dotenv pdf-parse @supabase/supabase-js --no-save --force
 
       - name: Run Scraper
         env:

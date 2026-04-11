@@ -20,7 +20,7 @@ async function runMagiyaScraper() {
   }
 
   const browser = await puppeteer.launch({
-    headless: "new",
+    headless: "new", executablePath: '/usr/bin/google-chrome',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     protocolTimeout: 60000 
   });
