@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer';
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
+import { createRequire } from 'module';
 
 dotenv.config();
 
@@ -199,8 +200,10 @@ async function runMagiyaScraper() {
         // Parse using pdfjs-dist (Mozilla's official PDF.js — works in Node 20 ESM perfectly)
         const pdfjsMod = await import('pdfjs-dist/legacy/build/pdf.mjs');
         const pdfjsLib = pdfjsMod.default || pdfjsMod;
-        // Point to the worker file using proper ESM URL (required by pdfjs-dist v3+)
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.mjs', import.meta.url).href;
+        // Use createRequire so Node resolves the path through node_modules (not relative to script)
+        const _require = createRequire(import.meta.url);
+        const workerPath = _require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
 
         const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfBuffer), verbosity: 0 });
         const pdfDoc = await loadingTask.promise;
