@@ -93,8 +93,8 @@ async function runMagiyaScraper() {
 
     const savedReports = [];
 
-    // Process each route
-    const routesToProcess = allRoutes.length > 0 ? allRoutes : ['Default'];
+    // Process each route (Limited to 1 for fast testing)
+    const routesToProcess = allRoutes.length > 0 ? allRoutes.slice(0, 1) : ['Default'];
 
     for (const routeName of routesToProcess) {
       console.log(`\n📍 Processing route: ${routeName}`);
