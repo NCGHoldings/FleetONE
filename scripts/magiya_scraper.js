@@ -102,7 +102,7 @@ async function runMagiyaScraper() {
 
     const savedReports = [];
 
-    // Process each route (Limited to 1 for fast testing)
+    // Process all routes — limit to 1 for testing the storage upload
     const routesToProcess = allRoutes.length > 0 ? allRoutes.slice(0, 1) : ['Default'];
 
     for (const routeName of routesToProcess) {
@@ -181,7 +181,60 @@ async function runMagiyaScraper() {
         continue;
       }
 
-      savedReports.push({ routeName, pdfUrl });
+      // Download PDF buffer using puppeteer (authenticated session)
+      console.log(`   📥 Downloading PDF...`);
+      let publicPdfUrl = pdfUrl; // fallback
+      try {
+        const pdfResp = await page.goto(pdfUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+        if (pdfResp) {
+          const pdfBuffer = await pdfResp.buffer();
+          
+          // Upload to Supabase Storage
+          const safeRoute = routeName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 60);
+          const fileName = `${dateStr}/${safeRoute}.pdf`;
+          
+          const { error: uploadErr } = await supabase.storage
+            .from('magiya-reports')
+            .upload(fileName, pdfBuffer, {
+              contentType: 'application/pdf',
+              upsert: true
+            });
+
+          if (uploadErr) {
+            console.log(`   ⚠️ Storage upload failed: ${uploadErr.message}. Using original URL.`);
+          } else {
+            const { data: urlData } = supabase.storage
+              .from('magiya-reports')
+              .getPublicUrl(fileName);
+            publicPdfUrl = urlData.publicUrl;
+            console.log(`   ☁️ Uploaded to Supabase Storage: ${publicPdfUrl}`);
+          }
+        }
+      } catch (dlErr) {
+        console.log(`   ⚠️ PDF download error: ${dlErr.message}. Using original URL.`);
+      }
+
+      // Go back to reports page for next route
+      await page.goto('https://magiyaoperator.zuselab.dev/reports', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+      await sleep(5000);
+
+      // Re-select report type
+      await page.evaluate(() => {
+        const buttons = document.querySelectorAll('button');
+        for (const btn of buttons) {
+          if (btn.innerText.trim().startsWith('Report Type')) { btn.click(); break; }
+        }
+      });
+      await sleep(2000);
+      await page.evaluate(() => {
+        const options = document.querySelectorAll('ui-option');
+        for (const opt of options) {
+          if (opt.innerText.trim() === 'Daily Bookings Report') { opt.click(); break; }
+        }
+      });
+      await sleep(4000);
+
+      savedReports.push({ routeName, pdfUrl: publicPdfUrl });
     }
 
     // ==== SAVE ALL REPORTS TO SUPABASE ====
