@@ -199,7 +199,8 @@ async function runMagiyaScraper() {
         // Parse using pdfjs-dist (Mozilla's official PDF.js — works in Node 20 ESM perfectly)
         const pdfjsMod = await import('pdfjs-dist/legacy/build/pdf.mjs');
         const pdfjsLib = pdfjsMod.default || pdfjsMod;
-        pdfjsLib.GlobalWorkerOptions.workerSrc = false; // disable worker for Node
+        // Point to the worker file using proper ESM URL (required by pdfjs-dist v3+)
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.mjs', import.meta.url).href;
 
         const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfBuffer), verbosity: 0 });
         const pdfDoc = await loadingTask.promise;
