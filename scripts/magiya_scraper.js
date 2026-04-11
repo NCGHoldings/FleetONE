@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { createRequire } from 'module';
 
 dotenv.config();
 
@@ -163,14 +162,30 @@ async function runMagiyaScraper() {
 
     if (!pdfBuffer) throw new Error('Could not get PDF buffer!');
 
-    console.log('📦 Directly requiring inner pdf-parse lib...');
-    const require = createRequire(import.meta.url);
-    const pdfParseFunc = require('pdf-parse/lib/pdf-parse.js');
-    if (typeof pdfParseFunc !== 'function') throw new Error('Inner pdfParse resolved to type: ' + typeof pdfParseFunc);
+    console.log('📦 Dynamically loading pdf.js-extract...');
+    const pdfExtractMod = await import('pdf.js-extract');
+    const PDFExtract = pdfExtractMod.PDFExtract || pdfExtractMod.default.PDFExtract;
+    const pdfExtract = new PDFExtract();
 
     console.log('🔍 Parsing PDF for exact passenger rows...');
-    const pdfData = await pdfParseFunc(pdfBuffer);
-    const text = pdfData.text;
+    const pdfData = await pdfExtract.extractBuffer(pdfBuffer, { disableCombineTextItems: false });
+    
+    // Sort PDF text items geometrically to recreate lines perfectly for regex parsing
+    const text = pdfData.pages.map(page => {
+        const sorted = page.content.sort((a,b) => {
+            if (Math.abs(a.y - b.y) < 3) return a.x - b.x;
+            return a.y - b.y;
+        });
+        let textStr = "";
+        let lastY = -1;
+        for (let c of sorted) {
+           if (lastY === -1 || Math.abs(c.y - lastY) > 3) textStr += '\n';
+           else textStr += ' ';
+           textStr += (c.str || '').trim();
+           lastY = c.y;
+        }
+        return textStr;
+    }).join('\n');
 
     // A robust regex to find booking rows based exactly on your screenshot format
     // It captures: Seat (e.g. 3-M, 4-M) | Phone (e.g. 0760309820) | Route parts | Booking Date
