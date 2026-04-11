@@ -1,6 +1,14 @@
 import puppeteer from 'puppeteer';
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const _pdfMod = require('pdf-parse');
+const pdfParse = typeof _pdfMod === 'function' ? _pdfMod : (_pdfMod.default || _pdfMod);
+
 dotenv.config();
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://your-supabase-project.supabase.co';
@@ -9,19 +17,11 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-// All routes to scrape
-const ROUTES = [
-  'Makumbura - Badulla 10:15 AM',
-  'Makumbura - Badulla 05:15 PM',
-  'Badulla - Makumbura 10:15 AM',
-  'Badulla - Makumbura 05:15 PM',
-  'Moratuwa - Karaingar 87 07:30 PM',
-  'Karaingar - Moratuwa 87 06:30 PM',
-  'Moratuwa - Karaingar 57 07:30 PM',
-];
-
 async function runMagiyaScraper() {
-  console.log('🚀 Magiya Scraper V7 — Multi-Route PDF URL Collector');
+  console.log('🚀 Magiya Scraper V8 — Native Data Extraction');
+
+  const downloadPath = path.resolve('./downloads');
+  if (!fs.existsSync(downloadPath)) fs.mkdirSync(downloadPath, { recursive: true });
 
   const browser = await puppeteer.launch({
     headless: "new",
@@ -35,7 +35,11 @@ async function runMagiyaScraper() {
     page.setDefaultTimeout(0);
     page.setDefaultNavigationTimeout(0);
 
-    // ===== LOGIN =====
+    const client = await page.target().createCDPSession();
+    await client.send('Page.setDownloadBehavior', {
+      behavior: 'allow', downloadPath: downloadPath,
+    });
+
     console.log('🚪 Logging in...');
     await page.goto('https://magiyaoperator.zuselab.dev/login', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
     await sleep(3000);
@@ -48,21 +52,15 @@ async function runMagiyaScraper() {
     console.log('✅ Logged in.');
     await sleep(5000);
 
-    // Use yesterday's date (most recent complete day)
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const dateStr = yesterday.toISOString().split('T')[0];
     console.log(`📅 Target date: ${dateStr}`);
 
-    const allResults = [];
-
-    // ===== LOOP THROUGH FIRST ROUTE FOR NOW =====
-    // Navigate to reports page
     console.log('📄 Going to Reports page...');
     await page.goto('https://magiyaoperator.zuselab.dev/reports', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
     await sleep(8000);
 
-    // Step 1: Select "Daily Bookings Report"
     console.log('📋 Selecting Daily Bookings Report...');
     await page.evaluate(() => {
       const buttons = document.querySelectorAll('button');
@@ -79,12 +77,11 @@ async function runMagiyaScraper() {
     });
     await sleep(5000);
 
-    // Step 2: Select first specific route
     console.log('🗺 Selecting route...');
     await page.evaluate(() => {
       const buttons = document.querySelectorAll('button');
       for (const btn of buttons) {
-        if (btn.innerText.trim() === 'All Trips' || btn.innerText.trim().startsWith('All Trips')) { btn.click(); break; }
+        if (btn.innerText.trim().startsWith('All Trips')) { btn.click(); break; }
       }
     });
     await sleep(2000);
@@ -98,7 +95,6 @@ async function runMagiyaScraper() {
           return text;
         }
       }
-      // Fallback: first non-All-Trips route
       for (const opt of options) {
         const text = opt.innerText.trim();
         if (text !== 'All Trips' && text !== '' && !text.includes('Bookings') && !text.includes('Cancellation')) {
@@ -111,7 +107,6 @@ async function runMagiyaScraper() {
     console.log(`   Route: ${selectedRoute}`);
     await sleep(5000);
 
-    // Step 3: Set date
     console.log('📅 Setting date...');
     await page.evaluate((d) => {
       const dateInputs = document.querySelectorAll('input[type="date"]');
@@ -124,7 +119,6 @@ async function runMagiyaScraper() {
     }, dateStr);
     await sleep(3000);
 
-    // Step 4: Click Generate
     console.log('⚙️ Clicking Generate Report...');
     await page.evaluate(() => {
       const buttons = document.querySelectorAll('button');
@@ -133,7 +127,6 @@ async function runMagiyaScraper() {
       }
     });
 
-    // Step 5: Wait for Download PDF
     console.log('⏳ Waiting for PDF...');
     let pdfReady = false;
     for (let i = 0; i < 48; i++) {
@@ -144,81 +137,155 @@ async function runMagiyaScraper() {
           return body.includes('Download PDF') || body.includes('Share PDF');
         });
         if (check) { pdfReady = true; console.log(`   ✅ PDF ready after ~${(i+1)*5}s`); break; }
-        console.log(`   ... poll ${i+1}/48`);
-      } catch(e) { console.log(`   ... hiccup ${i+1}`); }
+      } catch(e) {}
     }
 
-    if (!pdfReady) {
-      const text = await page.evaluate(() => document.body.innerText).catch(() => '');
-      console.log('Page text: ' + text.substring(0, 500));
-      throw new Error('Download button never appeared');
-    }
+    if (!pdfReady) throw new Error('Download button never appeared');
 
-    // Step 6: Get PDF URL
     console.log('📥 Extracting PDF URL...');
     const pdfUrl = await page.evaluate(() => {
       const links = document.querySelectorAll('a');
       for (const a of links) {
-        if (a.innerText.includes('Download PDF') || a.href?.includes('.pdf') || a.href?.includes('/storage/reports/')) {
-          return a.href;
-        }
+        if (a.href?.includes('.pdf') || a.href?.includes('/storage/reports/')) return a.href;
       }
       return null;
     });
     console.log(`   📎 PDF URL: ${pdfUrl}`);
 
-    // Step 7: Count passengers from page text
-    const reportInfo = await page.evaluate(() => {
-      const text = document.body.innerText;
-      // Try to find "Daily Report for <route> - <date>"
-      const match = text.match(/Daily Report for (.+?) - (.+?)[\n\r]/);
-      return {
-        title: match ? match[0].trim() : 'Unknown',
-        bodyLength: text.length
-      };
-    });
-    console.log(`   Report: ${reportInfo.title}`);
-
+    let pdfBuffer = null;
     if (pdfUrl) {
-      allResults.push({
-        route_name: selectedRoute || 'Unknown Route',
-        report_date: dateStr,
-        pdf_url: pdfUrl,
-        status: 'completed',
-        bus_number: 'NG 8241', // From PDF header
-        total_passengers: 0,
-        total_revenue_lkr: 0
-      });
+      console.log('   Fetching PDF data...');
+      const resp = await page.goto(pdfUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      if (resp) pdfBuffer = await resp.buffer();
     }
 
-    // ===== PUSH TO SUPABASE =====
-    if (allResults.length > 0) {
-      console.log(`\n💾 Saving ${allResults.length} report(s) to Supabase...`);
+    if (!pdfBuffer) {
+      console.log('   Checking local downloads...');
+      const files = fs.readdirSync(downloadPath).filter(f => f.endsWith('.pdf'));
+      if (files.length > 0) pdfBuffer = fs.readFileSync(path.join(downloadPath, files[0]));
+    }
+
+    if (!pdfBuffer) throw new Error('Could not get PDF buffer!');
+
+    console.log('🔍 Parsing PDF for exact passenger rows...');
+    const pdfData = await pdfParse(pdfBuffer);
+    const text = pdfData.text;
+
+    // A robust regex to find booking rows based exactly on your screenshot format
+    // It captures: Seat (e.g. 3-M, 4-M) | Phone (e.g. 0760309820) | Route parts | Booking Date
+    // Note: PDF text parsing often strips horizontal whitespace into spaces or newlines.
+    
+    const passengerRows = [];
+    
+    // We split by standard phone numbers lengths (9-10 digits) which are unique anchors
+    const lines = text.split('\n').filter(l => l.trim().length > 0);
+    
+    let totalPassengersCount = 0;
+    
+    // Fallback heuristic line scanning
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // If line contains a phone number e.g. 0760309820
+      const phoneMatch = line.match(/(07\d{8})/);
       
-      for (const result of allResults) {
-        const { error } = await supabase
-          .from('magiya_daily_reports')
-          .upsert(result, { onConflict: 'bus_number,report_date' });
-        
-        if (error) {
-          console.error(`   ❌ DB Error: ${error.message}`);
-          // If pdf_url column doesn't exist, try without it
-          if (error.message.includes('pdf_url')) {
-            console.log('   Retrying without pdf_url...');
-            const { pdf_url, ...withoutUrl } = result;
-            const { error: err2 } = await supabase
-              .from('magiya_daily_reports')
-              .upsert(withoutUrl, { onConflict: 'bus_number,report_date' });
-            if (err2) console.error(`   ❌ Retry failed: ${err2.message}`);
-            else console.log('   ✅ Saved (without PDF URL)');
-          }
-        } else {
-          console.log(`   ✅ Saved: ${result.route_name} → ${result.pdf_url}`);
-        }
+      if (phoneMatch) {
+         // The seat number is usually right before it
+         const phoneStr = phoneMatch[1];
+         let seatStr = line.substring(0, line.indexOf(phoneStr)).trim();
+         
+         // Sometimes seat is on previous line
+         if (seatStr.length === 0 && i > 0) {
+            seatStr = lines[i-1].trim();
+         }
+         
+         // Looking ahead for Location (e.g. Makumbura - 10:15 AM)
+         const remaining = line.substring(line.indexOf(phoneStr) + phoneStr.length).trim();
+         let locationStr = remaining;
+         let bookingType = "Unknown";
+         
+         // In PDF parsing, "NCG Express", "Online Booking" often end up on the next 1-3 lines
+         for (let j = 1; j <= 4; j++) {
+             if (i + j < lines.length) {
+                 const nextText = lines[i+j].trim();
+                 if (nextText.includes("NCG Express") || nextText.includes("Online Booking") || nextText.includes("Agent Booking")) {
+                     bookingType = nextText;
+                 } else if (nextText.includes("Badulla") || nextText.includes("Makumbura")) {
+                     locationStr = locationStr + " " + nextText;
+                 }
+             }
+         }
+         
+         passengerRows.push({
+             seat_number: seatStr,
+             contact: phoneStr,
+             location_route: locationStr || "Unknown",
+             booking_type: bookingType,
+             remarks: ""
+         });
+         
+         // Count individual seats (e.g., "3-M, 4-M" -> 2 seats)
+         if (seatStr) {
+             const seats = seatStr.split(',');
+             totalPassengersCount += seats.length;
+         } else {
+             totalPassengersCount += 1;
+         }
       }
     }
 
-    console.log('\n🎉 Scraper V7 complete!');
+    console.log(`   Found ${passengerRows.length} distinct booking records (approx ${totalPassengersCount} passengers).`);
+
+    // ===== PUSH TO SUPABASE =====
+    // Push the parent report
+    const reportData = {
+      route_name: selectedRoute || 'Unknown Route',
+      report_date: dateStr,
+      status: 'completed',
+      bus_number: 'NG 8241', 
+      total_passengers: totalPassengersCount,
+      total_revenue_lkr: totalPassengersCount > 0 ? 0 : 0 // Needs separate logic if calculating
+    };
+
+    console.log(`\n💾 Saving Report Data to magiya_daily_reports...`);
+    const { data: parentRecord, error: parentErr } = await supabase
+      .from('magiya_daily_reports')
+      .upsert(reportData, { onConflict: 'bus_number,report_date' })
+      .select('id')
+      .single();
+
+    if (parentErr) {
+      console.error(`   ❌ DB Error (Report): ${parentErr.message}`);
+      throw parentErr;
+    }
+
+    const reportId = parentRecord.id;
+
+    if (passengerRows.length > 0) {
+       console.log(`   Saving ${passengerRows.length} passenger records to magiya_passenger_bookings...`);
+       
+       // Assign the parent FK
+       const rowsToInsert = passengerRows.map(row => ({
+           ...row,
+           report_id: reportId
+       }));
+       
+       // Clear old rows for this report to prevent duplicates if rerunning
+       await supabase.from('magiya_passenger_bookings').delete().eq('report_id', reportId);
+       
+       const { error: childrenErr } = await supabase
+          .from('magiya_passenger_bookings')
+          .insert(rowsToInsert);
+          
+       if (childrenErr) {
+          console.error(`   ❌ DB Error (Passengers): ${childrenErr.message}`);
+       } else {
+          console.log(`   ✅ Successfully saved all detailed data rows to Supabase.`);
+       }
+    } else {
+       console.log(`   ⚠️ No passenger rows could be parsed. Is the report empty?`);
+    }
+
+    console.log('\n🎉 Scraper V8 complete!');
 
   } catch (err) {
     console.error('❌ Scraper Failed:', err.message);
