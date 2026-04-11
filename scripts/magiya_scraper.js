@@ -89,6 +89,15 @@ async function runMagiyaScraper() {
       return routes;
     });
 
+    // Close the dropdown so the next loop sequence works properly
+    await page.evaluate(() => {
+      const buttons = document.querySelectorAll('button');
+      for (const btn of buttons) {
+        if (btn.innerText.trim().startsWith('All Trips')) { btn.click(); break; }
+      }
+    });
+    await sleep(1000);
+
     console.log(`   Found ${allRoutes.length} routes: ${allRoutes.join(', ')}`);
 
     const savedReports = [];
