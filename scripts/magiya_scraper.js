@@ -15,40 +15,16 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-// Click any visible element containing exact text
-async function clickByText(page, text, tag = '*') {
-  const xpath = `//${tag}[contains(text(), "${text}")]`;
-  const elements = await page.$x(xpath);
-  if (elements.length > 0) {
-    await elements[0].click();
-    console.log(`   ✅ Clicked: "${text}"`);
-    return true;
-  }
-  console.log(`   ⚠️ Not found: "${text}"`);
-  return false;
-}
-
-// Check if text exists anywhere on page
-async function hasText(page, text) {
-  const xpath = `//*[contains(text(), "${text}")]`;
-  const elements = await page.$x(xpath);
-  return elements.length > 0;
-}
-
 async function runMagiyaScraper() {
-  console.log('🚀 Magiya Scraper V5 — Custom Dropdown Handler');
-  
+  console.log('🚀 Magiya Scraper V6 — UI-OPTION targeting');
+
   const downloadPath = path.resolve('./downloads');
   if (!fs.existsSync(downloadPath)) fs.mkdirSync(downloadPath, { recursive: true });
 
   const browser = await puppeteer.launch({
     headless: "new",
     executablePath: '/usr/bin/google-chrome',
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-    ],
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     protocolTimeout: 0
   });
 
@@ -59,15 +35,13 @@ async function runMagiyaScraper() {
 
     const client = await page.target().createCDPSession();
     await client.send('Page.setDownloadBehavior', {
-      behavior: 'allow',
-      downloadPath: downloadPath,
+      behavior: 'allow', downloadPath: downloadPath,
     });
 
     // ===== LOGIN =====
     console.log('🚪 Logging in...');
     await page.goto('https://magiyaoperator.zuselab.dev/login', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
     await sleep(3000);
-    
     await page.type('input[type="email"]', 'ncgexpress@magiya.lk', { delay: 30 });
     await page.type('input[type="password"]', '0770455981', { delay: 30 });
     await Promise.all([
@@ -82,214 +56,216 @@ async function runMagiyaScraper() {
     await page.goto('https://magiyaoperator.zuselab.dev/reports', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
     await sleep(8000);
 
-    // ===== DEBUG: Dump page structure =====
-    console.log('🔍 Analyzing page structure...');
-    const pageDebug = await page.evaluate(() => {
-      const info = {};
-      info.selects = document.querySelectorAll('select').length;
-      info.inputs = Array.from(document.querySelectorAll('input')).map(i => ({
-        type: i.type, placeholder: i.placeholder, value: i.value, name: i.name
-      }));
-      info.buttons = Array.from(document.querySelectorAll('button')).map(b => b.textContent.trim().substring(0, 50));
-      // Look for dropdown-like elements
-      info.divWithClick = document.querySelectorAll('[wire\\:click]').length;
-      info.wireModel = document.querySelectorAll('[wire\\:model]').length;
-      info.xData = document.querySelectorAll('[x-data]').length;
-      // All visible text items that look like dropdown options
-      info.allLinks = Array.from(document.querySelectorAll('a')).map(a => a.textContent.trim().substring(0, 60));
-      // Check for Livewire select components
-      info.wireSelect = document.querySelectorAll('[wire\\:model\\.live]').length;
-      // Any element with "Report Type" text
-      const allEls = document.querySelectorAll('*');
-      const reportTypeEls = [];
-      for (const el of allEls) {
-        const t = el.textContent?.trim();
-        if (t && (t === 'Report Type...' || t === 'Daily Bookings Report' || t === 'All Trips')) {
-          reportTypeEls.push({ tag: el.tagName, text: t.substring(0, 40), classes: el.className?.substring?.(0, 60) || '' });
+    // ===== STEP 1: Click "Report Type.." button to open dropdown =====
+    console.log('📋 Step 1: Opening Report Type dropdown...');
+    const step1 = await page.evaluate(() => {
+      const buttons = document.querySelectorAll('button');
+      for (const btn of buttons) {
+        if (btn.innerText.trim().startsWith('Report Type')) {
+          btn.click();
+          return 'clicked_report_type_button';
         }
       }
-      info.reportTypeElements = reportTypeEls;
-      return info;
-    }).catch(e => ({ error: e.message }));
-    
-    console.log('📊 Page structure:');
-    console.log(JSON.stringify(pageDebug, null, 2));
+      return 'not_found';
+    });
+    console.log('   ' + step1);
+    await sleep(2000); // Let dropdown animate open
 
-    // ===== STEP 1: Click the "Report Type" dropdown to open it =====
-    console.log('\n📋 Step 1: Opening Report Type dropdown...');
-    // Try clicking text "Report Type..." or any placeholder
-    let clicked = await clickByText(page, 'Report Type');
-    if (!clicked) {
-      // Try clicking by placeholder attribute
-      const placeholderEl = await page.$('[placeholder*="Report"]');
-      if (placeholderEl) {
-        await placeholderEl.click();
-        clicked = true;
-        console.log('   ✅ Clicked via placeholder');
+    // ===== STEP 2: Click "Daily Bookings Report" ui-option =====
+    console.log('📋 Step 2: Selecting "Daily Bookings Report"...');
+    const step2 = await page.evaluate(() => {
+      // Target the custom <ui-option> elements
+      const options = document.querySelectorAll('ui-option');
+      for (const opt of options) {
+        if (opt.innerText.trim() === 'Daily Bookings Report') {
+          opt.click();
+          return 'clicked_daily_bookings';
+        }
       }
-    }
-    await sleep(3000);
+      // Fallback: try any element
+      const all = document.querySelectorAll('*');
+      for (const el of all) {
+        if (el.children.length === 0 && el.innerText?.trim() === 'Daily Bookings Report') {
+          el.click();
+          return 'clicked_daily_bookings_fallback';
+        }
+      }
+      return 'not_found';
+    });
+    console.log('   ' + step2);
+    await sleep(5000); // Wait for Livewire to load trip options
 
-    // Now click "Daily Bookings Report" from the opened dropdown
-    console.log('   Selecting "Daily Bookings Report"...');
-    await clickByText(page, 'Daily Bookings Report');
-    await sleep(5000); // Wait for Livewire to update second dropdown
+    // ===== STEP 3: Click "All Trips" button to open trip dropdown =====
+    console.log('🗺 Step 3: Opening Trip dropdown...');
+    const step3 = await page.evaluate(() => {
+      const buttons = document.querySelectorAll('button');
+      for (const btn of buttons) {
+        const text = btn.innerText.trim();
+        if (text === 'All Trips' || text.startsWith('All Trips')) {
+          btn.click();
+          return 'clicked_all_trips_button';
+        }
+      }
+      return 'not_found';
+    });
+    console.log('   ' + step3);
+    await sleep(2000);
 
-    // ===== STEP 2: Click the Trip/Route dropdown =====
-    console.log('\n🗺 Step 2: Opening Trip dropdown...');
-    // After selecting report type, the second dropdown should now be active
-    // Try clicking "All Trips" text to open the dropdown
-    clicked = await clickByText(page, 'All Trips');
-    await sleep(3000);
-
-    // Select the first specific route
-    console.log('   Selecting first route...');
-    clicked = await clickByText(page, 'Makumbura - Badulla 10:15 AM');
-    if (!clicked) {
-      // Try partial match
-      clicked = await clickByText(page, 'Makumbura');
-    }
+    // ===== STEP 4: Select first specific route (NOT "All Trips") from ui-option list =====
+    console.log('🗺 Step 4: Selecting first specific route...');
+    const step4 = await page.evaluate(() => {
+      const options = document.querySelectorAll('ui-option');
+      const routeOptions = [];
+      for (const opt of options) {
+        const text = opt.innerText.trim();
+        routeOptions.push(text);
+        // Skip "All Trips" and pick first real route
+        if (text !== 'All Trips' && text.includes('Makumbura')) {
+          opt.click();
+          return 'clicked_route: ' + text;
+        }
+      }
+      // If no Makumbura, pick the first non-All-Trips option
+      for (const opt of options) {
+        const text = opt.innerText.trim();
+        if (text !== 'All Trips' && text !== '' && text !== 'Daily Bookings Report' && 
+            text !== 'Online Bookings Report' && text !== 'Agent Bookings Report' && 
+            text !== 'Booking Cancellations Report') {
+          opt.click();
+          return 'clicked_route: ' + text;
+        }
+      }
+      return 'not_found. Available options: ' + routeOptions.join(' | ');
+    });
+    console.log('   ' + step4);
     await sleep(5000);
 
-    // ===== STEP 3: Set date =====
-    console.log('\n📅 Step 3: Setting date to 2026-04-10...');
-    const dateInputs = await page.$$('input[type="date"]');
-    console.log(`   Found ${dateInputs.length} date inputs`);
-    
-    if (dateInputs.length >= 1) {
-      // Clear and set via JS to avoid Livewire interference
+    // ===== STEP 5: Set date to 2026-04-10 =====
+    console.log('📅 Step 5: Setting date...');
+    const step5 = await page.evaluate(() => {
+      const dateInputs = document.querySelectorAll('input[type="date"]');
+      const results = [];
       for (const di of dateInputs) {
-        await di.evaluate(el => {
-          el.value = '2026-04-10';
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-        });
+        // Use native setter to bypass Livewire interception
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        nativeInputValueSetter.call(di, '2026-04-10');
+        di.dispatchEvent(new Event('input', { bubbles: true }));
+        di.dispatchEvent(new Event('change', { bubbles: true }));
+        results.push(di.placeholder + ' → 2026-04-10');
       }
-      console.log('   ✅ Date set to 2026-04-10');
-    } else {
-      // Try any input that might be a date field
-      const allInputs = await page.$$('input');
-      for (const inp of allInputs) {
-        const placeholder = await inp.evaluate(el => el.placeholder || '');
-        if (placeholder.includes('yyyy') || placeholder.includes('date')) {
-          await inp.click({ clickCount: 3 });
-          await inp.type('2026-04-10', { delay: 30 });
-          console.log('   ✅ Date typed into text input');
-          break;
+      return results.join(', ') || 'no date inputs';
+    });
+    console.log('   ' + step5);
+    await sleep(3000);
+
+    // ===== STEP 6: Click "Generate Report" =====
+    console.log('⚙️ Step 6: Clicking Generate Report...');
+    const step6 = await page.evaluate(() => {
+      const buttons = document.querySelectorAll('button');
+      for (const btn of buttons) {
+        if (btn.innerText.trim().includes('Generate Report')) {
+          btn.click();
+          return 'clicked_generate';
         }
       }
-    }
-    await sleep(3000);
+      return 'not_found';
+    });
+    console.log('   ' + step6);
 
-    // ===== STEP 4: Click Generate Report =====
-    console.log('\n⚙️ Step 4: Clicking Generate Report...');
-    await clickByText(page, 'Generate Report', 'button');
-    if (!clicked) {
-      await clickByText(page, 'Generate', 'button');
-    }
-    await sleep(3000);
-
-    // ===== STEP 5: Wait for Download button =====
-    console.log('\n⏳ Step 5: Waiting for Download button (polling up to 4 min)...');
+    // ===== STEP 7: Wait for Download/Share PDF =====
+    console.log('⏳ Step 7: Waiting for PDF generation (polling up to 4 min)...');
     let downloadReady = false;
     for (let i = 0; i < 48; i++) {
       await sleep(5000);
       try {
-        const found = await hasText(page, 'Download');
-        if (found) {
+        const check = await page.evaluate(() => {
+          const body = document.body.innerText;
+          if (body.includes('Download PDF')) return 'download_pdf';
+          if (body.includes('Share PDF')) return 'share_pdf';
+          if (body.includes('PDF Ready')) return 'pdf_ready';
+          return null;
+        });
+        if (check) {
           downloadReady = true;
-          console.log(`   ✅ Download appeared after ~${(i + 1) * 5}s`);
-          break;
-        }
-        // Also check for Share PDF which appeared in user's screenshot
-        const foundShare = await hasText(page, 'Share PDF');
-        if (foundShare) {
-          downloadReady = true;
-          console.log(`   ✅ Share PDF appeared after ~${(i + 1) * 5}s`);
+          console.log(`   ✅ ${check} found after ~${(i + 1) * 5}s`);
           break;
         }
         console.log(`   ... poll ${i + 1}/48`);
       } catch (e) {
-        console.log(`   ... poll ${i + 1} error, continuing`);
+        console.log(`   ... poll ${i + 1} hiccup`);
       }
     }
 
     if (!downloadReady) {
-      // Take debug screenshot and dump HTML
-      console.log('📸 Taking debug screenshot...');
-      await page.screenshot({ path: path.join(downloadPath, 'debug_step5.png'), fullPage: true });
       const bodyText = await page.evaluate(() => document.body.innerText).catch(() => 'N/A');
-      console.log('📄 Page text at failure:');
-      console.log(bodyText.substring(0, 2000));
-      throw new Error('Download/Share PDF button never appeared.');
+      console.log('📄 Page text:\n' + bodyText.substring(0, 1500));
+      throw new Error('PDF never appeared.');
     }
 
-    // ===== STEP 6: Download the PDF =====
-    console.log('\n📥 Step 6: Getting PDF...');
-    
-    // First check if Download PDF is an <a> link with href
-    let pdfUrl = null;
-    const downloadLinks = await page.$x("//*[contains(text(), 'Download')]");
-    for (const el of downloadLinks) {
-      const href = await el.evaluate(e => e.href || e.closest('a')?.href || null).catch(() => null);
-      if (href && href.includes('http')) {
-        pdfUrl = href;
-        console.log(`   📎 PDF URL found: ${pdfUrl}`);
-        break;
+    // ===== STEP 8: Get PDF URL and download =====
+    console.log('📥 Step 8: Downloading PDF...');
+    const pdfUrl = await page.evaluate(() => {
+      const links = document.querySelectorAll('a');
+      for (const a of links) {
+        if (a.innerText.includes('Download PDF') || a.href?.includes('.pdf') || a.href?.includes('download')) {
+          return a.href;
+        }
       }
-    }
+      // Also check buttons that might trigger download
+      const buttons = document.querySelectorAll('button');
+      for (const btn of buttons) {
+        if (btn.innerText.includes('Download PDF')) {
+          btn.click();
+          return '__clicked_button__';
+        }
+      }
+      return null;
+    });
+    console.log('   PDF source: ' + pdfUrl);
 
-    // Click the download button
-    await clickByText(page, 'Download PDF');
-    await sleep(3000);
-
-    // Get PDF data
     let pdfBuffer = null;
 
-    // Method A: Direct URL fetch
-    if (pdfUrl) {
-      console.log('   Fetching PDF via direct URL...');
+    // If we got a URL, navigate to it
+    if (pdfUrl && pdfUrl !== '__clicked_button__') {
+      console.log('   Fetching PDF via URL...');
       try {
-        const cookies = await page.cookies();
-        const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-        
         const resp = await page.goto(pdfUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
         if (resp) {
           pdfBuffer = await resp.buffer();
           console.log(`   ✅ PDF fetched: ${pdfBuffer.length} bytes`);
         }
       } catch (e) {
-        console.log(`   Direct fetch failed: ${e.message}`);
+        console.log('   URL fetch failed, checking downloads...');
       }
     }
 
-    // Method B: Check downloads folder
+    // Check downloads folder
     if (!pdfBuffer) {
-      console.log('   Waiting for file download...');
-      for (let i = 0; i < 30; i++) {
+      console.log('   Checking downloads folder...');
+      for (let i = 0; i < 20; i++) {
         await sleep(2000);
         const files = fs.readdirSync(downloadPath).filter(f => f.endsWith('.pdf'));
         if (files.length > 0) {
           const fp = path.join(downloadPath, files[0]);
           if (fs.statSync(fp).size > 100) {
             pdfBuffer = fs.readFileSync(fp);
-            console.log(`   ✅ PDF from download: ${pdfBuffer.length} bytes`);
+            console.log(`   ✅ PDF from file: ${pdfBuffer.length} bytes`);
             break;
           }
         }
       }
     }
 
-    if (!pdfBuffer) throw new Error('Could not obtain PDF!');
+    if (!pdfBuffer) throw new Error('Could not get PDF data!');
 
-    // ===== STEP 7: Parse PDF =====
-    console.log('\n🔍 Parsing PDF...');
+    // ===== STEP 9: Parse PDF =====
+    console.log('🔍 Parsing PDF text...');
     const pdfData = await pdf(pdfBuffer);
     console.log('\n================= RAW PDF TEXT =================');
     console.log(pdfData.text);
     console.log('================= END PDF TEXT =================\n');
-    console.log(`Pages: ${pdfData.numpages}, Characters: ${pdfData.text.length}`);
-    console.log('✅ Phase 1 complete.');
+    console.log(`Pages: ${pdfData.numpages}, Chars: ${pdfData.text.length}`);
+    console.log('✅ V6 Phase 1 complete.');
 
   } catch (err) {
     console.error('❌ Scraper Failed:', err.message);
