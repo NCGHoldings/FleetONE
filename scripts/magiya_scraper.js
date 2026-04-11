@@ -176,33 +176,52 @@ async function runMagiyaScraper() {
       });
       console.log(`   📎 PDF URL: ${pdfUrl}`);
 
-      // ✅ SCRAPE HTML TABLE DIRECTLY — no PDF parsing needed!
-      console.log(`   📊 Extracting passenger data from rendered HTML table...`);
+      // ✅ SCRAPE DATA — TreeWalker approach works on Angular Material and any framework
+      console.log(`   📊 Extracting passenger data from live DOM...`);
       const passengers = await page.evaluate(() => {
+        const phoneRegex = /^07\d{8}$/;
         const rows = [];
-        // Try all table rows on the page
-        const tableRows = document.querySelectorAll('table tr, tbody tr');
-        for (const tr of tableRows) {
-          const cells = tr.querySelectorAll('td');
-          if (cells.length >= 2) {
-            const texts = Array.from(cells).map(c => c.innerText.trim());
-            // Look for rows with a phone number (07xxxxxxxx pattern)
-            const phoneCell = texts.find(t => /^07\d{8}$/.test(t));
-            if (phoneCell) {
-              rows.push({
-                seat_number: texts[0] || '',
-                contact: phoneCell,
-                location_route: texts.find(t => t.includes('–') || t.includes('-') || t.includes(':')) || '',
-                booking_type: texts.find(t => t.includes('NCG') || t.includes('Online') || t.includes('Agent')) || 'Unknown',
-                remarks: texts[texts.length - 1] || ''
-              });
+        const seen = new Set();
+
+        // Walk every text node looking for phone numbers
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+        let node;
+        while ((node = walker.nextNode())) {
+          const text = node.textContent.trim();
+          if (!phoneRegex.test(text) || seen.has(text)) continue;
+          seen.add(text);
+
+          // Walk up to find a row-like container (tr, mat-row, [role=row], etc.)
+          let el = node.parentElement;
+          let rowEl = null;
+          for (let i = 0; i < 6; i++) {
+            if (!el) break;
+            const tag = el.tagName.toLowerCase();
+            const role = el.getAttribute('role') || '';
+            if (tag === 'tr' || tag === 'mat-row' || role === 'row' || el.className.includes('row')) {
+              rowEl = el; break;
             }
+            el = el.parentElement;
           }
+
+          if (!rowEl) continue;
+
+          // Get all cell-like children
+          const cells = rowEl.querySelectorAll('td, mat-cell, [role="cell"]');
+          const texts = Array.from(cells).map(c => c.textContent.trim()).filter(Boolean);
+
+          rows.push({
+            seat_number: texts[0] || '',
+            contact: text,
+            location_route: texts[2] || texts[1] || '',
+            booking_type: texts[3] || 'Unknown',
+            remarks: texts[4] || ''
+          });
         }
         return rows;
       });
 
-      console.log(`   👥 Found ${passengers.length} passenger rows from HTML table`);
+      console.log(`   👥 Found ${passengers.length} passenger rows`);
 
       // Count individual seats (e.g. "3-M, 4-M" = 2)
       let totalPassengers = 0;
