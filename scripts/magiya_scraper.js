@@ -3,11 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
-const pdfParseExport = require('pdf-parse');
-const pdfParse = typeof pdfParseExport === 'function' ? pdfParseExport : pdfParseExport.default;
 
 dotenv.config();
 
@@ -167,8 +162,13 @@ async function runMagiyaScraper() {
 
     if (!pdfBuffer) throw new Error('Could not get PDF buffer!');
 
+    console.log('📦 Dynamically loading pdf-parse...');
+    const pdfMod = await import('pdf-parse');
+    const pdfParseFunc = typeof pdfMod === 'function' ? pdfMod : (pdfMod.default || pdfMod.pdfParse);
+    if (typeof pdfParseFunc !== 'function') throw new Error('pdfParse resolved to type: ' + typeof pdfParseFunc);
+
     console.log('🔍 Parsing PDF for exact passenger rows...');
-    const pdfData = await pdfParse(pdfBuffer);
+    const pdfData = await pdfParseFunc(pdfBuffer);
     const text = pdfData.text;
 
     // A robust regex to find booking rows based exactly on your screenshot format
