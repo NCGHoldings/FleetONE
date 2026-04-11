@@ -7,61 +7,33 @@ import { format } from 'date-fns';
 import { Bus, Users, DollarSign, Activity, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import React, { useState } from 'react';
 
-// Passenger Expansion Component
-const PassengerSubTable = ({ reportId }: { reportId: string }) => {
-  const { data: passengers, isLoading } = useQuery({
-    queryKey: ['magiya-passengers', reportId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('magiya_passenger_bookings')
-        .select('*')
-        .eq('report_id', reportId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  if (isLoading) {
-    return <div className="p-4 text-center text-sm text-slate-400">Loading passengers...</div>;
-  }
-
-  if (!passengers || passengers.length === 0) {
-    return <div className="p-4 text-center text-sm text-slate-400">No detailed passenger data found for this trip.</div>;
+// Passenger Expansion Component - V9 URL Mode
+const PassengerSubTable = ({ report }: { report: any }) => {
+  if (!report.pdf_url) {
+    return (
+      <div className="p-8 text-center bg-[#131823] border-x border-b border-[#2a3441] rounded-b-md">
+        <p className="text-sm text-slate-400">No PDF document was captured for this route.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="bg-[#131823] p-4 rounded-b-md border-x border-b border-[#2a3441]">
-      <h4 className="text-sm font-semibold text-slate-300 mb-2">Detailed Passenger List</h4>
-      <Table>
-        <TableHeader className="bg-[#1e2535]">
-          <TableRow className="border-[#2a3441]">
-            <TableHead className="text-slate-400 text-xs py-2">Seat #</TableHead>
-            <TableHead className="text-slate-400 text-xs py-2">Contact</TableHead>
-            <TableHead className="text-slate-400 text-xs py-2">Location & Time</TableHead>
-            <TableHead className="text-slate-400 text-xs py-2">Booking Type</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {passengers.map((p) => (
-            <TableRow key={p.id} className="border-[#2a3441] hover:bg-[#2a3441]/30">
-              <TableCell className="text-xs text-white py-2">{p.seat_number}</TableCell>
-              <TableCell className="text-xs text-slate-300 py-2">{p.contact}</TableCell>
-              <TableCell className="text-xs text-slate-300 py-2">{p.location_route}</TableCell>
-              <TableCell className="text-xs py-2">
-                <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] ${
-                  p.booking_type?.includes('Online') ? 'bg-[#0ea5e9]/10 text-[#0ea5e9]' :
-                  p.booking_type?.includes('NCG') ? 'bg-[#10b981]/10 text-[#10b981]'     :
-                  'bg-slate-700/50 text-slate-300'
-                }`}>
-                  {p.booking_type || 'Unknown'}
-                </span>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="bg-[#131823] p-4 rounded-b-md border-x border-b border-[#2a3441] flex flex-col items-center">
+      <div className="w-full flex justify-between items-center mb-4">
+        <h4 className="text-sm font-semibold text-slate-300">Official Passenger Manifest</h4>
+        <Button size="sm" variant="outline" className="text-xs bg-[#2a3441] border-[#384152] hover:bg-[#384152] text-white" onClick={() => window.open(report.pdf_url, '_blank')}>
+          Open Document
+        </Button>
+      </div>
+      <div className="w-full h-[600px] border border-[#2a3441] rounded overflow-hidden bg-white/5">
+        <iframe 
+          title={`Magiya Report ${report.id}`}
+          src={`${report.pdf_url}#toolbar=1&navpanes=0&scrollbar=1`}
+          className="w-full h-full"
+          frameBorder="0"
+          style={{ width: "100%", height: "100%", minHeight: "600px" }}
+        />
+      </div>
     </div>
   );
 };
@@ -215,7 +187,7 @@ const MagiyaReports = () => {
                       {expandedRow === report.id && (
                         <TableRow className="border-[#2a3441] hover:bg-transparent bg-transparent">
                           <TableCell colSpan={7} className="p-0">
-                            <PassengerSubTable reportId={report.id} />
+                            <PassengerSubTable report={report} />
                           </TableCell>
                         </TableRow>
                       )}
