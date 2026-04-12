@@ -1,48 +1,97 @@
 
-Fix the special hire invoice system at the source so long multi-bus invoices paginate correctly in both preview and PDF, while keeping route details and hire type accurate everywhere.
+What is happening
 
-1. Refactor the shared generator
-- Update `src/lib/invoice-generator.ts` to build a normalized list of invoice rows first.
-- Generate multiple `data-pdf-page` sections dynamically instead of forcing all bus rows into page 1.
-- Put header/customer info on page 1, continue bus rows onto page 2/3/etc automatically, and keep totals/payment info on the last item page.
-- Keep the optional signature page separate after the item pages.
+- Your screenshot shows this Lovable project is currently connected to:
+  `globallyceum25-dot/ncg-fleetone-6b02f072`
+- In Lovable, if you disconnect GitHub and connect again, it does not reattach the old repo.
+- It creates a new GitHub repo from the current Lovable project.
+- So this is not random; it is the current Lovable GitHub behavior.
 
-2. Make multi-bus rows compact and readable
-- For trips where all buses share the same route, show the full route once and avoid repeating the same long route block for every row.
-- Use a compact continuation style for extra bus rows (same route / shared trip details, individual vehicle + driver/conductor + amount per row).
-- This reduces vertical space and helps more buses fit cleanly across pages.
+Important limitation
 
-3. Fix preview to match the real PDF
-- Update the invoice preview entry points to display the new paginated HTML clearly:
-  - `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
-  - `src/components/special-hire/InvoiceViewer.tsx`
-  - `src/components/special-hire/BalanceInvoicePreview.tsx` if needed for consistency
-- Show separate page blocks with spacing/shadow in preview so management can actually see page 1, page 2, etc.
+- You cannot directly reconnect this existing Lovable project to your old existing GitHub repo.
+- Lovable currently supports exporting to a new repo, not attaching an already-created Lovable project back to an old repo.
 
-4. Cross-check all invoice paths
-- Verify every special hire invoice path uses the same shared generator and passes the same fields:
-  - draft invoice
-  - final/balance invoice
-  - payment reminder invoice
-  - regenerated invoice
-  - finance-approved/stored invoice
-- Re-check `hireType` and `intermediateStops` mapping in the construction paths so no path falls back to `External` unless the source data is truly missing.
+Best way to fix it
 
-5. Technical details
-- Main file: `src/lib/invoice-generator.ts`
-- Likely supporting files:
-  - `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
-  - `src/components/special-hire/InvoiceViewer.tsx`
-  - `src/components/special-hire/BalanceInvoicePreview.tsx`
-  - audit only: `src/components/special-hire/ConfirmedTripsTable.tsx`, `src/hooks/useDocumentRegeneration.ts`, `src/hooks/useDocumentManagement.ts`, `src/hooks/useFinanceApproval.ts`
-- Preferred implementation: dynamic page chunking in HTML generation, not just PDF slicing, so both on-screen preview and downloaded PDF behave the same.
+1. Keep the currently connected Lovable repo as the active sync repo:
+   `globallyceum25-dot/ncg-fleetone-6b02f072`
 
-6. QA after implementation
-- Test a quotation with many buses and a long route with multiple intermediate stops.
-- Confirm:
-  - preview shows page 2/page 3
-  - downloaded PDF also continues to page 2/page 3
-  - no rows are cut off
-  - route/intermediate stops appear correctly
-  - hire type shows Internal / Outside / Lyceum correctly
-  - payment reminder invoice matches the final invoice behavior
+2. Merge your original repo into this connected repo, so you keep:
+   - old commit history
+   - old files
+   - latest Lovable changes
+
+3. After that, optionally set up a mirror workflow so your original repo also stays updated.
+
+Exact terminal guide
+
+Use the normal Mac Terminal app.
+
+Run this first:
+
+```text
+git clone https://github.com/globallyceum25-dot/ncg-fleetone-6b02f072.git
+cd ncg-fleetone-6b02f072
+```
+
+Then add your old repo:
+
+```text
+git remote add old https://github.com/YOUR-ORG/YOUR-OLD-REPO.git
+git fetch old
+```
+
+Then merge the old repo history into the connected Lovable repo:
+
+```text
+git merge old/main --allow-unrelated-histories
+```
+
+If your old repo uses a different branch name, replace `main` with that branch, for example `master`.
+
+If there are merge conflicts
+
+- keep the newest correct files
+- then run:
+
+```text
+git add .
+git commit -m "Merge old repo into Lovable-connected repo"
+git push origin main
+```
+
+If you get “Repository not found”
+
+- the old repo URL is wrong, or
+- the old repo is private and your GitHub login is not authenticated
+
+Then do this:
+
+```text
+gh auth login
+gh repo clone YOUR-ORG/YOUR-OLD-REPO
+```
+
+or open the old repo in GitHub browser first and copy the exact HTTPS clone URL.
+
+If your goal is “connect my old repo directly inside Lovable”
+
+- that direct switch is not available right now for this project
+- the safe workaround is:
+  - keep the current Lovable-created repo connected
+  - merge your old repo into it
+  - optionally mirror back to the old repo
+
+If you want the repo under the correct organization/account
+
+- create a new Lovable project
+- connect GitHub
+- choose the correct GitHub org during setup
+- Lovable will still create a new repo there, not attach the old one
+
+Best next step from here
+
+- Find the exact old repo URL
+- Find whether its default branch is `main` or `master`
+- Then I can give you the exact commands with your real repo names and no guessing

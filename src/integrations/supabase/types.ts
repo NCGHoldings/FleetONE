@@ -12512,9 +12512,13 @@ export type Database = {
           bus_number: string | null
           extracted_at: string | null
           id: string
+          ncg_revenue_lkr: number | null
+          online_revenue_lkr: number | null
+          pdf_url: string | null
           report_date: string
           route_name: string | null
           status: string | null
+          total_amount_to_collect: number | null
           total_passengers: number | null
           total_revenue_lkr: number | null
         }
@@ -12522,9 +12526,13 @@ export type Database = {
           bus_number?: string | null
           extracted_at?: string | null
           id?: string
+          ncg_revenue_lkr?: number | null
+          online_revenue_lkr?: number | null
+          pdf_url?: string | null
           report_date: string
           route_name?: string | null
           status?: string | null
+          total_amount_to_collect?: number | null
           total_passengers?: number | null
           total_revenue_lkr?: number | null
         }
@@ -12532,13 +12540,58 @@ export type Database = {
           bus_number?: string | null
           extracted_at?: string | null
           id?: string
+          ncg_revenue_lkr?: number | null
+          online_revenue_lkr?: number | null
+          pdf_url?: string | null
           report_date?: string
           route_name?: string | null
           status?: string | null
+          total_amount_to_collect?: number | null
           total_passengers?: number | null
           total_revenue_lkr?: number | null
         }
         Relationships: []
+      }
+      magiya_passenger_bookings: {
+        Row: {
+          booking_type: string | null
+          contact: string | null
+          created_at: string | null
+          id: string
+          location_route: string | null
+          remarks: string | null
+          report_id: string | null
+          seat_number: string | null
+        }
+        Insert: {
+          booking_type?: string | null
+          contact?: string | null
+          created_at?: string | null
+          id?: string
+          location_route?: string | null
+          remarks?: string | null
+          report_id?: string | null
+          seat_number?: string | null
+        }
+        Update: {
+          booking_type?: string | null
+          contact?: string | null
+          created_at?: string | null
+          id?: string
+          location_route?: string | null
+          remarks?: string | null
+          report_id?: string | null
+          seat_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "magiya_passenger_bookings_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "magiya_daily_reports"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       maintenance_bays: {
         Row: {
