@@ -264,11 +264,15 @@ async function runMagiyaScraper() {
           else if (hasAgent)  bookingType = 'Agent';
 
           // Location: time-based tokens (departure + destination)
+          // Exclude report metadata text like 'Report Generated on...'
           const locTokens = tokens.filter(t =>
             t !== phone &&
             !t.includes('NCG') && !/online/i.test(t) && !/agent/i.test(t) &&
+            !/generated/i.test(t) && !t.toLowerCase().startsWith('report') &&
+            !/available/i.test(t) && !/booking/i.test(t) && !/seats/i.test(t) &&
             !/^\d{4}-\d{2}-\d{2}/.test(t) &&
-            (t.match(/\d{1,2}:\d{2}/) || t.includes('–') || /AM|PM/.test(t))
+            t.length < 50 &&  // exclude long descriptive strings
+            (t.match(/\d{1,2}:\d{2}/) || t.includes('\u2013') || t.includes('\u2014') || /AM|PM/.test(t))
           );
 
           // Remarks / booking date
@@ -286,28 +290,42 @@ async function runMagiyaScraper() {
 
         console.log(`   👥 Extracted ${passengers.length} passengers (${totalPassengers} seats) from PDF`);
 
-        // ── Extract financial summary table from bottom of PDF ───────────────
-        const parseLKR = (str) => parseFloat((str || '0').replace(/[^0-9.]/g, '')) || 0;
-        const strs = allItems.map(i => i.str);
+        // ── Extract financial summary table — coordinate-matched lookup ─────
+        // For each label, find all items at the SAME Y position to its right.
+        // This is more reliable than strs[i+1] after global sort.
+        const parseLKR = (str) => {
+          // Extract last LKR amount from a string like "2,180 X 2 seats = LKR 19,000.00"
+          const lkrMatch = str.match(/LKR\s*([\d,]+\.?\d*)/i);
+          if (lkrMatch) return parseFloat(lkrMatch[1].replace(/,/g, '')) || 0;
+          return parseFloat(str.replace(/[^0-9.]/g, '')) || 0;
+        };
 
-        // (Variables declared outside try for outer scope access)
-        for (let i = 0; i < strs.length; i++) {
-          const s = strs[i];
-          const next = strs[i + 1] || '';
-          if (/Total Booked Seats/i.test(s))         summarySeats   = parseInt(next) || totalPassengers;
-          if (/^Revenue$/i.test(s))                   summaryRevenue = parseLKR(next);
-          if (/Total Amount to Collect/i.test(s))     summaryTotal   = parseLKR(next);
-          if (/NCG Express Bookings/i.test(s) && /LKR/.test(strs.slice(i, i+4).join(' '))) {
-            const lkrStr = strs.slice(i+1, i+5).find(t => /LKR/.test(t));
-            summaryNCG = parseLKR(lkrStr);
-          }
-          if (/^Total Online$/i.test(s))              summaryOnline  = parseLKR(next);
-        }
+        const findRowValue = (labelRegex) => {
+          const labelItem = allItems.find(item => labelRegex.test(item.str));
+          if (!labelItem) return '';
+          // Get all items on the same row (within 5pt Y tolerance) to the right of the label
+          return allItems
+            .filter(item => Math.abs(item.y - labelItem.y) < 5 && item.x > labelItem.x)
+            .map(i => i.str)
+            .join(' ');
+        };
 
-        // Use summary seats if available (more accurate than block count)
+        const seatsRow   = findRowValue(/Total Booked Seats/i);
+        const revenueRow = findRowValue(/^Revenue$/i);
+        const totalRow   = findRowValue(/Total Amount to Collect/i);
+        const ncgRow     = findRowValue(/NCG Express Bookings/i);
+        const onlineRow  = findRowValue(/^Total Online$/i);
+
+        summarySeats   = parseInt(seatsRow) || totalPassengers;
+        summaryRevenue = parseLKR(revenueRow);
+        summaryTotal   = parseLKR(totalRow);
+        summaryNCG     = parseLKR(ncgRow);
+        summaryOnline  = parseLKR(onlineRow);
+
+        // Use PDF summary seat count (official, from Magiya report)
         if (summarySeats > 0) totalPassengers = summarySeats;
 
-        console.log(`   💰 Revenue: LKR ${summaryRevenue.toLocaleString()} | Total to collect: LKR ${summaryTotal.toLocaleString()} | Seats: ${summarySeats}`);
+        console.log(`   💰 Revenue: LKR ${summaryRevenue.toLocaleString()} | Total: LKR ${summaryTotal.toLocaleString()} | Seats: ${summarySeats}`);
 
         // ── Upload PDF to Supabase Storage for permanent URL ─────────────────
         const safeRoute = routeName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 60);
