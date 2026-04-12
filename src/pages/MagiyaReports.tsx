@@ -40,13 +40,11 @@ const PassengerDetail = ({ report }: { report: any }) => {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Count badge */}
           {passengers && passengers.length > 0 && (
             <span className="text-xs bg-[#0ea5e9]/10 text-[#0ea5e9] ring-1 ring-[#0ea5e9]/20 px-2.5 py-1 rounded-full font-medium">
               {passengers.length} passengers
             </span>
           )}
-          {/* PDF link - opens in new tab */}
           {report.pdf_url && (
             <Button
               size="sm"
@@ -60,6 +58,64 @@ const PassengerDetail = ({ report }: { report: any }) => {
           )}
         </div>
       </div>
+
+      {/* Booking Revenue Breakdown */}
+      {(report.ncg_booking_detail || report.online_booking_detail || report.ncg_revenue_lkr > 0 || report.online_revenue_lkr > 0) && (
+        <div className="px-5 py-4 border-b border-[#2a3441] bg-[#0a0f18]">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Booking Revenue Breakdown</p>
+          <div className="grid grid-cols-3 gap-3">
+            {/* NCG Express */}
+            <div className="rounded-lg border border-[#10b981]/20 bg-[#10b981]/5 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-[#10b981]/15 text-[#10b981]">NCG Express</span>
+                <span className="text-sm font-bold text-white">
+                  LKR {Number(report.ncg_revenue_lkr || 0).toLocaleString()}
+                </span>
+              </div>
+              {report.ncg_booking_detail && (
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  {report.ncg_booking_detail.replace(/=\s*LKR[\d,. ]+/i, '').trim()}
+                </p>
+              )}
+              <p className="text-xs text-[#10b981]/70 mt-1 font-medium">
+                {passengers ? passengers.filter((p: any) => (p.booking_type || '').includes('NCG')).length : 0} booking rows
+              </p>
+            </div>
+
+            {/* Online Booking */}
+            <div className="rounded-lg border border-[#0ea5e9]/20 bg-[#0ea5e9]/5 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-[#0ea5e9]/15 text-[#0ea5e9]">Online Booking</span>
+                <span className="text-sm font-bold text-white">
+                  LKR {Number(report.online_revenue_lkr || 0).toLocaleString()}
+                </span>
+              </div>
+              {report.online_booking_detail && (
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  {report.online_booking_detail.replace(/=\s*LKR[\d,. ]+/i, '').trim()}
+                </p>
+              )}
+              <p className="text-xs text-[#0ea5e9]/70 mt-1 font-medium">
+                {passengers ? passengers.filter((p: any) => (p.booking_type || '').includes('Online')).length : 0} booking rows
+              </p>
+            </div>
+
+            {/* Total */}
+            <div className="rounded-lg border border-[#f59e0b]/20 bg-[#f59e0b]/5 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-[#f59e0b]/15 text-[#f59e0b]">Total to Collect</span>
+              </div>
+              <p className="text-xl font-bold text-white mt-1">
+                LKR {Number(report.total_amount_to_collect || 0).toLocaleString()}
+              </p>
+              <p className="text-xs text-[#f59e0b]/70 mt-1 font-medium">
+                {report.total_passengers || 0} seats booked
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Passenger table */}
       {isLoading ? (
@@ -145,6 +201,7 @@ const MagiyaReports = () => {
   });
 
   const totalRevenue = reports?.reduce((sum, r) => sum + Number((r as any).total_revenue_lkr || 0), 0) || 0;
+  const totalAmountToCollect = reports?.reduce((sum, r) => sum + Number((r as any).total_amount_to_collect || 0), 0) || 0;
   const totalPassengers = reports?.reduce((sum, r) => sum + Number((r as any).total_passengers || 0), 0) || 0;
   const activeBuses = new Set(reports?.map(r => (r as any).bus_number)).size || 0;
   const totalReports = reports?.length || 0;
@@ -161,7 +218,7 @@ const MagiyaReports = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card className="bg-gradient-to-br from-[#1e2535] to-[#1a2030] border-[#2a3441]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-medium text-slate-400 uppercase tracking-wide">Generated Reports</CardTitle>
@@ -177,22 +234,35 @@ const MagiyaReports = () => {
 
         <Card className="bg-gradient-to-br from-[#1e2535] to-[#1a2030] border-[#2a3441]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-medium text-slate-400 uppercase tracking-wide">Calculated Revenue</CardTitle>
+            <CardTitle className="text-xs font-medium text-slate-400 uppercase tracking-wide">NCG Revenue</CardTitle>
             <div className="h-8 w-8 rounded-lg bg-[#0ea5e9]/10 flex items-center justify-center">
               <DollarSign className="h-4 w-4 text-[#0ea5e9]" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-white">LKR {totalRevenue.toLocaleString()}</div>
-            <p className="text-xs text-slate-500 mt-0.5">Total revenue value</p>
+            <p className="text-xs text-slate-500 mt-0.5">NCG Express earnings</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-[#1e2535] to-[#1a2030] border-[#2a3441]">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium text-slate-400 uppercase tracking-wide">Total to Collect</CardTitle>
+            <div className="h-8 w-8 rounded-lg bg-[#f59e0b]/10 flex items-center justify-center">
+              <DollarSign className="h-4 w-4 text-[#f59e0b]" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-white">LKR {totalAmountToCollect.toLocaleString()}</div>
+            <p className="text-xs text-slate-500 mt-0.5">Full passenger amount</p>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-[#1e2535] to-[#1a2030] border-[#2a3441]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-medium text-slate-400 uppercase tracking-wide">Passengers Extracted</CardTitle>
-            <div className="h-8 w-8 rounded-lg bg-[#f59e0b]/10 flex items-center justify-center">
-              <Users className="h-4 w-4 text-[#f59e0b]" />
+            <div className="h-8 w-8 rounded-lg bg-[#10b981]/10 flex items-center justify-center">
+              <Users className="h-4 w-4 text-[#10b981]" />
             </div>
           </CardHeader>
           <CardContent>
@@ -204,8 +274,8 @@ const MagiyaReports = () => {
         <Card className="bg-gradient-to-br from-[#1e2535] to-[#1a2030] border-[#2a3441]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-medium text-slate-400 uppercase tracking-wide">Active Buses</CardTitle>
-            <div className="h-8 w-8 rounded-lg bg-[#10b981]/10 flex items-center justify-center">
-              <Bus className="h-4 w-4 text-[#10b981]" />
+            <div className="h-8 w-8 rounded-lg bg-[#8b5cf6]/10 flex items-center justify-center">
+              <Bus className="h-4 w-4 text-[#8b5cf6]" />
             </div>
           </CardHeader>
           <CardContent>
@@ -239,7 +309,8 @@ const MagiyaReports = () => {
                 <TableHead className="text-slate-400 text-xs uppercase tracking-wide font-semibold">Bus</TableHead>
                 <TableHead className="text-slate-400 text-xs uppercase tracking-wide font-semibold">Route</TableHead>
                 <TableHead className="text-slate-400 text-xs uppercase tracking-wide font-semibold text-right">Passengers</TableHead>
-                <TableHead className="text-slate-400 text-xs uppercase tracking-wide font-semibold text-right">Revenue (LKR)</TableHead>
+                <TableHead className="text-slate-400 text-xs uppercase tracking-wide font-semibold text-right">NCG Revenue</TableHead>
+                <TableHead className="text-slate-400 text-xs uppercase tracking-wide font-semibold text-right">Total to Collect</TableHead>
                 <TableHead className="text-slate-400 text-xs uppercase tracking-wide font-semibold text-center">Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -298,6 +369,11 @@ const MagiyaReports = () => {
                       <TableCell className="text-right text-[#0ea5e9] font-medium">
                         {Number(report.total_revenue_lkr || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </TableCell>
+                      <TableCell className="text-right text-[#f59e0b] font-medium">
+                        {Number(report.total_amount_to_collect || 0) > 0
+                          ? Number(report.total_amount_to_collect).toLocaleString(undefined, { minimumFractionDigits: 2 })
+                          : '—'}
+                      </TableCell>
                       <TableCell className="text-center">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                           report.status === 'completed'
@@ -313,7 +389,7 @@ const MagiyaReports = () => {
                     {/* Expanded passenger detail panel */}
                     {expandedRow === report.id && (
                       <TableRow className="border-[#2a3441] hover:bg-transparent">
-                        <TableCell colSpan={7} className="p-0">
+                        <TableCell colSpan={8} className="p-0">
                           <PassengerDetail report={report} />
                         </TableCell>
                       </TableRow>

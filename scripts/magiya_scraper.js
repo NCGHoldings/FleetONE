@@ -183,6 +183,7 @@ async function runMagiyaScraper() {
       let totalPassengers = 0;
       // Summary financials — declared outside try so accessible even on error
       let summaryRevenue = 0, summaryTotal = 0, summaryNCG = 0, summaryOnline = 0, summarySeats = 0;
+      let summaryNCGDetail = '', summaryOnlineDetail = '', summaryAgentDetail = '';
 
       try {
         // Use page.evaluate + fetch to download PDF bytes WITH the browser's auth cookies
@@ -323,8 +324,11 @@ async function runMagiyaScraper() {
         summarySeats   = parseInt(seatsRow) || totalPassengers;
         summaryRevenue = parseLKR(revenueRow);
         summaryTotal   = parseLKR(totalRow);
-        summaryNCG     = parseLKR(ncgRow);
-        summaryOnline  = parseLKR(onlineRow);
+        summaryNCGDetail    = ncgRow.trim();
+        summaryOnlineDetail = findRowValue(/^Online Bookings/i).trim();
+        summaryAgentDetail  = findRowValue(/^Agent Bookings/i).trim();
+        summaryNCG     = parseLKR(summaryNCGDetail);
+        summaryOnline  = parseLKR(summaryOnlineDetail);
 
         // Use PDF summary seat count (official, from Magiya report)
         if (summarySeats > 0) totalPassengers = summarySeats;
@@ -350,7 +354,7 @@ async function runMagiyaScraper() {
         console.log(`   ⚠️ PDF extraction error: ${pdfErr.message}`);
       }
 
-      savedReports.push({ routeName, pdfUrl: pdfUrl || '', passengers, totalPassengers, summaryRevenue, summaryTotal, summaryNCG, summaryOnline });
+      savedReports.push({ routeName, pdfUrl: pdfUrl || '', passengers, totalPassengers, summaryRevenue, summaryTotal, summaryNCG, summaryOnline, summaryNCGDetail, summaryOnlineDetail, summaryAgentDetail });
 
       // Go back to reports page for next route
       await page.goto('https://magiyaoperator.zuselab.dev/reports', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
@@ -387,7 +391,10 @@ async function runMagiyaScraper() {
         total_revenue_lkr: rep.summaryRevenue || 0,
         total_amount_to_collect: rep.summaryTotal || 0,
         ncg_revenue_lkr: rep.summaryNCG || 0,
-        online_revenue_lkr: rep.summaryOnline || 0
+        online_revenue_lkr: rep.summaryOnline || 0,
+        ncg_booking_detail: rep.summaryNCGDetail || null,
+        online_booking_detail: rep.summaryOnlineDetail || null,
+        agent_booking_detail: rep.summaryAgentDetail || null
       };
 
       const { data: saved, error: parentErr } = await supabase
