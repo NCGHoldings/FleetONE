@@ -221,58 +221,113 @@ async function runMagiyaScraper() {
           }
         }
 
-        // Group items into rows by Y coordinate (within ±4 pt tolerance)
-        const rowMap = {};
-        for (const item of allItems) {
-          const rowY = Math.round(item.y / 4) * 4; // snap to 4pt grid
-          if (!rowMap[rowY]) rowMap[rowY] = [];
-          rowMap[rowY].push(item);
-        }
+        // Sort ALL items top-to-bottom, then left-to-right within same Y
+        allItems.sort((a, b) => {
+          const yDiff = b.y - a.y;
+          if (Math.abs(yDiff) > 4) return yDiff;
+          return a.x - b.x;
+        });
 
-        // Sort each row's items by X position (left to right)
-        const sortedRows = Object.values(rowMap)
-          .map(items => items.sort((a, b) => a.x - b.x))
-          .sort((a, b) => b[0].y - a[0].y); // top to bottom (Y decreases downward in PDF)
-
-        // Magiya PDF fixed columns (from left, px approx):
-        // Col0: Seat Number (~50-110)
-        // Col1: Contact phone (~130-200)  
-        // Col2: Location (~200-330)
-        // Col3: Booking Type + Date (~330-500)
-        // Col4: Remarks (~500+)
+        // ── Seat-anchored block parsing ──────────────────────────────────────
+        // Magiya PDF: each passenger row begins with a seat pattern like:
+        //   "3-M"  |  "3-M, 4-M"  |  "26-F, 25-F, 27-M"
+        const SEAT_RE  = /^\d{1,2}[-–][MF](\s*,\s*\d{1,2}[-–][MF])*$/i;
         const PHONE_RE = /^07\d{8}$/;
 
-        for (const rowItems of sortedRows) {
-          const rowTexts = rowItems.map(i => i.str);
-          // A data row must contain a phone number
-          const phone = rowTexts.find(t => PHONE_RE.test(t));
-          if (!phone) continue;
+        const blocks = [];
+        let cur = null;
+        for (const item of allItems) {
+          if (SEAT_RE.test(item.str)) {
+            if (cur) blocks.push(cur);
+            cur = { seat: item.str, tokens: [] };
+          } else if (cur) {
+            cur.tokens.push(item.str);
+          }
+        }
+        if (cur) blocks.push(cur);
 
-          const seat = rowTexts[0] || '';
-          const phoneIdx = rowTexts.indexOf(phone);
-          const location = rowTexts.slice(phoneIdx + 1).find(t => t.includes('–') || t.includes('-') || t.match(/\d{1,2}:\d{2}/)) || '';
-          const bookingType = rowTexts.find(t => t.includes('NCG') || t.includes('Online') || t.includes('Agent')) || 'Unknown';
-          const dateStr2 = rowTexts.find(t => /\d{4}-\d{2}-\d{2}/.test(t)) || '';
+        console.log(`   🧩 Found ${blocks.length} seat blocks in PDF`);
+
+        for (const block of blocks) {
+          const tokens = block.tokens.filter(Boolean);
+          const phone = tokens.find(t => PHONE_RE.test(t)) || '';
+
+          // Booking type: look for known keywords
+          let bookingType = 'Unknown';
+          const hasNCG    = tokens.some(t => t.includes('NCG'));
+          const hasOnline = tokens.some(t => /online/i.test(t));
+          const hasAgent  = tokens.some(t => /agent/i.test(t));
+          if (hasNCG)    bookingType = 'NCG Express';
+          else if (hasOnline) bookingType = 'Online Booking';
+          else if (hasAgent)  bookingType = 'Agent';
+
+          // Location: time-based tokens (departure + destination)
+          const locTokens = tokens.filter(t =>
+            t !== phone &&
+            !t.includes('NCG') && !/online/i.test(t) && !/agent/i.test(t) &&
+            !/^\d{4}-\d{2}-\d{2}/.test(t) &&
+            (t.match(/\d{1,2}:\d{2}/) || t.includes('–') || /AM|PM/.test(t))
+          );
+
+          // Remarks / booking date
+          const dateToken = tokens.find(t => /\d{4}-\d{2}-\d{2}/.test(t)) || '';
 
           passengers.push({
-            seat_number: seat,
+            seat_number: block.seat,
             contact: phone,
-            location_route: location,
-            booking_type: `${bookingType}${dateStr2 ? ' ' + dateStr2 : ''}`,
-            remarks: ''
+            location_route: locTokens.slice(0, 2).join(' → '),
+            booking_type: bookingType,
+            remarks: dateToken
           });
+          totalPassengers += block.seat.split(',').filter(Boolean).length;
         }
 
-        console.log(`   👥 Extracted ${passengers.length} passenger rows from PDF`);
-        for (const p of passengers) {
-          totalPassengers += p.seat_number ? p.seat_number.split(',').filter(Boolean).length : 1;
+        console.log(`   👥 Extracted ${passengers.length} passengers (${totalPassengers} seats) from PDF`);
+
+        // ── Extract financial summary table from bottom of PDF ───────────────
+        // Labels like "Total Booked Seats", "Revenue", "Total Amount to Collect"
+        const parseLKR = (str) => parseFloat((str || '0').replace(/[^0-9.]/g, '')) || 0;
+        const strs = allItems.map(i => i.str);
+
+        let summarySeats = 0, summaryRevenue = 0, summaryTotal = 0, summaryOnline = 0, summaryNCG = 0;
+        for (let i = 0; i < strs.length; i++) {
+          const s = strs[i];
+          const next = strs[i + 1] || '';
+          if (/Total Booked Seats/i.test(s))         summarySeats   = parseInt(next) || totalPassengers;
+          if (/^Revenue$/i.test(s))                   summaryRevenue = parseLKR(next);
+          if (/Total Amount to Collect/i.test(s))     summaryTotal   = parseLKR(next);
+          if (/NCG Express Bookings/i.test(s) && /LKR/.test(strs.slice(i, i+4).join(' '))) {
+            const lkrStr = strs.slice(i+1, i+5).find(t => /LKR/.test(t));
+            summaryNCG = parseLKR(lkrStr);
+          }
+          if (/^Total Online$/i.test(s))              summaryOnline  = parseLKR(next);
+        }
+
+        // Use summary seats if available (more accurate than block count)
+        if (summarySeats > 0) totalPassengers = summarySeats;
+
+        console.log(`   💰 Revenue: LKR ${summaryRevenue.toLocaleString()} | Total to collect: LKR ${summaryTotal.toLocaleString()} | Seats: ${summarySeats}`);
+
+        // ── Upload PDF to Supabase Storage for permanent URL ─────────────────
+        const safeRoute = routeName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 60);
+        const storageFile = `${dateStr}/${safeRoute}.pdf`;
+        const { error: uploadErr } = await supabase.storage
+          .from('magiya-reports')
+          .upload(storageFile, pdfBuffer, { contentType: 'application/pdf', upsert: true });
+
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from('magiya-reports').getPublicUrl(storageFile);
+          pdfUrl = urlData.publicUrl;
+          console.log(`   ☁️ Stored PDF: ${pdfUrl}`);
+        } else {
+          console.log(`   ⚠️ Storage upload: ${uploadErr.message} (using original URL)`);
         }
 
       } catch (pdfErr) {
         console.log(`   ⚠️ PDF extraction error: ${pdfErr.message}`);
       }
 
-      savedReports.push({ routeName, pdfUrl: pdfUrl || '', passengers, totalPassengers });
+      savedReports.push({ routeName, pdfUrl: pdfUrl || '', passengers, totalPassengers, summaryRevenue, summaryTotal, summaryNCG, summaryOnline });
 
       // Go back to reports page for next route
       await page.goto('https://magiyaoperator.zuselab.dev/reports', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
@@ -306,7 +361,10 @@ async function runMagiyaScraper() {
         bus_number: 'NG 8241',
         pdf_url: rep.pdfUrl || null,
         total_passengers: rep.totalPassengers || 0,
-        total_revenue_lkr: 0
+        total_revenue_lkr: rep.summaryRevenue || 0,
+        total_amount_to_collect: rep.summaryTotal || 0,
+        ncg_revenue_lkr: rep.summaryNCG || 0,
+        online_revenue_lkr: rep.summaryOnline || 0
       };
 
       const { data: saved, error: parentErr } = await supabase
