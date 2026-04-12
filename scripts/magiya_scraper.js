@@ -278,10 +278,14 @@ async function runMagiyaScraper() {
           // Remarks / booking date
           const dateToken = tokens.find(t => /\d{4}-\d{2}-\d{2}/.test(t)) || '';
 
+          // Deduplicate location tokens (remove repeated city strings)
+          const locSeen = new Set();
+          const uniqueLoc = locTokens.filter(t => { if (locSeen.has(t)) return false; locSeen.add(t); return true; });
+
           passengers.push({
             seat_number: block.seat,
             contact: phone,
-            location_route: locTokens.slice(0, 2).join(' → '),
+            location_route: uniqueLoc.slice(0, 2).join(' → '),
             booking_type: bookingType,
             remarks: dateToken
           });
