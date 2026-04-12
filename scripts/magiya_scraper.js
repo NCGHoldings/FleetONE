@@ -181,6 +181,8 @@ async function runMagiyaScraper() {
       console.log(`   📥 Downloading PDF via authenticated session...`);
       let passengers = [];
       let totalPassengers = 0;
+      // Summary financials — declared outside try so accessible even on error
+      let summaryRevenue = 0, summaryTotal = 0, summaryNCG = 0, summaryOnline = 0, summarySeats = 0;
 
       try {
         // Use page.evaluate + fetch to download PDF bytes WITH the browser's auth cookies
@@ -285,11 +287,10 @@ async function runMagiyaScraper() {
         console.log(`   👥 Extracted ${passengers.length} passengers (${totalPassengers} seats) from PDF`);
 
         // ── Extract financial summary table from bottom of PDF ───────────────
-        // Labels like "Total Booked Seats", "Revenue", "Total Amount to Collect"
         const parseLKR = (str) => parseFloat((str || '0').replace(/[^0-9.]/g, '')) || 0;
         const strs = allItems.map(i => i.str);
 
-        let summarySeats = 0, summaryRevenue = 0, summaryTotal = 0, summaryOnline = 0, summaryNCG = 0;
+        // (Variables declared outside try for outer scope access)
         for (let i = 0; i < strs.length; i++) {
           const s = strs[i];
           const next = strs[i + 1] || '';
