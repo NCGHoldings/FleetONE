@@ -38,3 +38,4 @@ test-results/
 e2e/.auth/
 whatsapp-server/.wwebjs_auth
 whatsapp-server/.wwebjs_auth
+public/bus_details/
