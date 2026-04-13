@@ -36,3 +36,5 @@ whatsapp-server/.wwebjs_auth/
 playwright-report/
 test-results/
 e2e/.auth/
+whatsapp-server/.wwebjs_auth
+whatsapp-server/.wwebjs_auth
