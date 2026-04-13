@@ -12,6 +12,8 @@ jobs:
           fetch-depth: 0
 
       - name: Push to Lovable Server
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          git remote add lovable https://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@github.com/NCGHoldings/ncg-fleetone-aff76110.git
+          git remote add lovable https://x-access-token:${GH_PAT}@github.com/NCGHoldings/ncg-fleetone-aff76110.git
           git push -f lovable main
