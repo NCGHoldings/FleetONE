@@ -13,5 +13,5 @@ jobs:
 
       - name: Push to Lovable Server
         run: |
-          git remote add lovable https://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@github.com/globallyceum25-dot/ncg-fleetone-6b02f072.git
+          git remote add lovable https://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@github.com/NCGHoldings/ncg-fleetone-aff76110.git
           git push -f lovable main
