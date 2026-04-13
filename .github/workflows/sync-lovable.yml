@@ -15,5 +15,10 @@ jobs:
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          git remote add lovable https://x-access-token:${GH_PAT}@github.com/NCGHoldings/ncg-fleetone-aff76110.git
+          # Strip any accidental hidden newlines or spaces from the copied token
+          CLEAN_TOKEN=$(echo "$GH_PAT" | tr -d '\n' | tr -d '\r' | tr -d ' ')
+          
+          # Add remote securely using quotes to prevent command injection
+          git remote add lovable "https://${CLEAN_TOKEN}@github.com/NCGHoldings/ncg-fleetone-aff76110.git"
+          
           git push -f lovable main
