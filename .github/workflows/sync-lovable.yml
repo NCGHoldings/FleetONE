@@ -1,0 +1,17 @@
+name: Sync to Lovable
+on:
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Golden Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Lovable Server
+        run: |
+          git remote add lovable https://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@github.com/globallyceum25-dot/ncg-fleetone-6b02f072.git
+          git push -f lovable main
