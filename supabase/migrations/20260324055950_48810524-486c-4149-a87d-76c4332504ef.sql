@@ -1,0 +1,3 @@
+ALTER TABLE public.yutong_quotations ADD COLUMN IF NOT EXISTS customer_category_id UUID REFERENCES public.customer_categories(id);
+ALTER TABLE public.sinotruck_quotations ADD COLUMN IF NOT EXISTS customer_category_id UUID REFERENCES public.customer_categories(id);
+ALTER TABLE public.lightvehicle_quotations ADD COLUMN IF NOT EXISTS customer_category_id UUID REFERENCES public.customer_categories(id);

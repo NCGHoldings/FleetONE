@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Anon can upload bus documents for migration" ON storage.objects;

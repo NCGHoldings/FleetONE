@@ -1,0 +1,1 @@
+ALTER TABLE public.special_hire_quotations ADD COLUMN IF NOT EXISTS fuel_price_per_liter NUMERIC;

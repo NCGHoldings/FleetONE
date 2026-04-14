@@ -1,0 +1,426 @@
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { 
+  Smartphone, 
+  Download, 
+  Share, 
+  Plus, 
+  CheckCircle2, 
+  Zap, 
+  Wifi, 
+  Shield,
+  Bus,
+  ArrowRight,
+  Monitor,
+  Apple,
+  Chrome,
+  AlertTriangle,
+  ExternalLink
+} from "lucide-react";
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
+const InstallApp = () => {
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isIPad, setIsIPad] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
+  const [isSafari, setIsSafari] = useState(false);
+  const [isInStandaloneMode, setIsInStandaloneMode] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
+
+  useEffect(() => {
+    // Check if app is already installed (works for both Android and iOS)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                         (window.navigator as any).standalone === true;
+    setIsInstalled(isStandalone);
+    setIsInStandaloneMode(isStandalone);
+
+    // Detect platform
+    const userAgent = navigator.userAgent.toLowerCase();
+    
+    // Enhanced iPad detection for iPadOS 13+ (reports as MacIntel with touch)
+    const isIPadDevice = /ipad/.test(userAgent) || 
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+      (/macintosh/.test(userAgent) && 'ontouchend' in document);
+    
+    const isIPhoneDevice = /iphone|ipod/.test(userAgent);
+    const isIOSDevice = isIPhoneDevice || isIPadDevice;
+    
+    setIsIPad(isIPadDevice);
+    setIsIOS(isIOSDevice);
+    setIsAndroid(/android/.test(userAgent));
+
+    // Detect if Safari on iOS/iPadOS (not Chrome, Firefox, etc.)
+    // Safari on iOS doesn't include "chrome", "crios", "fxios", "edgios" in user agent
+    const isSafariBrowser = isIOSDevice && 
+      /safari/i.test(userAgent) && 
+      !/chrome|crios|fxios|edgios|opios/i.test(userAgent);
+    setIsSafari(isSafariBrowser);
+
+    // Listen for install prompt (Android/Chrome only)
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      setIsInstalled(true);
+    }
+    setDeferredPrompt(null);
+  };
+
+  const copyUrlToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setUrlCopied(true);
+      setTimeout(() => setUrlCopied(false), 2000);
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = window.location.href;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setUrlCopied(true);
+      setTimeout(() => setUrlCopied(false), 2000);
+    }
+  };
+
+  const openInSafari = () => {
+    // Copy URL first, then show instructions
+    copyUrlToClipboard();
+  };
+
+  const features = [
+    {
+      icon: Zap,
+      title: "Fast Launch",
+      description: "Opens instantly from your home screen"
+    },
+    {
+      icon: Wifi,
+      title: "Works Offline",
+      description: "Access core features without internet"
+    },
+    {
+      icon: Shield,
+      title: "Secure",
+      description: "Enterprise-grade security protocols"
+    },
+    {
+      icon: Bus,
+      title: "Full Features",
+      description: "Complete fleet management on mobile"
+    }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-purple-900 text-white">
+      {/* Hero Section */}
+      <div className="container mx-auto px-4 py-12">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center w-24 h-24 bg-white/10 backdrop-blur-sm rounded-3xl mb-6 border border-white/20">
+            <Bus className="w-12 h-12 text-white" />
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">
+            NCG Speed TMS
+          </h1>
+          <p className="text-xl text-blue-200 max-w-2xl mx-auto">
+            Install our app for the best experience - fast, offline-capable, and always accessible from your home screen.
+          </p>
+        </div>
+
+        {/* Installation Status */}
+        {isInstalled ? (
+          <Card className="max-w-lg mx-auto bg-green-500/20 border-green-500/30 backdrop-blur-sm mb-12">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center gap-3 text-green-300">
+                <CheckCircle2 className="w-8 h-8" />
+                <span className="text-xl font-semibold">App Already Installed!</span>
+              </div>
+              <p className="text-center text-green-200 mt-2">
+                You can access NCG Speed from your home screen.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-12">
+            {/* Android/Chrome Install */}
+            <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-500/20 rounded-lg">
+                    <Chrome className="w-6 h-6 text-green-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-white">Android / Chrome</CardTitle>
+                    <CardDescription className="text-blue-200">
+                      Quick one-tap install
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {deferredPrompt ? (
+                  <Button 
+                    onClick={handleInstallClick}
+                    className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+                    size="lg"
+                  >
+                    <Download className="w-5 h-5 mr-2" />
+                    Install Now
+                  </Button>
+                ) : isAndroid ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-blue-200">
+                      Tap the menu button in Chrome and select "Install app" or "Add to Home screen"
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-blue-300">
+                      <Badge variant="outline" className="border-blue-400 text-blue-300">
+                        <Monitor className="w-3 h-3 mr-1" />
+                        Menu
+                      </Badge>
+                      <ArrowRight className="w-4 h-4" />
+                      <Badge variant="outline" className="border-blue-400 text-blue-300">
+                        <Plus className="w-3 h-3 mr-1" />
+                        Install
+                      </Badge>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-blue-200">
+                    Open this page in Chrome on Android for the best install experience.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* iOS/iPadOS Install */}
+            <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <Apple className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-white">
+                      {isIPad ? 'iPad' : 'iPhone / iPad'}
+                    </CardTitle>
+                    <CardDescription className="text-blue-200">
+                      Add to Home Screen via Safari
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Safari Warning for iOS/iPadOS users not in Safari */}
+                {isIOS && !isSafari && (
+                  <Alert className="bg-amber-500/20 border-amber-500/30 mb-4">
+                    <AlertTriangle className="w-5 h-5 text-amber-400" />
+                    <AlertDescription className="text-amber-200 ml-2">
+                      <strong className="block mb-1">⚠️ Safari Required</strong>
+                      <span className="text-xs">
+                        {isIPad ? 'iPad' : 'iPhone'} can only install apps through Safari browser.
+                        <br />
+                        <strong>Copy this URL and open it in Safari.</strong>
+                      </span>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {isIOS && !isSafari && (
+                  <Button 
+                    onClick={openInSafari}
+                    className={`w-full mb-4 ${urlCopied ? 'bg-green-500/30 border-green-500/50 text-green-200' : 'bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200'}`}
+                    variant="outline"
+                    size="lg"
+                  >
+                    {urlCopied ? (
+                      <>
+                        <CheckCircle2 className="w-5 h-5 mr-2" />
+                        URL Copied! Now open Safari
+                      </>
+                    ) : (
+                      <>
+                        <ExternalLink className="w-5 h-5 mr-2" />
+                        Copy URL & Open Safari
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-sm font-bold text-blue-300">
+                      1
+                    </div>
+                    <div>
+                      <p className="text-sm text-white font-medium">Open in Safari</p>
+                      <p className="text-xs text-blue-200">Must use Safari browser (not Chrome/Firefox)</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="w-6 h-6 rounded bg-blue-500/30 flex items-center justify-center">
+                          <span className="text-xs">🧭</span>
+                        </div>
+                        <span className="text-xs text-blue-300">Safari</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-sm font-bold text-blue-300">
+                      2
+                    </div>
+                    <div>
+                      <p className="text-sm text-white font-medium">Tap Share button</p>
+                      <p className="text-xs text-blue-200">
+                        {isIPad ? 'Top right corner or URL bar on iPad' : 'Bottom center of Safari'}
+                      </p>
+                      {/* Visual Share button indicator */}
+                      <div className="mt-2 relative">
+                        <div className="bg-gray-800/80 rounded-lg p-3 border border-white/10">
+                          <div className="flex items-center justify-between">
+                            {isIPad ? (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="px-2 py-1 bg-white/10 rounded text-xs text-blue-200">
+                                    ncgspeed.app/install
+                                  </div>
+                                  <div className="p-1.5 bg-blue-500 rounded-lg animate-pulse">
+                                    <Share className="w-4 h-4 text-white" />
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex items-center justify-center w-full gap-4">
+                                <div className="text-white/40">◄</div>
+                                <div className="p-2 bg-blue-500 rounded-lg animate-pulse">
+                                  <Share className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="text-white/40">►</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-center text-blue-300 mt-1">
+                          {isIPad ? '↑ Share button is here on iPad' : '↑ Share button is here on iPhone'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-sm font-bold text-blue-300">
+                      3
+                    </div>
+                    <div>
+                      <p className="text-sm text-white font-medium">Add to Home Screen</p>
+                      <p className="text-xs text-blue-200">
+                        <strong className="text-amber-300">Scroll down</strong> in share menu to find it
+                      </p>
+                      <div className="mt-2 bg-gray-800/80 rounded-lg p-2 border border-white/10">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-white/60">
+                            <span>📋</span> Copy
+                          </div>
+                          <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-white/60">
+                            <span>📱</span> AirDrop
+                          </div>
+                          <div className="flex items-center gap-2 px-2 py-1.5 bg-blue-500/30 rounded text-xs text-white border border-blue-400/50 animate-pulse">
+                            <Plus className="w-4 h-4" /> Add to Home Screen
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-center text-amber-300 mt-1">
+                          ↑ Scroll down to find this option
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-sm font-bold text-green-300">
+                      4
+                    </div>
+                    <div>
+                      <p className="text-sm text-white font-medium">Tap "Add"</p>
+                      <p className="text-xs text-blue-200">Top right corner to confirm</p>
+                      <CheckCircle2 className="w-5 h-5 text-green-400 mt-1" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Safari confirmation badge */}
+                {isIOS && isSafari && (
+                  <div className="mt-4 p-3 bg-green-500/20 rounded-lg border border-green-500/30">
+                    <div className="flex items-center gap-2 text-green-300">
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span className="font-medium">
+                        You're in Safari on {isIPad ? 'iPad' : 'iPhone'} - Ready to install!
+                      </span>
+                    </div>
+                    <p className="text-xs text-green-200 mt-1 ml-7">
+                      Follow the steps above to add to your Home Screen
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Features Grid */}
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-2xl font-bold text-center mb-8">Why Install?</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {features.map((feature, index) => (
+              <Card key={index} className="bg-white/5 border-white/10 backdrop-blur-sm text-center">
+                <CardContent className="pt-6">
+                  <feature.icon className="w-8 h-8 mx-auto mb-3 text-blue-300" />
+                  <h3 className="font-semibold text-white mb-1">{feature.title}</h3>
+                  <p className="text-xs text-blue-200">{feature.description}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Back to App Link */}
+        <div className="text-center mt-12">
+          <Button 
+            variant="outline" 
+            className="border-white/30 text-white hover:bg-white/10"
+            onClick={() => window.location.href = '/'}
+          >
+            <ArrowRight className="w-4 h-4 mr-2 rotate-180" />
+            Back to App
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default InstallApp;

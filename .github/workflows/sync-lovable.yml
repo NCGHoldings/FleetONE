@@ -1,0 +1,24 @@
+name: Sync to Lovable
+on:
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Golden Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Lovable Server
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          # Strip any accidental hidden newlines or spaces from the copied token
+          CLEAN_TOKEN=$(echo "$GH_PAT" | tr -d '\n' | tr -d '\r' | tr -d ' ')
+          
+          # Add remote securely using quotes to prevent command injection
+          git remote add lovable "https://${CLEAN_TOKEN}@github.com/NCGHoldings/ncg-fleetone-aff76110.git"
+          
+          git push -f lovable main

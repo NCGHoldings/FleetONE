@@ -1,0 +1,33 @@
+name: Mirror to FleetONE
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    name: Mirror to FleetONE
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync to FleetONE via API
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          SOURCE_SHA=$(git rev-parse HEAD)
+          echo "Mirroring commit: $SOURCE_SHA"
+
+          # Use GitHub API to create a repository dispatch on FleetONE
+          # This triggers FleetONE's deploy workflow
+          curl -X POST \
+            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/NCGHoldings/FleetONE/dispatches \
+            -d '{"event_type":"mirror_sync","client_payload":{"sha":"'"${SOURCE_SHA}"'"}}'
+
+          echo "✅ Triggered FleetONE deploy via repository dispatch"

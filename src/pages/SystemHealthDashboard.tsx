@@ -1,0 +1,472 @@
+import { useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Shield, RefreshCw, Clock, Zap, AlertTriangle, Activity, Workflow, Database, FileCheck, Link2, LayoutGrid } from 'lucide-react';
+import { useSystemHealthChecks } from '@/hooks/useSystemHealthChecks';
+import { useBusinessFlowTests } from '@/hooks/useBusinessFlowTests';
+import { useDataQualityChecks } from '@/hooks/useDataQualityChecks';
+import { useBusinessRulesChecks } from '@/hooks/useBusinessRulesChecks';
+import { useCrossModuleChecks } from '@/hooks/useCrossModuleChecks';
+import { StatusCard } from '@/components/system-health/StatusCard';
+import { LiveConsole } from '@/components/system-health/LiveConsole';
+import { LatencySparkline } from '@/components/system-health/LatencySparkline';
+import { HealthHistoryTable } from '@/components/system-health/HealthHistoryTable';
+import { BusinessFlowCard } from '@/components/system-health/BusinessFlowCard';
+import { CriticalAlertBanner } from '@/components/system-health/CriticalAlertBanner';
+import { HealthSummary } from '@/components/system-health/HealthSummary';
+import { DataQualityPanel } from '@/components/system-health/DataQualityPanel';
+import { RealDataSummary } from '@/components/system-health/RealDataSummary';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+
+export default function SystemHealthDashboard() {
+  const {
+    results,
+    consoleLogs,
+    isRunning,
+    lastRunTime,
+    autoRefreshEnabled,
+    criticalErrorCount,
+    runFullHealthCheck,
+    clearLogs,
+    toggleAutoRefresh
+  } = useSystemHealthChecks();
+
+  const {
+    results: flowResults,
+    isRunning: isFlowRunning,
+    lastRunTime: flowLastRunTime,
+    runAllTests: runFlowTests,
+    runCategoryTests,
+    criticalIssues
+  } = useBusinessFlowTests(true);
+
+  const {
+    results: dataQualityResults,
+    isRunning: isDataQualityRunning,
+    lastRunTime: dataQualityLastRunTime,
+    runAllChecks: runDataQualityChecks,
+    errorCount: dataQualityErrors,
+    warningCount: dataQualityWarnings
+  } = useDataQualityChecks();
+
+  const {
+    results: businessRulesResults,
+    isRunning: isBusinessRulesRunning,
+    lastRunTime: businessRulesLastRunTime,
+    runAllChecks: runBusinessRulesChecks,
+    errorCount: businessRulesErrors,
+    warningCount: businessRulesWarnings
+  } = useBusinessRulesChecks();
+
+  const {
+    results: crossModuleResults,
+    isRunning: isCrossModuleRunning,
+    lastRunTime: crossModuleLastRunTime,
+    runAllChecks: runCrossModuleChecks,
+    errorCount: crossModuleErrors,
+    warningCount: crossModuleWarnings
+  } = useCrossModuleChecks();
+
+  const [activeTab, setActiveTab] = useState('infrastructure');
+  
+  const previousErrorCount = useRef(0);
+
+  // Auto-run data checks on mount
+  useEffect(() => {
+    runDataQualityChecks();
+    runBusinessRulesChecks();
+    runCrossModuleChecks();
+  }, []);
+
+  // Show toast alerts for critical errors
+  useEffect(() => {
+    if (results.length === 0) return;
+    
+    const currentErrors = results.filter(r => r.status === 'error');
+    
+    if (currentErrors.length > 0 && previousErrorCount.current !== currentErrors.length) {
+      if (previousErrorCount.current > 0 || results.length > currentErrors.length) {
+        currentErrors.forEach(error => {
+          toast.error(`${error.checkName} Failed`, {
+            description: error.errorDetails || error.message,
+            duration: 10000,
+            action: {
+              label: 'Details',
+              onClick: () => {
+                const element = document.getElementById(`status-card-${error.id}`);
+                element?.scrollIntoView({ behavior: 'smooth' });
+              }
+            }
+          });
+        });
+      }
+    }
+    
+    previousErrorCount.current = currentErrors.length;
+  }, [results]);
+
+  // Calculate overall status
+  const totalErrors = criticalErrorCount + dataQualityErrors + businessRulesErrors + crossModuleErrors;
+  const totalWarnings = results.filter(r => r.status === 'warning').length + dataQualityWarnings + businessRulesWarnings + crossModuleWarnings;
+  
+  const overallStatus = results.length === 0 
+    ? 'pending' 
+    : totalErrors > 0
+      ? 'error' 
+      : totalWarnings > 0
+        ? 'warning' 
+        : 'success';
+
+  const statusText = {
+    success: 'All Systems Operational',
+    warning: 'Some Issues Detected',
+    error: 'Critical Issues Detected',
+    pending: 'Initializing...'
+  };
+
+  const runAllHealthChecks = () => {
+    runFullHealthCheck();
+    runFlowTests();
+    runDataQualityChecks();
+    runBusinessRulesChecks();
+    runCrossModuleChecks();
+  };
+
+  const isAnyRunning = isRunning || isFlowRunning || isDataQualityRunning || isBusinessRulesRunning || isCrossModuleRunning;
+
+  return (
+    <div className="min-h-full bg-slate-950 text-foreground rounded-lg overflow-hidden">
+      {/* Cyber grid background */}
+      <div 
+        className="absolute inset-0 opacity-[0.02] pointer-events-none"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(6, 182, 212, 0.3) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(6, 182, 212, 0.3) 1px, transparent 1px)
+          `,
+          backgroundSize: '50px 50px'
+        }}
+      />
+
+      <div className="relative z-10 p-6 max-w-7xl mx-auto space-y-6">
+        {/* Health Summary */}
+        <HealthSummary
+          flowResults={flowResults}
+          infrastructureErrors={criticalErrorCount}
+          infrastructureWarnings={results.filter(r => r.status === 'warning').length}
+        />
+
+        {/* Business Flow Critical Alert Banner */}
+        <CriticalAlertBanner
+          issues={criticalIssues}
+          onRecheck={runFlowTests}
+          isRunning={isFlowRunning}
+        />
+
+        {/* Combined Critical Alert Banner */}
+        {totalErrors > 0 && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-4">
+            <div className="p-2 rounded-lg bg-red-500/20">
+              <AlertTriangle className="h-6 w-6 text-red-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-red-400">
+                {totalErrors} Critical Issue{totalErrors > 1 ? 's' : ''} Detected
+              </h3>
+              <p className="text-sm text-red-400/80">
+                Infrastructure: {criticalErrorCount} • Data Quality: {dataQualityErrors} • Business Rules: {businessRulesErrors} • Cross-Module: {crossModuleErrors}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+              onClick={runAllHealthChecks}
+              disabled={isAnyRunning}
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2", isAnyRunning && "animate-spin")} />
+              Recheck All
+            </Button>
+          </div>
+        )}
+
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30">
+              <Shield className="h-8 w-8 text-cyan-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold font-mono tracking-tight text-foreground">
+                SYSTEM HEALTH MONITOR
+              </h1>
+              <div className="flex items-center gap-3 mt-1">
+                <Badge 
+                  className={cn(
+                    'font-mono text-xs uppercase tracking-wider',
+                    overallStatus === 'success' && 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                    overallStatus === 'warning' && 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                    overallStatus === 'error' && 'bg-red-500/20 text-red-400 border-red-500/30',
+                    overallStatus === 'pending' && 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+                  )}
+                >
+                  <span className={cn(
+                    'inline-block w-2 h-2 rounded-full mr-2',
+                    overallStatus === 'success' && 'bg-emerald-500',
+                    overallStatus === 'warning' && 'bg-amber-500',
+                    overallStatus === 'error' && 'bg-red-500',
+                    overallStatus === 'pending' && 'bg-slate-500'
+                  )} />
+                  {statusText[overallStatus]}
+                </Badge>
+                {lastRunTime && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Last check: {format(lastRunTime, 'HH:mm:ss')}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="auto-refresh"
+                checked={autoRefreshEnabled}
+                onCheckedChange={toggleAutoRefresh}
+              />
+              <Label htmlFor="auto-refresh" className="text-sm text-muted-foreground">
+                Auto-refresh (5min)
+              </Label>
+            </div>
+
+            <Button
+              onClick={runAllHealthChecks}
+              disabled={isAnyRunning}
+              className="bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-mono uppercase tracking-wider shadow-lg shadow-cyan-500/20"
+            >
+              {isAnyRunning ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4 mr-2" />
+              )}
+              {isAnyRunning ? 'Running...' : 'Run All Tests'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="bg-slate-900/50 border border-slate-700/50 p-1 flex-wrap h-auto gap-1">
+            <TabsTrigger 
+              value="infrastructure" 
+              className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400"
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              Infrastructure ({results.length})
+            </TabsTrigger>
+            <TabsTrigger 
+              value="business-flows"
+              className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400"
+            >
+              <Workflow className="h-4 w-4 mr-2" />
+              Business Flows ({flowResults.length})
+              {criticalIssues.length > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 px-1.5">
+                  {criticalIssues.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="data-quality"
+              className="data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400"
+            >
+              <Database className="h-4 w-4 mr-2" />
+              Data Quality ({dataQualityResults.length})
+              {dataQualityErrors > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 px-1.5">
+                  {dataQualityErrors}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="business-rules"
+              className="data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400"
+            >
+              <FileCheck className="h-4 w-4 mr-2" />
+              Business Rules ({businessRulesResults.length})
+              {businessRulesErrors > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 px-1.5">
+                  {businessRulesErrors}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="cross-module"
+              className="data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-400"
+            >
+              <Link2 className="h-4 w-4 mr-2" />
+              Cross-Module ({crossModuleResults.length})
+              {crossModuleErrors > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 px-1.5">
+                  {crossModuleErrors}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="module-overview"
+              className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400"
+            >
+              <LayoutGrid className="h-4 w-4 mr-2" />
+              Module Overview
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Infrastructure Tab */}
+          <TabsContent value="infrastructure" className="mt-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {results.length > 0 ? (
+                results.map(result => (
+                  <StatusCard
+                    key={result.id}
+                    id={result.id}
+                    checkType={result.checkType}
+                    checkName={result.checkName}
+                    status={result.status}
+                    message={result.message}
+                    latency={result.latency}
+                    errorDetails={result.errorDetails}
+                  />
+                ))
+              ) : (
+                ['Auth', 'Storage', 'DB Latency', 'DB Write', 'RLS Policies', 'Realtime'].map((name, idx) => (
+                  <StatusCard
+                    key={idx}
+                    id={`placeholder-${idx}`}
+                    checkType={['auth', 'storage', 'database', 'database', 'database', 'api'][idx]}
+                    checkName={name}
+                    status="pending"
+                    message="Waiting..."
+                    latency={0}
+                  />
+                ))
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <LatencySparkline />
+              <LiveConsole logs={consoleLogs} onClear={clearLogs} />
+            </div>
+
+            <HealthHistoryTable />
+          </TabsContent>
+
+          {/* Business Flows Tab */}
+          <TabsContent value="business-flows" className="mt-6 space-y-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-100">Business Flow Tests</h2>
+                <p className="text-sm text-slate-400">
+                  Automated tests for critical business operations
+                  {flowLastRunTime && (
+                    <span className="ml-2">
+                      • Last run: {format(flowLastRunTime, 'HH:mm:ss')}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={runFlowTests}
+                disabled={isFlowRunning}
+                className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", isFlowRunning && "animate-spin")} />
+                Run All Flow Tests
+              </Button>
+            </div>
+
+            {flowResults.length === 0 ? (
+              <div className="text-center py-12 bg-slate-900/30 rounded-lg border border-slate-700/30">
+                <Workflow className="h-12 w-12 text-slate-500 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-300">No Tests Run Yet</h3>
+                <p className="text-slate-400 mb-4">Click "Run All Flow Tests" to test all business flows</p>
+                <Button onClick={runFlowTests} disabled={isFlowRunning}>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Start Testing
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Array.from(new Set(flowResults.map(r => r.category))).map(category => (
+                  <BusinessFlowCard
+                    key={category}
+                    category={category}
+                    results={flowResults.filter(r => r.category === category)}
+                    onRetest={() => runCategoryTests(category)}
+                    isRetesting={isFlowRunning}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Data Quality Tab */}
+          <TabsContent value="data-quality" className="mt-6 space-y-6">
+            <DataQualityPanel
+              title="Data Quality Checks"
+              description="Monitor missing, stale, and invalid data across all modules"
+              results={dataQualityResults}
+              isRunning={isDataQualityRunning}
+              lastRunTime={dataQualityLastRunTime}
+              onRefresh={runDataQualityChecks}
+              accentColor="blue"
+            />
+          </TabsContent>
+
+          {/* Business Rules Tab */}
+          <TabsContent value="business-rules" className="mt-6 space-y-6">
+            <DataQualityPanel
+              title="Business Rules Validation"
+              description="Check for violations of critical business rules and policies"
+              results={businessRulesResults}
+              isRunning={isBusinessRulesRunning}
+              lastRunTime={businessRulesLastRunTime}
+              onRefresh={runBusinessRulesChecks}
+              accentColor="purple"
+            />
+          </TabsContent>
+
+          {/* Cross-Module Tab */}
+          <TabsContent value="cross-module" className="mt-6 space-y-6">
+            <DataQualityPanel
+              title="Cross-Module Integrity"
+              description="Verify data relationships and dependencies between modules"
+              results={crossModuleResults}
+              isRunning={isCrossModuleRunning}
+              lastRunTime={crossModuleLastRunTime}
+              onRefresh={runCrossModuleChecks}
+              accentColor="orange"
+            />
+          </TabsContent>
+
+          {/* Module Overview Tab */}
+          <TabsContent value="module-overview" className="mt-6 space-y-6">
+            <RealDataSummary />
+          </TabsContent>
+        </Tabs>
+
+        {/* Footer */}
+        <div className="text-center text-xs text-muted-foreground font-mono pt-4 border-t border-cyan-500/10">
+          <span className="text-cyan-600">PROACTIVE MONITORING</span> • Testing infrastructure + business flows + data quality + business rules + cross-module integrity
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,319 @@
+/* ============================================================
+   Shared Reconciliation Worksheet Styles — SAP B1-Style
+   Used by: AR, AP, Petty Cash, Sub-Ledger, Intercompany
+   ============================================================ */
+
+/* -------- Root Layout ---------- */
+.recon-ws-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.recon-ws-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  padding: 20px 24px 16px;
+  background: var(--background, #fff);
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.recon-ws-header-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+}
+
+.recon-ws-header-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.recon-ws-header-field .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+/* -------- Table ---------- */
+.recon-ws-table-wrap {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.recon-ws-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.recon-ws-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.recon-ws-table thead th {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 2px solid hsl(var(--border));
+  user-select: none;
+}
+
+.recon-ws-table thead th.num-col {
+  text-align: right;
+}
+
+.recon-ws-table tbody tr {
+  transition: background 0.15s;
+}
+
+.recon-ws-table tbody tr:hover {
+  background: hsl(var(--accent) / 0.5);
+}
+
+.recon-ws-table tbody tr.row-cleared {
+  background: hsl(142 76% 36% / 0.07);
+}
+
+.recon-ws-table tbody tr.row-cleared:hover {
+  background: hsl(142 76% 36% / 0.12);
+}
+
+.recon-ws-table tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  vertical-align: middle;
+}
+
+.recon-ws-table tbody td.num-col {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.recon-ws-table .cleared-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: hsl(142 76% 36%);
+}
+
+.recon-ws-table .cleared-amount-input {
+  width: 100px;
+  padding: 4px 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  background: hsl(var(--background));
+}
+
+.recon-ws-table .cleared-amount-input:focus {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: -1px;
+}
+
+.recon-ws-table .type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* AR module: green accents */
+.recon-ws-table .type-badge.ar-invoice {
+  background: hsl(142 76% 36% / 0.12);
+  color: hsl(142 76% 26%);
+}
+
+.recon-ws-table .type-badge.ar-receipt {
+  background: hsl(217 91% 60% / 0.12);
+  color: hsl(217 91% 40%);
+}
+
+.recon-ws-table .type-badge.ar-credit {
+  background: hsl(0 72% 51% / 0.1);
+  color: hsl(0 72% 40%);
+}
+
+/* AP module: orange accents */
+.recon-ws-table .type-badge.ap-invoice {
+  background: hsl(25 95% 53% / 0.12);
+  color: hsl(25 95% 35%);
+}
+
+.recon-ws-table .type-badge.ap-payment {
+  background: hsl(217 91% 60% / 0.12);
+  color: hsl(217 91% 40%);
+}
+
+.recon-ws-table .type-badge.ap-debit {
+  background: hsl(0 72% 51% / 0.1);
+  color: hsl(0 72% 40%);
+}
+
+/* Petty cash: purple accents */
+.recon-ws-table .type-badge.pc-disbursement {
+  background: hsl(270 67% 47% / 0.12);
+  color: hsl(270 67% 35%);
+}
+
+.recon-ws-table .type-badge.pc-replenishment {
+  background: hsl(142 76% 36% / 0.12);
+  color: hsl(142 76% 26%);
+}
+
+/* -------- Summary Footer ---------- */
+.recon-ws-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px 24px;
+  background: hsl(var(--muted));
+  border-top: 2px solid hsl(var(--border));
+  gap: 24px;
+}
+
+.recon-ws-summary-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recon-ws-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.recon-ws-summary-row .summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  min-width: 100px;
+}
+
+.recon-ws-summary-row .summary-count {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+  color: hsl(var(--foreground));
+}
+
+.recon-ws-summary-row .summary-amount {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 140px;
+  text-align: right;
+}
+
+.recon-ws-summary-row .summary-amount.negative {
+  color: hsl(0 72% 50%);
+}
+
+.recon-ws-summary-row .summary-amount.positive {
+  color: hsl(142 76% 30%);
+}
+
+.recon-ws-summary-right {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  min-width: 300px;
+}
+
+.recon-ws-balance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.recon-ws-balance-row.difference-row {
+  border-top: 2px solid hsl(var(--border));
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.recon-ws-balance-row .balance-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.recon-ws-balance-row .balance-value {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.recon-ws-balance-row .balance-value.positive {
+  color: hsl(142 76% 30%);
+}
+
+.recon-ws-balance-row .balance-value.negative {
+  color: hsl(0 72% 50%);
+}
+
+.recon-ws-balance-row .balance-value.neutral {
+  color: hsl(var(--foreground));
+}
+
+.recon-ws-balance-row .balance-value.match {
+  color: hsl(142 76% 30%);
+  font-size: 16px;
+}
+
+/* -------- Actions ---------- */
+.recon-ws-actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--background, #fff);
+  border-top: 1px solid hsl(var(--border));
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* -------- Empty state ---------- */
+.recon-ws-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  gap: 16px;
+  color: hsl(var(--muted-foreground));
+}
+
+.recon-ws-empty svg {
+  width: 48px;
+  height: 48px;
+  opacity: 0.4;
+}
