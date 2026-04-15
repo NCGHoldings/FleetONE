@@ -27,6 +27,7 @@ import { ManualOdometerEntryModal } from "@/components/fleet/ManualOdometerEntry
 import { OdometerAdjustmentModal } from "@/components/fleet/OdometerAdjustmentModal";
 import { OdometerOverviewModal } from "@/components/fleet/OdometerOverviewModal";
 import { BusApiConnectionModal } from "@/components/fleet/BusApiConnectionModal";
+import { BusCategoryBadge } from "@/components/fleet/BusCategoryBadge";
 import { useQuery } from "@tanstack/react-query";
 import { useKloudipFIOS } from "@/hooks/useKloudipFIOS";
 
@@ -55,6 +56,13 @@ interface TrackingData {
   gps_coordinates?: {lat: number; lng: number};
   route_id?: string;
   route_name?: string;
+  category_id?: string;
+  sub_category_id?: string;
+  buses?: {
+    category_id?: string;
+    sub_category_id?: string;
+    route?: string;
+  };
   speed_kmh: number;
   status: string;
   last_update: string;
@@ -175,7 +183,9 @@ export default function RealTimeTracking() {
            speed_kmh: speed,
            status: speed > 0 ? 'active' : 'inactive',
            last_update: lastUpdate,
-           route_name: dbData?.route_name || 'Unassigned',
+           route_name: dbData?.buses?.route || dbData?.route_name || 'Unassigned',
+           category_id: dbData?.buses?.category_id || dbData?.category_id,
+           sub_category_id: dbData?.buses?.sub_category_id || dbData?.sub_category_id,
            fuel_level_liters: dbData?.fuel_level_liters,
            tire_pressure: dbData?.tire_pressure,
            engine_health: getEngineHealth(speed, lastUpdate),
@@ -183,12 +193,11 @@ export default function RealTimeTracking() {
            fios_device_id: v.id,
            heading_degrees: v.pos?.c || 0,
            satellite_count: v.pos?.sc || 0,
-           satellites: v.pos?.sc || 0,
            ignition_status: speed > 0 ? true : false,
            daily_mileage_km: dbData?.daily_mileage_km || 0,
-           altitude: v.pos?.z || 0,
-           battery_v: v.prms?.pwr_ext?.v,
-           gsm: v.prms?.gsm?.v,
+           altitude_meters: v.pos?.z || 0,
+           battery_voltage: v.prms?.pwr_ext?.v,
+           gsm_signal_strength: v.prms?.gsm?.v,
         } as TrackingData;
       });
       setLiveTrackingData(merged);
@@ -205,7 +214,7 @@ export default function RealTimeTracking() {
     try {
       const { data, error } = await supabase
         .from('real_time_tracking')
-        .select('*')
+        .select(`*, buses ( category_id, sub_category_id, route )`)
         .order('last_update', { ascending: false });
 
       if (error) throw error;
@@ -444,6 +453,17 @@ export default function RealTimeTracking() {
       header: "Route",
     },
     {
+      accessorKey: "category_id",
+      header: "Category",
+      cell: ({ row }) => (
+        <BusCategoryBadge 
+          categoryId={row.original.category_id} 
+          subCategoryId={row.original.sub_category_id}
+          size="sm"
+        />
+      ),
+    },
+    {
       accessorKey: "speed_kmh",
       header: "Speed",
       cell: ({ row }) => (
@@ -521,10 +541,10 @@ export default function RealTimeTracking() {
       ),
     },
     {
-      accessorKey: "battery_v",
+      accessorKey: "battery_voltage",
       header: "Battery (V)",
       cell: ({ row }) => {
-        const val = row.getValue("battery_v") as number;
+        const val = row.getValue("battery_voltage") as number;
         return (
           <div className="flex items-center gap-2">
             <Battery className={`h-4 w-4 ${val < 11.5 ? 'text-destructive' : 'text-green-500'}`} />
@@ -534,10 +554,10 @@ export default function RealTimeTracking() {
       },
     },
     {
-      accessorKey: "satellites",
+      accessorKey: "satellite_count",
       header: "Satellites",
       cell: ({ row }) => {
-        const val = row.getValue("satellites") as number;
+        const val = row.getValue("satellite_count") as number;
         return (
           <div className="flex items-center gap-2">
             <Satellite className={`h-4 w-4 ${val < 5 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
@@ -547,10 +567,10 @@ export default function RealTimeTracking() {
       },
     },
     {
-      accessorKey: "gsm",
+      accessorKey: "gsm_signal_strength",
       header: "Signal",
       cell: ({ row }) => {
-        const val = row.getValue("gsm") as number;
+        const val = row.getValue("gsm_signal_strength") as number;
         return (
           <div className="flex items-center gap-2">
             <Activity className={`h-4 w-4 ${val < 2 ? 'text-destructive' : 'text-blue-500'}`} />
@@ -616,7 +636,7 @@ export default function RealTimeTracking() {
       },
     },
     {
-      accessorKey: "service_status",
+      id: "service_status",
       header: "Service Status",
       cell: ({ row }) => {
         const ServiceStatusCell = () => {
