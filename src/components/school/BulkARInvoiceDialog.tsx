@@ -75,10 +75,7 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
   // Calculate amount per student with billing percentage
   const calculateStudentAmount = (s: any) => {
     const fixedAmount = s.fixed_monthly_amount || 0;
-    const chargeAmount = fixedAmount * (billingPercentage / 100);
-    const outstanding = Math.abs(Math.min(s.payment_balance || 0, 0));
-    const credit = s.payment_balance > 0 ? s.payment_balance : 0;
-    return Math.max(0, chargeAmount + outstanding - credit);
+    return Math.max(0, fixedAmount * (billingPercentage / 100));
   };
 
   const totalAmount = selectedStudentsList.reduce((sum, s) => sum + calculateStudentAmount(s), 0);
