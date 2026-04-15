@@ -350,7 +350,7 @@ export default function RealTimeTracking() {
           model: "Unknown",
           capacity: 50,
           year: 2020,
-          status: "active",
+          status: "active" as const,
         }));
 
       if (missingBusesToInsert.length === 0) {

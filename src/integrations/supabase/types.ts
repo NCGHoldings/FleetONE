@@ -12509,10 +12509,13 @@ export type Database = {
       }
       magiya_daily_reports: {
         Row: {
+          agent_booking_detail: string | null
           bus_number: string | null
           extracted_at: string | null
           id: string
+          ncg_booking_detail: string | null
           ncg_revenue_lkr: number | null
+          online_booking_detail: string | null
           online_revenue_lkr: number | null
           pdf_url: string | null
           report_date: string
@@ -12523,10 +12526,13 @@ export type Database = {
           total_revenue_lkr: number | null
         }
         Insert: {
+          agent_booking_detail?: string | null
           bus_number?: string | null
           extracted_at?: string | null
           id?: string
+          ncg_booking_detail?: string | null
           ncg_revenue_lkr?: number | null
+          online_booking_detail?: string | null
           online_revenue_lkr?: number | null
           pdf_url?: string | null
           report_date: string
@@ -12537,10 +12543,13 @@ export type Database = {
           total_revenue_lkr?: number | null
         }
         Update: {
+          agent_booking_detail?: string | null
           bus_number?: string | null
           extracted_at?: string | null
           id?: string
+          ncg_booking_detail?: string | null
           ncg_revenue_lkr?: number | null
+          online_booking_detail?: string | null
           online_revenue_lkr?: number | null
           pdf_url?: string | null
           report_date?: string

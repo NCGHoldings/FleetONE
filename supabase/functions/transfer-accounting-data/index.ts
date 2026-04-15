@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
             .from(tableName)
             .delete()
             .eq("company_id", targetCompanyId)
-            .select("*", { count: "exact", head: true });
+            .select("*");
 
           // Actually delete
           await adminClient.from(tableName).delete().eq("company_id", targetCompanyId);

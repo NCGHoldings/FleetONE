@@ -126,10 +126,10 @@ export const FinanceDocumentPreviewModal = ({
   // Filter templates for this document type (+ related types) AND resolved company
   const availableTemplates = allTemplates?.filter((t) => {
     // Must match one of the template type IDs and be active
-    if (!templateTypeIds.includes(t.template_type_id) || !t.is_active) return false;
+    if (!templateTypeIds.includes((t as any).template_type_id) || !t.is_active) return false;
     // Filter to resolved company's templates
     if (resolvedCompanyId) {
-      return t.company_id === resolvedCompanyId;
+      return (t as any).company_id === resolvedCompanyId;
     }
     return true;
   });
@@ -243,9 +243,9 @@ export const FinanceDocumentPreviewModal = ({
     if (availableTemplates?.length && !selectedTemplateId) {
       // Prefer resolved company-specific template, then any default, then first available
       const companyTemplate = resolvedCompanyId 
-        ? availableTemplates.find((t) => t.company_id === resolvedCompanyId)
+        ? availableTemplates.find((t) => (t as any).company_id === resolvedCompanyId)
         : null;
-      const defaultTemplate = availableTemplates.find((t) => t.is_default);
+      const defaultTemplate = availableTemplates.find((t) => (t as any).is_default);
       const selectedTemplate = companyTemplate || defaultTemplate || availableTemplates[0];
       if (selectedTemplate) {
         setSelectedTemplateId(selectedTemplate.id);
@@ -334,20 +334,20 @@ export const FinanceDocumentPreviewModal = ({
       company,
       lineItems || [],
       allocations || [],
-      selectedTemplate.header_image_url || undefined,
-      (selectedTemplate.header_mode as HeaderMode) || 'logo_and_html'
+      (selectedTemplate as any).header_image_url || undefined,
+      ((selectedTemplate as any).header_mode as HeaderMode) || 'logo_and_html'
     );
 
-      const renderedHtml = replacePlaceholders(selectedTemplate.html_content || "", placeholders);
+      const renderedHtml = replacePlaceholders((selectedTemplate as any).html_content || "", placeholders);
       
       // Post-process: inject signatures into rendered HTML (works with ANY template)
       const withSignatures = injectSignaturesIntoHtml(renderedHtml, signatures);
       
       return generatePrintableDocument(
         withSignatures,
-        selectedTemplate.css_styles || undefined,
-        selectedTemplate.paper_size || "A4",
-        selectedTemplate.orientation || "portrait"
+        (selectedTemplate as any).css_styles || undefined,
+        (selectedTemplate as any).paper_size || "A4",
+        (selectedTemplate as any).orientation || "portrait"
       );
     }
 
@@ -457,7 +457,7 @@ export const FinanceDocumentPreviewModal = ({
                 {availableTemplates?.map((template) => (
                   <SelectItem key={template.id} value={template.id}>
                     {template.template_name}
-                    {template.is_default && " (Default)"}
+                    {(template as any).is_default && " (Default)"}
                   </SelectItem>
                 ))}
                 {(!availableTemplates || availableTemplates.length === 0) && (

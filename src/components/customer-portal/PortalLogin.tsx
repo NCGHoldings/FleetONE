@@ -82,10 +82,10 @@ export function PortalLogin({ onLogin }: PortalLoginProps) {
       setPortalAccessId(accessData.id);
       setStep("otp");
       
-      // In production, this would send an email. For now, show in toast for testing
-      toast.success(`OTP sent to ${email}. For testing: ${generatedOtp}`);
+      toast.success(`OTP has been sent to ${email}. Please check your email.`);
     } catch (error: any) {
-      toast.error("Failed to send OTP: " + error.message);
+      console.error("OTP send error:", error);
+      toast.error("Failed to send OTP. Please try again.");
     } finally {
       setIsLoading(false);
     }

@@ -36,6 +36,9 @@ import { FleetAlertsPanel } from "@/components/fleet/FleetAlertsPanel";
 import { BusDocumentPreviewModal } from "@/components/fleet/BusDocumentPreviewModal";
 import { useNavigate } from "react-router-dom";
 import busDocsManifest from "@/data/bus_documents.json";
+import { FleetFilterPanel, FleetFilters, defaultFilters } from "@/components/fleet/FleetFilterPanel";
+import { FleetVehicleDataImport } from "@/components/fleet/FleetVehicleDataImport";
+import { Upload } from "lucide-react";
 
 interface Fleet {
   id: string;
@@ -96,6 +99,7 @@ const FleetManagementComponent = () => {
   const [masterDataSheetOpen, setMasterDataSheetOpen] = useState(false);
   const [docPreviewModalOpen, setDocPreviewModalOpen] = useState(false);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
+  const [vehicleImportOpen, setVehicleImportOpen] = useState(false);
   const [filters, setFilters] = useState<FleetFilters>({ ...defaultFilters });
   const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([]);
   const [subCategoryOptions, setSubCategoryOptions] = useState<{ id: string; name: string }[]>([]);
@@ -651,6 +655,48 @@ const FleetManagementComponent = () => {
   const handleAddBus = () => {
     console.log("Adding new bus...");
     // Add bus logic will be implemented here
+  };
+
+  // Filtering logic
+  const distinctTypes = useMemo(() => [...new Set(data.map(b => b.type).filter(Boolean))], [data]);
+  const distinctModels = useMemo(() => [...new Set(data.map(b => b.model).filter(Boolean))], [data]);
+  const distinctYears = useMemo(() => [...new Set(data.map(b => b.year).filter(Boolean))], [data]);
+  const distinctRoutes = useMemo(() => [...new Set(data.map(b => b.route).filter(Boolean) as string[])], [data]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.categories.length) count++;
+    if (filters.subCategories.length) count++;
+    if (filters.types.length) count++;
+    if (filters.models.length) count++;
+    if (filters.years.length) count++;
+    if (filters.routes.length) count++;
+    if (filters.statuses.length) count++;
+    return count;
+  }, [filters]);
+
+  const filteredData = useMemo(() => {
+    return data.filter(bus => {
+      if (filters.categories.length && (!bus.category_id || !filters.categories.includes(bus.category_id))) return false;
+      if (filters.subCategories.length && (!bus.sub_category_id || !filters.subCategories.includes(bus.sub_category_id))) return false;
+      if (filters.types.length && !filters.types.includes(bus.type)) return false;
+      if (filters.models.length && !filters.models.includes(bus.model)) return false;
+      if (filters.years.length && !filters.years.includes(bus.year)) return false;
+      if (filters.routes.length && (!bus.route || !filters.routes.includes(bus.route))) return false;
+      if (filters.statuses.length && !filters.statuses.includes(bus.status)) return false;
+      return true;
+    });
+  }, [data, filters]);
+
+  const customSearch = (items: Fleet[], searchTerm: string) => {
+    const term = searchTerm.toLowerCase();
+    return items.filter(item =>
+      item.bus_no.toLowerCase().includes(term) ||
+      item.type.toLowerCase().includes(term) ||
+      (item.route || '').toLowerCase().includes(term) ||
+      item.model.toLowerCase().includes(term) ||
+      (item.owner_name || '').toLowerCase().includes(term)
+    );
   };
 
   // Calculate KPIs
