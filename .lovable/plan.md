@@ -1,66 +1,64 @@
 
 
-# Fix: School Bus AR Invoice Duplicate Charging & Balance Reset
+# Plan: Fix Remaining Security Findings
 
-## The Problem
+## Summary
 
-You're about to go live, and the AR invoice generation formula **double-charges students** by rolling the `payment_balance` (outstanding debt) into every new invoice. Here's the exact bug:
+There are **5 active findings** across two scanners (`supabase_lov` and `agent_security`). I'll fix 4 via a single database migration and mark 1 as already fixed.
 
-```
-Lines 475-479 in useSchoolBusFinance.ts:
+## Findings & Fixes
 
-chargeAmount = fixedAmount × (billingPercentage / 100)    // e.g. 8,700 × 80% = 6,960
-outstanding  = |min(payment_balance, 0)|                  // e.g. |-8,700| = 8,700
-credit       = max(payment_balance, 0)                    // e.g. 0
-amount       = chargeAmount + outstanding - credit        // e.g. 6,960 + 8,700 = 15,660  ← WRONG
-```
+### 1. NIC Exposure in `buses` and `route_permits` (ERROR)
+**Problem:** Old `SELECT USING (auth.role() = 'authenticated')` policies from the initial migration were never dropped. The later `FOR ALL` policies (admin/supervisor) exist but the old permissive SELECT still allows any authenticated user to read NIC, owner addresses, and driver phone numbers.
 
-**The `outstanding` is already encoded in `payment_balance`** — it represents cumulative unpaid debt. Adding it to each new invoice means:
-- Month 1: Invoice = 6,960 + 8,700 (imported debt) = 15,660
-- Month 2: If unpaid, balance is now -15,660, so Invoice = 6,960 + 15,660 = 22,620
-- This snowballs every month — **duplicate compounding**
-
-**Additionally**, since you're going live for the first time:
-- 1,813 out of 1,835 students have `payment_balance = -fixed_monthly_amount` (imported with debt equal to one month's fee)
-- These balances came from the Excel import and are **stale/legacy** — they should be reset to 0 before the first real billing cycle
-
-## The Fix (3 parts)
-
-### 1. Reset all student balances to 0 for go-live
-Since no real payments have been recorded (only 11 test transactions), reset all students:
+**Fix:** Drop the old permissive SELECT policies:
 ```sql
-UPDATE school_students 
-SET payment_balance = 0, 
-    current_amount_due = 0,
-    updated_at = NOW()
-WHERE is_active = true;
+DROP POLICY IF EXISTS "All authenticated users can view buses" ON public.buses;
+DROP POLICY IF EXISTS "All authenticated users can view permits" ON public.route_permits;
 ```
-This gives you a clean slate for the first billing cycle.
 
-### 2. Fix the AR invoice amount formula
-Change the invoice amount to charge **only the fixed amount × billing percentage** — do NOT add outstanding balance. The outstanding debt is already tracked in `payment_balance` and should not be re-invoiced.
+### 2. `pending_invites` JWT Claim Bypass (WARN)
+**Problem:** A delete policy uses `auth.jwt() ->> 'user_role'` instead of the `has_any_role()` function. The latest migration already replaced this with `has_any_role`, but the old JWT-based "Anon admins can delete invites" policy may still exist.
 
-**Before:** `amount = chargeAmount + outstanding - credit`
-**After:** `amount = chargeAmount` (just the monthly charge)
+**Fix:** Drop any remaining JWT-based policy:
+```sql
+DROP POLICY IF EXISTS "Anon admins can delete invites" ON public.pending_invites;
+DROP POLICY IF EXISTS "Admins can delete invites" ON public.pending_invites;
+-- Re-create using has_any_role (already covered by "Users with admin roles can manage invites" FOR ALL)
+```
 
-This change applies to both code paths (lines 475-479 and lines 545-549).
+### 3. Realtime Channel Data Leak (ERROR)
+**Problem:** `special_hire_quotations`, `special_hire_payments`, `special_hire_invoices` are published to Supabase Realtime. Any authenticated user can subscribe to change events. Realtime respects RLS on the underlying tables, so the fix is to ensure those tables have proper role-scoped SELECT policies (they already do via the `has_any_role` migration).
 
-### 3. Fix the BulkARInvoiceDialog preview calculation
-The `calculateStudentAmount` function (line 76-81) uses the same broken formula. Fix it to match.
+**Fix:** The existing RLS on these tables already filters Realtime broadcasts. I'll verify and mark as mitigated — Supabase Realtime respects table-level RLS policies for row filtering.
 
-## Files to Change
+### 4. Customer PII Broad Access (ERROR)
+**Problem:** `lightvehicle_customers` and `sinotruck_customers` still have old permissive policies (`USING (true)` or `auth.uid() IS NOT NULL`). `yutong_customers` and `customers` were already fixed to admin/finance roles.
 
-| File | Change |
+**Fix:** Drop old permissive policies on `lightvehicle_customers` and `sinotruck_customers`, leaving only the role-scoped `has_any_role` policies from the Dec 2025 migration:
+```sql
+DROP POLICY IF EXISTS "Auth select lv_customers" ON public.lightvehicle_customers;
+DROP POLICY IF EXISTS "Auth insert lv_customers" ON public.lightvehicle_customers;
+DROP POLICY IF EXISTS "Auth update lv_customers" ON public.lightvehicle_customers;
+DROP POLICY IF EXISTS "Authenticated users can view customers" ON public.sinotruck_customers;
+DROP POLICY IF EXISTS "Authenticated users can manage customers" ON public.sinotruck_customers;
+```
+
+### 5. Agent Security Unnamed Finding (Payroll/Students/Temp Passwords)
+**Problem:** This finding references issues that were already fixed in previous sessions:
+- Payroll: restricted to finance/admin roles
+- Students: branch-scoped RLS
+- Temporary passwords: `plain_password_display` column already dropped
+- Profiles: restricted to self/admin
+
+**Fix:** Mark as fixed with explanation.
+
+## Files Changed
+
+| What | Action |
 |------|--------|
-| `src/hooks/useSchoolBusFinance.ts` | Fix invoice amount formula in 2 places (lines ~475-479 and ~545-549) — remove `outstanding` addition |
-| `src/components/school/BulkARInvoiceDialog.tsx` | Fix `calculateStudentAmount` (line ~76-81) to match |
-| **DB migration** | Reset `payment_balance` and `current_amount_due` to 0 for all active students |
+| **DB Migration** | Single SQL migration dropping ~7 stale permissive policies |
+| **Security Findings** | Mark fixed/mitigated via `manage_security_finding` |
 
-## What This Means for Your Workflow Going Forward
-
-1. **Generate AR Invoice** → charges `fixed_amount × billing_%` only (e.g., 80% of 8,700 = 6,960)
-2. **Record Payment** → updates `payment_balance` via the existing DB trigger
-3. If a student **underpays**, their `payment_balance` goes negative naturally
-4. If a student **overpays**, their `payment_balance` goes positive (credit)
-5. Next month's invoice is still just the fixed charge — the balance is tracked separately, not compounded into invoices
+No frontend code changes needed — this is purely database policy cleanup.
 
