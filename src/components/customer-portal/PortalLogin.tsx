@@ -38,48 +38,17 @@ export function PortalLogin({ onLogin }: PortalLoginProps) {
 
     setIsLoading(true);
     try {
-      // Check if email exists in portal access
-      const { data: accessData, error: accessError } = await supabase
-        .from("customer_portal_access")
-        .select(`
-          id,
-          customer_id,
-          email,
-          is_active,
-          customers (
-            customer_name,
-            company_id,
-            companies (company_name)
-          )
-        `)
-        .eq("email", email.toLowerCase())
-        .eq("is_active", true)
-        .single();
+      const { data, error } = await supabase.functions.invoke("customer-portal-auth", {
+        body: { action: "send_otp", email: email.toLowerCase().trim() },
+      });
 
-      if (accessError || !accessData) {
+      if (error || !data?.portalAccessId) {
         toast.error("Email not found. Please contact support to get portal access.");
         setIsLoading(false);
         return;
       }
 
-      // Generate OTP (6 digits)
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-      // Store OTP
-      const { error: updateError } = await supabase
-        .from("customer_portal_access")
-        .update({
-          otp_code: generatedOtp,
-          otp_expires_at: expiresAt.toISOString(),
-        })
-        .eq("id", accessData.id);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      setPortalAccessId(accessData.id);
+      setPortalAccessId(data.portalAccessId);
       setStep("otp");
       
       toast.success(`OTP has been sent to ${email}. Please check your email.`);
