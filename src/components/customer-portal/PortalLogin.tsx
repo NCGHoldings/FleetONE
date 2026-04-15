@@ -68,82 +68,38 @@ export function PortalLogin({ onLogin }: PortalLoginProps) {
 
     setIsLoading(true);
     try {
-      // Verify OTP
-      const { data: accessData, error: accessError } = await supabase
-        .from("customer_portal_access")
-        .select(`
-          id,
-          customer_id,
-          email,
-          otp_code,
-          otp_expires_at,
-          customers (
-            customer_name,
-            company_id,
-            companies (company_name)
-          )
-        `)
-        .eq("id", portalAccessId)
-        .single();
-
-      if (accessError || !accessData) {
-        toast.error("Session expired. Please try again.");
-        setStep("email");
-        return;
-      }
-
-      // Check OTP
-      if (accessData.otp_code !== otp) {
-        toast.error("Invalid OTP. Please try again.");
-        setOtp("");
-        return;
-      }
-
-      // Check expiry
-      if (new Date(accessData.otp_expires_at) < new Date()) {
-        toast.error("OTP has expired. Please request a new one.");
-        setStep("email");
-        return;
-      }
-
-      // Generate session token
-      const sessionToken = crypto.randomUUID();
-      const sessionExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-      // Create session
-      await supabase.from("customer_portal_sessions").insert({
-        portal_access_id: accessData.id,
-        session_token: sessionToken,
-        expires_at: sessionExpiry.toISOString(),
+      const { data, error } = await supabase.functions.invoke("customer-portal-auth", {
+        body: { action: "verify_otp", otp, portalAccessId },
       });
 
-      // Update last login
-      await supabase
-        .from("customer_portal_access")
-        .update({
-          last_login_at: new Date().toISOString(),
-          login_count: (accessData as any).login_count + 1,
-          otp_code: null,
-          otp_expires_at: null,
-        })
-        .eq("id", accessData.id);
+      if (error || !data?.sessionToken) {
+        const errorMsg = data?.error || "Login failed. Please try again.";
+        if (errorMsg === "OTP expired") {
+          toast.error("OTP has expired. Please request a new one.");
+          setStep("email");
+        } else if (errorMsg === "Invalid OTP") {
+          toast.error("Invalid OTP. Please try again.");
+          setOtp("");
+        } else {
+          toast.error(errorMsg);
+          setStep("email");
+        }
+        return;
+      }
 
-      // Clear OTP
       setOtp("");
 
-      // Call onLogin with session data
-      const customerData = accessData.customers as any;
       onLogin({
-        customerId: accessData.customer_id,
-        customerName: customerData?.customer_name || "Customer",
-        email: accessData.email,
-        sessionToken,
-        companyName: customerData?.companies?.company_name || "Company",
+        customerId: data.customerId,
+        customerName: data.customerName,
+        email: data.email,
+        sessionToken: data.sessionToken,
+        companyName: data.companyName,
       });
 
       toast.success("Welcome back!");
     } catch (error: any) {
-      toast.error("Login failed: " + error.message);
+      toast.error("Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
