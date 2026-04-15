@@ -279,30 +279,30 @@ export const DocumentTemplateManager = () => {
                       )}
                     </div>
                   </div>
-                  {template.is_default && (
+                  {(template as any).is_default && (
                     <Badge variant="secondary">Default</Badge>
                   )}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Badge className={getModuleBadgeColor(template.document_template_types?.module || "")}>
-                    {template.document_template_types?.type_name || "Unknown"}
+                  <Badge className={getModuleBadgeColor((template as any).document_template_types?.module || "")}>
+                    {(template as any).document_template_types?.type_name || "Unknown"}
                   </Badge>
                   <Badge variant="outline">
-                    {template.companies?.short_code || template.companies?.name || "No Company"}
+                    {(template as any).companies?.short_code || (template as any).companies?.name || "No Company"}
                   </Badge>
-                  {template.header_mode && template.header_mode !== 'logo_and_html' && (
+                  {(template as any).header_mode && (template as any).header_mode !== 'logo_and_html' && (
                     <Badge variant="secondary" className="text-xs">
-                      {template.header_mode === 'header_image' ? 'Full Banner' : 
-                       template.header_mode === 'logo_only' ? 'Logo Only' : 'Text Only'}
+                      {(template as any).header_mode === 'header_image' ? 'Full Banner' : 
+                       (template as any).header_mode === 'logo_only' ? 'Logo Only' : 'Text Only'}
                     </Badge>
                   )}
                 </div>
 
-                {template.header_image_url && template.header_mode !== 'html_only' && (
-                  <div className={`bg-muted rounded overflow-hidden ${template.header_mode === 'header_image' ? 'h-20' : 'h-16'}`}>
+                {(template as any).header_image_url && (template as any).header_mode !== 'html_only' && (
+                  <div className={`bg-muted rounded overflow-hidden ${(template as any).header_mode === 'header_image' ? 'h-20' : 'h-16'}`}>
                     <img 
-                      src={template.header_image_url} 
+                      src={(template as any).header_image_url} 
                       alt="Header" 
                       className="h-full w-full object-contain"
                     />
@@ -310,7 +310,7 @@ export const DocumentTemplateManager = () => {
                 )}
 
                 <div className="text-xs text-muted-foreground">
-                  <p>Version {template.version} • Updated {format(new Date(template.updated_at), "MMM dd, yyyy")}</p>
+                  <p>Version {(template as any).version} • Updated {format(new Date((template as any).updated_at || template.created_at), "MMM dd, yyyy")}</p>
                 </div>
 
                 <div className="flex gap-2 pt-2 border-t">

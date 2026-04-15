@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { CalendarIcon, FileSpreadsheet, Users, DollarSign, AlertCircle, CheckCircle, Loader2, AlertTriangle, Trash2, Percent, Search } from "lucide-react";
+import { CalendarIcon, FileSpreadsheet, Users, DollarSign, AlertCircle, CheckCircle, Loader2, AlertTriangle, Trash2, Percent } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useStudentsForBulkAR, useGenerateBulkARInvoices, useBranchFinanceSettings, useExistingBatch, useDeleteARBatch } from "@/hooks/useSchoolBusFinance";
@@ -28,7 +28,6 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [step, setStep] = useState<"select" | "confirm" | "processing" | "complete">("select");
   const [billingPercentage, setBillingPercentage] = useState<number>(80);
-  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: students, isLoading: studentsLoading } = useStudentsForBulkAR(branchId);
   const { data: settings, isLoading: settingsLoading } = useBranchFinanceSettings(branchId);
@@ -73,18 +72,10 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
 
   const selectedStudentsList = students?.filter((s) => selectedStudents.has(s.id)) || [];
 
-  const filteredStudents = students?.filter(s => 
-    s.student_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (s.admission_no && s.admission_no.toLowerCase().includes(searchQuery.toLowerCase()))
-  ) || [];
-
   // Calculate amount per student with billing percentage
   const calculateStudentAmount = (s: any) => {
     const fixedAmount = s.fixed_monthly_amount || 0;
-    const chargeAmount = fixedAmount * (billingPercentage / 100);
-    const outstanding = Math.abs(Math.min(s.payment_balance || 0, 0));
-    const credit = s.payment_balance > 0 ? s.payment_balance : 0;
-    return Math.max(0, chargeAmount + outstanding - credit);
+    return Math.max(0, fixedAmount * (billingPercentage / 100));
   };
 
   const totalAmount = selectedStudentsList.reduce((sum, s) => sum + calculateStudentAmount(s), 0);
@@ -290,45 +281,31 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
             </div>
 
             {/* Student List */}
-            <div className="flex-1 overflow-hidden border rounded-lg flex flex-col">
-              <div className="bg-muted border-b">
-                <div className="p-3 border-b">
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      placeholder="Search by student name or admission number..." 
-                      className="pl-9 h-9 bg-background" 
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
+            <div className="flex-1 overflow-hidden border rounded-lg">
+              <div className="p-3 bg-muted border-b flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={students?.length > 0 && selectedStudents.size === students.length}
+                    onCheckedChange={toggleAll}
+                  />
+                  <span className="text-sm font-medium">Select All</span>
                 </div>
-                <div className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      checked={students?.length > 0 && selectedStudents.size === students.length}
-                      onCheckedChange={toggleAll}
-                    />
-                    <span className="text-sm font-medium">Select All</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    {selectedStudents.size} of {students?.length || 0} selected
-                  </span>
-                </div>
+                <span className="text-sm text-muted-foreground">
+                  {selectedStudents.size} of {students?.length || 0} selected
+                </span>
               </div>
               <ScrollArea className="h-[250px]">
                 {studentsLoading ? (
                   <div className="flex items-center justify-center h-32">
                     <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
-                ) : filteredStudents.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-32 text-muted-foreground space-y-2">
-                    {searchQuery ? <Search className="h-8 w-8 opacity-20" /> : <Users className="h-8 w-8 opacity-20" />}
-                    <p>{searchQuery ? "No matching students found" : "No active students with amount due"}</p>
+                ) : students?.length === 0 ? (
+                  <div className="flex items-center justify-center h-32 text-muted-foreground">
+                    No active students with amount due
                   </div>
                 ) : (
                   <div className="divide-y">
-                    {filteredStudents.map((student) => {
+                    {students?.map((student) => {
                       const invoiceAmount = calculateStudentAmount(student);
                       const outstandingBal = Math.abs(Math.min(student.payment_balance || 0, 0));
                       return (

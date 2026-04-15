@@ -24,8 +24,8 @@ const NCG_HOLDING_ID = '93010b42-701d-4007-88ba-5d2daeb611ab';
 export const useFinanceApproval = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
-  const { companyId } = useCompany();
-  const effectiveCompanyId = companyId || '93010b42-701d-4007-88ba-5d2daeb611ab'; // Fallback to NCG Holdings if context missing
+  const { selectedCompanyId } = useCompany();
+  const effectiveCompanyId = selectedCompanyId || '93010b42-701d-4007-88ba-5d2daeb611ab'; // Fallback to NCG Holdings if context missing
 
   // Helper function to get approval signatures for a document
   const getDocumentApprovals = async (documentId: string) => {

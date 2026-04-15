@@ -61,8 +61,7 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
 
   const fixedAmount = student.fixed_monthly_amount || 0;
   const previousBalance = student.payment_balance || 0;
-  const arrears = previousBalance < 0 ? Math.abs(previousBalance) : 0;
-  const amountDue = fixedAmount + arrears;
+  const amountDue = student.current_amount_due || fixedAmount;
   const receivedAmount = parseFloat(amountReceived) || 0;
   const difference = receivedAmount - fixedAmount;
   const newBalance = previousBalance + difference;
@@ -256,17 +255,9 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
                 </span>
               </div>
               
-              <div className="flex justify-between">
-                <span className="font-medium">Current Month Fee:</span>
-                <span className="font-semibold">LKR {fixedAmount.toLocaleString()}</span>
-              </div>
-              
               <div className="flex justify-between pt-2 border-t">
-                <span className="font-bold text-lg text-primary">Total Payable Today:</span>
-                <span className="font-bold text-lg text-primary flex flex-col items-end">
-                  LKR {amountDue.toLocaleString()}
-                  {arrears > 0 && <span className="text-xs font-normal text-muted-foreground">(Fee + Arrears)</span>}
-                </span>
+                <span className="font-medium">Amount Due This Month:</span>
+                <span className="font-semibold">LKR {amountDue.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -383,21 +374,14 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span>Current Month Allocated:</span>
-                  <span className="font-medium">LKR {Math.min(receivedAmount, fixedAmount).toLocaleString()}</span>
+                  <span>Difference from Fixed Amount:</span>
+                  <span className={cn(
+                    "font-medium",
+                    difference < 0 ? "text-destructive" : "text-green-600"
+                  )}>
+                    LKR {Math.abs(difference).toLocaleString()} {difference < 0 ? "(short)" : "(extra)"}
+                  </span>
                 </div>
-                {receivedAmount > fixedAmount && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Applied to Arrears/Credit:</span>
-                    <span className="font-medium">+ LKR {(receivedAmount - fixedAmount).toLocaleString()}</span>
-                  </div>
-                )}
-                {receivedAmount < fixedAmount && (
-                  <div className="flex justify-between text-destructive">
-                    <span>Current Month Shortfall:</span>
-                    <span className="font-medium">- LKR {(fixedAmount - receivedAmount).toLocaleString()}</span>
-                  </div>
-                )}
                 <div className="flex justify-between pt-2 border-t">
                   <span className="font-semibold">New Balance:</span>
                   <span className={cn(

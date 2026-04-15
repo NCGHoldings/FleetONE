@@ -1,97 +1,64 @@
 
-What is happening
 
-- Your screenshot shows this Lovable project is currently connected to:
-  `globallyceum25-dot/ncg-fleetone-6b02f072`
-- In Lovable, if you disconnect GitHub and connect again, it does not reattach the old repo.
-- It creates a new GitHub repo from the current Lovable project.
-- So this is not random; it is the current Lovable GitHub behavior.
+# Plan: Fix Remaining Security Findings
 
-Important limitation
+## Summary
 
-- You cannot directly reconnect this existing Lovable project to your old existing GitHub repo.
-- Lovable currently supports exporting to a new repo, not attaching an already-created Lovable project back to an old repo.
+There are **5 active findings** across two scanners (`supabase_lov` and `agent_security`). I'll fix 4 via a single database migration and mark 1 as already fixed.
 
-Best way to fix it
+## Findings & Fixes
 
-1. Keep the currently connected Lovable repo as the active sync repo:
-   `globallyceum25-dot/ncg-fleetone-6b02f072`
+### 1. NIC Exposure in `buses` and `route_permits` (ERROR)
+**Problem:** Old `SELECT USING (auth.role() = 'authenticated')` policies from the initial migration were never dropped. The later `FOR ALL` policies (admin/supervisor) exist but the old permissive SELECT still allows any authenticated user to read NIC, owner addresses, and driver phone numbers.
 
-2. Merge your original repo into this connected repo, so you keep:
-   - old commit history
-   - old files
-   - latest Lovable changes
-
-3. After that, optionally set up a mirror workflow so your original repo also stays updated.
-
-Exact terminal guide
-
-Use the normal Mac Terminal app.
-
-Run this first:
-
-```text
-git clone https://github.com/globallyceum25-dot/ncg-fleetone-6b02f072.git
-cd ncg-fleetone-6b02f072
+**Fix:** Drop the old permissive SELECT policies:
+```sql
+DROP POLICY IF EXISTS "All authenticated users can view buses" ON public.buses;
+DROP POLICY IF EXISTS "All authenticated users can view permits" ON public.route_permits;
 ```
 
-Then add your old repo:
+### 2. `pending_invites` JWT Claim Bypass (WARN)
+**Problem:** A delete policy uses `auth.jwt() ->> 'user_role'` instead of the `has_any_role()` function. The latest migration already replaced this with `has_any_role`, but the old JWT-based "Anon admins can delete invites" policy may still exist.
 
-```text
-git remote add old https://github.com/YOUR-ORG/YOUR-OLD-REPO.git
-git fetch old
+**Fix:** Drop any remaining JWT-based policy:
+```sql
+DROP POLICY IF EXISTS "Anon admins can delete invites" ON public.pending_invites;
+DROP POLICY IF EXISTS "Admins can delete invites" ON public.pending_invites;
+-- Re-create using has_any_role (already covered by "Users with admin roles can manage invites" FOR ALL)
 ```
 
-Then merge the old repo history into the connected Lovable repo:
+### 3. Realtime Channel Data Leak (ERROR)
+**Problem:** `special_hire_quotations`, `special_hire_payments`, `special_hire_invoices` are published to Supabase Realtime. Any authenticated user can subscribe to change events. Realtime respects RLS on the underlying tables, so the fix is to ensure those tables have proper role-scoped SELECT policies (they already do via the `has_any_role` migration).
 
-```text
-git merge old/main --allow-unrelated-histories
+**Fix:** The existing RLS on these tables already filters Realtime broadcasts. I'll verify and mark as mitigated — Supabase Realtime respects table-level RLS policies for row filtering.
+
+### 4. Customer PII Broad Access (ERROR)
+**Problem:** `lightvehicle_customers` and `sinotruck_customers` still have old permissive policies (`USING (true)` or `auth.uid() IS NOT NULL`). `yutong_customers` and `customers` were already fixed to admin/finance roles.
+
+**Fix:** Drop old permissive policies on `lightvehicle_customers` and `sinotruck_customers`, leaving only the role-scoped `has_any_role` policies from the Dec 2025 migration:
+```sql
+DROP POLICY IF EXISTS "Auth select lv_customers" ON public.lightvehicle_customers;
+DROP POLICY IF EXISTS "Auth insert lv_customers" ON public.lightvehicle_customers;
+DROP POLICY IF EXISTS "Auth update lv_customers" ON public.lightvehicle_customers;
+DROP POLICY IF EXISTS "Authenticated users can view customers" ON public.sinotruck_customers;
+DROP POLICY IF EXISTS "Authenticated users can manage customers" ON public.sinotruck_customers;
 ```
 
-If your old repo uses a different branch name, replace `main` with that branch, for example `master`.
+### 5. Agent Security Unnamed Finding (Payroll/Students/Temp Passwords)
+**Problem:** This finding references issues that were already fixed in previous sessions:
+- Payroll: restricted to finance/admin roles
+- Students: branch-scoped RLS
+- Temporary passwords: `plain_password_display` column already dropped
+- Profiles: restricted to self/admin
 
-If there are merge conflicts
+**Fix:** Mark as fixed with explanation.
 
-- keep the newest correct files
-- then run:
+## Files Changed
 
-```text
-git add .
-git commit -m "Merge old repo into Lovable-connected repo"
-git push origin main
-```
+| What | Action |
+|------|--------|
+| **DB Migration** | Single SQL migration dropping ~7 stale permissive policies |
+| **Security Findings** | Mark fixed/mitigated via `manage_security_finding` |
 
-If you get “Repository not found”
+No frontend code changes needed — this is purely database policy cleanup.
 
-- the old repo URL is wrong, or
-- the old repo is private and your GitHub login is not authenticated
-
-Then do this:
-
-```text
-gh auth login
-gh repo clone YOUR-ORG/YOUR-OLD-REPO
-```
-
-or open the old repo in GitHub browser first and copy the exact HTTPS clone URL.
-
-If your goal is “connect my old repo directly inside Lovable”
-
-- that direct switch is not available right now for this project
-- the safe workaround is:
-  - keep the current Lovable-created repo connected
-  - merge your old repo into it
-  - optionally mirror back to the old repo
-
-If you want the repo under the correct organization/account
-
-- create a new Lovable project
-- connect GitHub
-- choose the correct GitHub org during setup
-- Lovable will still create a new repo there, not attach the old one
-
-Best next step from here
-
-- Find the exact old repo URL
-- Find whether its default branch is `main` or `master`
-- Then I can give you the exact commands with your real repo names and no guessing

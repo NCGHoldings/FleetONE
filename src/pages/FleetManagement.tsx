@@ -3,7 +3,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KPICard } from "@/components/dashboard/KPICard";
-import { Bus, Wrench, DollarSign, Calendar, MoreHorizontal, Plus, Loader2, Eye, Edit, History, CalendarPlus, UserX, CreditCard, FileSpreadsheet, ExternalLink, Upload } from "lucide-react";
+import { Bus, Wrench, DollarSign, Calendar, MoreHorizontal, Plus, Loader2, Eye, Edit, History, CalendarPlus, UserX, CreditCard, FileSpreadsheet, ExternalLink } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
   DropdownMenu,
@@ -36,8 +36,9 @@ import { FleetAlertsPanel } from "@/components/fleet/FleetAlertsPanel";
 import { BusDocumentPreviewModal } from "@/components/fleet/BusDocumentPreviewModal";
 import { useNavigate } from "react-router-dom";
 import busDocsManifest from "@/data/bus_documents.json";
-import { FleetFilterPanel, type FleetFilters, defaultFilters } from "@/components/fleet/FleetFilterPanel";
+import { FleetFilterPanel, FleetFilters, defaultFilters } from "@/components/fleet/FleetFilterPanel";
 import { FleetVehicleDataImport } from "@/components/fleet/FleetVehicleDataImport";
+import { Upload } from "lucide-react";
 
 interface Fleet {
   id: string;
@@ -98,6 +99,7 @@ const FleetManagementComponent = () => {
   const [masterDataSheetOpen, setMasterDataSheetOpen] = useState(false);
   const [docPreviewModalOpen, setDocPreviewModalOpen] = useState(false);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
+  const [vehicleImportOpen, setVehicleImportOpen] = useState(false);
   const [filters, setFilters] = useState<FleetFilters>({ ...defaultFilters });
   const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([]);
   const [subCategoryOptions, setSubCategoryOptions] = useState<{ id: string; name: string }[]>([]);
@@ -417,31 +419,38 @@ const FleetManagementComponent = () => {
       // Get unique bus IDs
       const uniqueBusIds = [...new Set(tripBuses?.map(trip => trip.bus_id) || [])];
 
-      // Fetch existing buses to avoid N+1 query checks
-      const { data: existingBuses } = await supabase.from('buses').select('id');
-      const existingIds = new Set(existingBuses?.map(b => b.id) || []);
+      // Check if these buses exist in buses table, if not create them
+      for (const busId of uniqueBusIds) {
+        if (!busId) continue;
+        
+        const { data: existingBus } = await supabase
+          .from('buses')
+          .select('id')
+          .eq('id', busId)
+          .maybeSingle();
 
-      const newBusesToInsert = uniqueBusIds
-        .filter(id => id && !existingIds.has(id))
-        .map(busId => ({
-            id: busId,
-            bus_no: `BUS-${busId.slice(-8)}`,
-            type: 'Normal',
-            model: 'Unknown',
-            year: new Date().getFullYear(),
-            capacity: 50,
-            status: 'active',
-            current_mileage: 0,
-            service_interval_km: 10000,
-            expected_km_per_liter: 8.0,
-        }));
+        if (!existingBus) {
+          // Auto-create bus entry with bus_id
+          const { error: insertError } = await supabase
+            .from('buses')
+            .insert({
+              id: busId,
+              bus_no: `BUS-${busId.slice(-8)}`, // Generate bus number from ID
+              type: 'Normal',
+              model: 'Unknown',
+              year: new Date().getFullYear(),
+              capacity: 50,
+              status: 'active',
+              current_mileage: 0,
+              service_interval_km: 10000,
+              expected_km_per_liter: 8.0,
+            });
 
-      if (newBusesToInsert.length > 0) {
-        const { error: insertError } = await supabase.from('buses').insert(newBusesToInsert);
-        if (insertError) {
-          console.error('Error auto-creating missing buses:', insertError);
-        } else {
-          console.log(`Auto-created ${newBusesToInsert.length} missing buses.`);
+          if (insertError) {
+            console.error('Error auto-creating bus:', insertError);
+          } else {
+            console.log(`Auto-created bus with ID: ${busId}`);
+          }
         }
       }
     } catch (error) {
@@ -477,29 +486,39 @@ const FleetManagementComponent = () => {
         .from('driver_allocations')
         .select('trip_id, notes, bus_id');
 
-      // Get all daily trips for comprehensive matching in one go to eliminate N+1
+      // Get all daily trips for comprehensive matching
       const { data: allDailyTrips } = await supabase
         .from('daily_trips')
-        .select('*, routes(route_name)');
+        .select('*');
 
-      const busesToUpdate: {id: string, current_mileage?: number, route?: string}[] = [];
-
-      // Process buses natively in memory
-      const busesWithMetrics = buses?.map((bus) => {
+      // For each bus, get the latest data from daily_trips
+      const busesWithMetrics = await Promise.all(
+        buses?.map(async (bus) => {
           try {
-            // Method 1: Direct bus_id matching in memory
-            let latestTrip = allDailyTrips
-              ?.filter(t => t.bus_id === bus.id && t.odometer_end != null)
-              .sort((a,b) => {
-                 const dateA = new Date(a.trip_date + ' ' + (a.created_at || '')).getTime();
-                 const dateB = new Date(b.trip_date + ' ' + (b.created_at || '')).getTime();
-                 return dateB - dateA;
-              })[0] || null;
+            console.log(`🔍 Processing bus: ${bus.bus_no} (ID: ${bus.id})`);
 
-            let allTripsData = allDailyTrips?.filter(t => t.bus_id === bus.id && t.income != null) || [];
+            // Method 1: Direct bus_id matching (Primary)
+            const latestTrip = await supabase
+              .from('daily_trips')
+              .select('odometer_end, trip_date, created_at, trip_no')
+              .eq('bus_id', bus.id)
+              .not('odometer_end', 'is', null)
+              .order('trip_date', { ascending: false })
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            const allTrips = await supabase
+              .from('daily_trips')
+              .select('income, trip_date, route_id, route_label, routes(route_name)')
+              .eq('bus_id', bus.id)
+              .not('income', 'is', null);
 
             // Method 2: Fallback - Match by bus_no from driver_allocations notes
-            if ((!latestTrip || !allTripsData.length) && allocations) {
+            if ((!latestTrip.data || !allTrips.data?.length) && allocations) {
+              console.log(`🔄 Fallback: Matching ${bus.bus_no} by notes...`);
+              
+              // Find allocations that mention this bus_no in notes
               const matchingAllocations = allocations.filter(allocation => {
                 try {
                   const notes = typeof allocation.notes === 'string' 
@@ -512,58 +531,72 @@ const FleetManagementComponent = () => {
               });
 
               if (matchingAllocations.length > 0) {
+                console.log(`📋 Found ${matchingAllocations.length} matching allocations for ${bus.bus_no}`);
+                
+                // Get trips for these allocations
                 const tripIds = matchingAllocations.map(a => a.trip_id);
-                const matchingTrips = allDailyTrips?.filter(trip => tripIds.includes(trip.trip_no)) || [];
+                const matchingTrips = allDailyTrips?.filter(trip => 
+                  tripIds.includes(trip.trip_no)
+                ) || [];
 
                 if (matchingTrips.length > 0) {
-                  const tripsWithOdo = matchingTrips.filter(t => t.odometer_end != null).sort((a, b) => {
-                      const dateA = new Date(a.trip_date + ' ' + (a.created_at || '')).getTime();
-                      const dateB = new Date(b.trip_date + ' ' + (b.created_at || '')).getTime();
-                      return dateB - dateA;
-                  });
+                  // Get latest trip with odometer_end
+                  const tripsWithOdo = matchingTrips
+                    .filter(trip => trip.odometer_end != null)
+                    .sort((a, b) => {
+                      const dateA = new Date(a.trip_date + ' ' + (a.created_at || ''));
+                      const dateB = new Date(b.trip_date + ' ' + (b.created_at || ''));
+                      return dateB.getTime() - dateA.getTime();
+                    });
 
-                  if (tripsWithOdo.length > 0) latestTrip = tripsWithOdo[0];
-                  
-                  allTripsData = matchingTrips.filter(t => t.income != null).map(trip => ({
-                      ...trip,
-                      routes: trip.routes || { route_name: `Route-${trip.route_id?.slice(0, 8) || 'Unknown'}` }
-                  }));
+                  if (tripsWithOdo.length > 0) {
+                    latestTrip.data = tripsWithOdo[0];
+                    console.log(`🎯 Found odometer reading: ${tripsWithOdo[0].odometer_end}km for ${bus.bus_no}`);
+                  }
+
+                  // Update allTrips data - transform to match expected structure
+                  allTrips.data = matchingTrips
+                    .filter(trip => trip.income != null)
+                    .map(trip => ({
+                      income: trip.income || 0,
+                      trip_date: trip.trip_date,
+                      route_id: trip.route_id || '',
+                      route_label: trip.route_label || '',
+                      routes: { route_name: `Route-${trip.route_id?.slice(0, 8) || 'Unknown'}` }
+                    }));
                 }
               }
             }
 
+            // Update mileage if we have a newer reading
+            let currentMileage = bus.current_mileage || 0;
+            if (latestTrip.data?.odometer_end && latestTrip.data.odometer_end > currentMileage) {
+              currentMileage = latestTrip.data.odometer_end;
+              
+              // Update in database
+              await supabase
+                .from('buses')
+                .update({ current_mileage: currentMileage })
+                .eq('id', bus.id);
+              
+              console.log(`📈 Updated ${bus.bus_no} mileage: ${currentMileage}km`);
+            }
+
             // Calculate metrics
-            const totalRevenue = allTripsData.reduce((sum, trip) => sum + (trip.income || 0), 0);
-            const uniqueTripDates = [...new Set(allTripsData.map(trip => trip.trip_date))];
+            const totalRevenue = allTrips.data?.reduce((sum, trip) => sum + (trip.income || 0), 0) || 0;
+            const uniqueTripDates = [...new Set(allTrips.data?.map(trip => trip.trip_date) || [])];
             const runningDays = uniqueTripDates.length;
             const avgDailyRevenue = runningDays > 0 ? totalRevenue / runningDays : 0;
 
             // Get most common route
-            const routeNames = allTripsData.map(trip => trip.routes?.route_name || trip.route_label).filter(Boolean);
+            const routeNames = allTrips.data?.map(trip => trip.routes?.route_name || trip.route_label).filter(Boolean) || [];
             const mostCommonRoute = routeNames.length > 0 
               ? routeNames.sort((a, b) => 
                   routeNames.filter(v => v === a).length - routeNames.filter(v => v === b).length
                 ).pop()
               : null;
 
-            // Database Sink - Detect if route or mileage needs pushing
-            let currentMileage = bus.current_mileage || 0;
-            let needsUpdate = false;
-            let updatePayload: any = { id: bus.id };
-
-            if (latestTrip?.odometer_end && latestTrip.odometer_end > currentMileage) {
-              currentMileage = latestTrip.odometer_end;
-              updatePayload.current_mileage = currentMileage;
-              needsUpdate = true;
-            }
-            if (mostCommonRoute && mostCommonRoute !== bus.route) {
-              updatePayload.route = mostCommonRoute;
-              needsUpdate = true;
-            }
-
-            if (needsUpdate) {
-              busesToUpdate.push(updatePayload);
-            }
+            console.log(`✅ ${bus.bus_no}: Mileage=${currentMileage}, Revenue=${totalRevenue}, Days=${runningDays}`);
 
             return {
               ...bus,
@@ -576,27 +609,31 @@ const FleetManagementComponent = () => {
 
           } catch (busError) {
             console.error(`Error processing bus ${bus.bus_no}:`, busError);
-            return { ...bus, running_days: 0, avg_daily_revenue: 0, total_revenue: 0 } as Fleet;
+            return {
+              ...bus,
+              running_days: 0,
+              avg_daily_revenue: 0,
+              total_revenue: 0,
+            } as Fleet;
           }
-      }) || [];
+        }) || []
+      );
 
       setData(busesWithMetrics);
-
-      // Perform bulk database updates in the background unblocking the UI rendering
-      if (busesToUpdate.length > 0) {
-        Promise.all(busesToUpdate.map(payload => {
-            const { id, ...dataToUpdate } = payload;
-            return supabase.from('buses').update(dataToUpdate).eq('id', id);
-        })).catch(err => console.error("Error bulk updating fleet sync: ", err));
-      }
       
+      // Check for unlinked data and report
       const busesWithData = busesWithMetrics.filter(bus => bus.current_mileage > 0 || bus.running_days > 0);
       const busesWithoutData = busesWithMetrics.filter(bus => bus.current_mileage === 0 && bus.running_days === 0);
       
       toast({
-        title: "✅ Fleet Data Loaded Lightning Fast",
-        description: `Updated ${busesWithData.length}/${busesWithMetrics.length} buses securely in-memory.`,
+        title: "✅ Fleet Data Updated",
+        description: `Updated ${busesWithData.length}/${busesWithMetrics.length} buses with trip data. ${busesWithoutData.length} buses need data linkage.`,
       });
+
+      // Log buses without data for debugging
+      if (busesWithoutData.length > 0) {
+        console.log('🔍 Buses without linked trip data:', busesWithoutData.map(b => b.bus_no));
+      }
 
     } catch (error) {
       console.error('Error in fetchFleet:', error);
@@ -610,60 +647,6 @@ const FleetManagementComponent = () => {
     }
   };
 
-  const [vehicleImportOpen, setVehicleImportOpen] = useState(false);
-  const [customSearch, setCustomSearch] = useState("");
-
-  const distinctTypes = useMemo(() => Array.from(new Set(data.map(b => b.type).filter(Boolean))), [data]);
-  const distinctModels = useMemo(() => Array.from(new Set(data.map(b => b.model).filter(Boolean))), [data]);
-  const distinctYears = useMemo(() => Array.from(new Set(data.map(b => b.year).filter(Boolean))), [data]);
-  const distinctRoutes = useMemo(() => Array.from(new Set(data.map(b => b.route).filter(Boolean))), [data]);
-
-  const filteredData = useMemo(() => {
-    return data.filter(bus => {
-      // Free text search
-      if (customSearch && !bus.bus_no.toLowerCase().includes(customSearch.toLowerCase())) {
-        return false;
-      }
-      
-      // Exact matches
-      if (filters.categories?.length > 0 && (!bus.category_id || !filters.categories.includes(bus.category_id))) return false;
-      if (filters.subCategories?.length > 0 && (!bus.sub_category_id || !filters.subCategories.includes(bus.sub_category_id))) return false;
-      if (filters.types?.length > 0 && !filters.types.includes(bus.type)) return false;
-      if (filters.models?.length > 0 && !filters.models.includes(bus.model)) return false;
-      if (filters.years?.length > 0 && !filters.years.includes(bus.year)) return false;
-      if (filters.statuses?.length > 0 && !filters.statuses.includes(bus.status)) return false;
-      if (filters.routes?.length > 0 && (!bus.route || !filters.routes.includes(bus.route))) return false;
-      
-      // Range filters
-      if (filters.mileageMin && bus.current_mileage < Number(filters.mileageMin)) return false;
-      if (filters.mileageMax && bus.current_mileage > Number(filters.mileageMax)) return false;
-      if (filters.runningDaysMin && (bus.running_days || 0) < Number(filters.runningDaysMin)) return false;
-      if (filters.runningDaysMax && (bus.running_days || 0) > Number(filters.runningDaysMax)) return false;
-      if (filters.revenueMin && (bus.avg_daily_revenue || 0) < Number(filters.revenueMin)) return false;
-      if (filters.revenueMax && (bus.avg_daily_revenue || 0) > Number(filters.revenueMax)) return false;
-
-      return true;
-    });
-  }, [data, filters, customSearch]);
-
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (filters.categories?.length) count += filters.categories.length;
-    if (filters.subCategories?.length) count += filters.subCategories.length;
-    if (filters.types?.length) count += filters.types.length;
-    if (filters.models?.length) count += filters.models.length;
-    if (filters.years?.length) count += filters.years.length;
-    if (filters.statuses?.length) count += filters.statuses.length;
-    if (filters.routes?.length) count += filters.routes.length;
-    if (filters.insuranceExpiry) count++;
-    if (filters.licenseExpiry) count++;
-    if (filters.mileageMin || filters.mileageMax) count++;
-    if (filters.runningDaysMin || filters.runningDaysMax) count++;
-    if (filters.revenueMin || filters.revenueMax) count++;
-    return count;
-  }, [filters]);
-
-
   const handleExport = () => {
     console.log("Exporting fleet data...");
     // Export logic will be implemented here
@@ -672,6 +655,48 @@ const FleetManagementComponent = () => {
   const handleAddBus = () => {
     console.log("Adding new bus...");
     // Add bus logic will be implemented here
+  };
+
+  // Filtering logic
+  const distinctTypes = useMemo(() => [...new Set(data.map(b => b.type).filter(Boolean))], [data]);
+  const distinctModels = useMemo(() => [...new Set(data.map(b => b.model).filter(Boolean))], [data]);
+  const distinctYears = useMemo(() => [...new Set(data.map(b => b.year).filter(Boolean))], [data]);
+  const distinctRoutes = useMemo(() => [...new Set(data.map(b => b.route).filter(Boolean) as string[])], [data]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.categories.length) count++;
+    if (filters.subCategories.length) count++;
+    if (filters.types.length) count++;
+    if (filters.models.length) count++;
+    if (filters.years.length) count++;
+    if (filters.routes.length) count++;
+    if (filters.statuses.length) count++;
+    return count;
+  }, [filters]);
+
+  const filteredData = useMemo(() => {
+    return data.filter(bus => {
+      if (filters.categories.length && (!bus.category_id || !filters.categories.includes(bus.category_id))) return false;
+      if (filters.subCategories.length && (!bus.sub_category_id || !filters.subCategories.includes(bus.sub_category_id))) return false;
+      if (filters.types.length && !filters.types.includes(bus.type)) return false;
+      if (filters.models.length && !filters.models.includes(bus.model)) return false;
+      if (filters.years.length && !filters.years.includes(bus.year)) return false;
+      if (filters.routes.length && (!bus.route || !filters.routes.includes(bus.route))) return false;
+      if (filters.statuses.length && !filters.statuses.includes(bus.status)) return false;
+      return true;
+    });
+  }, [data, filters]);
+
+  const customSearch = (items: Fleet[], searchTerm: string) => {
+    const term = searchTerm.toLowerCase();
+    return items.filter(item =>
+      item.bus_no.toLowerCase().includes(term) ||
+      item.type.toLowerCase().includes(term) ||
+      (item.route || '').toLowerCase().includes(term) ||
+      item.model.toLowerCase().includes(term) ||
+      (item.owner_name || '').toLowerCase().includes(term)
+    );
   };
 
   // Calculate KPIs
