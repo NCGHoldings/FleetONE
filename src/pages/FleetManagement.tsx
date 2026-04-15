@@ -657,6 +657,48 @@ const FleetManagementComponent = () => {
     // Add bus logic will be implemented here
   };
 
+  // Filtering logic
+  const distinctTypes = useMemo(() => [...new Set(data.map(b => b.type).filter(Boolean))], [data]);
+  const distinctModels = useMemo(() => [...new Set(data.map(b => b.model).filter(Boolean))], [data]);
+  const distinctYears = useMemo(() => [...new Set(data.map(b => String(b.year)).filter(Boolean))], [data]);
+  const distinctRoutes = useMemo(() => [...new Set(data.map(b => b.route).filter(Boolean) as string[])], [data]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.categories.length) count++;
+    if (filters.subCategories.length) count++;
+    if (filters.types.length) count++;
+    if (filters.models.length) count++;
+    if (filters.years.length) count++;
+    if (filters.routes.length) count++;
+    if (filters.statuses.length) count++;
+    return count;
+  }, [filters]);
+
+  const filteredData = useMemo(() => {
+    return data.filter(bus => {
+      if (filters.categories.length && (!bus.category_id || !filters.categories.includes(bus.category_id))) return false;
+      if (filters.subCategories.length && (!bus.sub_category_id || !filters.subCategories.includes(bus.sub_category_id))) return false;
+      if (filters.types.length && !filters.types.includes(bus.type)) return false;
+      if (filters.models.length && !filters.models.includes(bus.model)) return false;
+      if (filters.years.length && !filters.years.includes(String(bus.year))) return false;
+      if (filters.routes.length && (!bus.route || !filters.routes.includes(bus.route))) return false;
+      if (filters.statuses.length && !filters.statuses.includes(bus.status)) return false;
+      return true;
+    });
+  }, [data, filters]);
+
+  const customSearch = (item: Fleet, searchTerm: string) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      item.bus_no.toLowerCase().includes(term) ||
+      item.type.toLowerCase().includes(term) ||
+      (item.route || '').toLowerCase().includes(term) ||
+      item.model.toLowerCase().includes(term) ||
+      (item.owner_name || '').toLowerCase().includes(term)
+    );
+  };
+
   // Calculate KPIs
   const totalBuses = data.length;
   const activeBuses = data.filter(bus => bus.status === 'active').length;

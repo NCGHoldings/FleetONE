@@ -224,16 +224,14 @@ export function LandedCostVoucherForm({ open, onOpenChange, onSuccess }: { open:
       // Create Voucher
       const { data: voucher, error: vError } = await supabase
         .from('landed_cost_vouchers')
-        .insert({
-          company_id: values.company_id as any,
-          project_id: values.project_id || null,
-          section_type: values.section_type,
+        .insert([{
           grn_id: values.grn_id,
           allocation_method: values.allocation_method,
           total_additional_cost: totalCharges,
           status: 'draft',
-          posting_date: new Date().toISOString().split('T')[0]
-        })
+          posting_date: new Date().toISOString().split('T')[0],
+          voucher_number: `LCV-${Date.now()}`
+        }] as any)
         .select()
         .single();
         
