@@ -35,8 +35,7 @@ export function useLeaveRequests() {
   
   const fetchLeaveRequests = async (): Promise<LeaveRequest[]> => {
     // Basic fetch - in a real app, you'd filter by organization_id
-    const { data, error } = await supabase
-      .from('leave_requests')
+    const { data, error } = await (supabase.from as any)('leave_requests')
       .select(`
         *,
         profiles:created_by(first_name, last_name)
@@ -59,8 +58,7 @@ export function useLeaveRequests() {
 
   const updateLeaveStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: LeaveStatus }) => {
-      const { data, error } = await supabase
-        .from('leave_requests')
+      const { data, error } = await (supabase.from as any)('leave_requests')
         .update({ status })
         .eq('id', id)
         .select()

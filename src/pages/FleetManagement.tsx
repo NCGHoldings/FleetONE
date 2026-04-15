@@ -36,6 +36,9 @@ import { FleetAlertsPanel } from "@/components/fleet/FleetAlertsPanel";
 import { BusDocumentPreviewModal } from "@/components/fleet/BusDocumentPreviewModal";
 import { useNavigate } from "react-router-dom";
 import busDocsManifest from "@/data/bus_documents.json";
+import { FleetFilterPanel, FleetFilters, defaultFilters } from "@/components/fleet/FleetFilterPanel";
+import { FleetVehicleDataImport } from "@/components/fleet/FleetVehicleDataImport";
+import { Upload } from "lucide-react";
 
 interface Fleet {
   id: string;
@@ -96,6 +99,7 @@ const FleetManagementComponent = () => {
   const [masterDataSheetOpen, setMasterDataSheetOpen] = useState(false);
   const [docPreviewModalOpen, setDocPreviewModalOpen] = useState(false);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
+  const [vehicleImportOpen, setVehicleImportOpen] = useState(false);
   const [filters, setFilters] = useState<FleetFilters>({ ...defaultFilters });
   const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([]);
   const [subCategoryOptions, setSubCategoryOptions] = useState<{ id: string; name: string }[]>([]);

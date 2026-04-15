@@ -37,8 +37,7 @@ export function LoadSavedRouteDialog({ open, onOpenChange, onRouteSelected }: Pr
   const fetchRoutes = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("saved_routes")
+      const { data, error } = await (supabase.from as any)("saved_routes")
         .select("*")
         .order("created_at", { ascending: false });
       
@@ -46,7 +45,7 @@ export function LoadSavedRouteDialog({ open, onOpenChange, onRouteSelected }: Pr
         console.warn("Could not fetch saved routes. Has the migration run?", error);
         setRoutes([]);
       } else {
-        setRoutes(data || []);
+        setRoutes((data || []) as any);
       }
     } catch (err) {
       console.error(err);

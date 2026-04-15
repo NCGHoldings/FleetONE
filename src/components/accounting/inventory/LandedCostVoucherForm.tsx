@@ -130,8 +130,8 @@ export function LandedCostVoucherForm({ open, onOpenChange, onSuccess }: { open:
         { data: aData }
       ] = await Promise.all([
         supabase.from('companies').select('id, name').order('name'),
-        supabase.from('suppliers').select('id, supplier_name').order('supplier_name'),
-        supabase.from('chart_of_accounts').select('id, account_code, account_name').eq('account_type', 'Liability').order('account_code')
+        (supabase.from as any)('suppliers').select('id, supplier_name').order('supplier_name'),
+        supabase.from('chart_of_accounts').select('id, account_code, account_name').eq('account_type', 'liability' as any).order('account_code')
       ]);
       setCompanies(cData || []);
       setSuppliers(sData || []);
@@ -156,8 +156,7 @@ export function LandedCostVoucherForm({ open, onOpenChange, onSuccess }: { open:
 
   const loadGRNItems = async (grnId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('grn_items')
+      const { data, error } = await (supabase.from as any)('grn_items')
         .select(`
           id, quantity, unit_price,
           items (id, name)
@@ -166,7 +165,7 @@ export function LandedCostVoucherForm({ open, onOpenChange, onSuccess }: { open:
         
       if (error) throw error;
       
-      const formattedItems = data?.map(d => ({
+      const formattedItems = (data as any[])?.map((d: any) => ({
         id: d.id,
         item_id: d.items?.id || '',
         item_name: d.items?.name || 'Unknown Item',
@@ -226,7 +225,7 @@ export function LandedCostVoucherForm({ open, onOpenChange, onSuccess }: { open:
       const { data: voucher, error: vError } = await supabase
         .from('landed_cost_vouchers')
         .insert({
-          company_id: values.company_id,
+          company_id: values.company_id as any,
           project_id: values.project_id || null,
           section_type: values.section_type,
           grn_id: values.grn_id,
@@ -262,12 +261,10 @@ export function LandedCostVoucherForm({ open, onOpenChange, onSuccess }: { open:
         .insert(calculatedItems.map(item => ({
           voucher_id: voucher.id,
           item_id: item.item_id,
-          original_qty: item.quantity,
-          original_unit_cost: item.unit_price,
+          original_cost: item.unit_price * item.quantity,
+          final_cost: item.landedUnitPrice * item.quantity,
           allocated_cost: item.allocatedAmount,
-          new_unit_cost: item.landedUnitPrice,
-          is_duty_exempt: item.is_duty_exempt
-        })));
+        })) as any);
 
       if (iError) throw iError;
 
