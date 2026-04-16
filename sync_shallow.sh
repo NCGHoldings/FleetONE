@@ -36,10 +36,14 @@ git commit -m "chore: pure lovable sync"
 
 # 4. Push directly to Lovable Server
 echo "Linking to Lovable..."
-git remote add lovable https://github.com/globallyceum25-dot/ncg-fleetone-75503699.git
+git remote add lovable https://github.com/globallyceum25-dot/ncg-fleetone-545c8dda.git
 
 echo "Blasting codebase to server... This will actually take 3 seconds!"
 git push -f lovable main
 
 echo "✅ SUPER SUCCESS! Lovable is now fully synced!"
+echo "Now pushing to NCGHoldings Main Repository..."
+cd "$ORIGINAL_DIR"
+git push origin main
+echo "🚀 BOTH REPOSITORIES ARE NOW 100% IN SYNC!"
 rm -rf /tmp/lovable-sync
