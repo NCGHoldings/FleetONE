@@ -475,6 +475,9 @@ export function useGenerateBulkARInvoices() {
           const fixedAmount = student.fixed_monthly_amount || 0;
           const amount = Math.max(0, fixedAmount * (effectivePercentage / 100));
 
+          const advanceApplyAmount = Math.max(0, Math.min(student.payment_balance || 0, amount));
+          const status = advanceApplyAmount >= amount ? "paid" : advanceApplyAmount > 0 ? "partial" : "posted";
+
           const { data, error } = await supabase
             .from("school_ar_invoices")
             .insert({
@@ -483,20 +486,22 @@ export function useGenerateBulkARInvoices() {
               invoice_number: invoiceNumber,
               invoice_month: format(invoiceMonth, "yyyy-MM-dd"),
               amount: amount,
-              status: "pending",
-              paid_amount: 0,
+              status: status,
+              paid_amount: advanceApplyAmount,
             })
             .select()
             .single();
 
           if (error) throw error;
           
-          // CRITICAL: Update the student's actual balance and amount due!
+          // CRITICAL: Update the student's actual balance and amount due mathematically safely
+          const updatedPaymentBalance = (student.payment_balance || 0) - amount;
+          
           await supabase
             .from("school_students")
             .update({
-              current_amount_due: (student.current_amount_due || 0) + amount,
-              payment_balance: (student.payment_balance || 0) - amount
+              current_amount_due: Math.max(0, -updatedPaymentBalance),
+              payment_balance: updatedPaymentBalance
             })
             .eq("id", student.id);
 
@@ -614,8 +619,9 @@ export function useGenerateBulkARInvoices() {
           // 3b. Auto-apply student advance balance if they have credit (payment_balance > 0)
           // This creates: DR Advance Payments Liability / CR Trade Receivables
           const liabilityAccountId = settings.advance_payments_liability_account_id;
-          if (liabilityAccountId && student.payment_balance > 0) {
-            const advanceApplyAmount = Math.min(student.payment_balance, amount);
+          const advanceApplyAmount = Math.max(0, Math.min(student.payment_balance || 0, amount));
+          
+          if (liabilityAccountId && advanceApplyAmount > 0) {
             const advRand = Math.random().toString(36).substring(2, 8).toUpperCase();
             const advanceEntryNumber = `SBS-ADV-${format(new Date(), "yyyyMM")}-${advRand}`;
 
@@ -665,6 +671,9 @@ export function useGenerateBulkARInvoices() {
           // 4. Create individual Finance ERP AR Invoice for this student
           let arInvoiceId: string | null = null;
           if (customerId) {
+            const netBalanceRemaining = amount - advanceApplyAmount;
+            const arStatus = advanceApplyAmount >= amount ? "paid" : advanceApplyAmount > 0 ? "partial" : "unpaid";
+
             const { data: arInvoice, error: arError } = await supabase
               .from("ar_invoices")
               .insert({
@@ -675,9 +684,9 @@ export function useGenerateBulkARInvoices() {
                 invoice_date: format(new Date(), "yyyy-MM-dd"),
                 due_date: format(new Date(new Date().setDate(new Date().getDate() + 30)), "yyyy-MM-dd"),
                 total_amount: amount,
-                balance: amount,
-                paid_amount: 0,
-                status: "unpaid",
+                balance: netBalanceRemaining,
+                paid_amount: advanceApplyAmount,
+                status: arStatus,
                 reference: `${student.student_name} - ${format(invoiceMonth, "MMM yyyy")}`,
                 notes: `School Bus AR for ${student.student_name}`,
                 journal_entry_id: journalEntry.id,
@@ -691,6 +700,8 @@ export function useGenerateBulkARInvoices() {
           }
 
           // 5. Create school invoice linked to Finance AR invoice and Journal Entry
+          const status = advanceApplyAmount >= amount ? "paid" : advanceApplyAmount > 0 ? "partial" : "posted";
+          
           const { error: schoolInvError } = await supabase
             .from("school_ar_invoices")
             .insert({
@@ -699,8 +710,8 @@ export function useGenerateBulkARInvoices() {
               invoice_number: invoiceNumber,
               invoice_month: format(invoiceMonth, "yyyy-MM-dd"),
               amount: amount,
-              status: "posted",
-              paid_amount: 0,
+              status: status,
+              paid_amount: advanceApplyAmount,
               ar_invoice_id: arInvoiceId,
               journal_entry_id: journalEntry.id,
             });
@@ -710,12 +721,14 @@ export function useGenerateBulkARInvoices() {
             throw schoolInvError;
           }
           
-          // CRITICAL: Update the student's actual balance and amount due!
+          // CRITICAL: Update the student's actual balance and amount due mathematically safely
+          const updatedPaymentBalance = (student.payment_balance || 0) - amount;
+
           await supabase
             .from("school_students")
             .update({
-              current_amount_due: (student.current_amount_due || 0) + amount,
-              payment_balance: (student.payment_balance || 0) - amount
+              current_amount_due: Math.max(0, -updatedPaymentBalance),
+              payment_balance: updatedPaymentBalance
             })
             .eq("id", student.id);
         }));

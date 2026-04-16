@@ -1,4 +1,5 @@
 #!/bin/bash
+ORIGINAL_DIR=$(pwd)
 echo "Fixing Golden Repo Upload..."
 
 git config --global http.version HTTP/1.1
