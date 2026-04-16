@@ -25,6 +25,8 @@ rm -rf .git
 git init
 git config http.version HTTP/1.1
 git config http.postBuffer 524288000
+git config user.email "bot@ncgholdings.com"
+git config user.name "Lovable Sync Bot"
 git branch -M main
 
 # Make absolutely sure the 341MB won't attach!
