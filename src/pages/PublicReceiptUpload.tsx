@@ -1,0 +1,463 @@
+import { useState } from "react";
+import { Upload, FileImage, CheckCircle, Loader2, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { supabasePublic as supabase } from "@/integrations/supabase/public-client";
+import { Badge } from "@/components/ui/badge";
+import { PublicPaymentDetails } from "@/components/school/PublicPaymentDetails";
+
+export default function PublicReceiptUpload() {
+  const { toast } = useToast();
+  const [step, setStep] = useState<'admission' | 'confirm' | 'upload' | 'success'>('admission');
+  const [admissionNo, setAdmissionNo] = useState("");
+  const [studentData, setStudentData] = useState<any>(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [submissionId, setSubmissionId] = useState("");
+
+  const handleSearchStudent = async () => {
+    const trimmedAdmissionNo = admissionNo.trim();
+    
+    // Input validation
+    if (!trimmedAdmissionNo) {
+      toast({
+        title: "Admission Number Required",
+        description: "Please enter your child's admission number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate admission number format (alphanumeric, 5-20 characters)
+    if (!/^[A-Za-z0-9-]+$/.test(trimmedAdmissionNo) || trimmedAdmissionNo.length < 3 || trimmedAdmissionNo.length > 20) {
+      toast({
+        title: "Invalid Format",
+        description: "Admission number must be 3-20 characters (letters, numbers, and hyphens only)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Use secure verification function instead of direct SELECT query
+      // This protects student PII from being exposed through anonymous queries
+      const { data: verifyResult, error } = await supabase
+        .rpc('verify_admission_number', {
+          p_admission_no: trimmedAdmissionNo
+        });
+
+      if (error) throw error;
+
+      const result = verifyResult as { found: boolean; message?: string; student?: any };
+
+      if (!result || !result.found) {
+        toast({
+          title: "Student Not Found",
+          description: result?.message || "No active student found with this admission number",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const studentInfo = result.student;
+
+      // Fetch branch name separately (not exposed by secure function)
+      const { data: branchData } = await supabase
+        .from('school_branches')
+        .select('branch_name, branch_code')
+        .eq('id', studentInfo.branch_id)
+        .single();
+
+      // Format data to match expected structure
+      const data = {
+        ...studentInfo,
+        school_branches: branchData
+      };
+
+      setStudentData(data);
+      
+      // Pre-fill with current amount due (includes any outstanding balance)
+      setPaymentAmount(data.current_amount_due?.toString() || data.fixed_monthly_amount?.toString() || "");
+      setStep('confirm');
+
+    } catch (error) {
+      console.error('Search error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to search for student. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Please select a file smaller than 10MB",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+      if (!validTypes.includes(file.type)) {
+        toast({
+          title: "Invalid File Type",
+          description: "Please upload an image (JPG, PNG) or PDF file",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setSelectedFile(file);
+      if (file.type.startsWith('image/')) {
+        setFilePreview(URL.createObjectURL(file));
+      }
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedFile || !studentData || !paymentAmount) {
+      toast({
+        title: "Missing Information",
+        description: "Please complete all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Upload file to storage
+      const fileName = `${studentData.branch_id}/${studentData.id}/${Date.now()}-${selectedFile.name}`;
+      
+      console.log('Uploading file to:', fileName);
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('school-receipts')
+        .upload(fileName, selectedFile);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
+
+      console.log('Upload successful:', uploadData);
+
+      // Create receipt record (no uploaded_by for anonymous users)
+      console.log('Creating receipt record...');
+      const { data: receiptData, error: insertError } = await supabase
+        .from('school_receipts')
+        .insert({
+          student_id: studentData.id,
+          branch_id: studentData.branch_id,
+          receipt_url: fileName, // Store path, not public URL (bucket is private)
+          file_name: selectedFile.name,
+          file_type: selectedFile.type,
+          file_size: selectedFile.size,
+          upload_source: 'parent',
+          verification_status: 'pending',
+          payment_amount: parseFloat(paymentAmount),
+          payment_date: new Date().toISOString().split('T')[0]
+          // Note: uploaded_by is left null for anonymous submissions
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        throw insertError;
+      }
+
+      console.log('Receipt record created:', receiptData);
+      setSubmissionId(receiptData.id);
+      setStep('success');
+
+      toast({
+        title: "Receipt Submitted Successfully",
+        description: "Your payment receipt has been submitted for verification",
+      });
+
+    } catch (error: any) {
+      console.error('Upload error details:', error);
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload receipt. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setStep('admission');
+    setAdmissionNo("");
+    setStudentData(null);
+    setPaymentAmount("");
+    setSelectedFile(null);
+    setFilePreview("");
+    setSubmissionId("");
+  };
+
+  // Success view
+  if (step === 'success') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle className="w-10 h-10 text-green-600" />
+            </div>
+            <CardTitle className="text-2xl">Receipt Submitted!</CardTitle>
+            <CardDescription>
+              Your payment receipt has been successfully submitted
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+              <p className="text-sm"><strong>Student:</strong> {studentData?.student_name}</p>
+              <p className="text-sm"><strong>Admission No:</strong> {studentData?.admission_no}</p>
+              <p className="text-sm"><strong>Branch:</strong> {studentData?.school_branches?.branch_name}</p>
+              <p className="text-sm"><strong>Amount:</strong> LKR {parseFloat(paymentAmount).toLocaleString()}</p>
+              <p className="text-sm"><strong>Reference ID:</strong> {submissionId.substring(0, 8)}</p>
+            </div>
+            
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Next Steps:</strong><br/>
+                Your receipt will be verified by the school administration. 
+                You will be notified once the payment is confirmed.
+              </p>
+            </div>
+
+            <Button 
+              onClick={handleReset}
+              className="w-full"
+              variant="outline"
+            >
+              Submit Another Receipt
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 flex items-center justify-center p-4">
+      <Card className="max-w-2xl w-full">
+        <CardHeader>
+          <CardTitle className="text-2xl text-center">School Bus Payment Receipt Upload</CardTitle>
+          <CardDescription className="text-center">
+            Submit your child's payment receipt for verification
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Step 1: Admission Number */}
+          {step === 'admission' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="admission">Student Admission Number</Label>
+                <Input
+                  id="admission"
+                  placeholder="Enter admission number"
+                  value={admissionNo}
+                  onChange={(e) => setAdmissionNo(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearchStudent()}
+                />
+              </div>
+
+              <Button 
+                onClick={handleSearchStudent}
+                disabled={loading || !admissionNo.trim()}
+                className="w-full"
+              >
+                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Search Student
+              </Button>
+
+              <div className="bg-muted/50 p-4 rounded-lg text-sm text-muted-foreground">
+                <p>Enter your child's admission number to continue with the payment receipt upload.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Confirm Student & Upload */}
+          {(step === 'confirm' || step === 'upload') && studentData && (
+            <div className="space-y-6">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStep('admission');
+                  setStudentData(null);
+                }}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Change Student
+              </Button>
+
+              {/* Student Information */}
+              <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg space-y-2">
+                <h3 className="font-semibold text-lg">Student Information</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Name:</p>
+                    <p className="font-medium">{studentData.student_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Admission No:</p>
+                    <p className="font-medium">{studentData.admission_no}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Grade:</p>
+                    <p className="font-medium">{studentData.grade}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Branch:</p>
+                    <p className="font-medium">{studentData.school_branches?.branch_name}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-muted-foreground">Payment Status:</p>
+                    <Badge variant={studentData.payment_status === 'paid' ? 'default' : 'destructive'}>
+                      {studentData.payment_status || 'Unpaid'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Details */}
+              <PublicPaymentDetails
+                fixedMonthlyAmount={studentData.fixed_monthly_amount || 0}
+                paymentBalance={studentData.payment_balance || 0}
+                currentAmountDue={studentData.current_amount_due || studentData.fixed_monthly_amount || 0}
+                paymentHistory={[]}
+              />
+
+              {/* Payment Amount with validation */}
+              <div className="space-y-2">
+                <Label htmlFor="amount">Payment Amount (LKR)</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  min="1"
+                  max="1000000"
+                  value={paymentAmount}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    if (isNaN(value) || value <= 0) {
+                      setPaymentAmount("");
+                    } else if (value > 1000000) {
+                      setPaymentAmount("1000000");
+                    } else {
+                      setPaymentAmount(e.target.value);
+                    }
+                  }}
+                  placeholder="Enter payment amount"
+                  required
+                />
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 space-y-1">
+                  <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                    Recommended Payment: LKR {(studentData.current_amount_due || studentData.fixed_monthly_amount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    This includes your fixed monthly fee of LKR {(studentData.fixed_monthly_amount || 0).toLocaleString()}
+                    {studentData.payment_balance !== 0 && (
+                      <span className={studentData.payment_balance < 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-green-600 dark:text-green-400 font-medium"}>
+                        {" "}{studentData.payment_balance < 0 ? "+ outstanding balance" : "- credit balance"} of LKR {Math.abs(studentData.payment_balance).toLocaleString()}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* File Upload */}
+              <div className="space-y-2">
+                <Label htmlFor="receipt">Upload Receipt</Label>
+                <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                  {selectedFile ? (
+                    <div className="space-y-4">
+                      {filePreview && (
+                        <img
+                          src={filePreview}
+                          alt="Preview"
+                          className="max-w-full max-h-48 mx-auto rounded"
+                        />
+                      )}
+                      <div className="flex items-center justify-center gap-2">
+                        <FileImage className="w-5 h-5 text-primary" />
+                        <span className="text-sm font-medium">{selectedFile.name}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setFilePreview("");
+                        }}
+                      >
+                        Change File
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Click to upload or drag and drop
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        PNG, JPG or PDF (Max 10MB)
+                      </p>
+                      <Input
+                        id="receipt"
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,application/pdf"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => document.getElementById('receipt')?.click()}
+                      >
+                        Choose File
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <Button 
+                onClick={handleSubmit}
+                disabled={uploading || !selectedFile || !paymentAmount}
+                className="w-full"
+                size="lg"
+              >
+                {uploading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Submit Receipt
+              </Button>
+
+              <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg text-sm text-yellow-800">
+                <strong>Note:</strong> Your receipt will be verified by the school administration. 
+                Please ensure the payment receipt is clear and readable.
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

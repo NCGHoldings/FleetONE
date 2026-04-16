@@ -1,0 +1,85 @@
+project_id = "wwjpdszkmtnzshbulkon"
+
+[functions.fetch-fios-tracking]
+verify_jwt = false
+
+[functions.get-maps-api-key]
+verify_jwt = true
+
+[functions.refresh-seasonal-themes]
+verify_jwt = false
+
+[functions.analyze-trips]
+verify_jwt = true
+
+[functions.send-whatsapp-quotation]
+verify_jwt = true
+
+[functions.check-service-alerts]
+verify_jwt = false
+
+[functions.update-bus-odometer]
+verify_jwt = false
+
+[functions.check-fuel-alerts]
+verify_jwt = false
+
+[functions.fetch-driver-events]
+verify_jwt = false
+
+[functions.populate-sample-fleet-data]
+verify_jwt = false
+
+[functions.aggregate-fleet-analytics]
+verify_jwt = false
+
+[functions.receive-vehicle-inquiry]
+verify_jwt = false
+
+[functions.accept-staff-invite]
+verify_jwt = false
+
+[functions.send-staff-invite]
+verify_jwt = true
+
+[functions.create-temporary-account]
+verify_jwt = true
+
+[functions.discover-bus-api]
+verify_jwt = true
+
+[functions.sync-bus-api-data]
+verify_jwt = false
+
+[functions.service-callback]
+verify_jwt = false
+
+[functions.auto-sync-attendance]
+verify_jwt = false
+
+[functions.calculate-commissions]
+verify_jwt = false
+
+[functions.generate-payroll]
+verify_jwt = false
+
+[functions.sync-staff-registry]
+verify_jwt = false
+
+[functions.process-recurring-invoices]
+verify_jwt = false
+
+[functions.process-payment-reminders]
+verify_jwt = false
+
+[functions.execute-workflow-rules]
+verify_jwt = false
+
+[functions.run-scheduled-tasks]
+verify_jwt = false
+
+[functions.yutong-executive-report]
+verify_jwt = false
+
+[functions.yutong-spreadsheet-data]
+verify_jwt = false

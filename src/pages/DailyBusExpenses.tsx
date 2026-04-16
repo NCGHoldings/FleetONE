@@ -1,0 +1,573 @@
+import React, { useState, useEffect } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { 
+  Calendar as CalendarIcon, 
+  Trash2, 
+  Eye, 
+  ArrowLeft,
+  Fuel,
+  Wrench,
+  CircleDollarSign,
+  Users,
+  Utensils,
+  ParkingCircle,
+  MapPin,
+  FileText,
+  ShieldCheck,
+  FileCheck,
+  Home,
+  AlertCircle,
+  ScrollText,
+  Building,
+  Scale,
+  ClipboardList,
+  Droplets,
+  ChevronDown,
+  ChevronUp,
+  Waves,
+  LayoutGrid,
+  Table as TableIcon,
+  Maximize2,
+  Minimize2,
+  Receipt
+} from "lucide-react";
+import { format } from "date-fns";
+import { DailyBusExpensesForm } from "@/components/trips/DailyBusExpensesForm";
+import { useDailyBusExpenses } from "@/hooks/useDailyBusExpenses";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ExpensesTableView } from "@/components/trips/ExpensesTableView";
+import { GLStatusBadge } from "@/components/ncg-express/GLStatusBadge";
+import { BulkGLPostingDialog } from "@/components/ncg-express/BulkGLPostingDialog";
+
+export default function DailyBusExpenses() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [date, setDate] = useState<Date>(new Date());
+  const { expenses, loading, saveExpense, deleteExpense, refetch } = useDailyBusExpenses(date);
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [expandAll, setExpandAll] = useState(false);
+  const [showBulkGLPostingDialog, setShowBulkGLPostingDialog] = useState(false);
+  
+  // Check if we're in view-only mode from OCR
+  const queryDate = searchParams.get('date');
+  const queryBusId = searchParams.get('bus');
+  const isViewOnly = !!(queryDate && queryBusId);
+
+  // Initialize date from query params
+  useEffect(() => {
+    if (queryDate) {
+      const parsedDate = new Date(queryDate + 'T00:00:00');
+      if (!isNaN(parsedDate.getTime())) {
+        setDate(parsedDate);
+      }
+    }
+  }, [queryDate]);
+
+  // Filter expenses if bus is specified
+  const displayedExpenses = isViewOnly && queryBusId
+    ? expenses.filter(exp => exp.bus_id === queryBusId)
+    : expenses;
+
+  // Calculate summary statistics
+  const totalExpenses = displayedExpenses.reduce((sum, exp) => sum + ((exp as any).total_daily_expenses || 0), 0);
+  const busCount = displayedExpenses.length;
+  const avgExpense = busCount > 0 ? totalExpenses / busCount : 0;
+
+  return (
+    <AppLayout>
+      <div className="p-6 space-y-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="hover:bg-muted"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          
+          <div className="flex-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold">Daily Bus Operating Expenses</h1>
+              <p className="text-muted-foreground mt-1">
+                Track expenses per bus per day - fuel, repairs, and operating costs
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(date, "PPP")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(d) => d && setDate(d)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {!isViewOnly && (
+                <>
+                  <div className="flex gap-2 border-l pl-2">
+                    <Button
+                      variant={viewMode === "table" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setViewMode("table")}
+                    >
+                      <TableIcon className="h-4 w-4 mr-2" />
+                      Table
+                    </Button>
+                    <Button
+                      variant={viewMode === "cards" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setViewMode("cards")}
+                    >
+                      <LayoutGrid className="h-4 w-4 mr-2" />
+                      Cards
+                    </Button>
+                  </div>
+
+                  {viewMode === "cards" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setExpandAll(!expandAll)}
+                    >
+                      {expandAll ? <Minimize2 className="h-4 w-4 mr-2" /> : <Maximize2 className="h-4 w-4 mr-2" />}
+                      {expandAll ? "Collapse All" : "Expand All"}
+                    </Button>
+                  )}
+
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowBulkGLPostingDialog(true)}
+                    className="border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950"
+                  >
+                    <Receipt className="h-4 w-4 mr-2" />
+                    Post to GL
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Summary Statistics */}
+        {!isViewOnly && displayedExpenses.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Total Buses</CardDescription>
+                <CardTitle className="text-3xl">{busCount}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Total Expenses</CardDescription>
+                <CardTitle className="text-3xl">
+                  {new Intl.NumberFormat('en-LK', {
+                    style: 'currency',
+                    currency: 'LKR',
+                    minimumFractionDigits: 0,
+                  }).format(totalExpenses)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Average per Bus</CardDescription>
+                <CardTitle className="text-3xl">
+                  {new Intl.NumberFormat('en-LK', {
+                    style: 'currency',
+                    currency: 'LKR',
+                    minimumFractionDigits: 0,
+                  }).format(avgExpense)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+          </div>
+        )}
+
+        {isViewOnly && (
+          <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                <Eye className="h-5 w-5" />
+                OCR View-Only Mode
+              </CardTitle>
+              <CardDescription className="text-blue-600 dark:text-blue-400">
+                Viewing expenses automatically saved from OCR trip sheet. This page is in read-only mode.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+
+        {!isViewOnly && (
+          <DailyBusExpensesForm
+            date={date}
+            onSave={saveExpense}
+          />
+        )}
+
+        {isViewOnly && queryBusId && (
+          <DailyBusExpensesForm
+            date={date}
+            onSave={saveExpense}
+            readOnly={true}
+            initialBusId={queryBusId}
+          />
+        )}
+
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Expenses for {format(date, "PPP")}</h2>
+          
+          {loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : displayedExpenses.length === 0 ? (
+            <Card className="p-8 text-center text-muted-foreground">
+              {isViewOnly 
+                ? "No OCR expenses found for this bus/date. Please check if expenses were saved correctly."
+                : "No expenses recorded for this date"}
+            </Card>
+          ) : viewMode === "table" && !isViewOnly ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Expenses Overview</CardTitle>
+                <CardDescription>Click the eye icon to view detailed breakdown</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ExpensesTableView expenses={displayedExpenses} onRefresh={refetch} />
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {displayedExpenses.map((expense) => (
+                <Card key={expense.id} className="overflow-hidden">
+                  <CardHeader className="bg-muted/50 pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-xl">{expense.buses.bus_no}</CardTitle>
+                        <CardDescription>{format(date, "EEEE, MMMM d, yyyy")}</CardDescription>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <GLStatusBadge 
+                          glPosted={(expense as any).gl_posted} 
+                          journalEntryId={(expense as any).journal_entry_id}
+                          showLink={true}
+                        />
+                        <div className="text-right">
+                          <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Expenses</div>
+                           <div className="text-3xl font-bold text-primary">
+                            Rs. {((expense as any).total_daily_expenses || 0).toLocaleString()}
+                          </div>
+                        </div>
+                        {!isViewOnly && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="hover:bg-destructive/10 hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Expense Record?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete the expense record for {expense.buses.bus_no} on {format(date, "PPP")}.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => expense.id && deleteExpense(expense.id)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="p-6">
+                    <Tabs defaultValue="all" className="w-full">
+                      <TabsList className="grid w-full grid-cols-5 mb-6">
+                        <TabsTrigger value="all">All</TabsTrigger>
+                        <TabsTrigger value="operational">Operational</TabsTrigger>
+                        <TabsTrigger value="staff">Staff</TabsTrigger>
+                        <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+                        <TabsTrigger value="administrative">Admin</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="all" className="space-y-6">
+                        {/* Operational Expenses */}
+                        <ExpenseSection
+                          title="Operational Expenses"
+                          color="blue"
+                          isExpanded={expandAll}
+                          expenses={[
+                            { icon: Fuel, label: "Fuel Cost", value: expense.fuel_cost },
+                            { icon: ParkingCircle, label: "Parking", value: expense.parking },
+                            { icon: MapPin, label: "Highway Charges", value: expense.highway_charges },
+                          ]}
+                        />
+
+                        {/* Staff Expenses */}
+                        <ExpenseSection
+                          title="Staff Expenses"
+                          color="green"
+                          isExpanded={expandAll}
+                          expenses={[
+                            { icon: CircleDollarSign, label: "Salary", value: expense.salary },
+                            { icon: Utensils, label: "Food", value: expense.food },
+                            { icon: Users, label: "Runner", value: expense.runner },
+                            { icon: Home, label: "Staff Accommodation", value: expense.staff_accommodation },
+                          ]}
+                        />
+
+                        {/* Maintenance */}
+                        <ExpenseSection
+                          title="Maintenance"
+                          color="orange"
+                          isExpanded={expandAll}
+                          expenses={[
+                            { icon: Wrench, label: "Repair", value: expense.repair },
+                            { icon: CircleDollarSign, label: "Tyre/Tube", value: expense.tyre_tube },
+                            { icon: Waves, label: "Body Wash", value: expense.body_wash },
+                          ]}
+                        />
+
+                        {/* Administrative */}
+                        <ExpenseSection
+                          title="Administrative"
+                          color="purple"
+                          isExpanded={expandAll}
+                          expenses={[
+                            { icon: ShieldCheck, label: "Police", value: expense.police },
+                            { icon: FileCheck, label: "Emission/Fitness", value: expense.emission_fitness },
+                            { icon: FileText, label: "Permits Renewal", value: expense.permits_renewal },
+                            { icon: ScrollText, label: "Log Sheet", value: expense.log_sheet },
+                            { icon: Building, label: "NTC", value: expense.ntc },
+                            { icon: Scale, label: "Legal/Court", value: expense.legal_court },
+                            { icon: ClipboardList, label: "Temporary Permit", value: expense.temporary_permit },
+                          ]}
+                        />
+
+                        {/* Other */}
+                        <ExpenseSection
+                          title="Other Expenses"
+                          color="gray"
+                          isExpanded={expandAll}
+                          expenses={[
+                            { icon: AlertCircle, label: "Accident Compensation", value: expense.accident_compensation },
+                            { icon: Building, label: "Vehicle Hire", value: expense.vehicle_hire },
+                            { icon: Droplets, label: "Short/Misc", value: expense.short_misc },
+                            { icon: FileText, label: "Other", value: expense.other },
+                          ]}
+                        />
+                      </TabsContent>
+
+                      <TabsContent value="operational">
+                        <ExpenseSection
+                          title="Operational Expenses"
+                          color="blue"
+                          isExpanded={true}
+                          expenses={[
+                            { icon: Fuel, label: "Fuel Cost", value: expense.fuel_cost },
+                            { icon: ParkingCircle, label: "Parking", value: expense.parking },
+                            { icon: MapPin, label: "Highway Charges", value: expense.highway_charges },
+                          ]}
+                        />
+                      </TabsContent>
+
+                      <TabsContent value="staff">
+                        <ExpenseSection
+                          title="Staff Expenses"
+                          color="green"
+                          isExpanded={true}
+                          expenses={[
+                            { icon: CircleDollarSign, label: "Salary", value: expense.salary },
+                            { icon: Utensils, label: "Food", value: expense.food },
+                            { icon: Users, label: "Runner", value: expense.runner },
+                            { icon: Home, label: "Staff Accommodation", value: expense.staff_accommodation },
+                          ]}
+                        />
+                      </TabsContent>
+
+                      <TabsContent value="maintenance">
+                        <ExpenseSection
+                          title="Maintenance"
+                          color="orange"
+                          isExpanded={true}
+                          expenses={[
+                            { icon: Wrench, label: "Repair", value: expense.repair },
+                            { icon: CircleDollarSign, label: "Tyre/Tube", value: expense.tyre_tube },
+                            { icon: Waves, label: "Body Wash", value: expense.body_wash },
+                          ]}
+                        />
+                      </TabsContent>
+
+                      <TabsContent value="administrative">
+                        <ExpenseSection
+                          title="Administrative"
+                          color="purple"
+                          isExpanded={true}
+                          expenses={[
+                            { icon: ShieldCheck, label: "Police", value: expense.police },
+                            { icon: FileCheck, label: "Emission/Fitness", value: expense.emission_fitness },
+                            { icon: FileText, label: "Permits Renewal", value: expense.permits_renewal },
+                            { icon: ScrollText, label: "Log Sheet", value: expense.log_sheet },
+                            { icon: Building, label: "NTC", value: expense.ntc },
+                            { icon: Scale, label: "Legal/Court", value: expense.legal_court },
+                            { icon: ClipboardList, label: "Temporary Permit", value: expense.temporary_permit },
+                          ]}
+                        />
+                      </TabsContent>
+                    </Tabs>
+
+                    {expense.notes && (
+                      <div className="mt-4 p-3 rounded-lg bg-muted/30 border-l-4 border-primary">
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">📌</span>
+                          <div className="flex-1">
+                            <div className="font-medium text-sm text-muted-foreground mb-1">Notes</div>
+                            <p className="text-sm">{expense.notes}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <BulkGLPostingDialog
+        open={showBulkGLPostingDialog}
+        onOpenChange={setShowBulkGLPostingDialog}
+        type="expenses"
+        onComplete={() => {
+          refetch();
+        }}
+      />
+    </AppLayout>
+  );
+}
+
+// Helper component for expense sections
+interface ExpenseSectionProps {
+  title: string;
+  color: "blue" | "green" | "orange" | "purple" | "gray";
+  isExpanded: boolean;
+  expenses: Array<{
+    icon: React.ElementType;
+    label: string;
+    value?: number;
+  }>;
+}
+
+function ExpenseSection({ title, color, isExpanded, expenses }: ExpenseSectionProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  // Sync with parent expandAll state
+  useEffect(() => {
+    setIsOpen(isExpanded);
+  }, [isExpanded]);
+
+  const colorClasses = {
+    blue: {
+      badge: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+      icon: "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400",
+      border: "border-blue-200 dark:border-blue-800"
+    },
+    green: {
+      badge: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+      icon: "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400",
+      border: "border-green-200 dark:border-green-800"
+    },
+    orange: {
+      badge: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+      icon: "bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400",
+      border: "border-orange-200 dark:border-orange-800"
+    },
+    purple: {
+      badge: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+      icon: "bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400",
+      border: "border-purple-200 dark:border-purple-800"
+    },
+    gray: {
+      badge: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+      icon: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+      border: "border-gray-200 dark:border-gray-700"
+    }
+  };
+
+  const sectionTotal = expenses.reduce((sum, exp) => sum + (exp.value || 0), 0);
+  const hasExpenses = sectionTotal > 0;
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className={`border rounded-lg ${colorClasses[color].border}`}>
+      <CollapsibleTrigger className="w-full">
+        <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
+          <div className="flex items-center gap-3">
+            <h3 className="font-semibold text-lg">{title}</h3>
+            <Badge className={colorClasses[color].badge}>
+              Rs. {sectionTotal.toLocaleString()}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </div>
+        </div>
+      </CollapsibleTrigger>
+      
+      <CollapsibleContent>
+        <div className="p-4 pt-0 space-y-2">
+          {expenses.map((expense) => (
+            expense.value && expense.value > 0 ? (
+              <div key={expense.label} className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-md ${colorClasses[color].icon}`}>
+                    <expense.icon className="h-4 w-4" />
+                  </div>
+                  <span className="font-medium">{expense.label}</span>
+                </div>
+                <span className="font-semibold tabular-nums">Rs. {expense.value.toLocaleString()}</span>
+              </div>
+            ) : null
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}

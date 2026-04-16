@@ -1,0 +1,299 @@
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useItemCategories } from "@/hooks/useAccountingData";
+import { useCreateItem } from "@/hooks/useAccountingMutations";
+import { useGenerateNumber } from "@/hooks/useNumbering";
+import { Loader2 } from "lucide-react";
+
+const itemSchema = z.object({
+  item_code: z.string().min(1, "Item code is required"),
+  item_name: z.string().min(1, "Item name is required"),
+  description: z.string().optional(),
+  category_id: z.string().optional(),
+  unit_of_measure: z.string().min(1, "Unit of measure is required"),
+  standard_cost: z.coerce.number().min(0, "Unit cost must be positive"),
+  selling_price: z.coerce.number().min(0, "Selling price must be positive"),
+  reorder_level: z.coerce.number().min(0, "Reorder level must be positive"),
+  reorder_quantity: z.coerce.number().min(0, "Reorder quantity must be positive"),
+  is_active: z.boolean().default(true),
+  is_batch_tracked: z.boolean().default(false),
+});
+
+type ItemFormData = z.infer<typeof itemSchema>;
+
+interface ItemFormProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export const ItemForm = ({ open, onOpenChange }: ItemFormProps) => {
+  const { data: categories } = useItemCategories();
+  const createItem = useCreateItem();
+  const generateNumber = useGenerateNumber();
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const form = useForm<ItemFormData>({
+    resolver: zodResolver(itemSchema),
+    defaultValues: {
+      item_code: "",
+      item_name: "",
+      description: "",
+      unit_of_measure: "EA",
+      standard_cost: 0,
+      selling_price: 0,
+      reorder_level: 10,
+      reorder_quantity: 50,
+      is_active: true,
+      is_batch_tracked: false,
+    },
+  });
+
+  // Auto-generate item code when dialog opens
+  useEffect(() => {
+    if (open && !form.getValues("item_code")) {
+      setIsGenerating(true);
+      generateNumber("item").then((code) => {
+        form.setValue("item_code", code);
+        setIsGenerating(false);
+      });
+    }
+  }, [open, generateNumber, form]);
+
+  const onSubmit = async (data: ItemFormData) => {
+    await createItem.mutateAsync(data);
+    onOpenChange(false);
+    form.reset();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Add New Item</DialogTitle>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="item_code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Item Code</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input 
+                          placeholder="Auto-generated" 
+                          {...field} 
+                          readOnly 
+                          className="bg-muted"
+                        />
+                        {isGenerating && (
+                          <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormDescription>Auto-generated from Settings</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="category_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories?.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.category_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="item_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Item Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter item name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Item description..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="unit_of_measure"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Unit of Measure</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="EA">Each (EA)</SelectItem>
+                        <SelectItem value="KG">Kilogram (KG)</SelectItem>
+                        <SelectItem value="L">Liter (L)</SelectItem>
+                        <SelectItem value="M">Meter (M)</SelectItem>
+                        <SelectItem value="BOX">Box</SelectItem>
+                        <SelectItem value="SET">Set</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="standard_cost"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Unit Cost (LKR)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="selling_price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Selling Price (LKR)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="reorder_level"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reorder Level</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="reorder_quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reorder Quantity</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="flex gap-6">
+              <FormField
+                control={form.control}
+                name="is_active"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormLabel className="!mt-0">Active</FormLabel>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="is_batch_tracked"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormLabel className="!mt-0">Track Batches</FormLabel>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createItem.isPending}>
+                {createItem.isPending ? "Creating..." : "Create Item"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+};

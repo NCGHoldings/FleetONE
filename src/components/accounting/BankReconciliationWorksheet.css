@@ -1,0 +1,387 @@
+/* ============================================================
+   Bank Reconciliation Worksheet — SAP B1-Style
+   ============================================================ */
+
+/* -------- Layout ---------- */
+.bank-recon-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.bank-recon-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  padding: 20px 24px 16px;
+  background: var(--background, #fff);
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.bank-recon-header-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+}
+
+.bank-recon-header-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bank-recon-header-field .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+/* -------- Table ---------- */
+.bank-recon-table-wrap {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.bank-recon-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.bank-recon-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.bank-recon-table thead th {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 2px solid hsl(var(--border));
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.bank-recon-table thead th.num-col {
+  text-align: right;
+}
+
+.bank-recon-table tbody tr {
+  transition: background 0.15s;
+}
+
+.bank-recon-table tbody tr:hover {
+  background: hsl(var(--accent) / 0.5);
+}
+
+.bank-recon-table tbody tr.row-cleared {
+  background: hsl(142 76% 36% / 0.07);
+}
+
+.bank-recon-table tbody tr.row-cleared:hover {
+  background: hsl(142 76% 36% / 0.12);
+}
+
+/* SAP-style deposit row highlight (light blue) */
+.bank-recon-table tbody tr.row-deposit {
+  background: hsl(217 91% 60% / 0.05);
+}
+
+.bank-recon-table tbody tr.row-deposit:hover {
+  background: hsl(217 91% 60% / 0.10);
+}
+
+.bank-recon-table tbody tr.row-deposit.row-cleared {
+  background: hsl(142 76% 36% / 0.07);
+}
+
+/* SAP-style payment row (subtle warm tint) */
+.bank-recon-table tbody tr.row-payment {
+  background: transparent;
+}
+
+.bank-recon-table tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  vertical-align: middle;
+}
+
+.bank-recon-table tbody td.num-col {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bank-recon-table .cleared-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: hsl(142 76% 36%);
+}
+
+.bank-recon-table .cleared-amount-input {
+  width: 100px;
+  padding: 4px 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  background: hsl(var(--background));
+}
+
+.bank-recon-table .cleared-amount-input:focus {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: -1px;
+}
+
+.bank-recon-table .type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.bank-recon-table .type-badge.deposit {
+  background: hsl(142 76% 36% / 0.12);
+  color: hsl(142 76% 26%);
+}
+
+.bank-recon-table .type-badge.payment {
+  background: hsl(0 72% 51% / 0.1);
+  color: hsl(0 72% 40%);
+}
+
+.bank-recon-table .type-badge.other {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+
+/* -------- SAP-Style Summary Footer ---------- */
+.bank-recon-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px 24px;
+  background: hsl(var(--muted));
+  border-top: 2px solid hsl(var(--border));
+  gap: 24px;
+}
+
+/* Left side: Payment & Deposit totals */
+.bank-recon-summary-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bank-recon-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.bank-recon-summary-row .summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  min-width: 80px;
+}
+
+.bank-recon-summary-row .summary-count {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+  color: hsl(var(--foreground));
+}
+
+.bank-recon-summary-row .summary-amount {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 140px;
+  text-align: right;
+}
+
+.bank-recon-summary-row .summary-amount.negative {
+  color: hsl(0 72% 50%);
+}
+
+.bank-recon-summary-row .summary-amount.positive {
+  color: hsl(142 76% 30%);
+}
+
+/* Right side: Cleared Book Balance, Statement Balance, Difference */
+.bank-recon-summary-right {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  min-width: 300px;
+}
+
+.bank-recon-balance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.bank-recon-balance-row.difference-row {
+  border-top: 2px solid hsl(var(--border));
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.bank-recon-balance-row .balance-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.bank-recon-balance-row .balance-value {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bank-recon-balance-row .balance-value.positive {
+  color: hsl(142 76% 30%);
+}
+
+.bank-recon-balance-row .balance-value.negative {
+  color: hsl(0 72% 50%);
+}
+
+.bank-recon-balance-row .balance-value.neutral {
+  color: hsl(var(--foreground));
+}
+
+.bank-recon-balance-row .balance-value.match {
+  color: hsl(142 76% 30%);
+  font-size: 16px;
+}
+
+/* -------- Actions ---------- */
+.bank-recon-actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--background, #fff);
+  border-top: 1px solid hsl(var(--border));
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* -------- Empty state ---------- */
+.bank-recon-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  gap: 16px;
+  color: hsl(var(--muted-foreground));
+}
+
+.bank-recon-empty svg {
+  width: 48px;
+  height: 48px;
+  opacity: 0.4;
+}
+
+/* -------- Adjustments Dialog ---------- */
+.adjustments-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.adjustments-form .field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.adjustments-form label {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.adjustments-form input,
+.adjustments-form select,
+.adjustments-form textarea {
+  padding: 8px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  font-size: 13px;
+  background: hsl(var(--background));
+}
+
+.adjustments-form textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+
+/* -------- Source Badges ---------- */
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.source-badge.source-ap {
+  background: hsl(25 95% 53% / 0.12);
+  color: hsl(25 95% 35%);
+}
+
+.source-badge.source-ar {
+  background: hsl(217 91% 60% / 0.12);
+  color: hsl(217 91% 40%);
+}
+
+.source-badge.source-fee {
+  background: hsl(0 72% 51% / 0.1);
+  color: hsl(0 72% 40%);
+}
+
+.source-badge.source-ibt {
+  background: hsl(270 67% 47% / 0.12);
+  color: hsl(270 67% 35%);
+}
+
+.source-badge.source-stmt {
+  background: hsl(142 76% 36% / 0.12);
+  color: hsl(142 76% 26%);
+}
+
+.source-badge.source-man {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}

@@ -1,0 +1,31 @@
+name: Run Magiya Scraper
+
+on:
+  schedule:
+    # Run every day at 11:59 PM UTC
+    - cron: '59 23 * * *'
+  workflow_dispatch: # Allows you to run this manually from the GitHub UI right now!
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: |
+          npm install --force --legacy-peer-deps
+          # Ensure all scraper dependencies are available
+          PUPPETEER_SKIP_DOWNLOAD=true npm install puppeteer@21.11.0 pdfjs-dist dotenv @supabase/supabase-js --no-save --force
+
+      - name: Run Scraper
+        env:
+          VITE_SUPABASE_URL: https://wwjpdszkmtnzshbulkon.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/magiya_scraper.js

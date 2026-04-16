@@ -1,0 +1,1 @@
+ALTER TABLE public.yutong_quotations ADD COLUMN vehicle_year INTEGER DEFAULT 2026;

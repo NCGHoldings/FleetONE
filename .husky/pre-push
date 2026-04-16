@@ -1,0 +1,24 @@
+#!/bin/sh
+
+echo "🔍 Running pre-push checks..."
+
+echo ""
+echo "📋 Step 1/2: Linting..."
+npx eslint . --quiet
+if [ $? -ne 0 ]; then
+  echo "❌ Lint failed! Fix errors before pushing."
+  exit 1
+fi
+echo "✅ Lint passed"
+
+echo ""
+echo "📋 Step 2/2: Type checking..."
+npx tsc --noEmit
+if [ $? -ne 0 ]; then
+  echo "❌ Type check failed! Fix type errors before pushing."
+  exit 1
+fi
+echo "✅ Type check passed"
+
+echo ""
+echo "🎉 All pre-push checks passed! Pushing..."
