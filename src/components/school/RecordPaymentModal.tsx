@@ -63,8 +63,8 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
   const previousBalance = student.payment_balance || 0;
   const amountDue = student.current_amount_due || fixedAmount;
   const receivedAmount = parseFloat(amountReceived) || 0;
-  const difference = receivedAmount - fixedAmount;
-  const newBalance = previousBalance + difference;
+  const difference = receivedAmount - amountDue;
+  const newBalance = previousBalance + receivedAmount;
   const nextMonthDue = fixedAmount - newBalance;
 
   const handleSubmit = async () => {

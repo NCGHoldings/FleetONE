@@ -34,7 +34,7 @@ git commit -m "chore: pure lovable sync"
 
 # 4. Push directly to Lovable Server
 echo "Linking to Lovable..."
-git remote add lovable https://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@github.com/NCGHoldings/ncg-fleetone-aff76110.git
+git remote add lovable https://github.com/globallyceum25-dot/ncg-fleetone-75503699.git
 
 echo "Blasting codebase to server... This will actually take 3 seconds!"
 git push -f lovable main

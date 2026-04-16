@@ -337,7 +337,7 @@ export function useStudentsForBulkAR(branchId: string | null) {
         .select("*")
         .eq("branch_id", branchId)
         .eq("is_active", true)
-        .gt("current_amount_due", 0) // All students with amount due > 0
+        // .gt("current_amount_due", 0) // REMOVED: We need to bill all active students, even if balance is 0
         .order("student_name");
 
       if (error) throw error;
@@ -490,6 +490,16 @@ export function useGenerateBulkARInvoices() {
             .single();
 
           if (error) throw error;
+          
+          // CRITICAL: Update the student's actual balance and amount due!
+          await supabase
+            .from("school_students")
+            .update({
+              current_amount_due: (student.current_amount_due || 0) + amount,
+              payment_balance: (student.payment_balance || 0) - amount
+            })
+            .eq("id", student.id);
+
           return data;
         });
 
@@ -543,9 +553,9 @@ export function useGenerateBulkARInvoices() {
           const amount = Math.max(0, fixedAmount * (effectivePercentage / 100));
           
           // Generate unique identifiers for this student
-          const uniqueSuffix = `${String(invoiceCounter).padStart(5, "0")}-${student.id.substring(0, 4).toUpperCase()}`;
+          const randSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
           const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(invoiceCounter).padStart(5, "0")}`;
-          const entryNumber = `SBS-JE-${format(invoiceMonth, "yyyyMM")}-${uniqueSuffix}`;
+          const entryNumber = `SBS-JE-${format(new Date(), "yyyyMM")}-${randSuffix}-${student.id.substring(0, 4).toUpperCase()}`;
           
           // 1. Create individual Journal Entry for this student
           const { data: journalEntry, error: jeError } = await supabase
@@ -606,7 +616,8 @@ export function useGenerateBulkARInvoices() {
           const liabilityAccountId = settings.advance_payments_liability_account_id;
           if (liabilityAccountId && student.payment_balance > 0) {
             const advanceApplyAmount = Math.min(student.payment_balance, amount);
-            const advanceEntryNumber = `SBS-ADV-${format(invoiceMonth, "yyyyMM")}-${uniqueSuffix}`;
+            const advRand = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const advanceEntryNumber = `SBS-ADV-${format(new Date(), "yyyyMM")}-${advRand}`;
 
             const { data: advanceJE, error: advJEError } = await supabase
               .from("journal_entries")
@@ -698,6 +709,15 @@ export function useGenerateBulkARInvoices() {
             console.error(`School invoice error for ${student.student_name}:`, schoolInvError);
             throw schoolInvError;
           }
+          
+          // CRITICAL: Update the student's actual balance and amount due!
+          await supabase
+            .from("school_students")
+            .update({
+              current_amount_due: (student.current_amount_due || 0) + amount,
+              payment_balance: (student.payment_balance || 0) - amount
+            })
+            .eq("id", student.id);
         }));
 
         // Update progress
@@ -1315,7 +1335,7 @@ export function useDeleteARBatch() {
       // 1. Get all school_ar_invoices for this batch (with linked ar_invoice_id and journal refs)
       const { data: schoolInvoices, error: fetchErr } = await supabase
         .from("school_ar_invoices")
-        .select("id, ar_invoice_id, invoice_number")
+        .select("id, ar_invoice_id, invoice_number, journal_entry_id, student_id, amount")
         .eq("batch_id", batchId);
 
       if (fetchErr) throw fetchErr;
@@ -1332,8 +1352,37 @@ export function useDeleteARBatch() {
         .map((si) => si.ar_invoice_id)
         .filter(Boolean) as string[];
 
-      // 4. Delete school_ar_invoices
+      // 4. Delete school_ar_invoices AND reverse student balances
       if (schoolInvoices && schoolInvoices.length > 0) {
+        // Reverse student balances back to original
+        for (const inv of schoolInvoices) {
+           if (inv.student_id && inv.amount) {
+              const { data: currentStudent } = await supabase
+                 .from("school_students")
+                 .select("current_amount_due, payment_balance")
+                 .eq("id", inv.student_id)
+                 .single();
+                 
+              if (currentStudent) {
+                 await supabase
+                    .from("school_students")
+                    .update({
+                       current_amount_due: Math.max(0, (currentStudent.current_amount_due || 0) - inv.amount),
+                       payment_balance: (currentStudent.payment_balance || 0) + inv.amount
+                    })
+                    .eq("id", inv.student_id);
+              }
+           }
+           
+           // Void the individual journal entry
+           if (inv.journal_entry_id) {
+              await supabase
+                .from("journal_entries")
+                .update({ status: "void", notes: "Voided: AR individual invoice deleted" })
+                .eq("id", inv.journal_entry_id);
+           }
+        }
+        
         const { error } = await supabase
           .from("school_ar_invoices")
           .delete()
