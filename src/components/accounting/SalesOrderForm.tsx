@@ -14,6 +14,7 @@ import { usePaymentTerms, useCreateSalesOrder } from "@/hooks/useSalesOrders";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { useGenerateNumber } from "@/hooks/useNumbering";
+import { SearchableCustomerSelector } from "./shared/SearchableCustomerSelector";
 
 const formSchema = z.object({
   so_number: z.string().min(1, "SO number is required"),
@@ -134,18 +135,11 @@ export const SalesOrderForm = ({ onSuccess }: SalesOrderFormProps) => {
         
         <div className="space-y-2">
           <Label htmlFor="customer_id">Customer *</Label>
-          <Select onValueChange={(value) => form.setValue("customer_id", value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select customer" />
-            </SelectTrigger>
-            <SelectContent>
-              {customers?.map((customer) => (
-                <SelectItem key={customer.id} value={customer.id}>
-                  {customer.customer_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCustomerSelector
+            value={form.watch("customer_id") || ""}
+            onValueChange={(value) => form.setValue("customer_id", value)}
+            showQuickAdd={true}
+          />
           {form.formState.errors.customer_id && (
             <p className="text-sm text-destructive">{form.formState.errors.customer_id.message}</p>
           )}

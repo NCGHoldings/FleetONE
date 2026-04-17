@@ -305,7 +305,21 @@ export const useCreatePettyCashTransaction = () => {
       const amount = data.amount || 0;
       const txnType = data.transaction_type || "disbursement";
 
-      // 1. Insert the transaction
+      // 1. Get the fund's GL account and current balance FIRST
+      const { data: fund } = await supabase
+        .from("petty_cash_funds")
+        .select("gl_account_id, current_balance, fund_name")
+        .eq("id", data.petty_cash_fund_id!)
+        .single();
+
+      let newBalance = 0;
+      if (fund) {
+        newBalance = txnType === "disbursement"
+          ? (fund.current_balance || 0) - amount
+          : (fund.current_balance || 0) + amount;
+      }
+
+      // 2. Insert the transaction with the accurate balance_after
       const { data: result, error } = await supabase
         .from("petty_cash_transactions")
         .insert({
@@ -313,7 +327,7 @@ export const useCreatePettyCashTransaction = () => {
           transaction_type: txnType,
           expense_request_id: data.expense_request_id,
           amount,
-          balance_after: 0,
+          balance_after: newBalance,
           receipt_number: data.receipt_number,
           description: data.description,
           payee_name: data.payee_name || null,
@@ -331,19 +345,8 @@ export const useCreatePettyCashTransaction = () => {
 
       if (error) throw error;
 
-      // 2. Get the fund's GL account for journal entry
-      const { data: fund } = await supabase
-        .from("petty_cash_funds")
-        .select("gl_account_id, current_balance, fund_name")
-        .eq("id", data.petty_cash_fund_id!)
-        .single();
-
-      // 3. Update fund balance
+      // 3. Update the fund's main balance table
       if (fund) {
-        const newBalance = txnType === "disbursement"
-          ? (fund.current_balance || 0) - amount
-          : (fund.current_balance || 0) + amount;
-
         await supabase
           .from("petty_cash_funds")
           .update({ current_balance: newBalance, updated_at: new Date().toISOString() })

@@ -16,6 +16,7 @@ import { format, addDays, addWeeks, addMonths, addQuarters, addYears } from "dat
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/hooks/useAuth";
+import { SearchableCustomerSelector } from "../shared/SearchableCustomerSelector";
 
 interface RecurringInvoice {
   id: string;
@@ -292,21 +293,11 @@ export function RecurringInvoicesView() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Customer *</Label>
-                  <Select
+                  <SearchableCustomerSelector
                     value={formData.customer_id}
                     onValueChange={(value) => setFormData({ ...formData, customer_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers?.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.customer_code} - {c.customer_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    showQuickAdd={true}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Template Name *</Label>

@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useCustomers, useARInvoices } from "@/hooks/useAccountingData";
-import { useCreateARCreditNote } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { useGenerateNumber } from "@/hooks/useNumbering";
+import { SearchableCustomerSelector } from "./shared/SearchableCustomerSelector";
 
 const creditNoteSchema = z.object({
   credit_note_number: z.string().min(1, "Credit note number is required"),
@@ -107,26 +107,14 @@ export const ARCreditNoteForm = ({ open, onOpenChange }: ARCreditNoteFormProps) 
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer</FormLabel>
-                  <Select 
+                  <SearchableCustomerSelector
+                    value={field.value}
                     onValueChange={(value) => {
                       field.onChange(value);
                       setSelectedCustomer(value);
-                    }} 
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select customer" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {customers?.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.customer_code} - {customer.customer_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    }}
+                    showQuickAdd={true}
+                  />
                   <FormMessage />
                 </FormItem>
               )}

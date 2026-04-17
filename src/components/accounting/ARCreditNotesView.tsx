@@ -12,9 +12,9 @@ import { useDeleteARCreditNote } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
 import { StatusBadge } from "./shared/StatusBadge";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { SearchableCustomerSelector } from "./shared/SearchableCustomerSelector";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
 import {
   AlertDialog,
@@ -144,14 +144,11 @@ export const ARCreditNotesView = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>Customer *</Label>
-                <Select value={formData.customer_id} onValueChange={v => setFormData(prev => ({ ...prev, customer_id: v, original_invoice_id: "" }))}>
-                  <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
-                  <SelectContent>
-                    {customers?.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableCustomerSelector
+                  value={formData.customer_id}
+                  onValueChange={v => setFormData(prev => ({ ...prev, customer_id: v, original_invoice_id: "" }))}
+                  showQuickAdd={true}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Original Invoice (Optional)</Label>

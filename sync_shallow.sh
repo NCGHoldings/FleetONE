@@ -32,8 +32,14 @@ git branch -M main
 
 # Make absolutely sure the 341MB won't attach!
 echo "public/bus_details/" >> .gitignore
+
 git add .
-git commit -m "chore: pure lovable sync"
+
+# 🔑 CRITICAL FIX: Force add all environment variables (.env, .env.local) to Lovable's repository
+# so that the Production build has the VITE_SUPABASE_URL available and doesn't white-screen.
+git add -f .env* 2>/dev/null || true
+
+git commit -m "chore: pure lovable sync with env"
 
 # 4. Push directly to Lovable Server
 echo "Linking to Lovable..."

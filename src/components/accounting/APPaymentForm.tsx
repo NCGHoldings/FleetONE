@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useVendors, useAPInvoices, useBankAccounts } from "@/hooks/useAccountingData";
+import { useVendors, useCustomers, useAPInvoices, useBankAccounts } from "@/hooks/useAccountingData";
 import { useCreateAPPayment, useApproveAPInvoice } from "@/hooks/useAccountingMutations";
 import { useVendorBankAccounts } from "@/hooks/useVendorBankAccounts";
 import { useGenerateNumber } from "@/hooks/useNumbering";
@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen, Landmark, FileText, Plus, Trash2, Upload, X } from "lucide-react";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 import { VehicleSelector } from "./shared/VehicleSelector";
+import { SearchableVendorSelector } from "./shared/SearchableVendorSelector";
 
 const paymentSchema = z.object({
   payment_number: z.string().min(1, "Payment number is required"),
@@ -87,6 +88,7 @@ const createEmptyLine = (): DirectPaymentLine => ({
 
 export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvanceMode = false }: APPaymentFormProps) => {
   const { data: vendors } = useVendors();
+  const { data: customers } = useCustomers();
   const { data: bankAccounts } = useBankAccounts();
   const { data: allInvoices } = useAPInvoices();
   const { selectedCompanyId } = useCompany();
@@ -517,21 +519,15 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                 name="vendor_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Vendor</FormLabel>
-                    <Select onValueChange={handleVendorChange} value={selectedVendorId}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select vendor" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {vendors?.map((vendor) => (
-                          <SelectItem key={vendor.id} value={vendor.id}>
-                            {vendor.vendor_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Vendor / Payee</FormLabel>
+                    <SearchableVendorSelector
+                      value={selectedVendorId}
+                      onValueChange={handleVendorChange}
+                      placeholder="Select vendor or customer"
+                      showQuickAdd={true}
+                      includeCustomers={true}
+                      customers={customers || []}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}

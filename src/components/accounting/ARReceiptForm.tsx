@@ -18,12 +18,13 @@ import { useCreateARReceipt } from "@/hooks/useAccountingMutations";
 import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, CheckCircle, ChevronsUpDown, Check, Info, Landmark } from "lucide-react";
+import { Wallet, CheckCircle, ChevronsUpDown, Check, Info, Landmark, UserPlus } from "lucide-react";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 import { VehicleSelector } from "./shared/VehicleSelector";
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { CustomerForm } from "./CustomerForm";
 import { useCompany } from "@/contexts/CompanyContext";
 
 const receiptSchema = z.object({
@@ -88,6 +89,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const [includeBankFee, setIncludeBankFee] = useState(false);
   const [bankFeeAmount, setBankFeeAmount] = useState(0);
   const [bankFeeType, setBankFeeType] = useState("bank_charge");
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
 
   // Build grouped party options
   const partyOptions = useMemo(() => {
@@ -412,31 +414,33 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                 render={() => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Customer / Vendor</FormLabel>
-                    <Popover open={partyOpen} onOpenChange={setPartyOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={partyOpen}
-                          className={cn(
-                            "w-full justify-between font-normal",
-                            !selectedCustomerId && "text-muted-foreground"
-                          )}
-                        >
-                          <span className="truncate">
-                            {selectedParty ? (
-                              <span className="flex items-center gap-1.5">
-                                <Badge variant={selectedParty.type === "customer" ? "default" : "secondary"} className="text-[10px] px-1 py-0">
-                                  {selectedParty.type === "customer" ? "C" : "V"}
-                                </Badge>
-                                {selectedParty.name}
+                    <div className="flex items-center gap-1">
+                      <div className="flex-1 min-w-0">
+                        <Popover open={partyOpen} onOpenChange={setPartyOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={partyOpen}
+                              className={cn(
+                                "w-full justify-between font-normal",
+                                !selectedCustomerId && "text-muted-foreground"
+                              )}
+                            >
+                              <span className="truncate">
+                                {selectedParty ? (
+                                  <span className="flex items-center gap-1.5 truncate">
+                                    <Badge variant={selectedParty.type === "customer" ? "default" : "secondary"} className="shrink-0 text-[10px] px-1 py-0">
+                                      {selectedParty.type === "customer" ? "C" : "V"}
+                                    </Badge>
+                                    <span className="truncate">{selectedParty.name}</span>
+                                  </span>
+                                ) : "Select customer or vendor..."}
                               </span>
-                            ) : "Select customer or vendor..."}
-                          </span>
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0 z-[200] bg-popover border shadow-lg" align="start" sideOffset={4} style={{ pointerEvents: 'auto' }} onOpenAutoFocus={(e) => e.preventDefault()}>
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[400px] p-0 z-[200] bg-popover border shadow-lg" align="start" sideOffset={4} style={{ pointerEvents: 'auto' }} onOpenAutoFocus={(e) => e.preventDefault()}>
                         <Command shouldFilter={true}>
                           <CommandInput placeholder="Search customer or vendor..." />
                           <CommandList className="max-h-[400px] overflow-y-auto">
@@ -477,6 +481,18 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                         </Command>
                       </PopoverContent>
                     </Popover>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 text-primary hover:text-primary/80"
+                    onClick={() => setShowCustomerForm(true)}
+                    title="Quick Add Customer"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
+                </div>
                     {/* GL Code Badge — shows override if set, otherwise auto-resolved */}
                     {(overrideGLAccountId || resolvedGL) && (
                       <div className="flex items-center gap-1.5 mt-1">
@@ -879,6 +895,15 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
           </form>
         </Form>
       </DialogContent>
+
+      <Dialog open={showCustomerForm} onOpenChange={setShowCustomerForm}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Quick Add Customer</DialogTitle>
+          </DialogHeader>
+          <CustomerForm onSuccess={() => setShowCustomerForm(false)} />
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 };

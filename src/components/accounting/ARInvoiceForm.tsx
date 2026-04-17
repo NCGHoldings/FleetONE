@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
+import { SearchableCustomerSelector } from "./shared/SearchableCustomerSelector";
 import { BusSelector } from "./BusSelector";
 
 const invoiceSchema = z.object({
@@ -326,20 +327,11 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Customer</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select customer" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {customers?.map((customer) => (
-                          <SelectItem key={customer.id} value={customer.id}>
-                            {customer.customer_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableCustomerSelector
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      showQuickAdd={true}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}

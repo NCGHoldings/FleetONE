@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useVendors, useAPInvoices } from "@/hooks/useAccountingData";
-import { useCreateAPDebitNote } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { useGenerateNumber } from "@/hooks/useNumbering";
+import { SearchableVendorSelector } from "./shared/SearchableVendorSelector";
 
 const debitNoteSchema = z.object({
   debit_note_number: z.string().min(1, "Debit note number is required"),
@@ -107,26 +107,14 @@ export const APDebitNoteForm = ({ open, onOpenChange }: APDebitNoteFormProps) =>
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Vendor</FormLabel>
-                  <Select 
+                  <SearchableVendorSelector
+                    value={field.value}
                     onValueChange={(value) => {
                       field.onChange(value);
                       setSelectedVendor(value);
-                    }} 
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select vendor" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {vendors?.map((vendor) => (
-                        <SelectItem key={vendor.id} value={vendor.id}>
-                          {vendor.vendor_code} - {vendor.vendor_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    }}
+                    showQuickAdd={true}
+                  />
                   <FormMessage />
                 </FormItem>
               )}

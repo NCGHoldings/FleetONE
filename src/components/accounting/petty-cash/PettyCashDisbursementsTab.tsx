@@ -16,12 +16,15 @@ import {
 import { EXPENSE_CATEGORIES, BUSINESS_UNITS, useCompanyExpenseCategories } from "@/hooks/useExpenseRequests";
 import { CurrencyDisplay } from "../shared/CurrencyDisplay";
 import { SearchableAccountSelector } from "../shared/SearchableAccountSelector";
+import { FinanceDocumentPreviewModal } from "../shared/FinanceDocumentPreviewModal";
+import { Printer } from "lucide-react";
 
 export const PettyCashDisbursementsTab = () => {
   const filteredCategories = useCompanyExpenseCategories();
   const [showForm, setShowForm] = useState(false);
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [previewData, setPreviewData] = useState<any>(null);
 
   const { data: funds } = usePettyCashFunds();
   const { data: transactions, isLoading } = useAllPettyCashTransactions({ 
@@ -133,6 +136,7 @@ export const PettyCashDisbursementsTab = () => {
               <TableHead>Method</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Reference</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -142,7 +146,7 @@ export const PettyCashDisbursementsTab = () => {
               </TableRow>
             ) : transactions?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No disbursements found</TableCell>
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No disbursements found</TableCell>
               </TableRow>
             ) : (
               transactions?.map((txn) => (
@@ -162,6 +166,11 @@ export const PettyCashDisbursementsTab = () => {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">{txn.reference_number || "-"}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" onClick={() => setPreviewData(txn)}>
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -270,6 +279,15 @@ export const PettyCashDisbursementsTab = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Print Document Modal */}
+      <FinanceDocumentPreviewModal
+        open={!!previewData}
+        onOpenChange={(op) => !op && setPreviewData(null)}
+        documentType="petty_cash_voucher"
+        documentData={previewData}
+      />
     </div>
   );
 };
+

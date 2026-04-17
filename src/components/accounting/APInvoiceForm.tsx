@@ -25,6 +25,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useGenerateNumber } from "@/hooks/useNumbering";
+import { SearchableVendorSelector } from "./shared/SearchableVendorSelector";
 
 const invoiceSchema = z.object({
   invoice_number: z.string().min(1, "Invoice number is required"),
@@ -551,20 +552,11 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Vendor</FormLabel>
-                    <Select onValueChange={handleVendorChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select vendor" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {vendors?.map((vendor) => (
-                          <SelectItem key={vendor.id} value={vendor.id}>
-                            {vendor.vendor_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableVendorSelector
+                      value={field.value}
+                      onValueChange={handleVendorChange}
+                      showQuickAdd={true}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}

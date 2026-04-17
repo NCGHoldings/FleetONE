@@ -380,6 +380,9 @@ export default function SchoolBusService() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <Button variant="outline" className="bg-primary/5 text-primary border-primary/20 hover:bg-primary/10" onClick={() => navigate("/school-bus/import-expenses")}>
+            Import Expenses
+          </Button>
           <Button onClick={() => navigate("/school-bus/import")}>
             Import Students
           </Button>

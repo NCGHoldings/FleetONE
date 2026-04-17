@@ -421,6 +421,8 @@ export const FinanceDocumentPreviewModal = ({
     cheque_voucher: "Cheque Voucher",
     wht_certificate: "WHT Certificate",
     grn: "Goods Receipt Note",
+    petty_cash_voucher: "Petty Cash Voucher",
+    iou_voucher: "IOU Voucher",
   }[documentType] || "Document";
 
   const docNumber = documentData?.invoice_number ||
@@ -430,6 +432,7 @@ export const FinanceDocumentPreviewModal = ({
                     documentData?.debit_note_number ||
                     documentData?.voucher_number ||
                     documentData?.certificate_number ||
+                    documentData?.iou_number ||
                     documentData?.grn_number ||
                     "";
 

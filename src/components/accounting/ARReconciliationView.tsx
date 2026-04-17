@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { SearchableCustomerSelector } from "./shared/SearchableCustomerSelector";
 import { Plus, CheckCircle, AlertTriangle, FileText, RefreshCw } from "lucide-react";
 
 export const ARReconciliationView = () => {
@@ -304,18 +305,11 @@ export const ARReconciliationView = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Customer</Label>
-              <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers?.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.customer_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableCustomerSelector
+                value={selectedCustomerId || ""}
+                onValueChange={setSelectedCustomerId}
+                showQuickAdd={false}
+              />
             </div>
             <div className="space-y-2">
               <Label>Period Start</Label>

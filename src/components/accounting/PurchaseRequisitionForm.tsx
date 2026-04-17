@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Search } from "lucide-react";
 import { useItems, useCostCenters } from "@/hooks/useAccountingData";
 import { useCreatePurchaseRequisition } from "@/hooks/useAccountingMutations";
 import { format } from "date-fns";
@@ -40,6 +40,25 @@ interface PRLine {
 interface PurchaseRequisitionFormProps {
   onSuccess: () => void;
 }
+
+// Category detection helper
+const getItemCategory = (item: any): string => {
+  const desc = (item.description || "").toLowerCase();
+  const code = (item.item_code || "").toLowerCase();
+  if (desc.includes("yutong") || code.startsWith("zk") || code.startsWith("ytg")) return "Yutong";
+  if (desc.includes("sinotruck") || desc.includes("sinotruk") || code.startsWith("snt-")) return "Sinotruk";
+  if (desc.includes("lightvehicle") || desc.includes("light vehicle") || code.startsWith("lv-")) return "Light Vehicle";
+  if (item.item_type === "vehicle") return "Vehicle";
+  return "Other";
+};
+
+const categoryColors: Record<string, string> = {
+  Yutong: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  Sinotruk: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  "Light Vehicle": "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  Vehicle: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  Other: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+};
 
 export const PurchaseRequisitionForm = ({
   onSuccess,
@@ -66,6 +85,23 @@ export const PurchaseRequisitionForm = ({
     unit_of_measure: "EA",
     estimated_unit_price: 0,
   });
+
+  // Search and filter state
+  const [itemSearch, setItemSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+
+  // Filtered items
+  const filteredItems = useMemo(() => {
+    const search = itemSearch.toLowerCase();
+    return items.filter((item: any) => {
+      const matchesCategory = categoryFilter === "all" || getItemCategory(item) === categoryFilter;
+      const matchesSearch = !search ||
+        item.item_code?.toLowerCase().includes(search) ||
+        item.item_name?.toLowerCase().includes(search) ||
+        item.description?.toLowerCase().includes(search);
+      return matchesCategory && matchesSearch;
+    });
+  }, [items, itemSearch, categoryFilter]);
 
   const addLine = () => {
     if (!newLine.description) {
@@ -113,7 +149,7 @@ export const PurchaseRequisitionForm = ({
         item_id: itemId,
         description: item.item_name,
         unit_of_measure: item.unit_of_measure || "EA",
-        estimated_unit_price: item.last_purchase_price || 0,
+        estimated_unit_price: item.selling_price || item.last_purchase_price || 0,
       });
     }
   };
@@ -245,7 +281,22 @@ export const PurchaseRequisitionForm = ({
       <Card>
         <CardContent className="pt-4">
           <div className="space-y-4">
-            <h3 className="font-medium">Line Items</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium">Line Items</h3>
+              {/* Category Filter */}
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-40 h-8 text-xs">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="Yutong">🚌 Yutong</SelectItem>
+                  <SelectItem value="Sinotruk">🚛 Sinotruk</SelectItem>
+                  <SelectItem value="Light Vehicle">🚗 Light Vehicle</SelectItem>
+                  <SelectItem value="Other">📦 Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Add New Line */}
             <div className="grid grid-cols-6 gap-2 items-end">
@@ -258,12 +309,39 @@ export const PurchaseRequisitionForm = ({
                   <SelectTrigger>
                     <SelectValue placeholder="Select item" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {items.map((item: any) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.item_code} - {item.item_name}
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="max-h-[300px]">
+                    {/* Search bar inside dropdown */}
+                    <div className="px-2 pb-2">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          placeholder="Search items..."
+                          className="pl-7 h-8 text-sm"
+                          value={itemSearch}
+                          onChange={(e) => setItemSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    </div>
+                    {filteredItems.map((item: any) => {
+                      const cat = getItemCategory(item);
+                      return (
+                        <SelectItem key={item.id} value={item.id}>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${categoryColors[cat] || categoryColors.Other}`}>
+                              {cat}
+                            </span>
+                            <span className="font-mono text-xs text-muted-foreground">{item.item_code}</span>
+                            <span className="truncate">{item.item_name}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                    {filteredItems.length === 0 && (
+                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                        No items match your filter
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

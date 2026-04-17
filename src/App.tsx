@@ -58,6 +58,7 @@ import PublicConductorUpload from "./pages/PublicConductorUpload";
 import { ConductorSubmissionsReview } from "./components/trips/ConductorSubmissionsReview";
 import { LateEntryApprovalInterface } from "./components/trips/LateEntryApprovalInterface";
 import SchoolImportPage from "./pages/SchoolImportPage";
+import SchoolBusExpenseImport from "./pages/SchoolBusExpenseImport";
 import CustomerManagement from "./pages/CustomerManagement";
 import AddStudentForm from "./pages/AddStudentForm";
 import SchoolRouteManagement from "./pages/SchoolRouteManagement";
@@ -576,6 +577,14 @@ const App = () => (
               <AppLayout>
                 <GlobalSchoolPayments />
               </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/import-expenses" 
+          element={
+            <ProtectedRoute>
+              <SchoolBusExpenseImport />
             </ProtectedRoute>
           } 
         />

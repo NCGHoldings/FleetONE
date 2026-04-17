@@ -635,21 +635,13 @@ export const generateAPPaymentVoucherTemplate = (): string => `
     </div>
   </div>
 
-  <div class="total-row">
-    <div>
-      <div class="meta-label" style="margin-bottom: 4px;">Amount in Words</div>
-      <div style="font-size: 13px; font-style: italic; color: var(--muted); max-width: 400px; line-height: 1.5;">{{amount_in_words}}</div>
-    </div>
-    <div style="text-align: right;">
-      <div class="total-label">Total Paid</div>
-      <div class="total-amount">{{amount}}</div>
-    </div>
-  </div>
-
-  <div style="margin-top: 40px;">
+  <div style="margin-top: 40px; margin-bottom: 32px;">
     <div class="meta-label">Invoice Allocations</div>
     <div style="margin-top: 16px; font-size: 13px;">
       {{allocations}}
+    </div>
+    <div style="margin-top: 12px; font-size: 13px; font-style: italic; color: var(--muted);">
+      <strong>Amount in Words:</strong> {{amount_in_words}}
     </div>
   </div>
 
@@ -1207,6 +1199,214 @@ export const generateTaxInvoiceTemplate = (): string => `
   </div>
 </div>
 `;
+// ==================== Petty Cash Voucher ====================
+export const generatePettyCashVoucherTemplate = (): string => `
+<style>\${commonStyles}
+  :root { 
+    --ink: #0f172a; 
+    --muted: #64748b; 
+    --divider: #e2e8f0;
+    --accent: #0ea5e9; 
+  }
+  .page { margin: 10px auto; max-width: 850px; }
+  .doc-minimal {
+    background: #ffffff;
+    padding: 48px 56px;
+    color: var(--ink);
+    border: 1px solid var(--divider);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  }
+  .flex-between { display: flex; justify-content: space-between; align-items: flex-start; }
+  .divider { border-bottom: 2px solid var(--ink); margin: 28px 0 32px 0; }
+  .light-divider { border-bottom: 1px solid var(--divider); margin: 24px 0; }
+  
+  .meta-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; margin-bottom: 6px; }
+  .meta-value { font-size: 14px; font-weight: 600; color: var(--ink); }
+  
+  .header-title { font-size: 26px; font-weight: 800; letter-spacing: 0.05em; color: var(--accent); margin: 0 0 12px 0; }
+  
+  .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; }
+  
+  .total-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); margin-top: 40px; }
+  .total-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 4px; }
+  .total-amount { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+  
+  .text-xs { font-size: 11px; line-height: 1.6; color: var(--muted); }
+  .text-sm { font-size: 13px; line-height: 1.6; }
+</style>
+<div class="page"><div class="doc-minimal">
+  <div class="flex-between">
+    <div>
+      <img src="{{ncg_master_logo}}" style="width: 220px !important; height: auto !important; max-height: 75px !important; object-fit: contain !important; margin-bottom: 12px !important; mix-blend-mode: multiply;" />
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">{{sector_name}}</div>
+      <div class="text-xs">{{company_address}}<br>Tel: {{company_phone}} | Email: {{company_email}}</div>
+    </div>
+    <div style="text-align: right;">
+      <h1 class="header-title">PETTY CASH VOUCHER</h1>
+      <div style="display: flex; gap: 32px; justify-content: flex-end; margin-top: 24px;">
+        <div style="text-align: left;">
+          <div class="meta-label">Voucher No</div>
+          <div class="meta-value">{{voucher_number}}</div>
+        </div>
+        <div style="text-align: left;">
+          <div class="meta-label">Date</div>
+          <div class="meta-value">{{payment_date}}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="details-grid">
+    <div>
+      <div class="meta-label" style="border-bottom: 1px solid var(--divider); padding-bottom: 8px; margin-bottom: 16px; color: var(--ink);">Issued To</div>
+      <div class="meta-value" style="font-size: 15px; margin-bottom: 4px;">{{payee_name}}</div>
+      <div class="text-sm" style="color: var(--muted);">Category: {{expense_category}}</div>
+    </div>
+    <div>
+      <div class="meta-label" style="border-bottom: 1px solid var(--divider); padding-bottom: 8px; margin-bottom: 16px; color: var(--ink);">Payment Information</div>
+      <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin-bottom: 6px;">
+        <span class="text-sm" style="color: var(--muted);">Fund:</span>
+        <span class="meta-value" style="font-size: 13px;">{{fund_name}}</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin-bottom: 6px;">
+        <span class="text-sm" style="color: var(--muted);">Ref / Receipt:</span>
+        <span class="meta-value" style="font-size: 13px;">{{receipt_number}}</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px;">
+        <span class="text-sm" style="color: var(--muted);">Method:</span>
+        <span class="meta-value" style="font-size: 13px;">{{payment_method}}</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="light-divider" style="margin-top: 32px;"></div>
+  
+  <div style="margin-top: 16px;">
+    <div class="meta-label">Description / Purpose</div>
+    <div class="text-sm" style="margin-top: 8px; color: var(--ink);">{{notes}}</div>
+  </div>
+
+  <div class="total-row" style="margin-top: 32px; border-top-color: var(--accent); border-bottom-color: var(--accent);">
+    <div>
+      <div class="meta-label" style="margin-bottom: 4px;">Amount in Words</div>
+      <div style="font-size: 13px; font-style: italic; color: var(--muted); max-width: 400px; line-height: 1.5;">{{amount_in_words}}</div>
+    </div>
+    <div style="text-align: right;">
+      <div class="total-label">Amount Paid</div>
+      <div class="total-amount" style="color: var(--accent);">{{amount}}</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 80px;">
+    ${buildFooter(['Prepared By', 'Verified By', 'Approved By', 'Received By (Payee)'])}
+  </div>
+</div></div>
+`;
+
+// ==================== IOU Voucher ====================
+export const generateIOUVoucherTemplate = (): string => `
+<style>${commonStyles}
+  :root { 
+    --ink: #0f172a; 
+    --muted: #64748b; 
+    --divider: #e2e8f0;
+    --accent: #eab308; 
+  }
+  .page { margin: 10px auto; max-width: 850px; }
+  .doc-minimal {
+    background: #ffffff;
+    padding: 48px 56px;
+    color: var(--ink);
+    border: 1px solid var(--divider);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  }
+  .flex-between { display: flex; justify-content: space-between; align-items: flex-start; }
+  .divider { border-bottom: 2px solid var(--ink); margin: 28px 0 32px 0; }
+  .light-divider { border-bottom: 1px solid var(--divider); margin: 24px 0; }
+  
+  .meta-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; margin-bottom: 6px; }
+  .meta-value { font-size: 14px; font-weight: 600; color: var(--ink); }
+  
+  .header-title { font-size: 26px; font-weight: 800; letter-spacing: 0.05em; color: var(--accent); margin: 0 0 12px 0; }
+  
+  .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; }
+  
+  .total-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); margin-top: 40px; }
+  .total-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 4px; }
+  .total-amount { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+  
+  .text-xs { font-size: 11px; line-height: 1.6; color: var(--muted); }
+  .text-sm { font-size: 13px; line-height: 1.6; }
+</style>
+<div class="page"><div class="doc-minimal">
+  <div class="flex-between">
+    <div>
+      <img src="{{ncg_master_logo}}" style="width: 220px !important; height: auto !important; max-height: 75px !important; object-fit: contain !important; margin-bottom: 12px !important; mix-blend-mode: multiply;" />
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">{{sector_name}}</div>
+      <div class="text-xs">{{company_address}}<br>Tel: {{company_phone}} | Email: {{company_email}}</div>
+    </div>
+    <div style="text-align: right;">
+      <h1 class="header-title">STAFF IOU VOUCHER</h1>
+      <div style="display: flex; gap: 32px; justify-content: flex-end; margin-top: 24px;">
+        <div style="text-align: left;">
+          <div class="meta-label">IOU No</div>
+          <div class="meta-value">{{iou_number}}</div>
+        </div>
+        <div style="text-align: left;">
+          <div class="meta-label">Date</div>
+          <div class="meta-value">{{issued_date}}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="details-grid">
+    <div>
+      <div class="meta-label" style="border-bottom: 1px solid var(--divider); padding-bottom: 8px; margin-bottom: 16px; color: var(--ink);">Issued To</div>
+      <div class="meta-value" style="font-size: 15px; margin-bottom: 4px;">{{staff_name}}</div>
+      <div class="text-sm" style="color: var(--muted);">Business Unit: {{business_unit}}</div>
+    </div>
+    <div>
+      <div class="meta-label" style="border-bottom: 1px solid var(--divider); padding-bottom: 8px; margin-bottom: 16px; color: var(--ink);">Repayment Terms</div>
+      <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin-bottom: 6px;">
+        <span class="text-sm" style="color: var(--muted);">Due Date:</span>
+        <span class="meta-value" style="font-size: 13px; color: #dc2626;">{{due_date}}</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="light-divider" style="margin-top: 32px;"></div>
+  
+  <div style="margin-top: 16px;">
+    <div class="meta-label">Purpose</div>
+    <div class="text-sm" style="margin-top: 8px; color: var(--ink);">{{purpose}}</div>
+  </div>
+
+  <div class="total-row" style="margin-top: 32px; border-top-color: var(--accent); border-bottom-color: var(--accent);">
+    <div>
+      <div class="meta-label" style="margin-bottom: 4px;">Amount in Words</div>
+      <div style="font-size: 13px; font-style: italic; color: var(--muted); max-width: 400px; line-height: 1.5;">{{amount_in_words}}</div>
+    </div>
+    <div style="text-align: right;">
+      <div class="total-label">Amount Issued</div>
+      <div class="total-amount" style="color: var(--accent);">{{amount}}</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 32px; background: #fffbeb; border: 1px solid #fde68a; padding: 16px; border-radius: 6px;">
+    <div class="meta-label" style="color: #92400e; margin-bottom: 8px;">Staff Acknowledgment</div>
+    <p style="margin: 0; font-size: 12px; color: #92400e; line-height: 1.6;">I hereby acknowledge receipt of the above amount. I authorize the company to deduct this outstanding amount from my salary or final settlement if not settled in full by the stipulated due date.</p>
+  </div>
+
+  <div style="margin-top: 60px;">
+    ${buildFooter(['Prepared By', 'Authorized By', 'Staff Signature'])}
+  </div>
+</div></div>
+`;
 
 // Export all templates as a map
 export const defaultTemplates: Record<string, () => string> = {
@@ -1223,6 +1423,8 @@ export const defaultTemplates: Record<string, () => string> = {
   wht_certificate: generateWHTCertificateTemplate,
   grn: generateGRNTemplate,
   tax_invoice: generateTaxInvoiceTemplate,
+  petty_cash_voucher: generatePettyCashVoucherTemplate,
+  iou_voucher: generateIOUVoucherTemplate,
 };
 
 // Template display names
@@ -1240,4 +1442,6 @@ export const templateDisplayNames: Record<string, string> = {
   wht_certificate: "WHT Certificate",
   grn: "Goods Receipt Note (GRN)",
   tax_invoice: "Sri Lanka Tax Invoice",
+  petty_cash_voucher: "Petty Cash Voucher",
+  iou_voucher: "IOU Voucher",
 };

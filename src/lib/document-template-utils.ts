@@ -673,6 +673,32 @@ export const mapDocumentToPlaceholders = (
       if (grnLogo) placeholders['{{company_logo}}'] = `<img src="${grnLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
       break;
     }
+    case 'petty_cash_voucher': {
+      placeholders['{{voucher_number}}'] = documentData?.receipt_number || documentData?.id?.substring(0, 8)?.toUpperCase() || '';
+      placeholders['{{payment_date}}'] = formatDate(documentData?.created_at || new Date().toISOString());
+      placeholders['{{fund_name}}'] = documentData?.fund?.fund_name || documentData?.petty_cash_funds?.fund_name || '';
+      placeholders['{{payee_name}}'] = documentData?.payee_name || '';
+      placeholders['{{expense_category}}'] = documentData?.expense_category || '';
+      placeholders['{{amount}}'] = formatCurrency(documentData?.amount);
+      placeholders['{{amount_in_words}}'] = numberToWords(documentData?.amount || 0);
+      placeholders['{{notes}}'] = documentData?.description || documentData?.notes || '';
+      placeholders['{{reference}}'] = documentData?.reference_number || documentData?.reference || '';
+      placeholders['{{receipt_number}}'] = documentData?.receipt_number || '';
+      placeholders['{{payment_method}}'] = documentData?.payment_method?.toUpperCase() || 'CASH';
+      break;
+    }
+
+    case 'iou_voucher': {
+      placeholders['{{iou_number}}'] = documentData?.iou_number || '';
+      placeholders['{{issued_date}}'] = formatDate(documentData?.issued_date || documentData?.created_at);
+      placeholders['{{due_date}}'] = formatDate(documentData?.due_date) || '—';
+      placeholders['{{staff_name}}'] = documentData?.staff?.staff_name || documentData?.staff_name || '';
+      placeholders['{{business_unit}}'] = documentData?.business_unit_code || '';
+      placeholders['{{amount}}'] = formatCurrency(documentData?.amount);
+      placeholders['{{amount_in_words}}'] = numberToWords(documentData?.amount || 0);
+      placeholders['{{purpose}}'] = documentData?.purpose || documentData?.notes || '';
+      break;
+    }
   }
   // Automatically map ALL fields from documentData as {{field_name}} placeholders.
   // This ensures custom templates can reference any data field without explicit mapping.

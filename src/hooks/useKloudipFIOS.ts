@@ -1,9 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-
-// Using Vite proxy to bypass CORS restrictions locally since the direct Cloud Edge deployment is protected
-const FIOS_URL = "/fios-api/api";
-
+// Using Vite proxy locally to prevent Mixed Content / CORS, but use direct CORS-enabled URL in production.
+const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+const FIOS_URL = isLocal ? "/fios-api/api" : "https://fios-api.kloudip.com/api";
 export interface FIOSUnit {
   nm: string;
   id: number;

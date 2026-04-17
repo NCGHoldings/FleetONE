@@ -11,12 +11,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { 
   FileText, Plus, RefreshCw, User, Calendar, 
-  AlertTriangle, CheckCircle, Clock, Loader2
+  AlertTriangle, CheckCircle, Clock, Loader2, Printer
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { useIOURecords, useCreateIOU, useUpdateIOU, IOURecord } from "@/hooks/usePettyCash";
 import { BUSINESS_UNITS } from "@/hooks/useExpenseRequests";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -33,6 +34,7 @@ export const IOUManagementView = () => {
   const [selectedIOU, setSelectedIOU] = useState<IOURecord | null>(null);
   const [showSettleDialog, setShowSettleDialog] = useState(false);
   const [settleAmount, setSettleAmount] = useState(0);
+  const [previewData, setPreviewData] = useState<any>(null);
 
   // New IOU form state
   const [newStaffId, setNewStaffId] = useState("");
@@ -270,17 +272,27 @@ export const IOUManagementView = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {iou.status !== "settled" && (
+                      <div className="flex justify-end gap-1">
                         <Button
                           variant="ghost"
-                          size="sm"
-                          onClick={() => openSettleDialog(iou)}
-                          disabled={updateIOU.isPending}
+                          size="icon"
+                          onClick={() => setPreviewData(iou)}
+                          title="Print / View"
                         >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Settle
+                          <Printer className="h-4 w-4" />
                         </Button>
-                      )}
+                        {iou.status !== "settled" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openSettleDialog(iou)}
+                            disabled={updateIOU.isPending}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Settle
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -433,6 +445,14 @@ export const IOUManagementView = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Print Document Modal */}
+      <FinanceDocumentPreviewModal
+        open={!!previewData}
+        onOpenChange={(op) => !op && setPreviewData(null)}
+        documentType="iou_voucher"
+        documentData={previewData}
+      />
     </div>
   );
 };
