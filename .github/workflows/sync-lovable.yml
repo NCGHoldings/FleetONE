@@ -1,5 +1,7 @@
 name: Sync to Lovable
 on:
+  push:
+    branches: [main]
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
@@ -18,7 +20,7 @@ jobs:
           # Strip any accidental hidden newlines or spaces from the copied token
           CLEAN_TOKEN=$(echo "$GH_PAT" | tr -d '\n' | tr -d '\r' | tr -d ' ')
           
-          # Add remote securely using quotes to prevent command injection
-          git remote add lovable "https://${CLEAN_TOKEN}@github.com/NCGHoldings/ncg-fleetone-aff76110.git"
+          # Add remote securely referencing the correct globallyceum branch
+          git remote add lovable "https://${CLEAN_TOKEN}@github.com/globallyceum25-dot/ncg-fleetone-545c8dda.git"
           
           git push -f lovable main
