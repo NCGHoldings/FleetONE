@@ -24,10 +24,11 @@ import { SearchableCustomerSelector } from "./shared/SearchableCustomerSelector"
 import { BusSelector } from "./BusSelector";
 
 const invoiceSchema = z.object({
-  invoice_number: z.string().min(1, "Invoice number is required"),
+  invoice_number: z.string().optional(),
   customer_id: z.string().min(1, "Customer is required"),
   invoice_date: z.string().min(1, "Invoice date is required"),
   due_date: z.string().min(1, "Due date is required"),
+  billing_address: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -101,6 +102,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
       invoice_number: "",
       invoice_date: format(new Date(), "yyyy-MM-dd"),
       due_date: format(addDays(new Date(), 30), "yyyy-MM-dd"),
+      billing_address: "",
       notes: "",
     },
   });
@@ -114,6 +116,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
         customer_id: editingInvoice.customer_id || "",
         invoice_date: editingInvoice.invoice_date || format(new Date(), "yyyy-MM-dd"),
         due_date: editingInvoice.due_date || format(addDays(new Date(), 30), "yyyy-MM-dd"),
+        billing_address: editingInvoice.billing_address || "",
         notes: editingInvoice.notes || "",
       });
 
@@ -152,16 +155,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
     }
   }, [open, editingInvoice]);
 
-  // Auto-generate invoice number when dialog opens (only for new)
-  useEffect(() => {
-    if (open && !isEditing && !form.getValues("invoice_number")) {
-      setIsGenerating(true);
-      generateNumber("ar_invoice").then((num) => {
-        form.setValue("invoice_number", num);
-        setIsGenerating(false);
-      });
-    }
-  }, [open, generateNumber, form, isEditing]);
+  // Note: Auto-generate invoice number exactly on save to prevent skipped sequences on cancel.
 
   const addLine = () => {
     setLines([
@@ -250,25 +244,28 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
         await updateInvoice.mutateAsync({
           id: editingInvoice.id,
           data: {
-            invoice_number: data.invoice_number,
+            invoice_number: data.invoice_number!,
             customer_id: data.customer_id,
             invoice_date: data.invoice_date,
             due_date: data.due_date,
             total_amount: grandTotal,
             tax_amount: totalTax,
+            billing_address: data.billing_address,
             notes: data.notes,
             ...busFields,
           },
           lines: lineData,
         });
       } else {
+        const finalInvoiceNumber = await generateNumber("ar_invoice");
         await createInvoice.mutateAsync({
-          invoice_number: data.invoice_number,
+          invoice_number: finalInvoiceNumber,
           customer_id: data.customer_id,
           invoice_date: data.invoice_date,
           due_date: data.due_date,
           total_amount: grandTotal,
           tax_amount: totalTax,
+          billing_address: data.billing_address,
           notes: data.notes,
           ...busFields,
           lines: lineData,
@@ -523,6 +520,20 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                 </div>
               </div>
             </div>
+
+            <FormField
+              control={form.control}
+              name="billing_address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Billing Address</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} placeholder="Enter specific billing address for this invoice..." rows={3} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

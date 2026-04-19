@@ -109,7 +109,7 @@ async function appendEditHistory(
 // ============ Edit AP Payment ============
 export const useEditAPPayment = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
 
   return useMutation({
     mutationFn: async ({ id, updates }: {
@@ -127,7 +127,7 @@ export const useEditAPPayment = () => {
       };
     }) => {
       const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId!) ? getBusinessUnitCode() : null;
+      const businessUnitCode = getBusinessUnitCode();
 
       // Fetch existing record
       const { data: existing, error: fetchErr } = await (supabase as any)
@@ -453,7 +453,7 @@ export const useEditAPPayment = () => {
 // ============ Edit AR Receipt ============
 export const useEditARReceipt = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
 
   return useMutation({
     mutationFn: async ({ id, updates }: {
@@ -468,7 +468,7 @@ export const useEditARReceipt = () => {
       };
     }) => {
       const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId!) ? getBusinessUnitCode() : null;
+      const businessUnitCode = getBusinessUnitCode();
 
       const { data: existing, error: fetchErr } = await (supabase as any)
         .from("ar_receipts")
@@ -736,7 +736,7 @@ export const useEditARReceipt = () => {
 // ============ Edit AP Invoice ============
 export const useEditAPInvoice = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
 
   return useMutation({
     mutationFn: async ({ id, updates }: {
@@ -750,7 +750,7 @@ export const useEditAPInvoice = () => {
       };
     }) => {
       const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId!) ? getBusinessUnitCode() : null;
+      const businessUnitCode = getBusinessUnitCode();
 
       const { data: existing, error: fetchErr } = await (supabase as any)
         .from("ap_invoices")
@@ -833,7 +833,7 @@ export const useEditAPInvoice = () => {
 // ============ Edit AR Invoice ============
 export const useEditARInvoice = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
 
   return useMutation({
     mutationFn: async ({ id, updates }: {
@@ -847,7 +847,7 @@ export const useEditARInvoice = () => {
       };
     }) => {
       const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId!) ? getBusinessUnitCode() : null;
+      const businessUnitCode = getBusinessUnitCode();
 
       const { data: existing, error: fetchErr } = await (supabase as any)
         .from("ar_invoices")

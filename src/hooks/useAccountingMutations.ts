@@ -334,7 +334,7 @@ export const useReverseJournalEntry = () => {
 // ============ AR Invoices ============
 export const useCreateARInvoice = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (invoice: {
@@ -363,7 +363,7 @@ export const useCreateARInvoice = () => {
       
       // For consolidated GL: post to parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
+      const businessUnitCode = getBusinessUnitCode();
       
       const { lines, bus_id, bus_no, bus_type, bus_category_id, bus_sub_category_id, ...headerData } = invoice;
       
@@ -510,7 +510,7 @@ export const useCreateARInvoice = () => {
 // ============ AR Receipts ============
 export const useCreateARReceipt = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (receipt: {
@@ -541,7 +541,7 @@ export const useCreateARReceipt = () => {
       
       // For consolidated GL: post to parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
+      const businessUnitCode = getBusinessUnitCode();
       
       const { data, error } = await supabase
         .from("ar_receipts")
@@ -891,7 +891,7 @@ export const useCreateARReceipt = () => {
 // ============ AP Invoices ============
 export const useCreateAPInvoice = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (invoice: {
@@ -922,7 +922,7 @@ export const useCreateAPInvoice = () => {
       
       // For consolidated GL: post to parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
+      const businessUnitCode = getBusinessUnitCode();
       
       const { lines, cost_allocations, ...headerData } = invoice;
       
@@ -1050,7 +1050,7 @@ export const useCreateAPInvoice = () => {
 // ============ AP Payments ============
 export const useCreateAPPayment = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (payment: {
@@ -1094,7 +1094,7 @@ export const useCreateAPPayment = () => {
       
       // For consolidated GL: post to parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
+      const businessUnitCode = getBusinessUnitCode();
 
       // Get vendor name for GL posting description
       const { data: vendorData } = await supabase
@@ -1795,7 +1795,7 @@ export const useClosePeriod = () => {
 // ============ Customer Mutations ============
 export const useCreateCustomer = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (customer: {
@@ -1813,7 +1813,7 @@ export const useCreateCustomer = () => {
       
       // For consolidated GL: store under parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
+      const businessUnitCode = getBusinessUnitCode();
       
       const { data, error } = await supabase
         .from("customers")
@@ -1864,7 +1864,7 @@ export const useUpdateCustomer = () => {
 // ============ Vendor Mutations ============
 export const useCreateVendor = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (vendor: {
@@ -1883,7 +1883,7 @@ export const useCreateVendor = () => {
       
       // For consolidated GL: store under parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
+      const businessUnitCode = getBusinessUnitCode();
       
       const { data, error } = await supabase
         .from("vendors")
@@ -1986,12 +1986,12 @@ export const useCreateAPDebitNote = () => {
 // ============ AP Approvals ============
 export const useApproveAPInvoice = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (id: string) => {
       const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId || '') ? getBusinessUnitCode() : undefined;
+      const businessUnitCode = getBusinessUnitCode() || undefined;
 
       // 1. Fetch invoice details
       const { data: invoice } = await (supabase as any)
@@ -2105,7 +2105,7 @@ export const useApproveAPInvoice = () => {
 
 export const useApproveAPPayment = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (id: string) => {
@@ -2130,7 +2130,7 @@ export const useApproveAPPayment = () => {
       // ========== FALLBACK GL POSTING for old payments without JE ==========
       try {
         const effectiveCompanyId = getEffectiveCompanyId();
-        const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId || '') ? getBusinessUnitCode() : undefined;
+        const businessUnitCode = getBusinessUnitCode() || undefined;
 
         const { data: payment } = await supabase
           .from("ap_payments")

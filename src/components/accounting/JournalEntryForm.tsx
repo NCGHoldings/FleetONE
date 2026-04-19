@@ -22,7 +22,7 @@ const lineSchema = z.object({
 });
 
 const formSchema = z.object({
-  entry_number: z.string().min(1, "Entry number is required"),
+  entry_number: z.string().optional(),
   entry_date: z.string().min(1, "Date is required"),
   description: z.string().min(1, "Description is required"),
   reference: z.string().optional(),
@@ -54,13 +54,7 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
     },
   });
 
-  // Auto-generate entry number on mount
-  useEffect(() => {
-    generateNumber("journal").then((num) => {
-      form.setValue("entry_number", num);
-      setIsGenerating(false);
-    });
-  }, [generateNumber, form]);
+  // Note: Auto-generate entry number exactly on save to prevent skipped sequences on cancel.
 
   const lines = form.watch("lines");
   const totalDebit = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
@@ -94,8 +88,10 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
         credit_amount: line.credit,
       }));
 
+    const finalEntryNumber = data.entry_number || await generateNumber("journal");
+
     await createEntry.mutateAsync({
-      entry_number: data.entry_number,
+      entry_number: finalEntryNumber,
       entry_date: data.entry_date,
       description: data.description,
       reference: data.reference,
@@ -123,11 +119,8 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
                       {...field} 
                       readOnly 
                       className="font-mono bg-muted" 
-                      placeholder="Auto-generated"
+                      placeholder="Auto-generated on save"
                     />
-                    {isGenerating && (
-                      <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
                   </div>
                 </FormControl>
                 <FormMessage />

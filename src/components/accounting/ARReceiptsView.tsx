@@ -253,6 +253,9 @@ export const ARReceiptsView = () => {
                         <Badge variant="outline" className="text-xs ml-1">Fees</Badge>
                       )}
                     </div>
+                    {(receipt as any).legacy_number && (receipt as any).legacy_number !== receipt.receipt_number && (
+                      <div className="text-[10px] text-muted-foreground/60 mt-0.5">was: {(receipt as any).legacy_number}</div>
+                    )}
                   </TableCell>
                   <TableCell>{format(new Date(receipt.receipt_date), "MMM dd, yyyy")}</TableCell>
                   <TableCell>{getCustomerName(receipt.customer_id)}</TableCell>

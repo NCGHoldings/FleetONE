@@ -307,6 +307,9 @@ export const APPaymentsView = () => {
                         <span title="Has attachment"><Paperclip className="h-3.5 w-3.5 text-primary ml-1" /></span>
                       )}
                     </div>
+                    {(payment as any).legacy_number && (payment as any).legacy_number !== payment.payment_number && (
+                      <div className="text-[10px] text-muted-foreground/60 mt-0.5">was: {(payment as any).legacy_number}</div>
+                    )}
                   </TableCell>
                   <TableCell>{format(new Date(payment.payment_date), "MMM dd, yyyy")}</TableCell>
                   <TableCell>{getVendorName(payment.vendor_id)}</TableCell>

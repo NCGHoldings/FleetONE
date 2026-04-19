@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { QuotationAddOnsSection } from './QuotationAddOnsSection';
 import { InlineAddOnsSection } from './InlineAddOnsSection';
 import { useActiveCustomerCategories } from '@/hooks/useCustomerCategories';
+import { useCustomerBridge, normalizePhone, type DuplicateCheckResult } from '@/hooks/useCustomerBridge';
+import { AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required'),
@@ -27,6 +29,7 @@ const formSchema = z.object({
   customer_category_id: z.string().optional(),
   business_registration_number: z.string().optional(),
   tax_registration_number: z.string().optional(),
+  nic_passport: z.string().optional(),
   bus_model_id: z.string().min(1, 'Bus model is required'),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.number().min(1, 'Unit price is required'),
@@ -78,9 +81,12 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
   const [tempAddOns, setTempAddOns] = useState<TempAddOn[]>([]);
   const [responsiblePersons, setResponsiblePersons] = useState<any[]>([]);
   const [customizationOptions, setCustomizationOptions] = useState<any[]>([]);
+  const [phoneDuplicateWarning, setPhoneDuplicateWarning] = useState<DuplicateCheckResult | null>(null);
+  const [isCheckingPhone, setIsCheckingPhone] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const { data: customerCategories } = useActiveCustomerCategories();
+  const { checkDuplicate, syncToAccounting } = useCustomerBridge();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -97,6 +103,23 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
     loadResponsiblePersons();
     loadCustomizationOptions();
   }, []);
+
+  // Debounced phone duplicate check
+  const phoneValue = form.watch('customer_phone');
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      const normalized = normalizePhone(phoneValue);
+      if (normalized && normalized.length >= 9) {
+        setIsCheckingPhone(true);
+        const result = await checkDuplicate(phoneValue);
+        setPhoneDuplicateWarning(result.isDuplicate ? result : null);
+        setIsCheckingPhone(false);
+      } else {
+        setPhoneDuplicateWarning(null);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [phoneValue, checkDuplicate]);
 
   const loadCustomizationOptions = async () => {
     try {
@@ -252,6 +275,27 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         description: `Quotation created successfully${tempAddOns.length > 0 ? ` with ${tempAddOns.length} add-ons` : ''}.`
       });
 
+      // Auto-sync customer to accounting
+      try {
+        const syncResult = await syncToAccounting({
+          customer_name: data.company_name || data.customer_name,
+          contact_phone: data.customer_phone,
+          contact_email: data.customer_email,
+          billing_address: '',
+          nic_passport: (data as any).nic_passport || undefined,
+          business_registration_no: data.business_registration_number || undefined,
+          customer_type: data.customer_type === 'company' ? 'business' : 'individual',
+          tax_id: data.tax_registration_number || undefined,
+          source_module: 'yutong',
+          source_record_id: insertedData.id,
+        });
+        if (syncResult.success) {
+          console.log(`[CustomerBridge] Yutong customer ${syncResult.isNew ? 'created' : 'linked'} in accounting: ${syncResult.customerId}`);
+        }
+      } catch (syncError) {
+        console.warn('[CustomerBridge] Non-blocking sync error:', syncError);
+      }
+
       onSubmit();
 
     } catch (error: any) {
@@ -307,8 +351,24 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   <FormItem>
                     <FormLabel>Phone Number *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Phone number" {...field} />
+                      <div className="relative">
+                        <Input placeholder="Phone number" {...field} />
+                        {isCheckingPhone && (
+                          <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                        {phoneDuplicateWarning && !isCheckingPhone && (
+                          <AlertTriangle className="absolute right-3 top-2.5 h-4 w-4 text-amber-500" />
+                        )}
+                        {!phoneDuplicateWarning && !isCheckingPhone && normalizePhone(field.value).length >= 9 && (
+                          <CheckCircle className="absolute right-3 top-2.5 h-4 w-4 text-emerald-500" />
+                        )}
+                      </div>
                     </FormControl>
+                    {phoneDuplicateWarning && (
+                      <FormDescription className="text-amber-600 font-medium text-xs">
+                        ⚠️ {phoneDuplicateWarning.message}
+                      </FormDescription>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -408,6 +468,23 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                     )}
                   />
                 </>
+              )}
+
+              {form.watch('customer_type') === 'personal' && (
+                <FormField
+                  control={form.control}
+                  name="nic_passport"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>NIC / Passport</FormLabel>
+                      <FormControl>
+                        <Input placeholder="200012345678 or 912345678V" {...field} />
+                      </FormControl>
+                      <FormDescription className="text-xs">Identity verification for individual customers</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               )}
 
               <FormField

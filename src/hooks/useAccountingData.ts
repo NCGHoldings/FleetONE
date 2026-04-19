@@ -7,12 +7,10 @@ import { useCompany } from "@/contexts/CompanyContext";
 
 // Helper hook to get auto business unit filtering for sub-companies
 const useAutoBusinessUnitFilter = () => {
-  const { selectedCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, getBusinessUnitCode } = useCompany();
 
   // Auto-filter by business unit when a sub-company is selected
-  const autoBusinessUnitCode = selectedCompanyId && isSubCompanyOfNCGHolding(selectedCompanyId)
-    ? getBusinessUnitCode()
-    : null;
+  const autoBusinessUnitCode = getBusinessUnitCode();
 
   return autoBusinessUnitCode;
 };
@@ -73,7 +71,7 @@ export const useAccountsByType = (accountType: "asset" | "liability" | "equity" 
 // Auto-filters by business_unit_code when a sub-company is selected
 // businessUnitCodeOverride: pass "all" to see all entries (consolidated view), or specific code
 export const useJournalEntries = (status?: "draft" | "posted" | "void", businessUnitCodeOverride?: string) => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
@@ -83,12 +81,12 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
     : autoBusinessUnitCode;
 
   return useQuery({
-    queryKey: ["journal-entries", status, effectiveCompanyId, businessUnitCode],
+    queryKey: ["journal-entries", selectedCompanyId, status, effectiveCompanyId, businessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("journal_entries")
         .select("*, business_unit_code")
-        .order("entry_date", { ascending: false });
+        .order("created_at", { ascending: false });
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
@@ -101,6 +99,22 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
       // Filter by specific business unit if provided (auto or override)
       if (businessUnitCode && businessUnitCode !== "all") {
         query = query.eq("business_unit_code", businessUnitCode);
+      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
+        // Parent companies drop filter
+      } else if (selectedCompany) {
+        // Fallback to prefix matching for legacy bridged records natively prefixed with short_code
+        const cName = selectedCompany.name.toLowerCase();
+        if (cName.includes("yutong")) {
+          query = query.ilike("entry_number", "YUT-%");
+        } else if (cName.includes("sinotruck")) {
+          query = query.ilike("entry_number", "SNT-%");
+        } else if (cName.includes("school bus")) {
+          query = query.ilike("entry_number", "SBS-%");
+        } else if (cName.includes("special hire")) {
+          query = query.ilike("entry_number", "SPH-%");
+        } else if (cName.includes("light vehicle")) {
+          query = query.ilike("entry_number", "LTV-%");
+        }
       }
 
       const { data, error } = await query;
@@ -193,12 +207,12 @@ export const useCustomers = () => {
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["customers", effectiveCompanyId, autoBusinessUnitCode],
+    queryKey: ["customers", selectedCompanyId, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("customers")
         .select("*, customer_categories(category_name)")
-        .order("customer_name");
+        .order("customer_code", { ascending: false });
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
@@ -249,12 +263,12 @@ export const useVendors = () => {
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["vendors", effectiveCompanyId, autoBusinessUnitCode],
+    queryKey: ["vendors", selectedCompanyId, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("vendors")
         .select("*, vendor_categories(category_name)")
-        .order("vendor_name");
+        .order("vendor_code", { ascending: false });
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
@@ -300,12 +314,12 @@ export const useVendorBalance = (vendorId: string) => {
 // ============ AR Invoices ============
 // Filters by business_unit_code when a sub-company is selected
 export const useARInvoices = (status?: string) => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["ar-invoices", status, effectiveCompanyId, autoBusinessUnitCode],
+    queryKey: ["ar-invoices", selectedCompanyId, status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       let query: any = supabase
         .from("ar_invoices")
@@ -324,7 +338,7 @@ export const useARInvoices = (status?: string) => {
             code
           )
         `)
-        .order("invoice_date", { ascending: false });
+        .order("created_at", { ascending: false });
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
@@ -333,6 +347,22 @@ export const useARInvoices = (status?: string) => {
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
         query = query.eq("business_unit_code", autoBusinessUnitCode);
+      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
+        // Parent companies drop filter
+      } else if (selectedCompany) {
+        // Fallback to prefix matching for legacy bridged records since invoice generator natively prefixes with short_code
+        const cName = selectedCompany.name.toLowerCase();
+        if (cName.includes("yutong")) {
+          query = query.ilike("invoice_number", "YUT-%");
+        } else if (cName.includes("sinotruck")) {
+          query = query.ilike("invoice_number", "SNT-%");
+        } else if (cName.includes("school bus")) {
+          query = query.ilike("invoice_number", "SBS-%");
+        } else if (cName.includes("special hire")) {
+          query = query.ilike("invoice_number", "SPH-%");
+        } else if (cName.includes("light vehicle")) {
+          query = query.ilike("invoice_number", "LTV-%");
+        }
       }
 
       if (status) {
@@ -350,12 +380,12 @@ export const useARInvoices = (status?: string) => {
 // ============ AP Invoices ============
 // Filters by business_unit_code when a sub-company is selected
 export const useAPInvoices = (status?: string) => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["ap-invoices", status, effectiveCompanyId, autoBusinessUnitCode],
+    queryKey: ["ap-invoices", selectedCompanyId, status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       let query: any = supabase
         .from("ap_invoices")
@@ -390,7 +420,7 @@ export const useAPInvoices = (status?: string) => {
             route_code
           )
         `)
-        .order("invoice_date", { ascending: false });
+        .order("created_at", { ascending: false });
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
@@ -399,6 +429,22 @@ export const useAPInvoices = (status?: string) => {
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
         query = query.eq("business_unit_code", autoBusinessUnitCode);
+      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
+        // Parent companies drop filter
+      } else if (selectedCompany) {
+        // Fallback to prefix matching for legacy bridged records since invoice generator natively prefixes with short_code
+        const cName = selectedCompany.name.toLowerCase();
+        if (cName.includes("yutong")) {
+          query = query.ilike("invoice_number", "YUT-%");
+        } else if (cName.includes("sinotruck")) {
+          query = query.ilike("invoice_number", "SNT-%");
+        } else if (cName.includes("school bus")) {
+          query = query.ilike("invoice_number", "SBS-%");
+        } else if (cName.includes("special hire")) {
+          query = query.ilike("invoice_number", "SPH-%");
+        } else if (cName.includes("light vehicle")) {
+          query = query.ilike("invoice_number", "LTV-%");
+        }
       }
 
       if (status) {
@@ -416,12 +462,12 @@ export const useAPInvoices = (status?: string) => {
 // ============ AR Receipts ============
 // Filters by business_unit_code when a sub-company is selected
 export const useARReceipts = () => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["ar-receipts", effectiveCompanyId, autoBusinessUnitCode],
+    queryKey: ["ar-receipts", selectedCompanyId, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("ar_receipts")
@@ -435,7 +481,7 @@ export const useARReceipts = () => {
             email
           )
         `)
-        .order("receipt_date", { ascending: false });
+        .order("created_at", { ascending: false });
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
@@ -444,6 +490,22 @@ export const useARReceipts = () => {
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
         query = query.eq("business_unit_code", autoBusinessUnitCode);
+      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
+        // Parent companies drop filter
+      } else if (selectedCompany) {
+        // Fallback to prefix matching
+        const cName = selectedCompany.name.toLowerCase();
+        if (cName.includes("yutong")) {
+          query = query.ilike("receipt_number", "YUT-%");
+        } else if (cName.includes("sinotruck")) {
+          query = query.ilike("receipt_number", "SNT-%");
+        } else if (cName.includes("school bus")) {
+          query = query.ilike("receipt_number", "SBS-%");
+        } else if (cName.includes("special hire")) {
+          query = query.ilike("receipt_number", "SPH-%");
+        } else if (cName.includes("light vehicle")) {
+          query = query.ilike("receipt_number", "LTV-%");
+        }
       }
 
       const { data, error } = await query;
@@ -457,12 +519,12 @@ export const useARReceipts = () => {
 // ============ AP Payments ============
 // Filters by business_unit_code when a sub-company is selected
 export const useAPPayments = () => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["ap-payments", effectiveCompanyId, autoBusinessUnitCode],
+    queryKey: ["ap-payments", selectedCompanyId, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("ap_payments")
@@ -496,7 +558,7 @@ export const useAPPayments = () => {
             account_label
           )
         `)
-        .order("payment_date", { ascending: false });
+        .order("created_at", { ascending: false });
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
@@ -505,6 +567,22 @@ export const useAPPayments = () => {
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
         query = query.eq("business_unit_code", autoBusinessUnitCode);
+      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
+        // Parent companies drop filter
+      } else if (selectedCompany) {
+        // Fallback to prefix matching
+        const cName = selectedCompany.name.toLowerCase();
+        if (cName.includes("yutong")) {
+          query = query.ilike("payment_number", "YUT-%");
+        } else if (cName.includes("sinotruck")) {
+          query = query.ilike("payment_number", "SNT-%");
+        } else if (cName.includes("school bus")) {
+          query = query.ilike("payment_number", "SBS-%");
+        } else if (cName.includes("special hire")) {
+          query = query.ilike("payment_number", "SPH-%");
+        } else if (cName.includes("light vehicle")) {
+          query = query.ilike("payment_number", "LTV-%");
+        }
       }
 
       const { data, error } = await query;
@@ -523,7 +601,7 @@ export const useAPPayments = () => {
               id, bank_name, bank_branch, account_number, account_holder_name, account_label
             )
           `)
-          .order("payment_date", { ascending: false });
+          .order("created_at", { ascending: false });
 
         if (effectiveCompanyId) {
           fallbackQuery = fallbackQuery.eq("company_id", effectiveCompanyId);
@@ -1135,7 +1213,7 @@ export const useGoodsReceiptNotes = () => {
       let query = supabase
         .from("goods_receipt_notes")
         .select(`*, vendors (vendor_name), purchase_orders (po_number)`)
-        .order("receipt_date", { ascending: false });
+        .order("created_at", { ascending: false });
 
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);

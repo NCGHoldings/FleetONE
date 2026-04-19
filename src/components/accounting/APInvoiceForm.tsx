@@ -28,7 +28,7 @@ import { useGenerateNumber } from "@/hooks/useNumbering";
 import { SearchableVendorSelector } from "./shared/SearchableVendorSelector";
 
 const invoiceSchema = z.object({
-  invoice_number: z.string().min(1, "Invoice number is required"),
+  invoice_number: z.string().optional(),
   vendor_id: z.string().min(1, "Vendor is required"),
   invoice_date: z.string().min(1, "Invoice date is required"),
   due_date: z.string().min(1, "Due date is required"),
@@ -243,48 +243,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     }
   }, [open, editingInvoice]);
 
-  // Auto-generate AP Invoice number when dialog opens (only for new invoices)
-  useEffect(() => {
-    if (!open || isEditing) return;
-    
-    const generateInvoiceNumber = async () => {
-      try {
-        const year = new Date().getFullYear();
-        const prefix = `AP-INV-${year}-`;
-        
-        let query = supabase
-          .from("ap_invoices")
-          .select("invoice_number")
-          .ilike("invoice_number", `${prefix}%`)
-          .order("invoice_number", { ascending: false })
-          .limit(1);
-
-        const effectiveCompanyId = getEffectiveCompanyId();
-        if (effectiveCompanyId) {
-          query = query.eq("company_id", effectiveCompanyId);
-        }
-
-        const { data: latestInvoice } = await query.maybeSingle();
-
-        let nextSeq = 1;
-        if (latestInvoice?.invoice_number) {
-          const match = latestInvoice.invoice_number.match(/(\d+)$/);
-          if (match) {
-            nextSeq = parseInt(match[1], 10) + 1;
-          }
-        }
-        
-        const autoNumber = `${prefix}${String(nextSeq).padStart(4, "0")}`;
-        form.setValue("invoice_number", autoNumber);
-      } catch (err) {
-        const year = new Date().getFullYear();
-        const ts = Date.now().toString().slice(-6);
-        form.setValue("invoice_number", `AP-INV-${year}-${ts}`);
-      }
-    };
-
-    generateInvoiceNumber();
-  }, [open, selectedCompanyId, isEditing]);
+  // Note: Auto-generate AP Invoice number exactly on save to prevent skipped sequences/collisions on cancel
 
   const applyWht = form.watch("apply_wht");
   const whtRate = form.watch("wht_rate") || 5;
@@ -453,13 +412,30 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
           lines: lineData,
         });
       } else {
+        // Generate AP Invoice Number immediately before save to guarantee sequence integrity!
+        let finalInvoiceNumber = data.invoice_number;
+        if (!finalInvoiceNumber) {
+          const year = new Date().getFullYear();
+          const prefix = `AP-INV-${year}-`;
+          let query = supabase.from("ap_invoices").select("invoice_number").ilike("invoice_number", `${prefix}%`).order("invoice_number", { ascending: false }).limit(1);
+          const effectiveCompanyId = getEffectiveCompanyId?.() || undefined;
+          if (effectiveCompanyId) query = query.eq("company_id", effectiveCompanyId);
+          const { data: latestInvoice } = await query.maybeSingle();
+          let nextSeq = 1;
+          if (latestInvoice?.invoice_number) {
+             const match = latestInvoice.invoice_number.match(/(\d+)$/);
+             if (match) nextSeq = parseInt(match[1], 10) + 1;
+          }
+          finalInvoiceNumber = `${prefix}${String(nextSeq).padStart(4, "0")}`;
+        }
+
         // Prepare cost allocations if enabled
         const validAllocations = allocateToUnits && costAllocations.length > 0 && Math.abs(unallocatedAmount) <= 0.01
           ? costAllocations.filter(a => a.unit_code && a.amount > 0).map(a => ({ unit_code: a.unit_code, amount: a.amount }))
           : undefined;
 
         const invoiceResult = await createInvoice.mutateAsync({
-          invoice_number: data.invoice_number,
+          invoice_number: finalInvoiceNumber,
           vendor_id: data.vendor_id,
           invoice_date: data.invoice_date,
           due_date: data.due_date,

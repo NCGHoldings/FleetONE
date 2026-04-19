@@ -2,10 +2,7 @@
 ORIGINAL_DIR=$(pwd)
 echo "Fixing Golden Repo Upload..."
 
-git config --global http.version HTTP/1.1
-git config --global http.postBuffer 524288000
-git config --global http.lowSpeedLimit 1000
-git config --global http.lowSpeedTime 600
+
 
 # 1. Ensure massive PDFs are untracked
 echo "public/bus_details/" >> .gitignore
@@ -24,8 +21,7 @@ cd /tmp/lovable-sync
 echo "Building pure codebase isolated from Git history bloat..."
 rm -rf .git
 git init
-git config http.version HTTP/1.1
-git config http.postBuffer 524288000
+
 git config user.email "bot@ncgholdings.com"
 git config user.name "Lovable Sync Bot"
 git branch -M main

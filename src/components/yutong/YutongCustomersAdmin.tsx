@@ -17,6 +17,7 @@ import { Plus, Search, Eye, Edit, Trash2, Link, Unlink, Building2, User } from '
 import { ColumnDef } from '@tanstack/react-table';
 import CustomerProfileModal from './CustomerProfileModal';
 import { useAuth } from '@/hooks/useAuth';
+import { useCustomerBridge } from '@/hooks/useCustomerBridge';
 
 const customerSchema = z.object({
   company_name: z.string().min(1, 'Company name is required'),
@@ -31,6 +32,7 @@ const customerSchema = z.object({
   payment_terms: z.number().min(0).default(30),
   tax_number: z.string().optional(),
   business_registration_no: z.string().optional(),
+  nic_passport: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -51,6 +53,7 @@ interface Customer {
   payment_terms: number;
   tax_number?: string;
   business_registration_no?: string;
+  nic_passport?: string;
   notes?: string;
   is_active: boolean;
   created_at: string;
@@ -71,8 +74,10 @@ export default function YutongCustomersAdmin() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { syncToAccounting } = useCustomerBridge();
   const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
@@ -104,6 +109,7 @@ export default function YutongCustomersAdmin() {
       payment_terms: 30,
       tax_number: '',
       business_registration_no: '',
+      nic_passport: '',
       notes: '',
     },
   });
@@ -180,6 +186,7 @@ export default function YutongCustomersAdmin() {
         payment_terms: data.payment_terms,
         tax_number: data.tax_number || '',
         business_registration_no: data.business_registration_no || '',
+        nic_passport: data.nic_passport || '',
         notes: data.notes || '',
         customer_code: `TEMP-${Date.now()}` // Will be overridden by trigger
       };
@@ -236,6 +243,7 @@ export default function YutongCustomersAdmin() {
       payment_terms: customer.payment_terms,
       tax_number: customer.tax_number || '',
       business_registration_no: customer.business_registration_no || '',
+      nic_passport: customer.nic_passport || '',
       notes: customer.notes || '',
     });
     setShowForm(true);
@@ -269,6 +277,48 @@ export default function YutongCustomersAdmin() {
   const handleViewProfile = (customer: Customer) => {
     setSelectedCustomer(customer);
     setShowProfile(true);
+  };
+
+  const handleSyncToAccounting = async (customer: Customer) => {
+    try {
+      setSyncingId(customer.id);
+      const result = await syncToAccounting({
+        customer_name: customer.company_name,
+        contact_phone: customer.phone,
+        contact_email: customer.email,
+        billing_address: customer.address,
+        customer_type: customer.customer_type as 'business' | 'individual' | 'government',
+        tax_id: customer.tax_number,
+        business_registration_no: customer.business_registration_no,
+        nic_passport: customer.nic_passport,
+        source_module: 'yutong',
+        source_record_id: customer.id,
+      });
+
+      if (result.success) {
+        toast({
+          title: "Successfully Synced",
+          description: result.isNew 
+            ? "Customer profile created in accounting." 
+            : "Customer successfully linked to existing accounting profile.",
+        });
+        loadCustomers(); // Reload to reflect any potential updates (e.g., accounting_customer_id)
+      } else {
+        toast({
+          title: "Sync Failed",
+          description: result.error || "An error occurred during synchronization",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Sync Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingId(null);
+    }
   };
 
   const columns: ColumnDef<Customer>[] = [
@@ -385,6 +435,15 @@ export default function YutongCustomersAdmin() {
                 <Unlink className="h-4 w-4" />
               </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleSyncToAccounting(customer)}
+              disabled={syncingId === customer.id}
+              title="Sync to Accounting"
+            >
+              <Building2 className={`h-4 w-4 ${syncingId === customer.id ? 'animate-pulse' : ''}`} />
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -522,6 +581,37 @@ export default function YutongCustomersAdmin() {
                     </FormItem>
                   )}
                 />
+
+                {form.watch('customer_type') === 'individual' || form.watch('customer_type') === 'government' ? (
+                  <FormField
+                    control={form.control}
+                    name="nic_passport"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>NIC / Passport</FormLabel>
+                        <FormControl>
+                          <Input placeholder="NIC or Passport No." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="business_registration_no"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Business Registration No</FormLabel>
+                        <FormControl>
+                          <Input placeholder="BRN" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
                 <FormField
                   control={form.control}
                   name="city"
@@ -575,19 +665,6 @@ export default function YutongCustomersAdmin() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tax Number</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="business_registration_no"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Business Registration No</FormLabel>
                       <FormControl>
                         <Input {...field} />
                       </FormControl>

@@ -56,16 +56,14 @@ export function CustomerMasterView() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const queryClient = useQueryClient();
-  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   const generateNumber = useGenerateNumber();
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const { data: categories } = useActiveCustomerCategories();
   
   // For consolidated GL: use parent company ID for storage, filter by business unit
   const effectiveCompanyId = getEffectiveCompanyId();
-  const businessUnitCode = selectedCompanyId && isSubCompanyOfNCGHolding(selectedCompanyId) 
-    ? getBusinessUnitCode() 
-    : null;
+  const businessUnitCode = getBusinessUnitCode();
 
   const [formData, setFormData] = useState({
     customer_code: "",
@@ -80,12 +78,12 @@ export function CustomerMasterView() {
   });
 
   const { data: customers, isLoading } = useQuery({
-    queryKey: ["customers", effectiveCompanyId, businessUnitCode],
+    queryKey: ["customers", selectedCompanyId, effectiveCompanyId, businessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("customers")
         .select("*, customer_categories(category_code, category_name)")
-        .order("customer_name");
+        .order("customer_code", { ascending: false });
       
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
@@ -94,6 +92,22 @@ export function CustomerMasterView() {
       // Filter by business unit for sub-company views
       if (businessUnitCode) {
         query = query.eq("business_unit_code", businessUnitCode);
+      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
+        // Parent companies skip module filtering
+      } else if (selectedCompany) {
+        // Fallback to source_module mapping since legacy bridged records use source_module instead of business_unit_code
+        const cName = selectedCompany.name.toLowerCase();
+        if (cName.includes("yutong")) {
+          query = query.eq("source_module", "yutong");
+        } else if (cName.includes("sinotruck")) {
+          query = query.eq("source_module", "sinotruck");
+        } else if (cName.includes("special hire")) {
+          query = query.eq("source_module", "special_hire");
+        } else if (cName.includes("school bus")) {
+          query = query.eq("source_module", "school_bus");
+        } else if (cName.includes("light vehicle")) {
+          query = query.eq("source_module", "light_vehicle");
+        }
       }
       
       const { data, error } = await query;
@@ -106,8 +120,9 @@ export function CustomerMasterView() {
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       if (!selectedCompanyId) throw new Error("Please select a company first");
+      const finalCode = await generateNumber("customer");
       const { error } = await supabase.from("customers").insert([{
-        customer_code: data.customer_code,
+        customer_code: finalCode,
         customer_name: data.customer_name,
         contact_person: data.contact_person || null,
         email: data.email || null,
@@ -240,16 +255,7 @@ export function CustomerMasterView() {
           <Dialog open={isDialogOpen} onOpenChange={async (open) => {
             setIsDialogOpen(open);
             if (open && !editingCustomer) {
-              // Auto-generate customer code for new customers
-              setIsGeneratingCode(true);
-              try {
-                const code = await generateNumber("customer");
-                setFormData(prev => ({ ...prev, customer_code: code }));
-              } catch (err) {
-                console.error("Failed to generate customer code:", err);
-              } finally {
-                setIsGeneratingCode(false);
-              }
+              // Note: auto-generate code exactly at save to prevent skipped numbers on cancel
             }
             if (!open) {
               resetForm();
@@ -429,7 +435,12 @@ export function CustomerMasterView() {
               <TableBody>
                 {filteredCustomers?.map((customer) => (
                   <TableRow key={customer.id}>
-                    <TableCell className="font-mono text-sm">{customer.customer_code}</TableCell>
+                    <TableCell className="font-mono text-sm">
+                      <div>{customer.customer_code}</div>
+                      {(customer as any).legacy_number && (customer as any).legacy_number !== customer.customer_code && (
+                        <div className="text-[10px] text-muted-foreground/60 mt-0.5">was: {(customer as any).legacy_number}</div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium">{customer.customer_name}</TableCell>
                     <TableCell>
                       {(customer as any).customer_categories?.category_code 

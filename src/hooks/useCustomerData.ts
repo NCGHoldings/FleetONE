@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useCompanyOptional } from "@/contexts/CompanyContext";
 
 export interface CustomerData {
   id: string;
@@ -10,7 +11,7 @@ export interface CustomerData {
   email?: string;
   address?: string;
   city?: string;
-  source: 'yutong' | 'special_hire' | 'fleet_owner';
+  source: 'yutong' | 'sinotruck' | 'special_hire' | 'fleet_owner' | 'accounting';
   customer_type: 'individual' | 'corporate';
   created_at: string;
   
@@ -19,6 +20,7 @@ export interface CustomerData {
     // Financial metrics
     total_lifetime_value: number;
     yutong_revenue: number;
+    sinotruck_revenue: number;
     special_hire_revenue: number;
     maintenance_revenue: number;
     outstanding_balance: number;
@@ -26,6 +28,7 @@ export interface CustomerData {
     // Behavioral metrics
     total_transactions: number;
     yutong_purchases: number;
+    sinotruck_purchases: number;
     special_hire_bookings: number;
     owned_buses: number;
     avg_booking_value: number;
@@ -80,15 +83,21 @@ export function useCustomerData() {
     activity: 'all'
   });
 
+  const companyContext = useCompanyOptional();
+  const selectedCompany = companyContext?.selectedCompany;
+  const isParent = companyContext?.isNCGHoldingOrSubCompany(selectedCompany?.id || '') && 
+                   (selectedCompany?.name?.includes('NCG') || !selectedCompany?.parent_company_id);
+
   const fetchCustomerData = async () => {
     try {
       setLoading(true);
       setError(null);
 
       // Fetch data from all sources
-      const [yutongCustomers, yutongQuotations, specialHireQuotations, buses] = await Promise.all([
+      const [yutongCustomers, yutongQuotations, sinotruckQuotations, specialHireQuotations, buses] = await Promise.all([
         supabase.from('yutong_customers').select('*'),
         supabase.from('yutong_quotations').select('*'),
+        supabase.from('sinotruck_quotations').select('*'),
         supabase.from('special_hire_quotations').select('*'),
         supabase.from('buses').select('*')
       ]);
@@ -141,6 +150,69 @@ export function useCustomerData() {
               outstanding_balance: 0,
               total_transactions: 0,
               yutong_purchases: 0,
+              special_hire_bookings: 0,
+              owned_buses: 0,
+              avg_booking_value: 0,
+              first_interaction: quotation.created_at,
+              last_interaction: quotation.updated_at || quotation.created_at,
+              months_active: 0,
+              booking_frequency: 0,
+              preferred_bus_types: [],
+              common_routes: [],
+              payment_methods: [],
+              recent_transactions: [],
+              monthly_revenue_trend: []
+            }
+          });
+        } else {
+          // Merge data if key exists (prefer non-empty values)
+          const existing = customerMap.get(key)!;
+          if (!existing.email && quotation.customer_email) {
+            existing.email = quotation.customer_email;
+          }
+          if (!existing.company_name && quotation.company_name) {
+            existing.company_name = normalizeCompanyName(quotation.company_name);
+          }
+          if (!existing.address && quotation.customer_address) {
+            existing.address = quotation.customer_address;
+          }
+          // Update last interaction if this quotation is newer
+          if (new Date(quotation.created_at) > new Date(existing.analytics.last_interaction)) {
+            existing.analytics.last_interaction = quotation.created_at;
+          }
+        }
+      });
+
+      // Process Sinotruck quotations
+      sinotruckQuotations.data?.forEach(quotation => {
+        const normalizedPhone = normalizePhone(quotation.customer_phone);
+        const normalizedEmail = quotation.customer_email?.toLowerCase().trim() || '';
+        
+        // Use phone as primary key, fallback to email, then ID
+        const key = normalizedPhone || normalizedEmail || quotation.id;
+        
+        if (!customerMap.has(key)) {
+          customerMap.set(key, {
+            id: quotation.id,
+            name: quotation.customer_name,
+            company_name: normalizeCompanyName(quotation.company_name),
+            phone: quotation.customer_phone,
+            email: quotation.customer_email,
+            address: quotation.customer_address,
+            city: '',
+            source: 'sinotruck',
+            customer_type: quotation.company_name ? 'corporate' : 'individual',
+            created_at: quotation.created_at,
+            analytics: {
+              total_lifetime_value: 0,
+              yutong_revenue: 0,
+              sinotruck_revenue: 0,
+              special_hire_revenue: 0,
+              maintenance_revenue: 0,
+              outstanding_balance: 0,
+              total_transactions: 0,
+              yutong_purchases: 0,
+              sinotruck_purchases: 0,
               special_hire_bookings: 0,
               owned_buses: 0,
               avg_booking_value: 0,
@@ -252,11 +324,13 @@ export function useCustomerData() {
             analytics: {
               total_lifetime_value: 0,
               yutong_revenue: 0,
+              sinotruck_revenue: 0,
               special_hire_revenue: 0,
               maintenance_revenue: 0,
               outstanding_balance: 0,
               total_transactions: 0,
               yutong_purchases: 0,
+              sinotruck_purchases: 0,
               special_hire_bookings: 0,
               owned_buses: owner.buses.length,
               avg_booking_value: 0,
@@ -305,6 +379,27 @@ export function useCustomerData() {
           .filter(q => q.status && REVENUE_STATUSES.includes(q.status.toLowerCase()))
           .reduce((sum, q) => sum + (Number(q.total_price) || 0), 0);
 
+        // Calculate Sinotruck analytics
+        const customerSinotruckQuotations = sinotruckQuotations.data?.filter(q => {
+          const normalizedQuotationPhone = normalizePhone(q.customer_phone);
+          const normalizedQuotationEmail = q.customer_email?.toLowerCase().trim() || '';
+          
+          const phoneMatch = normalizedCustomerPhone && normalizedQuotationPhone && 
+                            normalizedQuotationPhone === normalizedCustomerPhone;
+          const emailMatch = normalizedCustomerEmail && normalizedQuotationEmail && 
+                            normalizedQuotationEmail === normalizedCustomerEmail;
+          const nameMatch = customer.name && q.customer_name && 
+                           q.customer_name?.trim().toLowerCase() === customer.name?.trim().toLowerCase();
+          
+          return phoneMatch || emailMatch || nameMatch;
+        }) || [];
+
+        customer.analytics.sinotruck_purchases = customerSinotruckQuotations.length;
+        
+        customer.analytics.sinotruck_revenue = customerSinotruckQuotations
+          .filter(q => q.status && REVENUE_STATUSES.includes(q.status.toLowerCase()))
+          .reduce((sum, q) => sum + (Number(q.total_price) || 0), 0);
+
         // Calculate Special Hire analytics - use normalized matching (only match non-empty values)
         const customerSpecialHireQuotations = specialHireQuotations.data?.filter(q => {
           const normalizedQuotationPhone = normalizePhone(q.customer_phone);
@@ -330,11 +425,13 @@ export function useCustomerData() {
         // Calculate total metrics
         customer.analytics.total_lifetime_value = 
           customer.analytics.yutong_revenue + 
+          customer.analytics.sinotruck_revenue +
           customer.analytics.special_hire_revenue + 
           customer.analytics.maintenance_revenue;
 
         customer.analytics.total_transactions = 
           customer.analytics.yutong_purchases + 
+          customer.analytics.sinotruck_purchases +
           customer.analytics.special_hire_bookings;
 
         customer.analytics.avg_booking_value = customer.analytics.total_transactions > 0 
@@ -363,6 +460,14 @@ export function useCustomerData() {
             date: q.created_at,
             status: q.status || 'draft'
           })),
+          ...customerSinotruckQuotations.slice(-5).map(q => ({
+            id: q.id,
+            type: 'sinotruck_quotation' as any,
+            description: `Sinotruck Order ${q.status ? `(${q.status})` : ''}`,
+            amount: Number(q.total_price) || 0,
+            date: q.created_at,
+            status: q.status || 'pending'
+          })),
           ...customerSpecialHireQuotations.slice(-5).map(q => ({
             id: q.id,
             type: 'special_hire' as const,
@@ -388,6 +493,16 @@ export function useCustomerData() {
 
         // Add Yutong transactions - only revenue statuses
         customerYutongQuotations.forEach(q => {
+          const monthKey = q.created_at.slice(0, 7);
+          const existing = monthlyData.get(monthKey);
+          if (existing && q.status && REVENUE_STATUSES.includes(q.status.toLowerCase())) {
+            existing.revenue += Number(q.total_price) || 0;
+            existing.transactions += 1;
+          }
+        });
+
+        // Add Sinotruck transactions - only revenue statuses
+        customerSinotruckQuotations.forEach(q => {
           const monthKey = q.created_at.slice(0, 7);
           const existing = monthlyData.get(monthKey);
           if (existing && q.status && REVENUE_STATUSES.includes(q.status.toLowerCase())) {
@@ -431,9 +546,25 @@ export function useCustomerData() {
     }
   };
 
-  const filteredCustomers = customers.filter(customer => {
-    // Search filter
-    if (filters.search) {
+  const filteredCustomers = useMemo(() => {
+    return customers.filter(customer => {
+      // 1. Company Context Filter (Tenant Isolation)
+      if (selectedCompany && !isParent) {
+        const companyName = selectedCompany.name.toLowerCase();
+        // If logged into Yutong, only show Yutong customers
+        if (companyName.includes('yutong') && customer.source !== 'yutong') return false;
+        // If logged into Sinotruck, only show Sinotruck
+        if (companyName.includes('sinotruck') && customer.source !== 'sinotruck') return false;
+        // If logged into Special Hire, only show Special Hire
+        if (companyName.includes('special hire') && customer.source !== 'special_hire') return false;
+        // If logged into School Bus, only show School Bus
+        if (companyName.includes('school bus') && customer.source !== 'school_bus') return false;
+        // If logged into Light Vehicle, only show Light Vehicle
+        if (companyName.includes('light vehicle') && customer.source !== 'light_vehicle') return false;
+      }
+
+      // 2. Search filter
+      if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       const matchesSearch = 
         customer.name.toLowerCase().includes(searchLower) ||
@@ -470,6 +601,7 @@ export function useCustomerData() {
 
     return true;
   });
+  }, [customers, filters, selectedCompany, isParent]);
 
   useEffect(() => {
     fetchCustomerData();

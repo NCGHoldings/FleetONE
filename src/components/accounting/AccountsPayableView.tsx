@@ -111,7 +111,12 @@ export const AccountsPayableView = () => {
       accessorKey: "invoice_number",
       header: "Invoice #",
       cell: ({ row }: any) => (
-        <span className="font-mono font-medium">{row.original.invoice_number}</span>
+        <div>
+          <span className="font-mono font-medium">{row.original.invoice_number}</span>
+          {row.original.legacy_number && row.original.legacy_number !== row.original.invoice_number && (
+            <div className="text-[10px] text-muted-foreground/60 mt-0.5 font-mono">was: {row.original.legacy_number}</div>
+          )}
+        </div>
       ),
     },
     {

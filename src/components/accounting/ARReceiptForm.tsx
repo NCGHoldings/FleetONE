@@ -28,7 +28,7 @@ import { CustomerForm } from "./CustomerForm";
 import { useCompany } from "@/contexts/CompanyContext";
 
 const receiptSchema = z.object({
-  receipt_number: z.string().min(1, "Receipt number is required"),
+  receipt_number: z.string().optional(),
   customer_id: z.string().min(1, "Customer/Vendor is required"),
   receipt_date: z.string().min(1, "Receipt date is required"),
   amount: z.number().min(0.01, "Amount must be greater than 0"),
@@ -193,11 +193,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
     },
   });
 
-  useEffect(() => {
-    if (open) {
-      generateNumber("receipt").then(num => form.setValue("receipt_number", num));
-    }
-  }, [open]);
+  // Note: Auto-generate receipt number exactly on save to prevent skipped sequences on cancel.
 
   useEffect(() => {
     if (open) {
@@ -311,8 +307,10 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
       : allocations.filter((a) => a.selected && a.allocated_amount > 0);
     
     try {
+      const finalReceiptNumber = data.receipt_number || await generateNumber("receipt");
+      
       await createReceipt.mutateAsync({
-        receipt_number: data.receipt_number,
+        receipt_number: finalReceiptNumber,
         customer_id: data.customer_id,
         receipt_date: data.receipt_date,
         amount: data.amount,
@@ -401,7 +399,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                   <FormItem>
                     <FormLabel>Receipt #</FormLabel>
                     <FormControl>
-                      <Input {...field} className="font-mono" />
+                      <Input {...field} className="font-mono bg-muted/50" readOnly placeholder="Auto-generated on save" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

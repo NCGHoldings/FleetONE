@@ -11,7 +11,7 @@ import { ChartOfAccountsUpload } from "./ChartOfAccountsUpload";
 import { ChartOfAccountsTree } from "./ChartOfAccountsTree";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useCompany } from "@/contexts/CompanyContext";
+import { useCompany, NCG_HOLDING_ID } from "@/contexts/CompanyContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AccountForm } from "./AccountForm";
 import { AccountEditForm } from "./AccountEditForm";
@@ -21,9 +21,9 @@ export const ChartOfAccountsView = () => {
   const [viewMode, setViewMode] = useState<"tree" | "table">("tree");
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
-  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId, isSubCompanyOfNCGHolding } = useCompany();
-  const effectiveCompanyId = getEffectiveCompanyId();
-  const isConsolidated = selectedCompanyId ? isSubCompanyOfNCGHolding(selectedCompanyId) : false;
+  const { selectedCompanyId, selectedCompany } = useCompany();
+  const effectiveCompanyId = NCG_HOLDING_ID;
+  const isConsolidated = true;
 
   const { data: accounts, isLoading, refetch } = useQuery({
     queryKey: ["chart-of-accounts", effectiveCompanyId],
@@ -128,7 +128,7 @@ export const ChartOfAccountsView = () => {
           <div>
             <h2 className="text-2xl font-bold">Chart of Accounts</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              {selectedCompany?.name}{isConsolidated ? ' (Consolidated — NCG Holding COA)' : ''} - No accounts configured
+              NCG Holdings (Global Master Ledger) - No accounts configured
             </p>
           </div>
           <div className="flex gap-2">
@@ -139,8 +139,8 @@ export const ChartOfAccountsView = () => {
           <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold">No Chart of Accounts</h3>
           <p className="text-muted-foreground mt-2 max-w-md">
-            {selectedCompany?.name} doesn't have a Chart of Accounts yet. 
-            Upload an Excel file to initialize the account structure.
+            The NCG Holdings Master Ledger doesn't have a Chart of Accounts yet. 
+            Upload an Excel file to initialize the account structure globally.
           </p>
           <ChartOfAccountsUpload onUploadComplete={refetch} companyId={effectiveCompanyId!} />
         </div>
@@ -154,7 +154,7 @@ export const ChartOfAccountsView = () => {
         <div>
           <h2 className="text-2xl font-bold">Chart of Accounts</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {selectedCompany?.name}{isConsolidated ? ' (Consolidated — NCG Holding COA)' : ''} - {accounts?.length || 0} accounts
+            Global Master Ledger (NCG Holdings) - {accounts?.length || 0} accounts
           </p>
         </div>
         <div className="flex gap-2">

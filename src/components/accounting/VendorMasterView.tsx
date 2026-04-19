@@ -68,7 +68,7 @@ export function VendorMasterView() {
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [bankAccounts, setBankAccounts] = useState<BankAccountRow[]>([]);
   const queryClient = useQueryClient();
-  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   const generateNumber = useGenerateNumber();
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const saveBankAccounts = useSaveVendorBankAccounts();
@@ -79,9 +79,7 @@ export function VendorMasterView() {
   
   // For consolidated GL: use parent company ID for storage, filter by business unit
   const effectiveCompanyId = getEffectiveCompanyId();
-  const businessUnitCode = selectedCompanyId && isSubCompanyOfNCGHolding(selectedCompanyId) 
-    ? getBusinessUnitCode() 
-    : null;
+  const businessUnitCode = getBusinessUnitCode();
 
   // Load existing bank accounts when editing
   useEffect(() => {
@@ -147,7 +145,7 @@ export function VendorMasterView() {
       let query = supabase
         .from("vendors")
         .select("*, vendor_categories(category_code, category_name)")
-        .order("vendor_name");
+        .order("vendor_code", { ascending: false });
       
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
@@ -168,8 +166,9 @@ export function VendorMasterView() {
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       if (!selectedCompanyId) throw new Error("Please select a company first");
+      const finalCode = await generateNumber("vendor");
       const { data: inserted, error } = await supabase.from("vendors").insert([{
-        vendor_code: data.vendor_code,
+        vendor_code: finalCode,
         vendor_name: data.vendor_name,
         contact_person: data.contact_person || null,
         email: data.email || null,
@@ -339,16 +338,7 @@ export function VendorMasterView() {
           <Dialog open={isDialogOpen} onOpenChange={async (open) => {
             setIsDialogOpen(open);
             if (open && !editingVendor) {
-              // Auto-generate vendor code for new vendors
-              setIsGeneratingCode(true);
-              try {
-                const code = await generateNumber("vendor");
-                setFormData(prev => ({ ...prev, vendor_code: code }));
-              } catch (err) {
-                console.error("Failed to generate vendor code:", err);
-              } finally {
-                setIsGeneratingCode(false);
-              }
+              // Note: auto-generate code exactly at save to prevent skipped numbers on cancel
             }
             if (!open) {
               resetForm();
@@ -648,7 +638,12 @@ export function VendorMasterView() {
               <TableBody>
                 {filteredVendors?.map((vendor) => (
                   <TableRow key={vendor.id}>
-                    <TableCell className="font-mono text-sm">{vendor.vendor_code}</TableCell>
+                    <TableCell className="font-mono text-sm">
+                      <div>{vendor.vendor_code}</div>
+                      {(vendor as any).legacy_number && (vendor as any).legacy_number !== vendor.vendor_code && (
+                        <div className="text-[10px] text-muted-foreground/60 mt-0.5">was: {(vendor as any).legacy_number}</div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium">{vendor.vendor_name}</TableCell>
                     <TableCell>
                       {(vendor as any).vendor_categories?.category_code 

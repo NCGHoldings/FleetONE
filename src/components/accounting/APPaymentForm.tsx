@@ -29,7 +29,7 @@ import { VehicleSelector } from "./shared/VehicleSelector";
 import { SearchableVendorSelector } from "./shared/SearchableVendorSelector";
 
 const paymentSchema = z.object({
-  payment_number: z.string().min(1, "Payment number is required"),
+  payment_number: z.string().optional(),
   vendor_id: z.string().min(1, "Vendor is required"),
   payment_date: z.string().min(1, "Payment date is required"),
   payment_method: z.string().min(1, "Payment method is required"),
@@ -174,9 +174,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
         setIncludeBankFee(false);
         setBankFeeAmount(0);
         setBankFeeType("bank_charge");
-        generateNumber("payment").then((num) => {
-          form.setValue("payment_number", num);
-        });
+        // Note: auto-generate payment number exactly on save to prevent skipped sequences on cancel.
         hasGeneratedNumber.current = true;
       }
     } else {
@@ -343,8 +341,10 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       : allocations.filter((a) => a.selected && a.allocated_amount > 0);
     
     try {
+      const finalPaymentNumber = data.payment_number || await generateNumber("payment");
+      
       const paymentResult = await createPayment.mutateAsync({
-        payment_number: data.payment_number,
+        payment_number: finalPaymentNumber,
         vendor_id: data.vendor_id,
         payment_date: data.payment_date,
         amount: totalPayment,
@@ -507,7 +507,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                   <FormItem>
                     <FormLabel>Payment #</FormLabel>
                     <FormControl>
-                      <Input {...field} className="font-mono" />
+                      <Input {...field} className="font-mono bg-muted/50" readOnly placeholder="Auto-generated on save" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

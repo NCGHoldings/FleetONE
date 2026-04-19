@@ -290,17 +290,9 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
     
     // Invalidate all company-specific queries when company changes
     if (previousCompanyId !== id) {
-      // Invalidate queries that include company filtering
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
-      queryClient.invalidateQueries({ queryKey: ["vendors"] });
-      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["fixed-assets"] });
-      queryClient.invalidateQueries({ queryKey: ["ar-receipts"] });
-      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+      // Aggressively invalidate ALL cached queries system-wide to ensure 100% data integrity
+      // when switching contexts. This forces every mounted component to instantly refetch.
+      queryClient.invalidateQueries();
     }
     
     // Dispatch event for other components

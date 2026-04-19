@@ -27,6 +27,7 @@ import { buildSpecialHireQuotationBankSnapshot, SPECIAL_HIRE_QUOTATION_BANK_DEFA
 import { CostBreakdown } from './CostBreakdown';
 import { LocationAutocomplete } from '@/components/ui/location-autocomplete';
 import { calculateExtraTimeCharge } from '@/lib/extra-time-calculator';
+import { useCustomerBridge } from '@/hooks/useCustomerBridge';
 
 const formSchema = z.object({
   // Customer Details
@@ -188,6 +189,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const { toast } = useToast();
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId?.() || selectedCompanyId;
+  const { syncToAccounting } = useCustomerBridge();
 
   const AUTO_SAVE_KEY = 'special-hire-form-draft';
 
@@ -1885,6 +1887,25 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
       // Clear auto-saved data on successful submission
       clearAutoSave();
+
+      // Auto-sync customer to accounting (non-blocking, only for new quotations)
+      if (!isEditing) {
+        try {
+          const syncResult = await syncToAccounting({
+            customer_name: data.companyName || data.customerName,
+            contact_phone: data.customerPhone,
+            contact_email: data.customerEmail || undefined,
+            billing_address: data.pickupLocation || undefined,
+            customer_type: data.companyName ? 'business' : 'individual',
+            source_module: 'special_hire',
+          });
+          if (syncResult.success) {
+            console.log(`[CustomerBridge] Special Hire customer ${syncResult.isNew ? 'created' : 'linked'} in accounting: ${syncResult.customerId}`);
+          }
+        } catch (syncError) {
+          console.warn('[CustomerBridge] Non-blocking sync error:', syncError);
+        }
+      }
 
       // For versioning system, pass the quotation data to onSubmit
       if (editConfig) {

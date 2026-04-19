@@ -46,12 +46,16 @@ export default function CustomerManagement() {
   };
 
   const getSourceBadge = (source: string) => {
-    const badges = {
-      yutong: <Badge variant="default" className="bg-blue-100 text-blue-800 hover:bg-blue-100">Yutong</Badge>,
-      special_hire: <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">Special Hire</Badge>,
-      fleet_owner: <Badge variant="default" className="bg-purple-100 text-purple-800 hover:bg-purple-100">Fleet Owner</Badge>
+    const badges: Record<string, JSX.Element> = {
+      yutong: <Badge variant="default" className="bg-blue-100 text-blue-800 hover:bg-blue-100">🔵 Yutong</Badge>,
+      sinotruck: <Badge variant="default" className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">🟢 Sinotruck</Badge>,
+      special_hire: <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-100">🟡 Special Hire</Badge>,
+      school_bus: <Badge variant="default" className="bg-purple-100 text-purple-800 hover:bg-purple-100">🟣 School Bus</Badge>,
+      light_vehicle: <Badge variant="default" className="bg-cyan-100 text-cyan-800 hover:bg-cyan-100">🔵 Light Vehicle</Badge>,
+      fleet_owner: <Badge variant="default" className="bg-violet-100 text-violet-800 hover:bg-violet-100">🚛 Fleet Owner</Badge>,
+      accounting: <Badge variant="default" className="bg-gray-100 text-gray-800 hover:bg-gray-100">⚪ Accounting</Badge>,
     };
-    return badges[source as keyof typeof badges] || <Badge variant="outline">{source}</Badge>;
+    return badges[source] || <Badge variant="outline">{source}</Badge>;
   };
 
   const getCustomerTypeBadge = (type: string) => {
@@ -171,14 +175,18 @@ export default function CustomerManagement() {
                   className="flex-1 min-w-[300px]"
                 />
                 <Select value={filters.source} onValueChange={(value) => handleFilterChange('source', value)}>
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Source" />
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Source Company" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Sources</SelectItem>
-                    <SelectItem value="yutong">Yutong</SelectItem>
-                    <SelectItem value="special_hire">Special Hire</SelectItem>
-                    <SelectItem value="fleet_owner">Fleet Owner</SelectItem>
+                    <SelectItem value="all">All Companies</SelectItem>
+                    <SelectItem value="yutong">🔵 Yutong</SelectItem>
+                    <SelectItem value="sinotruck">🟢 Sinotruck</SelectItem>
+                    <SelectItem value="special_hire">🟡 Special Hire</SelectItem>
+                    <SelectItem value="school_bus">🟣 School Bus</SelectItem>
+                    <SelectItem value="light_vehicle">🔵 Light Vehicle</SelectItem>
+                    <SelectItem value="fleet_owner">🚛 Fleet Owner</SelectItem>
+                    <SelectItem value="accounting">⚪ Accounting</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={filters.customer_type} onValueChange={(value) => handleFilterChange('customer_type', value)}>
