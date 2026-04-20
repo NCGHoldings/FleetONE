@@ -154,11 +154,11 @@ BEGIN
       LOOP
           BEGIN
               INSERT INTO public.customers (
-                  company_id, customer_name, phone, email, billing_address,
+                  company_id, business_unit_code, customer_name, phone, email, billing_address,
                   customer_type, tax_id, business_registration_no,
                   source_module, source_record_id, created_at, updated_at
               ) VALUES (
-                  v_company_id,
+                  v_company_id, 'YUT',
                   y_cust.company_name, y_cust.phone, y_cust.email, y_cust.address,
                   COALESCE(y_cust.customer_type, 'business'),
                   y_cust.tax_number, y_cust.business_registration_no,
@@ -192,11 +192,11 @@ BEGIN
       LOOP
           BEGIN
               INSERT INTO public.customers (
-                  company_id, customer_name, phone, email, billing_address,
+                  company_id, business_unit_code, customer_name, phone, email, billing_address,
                   customer_type, tax_id, business_registration_no,
                   source_module, source_record_id, created_at, updated_at
               ) VALUES (
-                  v_company_id,
+                  v_company_id, 'SNT',
                   s_cust.company_name, s_cust.phone, s_cust.email, s_cust.address,
                   COALESCE(s_cust.customer_type, 'business'),
                   s_cust.tax_number, s_cust.business_registration_no,
