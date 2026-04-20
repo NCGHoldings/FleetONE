@@ -29,6 +29,7 @@ import { SearchableVendorSelector } from "./shared/SearchableVendorSelector";
 
 const invoiceSchema = z.object({
   invoice_number: z.string().optional(),
+  vendor_bill_number: z.string().optional(),
   vendor_id: z.string().min(1, "Vendor is required"),
   invoice_date: z.string().min(1, "Invoice date is required"),
   due_date: z.string().min(1, "Due date is required"),
@@ -187,6 +188,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
       invoice_number: "",
+      vendor_bill_number: "",
       invoice_date: format(new Date(), "yyyy-MM-dd"),
       due_date: format(addDays(new Date(), 30), "yyyy-MM-dd"),
       apply_wht: false,
@@ -201,6 +203,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     if (editingInvoice) {
       form.reset({
         invoice_number: editingInvoice.invoice_number || "",
+        vendor_bill_number: editingInvoice.vendor_bill_number || "",
         vendor_id: editingInvoice.vendor_id || "",
         invoice_date: editingInvoice.invoice_date || format(new Date(), "yyyy-MM-dd"),
         due_date: editingInvoice.due_date || format(addDays(new Date(), 30), "yyyy-MM-dd"),
@@ -397,6 +400,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
           id: editingInvoice.id,
           data: {
             invoice_number: data.invoice_number,
+            vendor_bill_number: data.vendor_bill_number || undefined,
             vendor_id: data.vendor_id,
             invoice_date: data.invoice_date,
             due_date: data.due_date,
@@ -436,6 +440,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
 
         const invoiceResult = await createInvoice.mutateAsync({
           invoice_number: finalInvoiceNumber,
+          vendor_bill_number: data.vendor_bill_number || undefined,
           vendor_id: data.vendor_id,
           invoice_date: data.invoice_date,
           due_date: data.due_date,
@@ -464,7 +469,8 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
               bank_account_id: paymentBankAccountId || undefined,
               cheque_number: paymentChequeNumber || undefined,
               reference: paymentReference || undefined,
-              notes: `Auto-payment for ${data.invoice_number}`,
+              vendor_bill_number: data.vendor_bill_number || undefined,
+              notes: `Auto-payment for ${finalInvoiceNumber}${data.vendor_bill_number ? ` | Vendor Bill: ${data.vendor_bill_number}` : ''}`,
               allocations: [{
                 invoice_id: invoiceResult.id,
                 allocated_amount: netPayable,
@@ -507,7 +513,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Header Fields */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <FormField
                 control={form.control}
                 name="invoice_number"
@@ -516,6 +522,20 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                     <FormLabel>AP Invoice #</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="Auto-generating..." readOnly className="bg-muted/50 font-mono" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="vendor_bill_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vendor Bill #</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Vendor's invoice no." className="font-mono" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -896,6 +896,7 @@ export const useCreateAPInvoice = () => {
   return useMutation({
     mutationFn: async (invoice: {
       invoice_number: string;
+      vendor_bill_number?: string;
       vendor_id: string;
       invoice_date: string;
       due_date: string;
@@ -937,7 +938,7 @@ export const useCreateAPInvoice = () => {
           route_id: invoice.route_id || null,
           bus_id: invoice.bus_id || null,
           school_route_id: invoice.school_route_id || null,
-        }])
+        } as any])
         .select()
         .single();
       
@@ -4341,6 +4342,7 @@ export const useUpdateAPInvoice = () => {
       data: {
         vendor_id: string;
         invoice_number: string;
+        vendor_bill_number?: string;
         invoice_date: string;
         due_date: string;
         subtotal?: number;
@@ -4369,6 +4371,7 @@ export const useUpdateAPInvoice = () => {
         .update({
           vendor_id: data.vendor_id,
           invoice_number: data.invoice_number,
+          vendor_bill_number: data.vendor_bill_number || null,
           invoice_date: data.invoice_date,
           due_date: data.due_date,
           subtotal: data.subtotal,
@@ -4381,7 +4384,7 @@ export const useUpdateAPInvoice = () => {
           bus_id: data.bus_id || null,
           school_route_id: data.school_route_id || null,
           updated_at: new Date().toISOString(),
-        })
+        } as any)
         .eq("id", id);
       if (headerError) throw headerError;
 

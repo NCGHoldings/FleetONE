@@ -56,6 +56,7 @@ export const AccountsPayableView = () => {
     const query = searchQuery.toLowerCase();
     return invoices.filter((inv) =>
       inv.invoice_number?.toLowerCase().includes(query) ||
+      (inv as any).vendor_bill_number?.toLowerCase().includes(query) ||
       inv.vendors?.vendor_name?.toLowerCase().includes(query) ||
       inv.vendors?.vendor_code?.toLowerCase().includes(query) ||
       inv.status?.toLowerCase().includes(query) ||
@@ -128,6 +129,14 @@ export const AccountsPayableView = () => {
           <p className="text-xs text-muted-foreground">{row.original.vendors?.vendor_code}</p>
         </div>
       ),
+    },
+    {
+      accessorKey: "vendor_bill_number",
+      header: "Vendor Bill #",
+      cell: ({ row }: any) => {
+        const billNo = row.original.vendor_bill_number;
+        return billNo ? <span className="font-mono text-xs">{billNo}</span> : <span className="text-xs text-muted-foreground">—</span>;
+      },
     },
     {
       accessorKey: "routes.route_name",
@@ -418,6 +427,10 @@ export const AccountsPayableView = () => {
                     {getStatusBadge(viewInvoice.status)}
                     {getApprovalBadge(viewInvoice.approval_status)}
                   </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Vendor Bill #</p>
+                  <p className="font-medium font-mono">{viewInvoice.vendor_bill_number || "—"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Invoice Date</p>
