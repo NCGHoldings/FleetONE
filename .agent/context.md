@@ -1,8 +1,9 @@
 # NCG FleetFlow — Full System Context
 
-> **Last verified:** 2026-03-29  
+> **Last verified:** 2026-04-19  
 > **Purpose:** Single source of truth for ALL system development. Read this FIRST before making any changes.  
-> **This file is auto-read by agents before any work to prevent hallucination.**
+> **This file is auto-read by agents before any work to prevent hallucination.**  
+> **App Version:** `1.5.0` (see `src/config/appVersion.ts`)
 
 ---
 
@@ -145,9 +146,11 @@ Per module pattern: `use{Module}OrderManagement`, `use{Module}OrderInvoiceManage
 | `useCommissionFinance.ts` | Sales commissions → GL |
 | `lib/gl-posting-utils.ts` | Core GL posting utility (used by AR module) |
 
-### 4.2 Key Constants
-- **NCG Holding ID:** `f40b0a9d-ae5b-41b3-9188-535ae94c9020`
-- **Business Unit Codes:** `YUT` (Yutong), `SNT` (Sinotruk), `LTV` (Light Vehicle)
+### 4.2 Key Constants (from `src/contexts/CompanyContext.tsx`)
+- **NCG Holding ID:** `a0000000-0000-0000-0000-000000000001`
+- **NCG Express ID:** `7ece7595-8b7b-46de-8bfc-c1e8e0da7513`
+- **NCG Test ID:** `f40b0a9d-ae5b-41b3-9188-535ae94c9020` (legacy — was previously documented as Holding ID)
+- **Business Unit Codes:** `YUT` (Yutong), `SNT` (Sinotruk), `LTV` (Light Vehicle), `SBO` (School Bus Ops), `SHR` (Special Hire), `SCH` (School)
 
 ### 4.3 GL Posting Patterns
 | Event | DR | CR |
@@ -225,3 +228,83 @@ If anything is missing: `supabase/migrations/vehicle_invoice_infrastructure.sql`
 | `sri-lanka-tax-invoice-generator.ts` | Sri Lanka tax invoice template |
 | `invoice-generator.ts` | General invoice utility |
 | `gl-posting-utils.ts` | Core GL posting utility |
+
+---
+
+## 8. MULTI-COMPANY ARCHITECTURE
+
+### 8.1 Company Hierarchy (from `CompanyContext.tsx`)
+| Level | Company | ID | GL Scope |
+|-------|---------|----|---------|
+| **Parent** | NCG Holdings | `a0000000-...0001` | Consolidated GL (shared by all sub-companies) |
+| Sub | Yutong Division | `YUT` short_code | Uses parent GL |
+| Sub | Sinotruk Division | `SNT` short_code | Uses parent GL |
+| Sub | Light Vehicle | `LTV` short_code | Uses parent GL |
+| Sub | School Bus Ops | `SBO` short_code | Uses parent GL |
+| **Standalone** | NCG Express | `7ece7595-...e513` | Own isolated GL |
+| **Test** | NCG Test | `f40b0a9d-...9020` | Own isolated GL (test sandbox) |
+
+### 8.2 Key Context Helpers
+- `getEffectiveCompanyId()` — Returns parent ID for sub-companies (for shared COA/GL), own ID for standalone
+- `getBusinessUnitCode()` — Returns `short_code` for sub-companies (tags journal entries)
+- `isSubCompanyOfNCGHolding()` — Guards School Bus and fleet operations to NCG Holding hierarchy only
+- `isTestCompany` — Boolean flag for test mode detection (prevents live GL writes)
+
+### 8.3 Customer Bridge (`useCustomerBridge.ts`)
+Central engine that syncs customers from any business unit into the unified `customers` table:
+- **Duplicate detection** by normalized phone (`normalizePhone()`) and NIC/passport
+- **Auto-categorization** by source module: `CAT-YUT`, `CAT-SNT`, `CAT-LTV`, `CAT-SHR`, `CAT-SCH`
+- **Customer code format:** `CUS-YUT-00001`, `CUS-SNT-00001`, etc.
+- **Race-condition safe** — handles `23505` unique constraint violations gracefully
+
+### 8.4 Entity Numbering System (`useNumbering.ts`)
+- Company-scoped sequences stored in `numbering_sequences` table
+- Configurable prefix, year/month inclusion, separator, padding
+- RPC: `generate_entity_number(p_entity_type, p_company_id)` for atomic number generation
+- Entity types: `customer`, `vendor`, `item`, `ar_invoice`, `ap_invoice`, `journal`, `grn`, `po`, `so`, `iou`, `expense_request`, etc.
+
+---
+
+## 9. REPOSITORY OPERATIONS
+
+### 9.1 Dev Commands
+```bash
+npm run dev              # Start local Vite dev server
+npm run build            # Production build
+npm run lint             # ESLint check
+npm run lovable-sync     # 1-click sync to both repos (see below)
+```
+
+### 9.2 Git Repositories
+| Repo | URL | Purpose |
+|------|-----|---------|
+| **Primary** | `NCGHoldings/FleetONE` | Main source of truth, CI/CD |
+| **Lovable Sandbox** | `globallyceum25-dot/ncg-fleetone-545c8dda` | Lovable platform preview |
+
+### 9.3 1-Click Lovable Cloud Sync
+The primary repo carries ~384MB of legacy binary history that causes GitHub `HTTP 408` timeouts on push to the Lovable repo. The `lovable-sync` script bypasses this:
+
+```bash
+npm run lovable-sync
+```
+
+This runs `sync_shallow.sh` which:
+1. Pushes your current branch to **NCGHoldings** (normal push).
+2. Creates a lightweight orphaned branch (`lovable_sync`) — strips all history.
+3. Does NOT include `.env` files (Lovable handles Supabase keys via native integration).
+4. Force-pushes the clean branch to **Globallyceum** and cleans up.
+
+### 9.4 RLS Hardening (April 2026)
+Comprehensive Row Level Security was applied across all tables via migration files:
+- `20260415000000_harden_rls_policies.sql`
+- `20260415000001_harden_child_rls_policies.sql`
+- `20260415000002_harden_storage_rls.sql`
+- `20260415000003_harden_rpc_search_path.sql`
+- `20260418_rls_tenant_lockdown.sql`
+
+### 9.5 Background Scripts
+| Script | Purpose |
+|--------|---------|
+| `scripts/magiya_scraper.js` | Headless Chrome scraper for Magiya fleet daily reports |
+| `scripts/syncDaemon.cjs` | Background telemetry sync daemon (GPS/door-lock/ignition) |
+| `scripts/ausPostCron.js` | Australia Post geofence reporting cron |

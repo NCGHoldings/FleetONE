@@ -55,6 +55,9 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
   const [expandedRows, setExpandedRows] = useState<ExpandedFleetRow[]>([]);
   const [availableRoutes, setAvailableRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // Local per-trip overrides (stored here until "Create Trips" is clicked)
+  // Key: "rosterId__seq" → { route_label?, route_id?, driver?, conductor?, turn_01_time?, turn_02_time? }
+  const [tripOverrides, setTripOverrides] = useState<Record<string, Record<string, any>>>({});
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
@@ -184,9 +187,11 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
           const standardRate = row.expected_km_per_liter;
           const performance = fuelConsumption > 0 ? standardRate - fuelConsumption : 0;
 
-          // Use per-trip route from daily_trips if available (daily mode), else roster default
-          const tripRouteLabel = matchedTrip?.route_label || row.route_label;
-          const tripRouteId = matchedTrip?.route_id || row.route_id;
+          // Use per-trip route from daily_trips if available, else check local overrides, else roster default
+          const overrideKey = `${row.id}__${seq}`;
+          const override = tripOverrides[overrideKey];
+          const tripRouteLabel = matchedTrip?.route_label || override?.route_label || row.route_label;
+          const tripRouteId = matchedTrip?.route_id || override?.route_id || row.route_id;
 
           expanded.push({
             ...row,
@@ -234,7 +239,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
   const TRIP_FIELDS = ['odometer_start', 'odometer_end', 'fuel_liters'];
   const BUS_DIRECT_FIELDS = ['standard_rate'];
 
-  const updateField = async (rosterId: string, field: string, value: any) => {
+  const updateField = async (rosterId: string, field: string, value: any, tripSequence?: number) => {
     try {
       // Handle per-trip route updates: field format is "route_label__trip:<trip_id>"
       const tripRouteMatch = field.match(/^route_label__trip:(.+)$/);
@@ -321,9 +326,9 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
       }
 
       // Other master-only fields should always update fleet_master_roster
-      const masterOnlyFields = ['bus_type', 'permit_type', 'sort_order', 'day_target'];
+      const masterOnlyFields = ['bus_type', 'permit_type', 'sort_order'];
       if (masterOnlyFields.includes(field)) {
-        const masterNumericFields = ['day_target', 'sort_order'];
+        const masterNumericFields = ['sort_order'];
         const masterValue = masterNumericFields.includes(field) ? Number(value) || 0 : value;
 
         const { error } = await supabase
@@ -339,20 +344,65 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
         return;
       }
 
+      // day_target: always updates fleet_master_roster (works in both master and daily mode)
+      if (field === 'day_target') {
+        const numVal = Number(value) || 0;
+        const { error } = await supabase
+          .from("fleet_master_roster")
+          .update({ day_target: numVal })
+          .eq("id", rosterId);
+
+        if (error) throw error;
+
+        setExpandedRows(prev => prev.map(r =>
+          r.id === rosterId ? { ...r, day_target: numVal } : r
+        ));
+        return;
+      }
+
       if (editMode === 'daily') {
-        // For per-trip route updates, find the exact expanded row (matching trip_sequence)
-        const row = expandedRows.find(r => r.id === rosterId && (r.trip_id || r.trip_sequence === 1));
-        const rosterLevelFields = ['route_label', 'route_id', 'remark'];
-        if (!row?.trip_id) {
-          if (!rosterLevelFields.includes(field)) {
-            toast({ title: "No trip generated", description: "You must click 'Create Trips' for today before you can override daily values.", variant: "destructive" });
-            return;
-          }
-          // For roster-level fields, fall through to master roster update below
-        } else {
+        // For per-trip updates, find the exact expanded row using tripSequence
+        const seq = tripSequence || 1;
+        let row = expandedRows.find(r => r.id === rosterId && r.trip_sequence === seq);
+        
+        // Per-trip fields that need individual daily_trips records
+        const perTripFields = ['route_label', 'route_id', 'default_driver', 'default_conductor', 'turn_01_time', 'turn_02_time'];
+             // If no trip_id exists and this is a per-trip field, store in local overrides
+        if (!row?.trip_id && perTripFields.includes(field)) {
+          const overrideKey = `${rosterId}__${seq}`;
+          setTripOverrides(prev => {
+            const current = prev[overrideKey] || {};
+            // Map the field name to the override key
+            const overrideField = field === 'default_driver' ? 'driver' 
+              : field === 'default_conductor' ? 'conductor'
+              : field;
+            return { ...prev, [overrideKey]: { ...current, [overrideField]: value } };
+          });
+
+          // Also update the displayed expandedRows locally so the UI reflects the change
+          setExpandedRows(prev => prev.map(r => {
+            if (r.id === rosterId && r.trip_sequence === seq) {
+              const updates: Record<string, any> = {};
+              if (field === 'route_label') updates.route_label = value;
+              if (field === 'route_id') updates.route_id = value;
+              if (field === 'default_driver') { updates.default_driver = value; updates.driver_name = value; }
+              if (field === 'default_conductor') { updates.default_conductor = value; updates.conductor_name = value; }
+              if (field === 'turn_01_time') updates.turn_01_time = value;
+              if (field === 'turn_02_time') updates.turn_02_time = value;
+              return { ...r, ...updates };
+            }
+            return r;
+          }));
+          
+          toast({ title: "Saved locally", description: `Will be applied when you click 'Create Trips'` });
+          return;
+        }
+
+        // If trip_id exists, update the specific trip directly
+        if (row?.trip_id) {
           const dailyUpdatePayload: Record<string, any> = {};
           
-          // Map master roster fields to daily_trips fields — route updates go to the specific trip
+          // Map master roster fields to daily_trips fields
           if (field === 'route_label') dailyUpdatePayload.route_label = value;
           if (field === 'route_id') dailyUpdatePayload.route_id = value;
           if (field === 'remark') {
@@ -361,11 +411,6 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
 
           // For driver/conductor/turn times, update the 'notes' JSON
           if (field === 'default_driver' || field === 'default_conductor' || field === 'turn_01_time' || field === 'turn_02_time') {
-            if (!row.trip_id) {
-              toast({ title: "No trip", description: "Create trips first before overriding crew or times", variant: "destructive" });
-              return;
-            }
-            
             try {
               const { data: tripData } = await supabase
                 .from("daily_trips")
@@ -389,8 +434,8 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
               dailyUpdatePayload.notes = JSON.stringify({
                 driver: field === 'default_driver' ? value : row.driver_name,
                 conductor: field === 'default_conductor' ? value : row.conductor_name,
-                turn_01_time: field === 'turn_01_time' ? value : row.daily_turn_01_time,
-                turn_02_time: field === 'turn_02_time' ? value : row.daily_turn_02_time
+                turn_01_time: field === 'turn_01_time' ? value : (row as any).daily_turn_01_time,
+                turn_02_time: field === 'turn_02_time' ? value : (row as any).daily_turn_02_time
               });
             }
           }
@@ -407,6 +452,8 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
             return;
           }
         }
+
+        // For non-per-trip fields (like remark) without trip_id, fall through to master roster update
       }
 
       // If EditMode is Master, or we're editing a field that only belongs on the Master (like bus_type)
@@ -484,17 +531,21 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
         for (let seq = existingCount + 1; seq <= row.trips_per_day; seq++) {
           const tripNo = `${datePrefix}-${String(tripCounter).padStart(4, '0')}`;
 
+          // Check for local per-trip overrides
+          const overrideKey = `${row.id}__${seq}`;
+          const override = tripOverrides[overrideKey];
+
           tripsToInsert.push({
             bus_id: row.bus_id,
-            route_id: row.route_id,
-            route_label: row.route_label,
+            route_id: override?.route_id || row.route_id,
+            route_label: override?.route_label || row.route_label,
             trip_date: dateStr,
             trip_no: tripNo,
             notes: JSON.stringify({ 
-              driver: row.default_driver || null, 
-              conductor: row.default_conductor || null,
-              turn_01_time: row.turn_01_time || null,
-              turn_02_time: row.turn_02_time || null
+              driver: override?.driver || row.default_driver || null, 
+              conductor: override?.conductor || row.default_conductor || null,
+              turn_01_time: override?.turn_01_time || row.turn_01_time || null,
+              turn_02_time: override?.turn_02_time || row.turn_02_time || null
             }),
             data_source: 'manual' as const,
           });
@@ -511,6 +562,8 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
       if (error) throw error;
 
       toast({ title: "Success", description: `Created ${tripsToInsert.length} trips for ${dateStr}` });
+      // Clear local overrides since they've been applied to the created trips
+      setTripOverrides({});
       await fetchRoster();
     } catch (error: any) {
       console.error("Error creating trips:", error);

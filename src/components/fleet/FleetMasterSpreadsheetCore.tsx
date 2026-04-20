@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 interface Props {
   rows: ExpandedFleetRow[];
   loading: boolean;
-  onUpdate: (rosterId: string, field: string, value: any) => void;
+  onUpdate: (rosterId: string, field: string, value: any, tripSequence?: number) => void;
   editMode?: 'master' | 'daily';
   selectedDate?: Date;
   availableRoutes?: any[];
@@ -128,13 +128,13 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
     setEditValue(String(currentValue ?? ''));
   };
 
-  const commitEdit = (rosterId: string, field: string) => {
+  const commitEdit = (rosterId: string, field: string, tripSequence?: number) => {
     if (editingCell) {
       saveScrollPosition();
       const numericFields = ['trips_per_day', 'day_target', 'sort_order', 'odometer_start', 'odometer_end', 'fuel_liters'];
       const val = numericFields.includes(field) ? Number(editValue) || 0 : editValue;
       
-      onUpdate(rosterId, field, val);
+      onUpdate(rosterId, field, val, tripSequence);
       setEditingCell(null);
     }
   };
@@ -142,10 +142,10 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
 
   const cancelEdit = () => setEditingCell(null);
 
-  const handleKeyDown = (e: React.KeyboardEvent, rosterId: string, field: string) => {
+  const handleKeyDown = (e: React.KeyboardEvent, rosterId: string, field: string, tripSequence?: number) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      commitEdit(rosterId, field);
+      commitEdit(rosterId, field, tripSequence);
     } else if (e.key === 'Escape') {
       cancelEdit();
     }
@@ -155,7 +155,8 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
     if (editMode === 'master') return true;
     const dailyEditable = [
       'route_label', 'route_id', 'remark', 'default_driver', 'default_conductor',
-      'odometer_start', 'odometer_end', 'fuel_liters', 'trips_per_day'
+      'odometer_start', 'odometer_end', 'fuel_liters', 'trips_per_day',
+      'turn_01_time', 'turn_02_time', 'day_target', 'standard_rate'
     ];
     return dailyEditable.includes(field);
   };
@@ -174,8 +175,8 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
             type={type}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            onBlur={() => commitEdit(row.id, field)}
-            onKeyDown={(e) => handleKeyDown(e, row.id, field)}
+            onBlur={() => commitEdit(row.id, field, row.trip_sequence)}
+            onKeyDown={(e) => handleKeyDown(e, row.id, field, row.trip_sequence)}
             className="absolute left-0 top-1/2 -translate-y-1/2 min-w-[200px] h-10 px-3 text-sm border-2 border-primary rounded bg-background shadow-lg focus:ring-2 focus:ring-primary focus:outline-none z-50"
           />
         </div>
@@ -225,7 +226,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
         value={value || ''}
         onValueChange={(v) => {
           saveScrollPosition();
-          onUpdate(row.id, field, v);
+          onUpdate(row.id, field, v, row.trip_sequence);
         }}
       >
         <SelectTrigger className="h-10 text-sm border-0 bg-transparent px-3 focus:ring-0 shadow-none hover:bg-accent/50 min-w-[100px]">
@@ -249,11 +250,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
     [...new Set(rows.map(r => r.default_conductor).filter(Boolean))].sort() as string[], [rows]);
 
   const renderRouteCell = (row: ExpandedFleetRow) => {
-    // In master mode, sub-rows inherit parent route
-    if (row.trip_sequence > 1 && editMode === 'master') {
-      return <span className="text-muted-foreground text-sm">↑</span>;
-    }
-
+    // Route is always editable in master mode, and editable per-trip in daily mode
     if (!isEditable('route_label')) {
       return (
         <span
@@ -274,7 +271,9 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
           <button
             className={cn(
               "flex w-full items-center justify-between rounded px-3 py-2.5 text-sm min-h-[40px] hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary",
-              !row.route_label && "text-muted-foreground"
+              !row.route_label && "text-muted-foreground",
+              // Subtle indicator for per-trip route in daily mode
+              editMode === 'daily' && row.trip_sequence > 1 && "border-l-2 border-primary/40"
             )}
             onClick={() => {
               if (isOpen) setOpenRouteComboboxFor(null);
@@ -298,11 +297,15 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                     value={routeItem.route_name}
                     onSelect={(currentValue) => {
                       saveScrollPosition();
-                      // For per-trip route updates in daily mode, pass trip_id context
+                      // Per-trip route: update only this trip's daily_trips record
                       if (editMode === 'daily' && row.trip_id) {
                         onUpdate(row.id, `route_label__trip:${row.trip_id}`, currentValue);
+                      } else if (editMode === 'master') {
+                        // Master mode: update the roster (all trips share this route)
+                        onUpdate(row.id, 'route_label', currentValue, row.trip_sequence);
                       } else {
-                        onUpdate(row.id, 'route_label', currentValue);
+                        // Daily mode but no trips created yet — update roster as fallback
+                        onUpdate(row.id, 'route_label', currentValue, row.trip_sequence);
                       }
                       setOpenRouteComboboxFor(null);
                     }}
@@ -362,7 +365,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                 {names.map((name) => (
                   <CommandItem key={name} value={name} onSelect={(currentValue) => {
                     saveScrollPosition();
-                    onUpdate(row.id, field, currentValue);
+                    onUpdate(row.id, field, currentValue, row.trip_sequence);
                     setOpenCrewComboboxFor(null);
                   }}>
                     <Check className={cn("mr-2 h-4 w-4", value === name ? "opacity-100" : "opacity-0")} />

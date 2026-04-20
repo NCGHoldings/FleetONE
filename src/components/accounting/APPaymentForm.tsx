@@ -119,7 +119,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
-      payment_number: `PAY-${format(new Date(), "yyyyMMdd")}`,
+      payment_number: "", // Leave empty so backend sequence generator creates PAY-NCGH-YYYY-XXXX
       vendor_id: preselectedVendorId || "",
       payment_date: format(new Date(), "yyyy-MM-dd"),
       payment_method: "bank_transfer",
@@ -339,6 +339,13 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     const selectedAllocations = isAdvance || isDirectPayment
       ? [] 
       : allocations.filter((a) => a.selected && a.allocated_amount > 0);
+      
+    // Auto-generate interconnection notes linking Payment directly to the allocated AP Invoices
+    const interconnectedInvoiceNumbers = selectedAllocations.map(a => a.invoice_number).join(", ");
+    const finalVendorBillNumber = vendorBillNumber || (interconnectedInvoiceNumbers ? `AP-BILLS: ${interconnectedInvoiceNumbers}` : undefined);
+    const finalNotes = data.notes 
+      ? `${data.notes}\n\nAllocated to Invoices: ${interconnectedInvoiceNumbers}`
+      : interconnectedInvoiceNumbers ? `Allocated to Invoices: ${interconnectedInvoiceNumbers}` : undefined;
     
     try {
       const finalPaymentNumber = data.payment_number || await generateNumber("payment");
@@ -353,11 +360,11 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
         cheque_number: data.cheque_number,
         cheque_date: data.cheque_date,
         reference: data.reference,
-        notes: data.notes,
+        notes: finalNotes,
         is_advance: isAdvance,
         is_direct_payment: isDirectPayment,
         vendor_bank_account_id: selectedBankAccountId || undefined,
-        vendor_bill_number: vendorBillNumber || undefined,
+        vendor_bill_number: finalVendorBillNumber,
         bus_id: selectedBusId || undefined,
         bus_no: selectedBusNo || undefined,
         vehicle_type: selectedVehicleType || undefined,

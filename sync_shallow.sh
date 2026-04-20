@@ -1,52 +1,32 @@
 #!/bin/bash
 ORIGINAL_DIR=$(pwd)
-echo "Fixing Golden Repo Upload..."
+echo "🚀 Starting 1-Click Sync Process..."
 
-
-
-# 1. Ensure massive PDFs are untracked
-echo "public/bus_details/" >> .gitignore
+# 1. Ensure massive PDFs are untracked just in case
+echo "public/bus_details/" >> .gitignore 2>/dev/null
 git rm -r --cached "public/bus_details/" 2>/dev/null
 git add .gitignore
-git commit -m "chore: bypass 341MB of bus certificates for Lovable sync"
+git commit -m "chore: bypass 341MB of bus certificates for Lovable sync" 2>/dev/null
 
-# 2. Extract into a separate temp folder
-echo "Extracting a lightweight 5MB copy..."
-rm -rf /tmp/lovable-sync
-mkdir -p /tmp/lovable-sync
-cp -a "/Users/staff/Downloads/ncg new one/ncg-fleetflow/." /tmp/lovable-sync/
-cd /tmp/lovable-sync
+echo "📦 1/3 - Pushing normally to NCGHoldings (your main repo)..."
+current_branch=$(git branch --show-current)
+git push origin "$current_branch"
 
-# 3. Create a clean Orphan Repository to bypass GitHub's Shallow protection!
-echo "Building pure codebase isolated from Git history bloat..."
-rm -rf .git
-git init
+echo "🧹 2/3 - Generating lightweight clean branch for Lovable..."
+# Generate a perfect clean sheet of the current codebase without the 384MB Ghost history
+git checkout --orphan lovable_sync
+git add -A
+# Notice: We intentionally DO NOT force add the .env file.
+# Pushing the .env file triggers a 408 Timeout because GitHub secretly blocks Supabase Passwords!
+# Lovable automatically handles the keys via the native Supabase integration.
+git commit -m "force clean lovable sync"
 
-git config user.email "bot@ncgholdings.com"
-git config user.name "Lovable Sync Bot"
-git branch -M main
+echo "⚡ 3/3 - Pushing safely to Globallyceum (Lovable repo)..."
+git remote add lovablerepo https://github.com/globallyceum25-dot/ncg-fleetone-545c8dda.git 2>/dev/null
+git push -f lovablerepo lovable_sync:main
 
-# Make absolutely sure the 341MB won't attach!
-echo "public/bus_details/" >> .gitignore
+echo "🧹 Cleaning up..."
+git checkout "$current_branch"
+git branch -D lovable_sync
 
-git add .
-
-# 🔑 CRITICAL FIX: Force add all environment variables (.env, .env.local) to Lovable's repository
-# so that the Production build has the VITE_SUPABASE_URL available and doesn't white-screen.
-git add -f .env* 2>/dev/null || true
-
-git commit -m "chore: pure lovable sync with env"
-
-# 4. Push directly to Lovable Server
-echo "Linking to Lovable..."
-git remote add lovable https://github.com/globallyceum25-dot/ncg-fleetone-545c8dda.git
-
-echo "Blasting codebase to server... This will actually take 3 seconds!"
-git push -f lovable main
-
-echo "✅ SUPER SUCCESS! Lovable is now fully synced!"
-echo "Now pushing to NCGHoldings Main Repository..."
-cd "$ORIGINAL_DIR"
-git push origin main
-echo "🚀 BOTH REPOSITORIES ARE NOW 100% IN SYNC!"
-rm -rf /tmp/lovable-sync
+echo "🎉 All Done! Both your NCGHoldings and Globallyceum repositories are 100% Synced!"
