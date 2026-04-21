@@ -499,7 +499,20 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           </tr>
           <tr>
             <td style="padding: 5px; vertical-align: top; font-weight: bold;">Mileage</td>
-            <td style="padding: 5px; vertical-align: top;">${data.hasAdjustments && data.actualKmTraveled ? `${mileage} KM (Quoted: ${originalKm} KM)` : `${mileage} KM`}</td>
+            <td style="padding: 5px; vertical-align: top;">${(() => {
+              const hasPostTrip = !!(data.hasAdjustments && data.actualKmTraveled && data.extraKm);
+              const hasQuotationExtras = quotationExtraKm > 0;
+              if (hasPostTrip && hasQuotationExtras) {
+                return `${mileage} KM (Quoted: ${quotedKmDisplay} KM incl. +${quotationExtraKm} km extras, ${(data.extraKm || 0) > 0 ? '+' : ''}${data.extraKm} km post-trip)`;
+              }
+              if (hasPostTrip) {
+                return `${mileage} KM (Quoted: ${quotedKmDisplay} KM, ${(data.extraKm || 0) > 0 ? '+' : ''}${data.extraKm} km extra)`;
+              }
+              if (hasQuotationExtras) {
+                return `${mileage} KM (Base: ${baseQuotedKm} KM, +${quotationExtraKm} km quotation extras)`;
+              }
+              return `${mileage} KM`;
+            })()}</td>
           </tr>
         </table>
       `;
