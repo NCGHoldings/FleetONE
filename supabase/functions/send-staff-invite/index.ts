@@ -130,8 +130,20 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Invite created:", invite.id);
 
-    // Generate invite link with production domain
-    const inviteUrl = `https://ncg-fleetflow.lovable.app/accept-invite?token=${inviteToken}`;
+    // Derive base URL from request origin, fallback to correct published domain
+    const originHeader = req.headers.get("origin");
+    const refererHeader = req.headers.get("referer");
+    let baseUrl = "https://ncg-fleetone.lovable.app";
+    if (originHeader && originHeader.startsWith("http")) {
+      baseUrl = originHeader.replace(/\/$/, "");
+    } else if (refererHeader && refererHeader.startsWith("http")) {
+      try {
+        baseUrl = new URL(refererHeader).origin;
+      } catch (_) {
+        // keep fallback
+      }
+    }
+    const inviteUrl = `${baseUrl}/accept-invite?token=${inviteToken}`;
     console.log("Invite URL generated:", inviteUrl);
 
     // Try to send email (but don't fail if email service is down)
