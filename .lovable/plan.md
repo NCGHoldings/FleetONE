@@ -1,86 +1,64 @@
 
-# Execute: Option C — Hard delete all wrong-branch April SBO data including the 4 paid receipts
+# Add inline Driver / Conductor edit on Daily Trips (with autocomplete + auto-add)
 
-You picked **C**: treat the 4 paid invoices in Wattala/Nugegoda/Anuradhapura as test data and wipe them along with their receipts. Final April SBO target: **670 invoices / Rs 4,094,760** across Katunayaka (33), Panadura (440), Nuwara Eliya (197).
+## What you want
+On the Daily Trips page (`/trips`), the "Driver: N/A • Conductor: N/A" row inside each trip should be editable inline — same simple pattern as Revenue and Expenses. Each field should:
+- Show a dropdown of existing drivers / conductors (from staff registry).
+- Allow free typing of a brand new name.
+- When a new name is saved, automatically add it to the staff registry so it appears in the dropdown next time and in the autocomplete suggestion list everywhere.
 
-## What will run (single migration, LIVE only)
-
-### Step 1 — Snapshot to archive schema
-Create `_archive_april_sbo_<timestamp>` and copy every row about to be deleted from:
-- `ar_invoices`, `journal_entries`, `journal_entry_lines`
-- `school_ar_invoices`, `school_student_ar_link`
-- `ar_receipts`, `ar_receipt_allocations` (the 4 paid + linked rows)
-
-Recoverable via 1 query if anything looks wrong.
-
-### Step 2 — Delete the 4 receipts (Option C)
-Targets exactly these 4 paid invoices:
-- Nugegoda INV-NCGH-2026-00060 (Rs 7,300)
-- Wattala INV-NCGH-2026-00241 (Rs 9,000)
-- Wattala INV-NCGH-2026-00526 (Rs 11,200)
-- Anuradhapura INV-NCGH-2026-01172 (Rs 7,120)
-
-Delete: `ar_receipt_allocations` → `ar_receipts` → reverse cash JE lines → delete cash JEs.
-
-### Step 3 — Delete wrong-branch April SBO AR + JE data
-Scope:
+## Where it goes
+File: `src/components/trips/BusDailySummaryTable.tsx` — the line that currently renders:
 ```
-business_unit_code = 'SBO'
-AND date BETWEEN 2026-04-01 AND 2026-04-30
-AND (
-  branch IN ('Wattala','Kurunegala','Nugegoda','Anuradhapura')
-  OR (branch = 'Katunayaka' AND invoice_date IN ('2026-04-06','2026-04-09','2026-04-21'))
-)
+Driver: {trip.driver_name} • Conductor: {trip.conductor_name}
 ```
-Order: `school_student_ar_link` → `school_ar_invoices` → `journal_entry_lines` → `journal_entries` → `ar_invoices`.
+We'll add a small `Pencil` button next to it (matching the Revenue edit button pattern at line 393–410) that opens a small inline edit modal.
 
-### Step 4 — Delete 575 zombie zero-debit JEs
-April SBO with `total_debit = 0`, no lines, no AR link, no AP link, no expense_request link, no operational link.
+## How it will work (atomic and matches existing pattern)
 
-### Step 5 — Regenerate 33 Katunayaka active-student invoices (Apr 21)
-Atomic per-student write (same flow that worked for Panadura/NE):
-1. Resolve customer
-2. Create `ar_invoices`
-3. Create `journal_entries` + lines (DR 12201001, CR 41103001)
-4. Link `ar_invoices.journal_entry_id`
-5. Insert `school_ar_invoices` with both IDs
-6. Insert `school_student_ar_link`
-7. Update student `payment_balance`
+### 1. New component: `src/components/trips/InlineCrewEditor.tsx`
+Mirrors `InlineRevenueEditor.tsx` exactly:
+- Same `Dialog` shell, same Save / Cancel footer.
+- Two combobox fields: **Driver** and **Conductor**.
+- Each combobox = `Command`/`Popover` (shadcn) with:
+  - Type-to-search input.
+  - Filtered list of existing staff from `staff_registry` (filtered by `staff_type = 'driver'` or `'conductor'`, only `is_active = true`).
+  - "Use [typed name]" option appears at the bottom when the typed value doesn't exist — clicking it accepts the new name.
+- On Save:
+  1. Read current `daily_trips.notes` for that trip.
+  2. Merge `{ driver, conductor }` into the JSON (preserve all other notes keys).
+  3. `update daily_trips set notes = ... where id = trip.id`.
+  4. For any new name (not already in `staff_registry`), insert into `staff_registry` with sensible defaults:
+     - `staff_name` = typed name
+     - `staff_type` = `'driver'` or `'conductor'`
+     - `salary_type` = `'monthly'`
+     - `monthly_salary` = `0`
+     - `is_active` = `true`
+  5. Toast success and call `onSaved()` to refresh the parent list.
 
-Amount = `fixed_monthly_amount * 0.80` per active Katunayaka student.
+### 2. Hook the editor into `BusDailySummaryTable.tsx`
+- Add new state `editingCrewTrip` (same shape as `editingTrip`).
+- Replace the current static driver/conductor `<div>` (lines 317–322) with a flex row that includes a small `Pencil` button identical in style to the Revenue one. Clicking sets `editingCrewTrip`.
+- Render `<InlineCrewEditor isOpen={!!editingCrewTrip} trip={editingCrewTrip} onClose={...} onSaved={onRefresh} />`.
 
-### Step 6 — Recalculate COA balances
-For NCG Holding only:
-- `12201001` Trade Receivable - External
-- `41103001` Transport Income - School Buses
+### 3. Autocomplete data source (typeahead suggestions everywhere)
+- The combobox queries `staff_registry` directly (the same source used by HR Hub, Staff Performance and Driver Allocation). Because new names are saved back to that table, every other place that reads from `staff_registry` will pick up the suggestion automatically — no further work needed for "next time" suggestions.
+- Trip data parser (`useDailyBusGroupedTrips.ts` line 234) already reads `notes.driver` / `notes.conductor`, so the new value is rendered immediately after refresh.
 
-Reset `current_balance = 0`, then re-sum from all remaining posted `journal_entry_lines` (project-start to today).
+## Safety / scope
+- Only the inline display row changes — no table layout, no column changes.
+- `notes` JSON is read-merge-write so other keys (turn times, etc.) are preserved.
+- Empty input clears the field (sets `notes.driver` / `.conductor` to empty string).
+- Insert into `staff_registry` is wrapped in try/catch — if the staff insert fails, the trip update still succeeds and a soft toast warns "Saved trip but couldn't add to staff registry".
+- Does not change finance, GL posting, or any other module.
 
-### Step 7 — Add validation views
-- `v_sbo_finance_validation` — branch+month parity (active vs AR vs JE vs school invoice vs total)
-- `v_sbo_orphan_journal_entries` — exposes any drift going forward
-
-Migration **aborts and rolls back** if final April SBO totals ≠ 670 / Rs 4,094,760.
-
-## Code hardening (after migration succeeds)
-
+## Files touched
 | File | Change |
 |---|---|
-| `src/hooks/useSchoolBusFinance.ts` | Atomic per-student write with rollback. Preflight blocks regeneration when month already has invoices for that branch. Only active students included. Customer auto-provision (`SBS-<BRANCH>`). |
-| `src/components/school/BulkARInvoiceDialog.tsx` | Validation panel before generation: Active vs AR vs JE vs COA. Block button on mismatch. "Repair now" only when safe. |
-| New SBO Finance overview card | Live OK / MISMATCH banner sourced from `v_sbo_finance_validation`. |
+| `src/components/trips/InlineCrewEditor.tsx` | **new** — dialog + 2 comboboxes + save handler |
+| `src/components/trips/BusDailySummaryTable.tsx` | replace static driver/conductor text with editable row + pencil button + render new editor |
 
-## Expected end state (LIVE only)
-
-| Metric | Value |
-|---|---:|
-| April 2026 SBO AR invoices | 670 |
-| April 2026 SBO linked JEs | 670 |
-| April 2026 SBO outstanding | Rs 4,094,760 |
-| Branches visible | Katunayaka, Panadura, Nuwara Eliya |
-| 12201001 movement (April SBO) | DR 4,094,760 |
-| 41103001 movement (April SBO) | CR 4,094,760 |
-| Orphan SBO JEs | 0 |
-
-## Out of scope
-TEST environment, other modules (SPH/YUT/SNT/LTV/NCGE), other months, other COA accounts.
+## Result
+- Click pencil next to "Driver: N/A • Conductor: N/A" on any trip in `/trips`.
+- Pick from the dropdown of existing staff, or type a new name and confirm.
+- Save → trip updates, new names get added to staff registry, dropdown gets richer for the next trip you edit.
