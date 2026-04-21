@@ -308,10 +308,16 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     return `${data.pickupLocation || ''} → ${data.dropLocation || ''}`;
   })();
 
-  const mileage = (data.hasAdjustments && data.actualKmTraveled)
-    ? data.actualKmTraveled
-    : (data.tripDistance || data.totalKm || 0);
-  const originalKm = data.originalQuotedKm || data.tripDistance || data.totalKm || 0;
+  // ---- Robust mileage resolution ----
+  const quotationExtraKm = Number(data.quotationAdditionalDistanceKm) || 0;
+  const quotationExtraAmt = Number(data.quotationAdditionalDistanceAmount) || 0;
+  const baseQuotedKm = Number(data.originalQuotedKm) || Number(data.tripDistance) || Number(data.totalKm) || 0;
+  // "Quoted" shown to customer always includes quotation-time extras
+  const quotedKmDisplay = baseQuotedKm + (data.originalQuotedKm ? 0 : quotationExtraKm);
+  // "Actual" prefers post-trip actual; otherwise the quoted total (incl. quotation extras)
+  const actualKmDisplay = Number(data.actualKmTraveled) || quotedKmDisplay || Number(data.tripDistance) || Number(data.totalKm) || 0;
+  const mileage = actualKmDisplay || quotedKmDisplay;
+  const originalKm = quotedKmDisplay;
 
   // Build all bus rows
   const busRows = buildBusRows(data, itemDetail, subTotal);
