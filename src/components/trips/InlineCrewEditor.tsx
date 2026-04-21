@@ -219,13 +219,19 @@ export function InlineCrewEditor({
         .single();
       if (fetchErr) throw fetchErr;
 
-      const existingNotes =
-        current?.notes && typeof current.notes === "object" && !Array.isArray(current.notes)
-          ? (current.notes as Record<string, any>)
-          : {};
+      const safeParse = (value: any): Record<string, any> => {
+        if (!value) return {};
+        if (typeof value === "object" && !Array.isArray(value)) return value;
+        try {
+          const parsed = JSON.parse(value);
+          return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+        } catch {
+          return {};
+        }
+      };
 
       const mergedNotes = {
-        ...existingNotes,
+        ...safeParse(current?.notes),
         driver: driver.trim(),
         conductor: conductor.trim(),
       };
@@ -233,7 +239,7 @@ export function InlineCrewEditor({
       const { error } = await supabase
         .from("daily_trips")
         .update({
-          notes: mergedNotes,
+          notes: JSON.stringify(mergedNotes),
           updated_at: new Date().toISOString(),
         })
         .eq("id", trip.id);
