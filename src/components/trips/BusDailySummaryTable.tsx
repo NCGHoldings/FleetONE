@@ -323,10 +323,25 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
                             <div className="font-medium">
                               Trip #{idx + 1} • {trip.route_name}
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              {trip.driver_name && `Driver: ${trip.driver_name}`}
-                              {trip.driver_name && trip.conductor_name && " • "}
-                              {trip.conductor_name && `Conductor: ${trip.conductor_name}`}
+                            <div className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap">
+                              <span>
+                                Driver: {trip.driver_name || 'N/A'} • Conductor: {trip.conductor_name || 'N/A'}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => setEditingCrewTrip({
+                                  id: trip.id,
+                                  trip_no: trip.trip_no,
+                                  route_name: trip.route_name,
+                                  driver_name: trip.driver_name && trip.driver_name !== 'N/A' ? trip.driver_name : '',
+                                  conductor_name: trip.conductor_name && trip.conductor_name !== 'N/A' ? trip.conductor_name : '',
+                                })}
+                                title="Edit driver / conductor"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -490,6 +505,14 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
         isOpen={!!editingTrip}
         onClose={() => setEditingTrip(null)}
         trip={editingTrip}
+        onSaved={onRefresh}
+      />
+
+      {/* Inline Crew (Driver / Conductor) Editor */}
+      <InlineCrewEditor
+        isOpen={!!editingCrewTrip}
+        onClose={() => setEditingCrewTrip(null)}
+        trip={editingCrewTrip}
         onSaved={onRefresh}
       />
     </div>
