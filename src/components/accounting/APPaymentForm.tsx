@@ -86,6 +86,14 @@ const createEmptyLine = (): DirectPaymentLine => ({
   line_total: 0,
 });
 
+// Parse payee value emitted by SearchableVendorSelector. Customer rows are prefixed with "customer:".
+const parsePayee = (value: string): { type: "vendor" | "customer"; id: string } => {
+  if (value && value.startsWith("customer:")) {
+    return { type: "customer", id: value.substring("customer:".length) };
+  }
+  return { type: "vendor", id: value };
+};
+
 export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvanceMode = false }: APPaymentFormProps) => {
   const { data: vendors } = useVendors();
   const { data: customers } = useCustomers();
@@ -99,6 +107,10 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
 
   const [allocations, setAllocations] = useState<InvoiceAllocation[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState(preselectedVendorId || "");
+  // Real (unprefixed) payee id + type, derived from selectedVendorId
+  const initialParsed = parsePayee(preselectedVendorId || "");
+  const [payeeType, setPayeeType] = useState<"vendor" | "customer">(initialParsed.type);
+  const [payeeId, setPayeeId] = useState<string>(initialParsed.id);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState("");
   const [isAdvance, setIsAdvance] = useState(isAdvanceMode);
   const [isDirectPayment, setIsDirectPayment] = useState(false);
@@ -114,7 +126,10 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const [selectedBusNo, setSelectedBusNo] = useState("");
   const [selectedVehicleType, setSelectedVehicleType] = useState<"fleet" | "external" | "">("");
 
-  const { data: vendorBankAccounts } = useVendorBankAccounts(selectedVendorId || undefined);
+  // Only fetch vendor bank accounts when payee is a vendor (customers don't have vendor_bank_accounts)
+  const { data: vendorBankAccounts } = useVendorBankAccounts(
+    payeeType === "vendor" && payeeId ? payeeId : undefined
+  );
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
