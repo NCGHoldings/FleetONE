@@ -1,5 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
+import { getInvoiceMileage } from '@/lib/special-hire-invoice-helpers';
 
 interface PostTripAdjustmentData {
   quotation_no?: string;
@@ -33,6 +34,9 @@ interface PostTripAdjustmentData {
   final_balance?: number;
   driver_name?: string;
   vehicle_no?: string;
+  // Optional raw quotation + adjustment so the preview can use the unified mileage helper.
+  quotation?: any;
+  adjustment?: any;
 }
 
 interface Props {
@@ -42,12 +46,21 @@ interface Props {
 
 export function PostTripAdjustmentPreview({ data, className = '' }: Props) {
   const currentDate = format(new Date(), 'dd/MM/yyyy');
-  
-  const quotedKm = data.quoted_km || 0;
-  const actualKm = data.actual_km || quotedKm;
-  const extraKm = data.extra_km || Math.max(0, actualKm - quotedKm);
+
+  // Single source of truth for mileage values when quotation/adjustment are passed in.
+  // Falls back to the legacy fields on `data` when not provided so older callers keep working.
+  const mileage = data.quotation
+    ? getInvoiceMileage(data.quotation, data.adjustment ?? null)
+    : null;
+
+  const quotedKm = mileage?.quoted ?? data.quoted_km ?? 0;
+  const actualKm = mileage?.actual ?? data.actual_km ?? quotedKm;
+  const helperExtraKm = mileage ? mileage.postTripExtras : null;
+  const extraKm = helperExtraKm !== null
+    ? helperExtraKm
+    : (data.extra_km ?? Math.max(0, actualKm - quotedKm));
   const extraKmCharge = data.extra_km_charge || 0;
-  const extraKmTotal = data.extra_km_total || (extraKm * extraKmCharge);
+  const extraKmTotal = data.extra_km_total || (Math.max(0, extraKm) * extraKmCharge);
   
   const originalAmount = data.original_amount || data.gross_revenue || 0;
   const additionalExpenses = data.additional_expenses || [];

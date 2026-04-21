@@ -13,6 +13,11 @@ import { PostTripAdjustmentModal } from './PostTripAdjustmentModal';
 import { PaymentConfirmationModal } from './PaymentConfirmationModal';
 import { usePostTripAdjustment } from '@/hooks/usePostTripAdjustment';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  getQuotationAdditionalDistance,
+  calculateTotalKm,
+  resolveBusType,
+} from '@/lib/special-hire-invoice-helpers';
 
 interface TripDetailsModalProps {
   open: boolean;
@@ -83,11 +88,13 @@ export function TripDetailsModal({
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const { getAdjustment } = usePostTripAdjustment();
   const [localAdjustmentData, setLocalAdjustmentData] = useState<any>(null);
+  const [fullQuotation, setFullQuotation] = useState<any>(null);
 
   // Fetch adjustment data when modal opens or quotation changes
   useEffect(() => {
     if (open && trip?.quotation_id) {
       fetchAdjustmentData();
+      fetchFullQuotation();
     }
   }, [open, trip?.quotation_id]);
 
@@ -97,6 +104,28 @@ export function TripDetailsModal({
       setLocalAdjustmentData(data);
     }
   };
+
+  const fetchFullQuotation = async () => {
+    if (!trip?.quotation_id) return;
+    try {
+      const { data, error } = await supabase
+        .from('special_hire_quotations')
+        .select('km_trip, km_parking_to_pickup, km_drop_to_parking, total_distance_km, additional_charges, bus_fleet_details, total_additional_charges, hire_type, intermediate_stops')
+        .eq('id', trip.quotation_id)
+        .maybeSingle();
+      if (!error && data) setFullQuotation(data);
+    } catch (e) {
+      console.error('Error fetching full quotation in TripDetailsModal:', e);
+    }
+  };
+
+  // Compute distance context for the GenerateBalanceInvoiceModal so the
+  // invoice's Mileage line shows the correct value even when no post-trip
+  // adjustment exists.
+  const baseTripKm = calculateTotalKm(fullQuotation);
+  const quotationExtras = getQuotationAdditionalDistance(fullQuotation);
+  const totalQuotedTripKm = baseTripKm + quotationExtras.distanceKm;
+  const resolvedBusType = fullQuotation ? resolveBusType(fullQuotation) : 'Standard Bus';
 
   // Use effective adjustment that prioritizes local data over props
   const effectiveAdjustment = localAdjustmentData || adjustmentData || null;
@@ -309,7 +338,7 @@ export function TripDetailsModal({
               drop_location: trip.quotation.drop_location,
               pickup_datetime: trip.quotation.pickup_datetime,
               drop_datetime: trip.quotation.drop_datetime,
-              bus_type: 'Standard Bus',
+              bus_type: resolvedBusType,
               number_of_buses: trip.quotation.number_of_buses,
               number_of_passengers: trip.quotation.number_of_passengers,
               original_quotation_amount: effectiveAdjustment?.original_quotation_amount || 0,
@@ -317,11 +346,17 @@ export function TripDetailsModal({
               fuel_cost_fuel_only: trip.quotation.fuel_cost_fuel_only,
               commission_pass_through_amount: trip.quotation.commission_pass_through_amount,
               discount_amount_lkr: trip.quotation.discount_amount_lkr,
+              total_additional_charges: (fullQuotation as any)?.total_additional_charges,
               advance_paid: trip.advance_paid,
               balance_due: effectiveAdjustment?.balance_due || trip.balance_due,
               driver_name: trip.driver_name,
               conductor_name: trip.conductor_name,
               bus_no: trip.bus_no,
+              // Distance context — keeps Mileage line correct even without a post-trip adjustment.
+              tripDistance: totalQuotedTripKm || undefined,
+              totalKm: totalQuotedTripKm || undefined,
+              hire_type: (fullQuotation as any)?.hire_type,
+              intermediate_stops: (fullQuotation as any)?.intermediate_stops,
             }}
             adjustmentData={{
               id: effectiveAdjustment.id || '',
