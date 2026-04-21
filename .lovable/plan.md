@@ -1,67 +1,63 @@
 
 
-# Fix duplicate AP invoice + Add "Direct Payment" mode for fuel imports
+# Fix: Direct Payment account selector is empty + add live balance & validation
 
-## Issue 1: Duplicate AP Invoice error (the red box you saw)
+## Root Cause (the bug you're seeing)
 
-**Root cause** in `src/hooks/useSchoolBusBulkExpenses.ts` line 260:
+In `src/pages/SchoolBusExpenseImport.tsx` the dropdown is wired to a state called `directAccounts`, but there is **no code that ever fetches and fills it**. The `useEffect` on line 78 loads branches, buses, vendors, and petty cash — but skips the chart-of-accounts query for asset float/bank accounts. So the dropdown opens empty.
 
-The invoice number is built as `${invoiceNumber}-${busId.substring(0,4)}`. When two buses in the same import share the **same first 4 chars of their UUID** (rare but possible), or when you re-run the same Master Invoice No. twice, the unique constraint `ap_invoices_vendor_id_invoice_number_key` rejects the second row.
+## What I'll change
 
-**Fix:** make the per-row invoice number truly unique by using:
-- `${masterInvoiceNo}-${busNo}-${expenseDate}` (uses the human-readable bus number + date, not a UUID slice)
-- Plus a sequence index `(i+1)` as a final guard against same-bus same-day duplicates
+### 1. Load the Pay-From accounts from the database
 
-Also: AP invoices that **were partially created before the failure** (the ones you can see succeeded in the screenshot) leave the import in a half-posted state. Fix #2 below addresses that.
+Add a Supabase query inside `initData` that fetches all **active asset** accounts whose name contains FLOAT, BANK, or CASH (incl. the SBS fuel float you need: code `13005002` = FUEL FLOAT - DIALOG TOUCH_SBS, current balance Rs 5,000,000). Order by account_code so SBS sits next to the other floats.
 
-## Issue 2: Half-posted imports leave orphaned AP invoices
+### 2. Default to FUEL FLOAT - DIALOG TOUCH_SBS
 
-Currently the loop creates a JE → AP invoice → JE lines per bus. If row 11 fails, rows 1–10 are already in the DB and you cannot retry without manually deleting them. 
+After the fetch, auto-select the SBS float (account code `13005002`) so the user doesn't need to pick it manually for the common case. They can change it if needed.
 
-**Fix:** wrap the entire batch in a server-side transaction via a new edge function `bulk-import-fuel-expenses` so it's all-or-nothing. Cleaner than client-side rollback.
+### 3. Show the live balance next to each option
 
-## Issue 3: NEW — "Direct Payment" payment mode (the main feature you asked for)
+Each `<SelectItem>` will render: account_code + account_name + current_balance in Rs. So the dropdown looks like:
 
-Add a 4th option in the **Payment Mode** dropdown on `/school-bus/import-expenses`:
+```
+13005001  FUEL FLOAT - DIALOG TOUCH         Rs 0.00
+13005002  FUEL FLOAT - DIALOG TOUCH_SBS     Rs 5,000,000.00   ← default
+13005003  FUEL FLOAT - DIALOG TOUCH_SHS     Rs 3,841,959.72
+13001006  NTB BANK C/A - 100530011672       Rs 3,923,411.50
+... (banks)
+```
 
-| Existing | NEW |
-|---|---|
-| Trade Payable (AP / Credit) | **Direct Payment (No AP)** ← new |
-| Petty Cash | |
-| IOU Account | |
+### 4. Add live validation panel below the dropdown
 
-When **Direct Payment** is selected:
-- A new field appears: **"Pay From Account"** (Select)
-  - Defaulted to **`FUEL FLOAT - DIALOG TOUCH_SBS`** (account code 13005002, the asset account you mentioned)
-  - Dropdown also lists `FUEL FLOAT - DIALOG TOUCH`, `FUEL FLOAT - DIALOG TOUCH_SHS`, all bank accounts, and any other asset float accounts so the user can switch
-- **No AP invoice** is created (skips the duplicate-key bug entirely for this mode)
-- **No vendor / invoice number / due date** fields shown
-- Per-bus posting:
-  - **DR** Fuel Expense (existing fuel expense GL)
-  - **CR** FUEL FLOAT - DIALOG TOUCH_SBS (or whatever the user picked)
-- The asset balance on the float account is reduced automatically via the existing `updateAccountBalancesFromJournalEntry` helper (already handles asset-normal credit reductions correctly)
+Once an account is selected AND the Excel preview has rows, show a small validation card:
 
-This matches the real-world flow: Dialog Touch fuel float is pre-loaded with money, fuel pumps deduct from it directly, no supplier invoice exists.
+```
+Selected Account Balance:    Rs 5,000,000.00
+Excel Import Total:          Rs   473,562.40   (sum of Fuel Cost column)
+Balance After Posting:       Rs 4,526,437.60   ← green if ≥ 0
+                                                  ← red + warning if < 0
+```
 
-## Files to change
+If the Excel total exceeds the available balance, show a red alert "**Insufficient float balance — top up the float account before importing**" and **disable the Confirm & Post GL button**.
+
+### 5. Lock the Confirm button when nothing is selected
+
+Currently the Confirm button only checks branch + valid rows. Add: when payment mode is `direct`, require `directPaymentAccountId` to be set AND `excelTotal ≤ accountBalance`.
+
+## Files touched
 
 | File | Change |
 |---|---|
-| `src/hooks/useSchoolBusBulkExpenses.ts` | (1) Fix invoice-number uniqueness (use `bus_no` + date + index, not UUID slice). (2) Add `paymentMethod: 'direct'` branch with `directPaymentAccountId` in payload. (3) Skip `ap_invoices` insert when mode is `direct`. (4) Use the chosen asset account as the credit account. |
-| `src/pages/SchoolBusExpenseImport.tsx` | (1) Add `'direct'` to the `paymentMethod` union. (2) Add `directPaymentAccountId` state. (3) Add new `<SelectItem value="direct">Direct Payment (Fuel Float / Bank)</SelectItem>`. (4) Render a new dynamic block when `paymentMethod === 'direct'` with a "Pay From Account" select pre-populated from `chart_of_accounts` filtered to `account_type='asset'` and name containing `FLOAT` or `BANK`, defaulted to the SBS float. (5) Pass the new field to the mutation. |
-| (optional) `supabase/functions/bulk-import-fuel-expenses/index.ts` | New edge function wrapping the batch in a single transaction so partial failures roll back cleanly. *Skipping in v1 to keep scope tight — can be added next.* |
+| `src/pages/SchoolBusExpenseImport.tsx` | (a) Add COA fetch in `initData`. (b) Auto-default to `13005002`. (c) Render code + name + balance in each dropdown item. (d) Compute `excelTotal = sum(parsedData.amount)` and `remainingBalance = balance − excelTotal`; render the validation card. (e) Extend the Confirm button's `disabled` condition. |
+
+No DB schema changes, no new edge functions, no changes to `useSchoolBusBulkExpenses.ts`.
 
 ## What you'll see after the fix
 
-1. The duplicate-AP-invoice error stops happening for normal AP imports (fix #1).
-2. New **"Direct Payment (Fuel Float / Bank)"** option in the Payment Mode dropdown.
-3. Selecting it shows a single "Pay From Account" picker, defaulted to `FUEL FLOAT - DIALOG TOUCH_SBS`.
-4. Confirm & Post → for every bus row: **DR Fuel Expense / CR Fuel Float SBS** — no AP invoice, no vendor, no due date.
-5. The Fuel Float SBS asset balance (currently Rs 5,000,000) drops by the total fuel cost imported.
-6. Daily bus expenses, mileage, and journal entries still get created exactly as they do today.
-
-## Out of scope (mention if you want them next)
-- Cleaning up the orphaned AP invoices already created in your failed run (need a cleanup script — say the word and I'll write it).
-- Same Direct Payment option for the non-bulk single-expense entry form.
-- Edge-function transactional wrapping for atomic rollback.
+1. Open `/school-bus/import-expenses` → pick **Direct Payment** mode.
+2. The "Pay From Account" dropdown now lists all asset float + bank + cash accounts with their **current balance shown next to each name**.
+3. **FUEL FLOAT - DIALOG TOUCH_SBS (Rs 5,000,000)** is pre-selected by default.
+4. After uploading the Excel file, a validation card appears showing: account balance, Excel import total, and balance after posting (green if OK, red + alert if insufficient).
+5. The "Confirm & Post GL" button is disabled until everything checks out.
 
