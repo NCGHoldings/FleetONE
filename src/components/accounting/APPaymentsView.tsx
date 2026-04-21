@@ -15,6 +15,9 @@ import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "dat
 import { useAPPayments, useVendors } from "@/hooks/useAccountingData";
 import { useDeleteAPPayment, useApproveAPPayment } from "@/hooks/useAccountingMutations";
 import { useBankFees } from "@/hooks/useBankFees";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Download, ExternalLink } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { APPaymentForm } from "./APPaymentForm";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
