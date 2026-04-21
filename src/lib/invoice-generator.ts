@@ -345,6 +345,15 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Original Quote Amount</td>
         <td style="border: 1px solid #ddd; padding: 8px;">${subTotal.toLocaleString()}.00</td>
       </tr>
+      ${quotationExtraKm > 0 ? `
+      <tr style="background: #eef6ff;">
+        <td style="border: 1px solid #ddd; padding: 8px; font-size: 12px;" colspan="2">
+          <strong>Quotation Extra Distance:</strong><br>
+          +${quotationExtraKm} km added at quotation time
+          ${quotationExtraAmt > 0 ? `<br>Charge: LKR ${quotationExtraAmt.toLocaleString()}.00 (included in Original Quote Amount above)` : ''}
+        </td>
+      </tr>
+      ` : ''}
       ${data.hasAdjustments && data.extraKm && data.extraKm !== 0 ? `
       <tr style="background: #fff9e6;">
         <td style="border: 1px solid #ddd; padding: 8px; font-size: 12px;" colspan="2">
