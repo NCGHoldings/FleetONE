@@ -211,8 +211,25 @@ export function useSchoolBusBulkExpenses() {
       }
 
       // We will loop through the batch and upload them one by one.
+      let skippedCount = 0;
+      let postedCount = 0;
       for (let i = 0; i < payload.expenses.length; i++) {
         const expense = payload.expenses[i];
+
+        // Duplicate guard: skip if a fuel-import JE already exists for (bus, date)
+        const { data: existingFuelLine } = await supabase
+          .from("journal_entry_lines")
+          .select("journal_entry_id, journal_entries!inner(id, entry_date, source_module)")
+          .eq("bus_id", expense.busId)
+          .eq("journal_entries.source_module", "school_bus_fuel_import")
+          .eq("journal_entries.entry_date", expense.expenseDate)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingFuelLine?.journal_entry_id) {
+          skippedCount += 1;
+          continue;
+        }
         // Resolve human-readable bus_no for use in invoice number / journal description
         const { data: busRow } = await supabase
           .from("buses")
