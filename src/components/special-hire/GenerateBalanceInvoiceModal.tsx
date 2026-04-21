@@ -112,8 +112,22 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
     if (open && quotationData.id) {
       checkExistingInvoice();
       fetchFreshAdjustmentData();
+      fetchFullQuotation();
     }
   }, [open, quotationData.id]);
+
+  const fetchFullQuotation = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('special_hire_quotations')
+        .select('km_trip, km_parking_to_pickup, km_drop_to_parking, total_distance_km, additional_charges, bus_fleet_details')
+        .eq('id', quotationData.id)
+        .maybeSingle();
+      if (!error && data) setFullQuotation(data);
+    } catch (e) {
+      console.error('Error fetching full quotation for mileage:', e);
+    }
+  };
 
   const fetchFreshAdjustmentData = async () => {
     try {
