@@ -1,56 +1,62 @@
 
 
-# Make the AP Payment attachment 📎 actually openable
+# Fix: Katunayaka (and all SBO branches) AR invoices going to wrong company / not showing on AR page / COA not updating
 
-## What you're seeing today
+## What's actually broken (verified in DB)
 
-The paperclip icon in the **Payment #** column lights up when `ap_payments.document_url` has a value (set after upload to the `documents` storage bucket at `ap_payments/<id>/<filename>`), but it's only a static `<span title="Has attachment">` — there's no click handler, no signed URL fetch, and no preview. So you can see it exists but can't open it.
+I queried your live DB and found three connected bugs:
 
-There's no "Attachments" section in the **View Details** dialog either, so the only entry point right now is non-existent.
+| Symptom | Real cause |
+|---|---|
+| AR invoices generated today (28 invoices, 2026-04-21) but **AR Invoices page shows 0** | `customer_id` lookup fails → AR insert silently skipped. `customers.customer_code` has a **global UNIQUE constraint** and `SBS-LKA` already exists under the Test company (`f40b0a9d…`). When LIVE mode tries to insert `SBS-LKA` for NCG Holding it fails, the catch sets `customerId = null`, AR insert is skipped — no error toast. |
+| **JEs exist but COA tree doesn't update** | The Katunayaka `school_bus_finance_settings` row has `trade_receivable_account_id` and `sbs_collection_account_id` pointing to **Test COA accounts** (`cce9995e…` / `19891c60…`, both `company_id = f40b0a9d…`). The JE is created under NCG Holding (`a000…001`) but its lines reference Test-owned accounts, so `chart_of_accounts.current_balance` updates land on the Test COA — invisible in the Holding tree. |
+| **"School Bus Operations" branch picker silently uses Test settings** | The "cross-company fallback" in `useBranchFinanceSettings` (line 153-165) returns ANY row with `trade_receivable_account_id NOT NULL` for that branch, regardless of company. For Katunayaka the only configured row is the Test one → LIVE mode unknowingly inherits Test mappings. |
+| Today's 28 `school_ar_invoices` rows all have `ar_invoice_id = NULL` | Same root cause: AR insert silently skipped, so the link back is missing — student payments can't auto-mark the invoice paid. |
 
-## What I'll add
+## What I'll change
 
-### 1. Make the paperclip clickable in the table row
-`src/components/accounting/APPaymentsView.tsx` (around line 328)
-- Replace the static span with a `<Button variant="ghost" size="icon">` icon button.
-- On click: call `supabase.storage.from('documents').createSignedUrl(payment.document_url, 60)` and `window.open(signedUrl, '_blank', 'noopener')`.
-- Show a toast on failure ("Attachment file no longer exists").
-- Add a tooltip: "Open attached document".
+### 1. Fix the customer lookup (eliminate silent failure) — `src/hooks/useSchoolBusFinance.ts` lines 515–542
+- Instead of `eq("company_id", effectiveCompanyId).eq("customer_code", "SBS-LKA")`, search by **(business_unit_code='SBO', customer_code)** first, regardless of company.
+- If found: reuse it — but if its `company_id` != `effectiveCompanyId`, **migrate it** to `effectiveCompanyId` via UPDATE (one-shot fix, harmless because customer_code is the natural key and is globally unique).
+- If not found: insert with a per-company suffix fallback (`SBS-LKA-NCGH`) so the global UNIQUE doesn't bite. Wrap in try/catch and **throw on failure** instead of silently nulling — the user must see "Customer setup failed" toast rather than 28 invoices vanishing.
 
-### 2. Add an explicit "Attachment" action button in the row actions
-Same file, in the actions column near the existing Eye / Print buttons.
-- Only render when `payment.document_url` is truthy.
-- Same signed-URL + new-tab behavior as #1, with a `<Paperclip />` icon and tooltip "View attachment".
-- This makes the feature discoverable for users who don't notice the small icon next to the payment number.
+### 2. Block "wrong-company COA" at the settings layer — same file, `useBranchFinanceSettings` lines 131–195
+- Tighten the cross-company fallback (line 153-165): only fall back to another company's settings if **both COA accounts also belong to `effectiveCompanyId`** (verify via a join). Otherwise treat as not configured and force the user to set up branch settings for this company.
+- Add a new helper `validateGLAccountsBelongToCompany(settings, effectiveCompanyId)` that runs before any JE insert in `useGenerateBulkARInvoices` and `usePostStudentPaymentToGL`. If any account is owned by another company, throw a clear error: *"Katunayaka GL accounts belong to NCG Test, not NCG Holding. Open Settings → School Bus Finance → Katunayaka and re-pick the Trade Receivable / Sales accounts under NCG Holding."*
 
-### 3. Show the attachment inside the **View Details** dialog
-`APPaymentsView.tsx` already opens a details panel (`detailPayment` state, `FileText` button). I'll add an "Attachment" row inside that panel:
-- File name (extracted from the path's last segment).
-- "Open in new tab" button (signed URL).
-- "Download" button (uses the same signed URL with `download` attribute).
-- If the file is an image (`.png/.jpg/.jpeg/.webp`) or PDF, render an inline preview (`<img>` or `<iframe>`); otherwise just the filename + buttons.
+### 3. Auto-remap the Katunayaka settings row (one-time DB migration)
+The Katunayaka `school_bus_finance_settings` row currently points to Test COA. I'll write a migration that:
+- Looks up NCG Holding's equivalent COA accounts by `account_code` (`12201001` → `a1678110…` for TR, `41103001` → `753cb8f4…` for Sales School Buses, plus the liability account).
+- Updates the Katunayaka row + the duplicate "branch_id IS NULL" defaults to point at NCG Holding's COA IDs and resets `company_id = a0000000-0000-0000-0000-000000000001`.
+- Leaves the Test-environment row (`branch_id = 4b0dcd34…`) alone.
 
-### 4. Allow uploading an attachment for payments that don't have one yet
-`APPaymentEditDialog` currently doesn't expose the upload field. Add a small "Attach document" `<input type="file">` block:
-- Reuses the same upload code already in `APPaymentForm.tsx` (lines 414–423): `documents` bucket → `ap_payments/<id>/<filename>` → update `document_url`.
-- After upload: invalidate the `ap_payments` query so the paperclip + preview appear immediately.
+### 4. Backfill the 28 orphan invoices created today
+A one-time SQL script that:
+- Finds the 28 `school_ar_invoices` rows with `ar_invoice_id IS NULL` created on 2026-04-21 for Katunayaka students.
+- Creates the matching `customers` row (`SBS-LKA`, NCG Holding) if missing.
+- For each orphan, inserts the corresponding `ar_invoices` row (linking to the existing `journal_entry_id`) and updates `school_ar_invoices.ar_invoice_id`.
+- Re-points the existing JE lines to NCG Holding's COA account IDs (so the COA balances update correctly).
+- Recomputes `chart_of_accounts.current_balance` for the affected accounts.
 
-### 5. Replace any remaining lookups by hidden field
-The `JournalEntryDetailDialog` already passes `documentUrl` into its `RelatedDocument` model (line 108). I'll verify that downstream `previewDoc` rendering also uses a signed URL — if it currently uses a raw path, switch it to `createSignedUrl` the same way as #1 so opening from the JE dialog also works.
+### 5. Re-confirm payment auto-allocation works after the link is restored
+The student payment posting code (`usePostStudentPaymentToGL`, line ~770+) already DR Bank / CR Trade Receivable. Once `school_ar_invoices.ar_invoice_id` is populated (steps 1+4), the existing AR allocation logic naturally settles the invoice. No code change needed here — it was just missing the link.
 
 ## Files touched
 
 | File | Change |
 |---|---|
-| `src/components/accounting/APPaymentsView.tsx` | Clickable paperclip → signed URL + new tab; new "View attachment" action button; attachment block in details dialog |
-| `src/components/accounting/APPaymentEditDialog.tsx` | Add "Attach document" file input + reuse upload-to-storage code; invalidate query on success |
-| `src/components/accounting/JournalEntryDetailDialog.tsx` | Convert `documentUrl` (storage path) → signed URL before rendering preview/open buttons |
+| `src/hooks/useSchoolBusFinance.ts` | Fix customer lookup (search by business_unit_code, migrate company_id, throw on fail); tighten `useBranchFinanceSettings` fallback to validate COA company; add `validateGLAccountsBelongToCompany` guard before JE insert in both bulk-invoice and payment-posting flows |
+| `supabase/migrations/<new>.sql` | Re-map Katunayaka `school_bus_finance_settings` to NCG Holding COA IDs; backfill 28 orphan AR invoices + relink JE lines + recompute COA balances |
 
 ## What you'll see after the fix
 
-1. The 📎 next to a payment number is now a button — clicking it opens the attached document in a new browser tab.
-2. The actions column for every payment with an attachment gets a new 📎 button with the same behavior, so it's easy to find.
-3. Opening **View Details** on a payment now shows the attachment filename, an inline preview (image/PDF), and **Open** + **Download** buttons.
-4. From the **Edit Payment** dialog you can attach a document to any existing payment that doesn't have one yet.
-5. From the linked Journal Entry's "Related Documents" section, the AP Payment row's attachment also opens correctly (was already wired but not signed-URL-safe).
+1. The 28 Katunayaka invoices generated today appear under **Accounting → AR → Invoices** with status `unpaid` and the correct customer (`School Bus Students - Katunayaka`).
+2. The COA tree under NCG Holding → `41103001 TRANSPORT INCOME - SCHOOL BUSES` shows the credit balance (today's batch ≈ LKR 168,000), and `12201001 TRADE RECEIVABLE-EXTERNAL` shows the matching debit.
+3. Generating next month's batch (or any other branch) routes everything to NCG Holding COA, never Test.
+4. When a student pays, the existing AR allocation now finds the linked `ar_invoice_id` and auto-marks the invoice paid/partial.
+5. If anyone misconfigures GL accounts (cross-company) again, the system throws a clear error toast instead of silently writing orphan JEs.
 
+## Out of scope (say the word for any of these)
+- Cleaning the duplicate Katunayaka settings rows (3 exist; 1 is enough). Easy to do once you confirm.
+- Same hardening for the other branches if they have the same Test→Holding misconfiguration. I'll quickly extend the migration to all SBO branches if you want.
+- Adding a UI banner in **School Bus Finance Settings** that warns when the picked COA account belongs to a different company than the active one.
