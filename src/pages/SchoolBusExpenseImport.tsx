@@ -89,6 +89,21 @@ export default function SchoolBusExpenseImport() {
 
       const { data: pcData } = await supabase.from("petty_cash_funds").select("id, fund_name");
       if (pcData) setPettyCashFunds(pcData);
+
+      // Fetch float / bank / cash asset accounts for Direct Payment
+      const { data: acctData } = await supabase
+        .from("chart_of_accounts")
+        .select("id, account_code, account_name, current_balance")
+        .eq("account_type", "asset")
+        .eq("is_active", true)
+        .or("account_name.ilike.%FLOAT%,account_name.ilike.%BANK%,account_name.ilike.%CASH%")
+        .order("account_code");
+      if (acctData) {
+        setDirectAccounts(acctData as any);
+        // Default to FUEL FLOAT - DIALOG TOUCH_SBS (13005002)
+        const sbsFloat = acctData.find((a: any) => a.account_code === "13005002");
+        if (sbsFloat) setDirectPaymentAccountId(sbsFloat.id);
+      }
     };
     initData();
   }, []);
