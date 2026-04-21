@@ -548,10 +548,6 @@ export const useCreateARReceipt = () => {
       // We must NOT write that into the customers FK column. Persist it on payee_employee_id
       // and leave customer_id null so the FK does not break.
       const isEmployeeParty = receipt.party_type === "employee";
-      const employeeId = isEmployeePary
-        ? receipt.customer_id
-        : (receipt.payee_employee_id || null);
-      // typo guard
       const employeeIdResolved = isEmployeeParty ? receipt.customer_id : (receipt.payee_employee_id || null);
       const customerFkValue = isEmployeeParty ? null : receipt.customer_id;
 
