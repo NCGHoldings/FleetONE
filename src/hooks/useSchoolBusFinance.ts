@@ -868,6 +868,171 @@ export function useGenerateBulkARInvoices() {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Drift detection + self-heal: count school invoices that have a JE but no AR,
+// and let an admin repair them in-place for the active company + branch + month.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useOrphanARCount(branchId: string | null, invoiceMonth: Date | null) {
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+
+  return useQuery({
+    queryKey: ["sbo-orphan-ar-count", effectiveCompanyId, branchId, invoiceMonth?.toISOString().slice(0, 7)],
+    queryFn: async () => {
+      if (!branchId || !invoiceMonth || !effectiveCompanyId) return 0;
+      const monthStart = format(new Date(invoiceMonth.getFullYear(), invoiceMonth.getMonth(), 1), "yyyy-MM-dd");
+      const monthEnd = format(new Date(invoiceMonth.getFullYear(), invoiceMonth.getMonth() + 1, 0), "yyyy-MM-dd");
+
+      const { data: studentIds } = await supabase
+        .from("school_students")
+        .select("id")
+        .eq("branch_id", branchId);
+      const ids = (studentIds || []).map((s) => s.id);
+      if (ids.length === 0) return 0;
+
+      const { count } = await supabase
+        .from("school_ar_invoices")
+        .select("id", { count: "exact", head: true })
+        .in("student_id", ids)
+        .gte("invoice_month", monthStart)
+        .lte("invoice_month", monthEnd)
+        .is("ar_invoice_id", null)
+        .not("journal_entry_id", "is", null);
+
+      return count || 0;
+    },
+    enabled: !!branchId && !!invoiceMonth && !!effectiveCompanyId,
+  });
+}
+
+export function useRepairOrphanARs() {
+  const queryClient = useQueryClient();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+
+  return useMutation({
+    mutationFn: async ({ branchId, invoiceMonth }: { branchId: string; invoiceMonth: Date }) => {
+      if (!effectiveCompanyId) throw new Error("No active company");
+
+      const monthStart = format(new Date(invoiceMonth.getFullYear(), invoiceMonth.getMonth(), 1), "yyyy-MM-dd");
+      const monthEnd = format(new Date(invoiceMonth.getFullYear(), invoiceMonth.getMonth() + 1, 0), "yyyy-MM-dd");
+
+      const { data: branch, error: brErr } = await supabase
+        .from("school_branches")
+        .select("id, branch_name, branch_code")
+        .eq("id", branchId)
+        .single();
+      if (brErr || !branch) throw brErr || new Error("Branch not found");
+      const customerCode = `SBS-${branch.branch_code}`;
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id, company_id")
+        .eq("customer_code", customerCode)
+        .eq("business_unit_code", "SBO")
+        .maybeSingle();
+
+      let customerId = customer?.id || null;
+      if (!customerId) {
+        const { data: newC, error: cErr } = await supabase
+          .from("customers")
+          .insert({
+            company_id: effectiveCompanyId,
+            business_unit_code: "SBO",
+            customer_code: customerCode,
+            customer_name: `School Bus Students - ${branch.branch_name}`,
+            is_active: true,
+          } as any)
+          .select("id")
+          .single();
+        if (cErr || !newC) throw cErr || new Error("Customer create failed");
+        customerId = newC.id;
+      } else if (customer && customer.company_id !== effectiveCompanyId) {
+        const { data: migrated, error: mErr } = await supabase
+          .from("customers")
+          .update({ company_id: effectiveCompanyId })
+          .eq("id", customer.id)
+          .select("id, company_id");
+        if (mErr) throw mErr;
+        if (!migrated || migrated.length === 0) {
+          throw new Error(
+            `Customer ${customerCode} exists on another company and tenant access blocks the migration. Ask an admin to run a one-line SQL UPDATE.`,
+          );
+        }
+      }
+
+      const { data: studentIds } = await supabase
+        .from("school_students")
+        .select("id, student_name")
+        .eq("branch_id", branchId);
+      const studentMap = new Map((studentIds || []).map((s) => [s.id, s.student_name]));
+      if (studentMap.size === 0) return { repaired: 0 };
+
+      const { data: orphans, error: oErr } = await supabase
+        .from("school_ar_invoices")
+        .select("id, invoice_number, amount, paid_amount, invoice_month, status, journal_entry_id, student_id")
+        .in("student_id", Array.from(studentMap.keys()))
+        .gte("invoice_month", monthStart)
+        .lte("invoice_month", monthEnd)
+        .is("ar_invoice_id", null)
+        .not("journal_entry_id", "is", null);
+      if (oErr) throw oErr;
+      if (!orphans || orphans.length === 0) return { repaired: 0 };
+
+      let repaired = 0;
+      for (const o of orphans) {
+        const paid = Number(o.paid_amount || 0);
+        const total = Number(o.amount || 0);
+        const status = paid >= total ? "paid" : paid > 0 ? "partial" : "unpaid";
+        const invoiceDate = o.invoice_month || format(new Date(), "yyyy-MM-dd");
+        const dueDate = format(new Date(new Date(invoiceDate).getTime() + 30 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
+
+        const { data: ar, error: arErr } = await supabase
+          .from("ar_invoices")
+          .insert({
+            company_id: effectiveCompanyId,
+            business_unit_code: "SBO",
+            customer_id: customerId,
+            invoice_number: o.invoice_number,
+            invoice_date: invoiceDate,
+            due_date: dueDate,
+            total_amount: total,
+            paid_amount: paid,
+            balance: total - paid,
+            status,
+            reference: `${studentMap.get(o.student_id) || ""} (repair)`,
+            notes: `Repaired from school_ar_invoices on ${format(new Date(), "yyyy-MM-dd")}`,
+            journal_entry_id: o.journal_entry_id,
+          } as any)
+          .select("id")
+          .single();
+        if (arErr || !ar) {
+          console.warn(`Repair failed for ${o.invoice_number}:`, arErr?.message);
+          continue;
+        }
+
+        const { error: linkErr } = await supabase
+          .from("school_ar_invoices")
+          .update({ ar_invoice_id: ar.id })
+          .eq("id", o.id);
+        if (!linkErr) repaired++;
+      }
+
+      return { repaired };
+    },
+    onSuccess: ({ repaired }) => {
+      queryClient.invalidateQueries({ queryKey: ["sbo-orphan-ar-count"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      toast.success(`Repaired ${repaired} orphan AR invoice${repaired === 1 ? "" : "s"}`);
+    },
+    onError: (e: any) => {
+      toast.error(`Repair failed: ${e?.message || "unknown error"}`);
+    },
+  });
+}
+
 // Post payment to GL
 export function usePostPaymentToGL() {
   const queryClient = useQueryClient();
