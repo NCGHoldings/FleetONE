@@ -62,7 +62,7 @@ interface ARReceiptFormProps {
 interface PartyOption {
   id: string;
   name: string;
-  type: "customer" | "vendor";
+  type: "customer" | "vendor" | "employee";
   categoryName: string;
 }
 
@@ -76,9 +76,24 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const { getEffectiveCompanyId } = useCompany();
   const submitLock = useRef(false);
 
+  // Fetch active employees from staff_registry for the Employee party group
+  const { data: employees } = useQuery({
+    queryKey: ["ar-receipt-employees"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("staff_registry")
+        .select("id, staff_name, staff_type")
+        .eq("is_active", true)
+        .order("staff_name");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open,
+  });
+
   const [allocations, setAllocations] = useState<InvoiceAllocation[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(preselectedCustomerId || "");
-  const [selectedPartyType, setSelectedPartyType] = useState<"customer" | "vendor">("customer");
+  const [selectedPartyType, setSelectedPartyType] = useState<"customer" | "vendor" | "employee">("customer");
   const [isAdvance, setIsAdvance] = useState(isAdvanceMode);
   const [globalWriteOffAccountId, setGlobalWriteOffAccountId] = useState("");
   const [partyOpen, setPartyOpen] = useState(false);
@@ -120,21 +135,39 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
       }
     }
 
+    // Group employees by staff_type
+    if (employees) {
+      for (const e of employees) {
+        const typeLabel = (e.staff_type || "Other").charAt(0).toUpperCase() + (e.staff_type || "other").slice(1);
+        options.push({
+          id: e.id,
+          name: e.staff_name,
+          type: "employee",
+          categoryName: typeLabel,
+        });
+      }
+    }
+
     return options;
-  }, [customers, vendors]);
+  }, [customers, vendors, employees]);
 
   // Group by type then category
   const groupedOptions = useMemo(() => {
     const customersByCategory = new Map<string, PartyOption[]>();
     const vendorsByCategory = new Map<string, PartyOption[]>();
+    const employeesByType = new Map<string, PartyOption[]>();
 
     for (const opt of partyOptions) {
-      const map = opt.type === "customer" ? customersByCategory : vendorsByCategory;
+      const map = opt.type === "customer"
+        ? customersByCategory
+        : opt.type === "vendor"
+          ? vendorsByCategory
+          : employeesByType;
       if (!map.has(opt.categoryName)) map.set(opt.categoryName, []);
       map.get(opt.categoryName)!.push(opt);
     }
 
-    return { customersByCategory, vendorsByCategory };
+    return { customersByCategory, vendorsByCategory, employeesByType };
   }, [partyOptions]);
 
   const selectedParty = partyOptions.find(p => p.id === selectedCustomerId);
