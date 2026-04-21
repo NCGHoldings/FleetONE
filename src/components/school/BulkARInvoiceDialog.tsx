@@ -155,6 +155,38 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
               </div>
             )}
 
+            {/* Orphan AR Repair Banner — drift between school invoices and Finance AR */}
+            {orphanCount > 0 && (
+              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-medium text-amber-700">
+                    {orphanCount} student{orphanCount === 1 ? "" : "s"} this month {orphanCount === 1 ? "has" : "have"} a journal entry but no AR invoice
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    These were posted to the GL but never appeared in the AR ledger. Repair links them to the right customer in the active company.
+                  </p>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="mt-3"
+                    disabled={repairOrphans.isPending}
+                    onClick={async () => {
+                      await repairOrphans.mutateAsync({ branchId, invoiceMonth });
+                      await refetchOrphans();
+                    }}
+                  >
+                    {repairOrphans.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                    )}
+                    Repair {orphanCount} orphan AR invoice{orphanCount === 1 ? "" : "s"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Existing Batch Warning */}
             {existingBatch && (
               <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
