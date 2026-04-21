@@ -1,186 +1,89 @@
 
-# Fix: School Bus AR/GL/COA validation and make April match only Katunayaka, Panadura, Nuwara Eliya
 
-## What I found in LIVE
+# Plan: Cut LIVE School Bus April 2026 to exactly 670 / Rs 4,094,760
 
-The current numbers are not matching because old and failed batches are still inside Finance.
+## What's actually in LIVE right now (April 2026, SBO)
 
-### Correct target for April 2026
-The 3 branches you said are completed are:
+| Branch | AR rows | AR amount | Date(s) | Status |
+|---|---:|---:|---|---|
+| Katunayaka | 35 | 221,500 | 04-06 | Old failed batch — DELETE |
+| Katunayaka | 33 | 241,155 | 04-09 | Old failed batch — DELETE |
+| Katunayaka | 1 | 9,840 | 04-21 | Single test — DELETE |
+| Wattala | 536 | 5,130,035 | 04-09 | Not in your "completed 3" — DELETE (⚠ 2 paid) |
+| Kurunegala | 499 | 5,090,800 | 04-15 | Not in your "completed 3" — DELETE |
+| Nugegoda | 2 | 17,500 | 04-01 | Not in your "completed 3" — DELETE (⚠ 1 paid) |
+| Anuradhapura | 1 | 7,120 | 04-15 | Not in your "completed 3" — DELETE (⚠ 1 paid) |
+| **Panadura** | **440** | **2,762,960** | 04-21 | ✅ KEEP |
+| **Nuwara Eliya** | **197** | **1,139,560** | 04-21 | ✅ KEEP |
+| **Total now** | **1,744** | **14,620,470** | | Target after cut: **637 / 3,902,520** |
 
-| Branch | Active students | Correct 80% invoice total |
-|---|---:|---:|
-| Katunayaka | 33 | Rs 192,240 |
-| Panadura | 440 | Rs 2,762,960 |
-| Nuwara Eliya | 197 | Rs 1,139,560 |
-| **Total** | **670** | **Rs 4,094,760** |
+JEs follow the same pattern: 2,857 SBO JEs in April, of which only ~637 belong to Panadura+Nuwara Eliya (Apr-21 batch). Plus there are 575 zero-debit zombie JEs scattered across 04-01/03/06/09.
 
-So your expected outstanding amount **Rs 4,094,760** is correct.
+After cleanup of the 7 wrong branches, **Katunayaka 33 still needs to be regenerated** (active students with no remaining AR) to reach the 670 / Rs 4,094,760 target.
 
-### Current wrong state
-Current AR shows:
+## Issue requiring your decision
 
-| Branch | AR count | AR amount | Issue |
-|---|---:|---:|---|
-| Katunayaka | 69 | Rs 472,495 | 68 rows are old inactive-student invoices from previous failed runs |
-| Panadura | 440 | Rs 2,762,960 | Correct |
-| Nuwara Eliya | 197 | Rs 1,139,560 | Correct |
-| **Total** | **706** | **Rs 4,375,015** | Over by **Rs 280,255** |
+**4 AR invoices in the to-be-deleted branches have payments recorded against them:**
+- Nugegoda INV-NCGH-2026-00060 — Rs 7,300 paid
+- Wattala INV-NCGH-2026-00241 — Rs 9,000 paid
+- Wattala INV-NCGH-2026-00526 — Rs 11,200 paid
+- Anuradhapura INV-NCGH-2026-01172 — Rs 7,120 paid
 
-Current GL has extra entries too:
-- **473 unlinked SBO JEs** on 2026-04-21 with no `school_ar_invoices` and no `ar_invoices`.
-- These are extra GL rows and must not appear under School Bus now.
-- 440 of these are duplicate Panadura JEs.
-- 33 of these are Katunayaka active-student JEs from the correct attempt, but Katunayaka’s visible AR is currently attached mostly to old inactive-student batches, so Katunayaka needs a controlled rebuild.
+Total Rs 34,620 in real student payments. These were collected from real students. Deleting the AR invoice without handling the payment will **break the cash side**.
 
-## Repair plan
+I will **NOT** assume; I'll list options below — you pick option **A**, **B**, or **C** before I run anything.
 
-### 1. Clean current April School Bus Finance state
+| Option | What happens to the 4 paid AR rows | What happens to the cash already received |
+|---|---|---|
+| **A** | Keep these 4 AR rows (and their JEs). They stay visible under SBO April. | Cash stays correctly recorded. Final count becomes 641 + 33 Katunayaka = **674** / Rs 3,937,140. Doesn't match your 670 target exactly but books are clean. |
+| **B** | Delete them anyway. | I will reverse the receipt postings and credit the student `payment_balance` so cash isn't lost. Money becomes "advance / unallocated" against student. |
+| **C** | Delete them and also delete the receipts (treat as test data). | Cash entry for Rs 34,620 is wiped. Only safe if those 4 receipts were test entries — please confirm they're not real. |
 
-I will apply a targeted data repair for April 2026, SBO only, NCG Holding only:
+## Migration that will run after you pick A / B / C
 
-1. Remove old Katunayaka April AR invoices that are linked to inactive students.
-2. Remove the linked old Katunayaka school invoices from those failed batches.
-3. Remove or reverse/delete only the related Katunayaka old JEs that are safe to remove:
-   - no active student
-   - April 2026
-   - SBO
-   - NCG Holding
-   - linked to removed old school invoices
-4. Convert the 33 correct Katunayaka active-student orphan JEs into proper Finance rows:
-   - create `school_ar_invoices`
-   - create/link `ar_invoices`
-   - attach to existing correct JEs
-   - amount = 80% of active student fixed monthly amount
-5. Remove the 440 duplicate Panadura orphan JEs because Panadura already has correct 440 AR + school invoices + linked JEs.
-6. Recheck final April result:
-   - AR count = **670**
-   - School invoice count = **670**
-   - Linked JE count = **670**
-   - Outstanding = **Rs 4,094,760**
-   - Branches = Katunayaka, Panadura, Nuwara Eliya only
+### Step 1 — Snapshot
+- Create `_archive_april_sbo_cleanup_<timestamp>` schema and copy every AR/JE/JE-line/school_ar_invoices/allocation row I'm about to touch. Nothing is lost — recoverable in 1 query.
 
-### 2. Recalculate COA balances correctly
-
-After cleanup, I will recalculate affected COA accounts from the remaining posted JEs, especially:
-- `12201001` Trade Receivable - External
-- `41103001` Transport Income - School Buses
-
-This is needed because old failed JEs already updated COA balances. After deleting/reversing them, the COA must match the remaining valid School Bus JEs only.
-
-Expected April valid School Bus posting effect:
-- DR Trade Receivable: **Rs 4,094,760**
-- CR School Bus Transport Income: **Rs 4,094,760**
-
-### 3. Stop future mismatches with validation
-
-I will harden `src/hooks/useSchoolBusFinance.ts` so the system cannot create partial finance records.
-
-New validation before generating:
-- Selected branch/month must not already have active invoices unless user deletes/regenerates.
-- Only active students are included.
-- Billing amount must equal `fixed_monthly_amount * billing_percentage / 100`.
-- Customer must exist for the correct company and `business_unit_code = SBO`.
-- COA settings must belong to the effective NCG Holding company.
-- The branch/month must pass a preflight parity check.
-
-New write order:
-1. Resolve customer.
-2. Create AR invoice.
-3. Create JE header + lines.
-4. Link `ar_invoices.journal_entry_id`.
-5. Create `school_ar_invoices` with both `ar_invoice_id` and `journal_entry_id`.
-6. Update student balance.
-7. Update COA.
-
-If any step fails, it will repair/rollback what was created in that loop instead of leaving orphan JEs or orphan AR rows.
-
-### 4. Add auto-matching and verification dashboard
-
-I will add a School Bus Finance verification layer that compares:
-
-```text
-Active Students
-  = School AR invoices
-  = Finance AR invoices
-  = Linked Journal Entries
-  = COA movement
+### Step 2 — Delete wrong-branch April SBO data (scope below)
+Targets exactly:
 ```
+business_unit_code = 'SBO'
+AND invoice_date / entry_date BETWEEN 2026-04-01 AND 2026-04-30
+AND linked-student branch IN (Wattala, Kurunegala, Nugegoda, Anuradhapura)
+   OR (Katunayaka AND invoice_date IN 04-06, 04-09, 04-21)
+```
+For each match:
+- delete `school_ar_invoices` row
+- delete `journal_entry_lines` then `journal_entries`
+- delete `ar_invoices`
+- handle 4 paid invoices per option A/B/C
 
-For each branch/month it will show:
-- active student count
-- school invoice count
-- Finance AR count
-- linked JE count
-- orphan JE count
-- duplicate invoice count
-- expected total
-- AR total
-- JE total
-- difference
+### Step 3 — Delete zero-debit zombie JEs (575 rows, no lines, no AR link)
+Apr 01/03/06/09 with `total_debit = 0` AND `id NOT IN (ar_invoices.journal_entry_id)` AND no `journal_entry_lines`.
 
-When mismatch exists, the UI will show:
-- red warning banner
-- exact branch/month problem
-- “Repair now” action for safe repairs only
+### Step 4 — Regenerate the 33 Katunayaka active-student invoices (Apr 21 batch)
+Same atomic flow that now works for Panadura/NE: customer → ar_invoice → JE+lines → school_ar_invoices link.
 
-### 5. Database validation objects
+### Step 5 — Recalculate COA balances
+For NCG Holding `12201001` (Trade Receivable - External) and `41103001` (Transport Income - School Buses): wipe `current_balance`, then sum all remaining posted JE lines from project start. Result must show DR 4,094,760 / CR 4,094,760 movement from the April SBO batch (plus any prior history, untouched).
 
-I will add/upgrade database-side helpers:
+### Step 6 — Verification view
+Add `v_sbo_finance_validation` that returns OK / MISMATCH per branch+month. Migration aborts if final April SBO totals ≠ 670 / Rs 4,094,760.
 
-| Object | Purpose |
-|---|---|
-| `v_sbo_ar_je_parity` | Branch/month AR/JE/school invoice count and amount comparison |
-| `v_sbo_orphan_journal_entries` | Shows SBO JEs not linked to school invoice or AR |
-| `v_sbo_finance_validation` | Final validation view with status: OK / MISMATCH |
-| repair function/RPC | Controlled repair for branch/month, not broad manual SQL |
+## Code hardening (after data is clean)
+- `src/hooks/useSchoolBusFinance.ts` — atomic per-student write with rollback; preflight blocks regeneration when month already has invoices for that branch; only active students included.
+- `src/components/school/BulkARInvoiceDialog.tsx` — pre-generate validation panel showing Active vs AR vs JE vs COA, "Repair now" button only when drift exists.
 
-### 6. UI changes
+## Out of scope
+- TEST environment — not touched.
+- Other modules (SPH, YUT, SNT, LTV, NCGE) — not touched.
+- Months other than April 2026 — not touched.
+- Other COA accounts — only the two affected ones recalculated.
 
-Files to update:
-- `src/hooks/useSchoolBusFinance.ts`
-  - atomic generation
-  - preflight validation
-  - repair hooks
-  - active-student-only logic
-- `src/components/school/BulkARInvoiceDialog.tsx`
-  - show validation summary before generation
-  - block generation when mismatch exists
-  - repair button for safe orphan/duplicate cases
-- School Bus Finance settings/overview component
-  - add branch/month validation panel
-- New migration / data repair SQL
-  - April 2026 cleanup
-  - COA recalculation
-  - validation views/functions
+## ⚠ Need your reply before I proceed
 
-## Safety scope
+**Reply with one of:**
+- **"A"** — keep the 4 paid invoices; final count 674
+- **"B"** — delete + push Rs 34,620 to student advance balances
+- **"C"** — delete everything including receipts (only if these 4 were test payments)
 
-This repair will only touch:
-- NCG Holding
-- `business_unit_code = 'SBO'`
-- April 2026
-- Katunayaka, Panadura, Nuwara Eliya reconciliation
-- School Bus AR/JE/COA records directly involved in this mismatch
-
-It will not touch:
-- Special Hire
-- Yutong
-- Sinotruk
-- Light Vehicle
-- NCG Express
-- unrelated AP/AR records
-- other months unless explicitly included in validation views
-
-## Expected result after implementation
-
-- AR invoice list under School Bus shows only:
-  - Katunayaka
-  - Panadura
-  - Nuwara Eliya
-- AR count becomes **670**
-- Outstanding becomes **Rs 4,094,760**
-- School Bus GL JE count matches the same 670 valid AR invoices
-- Orphan/duplicate SBO JEs are removed from current School Bus section
-- COA balances are recalculated to match valid posted JEs
-- Future batches cannot create AR without JE, JE without AR, or COA without linked source
