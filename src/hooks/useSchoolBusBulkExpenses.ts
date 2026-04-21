@@ -170,12 +170,15 @@ export function useSchoolBusBulkExpenses() {
         }
         const { data: directAccount, error: directErr } = await supabase
           .from("chart_of_accounts")
-          .select("id, account_name")
+          .select("id, account_name, company_id")
           .eq("id", payload.directPaymentAccountId)
           .maybeSingle();
 
         if (directErr || !directAccount) {
           throw new Error("Selected Direct Payment account not found.");
+        }
+        if (directAccount.company_id !== effectiveCompanyId) {
+          throw new Error("Selected account belongs to a different company. Pick an account from the current company's COA.");
         }
         creditAccountId = directAccount.id;
         creditAccountName = directAccount.account_name;
@@ -195,6 +198,16 @@ export function useSchoolBusBulkExpenses() {
         }
         creditAccountId = payableAccount.id;
         creditAccountName = payableAccount.account_name;
+      }
+
+      // Cross-company guard: ensure the fuel expense account also belongs to this company
+      const { data: fuelAcctCheck } = await supabase
+        .from("chart_of_accounts")
+        .select("company_id")
+        .eq("id", defaultFuelAccountId)
+        .maybeSingle();
+      if (fuelAcctCheck && fuelAcctCheck.company_id !== effectiveCompanyId) {
+        throw new Error("Fuel Expense account belongs to a different company. Update Finance Settings to use a COA from the current company.");
       }
 
       // We will loop through the batch and upload them one by one.
