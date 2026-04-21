@@ -81,7 +81,24 @@ export const APPaymentsView = () => {
     return "Unknown";
   };
 
-  // Check if payment has linked fees
+  // Open an attached document via signed URL
+  const openAttachment = async (path: string, download = false) => {
+    try {
+      const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 60, download ? { download: true } : undefined);
+      if (error || !data?.signedUrl) throw error || new Error("No signed URL");
+      window.open(data.signedUrl, "_blank", "noopener");
+    } catch (e: any) {
+      toast.error("Could not open attachment", { description: e?.message || "File may no longer exist." });
+    }
+  };
+
+  // Build a preview URL for inline display in the details dialog
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const loadPreviewUrl = async (path: string) => {
+    setPreviewUrl(null);
+    const { data } = await supabase.storage.from("documents").createSignedUrl(path, 300);
+    if (data?.signedUrl) setPreviewUrl(data.signedUrl);
+  };
   const hasLinkedFees = (paymentId: string) => {
     return bankFees?.some(f => f.ap_payment_id === paymentId);
   };
@@ -329,7 +346,15 @@ export const APPaymentsView = () => {
                         <Badge variant="outline" className="text-xs ml-1">Fees</Badge>
                       )}
                       {(payment as any).document_url && (
-                        <span title="Has attachment"><Paperclip className="h-3.5 w-3.5 text-primary ml-1" /></span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 ml-1"
+                          onClick={() => openAttachment((payment as any).document_url)}
+                          title="Open attached document"
+                        >
+                          <Paperclip className="h-3.5 w-3.5 text-primary" />
+                        </Button>
                       )}
                     </div>
                     {(payment as any).legacy_number && (payment as any).legacy_number !== payment.payment_number && (
