@@ -644,6 +644,25 @@ export const useCreateARReceipt = () => {
             .single();
           customerName = vendorData?.vendor_name || "";
         } catch { /* Non-blocking */ }
+      } else if (partyType === "employee") {
+        // Resolve Staff Advance / IOU receivable account from gl_settings
+        try {
+          const { data: glSettings } = await (supabase as any)
+            .from("gl_settings")
+            .select("staff_advance_account_id, trade_receivable_account_id")
+            .eq("company_id", effectiveCompanyId)
+            .maybeSingle();
+          tradeReceivableId = glSettings?.staff_advance_account_id || glSettings?.trade_receivable_account_id || null;
+          advanceAccountId = glSettings?.staff_advance_account_id || null;
+        } catch { /* Non-blocking */ }
+        try {
+          const { data: staff } = await supabase
+            .from("staff_registry")
+            .select("staff_name")
+            .eq("id", receipt.customer_id)
+            .single();
+          customerName = staff?.staff_name || "Employee";
+        } catch { /* Non-blocking */ }
       } else {
         const { resolveCustomerARAccounts } = await import("@/hooks/useCustomerCategories");
         const resolved = await resolveCustomerARAccounts(receipt.customer_id, effectiveCompanyId);
