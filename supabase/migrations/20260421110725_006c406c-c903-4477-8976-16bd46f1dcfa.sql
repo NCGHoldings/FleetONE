@@ -1,0 +1,1 @@
+ALTER VIEW public.v_sbo_ar_je_parity SET (security_invoker = true);
