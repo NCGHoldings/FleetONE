@@ -10,7 +10,10 @@ import { useEditAPPayment } from "@/hooks/useEditAccountingMutations";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Paperclip, Upload } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 interface APPaymentEditDialogProps {
   open: boolean;
@@ -21,6 +24,7 @@ interface APPaymentEditDialogProps {
 export const APPaymentEditDialog = ({ open, onOpenChange, payment }: APPaymentEditDialogProps) => {
   const { data: bankAccounts } = useBankAccounts();
   const editPayment = useEditAPPayment();
+  const queryClient = useQueryClient();
 
   const [amount, setAmount] = useState(0);
   const [paymentDate, setPaymentDate] = useState("");
@@ -31,6 +35,8 @@ export const APPaymentEditDialog = ({ open, onOpenChange, payment }: APPaymentEd
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [vendorBillNumber, setVendorBillNumber] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [currentDocUrl, setCurrentDocUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (payment && open) {
@@ -43,8 +49,30 @@ export const APPaymentEditDialog = ({ open, onOpenChange, payment }: APPaymentEd
       setReference(payment.reference || "");
       setNotes(payment.notes || "");
       setVendorBillNumber(payment.vendor_bill_number || "");
+      setCurrentDocUrl(payment.document_url || null);
     }
   }, [payment, open]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !payment?.id) return;
+    setUploading(true);
+    try {
+      const path = `ap_payments/${payment.id}/${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("documents").upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      const { error: updErr } = await supabase.from("ap_payments").update({ document_url: path }).eq("id", payment.id);
+      if (updErr) throw updErr;
+      setCurrentDocUrl(path);
+      toast.success("Attachment uploaded");
+      queryClient.invalidateQueries({ queryKey: ["ap_payments"] });
+    } catch (err: any) {
+      toast.error("Upload failed", { description: err?.message });
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
 
   const handleSubmit = () => {
     if (!payment?.id) return;
@@ -145,6 +173,32 @@ export const APPaymentEditDialog = ({ open, onOpenChange, payment }: APPaymentEd
           <div>
             <Label>Notes</Label>
             <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
+          </div>
+
+          <div className="border-t pt-4">
+            <Label className="flex items-center gap-2">
+              <Paperclip className="h-4 w-4" /> Attachment
+            </Label>
+            {currentDocUrl ? (
+              <p className="text-xs text-muted-foreground mt-1 break-all">
+                Current: {currentDocUrl.split("/").pop()}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">No attachment yet.</p>
+            )}
+            <div className="mt-2 flex items-center gap-2">
+              <Input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={handleFileUpload}
+                disabled={uploading}
+                className="text-xs"
+              />
+              {uploading && <Upload className="h-4 w-4 animate-pulse text-primary" />}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Uploading replaces any existing attachment reference.
+            </p>
           </div>
 
           <Button onClick={handleSubmit} className="w-full" disabled={editPayment.isPending}>

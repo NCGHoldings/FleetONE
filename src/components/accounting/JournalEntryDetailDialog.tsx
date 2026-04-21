@@ -356,9 +356,10 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7"
-                                onClick={() => {
-                                  const { data } = supabase.storage.from("documents").getPublicUrl(doc.documentUrl!);
-                                  window.open(data.publicUrl, "_blank");
+                                onClick={async () => {
+                                  const { data, error } = await supabase.storage.from("documents").createSignedUrl(doc.documentUrl!, 60);
+                                  if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
+                                  else console.error("Attachment signed URL failed", error);
                                 }}
                                 title="View Attachment"
                               >
