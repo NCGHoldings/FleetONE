@@ -21,8 +21,8 @@ export const ChartOfAccountsView = () => {
   const [viewMode, setViewMode] = useState<"tree" | "table">("tree");
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
-  const { selectedCompanyId, selectedCompany } = useCompany();
-  const effectiveCompanyId = NCG_HOLDING_ID;
+  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId() || NCG_HOLDING_ID;
   const isConsolidated = true;
 
   const { data: accounts, isLoading, refetch } = useQuery({

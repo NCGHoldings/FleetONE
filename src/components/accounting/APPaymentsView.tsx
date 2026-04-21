@@ -148,6 +148,7 @@ export const APPaymentsView = () => {
       bank_transfer: "Bank Transfer",
       cheque: "Cheque",
       online: "Online",
+      direct: "Direct (Float)",
     };
     return labels[method] || method;
   };
