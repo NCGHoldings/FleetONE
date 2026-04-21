@@ -53,6 +53,12 @@ export interface InvoiceData {
   }>;
   totalAdditionalExpenses?: number;
   adjustmentNotes?: string;
+  /** Quotation-time extra KM (from additional_charges[type='additional_distance']). Display-only. */
+  quotationAdditionalDistanceKm?: number;
+  /** Quotation-time extra KM total charge (LKR). Display-only — already inside totalAmount. */
+  quotationAdditionalDistanceAmount?: number;
+  /** Optional itemized breakdown of quotation-time extra distance entries. */
+  quotationAdditionalDistanceBreakdown?: Array<{ description: string; distance: number; amount: number }>;
   preparedBy?: ApprovalSignature;
   checkedBy?: ApprovalSignature;
   approvedBy?: ApprovalSignature;
