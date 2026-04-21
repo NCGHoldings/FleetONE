@@ -24,6 +24,7 @@ import { VehicleSelector } from "./shared/VehicleSelector";
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { CustomerForm } from "./CustomerForm";
 import { useCompany } from "@/contexts/CompanyContext";
 
