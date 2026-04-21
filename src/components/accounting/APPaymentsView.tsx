@@ -53,10 +53,29 @@ export const APPaymentsView = () => {
   const [editingPayment, setEditingPayment] = useState<any>(null);
   const [historyPayment, setHistoryPayment] = useState<any>(null);
 
-  // Get vendor name helper
+  // Get vendor name helper (legacy - kept for vendor-only lookups)
   const getVendorName = (vendorId: string) => {
     const vendor = vendors?.find(v => v.id === vendorId);
     return vendor?.vendor_name || "Unknown";
+  };
+
+  // Resolve display label for any payee type (vendor / customer / direct float)
+  const getPayeeLabel = (payment: any): string => {
+    const type = payment?.payee_type;
+    if (type === "customer") {
+      const name = payment?.customers?.customer_name;
+      return name ? `${name} (Customer)` : "Customer";
+    }
+    if (type === "direct" || payment?.is_direct_payment) {
+      const bus = payment?.bus_no;
+      return bus ? `Bus ${bus} (Fuel Float)` : "Direct (Float)";
+    }
+    // vendor (default)
+    const vendorName = payment?.vendors?.vendor_name || (payment?.vendor_id ? getVendorName(payment.vendor_id) : null);
+    if (vendorName && vendorName !== "Unknown") return vendorName;
+    // last-chance fallbacks
+    if (payment?.bus_no) return `Bus ${payment.bus_no} (Fuel Float)`;
+    return "Unknown";
   };
 
   // Check if payment has linked fees
@@ -87,15 +106,17 @@ export const APPaymentsView = () => {
 
   // Filter payments
   const filteredPayments = payments?.filter(payment => {
-    const matchesSearch = 
-      payment.payment_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      getVendorName(payment.vendor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.cheque_number?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      payment.payment_number.toLowerCase().includes(term) ||
+      getPayeeLabel(payment).toLowerCase().includes(term) ||
+      payment.reference?.toLowerCase().includes(term) ||
+      payment.cheque_number?.toLowerCase().includes(term) ||
+      (payment as any).bus_no?.toLowerCase?.().includes(term);
+
     const matchesVendor = selectedVendor === "_all" || payment.vendor_id === selectedVendor;
     const matchesMethod = paymentMethodFilter === "_all" || payment.payment_method === paymentMethodFilter;
-    
+
     return matchesSearch && matchesVendor && matchesMethod;
   }) || [];
 
@@ -120,7 +141,7 @@ export const APPaymentsView = () => {
       setPrintCheque({
         cheque_number: payment.cheque_number || "",
         cheque_date: payment.cheque_date || payment.payment_date,
-        payee: getVendorName(payment.vendor_id),
+        payee: getPayeeLabel(payment),
         amount: payment.amount,
         bank_account_name: payment.bank_account_id || "",
         reference: payment.reference,
@@ -270,7 +291,7 @@ export const APPaymentsView = () => {
             <TableRow>
               <TableHead>Payment #</TableHead>
               <TableHead>Date</TableHead>
-              <TableHead>Vendor</TableHead>
+              <TableHead>Payee</TableHead>
               <TableHead>Method</TableHead>
               <TableHead>Cheque #</TableHead>
               <TableHead>Vendor Bill #</TableHead>
@@ -313,7 +334,7 @@ export const APPaymentsView = () => {
                     )}
                   </TableCell>
                   <TableCell>{format(new Date(payment.payment_date), "MMM dd, yyyy")}</TableCell>
-                  <TableCell>{getVendorName(payment.vendor_id)}</TableCell>
+                  <TableCell>{getPayeeLabel(payment)}</TableCell>
                   <TableCell>{getPaymentMethodLabel(payment.payment_method || "")}</TableCell>
                   <TableCell className="font-mono">{payment.cheque_number || "-"}</TableCell>
                   <TableCell className="font-mono text-muted-foreground">{(payment as any).vendor_bill_number || "-"}</TableCell>

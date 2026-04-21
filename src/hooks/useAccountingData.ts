@@ -556,6 +556,11 @@ export const useAPPayments = () => {
             account_number,
             account_holder_name,
             account_label
+          ),
+          customers!ap_payments_payee_customer_id_fkey (
+            id,
+            customer_code,
+            customer_name
           )
         `)
         .order("created_at", { ascending: false });
