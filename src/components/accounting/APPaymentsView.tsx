@@ -405,6 +405,17 @@ export const APPaymentsView = () => {
                       <Button variant="ghost" size="icon" onClick={() => handleViewPayment(payment)}>
                         <Eye className="h-4 w-4" />
                       </Button>
+                      {(payment as any).document_url && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openAttachment((payment as any).document_url)}
+                          title="View attachment"
+                          className="text-primary"
+                        >
+                          <Paperclip className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => handleAddBankFee(payment)} title="Add Bank Fee">
                         <Landmark className="h-4 w-4" />
                       </Button>
@@ -490,7 +501,7 @@ export const APPaymentsView = () => {
       />
 
       {/* Payment Detail Dialog */}
-      <Dialog open={!!detailPayment} onOpenChange={(open) => { if (!open) setDetailPayment(null); }}>
+      <Dialog open={!!detailPayment} onOpenChange={(open) => { if (!open) { setDetailPayment(null); setPreviewUrl(null); } else if (detailPayment?.document_url) { loadPreviewUrl(detailPayment.document_url); } }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Payment Details</DialogTitle>
