@@ -13,7 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { CalendarIcon, FileSpreadsheet, Users, DollarSign, AlertCircle, CheckCircle, Loader2, AlertTriangle, Trash2, Percent } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useStudentsForBulkAR, useGenerateBulkARInvoices, useBranchFinanceSettings, useExistingBatch, useDeleteARBatch } from "@/hooks/useSchoolBusFinance";
+import { useStudentsForBulkAR, useGenerateBulkARInvoices, useBranchFinanceSettings, useExistingBatch, useDeleteARBatch, useOrphanARCount, useRepairOrphanARs } from "@/hooks/useSchoolBusFinance";
 import { toast } from "sonner";
 
 interface BulkARInvoiceDialogProps {
@@ -34,6 +34,8 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
   const generateBulkAR = useGenerateBulkARInvoices();
   const { data: existingBatch, isLoading: checkingBatch, refetch: refetchBatch } = useExistingBatch(branchId, invoiceMonth, open);
   const deleteARBatch = useDeleteARBatch();
+  const { data: orphanCount = 0, refetch: refetchOrphans } = useOrphanARCount(branchId, invoiceMonth);
+  const repairOrphans = useRepairOrphanARs();
 
   const effectiveSettings = settings;
 
