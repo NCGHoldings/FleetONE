@@ -426,14 +426,21 @@ export function useSchoolBusBulkExpenses() {
         await updateAccountBalancesFromJournalEntry(journalEntry.id);
       }
 
-      return true;
+      return { posted: postedCount, skipped: skippedCount };
     },
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ["daily-bus-expenses"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["buses"] });
-      toast.success("Bulk expenses successfully imported and posted to GL!");
+      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+      const posted = result?.posted ?? 0;
+      const skipped = result?.skipped ?? 0;
+      if (skipped > 0) {
+        toast.success(`Imported ${posted} bus${posted === 1 ? '' : 'es'}, skipped ${skipped} duplicate${skipped === 1 ? '' : 's'} already posted on this date.`);
+      } else {
+        toast.success(`Bulk expenses imported and posted to GL (${posted} bus${posted === 1 ? '' : 'es'}).`);
+      }
     },
     onError: (error: any) => {
       toast.error(`Bulk import failed: ${error.message}`);
