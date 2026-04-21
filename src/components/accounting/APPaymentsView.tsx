@@ -393,7 +393,7 @@ export const APPaymentsView = () => {
                           Approve
                         </Button>
                       )}
-                      <Button variant="ghost" size="icon" onClick={() => setDetailPayment(payment)} title="View Details">
+                      <Button variant="ghost" size="icon" onClick={() => { setDetailPayment(payment); if ((payment as any).document_url) loadPreviewUrl((payment as any).document_url); else setPreviewUrl(null); }} title="View Details">
                         <FileText className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => setEditingPayment(payment)} title="Edit Payment">
@@ -501,7 +501,7 @@ export const APPaymentsView = () => {
       />
 
       {/* Payment Detail Dialog */}
-      <Dialog open={!!detailPayment} onOpenChange={(open) => { if (!open) { setDetailPayment(null); setPreviewUrl(null); } else if (detailPayment?.document_url) { loadPreviewUrl(detailPayment.document_url); } }}>
+      <Dialog open={!!detailPayment} onOpenChange={(open) => { if (!open) { setDetailPayment(null); setPreviewUrl(null); } }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Payment Details</DialogTitle>
