@@ -232,6 +232,10 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
     const totalAmount = computedTotalAmount();
     const actualTotalPaid = freshTotalPaid ?? quotationData.total_paid ?? quotationData.advance_paid ?? 0;
 
+    // Resolve unified mileage from full quotation + adjustment (single source of truth)
+    const mileageInfo = getInvoiceMileage(fullQuotation, hasRealAdjustment ? effectiveAdjustment : null);
+    const fallbackTripDistance = quotationData.tripDistance ?? (mileageInfo.quoted || calculateTotalKm(fullQuotation));
+
     return {
       invoiceNo,
       invoiceType: 'balance',
@@ -251,8 +255,8 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       advanceAmount: getActualTotalPaid(),
       balanceAmount: finalBalance,
       paidAmount: actualTotalPaid,
-      tripDistance: quotationData.tripDistance,
-      totalKm: quotationData.totalKm,
+      tripDistance: fallbackTripDistance,
+      totalKm: quotationData.totalKm ?? mileageInfo.quoted,
       companyLogo,
       vehicleNo: quotationData.bus_no,
       driverName: quotationData.driver_name,
@@ -264,11 +268,16 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       extraKm: hasRealAdjustment ? effectiveAdjustment.extra_km : undefined,
       extraKmChargePerKm: hasRealAdjustment ? (effectiveAdjustment.extra_km_rate || effectiveAdjustment.extra_km_charge_per_km) : undefined,
       extraKmTotalCharge: hasRealAdjustment ? effectiveAdjustment.extra_km_total_charge : undefined,
-      originalQuotedKm: hasRealAdjustment ? effectiveAdjustment.original_quoted_km : undefined,
-      actualKmTraveled: hasRealAdjustment ? effectiveAdjustment.actual_km_traveled : undefined,
+      // Always pass the resolved quoted/actual KM so the Mileage line is never silently 0
+      originalQuotedKm: mileageInfo.quoted || undefined,
+      actualKmTraveled: mileageInfo.actual || undefined,
       additionalExpenses: hasRealAdjustment ? effectiveAdjustment.additional_expenses : undefined,
       totalAdditionalExpenses: hasRealAdjustment ? effectiveAdjustment.total_additional_expenses : undefined,
       adjustmentNotes: hasRealAdjustment ? effectiveAdjustment.adjustment_notes : undefined,
+      // Quotation-time additional distance (visible row + mileage breakdown)
+      quotationAdditionalDistanceKm: mileageInfo.quotationExtras || undefined,
+      quotationAdditionalDistanceAmount: mileageInfo.quotationExtrasAmount || undefined,
+      quotationAdditionalDistanceBreakdown: mileageInfo.quotationExtrasBreakdown.length > 0 ? mileageInfo.quotationExtrasBreakdown : undefined,
       hireType: quotationData.hire_type || 'External',
       intermediateStops: (() => {
         try {
