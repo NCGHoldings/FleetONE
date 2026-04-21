@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -67,6 +67,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const queryClient = useQueryClient();
   const generatePayNum = useGenerateNumber();
+  const submitLock = useRef(false);
 
   const isEditing = !!editingInvoice;
 
@@ -382,6 +383,9 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
   const selectedSchoolRoute = schoolRoutes?.find(r => r.id === selectedSchoolRouteId);
 
   const onSubmit = async (data: InvoiceFormData) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+
     const lineData = lines
       .filter(l => l.description.trim() || l.unit_price > 0)
       .map(l => ({
@@ -498,6 +502,8 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
       setCostAllocations([]);
     } catch (error) {
       // Error handled by mutation
+    } finally {
+      submitLock.current = false;
     }
   };
 

@@ -250,7 +250,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
           .update({ route_label: value })
           .eq("id", tripId);
         if (error) throw error;
-        await fetchRoster(true);
+        setExpandedRows(prev => prev.map(r => r.trip_id === tripId ? { ...r, route_label: value } : r));
         return;
       }
       // Standard rate updates the buses table directly
@@ -264,7 +264,14 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
           .update({ [dbField]: numVal })
           .eq("id", row.bus_id);
         if (error) throw error;
-        await fetchRoster(true);
+        setExpandedRows(prev => prev.map(r => {
+          if (r.bus_id === row.bus_id) {
+            const upd = { ...r, standard_rate: numVal };
+            upd.performance = upd.fuel_consumption > 0 ? numVal - upd.fuel_consumption : 0;
+            return upd;
+          }
+          return r;
+        }));
         return;
       }
 
@@ -302,8 +309,22 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
           .eq("id", row.trip_id);
 
         if (error) throw error;
-        // Silent refresh — no loading spinner, preserves scroll
-        await fetchRoster(true);
+        
+        setExpandedRows(prev => prev.map(r => {
+          if (r.trip_id === row.trip_id) {
+            const upd = { ...r, ...updatePayload };
+            if (updatePayload.distance_km !== undefined) upd.total_mileage = updatePayload.distance_km;
+            if (updatePayload.km_per_liter !== undefined) upd.fuel_consumption = updatePayload.km_per_liter;
+            if (upd.fuel_consumption > 0 && upd.standard_rate) {
+              upd.performance = Math.round((upd.standard_rate - upd.fuel_consumption) * 100) / 100;
+            }
+            if (field === 'odometer_start') upd.start_meter = numVal;
+            if (field === 'odometer_end') upd.end_meter = numVal;
+            if (field === 'fuel_liters') upd.fuel_liters = numVal;
+            return upd;
+          }
+          return r;
+        }));
         return;
       }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -74,6 +74,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const createReceipt = useCreateARReceipt();
   const generateNumber = useGenerateNumber();
   const { getEffectiveCompanyId } = useCompany();
+  const submitLock = useRef(false);
 
   const [allocations, setAllocations] = useState<InvoiceAllocation[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(preselectedCustomerId || "");
@@ -302,6 +303,9 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const effectiveBankFee = includeBankFee ? bankFeeAmount : 0;
 
   const onSubmit = async (data: ReceiptFormData) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+
     const selectedAllocations = isAdvance 
       ? [] 
       : allocations.filter((a) => a.selected && a.allocated_amount > 0);
@@ -346,6 +350,8 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
       setBankFeeType("bank_charge");
     } catch (error) {
       // Error handled by mutation
+    } finally {
+      submitLock.current = false;
     }
   };
 

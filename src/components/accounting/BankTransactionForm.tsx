@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -38,6 +38,7 @@ export const BankTransactionForm = ({ open, onOpenChange, preselectedBankId }: B
   const { data: accounts } = useChartOfAccounts();
   const createTransaction = useCreateBankTransaction();
   const generateNumber = useGenerateNumber();
+  const submitLock = useRef(false);
 
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
@@ -67,6 +68,9 @@ export const BankTransactionForm = ({ open, onOpenChange, preselectedBankId }: B
   }, [open]);
 
   const onSubmit = async (data: TransactionFormData) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+    
     const isDebit = ["withdrawal", "payment", "transfer_out", "bank_charge"].includes(data.transaction_type);
     
     try {
@@ -83,6 +87,8 @@ export const BankTransactionForm = ({ open, onOpenChange, preselectedBankId }: B
       onOpenChange(false);
     } catch (error) {
       // Error handled in mutation
+    } finally {
+      submitLock.current = false;
     }
   };
 

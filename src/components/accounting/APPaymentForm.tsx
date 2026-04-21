@@ -160,6 +160,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   }, [paymentMethod, watchedBankAccountId, open]);
 
   const hasGeneratedNumber = useRef(false);
+  const submitLock = useRef(false);
 
   // Reset form and generate payment number when dialog opens
   useEffect(() => {
@@ -180,6 +181,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     } else {
       hasGeneratedNumber.current = false;
       prevBankAccountRef.current = undefined;
+      submitLock.current = false;
     }
   }, [open, isAdvanceMode, form, generateNumber]);
 
@@ -336,6 +338,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const totalWithFees = totalPayment + effectiveBankFee;
 
   const onSubmit = async (data: PaymentFormData) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+
     const selectedAllocations = isAdvance || isDirectPayment
       ? [] 
       : allocations.filter((a) => a.selected && a.allocated_amount > 0);
@@ -438,6 +443,8 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       setSelectedVehicleType("");
     } catch (error) {
       // Error handled by mutation
+    } finally {
+      submitLock.current = false;
     }
   };
 

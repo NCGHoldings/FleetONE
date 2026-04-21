@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ export const PettyCashDisbursementsTab = () => {
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [previewData, setPreviewData] = useState<any>(null);
+  const submitLock = useRef(false);
 
   const { data: funds } = usePettyCashFunds();
   const { data: transactions, isLoading } = useAllPettyCashTransactions({ 
@@ -57,25 +58,31 @@ export const PettyCashDisbursementsTab = () => {
 
   const handleSubmit = async () => {
     if (!form.petty_cash_fund_id || form.amount <= 0) return;
+    if (submitLock.current) return;
+    submitLock.current = true;
 
-    const needsApproval = selectedFund && selectedFund.approval_required_above > 0 && form.amount > selectedFund.approval_required_above;
+    try {
+      const needsApproval = selectedFund && selectedFund.approval_required_above > 0 && form.amount > selectedFund.approval_required_above;
 
-    await createTransaction.mutateAsync({
-      petty_cash_fund_id: form.petty_cash_fund_id,
-      transaction_type: "disbursement",
-      amount: form.amount,
-      description: form.description,
-      payee_name: form.payee_name,
-      expense_category: form.expense_category || undefined,
-      gl_account_id: form.gl_account_id || undefined,
-      reference_number: form.reference_number || undefined,
-      payment_method: form.payment_method,
-      status: needsApproval ? "pending" : "approved",
-      branch_id: selectedFund?.branch_id || undefined,
-    } as any);
+      await createTransaction.mutateAsync({
+        petty_cash_fund_id: form.petty_cash_fund_id,
+        transaction_type: "disbursement",
+        amount: form.amount,
+        description: form.description,
+        payee_name: form.payee_name,
+        expense_category: form.expense_category || undefined,
+        gl_account_id: form.gl_account_id || undefined,
+        reference_number: form.reference_number || undefined,
+        payment_method: form.payment_method,
+        status: needsApproval ? "pending" : "approved",
+        branch_id: selectedFund?.branch_id || undefined,
+      } as any);
 
-    setShowForm(false);
-    resetForm();
+      setShowForm(false);
+      resetForm();
+    } finally {
+      submitLock.current = false;
+    }
   };
 
   const getCategoryLabel = (value: string) => {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { 
-  Plus, Pencil, Trash2, User, Building2, Loader2, MapPin, AlertTriangle
+  Plus, Pencil, User, Building2, Loader2, MapPin, AlertTriangle
 } from "lucide-react";
 import { 
-  usePettyCashFunds, useCreatePettyCashFund, useUpdatePettyCashFund, useDeactivatePettyCashFund,
+  usePettyCashFunds, useCreatePettyCashFund, useUpdatePettyCashFund,
   PettyCashFund
 } from "@/hooks/usePettyCash";
 import { BUSINESS_UNITS } from "@/hooks/useExpenseRequests";
@@ -20,6 +21,7 @@ import { CurrencyDisplay } from "../shared/CurrencyDisplay";
 import { SearchableAccountSelector } from "../shared/SearchableAccountSelector";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const FUND_TYPES = [
   { value: "main", label: "Main Fund" },
@@ -39,7 +41,8 @@ export const PettyCashFundsTab = () => {
   });
   const createFund = useCreatePettyCashFund();
   const updateFund = useUpdatePettyCashFund();
-  const deactivateFund = useDeactivatePettyCashFund();
+
+  const { allCompanies } = useCompany();
 
   const { data: branches } = useQuery({
     queryKey: ["school-branches"],
@@ -63,13 +66,14 @@ export const PettyCashFundsTab = () => {
     fund_type: "main",
     approval_required_above: 0,
     notes: "",
+    company_id: "",
   });
 
   const resetForm = () => {
     setForm({
       fund_name: "", business_unit_code: "", opening_balance: 0, custodian_name: "",
       gl_account_id: "", branch_id: "", fund_limit: 0, low_balance_threshold: 0,
-      fund_type: "main", approval_required_above: 0, notes: "",
+      fund_type: "main", approval_required_above: 0, notes: "", company_id: "",
     });
     setEditingFund(null);
   };
@@ -93,6 +97,7 @@ export const PettyCashFundsTab = () => {
       fund_type: fund.fund_type || "main",
       approval_required_above: fund.approval_required_above || 0,
       notes: fund.notes || "",
+      company_id: fund.company_id || "",
     });
     setShowForm(true);
   };
@@ -108,9 +113,8 @@ export const PettyCashFundsTab = () => {
   };
 
   const handleDeactivate = async (fundId: string) => {
-    if (confirm("Are you sure you want to deactivate this fund?")) {
-      await deactivateFund.mutateAsync(fundId);
-    }
+    // Fund deactivation is disabled to protect financial data integrity
+    toast({ title: "Action Blocked", description: "Funds cannot be deleted. Edit the fund to reassign or update details.", variant: "destructive" });
   };
 
   return (
@@ -204,9 +208,6 @@ export const PettyCashFundsTab = () => {
                       <Button variant="ghost" size="icon" onClick={() => openEdit(fund)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDeactivate(fund.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -281,6 +282,21 @@ export const PettyCashFundsTab = () => {
               <Label>GL Account</Label>
               <SearchableAccountSelector value={form.gl_account_id} onValueChange={(v) => setForm({ ...form, gl_account_id: v })} placeholder="Select GL account" />
             </div>
+            {editingFund && (
+              <div className="md:col-span-2">
+                <Label>Company / Section</Label>
+                <Select value={form.company_id || "none"} onValueChange={(v) => setForm({ ...form, company_id: v === "none" ? "" : v })}>
+                  <SelectTrigger><SelectValue placeholder="Select company section" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Change</SelectItem>
+                    {allCompanies.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}{c.short_code ? ` (${c.short_code})` : ""}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">⚠ Changing the company section will move this fund and all its data to the selected section.</p>
+              </div>
+            )}
             <div className="md:col-span-2">
               <Label>Notes</Label>
               <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Fund description / notes..." rows={2} />

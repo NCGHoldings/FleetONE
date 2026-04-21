@@ -38,6 +38,123 @@ const FLEET_SECTIONS = [
 
 type SectionKey = typeof FLEET_SECTIONS[number]['key'];
 
+const MemoizedFleetRow = React.memo(({
+  row, globalIndex, isSubRow, hasFuelData, rowBg,
+  frozenCol1Width, frozenCol2Width, visibleSections, editMode,
+  renderRouteCell, renderDropdownCell, renderEditableCell, renderCrewCombobox, getPerformanceColor,
+  editingCell, openRouteComboboxFor, openCrewComboboxFor, BUS_TYPE_OPTIONS, PERMIT_TYPE_OPTIONS, REMARK_OPTIONS
+}: any) => {
+  return (
+    <TableRow
+      className={`${isSubRow ? 'bg-muted/30' : ''} hover:bg-accent/30`}
+    >
+      {/* Frozen: No */}
+      <TableCell
+        className={cn("text-sm font-mono sticky left-0 z-10 py-2 min-h-[40px]", rowBg)}
+        style={{ width: frozenCol1Width, minWidth: frozenCol1Width }}
+      >
+        {isSubRow ? '' : globalIndex}
+      </TableCell>
+      {/* Frozen: Bus */}
+      <TableCell
+        className={cn("text-sm font-semibold sticky z-10 py-2 min-h-[40px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]", rowBg)}
+        style={{ left: frozenCol1Width, width: frozenCol2Width, minWidth: frozenCol2Width }}
+      >
+        {isSubRow ? '' : row.bus_no}
+      </TableCell>
+      {/* Route & Type */}
+      {visibleSections.has('route_type') && (
+        <>
+          <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderRouteCell(row)}</TableCell>
+          <TableCell className="text-sm font-mono text-center py-2 min-h-[40px]">{row.trip_sequence}</TableCell>
+          <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderDropdownCell(row, 'bus_type', row.bus_type || '', BUS_TYPE_OPTIONS)}</TableCell>
+          <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderDropdownCell(row, 'permit_type', row.permit_type || '', PERMIT_TYPE_OPTIONS)}</TableCell>
+        </>
+      )}
+      {/* Config */}
+      {visibleSections.has('config') && (
+        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderEditableCell(row, 'trips_per_day', row.trips_per_day, 'number')}</TableCell>
+      )}
+      {/* Status */}
+      {visibleSections.has('status') && (
+        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderDropdownCell(row, 'remark', row.remark || '', REMARK_OPTIONS)}</TableCell>
+      )}
+      {/* Crew */}
+      {visibleSections.has('crew') && (
+        <>
+          <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderCrewCombobox(row, 'default_driver', (editMode === 'daily' ? row.driver_name : row.default_driver) || '')}</TableCell>
+          <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderCrewCombobox(row, 'default_conductor', (editMode === 'daily' ? row.conductor_name : row.default_conductor) || '')}</TableCell>
+        </>
+      )}
+      {/* Turns */}
+      {visibleSections.has('turns') && (
+        <>
+          <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderEditableCell(row, 'turn_01_time', editMode === 'daily' ? (row as any).daily_turn_01_time ?? row.turn_01_time : row.turn_01_time)}</TableCell>
+          <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderEditableCell(row, 'turn_02_time', editMode === 'daily' ? (row as any).daily_turn_02_time ?? row.turn_02_time : row.turn_02_time)}</TableCell>
+        </>
+      )}
+      {/* Meter / Fuel */}
+      {visibleSections.has('meter') && (
+        <>
+          <TableCell className="text-sm text-muted-foreground py-2 min-h-[40px]">{isSubRow ? '' : row.bus_model || '-'}</TableCell>
+          <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">
+            {renderEditableCell(row, 'odometer_start', row.start_meter || '', 'number')}
+          </TableCell>
+          <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">
+            {renderEditableCell(row, 'odometer_end', row.end_meter || '', 'number')}
+          </TableCell>
+          <TableCell className="text-sm text-right font-mono font-semibold py-2 min-h-[40px]">
+            {row.total_mileage > 0 ? row.total_mileage.toLocaleString() : '-'}
+          </TableCell>
+          <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">
+            {renderEditableCell(row, 'fuel_liters', row.fuel_liters || '', 'number')}
+          </TableCell>
+          <TableCell className="text-sm text-right font-mono py-2 min-h-[40px]">
+            {hasFuelData ? row.fuel_consumption.toFixed(2) : '-'}
+          </TableCell>
+          <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">
+            {isSubRow ? '' : renderEditableCell(row, 'standard_rate', row.standard_rate || '', 'number')}
+          </TableCell>
+          <TableCell className={`text-sm text-right font-mono font-bold py-2 min-h-[40px] ${getPerformanceColor(row.performance, hasFuelData)}`}>
+            {hasFuelData ? (row.performance >= 0 ? '+' : '') + row.performance.toFixed(2) : '-'}
+          </TableCell>
+        </>
+      )}
+      {/* Financials */}
+      {visibleSections.has('financials') && (
+        <>
+          <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">{renderEditableCell(row, 'day_target', row.day_target, 'number')}</TableCell>
+          <TableCell className="text-sm text-right font-mono text-green-700 dark:text-green-400 py-2 min-h-[40px]">
+            {row.passenger_income > 0 ? formatLKR(row.passenger_income) : '-'}
+          </TableCell>
+          <TableCell className="text-sm text-right font-mono text-green-700 dark:text-green-400 py-2 min-h-[40px]">
+            {row.luggage_income > 0 ? formatLKR(row.luggage_income) : '-'}
+          </TableCell>
+          <TableCell className="text-sm text-right font-mono text-destructive py-2 min-h-[40px]">
+            {row.total_expenses > 0 ? formatLKR(row.total_expenses) : '-'}
+          </TableCell>
+          <TableCell className={`text-sm text-right font-mono font-bold py-2 min-h-[40px] ${row.net_income >= 0 ? 'text-green-700 dark:text-green-400' : 'text-destructive'}`}>
+            {(row.passenger_income + row.luggage_income + row.total_expenses) > 0 ? formatLKR(row.net_income) : '-'}
+          </TableCell>
+        </>
+      )}
+    </TableRow>
+  );
+}, (prevProps, nextProps) => {
+  if (prevProps.row !== nextProps.row) return false;
+  if (prevProps.editMode !== nextProps.editMode) return false;
+  if (prevProps.visibleSections !== nextProps.visibleSections) return false;
+
+  const rowPrefix = `${prevProps.row.id}-${prevProps.row.trip_sequence}`;
+  const wasEditing = prevProps.editingCell?.startsWith(rowPrefix) || prevProps.openRouteComboboxFor?.startsWith(rowPrefix) || prevProps.openCrewComboboxFor?.startsWith(rowPrefix);
+  const isEditing = nextProps.editingCell?.startsWith(rowPrefix) || nextProps.openRouteComboboxFor?.startsWith(rowPrefix) || nextProps.openCrewComboboxFor?.startsWith(rowPrefix);
+
+  if (wasEditing !== isEditing) return false;
+  if (wasEditing && isEditing) return false;
+  
+  return true;
+});
+
 export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode = 'master', selectedDate, availableRoutes = [] }: Props) {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -590,101 +707,29 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                 const hasFuelData = row.fuel_liters > 0 && row.total_mileage > 0;
                 const rowBg = isSubRow ? frozenSubRowBg : frozenBodyBg;
                 return (
-                  <TableRow
+                  <MemoizedFleetRow
                     key={`${row.id}-${row.trip_sequence}`}
-                    className={`${isSubRow ? 'bg-muted/30' : ''} hover:bg-accent/30`}
-                  >
-                    {/* Frozen: No */}
-                    <TableCell
-                      className={cn("text-sm font-mono sticky left-0 z-10 py-2 min-h-[40px]", rowBg)}
-                      style={{ width: frozenCol1Width, minWidth: frozenCol1Width }}
-                    >
-                      {isSubRow ? '' : globalIndex}
-                    </TableCell>
-                    {/* Frozen: Bus */}
-                    <TableCell
-                      className={cn("text-sm font-semibold sticky z-10 py-2 min-h-[40px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]", rowBg)}
-                      style={{ left: frozenCol1Width, width: frozenCol2Width, minWidth: frozenCol2Width }}
-                    >
-                      {isSubRow ? '' : row.bus_no}
-                    </TableCell>
-                    {/* Route & Type */}
-                    {visibleSections.has('route_type') && (
-                      <>
-                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderRouteCell(row)}</TableCell>
-                        <TableCell className="text-sm font-mono text-center py-2 min-h-[40px]">{row.trip_sequence}</TableCell>
-                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderDropdownCell(row, 'bus_type', row.bus_type || '', BUS_TYPE_OPTIONS)}</TableCell>
-                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderDropdownCell(row, 'permit_type', row.permit_type || '', PERMIT_TYPE_OPTIONS)}</TableCell>
-                      </>
-                    )}
-                    {/* Config */}
-                    {visibleSections.has('config') && (
-                      <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderEditableCell(row, 'trips_per_day', row.trips_per_day, 'number')}</TableCell>
-                    )}
-                    {/* Status */}
-                    {visibleSections.has('status') && (
-                      <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderDropdownCell(row, 'remark', row.remark || '', REMARK_OPTIONS)}</TableCell>
-                    )}
-                    {/* Crew */}
-                    {visibleSections.has('crew') && (
-                      <>
-                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderCrewCombobox(row, 'default_driver', (editMode === 'daily' ? row.driver_name : row.default_driver) || '')}</TableCell>
-                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderCrewCombobox(row, 'default_conductor', (editMode === 'daily' ? row.conductor_name : row.default_conductor) || '')}</TableCell>
-                      </>
-                    )}
-                    {/* Turns */}
-                    {visibleSections.has('turns') && (
-                      <>
-                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderEditableCell(row, 'turn_01_time', editMode === 'daily' ? (row as any).daily_turn_01_time ?? row.turn_01_time : row.turn_01_time)}</TableCell>
-                        <TableCell className="text-sm py-2 min-h-[40px] p-0">{renderEditableCell(row, 'turn_02_time', editMode === 'daily' ? (row as any).daily_turn_02_time ?? row.turn_02_time : row.turn_02_time)}</TableCell>
-                      </>
-                    )}
-                    {/* Meter / Fuel */}
-                    {visibleSections.has('meter') && (
-                      <>
-                        <TableCell className="text-sm text-muted-foreground py-2 min-h-[40px]">{isSubRow ? '' : row.bus_model || '-'}</TableCell>
-                        <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">
-                          {renderEditableCell(row, 'odometer_start', row.start_meter || '', 'number')}
-                        </TableCell>
-                        <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">
-                          {renderEditableCell(row, 'odometer_end', row.end_meter || '', 'number')}
-                        </TableCell>
-                        <TableCell className="text-sm text-right font-mono font-semibold py-2 min-h-[40px]">
-                          {row.total_mileage > 0 ? row.total_mileage.toLocaleString() : '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">
-                          {renderEditableCell(row, 'fuel_liters', row.fuel_liters || '', 'number')}
-                        </TableCell>
-                        <TableCell className="text-sm text-right font-mono py-2 min-h-[40px]">
-                          {hasFuelData ? row.fuel_consumption.toFixed(2) : '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">
-                          {isSubRow ? '' : renderEditableCell(row, 'standard_rate', row.standard_rate || '', 'number')}
-                        </TableCell>
-                        <TableCell className={`text-sm text-right font-mono font-bold py-2 min-h-[40px] ${getPerformanceColor(row.performance, hasFuelData)}`}>
-                          {hasFuelData ? (row.performance >= 0 ? '+' : '') + row.performance.toFixed(2) : '-'}
-                        </TableCell>
-                      </>
-                    )}
-                    {/* Financials */}
-                    {visibleSections.has('financials') && (
-                      <>
-                        <TableCell className="text-sm text-right font-mono py-2 min-h-[40px] p-0">{renderEditableCell(row, 'day_target', row.day_target, 'number')}</TableCell>
-                        <TableCell className="text-sm text-right font-mono text-green-700 dark:text-green-400 py-2 min-h-[40px]">
-                          {row.passenger_income > 0 ? formatLKR(row.passenger_income) : '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-right font-mono text-green-700 dark:text-green-400 py-2 min-h-[40px]">
-                          {row.luggage_income > 0 ? formatLKR(row.luggage_income) : '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-right font-mono text-destructive py-2 min-h-[40px]">
-                          {row.total_expenses > 0 ? formatLKR(row.total_expenses) : '-'}
-                        </TableCell>
-                        <TableCell className={`text-sm text-right font-mono font-bold py-2 min-h-[40px] ${row.net_income >= 0 ? 'text-green-700 dark:text-green-400' : 'text-destructive'}`}>
-                          {(row.passenger_income + row.luggage_income + row.total_expenses) > 0 ? formatLKR(row.net_income) : '-'}
-                        </TableCell>
-                      </>
-                    )}
-                  </TableRow>
+                    row={row}
+                    globalIndex={globalIndex}
+                    isSubRow={isSubRow}
+                    hasFuelData={hasFuelData}
+                    rowBg={rowBg}
+                    frozenCol1Width={frozenCol1Width}
+                    frozenCol2Width={frozenCol2Width}
+                    visibleSections={visibleSections}
+                    editMode={editMode}
+                    renderRouteCell={renderRouteCell}
+                    renderDropdownCell={renderDropdownCell}
+                    renderEditableCell={renderEditableCell}
+                    renderCrewCombobox={renderCrewCombobox}
+                    getPerformanceColor={getPerformanceColor}
+                    editingCell={editingCell}
+                    openRouteComboboxFor={openRouteComboboxFor}
+                    openCrewComboboxFor={openCrewComboboxFor}
+                    BUS_TYPE_OPTIONS={BUS_TYPE_OPTIONS}
+                    PERMIT_TYPE_OPTIONS={PERMIT_TYPE_OPTIONS}
+                    REMARK_OPTIONS={REMARK_OPTIONS}
+                  />
                 );
               })}
             </React.Fragment>

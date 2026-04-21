@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowUpCircle, Plus, Loader2 } from "lucide-react";
+import { ArrowUpCircle, Plus, Loader2, Info } from "lucide-react";
 import { format } from "date-fns";
 import { 
   usePettyCashFunds, useAllPettyCashTransactions, useCreatePettyCashTransaction 
@@ -20,6 +20,7 @@ export const PettyCashReplenishmentsTab = () => {
 
   const { data: funds } = usePettyCashFunds();
   const { data: transactions, isLoading } = useAllPettyCashTransactions({ transactionType: "replenishment" });
+  const { data: allTransactions } = useAllPettyCashTransactions();
   const { data: bankAccounts } = useBankAccounts();
   const createTransaction = useCreatePettyCashTransaction();
 
@@ -32,6 +33,72 @@ export const PettyCashReplenishmentsTab = () => {
   });
 
   const selectedFund = funds?.find((f) => f.id === form.petty_cash_fund_id);
+
+  // Calculate spent since last replenishment (imprest system)
+  const spentSinceLastReplenishment = useMemo(() => {
+    if (!selectedFund || !allTransactions) return 0;
+    
+    // Find the last replenishment date for this fund
+    const fundReplenishments = (transactions || [])
+      .filter((t) => t.petty_cash_fund_id === selectedFund.id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    
+    const lastReplenishmentDate = fundReplenishments.length > 0
+      ? new Date(fundReplenishments[0].created_at)
+      : new Date(0); // If no prior replenishment, count all disbursements
+
+    // Sum disbursements since last replenishment
+    const disbursedAmount = (allTransactions || [])
+      .filter((t) => 
+        t.petty_cash_fund_id === selectedFund.id &&
+        t.transaction_type === "disbursement" &&
+        new Date(t.created_at) > lastReplenishmentDate
+      )
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    return disbursedAmount;
+  }, [selectedFund, allTransactions, transactions]);
+
+  // Auto-suggest replenishment amount
+  const suggestedAmount = useMemo(() => {
+    if (!selectedFund) return 0;
+    // Imprest system: replenish what was spent
+    if (spentSinceLastReplenishment > 0) {
+      return spentSinceLastReplenishment;
+    }
+    // If fund has a limit and balance is below, suggest top-up to limit
+    if (selectedFund.fund_limit > 0) {
+      return Math.max(0, selectedFund.fund_limit - selectedFund.current_balance);
+    }
+    return 0;
+  }, [selectedFund, spentSinceLastReplenishment]);
+
+  // When fund is selected, auto-fill the suggested amount
+  const handleFundChange = (fundId: string) => {
+    setForm((prev) => ({ ...prev, petty_cash_fund_id: fundId }));
+    // We'll update amount after suggestedAmount recomputes via effect
+    setTimeout(() => {
+      const fund = funds?.find((f) => f.id === fundId);
+      if (fund) {
+        // Calculate immediately for this fund
+        const fundReplenishments = (transactions || [])
+          .filter((t) => t.petty_cash_fund_id === fundId)
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        const lastDate = fundReplenishments.length > 0 ? new Date(fundReplenishments[0].created_at) : new Date(0);
+        const spent = (allTransactions || [])
+          .filter((t) => t.petty_cash_fund_id === fundId && t.transaction_type === "disbursement" && new Date(t.created_at) > lastDate)
+          .reduce((sum, t) => sum + (t.amount || 0), 0);
+        
+        const suggested = spent > 0 ? spent : (fund.fund_limit > 0 ? Math.max(0, fund.fund_limit - fund.current_balance) : 0);
+        if (suggested > 0) {
+          setForm((prev) => ({ ...prev, amount: suggested }));
+        }
+      }
+    }, 0);
+  };
+
+  // Balance after replenishment preview
+  const balanceAfter = selectedFund ? selectedFund.current_balance + form.amount : 0;
 
   const resetForm = () => {
     setForm({ petty_cash_fund_id: "", amount: 0, description: "", reference_number: "", payment_method: "cash" });
@@ -55,6 +122,13 @@ export const PettyCashReplenishmentsTab = () => {
     resetForm();
   };
 
+  // Extract AP Ref from description (format: "... [AP: PC-REPL-xxxx]")
+  const extractAPRef = (description: string | null) => {
+    if (!description) return null;
+    const match = description.match(/\[AP:\s*(PC-REPL-\d+)\]/);
+    return match ? match[1] : null;
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -74,32 +148,43 @@ export const PettyCashReplenishmentsTab = () => {
               <TableHead className="text-right">Balance After</TableHead>
               <TableHead>Method</TableHead>
               <TableHead>Reference</TableHead>
+              <TableHead>AP Ref</TableHead>
               <TableHead>Description</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell>
+                <TableCell colSpan={8} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell>
               </TableRow>
             ) : transactions?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No replenishments found</TableCell>
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No replenishments found</TableCell>
               </TableRow>
             ) : (
-              transactions?.map((txn) => (
-                <TableRow key={txn.id}>
-                  <TableCell>{format(new Date(txn.created_at), "MMM dd, yyyy")}</TableCell>
-                  <TableCell>{txn.fund?.fund_name || "-"}</TableCell>
-                  <TableCell className="text-right font-semibold text-green-600">
-                    +<CurrencyDisplay amount={txn.amount} />
-                  </TableCell>
-                  <TableCell className="text-right"><CurrencyDisplay amount={txn.balance_after} /></TableCell>
-                  <TableCell><Badge variant="outline">{txn.payment_method || "cash"}</Badge></TableCell>
-                  <TableCell className="text-sm">{txn.reference_number || "-"}</TableCell>
-                  <TableCell className="text-sm">{txn.description || "-"}</TableCell>
-                </TableRow>
-              ))
+              transactions?.map((txn) => {
+                const apRef = extractAPRef(txn.description);
+                return (
+                  <TableRow key={txn.id}>
+                    <TableCell>{format(new Date(txn.created_at), "MMM dd, yyyy")}</TableCell>
+                    <TableCell>{txn.fund?.fund_name || "-"}</TableCell>
+                    <TableCell className="text-right font-semibold text-green-600">
+                      +<CurrencyDisplay amount={txn.amount} />
+                    </TableCell>
+                    <TableCell className="text-right"><CurrencyDisplay amount={txn.balance_after} /></TableCell>
+                    <TableCell><Badge variant="outline">{txn.payment_method || "cash"}</Badge></TableCell>
+                    <TableCell className="text-sm">{txn.reference_number || "-"}</TableCell>
+                    <TableCell className="text-sm">
+                      {apRef ? (
+                        <Badge variant="secondary" className="text-xs font-mono">{apRef}</Badge>
+                      ) : "-"}
+                    </TableCell>
+                    <TableCell className="text-sm max-w-[200px] truncate">
+                      {txn.description?.replace(/\s*\[AP:.*?\]/, "") || "-"}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -117,7 +202,7 @@ export const PettyCashReplenishmentsTab = () => {
           <div className="space-y-4">
             <div>
               <Label>Select Fund *</Label>
-              <Select value={form.petty_cash_fund_id} onValueChange={(v) => setForm({ ...form, petty_cash_fund_id: v })}>
+              <Select value={form.petty_cash_fund_id} onValueChange={handleFundChange}>
                 <SelectTrigger><SelectValue placeholder="Select fund" /></SelectTrigger>
                 <SelectContent>
                   {funds?.map((f) => (
@@ -128,10 +213,18 @@ export const PettyCashReplenishmentsTab = () => {
                 </SelectContent>
               </Select>
               {selectedFund && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Current Balance: Rs {selectedFund.current_balance.toLocaleString()}
-                  {selectedFund.fund_limit > 0 && ` | Limit: Rs ${selectedFund.fund_limit.toLocaleString()}`}
-                </p>
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    Current Balance: Rs {selectedFund.current_balance.toLocaleString()}
+                    {selectedFund.fund_limit > 0 && ` | Limit: Rs ${selectedFund.fund_limit.toLocaleString()}`}
+                  </p>
+                  {spentSinceLastReplenishment > 0 && (
+                    <p className="text-xs text-amber-600 flex items-center gap-1">
+                      <Info className="h-3 w-3" />
+                      Spent since last replenishment: Rs {spentSinceLastReplenishment.toLocaleString()}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
             <div>
@@ -142,7 +235,33 @@ export const PettyCashReplenishmentsTab = () => {
                 onChange={(e) => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })}
                 className="text-lg font-semibold"
               />
-              {selectedFund && selectedFund.fund_limit > 0 && (form.amount + selectedFund.current_balance) > selectedFund.fund_limit && (
+              {suggestedAmount > 0 && form.amount !== suggestedAmount && (
+                <button 
+                  type="button"
+                  className="text-xs text-blue-600 hover:underline mt-1"
+                  onClick={() => setForm({ ...form, amount: suggestedAmount })}
+                >
+                  💡 Use suggested amount: Rs {suggestedAmount.toLocaleString()}
+                </button>
+              )}
+              {selectedFund && form.amount > 0 && (
+                <div className="mt-2 p-2 rounded bg-muted/50 border text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span>Current Balance:</span>
+                    <span>Rs {selectedFund.current_balance.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-green-600 font-medium">
+                    <span>+ Replenishment:</span>
+                    <span>Rs {form.amount.toLocaleString()}</span>
+                  </div>
+                  <hr className="my-1" />
+                  <div className="flex justify-between font-bold">
+                    <span>Balance After:</span>
+                    <span>Rs {balanceAfter.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+              {selectedFund && selectedFund.fund_limit > 0 && balanceAfter > selectedFund.fund_limit && (
                 <p className="text-xs text-amber-600 mt-1">⚠ This will exceed the fund limit of Rs {selectedFund.fund_limit.toLocaleString()}</p>
               )}
             </div>

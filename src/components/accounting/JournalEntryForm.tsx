@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -39,6 +39,7 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
   const createEntry = useCreateJournalEntry();
   const generateNumber = useGenerateNumber();
   const [isGenerating, setIsGenerating] = useState(true);
+  const submitLock = useRef(false);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -75,9 +76,9 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
   };
 
   const onSubmit = async (data: FormValues) => {
-    if (!isBalanced) {
-      return;
-    }
+    if (!isBalanced) return;
+    if (submitLock.current) return;
+    submitLock.current = true;
 
     const validLines = data.lines
       .filter(line => line.account_id && (line.debit > 0 || line.credit > 0))
@@ -90,17 +91,21 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
 
     const finalEntryNumber = data.entry_number || await generateNumber("journal");
 
-    await createEntry.mutateAsync({
-      entry_number: finalEntryNumber,
-      entry_date: data.entry_date,
-      description: data.description,
-      reference: data.reference,
-      total_debit: totalDebit,
-      total_credit: totalCredit,
-      lines: validLines,
-    });
+    try {
+      await createEntry.mutateAsync({
+        entry_number: finalEntryNumber,
+        entry_date: data.entry_date,
+        description: data.description,
+        reference: data.reference,
+        total_debit: totalDebit,
+        total_credit: totalCredit,
+        lines: validLines,
+      });
 
-    onSuccess?.();
+      onSuccess?.();
+    } finally {
+      submitLock.current = false;
+    }
   };
 
   return (

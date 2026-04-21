@@ -66,6 +66,7 @@ export const PurchaseOrderForm = ({ open, onOpenChange }: PurchaseOrderFormProps
   const createPO = useCreatePurchaseOrder();
   const generateNumber = useGenerateNumber();
   const numberGenerated = useRef(false);
+  const submitLock = useRef(false);
 
   const [lines, setLines] = useState<POLine[]>([
     { id: "1", item_id: "", description: "", quantity: 1, unit_price: 0, line_total: 0 },
@@ -160,14 +161,20 @@ export const PurchaseOrderForm = ({ open, onOpenChange }: PurchaseOrderFormProps
   const subtotal = lines.reduce((sum, line) => sum + line.line_total, 0);
 
   const onSubmit = async (data: POFormData) => {
-    await createPO.mutateAsync({
-      ...data,
-      total_amount: subtotal,
-      lines: lines.filter(l => l.item_id),
-    });
-    onOpenChange(false);
-    form.reset();
-    setLines([{ id: "1", item_id: "", description: "", quantity: 1, unit_price: 0, line_total: 0 }]);
+    if (submitLock.current) return;
+    submitLock.current = true;
+    try {
+      await createPO.mutateAsync({
+        ...data,
+        total_amount: subtotal,
+        lines: lines.filter(l => l.item_id),
+      });
+      onOpenChange(false);
+      form.reset();
+      setLines([{ id: "1", item_id: "", description: "", quantity: 1, unit_price: 0, line_total: 0 }]);
+    } finally {
+      submitLock.current = false;
+    }
   };
 
   const currencySymbol = currency === "USD" ? "$" : "LKR";

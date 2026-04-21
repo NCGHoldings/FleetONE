@@ -203,18 +203,21 @@ export const useCreatePettyCashFund = () => {
 
   return useMutation({
     mutationFn: async (data: Partial<PettyCashFund>) => {
+      // Helper: convert empty strings to null for UUID columns
+      const uuidOrNull = (val: any): string | null => (val && typeof val === 'string' && val.trim().length > 0) ? val.trim() : null;
+
       const { data: result, error } = await supabase
         .from("petty_cash_funds")
         .insert({
           fund_name: data.fund_name || "New Fund",
           business_unit_code: data.business_unit_code || "SBO",
           company_id: selectedCompanyId,
-          custodian_id: data.custodian_id,
+          custodian_id: uuidOrNull(data.custodian_id),
           custodian_name: data.custodian_name || null,
           opening_balance: data.opening_balance || 0,
           current_balance: data.opening_balance || 0,
-          gl_account_id: data.gl_account_id,
-          branch_id: data.branch_id || null,
+          gl_account_id: uuidOrNull(data.gl_account_id),
+          branch_id: uuidOrNull(data.branch_id as string),
           fund_limit: data.fund_limit || 0,
           low_balance_threshold: data.low_balance_threshold || 0,
           fund_type: data.fund_type || "main",
@@ -242,31 +245,52 @@ export const useUpdatePettyCashFund = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...data }: Partial<PettyCashFund> & { id: string }) => {
+      // Helper: convert empty strings to null for UUID columns (PostgreSQL rejects '' for uuid type)
+      const uuidOrNull = (val: any): string | null => (val && typeof val === 'string' && val.trim().length > 0) ? val.trim() : null;
+
+      const updatePayload: any = {
+        fund_name: data.fund_name,
+        business_unit_code: data.business_unit_code || null,
+        custodian_id: uuidOrNull(data.custodian_id),
+        custodian_name: data.custodian_name || null,
+        gl_account_id: uuidOrNull(data.gl_account_id),
+        branch_id: uuidOrNull(data.branch_id as string),
+        fund_limit: data.fund_limit,
+        low_balance_threshold: data.low_balance_threshold,
+        fund_type: data.fund_type,
+        approval_required_above: data.approval_required_above,
+        notes: data.notes || null,
+      };
+
+      // Allow company_id reassignment (for moving fund between sections)
+      if (uuidOrNull(data.company_id)) {
+        updatePayload.company_id = uuidOrNull(data.company_id);
+      }
+
       const { data: result, error } = await supabase
         .from("petty_cash_funds")
-        .update({
-          fund_name: data.fund_name,
-          business_unit_code: data.business_unit_code,
-          custodian_id: data.custodian_id,
-          custodian_name: data.custodian_name || null,
-          gl_account_id: data.gl_account_id,
-          branch_id: data.branch_id as string | undefined,
-          fund_limit: data.fund_limit,
-          low_balance_threshold: data.low_balance_threshold,
-          fund_type: data.fund_type,
-          approval_required_above: data.approval_required_above,
-          notes: data.notes,
-        })
+        .update(updatePayload)
         .eq("id", id)
         .select()
         .single();
 
       if (error) throw error;
+
+      // If company_id is being reassigned, forcefully update all historical transactions 
+      // so they move with the fund to the new company dashboard.
+      if (updatePayload.company_id) {
+        await supabase
+          .from("petty_cash_transactions")
+          .update({ company_id: updatePayload.company_id })
+          .eq("petty_cash_fund_id", id);
+      }
+
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });
-      toast({ title: "Fund Updated", description: "The petty cash fund has been updated." });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-transactions"] });
+      toast({ title: "Fund Updated", description: "The petty cash fund and its linked transactions have been updated." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -298,37 +322,45 @@ export const useDeactivatePettyCashFund = () => {
 
 export const useCreatePettyCashTransaction = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
 
   return useMutation({
     mutationFn: async (data: Partial<PettyCashTransaction>) => {
       const amount = data.amount || 0;
       const txnType = data.transaction_type || "disbursement";
 
-      // 1. Get the fund's GL account and current balance FIRST
-      const { data: fund } = await supabase
+      // 1. DEFENSIVE RE-READ: Always fetch the fund's LIVE current_balance right before computing
+      const { data: fund, error: fundError } = await supabase
         .from("petty_cash_funds")
-        .select("gl_account_id, current_balance, fund_name")
+        .select("gl_account_id, current_balance, fund_name, business_unit_code, company_id, fund_limit")
         .eq("id", data.petty_cash_fund_id!)
         .single();
 
-      let newBalance = 0;
-      if (fund) {
-        newBalance = txnType === "disbursement"
-          ? (fund.current_balance || 0) - amount
-          : (fund.current_balance || 0) + amount;
+      if (fundError || !fund) {
+        throw new Error(`Failed to read fund balance: ${fundError?.message || "Fund not found"}`);
       }
 
-      // 2. Insert the transaction with the accurate balance_after
+      // 2. Calculate balance_after from LIVE balance (not cached/stale value)
+      const liveBalance = fund.current_balance || 0;
+      const newBalance = txnType === "disbursement"
+        ? liveBalance - amount
+        : liveBalance + amount;
+
+      // Guard: prevent negative balance on disbursement
+      if (txnType === "disbursement" && newBalance < 0) {
+        throw new Error(`Insufficient fund balance. Available: LKR ${liveBalance.toLocaleString()}, Requested: LKR ${amount.toLocaleString()}`);
+      }
+
+      // 3. Insert the transaction with the accurate balance_after
       const { data: result, error } = await supabase
         .from("petty_cash_transactions")
         .insert({
           petty_cash_fund_id: data.petty_cash_fund_id!,
           transaction_type: txnType,
-          expense_request_id: data.expense_request_id,
+          expense_request_id: data.expense_request_id || null,
           amount,
           balance_after: newBalance,
-          receipt_number: data.receipt_number,
+          receipt_number: data.receipt_number || null,
           description: data.description,
           payee_name: data.payee_name || null,
           expense_category: data.expense_category || null,
@@ -345,20 +377,57 @@ export const useCreatePettyCashTransaction = () => {
 
       if (error) throw error;
 
-      // 3. Update the fund's main balance table
-      if (fund) {
-        await supabase
-          .from("petty_cash_funds")
-          .update({ current_balance: newBalance, updated_at: new Date().toISOString() })
-          .eq("id", data.petty_cash_fund_id!);
+      // 4. Update the fund's main balance + last_replenished_at for replenishments
+      const fundUpdate: any = { current_balance: newBalance, updated_at: new Date().toISOString() };
+      if (txnType === "replenishment") {
+        fundUpdate.last_replenished_at = new Date().toISOString();
+      }
+      await supabase
+        .from("petty_cash_funds")
+        .update(fundUpdate)
+        .eq("id", data.petty_cash_fund_id!);
+
+      // 5. AUTO-CREATE AP PAYMENT for replenishments (audit-grade visibility)
+      if (txnType === "replenishment" && amount > 0) {
+        try {
+          const effectiveCompanyId = getEffectiveCompanyId() || selectedCompanyId;
+          const businessUnitCode = getBusinessUnitCode() || fund.business_unit_code || null;
+          const paymentNumber = `PC-REPL-${Date.now().toString().slice(-8)}`;
+
+          const { data: apPayment } = await supabase
+            .from("ap_payments")
+            .insert([{
+              payment_number: paymentNumber,
+              payment_date: new Date().toISOString().split("T")[0],
+              amount: amount,
+              payment_method: data.payment_method || "cash",
+              reference: data.reference_number || null,
+              notes: `Petty Cash Replenishment: ${fund.fund_name} | Ref: ${data.reference_number || "N/A"} | Balance After: LKR ${newBalance.toLocaleString()}`,
+              status: "posted",
+              company_id: effectiveCompanyId,
+              business_unit_code: businessUnitCode,
+              is_advance: false,
+              is_direct_payment: true,
+            } as any])
+            .select()
+            .single();
+
+          if (apPayment) {
+            // Link AP payment reference back to petty cash transaction description
+            await supabase
+              .from("petty_cash_transactions")
+              .update({ description: `${data.description || "Replenishment"} [AP: ${paymentNumber}]` })
+              .eq("id", result.id);
+          }
+        } catch (apErr) {
+          console.error("AP Payment auto-creation failed (replenishment still saved):", apErr);
+        }
       }
 
-      // 4. Auto-create GL Journal Entry if fund has a GL account linked
-      if (fund?.gl_account_id && amount > 0) {
+      // 6. Auto-create GL Journal Entry if fund has a GL account linked
+      if (fund.gl_account_id && amount > 0) {
         try {
           const fundGLAccountId = fund.gl_account_id;
-          // For disbursement: the expense/debit account is either the transaction's gl_account_id or the fund GL
-          // For replenishment: we need a bank/cash account to credit
           let debitAccountId: string;
           let creditAccountId: string;
           let jeDescription: string;
@@ -503,6 +572,7 @@ export const useCreatePettyCashTransaction = () => {
       queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
       toast({ title: "Transaction Recorded", description: "The petty cash transaction has been recorded and posted to GL." });
     },
     onError: (error: Error) => {

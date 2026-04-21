@@ -628,9 +628,10 @@ export const useBankAccounts = () => {
   return useQuery({
     queryKey: ["bank-accounts", selectedCompanyId],
     queryFn: async () => {
+      // Use explicit column selection to avoid PostgREST errors from non-existent columns (e.g. 'status')
       let query = supabase
         .from("bank_accounts")
-        .select("*")
+        .select("id, account_name, bank_name, account_number, account_type, currency, current_balance, company_id, branch_id, gl_account_id, is_active, opening_balance, notes, created_at, updated_at")
         .order("account_name");
 
       if (selectedCompanyId) {
@@ -638,7 +639,16 @@ export const useBankAccounts = () => {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        // Fallback: if explicit columns fail (schema mismatch), try minimal safe columns
+        console.warn("Bank accounts query failed, retrying with minimal columns:", error.message);
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("bank_accounts")
+          .select("id, account_name, bank_name, account_number, company_id, current_balance, is_active, created_at, updated_at")
+          .order("account_name");
+        if (fallbackError) throw fallbackError;
+        return fallbackData;
+      }
       return data;
     },
     enabled: !!selectedCompanyId,

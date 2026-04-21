@@ -45,6 +45,7 @@ export const GoodsReceiptForm = ({ open, onOpenChange, purchaseOrderId }: GoodsR
   const createGRN = useCreateGoodsReceipt();
   const generateNumber = useGenerateNumber();
   const numberGenerated = useRef(false);
+  const submitLock = useRef(false);
 
   const [lines, setLines] = useState<GRNLine[]>([]);
 
@@ -100,19 +101,25 @@ export const GoodsReceiptForm = ({ open, onOpenChange, purchaseOrderId }: GoodsR
   const totalValue = lines.reduce((sum, line) => sum + line.line_total, 0);
 
   const onSubmit = async (data: GRNFormData) => {
-    await createGRN.mutateAsync({
-      ...data,
-      total_value: totalValue,
-      lines: lines.map(l => ({
-        item_name: l.item_name,
-        quantity: l.received_qty,
-        unit_price: l.unit_price,
-        line_total: l.line_total,
-      })),
-    });
-    onOpenChange(false);
-    form.reset();
-    setLines([]);
+    if (submitLock.current) return;
+    submitLock.current = true;
+    try {
+      await createGRN.mutateAsync({
+        ...data,
+        total_value: totalValue,
+        lines: lines.map(l => ({
+          item_name: l.item_name,
+          quantity: l.received_qty,
+          unit_price: l.unit_price,
+          line_total: l.line_total,
+        })),
+      });
+      onOpenChange(false);
+      form.reset();
+      setLines([]);
+    } finally {
+      submitLock.current = false;
+    }
   };
 
   const openPOs = purchaseOrders?.filter(po => 

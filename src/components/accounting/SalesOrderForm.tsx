@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -37,6 +37,7 @@ export const SalesOrderForm = ({ onSuccess }: SalesOrderFormProps) => {
   const { data: items } = useItems();
   const createOrder = useCreateSalesOrder();
   const generateNumber = useGenerateNumber();
+  const submitLock = useRef(false);
   
   const [lines, setLines] = useState<{
     item_id: string;
@@ -101,25 +102,28 @@ export const SalesOrderForm = ({ onSuccess }: SalesOrderFormProps) => {
   const total = subtotal + taxAmount;
   
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
-    if (lines.length === 0) {
-      return;
+    if (lines.length === 0) return;
+    if (submitLock.current) return;
+    submitLock.current = true;
+    
+    try {
+      const validatedData = {
+        so_number: data.so_number,
+        customer_id: data.customer_id,
+        order_date: data.order_date,
+        delivery_date: data.delivery_date,
+        payment_terms_id: data.payment_terms_id,
+        shipping_address: data.shipping_address,
+        billing_address: data.billing_address,
+        notes: data.notes,
+        lines,
+      };
+      
+      await createOrder.mutateAsync(validatedData);
+      onSuccess?.();
+    } finally {
+      submitLock.current = false;
     }
-    
-    const validatedData = {
-      so_number: data.so_number,
-      customer_id: data.customer_id,
-      order_date: data.order_date,
-      delivery_date: data.delivery_date,
-      payment_terms_id: data.payment_terms_id,
-      shipping_address: data.shipping_address,
-      billing_address: data.billing_address,
-      notes: data.notes,
-      lines,
-    };
-    
-    await createOrder.mutateAsync(validatedData);
-    
-    onSuccess?.();
   };
   
   return (
