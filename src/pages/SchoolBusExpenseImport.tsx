@@ -53,9 +53,10 @@ export default function SchoolBusExpenseImport() {
   const [buses, setBuses] = useState<{id: string, bus_no: string}[]>([]);
   const [vendors, setVendors] = useState<{id: string, vendor_name: string}[]>([]);
   const [pettyCashFunds, setPettyCashFunds] = useState<{id: string, fund_name: string}[]>([]);
+  const [directAccounts, setDirectAccounts] = useState<{id: string, account_code: string, account_name: string}[]>([]);
   
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<'ap' | 'iou' | 'petty_cash'>('ap');
+  const [paymentMethod, setPaymentMethod] = useState<'ap' | 'iou' | 'petty_cash' | 'direct'>('ap');
   
   // AP specific inputs
   const [vendorId, setVendorId] = useState<string>("");
@@ -65,6 +66,9 @@ export default function SchoolBusExpenseImport() {
   
   // Petty Cash inputs
   const [pettyCashFundId, setPettyCashFundId] = useState<string>("");
+  
+  // Direct Payment inputs
+  const [directPaymentAccountId, setDirectPaymentAccountId] = useState<string>("");
   
   const [parsedData, setParsedData] = useState<MappedExpense[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
