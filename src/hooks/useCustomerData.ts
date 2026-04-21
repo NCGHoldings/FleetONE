@@ -11,7 +11,7 @@ export interface CustomerData {
   email?: string;
   address?: string;
   city?: string;
-  source: 'yutong' | 'sinotruck' | 'special_hire' | 'fleet_owner' | 'accounting';
+  source: 'yutong' | 'sinotruck' | 'special_hire' | 'fleet_owner' | 'accounting' | 'school_bus' | 'light_vehicle';
   customer_type: 'individual' | 'corporate';
   created_at: string;
   
@@ -94,13 +94,16 @@ export function useCustomerData() {
       setError(null);
 
       // Fetch data from all sources
-      const [yutongCustomers, yutongQuotations, sinotruckQuotations, specialHireQuotations, buses] = await Promise.all([
+      // Note: cast sinotruck_quotations to any[] — the schema uses contact_number/customer_name only,
+      // but legacy records may carry customer_phone/customer_email/company_name fields.
+      const [yutongCustomers, yutongQuotations, sinotruckQuotationsRaw, specialHireQuotations, buses] = await Promise.all([
         supabase.from('yutong_customers').select('*'),
         supabase.from('yutong_quotations').select('*'),
         supabase.from('sinotruck_quotations').select('*'),
         supabase.from('special_hire_quotations').select('*'),
         supabase.from('buses').select('*')
       ]);
+      const sinotruckQuotations = { ...sinotruckQuotationsRaw, data: (sinotruckQuotationsRaw.data || []) as any[] };
 
       if (yutongCustomers.error) throw yutongCustomers.error;
       if (yutongQuotations.error) throw yutongQuotations.error;
@@ -145,11 +148,13 @@ export function useCustomerData() {
             analytics: {
               total_lifetime_value: 0,
               yutong_revenue: 0,
+              sinotruck_revenue: 0,
               special_hire_revenue: 0,
               maintenance_revenue: 0,
               outstanding_balance: 0,
               total_transactions: 0,
               yutong_purchases: 0,
+              sinotruck_purchases: 0,
               special_hire_bookings: 0,
               owned_buses: 0,
               avg_booking_value: 0,
@@ -268,11 +273,13 @@ export function useCustomerData() {
             analytics: {
               total_lifetime_value: 0,
               yutong_revenue: 0,
+              sinotruck_revenue: 0,
               special_hire_revenue: 0,
               maintenance_revenue: 0,
               outstanding_balance: 0,
               total_transactions: 0,
               yutong_purchases: 0,
+              sinotruck_purchases: 0,
               special_hire_bookings: 0,
               owned_buses: 0,
               avg_booking_value: 0,
@@ -772,6 +779,7 @@ export function useCustomerProfile(selectedCustomer: { id: string; name: string;
             ].reduce((sum, val) => sum + val, 0),
             
             yutong_revenue: yutongQuotations.filter(q => q.status && ['converted_to_order', 'confirmed', 'order_created', 'completed'].includes(q.status.toLowerCase())).reduce((sum, q) => sum + (q.total_price || 0), 0),
+            sinotruck_revenue: 0,
             special_hire_revenue: specialHireQuotations.filter(q => q.trip_status && ['completed', 'confirmed'].includes(q.trip_status.toLowerCase())).reduce((sum, q) => sum + (q.gross_revenue || 0), 0),
             maintenance_revenue: 0, // Would need maintenance records to calculate this
             
@@ -780,6 +788,7 @@ export function useCustomerProfile(selectedCustomer: { id: string; name: string;
             // Transaction counts
             total_transactions: yutongQuotations.length + specialHireQuotations.length,
             yutong_purchases: yutongQuotations.filter(q => q.status && ['converted_to_order', 'confirmed', 'order_created', 'completed'].includes(q.status.toLowerCase())).length,
+            sinotruck_purchases: 0,
             special_hire_bookings: specialHireQuotations.length,
             owned_buses: ownedBuses.length,
             

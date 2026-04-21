@@ -509,9 +509,9 @@ export const CustomerForm = ({ customer, onSuccess }: CustomerFormProps) => {
               <div className="text-sm text-muted-foreground">
                 Code: {duplicateWarning.existingCustomer.customer_code}
               </div>
-              {duplicateWarning.existingCustomer.contact_phone && (
+              {duplicateWarning.existingCustomer.phone && (
                 <div className="text-sm text-muted-foreground">
-                  Phone: {duplicateWarning.existingCustomer.contact_phone}
+                  Phone: {duplicateWarning.existingCustomer.phone}
                 </div>
               )}
               {duplicateWarning.existingCustomer.source_module && (
