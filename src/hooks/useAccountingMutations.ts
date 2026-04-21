@@ -1057,6 +1057,8 @@ export const useCreateAPPayment = () => {
     mutationFn: async (payment: {
       payment_number: string;
       vendor_id: string;
+      payee_type?: "vendor" | "customer";
+      payee_id?: string;
       payment_date: string;
       amount: number;
       payment_method: string;
@@ -1097,19 +1099,35 @@ export const useCreateAPPayment = () => {
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = getBusinessUnitCode();
 
-      // Get vendor name for GL posting description
-      const { data: vendorData } = await supabase
-        .from("vendors")
-        .select("vendor_name")
-        .eq("id", payment.vendor_id)
-        .single();
-      const vendorName = vendorData?.vendor_name || "";
+      // Resolve payee type/id (default to vendor for backward compatibility)
+      const payeeType: "vendor" | "customer" = payment.payee_type || "vendor";
+      const payeeId: string = payment.payee_id || payment.vendor_id;
+
+      // Get payee name for GL posting description (vendor or customer)
+      let vendorName = "";
+      if (payeeType === "customer") {
+        const { data: customerData } = await supabase
+          .from("customers")
+          .select("customer_name")
+          .eq("id", payeeId)
+          .maybeSingle();
+        vendorName = (customerData as any)?.customer_name || "";
+      } else {
+        const { data: vendorData } = await supabase
+          .from("vendors")
+          .select("vendor_name")
+          .eq("id", payeeId)
+          .maybeSingle();
+        vendorName = vendorData?.vendor_name || "";
+      }
       
       const { data, error } = await supabase
         .from("ap_payments")
         .insert([{
           payment_number: payment.payment_number,
-          vendor_id: payment.vendor_id,
+          vendor_id: payeeType === "vendor" ? payeeId : null,
+          payee_customer_id: payeeType === "customer" ? payeeId : null,
+          payee_type: payeeType,
           payment_date: payment.payment_date,
           amount: payment.amount,
           payment_method: payment.payment_method,
