@@ -194,6 +194,22 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
               .single();
             if (account) setResolvedGL({ accountCode: account.account_code, accountName: account.account_name });
           }
+        } else if (selectedPartyType === "employee") {
+          // Resolve Staff Advance / IOU receivable from gl_settings
+          const { data: glSettings } = await (supabase as any)
+            .from("gl_settings")
+            .select("staff_advance_account_id")
+            .eq("company_id", effectiveCompanyId)
+            .maybeSingle();
+          const accountId = glSettings?.staff_advance_account_id;
+          if (accountId) {
+            const { data: account } = await supabase
+              .from("chart_of_accounts")
+              .select("account_code, account_name")
+              .eq("id", accountId)
+              .single();
+            if (account) setResolvedGL({ accountCode: account.account_code, accountName: account.account_name });
+          }
         } else {
           const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
           const resolved = await resolveVendorAPAccounts(selectedCustomerId, effectiveCompanyId);
