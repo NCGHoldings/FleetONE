@@ -225,6 +225,7 @@ export default function SchoolBusExpenseImport() {
         invoiceDate: paymentMethod === 'ap' ? invoiceDate : undefined,
         dueDate: paymentMethod === 'ap' ? dueDate : undefined,
         pettyCashFundId: paymentMethod === 'petty_cash' ? pettyCashFundId : undefined,
+        directPaymentAccountId: paymentMethod === 'direct' ? directPaymentAccountId : undefined,
         expenses: parsedData.map(d => ({
           expenseDate: d.expenseDate,
           busId: d.busId,
@@ -286,6 +287,7 @@ export default function SchoolBusExpenseImport() {
                     <SelectItem value="ap">Trade Payable (AP / Credit)</SelectItem>
                     <SelectItem value="petty_cash">Petty Cash</SelectItem>
                     <SelectItem value="iou">IOU Account</SelectItem>
+                    <SelectItem value="direct">Direct Payment (Fuel Float / Bank)</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
