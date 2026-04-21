@@ -127,15 +127,52 @@ export function useSchoolBusFinanceSettings() {
   });
 }
 
-// Get settings for a specific branch, falling back to default settings if not found
+// Validate that the COA accounts referenced by a settings row belong to the
+// effective (active/consolidated) company. Returns the IDs of any accounts
+// that belong to a *different* company so callers can fail loudly instead of
+// silently posting JE lines into the wrong company's COA.
+export async function validateGLAccountsBelongToCompany(
+  settings: { trade_receivable_account_id?: string | null; sbs_collection_account_id?: string | null; advance_payments_liability_account_id?: string | null } | null | undefined,
+  effectiveCompanyId: string,
+): Promise<{ ok: boolean; mismatched: Array<{ id: string; account_code: string; company_id: string }> }> {
+  if (!settings) return { ok: false, mismatched: [] };
+  const ids = [
+    settings.trade_receivable_account_id,
+    settings.sbs_collection_account_id,
+    settings.advance_payments_liability_account_id,
+  ].filter((x): x is string => !!x);
+  if (ids.length === 0) return { ok: false, mismatched: [] };
+
+  const { data, error } = await supabase
+    .from("chart_of_accounts")
+    .select("id, account_code, company_id")
+    .in("id", ids);
+  if (error) throw error;
+
+  const mismatched = (data || []).filter((a) => a.company_id !== effectiveCompanyId);
+  return { ok: mismatched.length === 0, mismatched };
+}
+
+// Get settings for a specific branch, falling back to default settings if not found.
+// IMPORTANT: any cross-company fallback is only honoured when the COA accounts on
+// that fallback row also belong to the active (effective) company. Otherwise we
+// would happily post JE lines into another company's COA — which is exactly the
+// Katunayaka bug that left invoices invisible and balances unupdated.
 export function useBranchFinanceSettings(branchId: string | null) {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["school-bus-finance-settings", selectedCompanyId, branchId],
+    queryKey: ["school-bus-finance-settings", selectedCompanyId, effectiveCompanyId, branchId],
     queryFn: async () => {
       const hasConfiguredAccounts = (s: any) =>
         s && s.trade_receivable_account_id && s.sbs_collection_account_id;
+
+      const accountsBelongToEffectiveCompany = async (s: any) => {
+        if (!s) return false;
+        const v = await validateGLAccountsBelongToCompany(s, effectiveCompanyId);
+        return v.ok;
+      };
 
       // First try to get branch-specific settings for selected company
       if (branchId) {
@@ -146,22 +183,23 @@ export function useBranchFinanceSettings(branchId: string | null) {
           .eq("branch_id", branchId)
           .maybeSingle();
 
-        if (hasConfiguredAccounts(branchSettings)) {
+        if (hasConfiguredAccounts(branchSettings) && (await accountsBelongToEffectiveCompany(branchSettings))) {
           return branchSettings;
         }
 
-        // Fallback: search across ALL companies for this branch with configured accounts
-        const { data: crossCompanySettings } = await supabase
+        // Fallback: search across ALL companies for this branch with configured accounts,
+        // but only accept rows whose COA accounts belong to the EFFECTIVE company.
+        const { data: crossCandidates } = await supabase
           .from("school_bus_finance_settings")
           .select("*")
           .eq("branch_id", branchId)
           .not("trade_receivable_account_id", "is", null)
-          .not("sbs_collection_account_id", "is", null)
-          .limit(1)
-          .maybeSingle();
+          .not("sbs_collection_account_id", "is", null);
 
-        if (crossCompanySettings) {
-          return crossCompanySettings;
+        for (const candidate of crossCandidates || []) {
+          if (await accountsBelongToEffectiveCompany(candidate)) {
+            return candidate;
+          }
         }
       }
 
@@ -173,22 +211,27 @@ export function useBranchFinanceSettings(branchId: string | null) {
         .is("branch_id", null)
         .maybeSingle();
 
-      if (hasConfiguredAccounts(defaultSettings)) {
+      if (hasConfiguredAccounts(defaultSettings) && (await accountsBelongToEffectiveCompany(defaultSettings))) {
         return defaultSettings;
       }
 
-      // Final fallback: any default settings with configured accounts
-      const { data: anyDefault, error } = await supabase
+      // Final fallback: any default settings with COA accounts that belong to
+      // the effective company.
+      const { data: anyDefaults, error } = await supabase
         .from("school_bus_finance_settings")
         .select("*")
         .is("branch_id", null)
         .not("trade_receivable_account_id", "is", null)
-        .not("sbs_collection_account_id", "is", null)
-        .limit(1)
-        .maybeSingle();
+        .not("sbs_collection_account_id", "is", null);
 
       if (error) throw error;
-      return anyDefault || defaultSettings;
+      for (const candidate of anyDefaults || []) {
+        if (await accountsBelongToEffectiveCompany(candidate)) {
+          return candidate;
+        }
+      }
+
+      return defaultSettings ?? null;
     },
     enabled: !!selectedCompanyId,
   });
