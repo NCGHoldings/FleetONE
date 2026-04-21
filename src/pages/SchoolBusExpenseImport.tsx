@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolBusBulkExpenses, BulkBusExpense } from "@/hooks/useSchoolBusBulkExpenses";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface ParsedRow {
   "Ref."?: string;
@@ -74,39 +75,52 @@ export default function SchoolBusExpenseImport() {
   const [isProcessing, setIsProcessing] = useState(false);
   
   const { mutateAsync: uploadExpenses, isPending: isUploading } = useSchoolBusBulkExpenses();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   useEffect(() => {
     // Fetch branches and buses for mapping
     const initData = async () => {
+      if (!effectiveCompanyId) return;
+
       const { data: bData } = await supabase.from("school_branches").select("id, branch_name").eq("is_active", true);
       if (bData) setBranches(bData);
 
       const { data: busData } = await supabase.from("buses").select("id, bus_no");
       if (busData) setBuses(busData);
-      
-      const { data: vData } = await supabase.from("vendors").select("id, vendor_name").eq("is_active", true);
+
+      const { data: vData } = await supabase
+        .from("vendors")
+        .select("id, vendor_name")
+        .eq("is_active", true)
+        .eq("company_id", effectiveCompanyId);
       if (vData) setVendors(vData);
 
-      const { data: pcData } = await supabase.from("petty_cash_funds").select("id, fund_name");
+      const { data: pcData } = await supabase
+        .from("petty_cash_funds")
+        .select("id, fund_name")
+        .eq("company_id", effectiveCompanyId);
       if (pcData) setPettyCashFunds(pcData);
 
-      // Fetch float / bank / cash asset accounts for Direct Payment
+      // Fetch float / bank / cash asset accounts for Direct Payment — scoped to active company
       const { data: acctData } = await supabase
         .from("chart_of_accounts")
         .select("id, account_code, account_name, current_balance")
+        .eq("company_id", effectiveCompanyId)
         .eq("account_type", "asset")
         .eq("is_active", true)
         .or("account_name.ilike.%FLOAT%,account_name.ilike.%BANK%,account_name.ilike.%CASH%")
         .order("account_code");
       if (acctData) {
         setDirectAccounts(acctData as any);
-        // Default to FUEL FLOAT - DIALOG TOUCH_SBS (13005002)
+        // Default to FUEL FLOAT - DIALOG TOUCH_SBS (13005002) if available in this company
         const sbsFloat = acctData.find((a: any) => a.account_code === "13005002");
         if (sbsFloat) setDirectPaymentAccountId(sbsFloat.id);
+        else setDirectPaymentAccountId("");
       }
     };
     initData();
-  }, []);
+  }, [effectiveCompanyId]);
 
   const parseExcelDate = (excelDate: string | number) => {
     if (!excelDate) return format(new Date(), "yyyy-MM-dd");
