@@ -601,11 +601,23 @@ export function useGenerateBulkARInvoices() {
         if (anyExisting.company_id !== effectiveCompanyId) {
           // One-shot migration so the customer lines up with the active company's
           // AR ledger. Safe because customer_code is the global natural key.
-          const { error: migrateErr } = await supabase
+          // CRITICAL: verify the row actually moved — RLS can silently no-op the
+          // UPDATE when the existing row is on a different tenant. That was the
+          // root cause of the 197 Nuwara Eliya invoices missing from AR on
+          // 2026-04-21: customer SBS-NUW lived on NCG Test, the user was on
+          // NCG Holding, the UPDATE returned no error AND no rows changed.
+          const { data: migrated, error: migrateErr } = await supabase
             .from("customers")
             .update({ company_id: effectiveCompanyId })
-            .eq("id", anyExisting.id);
+            .eq("id", anyExisting.id)
+            .select("id, company_id");
           if (migrateErr) throw migrateErr;
+          if (!migrated || migrated.length === 0 || migrated[0].company_id !== effectiveCompanyId) {
+            throw new Error(
+              `Cannot post AR for ${branchName}: customer ${customerCode} exists on a different company and could not be migrated (tenant access blocked). ` +
+              `Ask an admin to run: UPDATE customers SET company_id = '${effectiveCompanyId}' WHERE customer_code = '${customerCode}';`
+            );
+          }
         }
       } else {
         const { data: newCustomer, error: customerError } = await supabase
