@@ -2,6 +2,8 @@ import puppeteer from 'puppeteer';
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import { createRequire } from 'module';
+import { existsSync } from 'fs';
+import { execSync } from 'child_process';
 
 dotenv.config();
 
@@ -11,15 +13,47 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function runMagiyaScraper() {
-  console.log('🚀 Magiya Scraper V9 — URL Storage Mode');
+// Auto-detect Chrome/Chromium binary — searches common paths on Linux, macOS, and CI runners
+function findChromePath() {
+  const candidates = [
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/snap/bin/chromium',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) {
+      console.log(`🔍 Found Chrome at: ${p}`);
+      return p;
+    }
+  }
+  // Fallback: try `which` command
+  try {
+    const found = execSync('which google-chrome || which chromium-browser || which chromium 2>/dev/null', { encoding: 'utf-8' }).trim();
+    if (found) {
+      console.log(`🔍 Found Chrome via PATH: ${found}`);
+      return found;
+    }
+  } catch {}
+  // No system Chrome — let Puppeteer use its bundled Chromium
+  console.log('⚠️ No system Chrome found — using Puppeteer bundled Chromium');
+  return undefined;
+}
 
-  const browser = await puppeteer.launch({
+async function runMagiyaScraper() {
+  console.log('🚀 Magiya Scraper V10 — Resilient Chrome Detection');
+
+  const chromePath = findChromePath();
+  const launchOptions = {
     headless: "new",
-    executablePath: '/usr/bin/google-chrome',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
     protocolTimeout: 0
-  });
+  };
+  if (chromePath) launchOptions.executablePath = chromePath;
+
+  const browser = await puppeteer.launch(launchOptions);
 
   try {
     const page = await browser.newPage();
