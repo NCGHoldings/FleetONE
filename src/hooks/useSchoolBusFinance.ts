@@ -555,33 +555,65 @@ export function useGenerateBulkARInvoices() {
         return batch;
       }
 
-      // Get or create a customer for this branch in Finance ERP
-      let customerId: string | null = null;
-      const { data: existingCustomer } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("company_id", effectiveCompanyId)
-        .eq("customer_code", `SBS-${branchCode}`)
-        .maybeSingle();
+      // ── Validate the COA accounts on the settings actually belong to the
+      //    effective company. If they don't, refuse to post — otherwise we
+      //    silently write JE lines into another company's COA (the bug that
+      //    caused 33 Katunayaka invoices to vanish on 2026-04-21).
+      const accountValidation = await validateGLAccountsBelongToCompany(settings, effectiveCompanyId);
+      if (!accountValidation.ok) {
+        const codes = accountValidation.mismatched.map((a) => a.account_code).join(", ");
+        throw new Error(
+          `Cannot post AR for ${branchName}: GL accounts (${codes}) belong to a different company. ` +
+          `Open Settings → School Bus Finance → ${branchName} and re-pick the Trade Receivable / Sales / Advance accounts under the active company.`,
+        );
+      }
 
-      if (existingCustomer) {
-        customerId = existingCustomer.id;
+      // ── Get or create the per-branch customer in Finance ERP.
+      // customers.customer_code has a GLOBAL UNIQUE constraint, so we search
+      // by (business_unit_code, customer_code) regardless of company first
+      // and migrate the row to the effective company if it lives elsewhere.
+      // Throws on failure instead of silently nulling customerId — that was
+      // the silent-skip that hid 33 invoices.
+      let customerId: string | null = null;
+      const customerCode = `SBS-${branchCode}`;
+      const { data: anyExisting, error: lookupErr } = await supabase
+        .from("customers")
+        .select("id, company_id")
+        .eq("business_unit_code", "SBO")
+        .eq("customer_code", customerCode)
+        .maybeSingle();
+      if (lookupErr) throw lookupErr;
+
+      if (anyExisting) {
+        customerId = anyExisting.id;
+        if (anyExisting.company_id !== effectiveCompanyId) {
+          // One-shot migration so the customer lines up with the active company's
+          // AR ledger. Safe because customer_code is the global natural key.
+          const { error: migrateErr } = await supabase
+            .from("customers")
+            .update({ company_id: effectiveCompanyId })
+            .eq("id", anyExisting.id);
+          if (migrateErr) throw migrateErr;
+        }
       } else {
         const { data: newCustomer, error: customerError } = await supabase
           .from("customers")
           .insert({
             company_id: effectiveCompanyId,
-            business_unit_code: 'SBO',
-            customer_code: `SBS-${branchCode}`,
+            business_unit_code: "SBO",
+            customer_code: customerCode,
             customer_name: `School Bus Students - ${branchName}`,
             is_active: true,
           } as any)
           .select()
           .single();
 
-        if (!customerError && newCustomer) {
-          customerId = newCustomer.id;
+        if (customerError || !newCustomer) {
+          throw new Error(
+            `Customer setup failed for ${branchName} (${customerCode}): ${customerError?.message || "unknown error"}`,
+          );
         }
+        customerId = newCustomer.id;
       }
 
       // Process students in chunks for performance (50 at a time)
