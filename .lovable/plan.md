@@ -1,62 +1,129 @@
 
+# Fix: Katunayaka AR invoices still empty in LIVE while COA updates
 
-# Fix: Katunayaka (and all SBO branches) AR invoices going to wrong company / not showing on AR page / COA not updating
+## What’s actually wrong now
 
-## What's actually broken (verified in DB)
+I cross-checked the code and live DB. There are 2 separate Katunayaka problems:
 
-I queried your live DB and found three connected bugs:
+1. **Katunayaka’s latest broken batch was posted into TEST company IDs**
+   - `school_ar_invoice_batches` on **2026-04-21** for Katunayaka was saved with `company_id = NCG Test parent (f40b...)`
+   - its JE was also created under **NCG Test**
+   - the school invoice `SBS-INV-202604-01142` has **`ar_invoice_id = NULL`**
+   - result: **COA can move**, but **AR invoice list stays empty** because no Finance AR row exists in LIVE
 
-| Symptom | Real cause |
-|---|---|
-| AR invoices generated today (28 invoices, 2026-04-21) but **AR Invoices page shows 0** | `customer_id` lookup fails → AR insert silently skipped. `customers.customer_code` has a **global UNIQUE constraint** and `SBS-LKA` already exists under the Test company (`f40b0a9d…`). When LIVE mode tries to insert `SBS-LKA` for NCG Holding it fails, the catch sets `customerId = null`, AR insert is skipped — no error toast. |
-| **JEs exist but COA tree doesn't update** | The Katunayaka `school_bus_finance_settings` row has `trade_receivable_account_id` and `sbs_collection_account_id` pointing to **Test COA accounts** (`cce9995e…` / `19891c60…`, both `company_id = f40b0a9d…`). The JE is created under NCG Holding (`a000…001`) but its lines reference Test-owned accounts, so `chart_of_accounts.current_balance` updates land on the Test COA — invisible in the Holding tree. |
-| **"School Bus Operations" branch picker silently uses Test settings** | The "cross-company fallback" in `useBranchFinanceSettings` (line 153-165) returns ANY row with `trade_receivable_account_id NOT NULL` for that branch, regardless of company. For Katunayaka the only configured row is the Test one → LIVE mode unknowingly inherits Test mappings. |
-| Today's 28 `school_ar_invoices` rows all have `ar_invoice_id = NULL` | Same root cause: AR insert silently skipped, so the link back is missing — student payments can't auto-mark the invoice paid. |
+2. **Older Katunayaka AR rows are hidden by the AR list filter**
+   - Katunayaka school invoices from **2026-04-09** already have linked `ar_invoice_id`s
+   - but those linked `ar_invoices` live under **NCG Test company_id**
+   - and the AR list uses brittle fallback logic based on invoice-number prefixes (`SBS-%`)
+   - meanwhile **live “School Bus Operations” has no `short_code`**, so it does not auto-resolve `SBO` cleanly
+   - result: even valid SBO invoices can stay invisible if their numbers are like `INV-NCGH-*`
 
-## What I'll change
+## What I’ll change
 
-### 1. Fix the customer lookup (eliminate silent failure) — `src/hooks/useSchoolBusFinance.ts` lines 515–542
-- Instead of `eq("company_id", effectiveCompanyId).eq("customer_code", "SBS-LKA")`, search by **(business_unit_code='SBO', customer_code)** first, regardless of company.
-- If found: reuse it — but if its `company_id` != `effectiveCompanyId`, **migrate it** to `effectiveCompanyId` via UPDATE (one-shot fix, harmless because customer_code is the natural key and is globally unique).
-- If not found: insert with a per-company suffix fallback (`SBS-LKA-NCGH`) so the global UNIQUE doesn't bite. Wrap in try/catch and **throw on failure** instead of silently nulling — the user must see "Customer setup failed" toast rather than 28 invoices vanishing.
+### 1. Add a dedicated School Bus posting-context resolver
+In `src/hooks/useSchoolBusFinance.ts`, stop using raw `selectedCompanyId` directly for School Bus finance posting.
 
-### 2. Block "wrong-company COA" at the settings layer — same file, `useBranchFinanceSettings` lines 131–195
-- Tighten the cross-company fallback (line 153-165): only fall back to another company's settings if **both COA accounts also belong to `effectiveCompanyId`** (verify via a join). Otherwise treat as not configured and force the user to set up branch settings for this company.
-- Add a new helper `validateGLAccountsBelongToCompany(settings, effectiveCompanyId)` that runs before any JE insert in `useGenerateBulkARInvoices` and `usePostStudentPaymentToGL`. If any account is owned by another company, throw a clear error: *"Katunayaka GL accounts belong to NCG Test, not NCG Holding. Open Settings → School Bus Finance → Katunayaka and re-pick the Trade Receivable / Sales accounts under NCG Holding."*
+I’ll add a resolver that determines:
+- **operational company id** = School Bus child company
+  - LIVE: `School Bus Operations` (`a000...0002`)
+  - TEST: `Test School Bus` (`0fba...`)
+- **effective GL company id**
+  - LIVE: `NCG Holding` (`a000...0001`)
+  - TEST: `NCG Test` (`f40b...`)
+- **business unit code** = always `SBO`
 
-### 3. Auto-remap the Katunayaka settings row (one-time DB migration)
-The Katunayaka `school_bus_finance_settings` row currently points to Test COA. I'll write a migration that:
-- Looks up NCG Holding's equivalent COA accounts by `account_code` (`12201001` → `a1678110…` for TR, `41103001` → `753cb8f4…` for Sales School Buses, plus the liability account).
-- Updates the Katunayaka row + the duplicate "branch_id IS NULL" defaults to point at NCG Holding's COA IDs and resets `company_id = a0000000-0000-0000-0000-000000000001`.
-- Leaves the Test-environment row (`branch_id = 4b0dcd34…`) alone.
+Then I’ll use that resolver in:
+- `useBranchFinanceSettings`
+- `useGenerateBulkARInvoices`
+- `usePostPaymentToGL`
+- `useBackfillARInvoiceLinks`
 
-### 4. Backfill the 28 orphan invoices created today
-A one-time SQL script that:
-- Finds the 28 `school_ar_invoices` rows with `ar_invoice_id IS NULL` created on 2026-04-21 for Katunayaka students.
-- Creates the matching `customers` row (`SBS-LKA`, NCG Holding) if missing.
-- For each orphan, inserts the corresponding `ar_invoices` row (linking to the existing `journal_entry_id`) and updates `school_ar_invoices.ar_invoice_id`.
-- Re-points the existing JE lines to NCG Holding's COA account IDs (so the COA balances update correctly).
-- Recomputes `chart_of_accounts.current_balance` for the affected accounts.
+This prevents Katunayaka from writing batches/JEs/AR into the wrong company just because the current selector/context drifted.
 
-### 5. Re-confirm payment auto-allocation works after the link is restored
-The student payment posting code (`usePostStudentPaymentToGL`, line ~770+) already DR Bank / CR Trade Receivable. Once `school_ar_invoices.ar_invoice_id` is populated (steps 1+4), the existing AR allocation logic naturally settles the invoice. No code change needed here — it was just missing the link.
+### 2. Fix AR invoice visibility logic for School Bus
+In `src/contexts/CompanyContext.tsx` and `src/hooks/useAccountingData.ts`:
 
-## Files touched
+- add a fallback business-unit mapping when `short_code` is missing
+  - `school_bus -> SBO`
+  - `special_hire -> SPH`
+  - `yutong -> YUT`
+  - `sinotruck -> SNT`
+  - `light_vehicle -> LTV`
+- update `useARInvoices()` to prefer **`business_unit_code = SBO`** for School Bus sub-company views
+- keep invoice-number prefix filtering only as a legacy last-resort, not the main rule
+
+This ensures School Bus AR shows all SBO invoices regardless of numbering pattern (`SBS-*` or `INV-NCGH-*`).
+
+### 3. Unify customer resolution for School Bus AR + payment sync
+Create one shared helper in `src/hooks/useSchoolBusFinance.ts` for branch finance customer resolution:
+- Katunayaka -> `SBS-LKA`
+- Nuwara Eliya -> `SBS-NUW`
+- etc.
+
+Use the same helper in:
+- bulk AR generation
+- orphan/backfill linking
+- payment-time sync when `ar_invoice_id` is missing
+
+This restores the rule:
+- **invoice created -> linked Finance AR exists**
+- **student payment -> same AR invoice auto-updates to partial/paid**
+
+### 4. Add a targeted migration for Katunayaka only
+Create a new migration to safely fix only Katunayaka’s broken records.
+
+The migration will:
+
+#### A. normalize finance settings
+- move/copy Katunayaka School Bus finance settings from **Test School Bus company** to the correct **live School Bus company**
+- preserve the current correct Holding COA account IDs
+
+#### B. repair broken 2026-04-21 records
+- find Katunayaka `school_ar_invoices` with `ar_invoice_id IS NULL`
+- create missing `ar_invoices` in **NCG Holding**
+- link them back into `school_ar_invoices.ar_invoice_id`
+
+#### C. migrate wrongly-posted Katunayaka finance rows from TEST to LIVE hierarchy
+for Katunayaka-linked historical School Bus finance records:
+- move `school_ar_invoice_batches.company_id` to live School Bus company
+- move `ar_invoices.company_id` to NCG Holding
+- move `journal_entries.company_id` to NCG Holding
+- align `journal_entry_lines.company_id` to NCG Holding
+- preserve `business_unit_code = 'SBO'`
+- keep existing JE/account links intact
+
+This is the key step that makes Katunayaka history visible in LIVE AR without touching branches that already work.
+
+### 5. Harden against future silent damage
+Before posting School Bus AR or payment JEs:
+- validate posting context is coherent
+- validate School Bus settings belong to the resolved operational company
+- validate COA accounts belong to the resolved effective GL company
+- fail loudly with a toast instead of silently producing hidden records
+
+## Files to touch
 
 | File | Change |
 |---|---|
-| `src/hooks/useSchoolBusFinance.ts` | Fix customer lookup (search by business_unit_code, migrate company_id, throw on fail); tighten `useBranchFinanceSettings` fallback to validate COA company; add `validateGLAccountsBelongToCompany` guard before JE insert in both bulk-invoice and payment-posting flows |
-| `supabase/migrations/<new>.sql` | Re-map Katunayaka `school_bus_finance_settings` to NCG Holding COA IDs; backfill 28 orphan AR invoices + relink JE lines + recompute COA balances |
+| `src/hooks/useSchoolBusFinance.ts` | Add School Bus company-context resolver, shared customer resolver, update generation/payment/backfill flows |
+| `src/hooks/useAccountingData.ts` | Fix `useARInvoices()` filtering to rely on `business_unit_code` for SBO views |
+| `src/contexts/CompanyContext.tsx` | Add fallback BU-code mapping when `short_code` is missing |
+| `src/components/school/RecordPaymentModal.tsx` | Point payment sync to shared School Bus customer/linking logic if needed |
+| `supabase/migrations/<new>.sql` | Katunayaka-only settings normalization + batch/AR/JE migration + missing AR backfill |
 
-## What you'll see after the fix
+## What you’ll see after the fix
 
-1. The 28 Katunayaka invoices generated today appear under **Accounting → AR → Invoices** with status `unpaid` and the correct customer (`School Bus Students - Katunayaka`).
-2. The COA tree under NCG Holding → `41103001 TRANSPORT INCOME - SCHOOL BUSES` shows the credit balance (today's batch ≈ LKR 168,000), and `12201001 TRADE RECEIVABLE-EXTERNAL` shows the matching debit.
-3. Generating next month's batch (or any other branch) routes everything to NCG Holding COA, never Test.
-4. When a student pays, the existing AR allocation now finds the linked `ar_invoice_id` and auto-marks the invoice paid/partial.
-5. If anyone misconfigures GL accounts (cross-company) again, the system throws a clear error toast instead of silently writing orphan JEs.
+1. **Katunayaka AR invoices appear in LIVE Accounting → AR → Invoices**
+2. The missing latest invoice(s), including the broken **2026-04-21** batch, will exist as proper Finance AR rows
+3. Older Katunayaka invoices that were wrongly sitting under TEST become visible in LIVE
+4. When a **student pays**, the linked AR invoice updates to **partial/paid** again
+5. Other branches stay safe because:
+   - migration is scoped to **Katunayaka only**
+   - AR query change is additive and based on correct `business_unit_code`
+   - School Bus posting guard prevents future wrong-company writes
 
-## Out of scope (say the word for any of these)
-- Cleaning the duplicate Katunayaka settings rows (3 exist; 1 is enough). Easy to do once you confirm.
-- Same hardening for the other branches if they have the same Test→Holding misconfiguration. I'll quickly extend the migration to all SBO branches if you want.
-- Adding a UI banner in **School Bus Finance Settings** that warns when the picked COA account belongs to a different company than the active one.
+## Technical notes
+- Verified broken Katunayaka batch on `2026-04-21` was saved under **NCG Test parent**
+- Verified broken school invoice `SBS-INV-202604-01142` currently has **no Finance AR link**
+- Verified older Katunayaka linked AR rows exist but are under **TEST company_id**
+- Verified live `School Bus Operations` company currently lacks a usable `short_code`, which is why the AR list falls back to fragile invoice-prefix filtering
