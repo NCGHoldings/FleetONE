@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, FileText, Search, Printer, Pencil, Trash2 } from "lucide-react";
 import { useARCreditNotes, useCustomers, useARInvoices } from "@/hooks/useAccountingData";
 import { useDeleteARCreditNote } from "@/hooks/useAccountingMutations";
+import { supabase } from "@/integrations/supabase/client";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
 import { StatusBadge } from "./shared/StatusBadge";
