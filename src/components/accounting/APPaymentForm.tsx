@@ -375,7 +375,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       
       const paymentResult = await createPayment.mutateAsync({
         payment_number: finalPaymentNumber,
-        vendor_id: data.vendor_id,
+        vendor_id: payeeType === "vendor" ? payeeId : "", // legacy field; ignored when payee_type='customer'
+        payee_type: payeeType,
+        payee_id: payeeId,
         payment_date: data.payment_date,
         amount: totalPayment,
         payment_method: data.payment_method,
@@ -386,7 +388,8 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
         notes: finalNotes,
         is_advance: isAdvance,
         is_direct_payment: isDirectPayment,
-        vendor_bank_account_id: selectedBankAccountId || undefined,
+        // Vendor bank account only applies when paying a vendor
+        vendor_bank_account_id: payeeType === "vendor" ? (selectedBankAccountId || undefined) : undefined,
         vendor_bill_number: finalVendorBillNumber,
         bus_id: selectedBusId || undefined,
         bus_no: selectedBusNo || undefined,
