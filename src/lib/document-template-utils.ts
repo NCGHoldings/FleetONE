@@ -508,24 +508,24 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{voucher_no}}'] = documentData?.payment_number || '';
       placeholders['{{voucher_date}}'] = formatDate(documentData?.payment_date);
 
-      // Payee aliases (from joined vendor data)
-      placeholders['{{payee_name}}'] = documentData?.vendors?.vendor_name || '';
-      placeholders['{{payee_account}}'] = documentData?.vendors?.bank_account || '';
-      placeholders['{{payee_bank}}'] = documentData?.vendors?.bank_name || '';
-      placeholders['{{payee_tax_id}}'] = documentData?.vendors?.tax_id || '';
+      // Payee aliases (resolved from payee_type-aware variables above)
+      placeholders['{{payee_name}}'] = payeeName;
+      placeholders['{{payee_account}}'] = payeeBankAccount;
+      placeholders['{{payee_bank}}'] = payeeBankName;
+      placeholders['{{payee_tax_id}}'] = payeeTaxId;
 
-      // Vendor bank account details (from vendor_bank_accounts if available)
+      // Vendor bank account details (vendor_bank_accounts join still preferred when present)
       const vendorBankAccount = documentData?.vendor_bank_accounts;
-      placeholders['{{vendor_bank_name}}'] = vendorBankAccount?.bank_name || documentData?.vendors?.bank_name || '';
-      placeholders['{{vendor_bank_branch}}'] = vendorBankAccount?.bank_branch || documentData?.vendors?.bank_branch || '';
-      placeholders['{{vendor_account_number}}'] = vendorBankAccount?.account_number || documentData?.vendors?.bank_account || '';
-      placeholders['{{vendor_account_holder}}'] = vendorBankAccount?.account_holder_name || documentData?.vendors?.vendor_name || '';
-      placeholders['{{vendor_email}}'] = documentData?.vendors?.email || '';
-      placeholders['{{vendor_phone}}'] = documentData?.vendors?.phone || '';
-      placeholders['{{vendor_contact}}'] = documentData?.vendors?.contact_person || '';
+      placeholders['{{vendor_bank_name}}'] = vendorBankAccount?.bank_name || payeeBankName;
+      placeholders['{{vendor_bank_branch}}'] = vendorBankAccount?.bank_branch || payeeBankBranch;
+      placeholders['{{vendor_account_number}}'] = vendorBankAccount?.account_number || payeeBankAccount;
+      placeholders['{{vendor_account_holder}}'] = vendorBankAccount?.account_holder_name || payeeName;
+      placeholders['{{vendor_email}}'] = payeeEmail;
+      placeholders['{{vendor_phone}}'] = payeePhone;
+      placeholders['{{vendor_contact}}'] = payeeContact;
 
-      // Currency (from vendor or fallback to LKR)
-      placeholders['{{currency}}'] = documentData?.vendors?.currency || 'LKR';
+      // Currency (resolved by payee type)
+      placeholders['{{currency}}'] = payeeCurrency;
 
       // Payment reference (reference or cheque number)
       placeholders['{{payment_ref}}'] = documentData?.reference || documentData?.cheque_number || '';
@@ -566,7 +566,7 @@ export const mapDocumentToPlaceholders = (
         : '';
       placeholders['{{received_by}}'] = documentData?.received_by || '';
       placeholders['{{finance_controller}}'] = documentData?.finance_controller || '';
-      placeholders['{{payee_signature_name}}'] = documentData?.vendors?.vendor_name || '';
+      placeholders['{{payee_signature_name}}'] = payeeName;
 
       // Use company logo URL directly for custom templates that use src="{{company_logo}}"
       // Override the <img> tag version with the raw URL for custom templates
