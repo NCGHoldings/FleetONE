@@ -415,12 +415,78 @@ export const mapDocumentToPlaceholders = (
     }
 
     case 'ap_payment_voucher': {
+      // Branch payee data source based on payee_type (vendor | customer | employee)
+      // The AP Payments query joins customers via ap_payments_payee_customer_id_fkey,
+      // so when payee_type='customer' we must read from documentData.customers, not vendors.
+      const payeeType = documentData?.payee_type || 'vendor';
+      const isCustomerPayee = payeeType === 'customer';
+      const isEmployeePayee = payeeType === 'employee';
+      const customerPayee = documentData?.customers || null;
+      const employeePayee = documentData?.employees || documentData?.staff_registry || null;
+
+      // Resolved payee fields (name / address / code / bank / contact / currency)
+      const payeeName = isCustomerPayee
+        ? (customerPayee?.customer_name || '')
+        : isEmployeePayee
+          ? (employeePayee?.staff_name || '')
+          : (documentData?.vendors?.vendor_name || '');
+      const payeeAddress = isCustomerPayee
+        ? (customerPayee?.billing_address || '')
+        : isEmployeePayee
+          ? (employeePayee?.address || '')
+          : (documentData?.vendors?.address || '');
+      const payeeCode = isCustomerPayee
+        ? (customerPayee?.customer_code || '')
+        : isEmployeePayee
+          ? (employeePayee?.staff_code || employeePayee?.id?.substring(0, 8) || '')
+          : (documentData?.vendors?.vendor_code || '');
+      const payeeBankAccount = isCustomerPayee
+        ? (customerPayee?.bank_account || '')
+        : isEmployeePayee
+          ? (employeePayee?.bank_account || '')
+          : (documentData?.vendors?.bank_account || '');
+      const payeeBankName = isCustomerPayee
+        ? (customerPayee?.bank_name || '')
+        : isEmployeePayee
+          ? (employeePayee?.bank_name || '')
+          : (documentData?.vendors?.bank_name || '');
+      const payeeBankBranch = isCustomerPayee
+        ? (customerPayee?.bank_branch || '')
+        : isEmployeePayee
+          ? (employeePayee?.bank_branch || '')
+          : (documentData?.vendors?.bank_branch || '');
+      const payeeEmail = isCustomerPayee
+        ? (customerPayee?.email || '')
+        : isEmployeePayee
+          ? (employeePayee?.email || '')
+          : (documentData?.vendors?.email || '');
+      const payeePhone = isCustomerPayee
+        ? (customerPayee?.phone || '')
+        : isEmployeePayee
+          ? (employeePayee?.phone || employeePayee?.mobile_number || '')
+          : (documentData?.vendors?.phone || '');
+      const payeeContact = isCustomerPayee
+        ? (customerPayee?.contact_person || customerPayee?.customer_name || '')
+        : isEmployeePayee
+          ? (employeePayee?.staff_name || '')
+          : (documentData?.vendors?.contact_person || '');
+      const payeeTaxId = isCustomerPayee
+        ? (customerPayee?.tax_id || '')
+        : isEmployeePayee
+          ? (employeePayee?.nic_number || '')
+          : (documentData?.vendors?.tax_id || '');
+      const payeeCurrency = isCustomerPayee
+        ? (customerPayee?.currency || 'LKR')
+        : (documentData?.vendors?.currency || 'LKR');
+      const payeeTypeLabel = isCustomerPayee ? 'Customer' : isEmployeePayee ? 'Employee' : 'Vendor';
+
       // Standard field mappings
       placeholders['{{payment_number}}'] = documentData?.payment_number || '';
       placeholders['{{payment_date}}'] = formatDate(documentData?.payment_date);
-      placeholders['{{vendor_name}}'] = documentData?.vendors?.vendor_name || '';
-      placeholders['{{vendor_address}}'] = documentData?.vendors?.address || '';
-      placeholders['{{vendor_code}}'] = documentData?.vendors?.vendor_code || '';
+      placeholders['{{vendor_name}}'] = payeeName;
+      placeholders['{{vendor_address}}'] = payeeAddress;
+      placeholders['{{vendor_code}}'] = payeeCode;
+      placeholders['{{payee_type_label}}'] = payeeTypeLabel;
       placeholders['{{amount}}'] = formatCurrency(documentData?.amount);
       placeholders['{{total_amount}}'] = formatCurrency(documentData?.amount);
       placeholders['{{amount_in_words}}'] = numberToWords(documentData?.amount || 0);
