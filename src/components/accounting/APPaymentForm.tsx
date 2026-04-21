@@ -200,23 +200,23 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     }
   }, [open, isAdvanceMode, form, generateNumber]);
 
-  // Get pending invoices for selected vendor
+  // Get pending invoices for selected vendor (only when payee is a vendor)
   const pendingInvoices = useMemo(() => {
-    if (!selectedVendorId || !allInvoices) return [];
+    if (payeeType !== "vendor" || !payeeId || !allInvoices) return [];
     return allInvoices.filter(
-      (inv) => inv.vendor_id === selectedVendorId && inv.approval_status === "pending" && (inv.balance || 0) > 0
+      (inv) => inv.vendor_id === payeeId && inv.approval_status === "pending" && (inv.balance || 0) > 0
     );
-  }, [selectedVendorId, allInvoices]);
+  }, [payeeType, payeeId, allInvoices]);
 
   const pendingTotal = useMemo(() => {
     return pendingInvoices.reduce((sum, inv) => sum + (inv.balance || 0), 0);
   }, [pendingInvoices]);
 
-  // Filter invoices for selected vendor
+  // Filter invoices for selected vendor (skip when payee is customer — customers don't have AP invoices)
   useEffect(() => {
-    if (selectedVendorId && allInvoices && !isAdvance && !isDirectPayment) {
+    if (payeeType === "vendor" && payeeId && allInvoices && !isAdvance && !isDirectPayment) {
       const vendorInvoices = allInvoices.filter(
-        (inv) => inv.vendor_id === selectedVendorId && (inv.balance || 0) > 0 && inv.approval_status === "approved"
+        (inv) => inv.vendor_id === payeeId && (inv.balance || 0) > 0 && inv.approval_status === "approved"
       );
       setAllocations(
         vendorInvoices.map((inv) => ({
@@ -234,7 +234,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     } else {
       setAllocations([]);
     }
-  }, [selectedVendorId, allInvoices, isAdvance, isDirectPayment]);
+  }, [payeeType, payeeId, allInvoices, isAdvance, isDirectPayment]);
 
   // Auto-select default bank account when vendor changes
   useEffect(() => {
@@ -254,6 +254,9 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const handleVendorChange = (vendorId: string) => {
     setSelectedVendorId(vendorId);
     setSelectedBankAccountId("");
+    const parsed = parsePayee(vendorId);
+    setPayeeType(parsed.type);
+    setPayeeId(parsed.id);
     form.setValue("vendor_id", vendorId);
   };
 
