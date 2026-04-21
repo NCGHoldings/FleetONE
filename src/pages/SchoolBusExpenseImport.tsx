@@ -459,17 +459,25 @@ export default function SchoolBusExpenseImport() {
                  <CardDescription>Verify system matching before confirming import.</CardDescription>
                </div>
                
-               <Button 
-                  onClick={handleConfirmImport} 
-                  disabled={isUploading || parsedData.length === 0 || !selectedBranchId || parsedData.some(d => !d.isValid)}
-               >
-                 {isUploading ? "Processing..." : (
-                   <>
-                     <CheckCircle2 className="h-4 w-4 mr-2" />
-                     Confirm & Post GL
-                   </>
-                 )}
-               </Button>
+               {(() => {
+                 const selectedAcct = directAccounts.find(a => a.id === directPaymentAccountId);
+                 const acctBalance = Number(selectedAcct?.current_balance || 0);
+                 const excelTotal = parsedData.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+                 const directInvalid = paymentMethod === 'direct' && (!directPaymentAccountId || excelTotal > acctBalance);
+                 return (
+                   <Button 
+                      onClick={handleConfirmImport} 
+                      disabled={isUploading || parsedData.length === 0 || !selectedBranchId || parsedData.some(d => !d.isValid) || directInvalid}
+                   >
+                     {isUploading ? "Processing..." : (
+                       <>
+                         <CheckCircle2 className="h-4 w-4 mr-2" />
+                         Confirm & Post GL
+                       </>
+                     )}
+                   </Button>
+                 );
+               })()}
              </CardHeader>
              <CardContent className="p-0">
                {isProcessing ? (
