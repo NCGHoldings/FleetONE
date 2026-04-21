@@ -206,13 +206,57 @@ export const useCreatePettyCashFund = () => {
       // Helper: convert empty strings to null for UUID columns
       const uuidOrNull = (val: any): string | null => (val && typeof val === 'string' && val.trim().length > 0) ? val.trim() : null;
 
+      // Hard guard: company is required for the FK
+      if (!selectedCompanyId) {
+        throw new Error("Select a company before creating a fund");
+      }
+      // Hard guards for required fields
+      if (!data.fund_name?.trim()) throw new Error("Fund name is required");
+      if (!data.business_unit_code) throw new Error("Business unit is required");
+      if (!data.gl_account_id) throw new Error("GL account is required");
+      if (!data.custodian_name?.trim()) throw new Error("Custodian is required");
+      if (!data.opening_balance || data.opening_balance <= 0) {
+        throw new Error("Opening balance must be greater than zero");
+      }
+
+      // Auto-create staff_registry row when custodian was free-typed (no custodian_id)
+      let resolvedCustodianId = data.custodian_id || null;
+      if (!resolvedCustodianId && data.custodian_name) {
+        const trimmed = data.custodian_name.trim();
+        // Look for existing match first
+        const { data: existing } = await supabase
+          .from("staff_registry")
+          .select("id")
+          .ilike("staff_name", trimmed)
+          .eq("is_active", true)
+          .maybeSingle();
+        if (existing?.id) {
+          resolvedCustodianId = existing.id;
+        } else {
+          const { data: newStaff, error: staffError } = await supabase
+            .from("staff_registry")
+            .insert({
+              staff_name: trimmed,
+              staff_type: "driver",
+              salary_type: "monthly",
+              monthly_salary: 0,
+              is_active: true,
+            })
+            .select("id")
+            .single();
+          if (!staffError && newStaff?.id) {
+            resolvedCustodianId = newStaff.id;
+          }
+        }
+      }
+
       const { data: result, error } = await supabase
         .from("petty_cash_funds")
         .insert({
           fund_name: data.fund_name || "New Fund",
           business_unit_code: data.business_unit_code || "SBO",
           company_id: selectedCompanyId,
-          custodian_id: uuidOrNull(data.custodian_id),
+          custodian_id: uuidOrNull(resolvedCustodianId),
           custodian_name: data.custodian_name || null,
           opening_balance: data.opening_balance || 0,
           current_balance: data.opening_balance || 0,
