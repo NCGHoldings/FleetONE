@@ -1,0 +1,2 @@
+alter table public.ar_receipts add column if not exists payee_employee_id uuid references public.staff_registry(id);
+create index if not exists idx_ar_receipts_payee_employee_id on public.ar_receipts(payee_employee_id);

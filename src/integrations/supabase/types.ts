@@ -2070,6 +2070,7 @@ export type Database = {
           legacy_number: string | null
           notes: string | null
           override_gl_account_id: string | null
+          payee_employee_id: string | null
           payment_method: string | null
           receipt_date: string
           receipt_number: string
@@ -2097,6 +2098,7 @@ export type Database = {
           legacy_number?: string | null
           notes?: string | null
           override_gl_account_id?: string | null
+          payee_employee_id?: string | null
           payment_method?: string | null
           receipt_date: string
           receipt_number: string
@@ -2124,6 +2126,7 @@ export type Database = {
           legacy_number?: string | null
           notes?: string | null
           override_gl_account_id?: string | null
+          payee_employee_id?: string | null
           payment_method?: string | null
           receipt_date?: string
           receipt_number?: string
@@ -2173,6 +2176,13 @@ export type Database = {
             columns: ["override_gl_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_receipts_payee_employee_id_fkey"
+            columns: ["payee_employee_id"]
+            isOneToOne: false
+            referencedRelation: "staff_registry"
             referencedColumns: ["id"]
           },
         ]
