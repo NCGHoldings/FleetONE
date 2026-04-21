@@ -1298,10 +1298,10 @@ export const useCreateAPPayment = () => {
           // Link journal entry to payment
           await supabase.from("ap_payments").update({ journal_entry_id: je.id }).eq("id", data.id);
         }
-      } else if (!payment.is_direct_payment) {
+      } else if (!payment.is_direct_payment && payeeType === "vendor") {
         // Normal / Advance payment GL posting — resolve via vendor category mappings
         const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
-        const resolvedPaymentAccounts = await resolveVendorAPAccounts(payment.vendor_id, effectiveCompanyId);
+        const resolvedPaymentAccounts = await resolveVendorAPAccounts(payeeId, effectiveCompanyId);
 
         // For advance payments: use the advance account if available, else fall back to trade payable
         const tradePayableId = payment.is_advance
