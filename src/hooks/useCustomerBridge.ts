@@ -41,8 +41,8 @@ export interface DuplicateCheckResult {
     id: string;
     customer_name: string;
     customer_code: string;
-    contact_phone?: string;
-    source_module?: string;
+    phone?: string | null;
+    source_module?: string | null;
   } | null;
   message: string;
 }
@@ -94,9 +94,9 @@ export function useCustomerBridge() {
     // 1. Check by normalized phone
     const normalizedPhone = normalizePhone(phone);
     if (normalizedPhone) {
-      const { data: phoneMatch } = await supabase
+      const { data: phoneMatch } = await (supabase as any)
         .from('customers')
-        .select('id, customer_name, customer_code, contact_phone, source_module')
+        .select('id, customer_name, customer_code, phone, source_module')
         .eq('company_id', effectiveCompanyId)
         .eq('normalized_phone', normalizedPhone)
         .limit(1)
@@ -114,9 +114,9 @@ export function useCustomerBridge() {
 
     // 2. Check by NIC/Passport
     if (nic && nic.trim()) {
-      const { data: nicMatch } = await supabase
+      const { data: nicMatch } = await (supabase as any)
         .from('customers')
-        .select('id, customer_name, customer_code, contact_phone, source_module')
+        .select('id, customer_name, customer_code, phone, source_module')
         .eq('company_id', effectiveCompanyId)
         .eq('nic_passport', nic.trim())
         .limit(1)
@@ -163,8 +163,8 @@ export function useCustomerBridge() {
         // Update the existing customer with any new information that was previously empty
         const updatePayload: Record<string, any> = {};
         if (data.billing_address) updatePayload.billing_address = data.billing_address;
-        if (data.contact_email && !duplicateCheck.existingCustomer.contact_phone) {
-          updatePayload.contact_email = data.contact_email;
+        if (data.contact_email && !duplicateCheck.existingCustomer.phone) {
+          updatePayload.email = data.contact_email;
         }
         if (data.nic_passport) updatePayload.nic_passport = data.nic_passport;
         if (data.business_registration_no) updatePayload.business_registration_no = data.business_registration_no;
@@ -209,8 +209,8 @@ export function useCustomerBridge() {
       const insertPayload = {
         customer_code: customerCode,
         customer_name: data.customer_name,
-        contact_phone: data.contact_phone || null,
-        contact_email: data.contact_email || null,
+        phone: data.contact_phone || null,
+        email: data.contact_email || null,
         billing_address: data.billing_address || null,
         nic_passport: data.nic_passport || null,
         business_registration_no: data.business_registration_no || null,
@@ -305,14 +305,14 @@ async function linkSourceRecord(
   sourceRecordId: string,
   accountingCustomerId: string,
 ) {
-  const tableMap: Partial<Record<SourceModule, string>> = {
+  const tableMap: Partial<Record<SourceModule, 'yutong_customers' | 'sinotruck_customers'>> = {
     yutong: 'yutong_customers',
     sinotruck: 'sinotruck_customers',
   };
 
   const table = tableMap[sourceModule];
   if (table) {
-    await supabase
+    await (supabase as any)
       .from(table)
       .update({ accounting_customer_id: accountingCustomerId })
       .eq('id', sourceRecordId);
