@@ -370,7 +370,14 @@ export default function SchoolBusExpenseImport() {
               )}
 
               {/* Dynamic Direct Payment Fields */}
-              {paymentMethod === 'direct' && (
+              {paymentMethod === 'direct' && (() => {
+                const selectedAcct = directAccounts.find(a => a.id === directPaymentAccountId);
+                const acctBalance = Number(selectedAcct?.current_balance || 0);
+                const excelTotal = parsedData.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+                const remaining = acctBalance - excelTotal;
+                const insufficient = excelTotal > 0 && remaining < 0;
+                const fmt = (n: number) => `Rs ${n.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                return (
                 <div className="space-y-4 pt-2 border-t border-primary/10">
                   <div className="space-y-2">
                     <Label className="text-xs font-semibold">Pay From Account (Asset)</Label>
@@ -378,11 +385,17 @@ export default function SchoolBusExpenseImport() {
                       <SelectTrigger className="bg-white">
                          <SelectValue placeholder="Select Float / Bank Account..." />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[400px]">
+                        {directAccounts.length === 0 && (
+                          <div className="p-3 text-xs text-muted-foreground">No asset accounts loaded</div>
+                        )}
                         {directAccounts.map(a => (
                           <SelectItem key={a.id} value={a.id}>
-                            <span className="font-mono text-xs text-muted-foreground mr-2">{a.account_code}</span>
-                            {a.account_name}
+                            <div className="flex items-center gap-2 w-full">
+                              <span className="font-mono text-xs text-muted-foreground">{a.account_code}</span>
+                              <span className="flex-1">{a.account_name}</span>
+                              <span className="text-xs font-semibold text-primary ml-2">{fmt(Number(a.current_balance || 0))}</span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -391,8 +404,32 @@ export default function SchoolBusExpenseImport() {
                       No AP invoice will be created. Journal Entry: DR Fuel Expense / CR Selected Asset.
                     </p>
                   </div>
+
+                  {selectedAcct && (
+                    <div className={`rounded-md border p-3 space-y-1.5 text-xs ${insufficient ? 'bg-destructive/10 border-destructive' : 'bg-muted/50 border-border'}`}>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Selected Account Balance:</span>
+                        <span className="font-mono font-semibold">{fmt(acctBalance)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Excel Import Total:</span>
+                        <span className="font-mono font-semibold">{fmt(excelTotal)}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-1.5">
+                        <span className="text-muted-foreground">Balance After Posting:</span>
+                        <span className={`font-mono font-bold ${insufficient ? 'text-destructive' : 'text-green-600'}`}>{fmt(remaining)}</span>
+                      </div>
+                      {insufficient && (
+                        <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-destructive/30 text-destructive">
+                          <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                          <span className="font-medium">Insufficient float balance — top up the float account before importing.</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+                );
+              })()}
               
               <div className="space-y-2 pt-4">
                 <Label>Upload Excel File</Label>
