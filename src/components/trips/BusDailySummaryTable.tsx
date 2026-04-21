@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { ExpenseBreakdownPreview, DailyExpenseData } from "./ExpenseBreakdownPreview";
 import { InlineExpenseEditor } from "./InlineExpenseEditor";
 import { InlineRevenueEditor } from "./InlineRevenueEditor";
+import { InlineCrewEditor } from "./InlineCrewEditor";
 import { GLStatusBadge, GLAggregatedStatus } from "@/components/ncg-express/GLStatusBadge";
 import { useNCGExpressFinanceSettings, postTripRevenueToGL } from "@/hooks/useNCGExpressFinance";
 import { toast } from "@/hooks/use-toast";
