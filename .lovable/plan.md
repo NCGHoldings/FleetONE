@@ -1,129 +1,69 @@
 
-# Fix: Katunayaka AR invoices still empty in LIVE while COA updates
 
-## What’s actually wrong now
+# Fix: Special Hire Invoice — Mileage shows quoted-only, Extra KM (quotation-time + post-trip) not reflected
 
-I cross-checked the code and live DB. There are 2 separate Katunayaka problems:
+## What's broken (verified in code)
 
-1. **Katunayaka’s latest broken batch was posted into TEST company IDs**
-   - `school_ar_invoice_batches` on **2026-04-21** for Katunayaka was saved with `company_id = NCG Test parent (f40b...)`
-   - its JE was also created under **NCG Test**
-   - the school invoice `SBS-INV-202604-01142` has **`ar_invoice_id = NULL`**
-   - result: **COA can move**, but **AR invoice list stays empty** because no Finance AR row exists in LIVE
+### Bug 1: Invoice "Mileage" line always shows the quoted KM, never the actual KM traveled
+File: `src/lib/invoice-generator.ts` (lines 305-307, 480-482)
 
-2. **Older Katunayaka AR rows are hidden by the AR list filter**
-   - Katunayaka school invoices from **2026-04-09** already have linked `ar_invoice_id`s
-   - but those linked `ar_invoices` live under **NCG Test company_id**
-   - and the AR list uses brittle fallback logic based on invoice-number prefixes (`SBS-%`)
-   - meanwhile **live “School Bus Operations” has no `short_code`**, so it does not auto-resolve `SBO` cleanly
-   - result: even valid SBO invoices can stay invisible if their numbers are like `INV-NCGH-*`
+```ts
+const mileage = (data.hasAdjustments && data.actualKmTraveled)
+  ? data.actualKmTraveled
+  : (data.tripDistance || data.totalKm || 0);
+```
 
-## What I’ll change
+The fallback uses `data.tripDistance || data.totalKm || 0`. But:
+- `TripDetailsModal.tsx` (lines 301–325) builds `quotationData` for `GenerateBalanceInvoiceModal` and **never passes** `tripDistance` or `totalKm`. They are `undefined`.
+- `GenerateBalanceInvoiceModal.tsx` (lines 238-239) just forwards those undefined values.
+- The screenshot text "Quoted: 0 km | Actual: 0 km" proves the saved adjustment row has `original_quoted_km = 0` and `actual_km_traveled = 0` (because of stale-prop save inside `PostTripAdjustmentModal`).
+- Result: invoice's Mileage cell ends up showing 0 or only the "fixed rate 1 km – 100 km" boilerplate, never the real total traveled distance.
 
-### 1. Add a dedicated School Bus posting-context resolver
-In `src/hooks/useSchoolBusFinance.ts`, stop using raw `selectedCompanyId` directly for School Bus finance posting.
+### Bug 2: Quotation-time "Additional Distance" (extra km added inside the quotation form via Additional Charges) is invisible on the invoice
+- The quotation form supports `additional_charges` JSONB items of type `additional_distance` (each with its own `distance` + `amount`). See `EnhancedCostCalculator.tsx` line 333-336 (`additionalDistanceFromCharges`) and `SpecialHireForm.tsx` (additional charges loader).
+- These km **never** flow into the invoice's Mileage line, item description, or the "Original Quote Amount". Only the lump-sum money side hits `total_additional_charges` (rolled into `gross_revenue`), but the customer can't see *what* the extra km were.
 
-I’ll add a resolver that determines:
-- **operational company id** = School Bus child company
-  - LIVE: `School Bus Operations` (`a000...0002`)
-  - TEST: `Test School Bus` (`0fba...`)
-- **effective GL company id**
-  - LIVE: `NCG Holding` (`a000...0001`)
-  - TEST: `NCG Test` (`f40b...`)
-- **business unit code** = always `SBO`
+### Bug 3: Post-trip adjustment row sometimes persists with `original_quoted_km = 0` / `actual_km_traveled = 0`
+- `PostTripAdjustmentModal` props default `originalKm = 0`. If the modal opens before `trip.quotation.km_trip` is hydrated, `buildAdjustment()` snapshots 0.
+- The DB row is then upserted with `original_quoted_km = 0`, even though `extra_km` was calculated using the live KM the user typed.
+- Same for `actual_km_traveled` — if the user only typed the *extra* (or the input went via auto-set), the saved row stores 0 but `extra_km` ≠ 0.
 
-Then I’ll use that resolver in:
-- `useBranchFinanceSettings`
-- `useGenerateBulkARInvoices`
-- `usePostPaymentToGL`
-- `useBackfillARInvoiceLinks`
+## What I'll change
 
-This prevents Katunayaka from writing batches/JEs/AR into the wrong company just because the current selector/context drifted.
-
-### 2. Fix AR invoice visibility logic for School Bus
-In `src/contexts/CompanyContext.tsx` and `src/hooks/useAccountingData.ts`:
-
-- add a fallback business-unit mapping when `short_code` is missing
-  - `school_bus -> SBO`
-  - `special_hire -> SPH`
-  - `yutong -> YUT`
-  - `sinotruck -> SNT`
-  - `light_vehicle -> LTV`
-- update `useARInvoices()` to prefer **`business_unit_code = SBO`** for School Bus sub-company views
-- keep invoice-number prefix filtering only as a legacy last-resort, not the main rule
-
-This ensures School Bus AR shows all SBO invoices regardless of numbering pattern (`SBS-*` or `INV-NCGH-*`).
-
-### 3. Unify customer resolution for School Bus AR + payment sync
-Create one shared helper in `src/hooks/useSchoolBusFinance.ts` for branch finance customer resolution:
-- Katunayaka -> `SBS-LKA`
-- Nuwara Eliya -> `SBS-NUW`
-- etc.
-
-Use the same helper in:
-- bulk AR generation
-- orphan/backfill linking
-- payment-time sync when `ar_invoice_id` is missing
-
-This restores the rule:
-- **invoice created -> linked Finance AR exists**
-- **student payment -> same AR invoice auto-updates to partial/paid**
-
-### 4. Add a targeted migration for Katunayaka only
-Create a new migration to safely fix only Katunayaka’s broken records.
-
-The migration will:
-
-#### A. normalize finance settings
-- move/copy Katunayaka School Bus finance settings from **Test School Bus company** to the correct **live School Bus company**
-- preserve the current correct Holding COA account IDs
-
-#### B. repair broken 2026-04-21 records
-- find Katunayaka `school_ar_invoices` with `ar_invoice_id IS NULL`
-- create missing `ar_invoices` in **NCG Holding**
-- link them back into `school_ar_invoices.ar_invoice_id`
-
-#### C. migrate wrongly-posted Katunayaka finance rows from TEST to LIVE hierarchy
-for Katunayaka-linked historical School Bus finance records:
-- move `school_ar_invoice_batches.company_id` to live School Bus company
-- move `ar_invoices.company_id` to NCG Holding
-- move `journal_entries.company_id` to NCG Holding
-- align `journal_entry_lines.company_id` to NCG Holding
-- preserve `business_unit_code = 'SBO'`
-- keep existing JE/account links intact
-
-This is the key step that makes Katunayaka history visible in LIVE AR without touching branches that already work.
-
-### 5. Harden against future silent damage
-Before posting School Bus AR or payment JEs:
-- validate posting context is coherent
-- validate School Bus settings belong to the resolved operational company
-- validate COA accounts belong to the resolved effective GL company
-- fail loudly with a toast instead of silently producing hidden records
-
-## Files to touch
+### Files
 
 | File | Change |
 |---|---|
-| `src/hooks/useSchoolBusFinance.ts` | Add School Bus company-context resolver, shared customer resolver, update generation/payment/backfill flows |
-| `src/hooks/useAccountingData.ts` | Fix `useARInvoices()` filtering to rely on `business_unit_code` for SBO views |
-| `src/contexts/CompanyContext.tsx` | Add fallback BU-code mapping when `short_code` is missing |
-| `src/components/school/RecordPaymentModal.tsx` | Point payment sync to shared School Bus customer/linking logic if needed |
-| `supabase/migrations/<new>.sql` | Katunayaka-only settings normalization + batch/AR/JE migration + missing AR backfill |
+| `src/components/special-hire/TripDetailsModal.tsx` | Pass real `tripDistance`, `totalKm`, full bus type, and `total_additional_charges` into `GenerateBalanceInvoiceModal`. Compute total trip distance = `km_parking_to_pickup + km_trip + km_drop_to_parking + Σ additional_charges[type='additional_distance'].distance`. |
+| `src/components/special-hire/GenerateBalanceInvoiceModal.tsx` | Accept and forward `tripDistance`, `totalKm`, plus a new `quotationAdditionalDistanceKm` and `quotationAdditionalChargeBreakdown[]`. Fill `actualKmTraveled` and `originalQuotedKm` on the `InvoiceData` even when only the quotation-time extras exist (no post-trip adjustment). |
+| `src/lib/invoice-generator.ts` | (a) Robust mileage: prefer `actualKmTraveled`, then `tripDistance`, then `totalKm`, then `originalQuotedKm` — never silently 0. (b) When quotation has `additional_distance` charges, append a "Quotation Extra Distance" row right above the Extra KM Adjustment block in the totals table, plus include the quoted-extra km in the Mileage line as `Quoted: X KM (incl. +Y km extras)`. (c) Add the quotation-extra km charge as a visible totals row when present. |
+| `src/components/special-hire/PostTripAdjustmentModal.tsx` | Guard `buildAdjustment()`: if `originalKm` prop is 0 but `actualKm > 0`, refuse to save with explicit toast; always force `original_quoted_km` to the resolved quotation `km_trip` (read once on open, never trust prop default of 0). Also force `actual_km_traveled = actualKm` (never default to 0) — using the `extraKm` value as a sanity check. |
+| `src/hooks/usePostTripAdjustment.ts` | In `saveAdjustmentDraft` and `finalizeAdjustment`, validate that `original_quoted_km > 0` whenever `extra_km !== 0`. Throw a clear error if invariant breaks (so we never silently persist 0/0/+7.8 again). |
+| `src/components/special-hire/EnhancedDocumentViewer.tsx` | Same fix as `GenerateBalanceInvoiceModal`: include `tripDistance` (computed total) and quotation-time additional distance in the rebuilt `InvoiceData` so signed/regenerated PDFs show the right Mileage too. |
+| `src/lib/special-hire-invoice-helpers.ts` | Add `getInvoiceMileage(quotation, adjustment?)` helper that returns `{ quoted: number, actual: number, extras: number }` so all callers (invoice modal, document viewer, post-trip preview) compute the same mileage values. Use everywhere instead of ad-hoc math. |
+| `src/components/special-hire/PostTripAdjustmentPreview.tsx` | Use the new helper so the PDF preview also reflects "Quoted (incl. quotation extras): X km / Actual: Y km" consistently. |
 
-## What you’ll see after the fix
+### One-time DB cleanup (small migration)
+For existing `special_hire_trip_adjustments` rows where `original_quoted_km = 0` AND a parent quotation has `km_trip > 0`:
+- Backfill `original_quoted_km = quotations.km_trip` (with parking-to-pickup + drop-to-parking added if available).
+- Backfill `actual_km_traveled = original_quoted_km + extra_km` so existing already-finalized invoices regenerate correctly.
+- Scope: Special Hire only; do **not** touch SBO/YUT/SNT/LTV.
 
-1. **Katunayaka AR invoices appear in LIVE Accounting → AR → Invoices**
-2. The missing latest invoice(s), including the broken **2026-04-21** batch, will exist as proper Finance AR rows
-3. Older Katunayaka invoices that were wrongly sitting under TEST become visible in LIVE
-4. When a **student pays**, the linked AR invoice updates to **partial/paid** again
-5. Other branches stay safe because:
-   - migration is scoped to **Katunayaka only**
-   - AR query change is additive and based on correct `business_unit_code`
-   - School Bus posting guard prevents future wrong-company writes
+### Behavior after the fix (matches your screenshots)
 
-## Technical notes
-- Verified broken Katunayaka batch on `2026-04-21` was saved under **NCG Test parent**
-- Verified broken school invoice `SBS-INV-202604-01142` currently has **no Finance AR link**
-- Verified older Katunayaka linked AR rows exist but are under **TEST company_id**
-- Verified live `School Bus Operations` company currently lacks a usable `short_code`, which is why the AR list falls back to fragile invoice-prefix filtering
+1. The Invoice "Mileage" line will show:
+   - With post-trip adjustment: `Mileage: 108 KM (Quoted: 100.2 KM, +7.8 km extra)` instead of `100.2 KM`.
+   - With quotation-time extra distance only (no post-trip adj): `Mileage: 120 KM (Base: 100 KM, +20 km quotation extras)`.
+   - With both: combined display showing base, quotation extras, and post-trip extras.
+2. The "Item Detail" remark line will spell out the route, and the totals table will show:
+   - **Quotation Extra Distance Charge** (when applicable) — separate row, visible to customer.
+   - **Extra KM Adjustment** (post-trip) — already exists, will now also display the correct quoted vs actual values.
+3. The financial flow stays unchanged — `total_additional_charges` already rolls into `Original Quote Amount`. We're just **making it visible** on the customer document.
+4. Future post-trip adjustments cannot be saved with `original_quoted_km = 0` while `extra_km ≠ 0` — the system will throw a clear toast and refuse.
+5. Existing broken invoices (like the one in your screenshot) regenerate correctly after the one-time backfill.
+
+### Out of scope (say the word for any)
+- Re-issuing/auto-resending the already-emailed broken invoices.
+- Adding a "Distance breakdown" sub-table on the QuotationPreview.tsx (only invoice fixed here).
+- Changing the GL posting amounts (numbers stay identical; only display strings change, plus the quotation-extra row that was already in the GL via `total_additional_charges`).
+
