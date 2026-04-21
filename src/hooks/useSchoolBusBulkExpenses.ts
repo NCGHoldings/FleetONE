@@ -291,12 +291,14 @@ export function useSchoolBusBulkExpenses() {
             company_id: effectiveCompanyId,
             business_unit_code: 'SBO',
             business_unit_id: selectedCompanyId,
+            source_module: 'school_bus_fuel_import',
             posted_at: new Date().toISOString(),
           })
           .select()
           .single();
 
         if (jeError) throw jeError;
+        postedCount += 1;
 
         // Link journal entry back to daily_bus_expenses if it lacked one
         if (dailyExpenseId) {
