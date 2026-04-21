@@ -20,6 +20,7 @@ import {
   postDiscountToGLStandalone,
   updateSPHARInvoiceOnInvoiceSent,
 } from '@/hooks/useSpecialHireFinance';
+import { getInvoiceMileage, getQuotationAdditionalDistance, calculateTotalKm } from '@/lib/special-hire-invoice-helpers';
 
 
 interface GenerateBalanceInvoiceModalProps {
