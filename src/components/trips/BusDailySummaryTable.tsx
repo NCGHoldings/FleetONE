@@ -41,6 +41,14 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
     expenses: DailyExpenseData | null;
   } | null>(null);
   
+  const [editingCrewTrip, setEditingCrewTrip] = useState<{
+    id: string;
+    trip_no: string;
+    route_name: string;
+    driver_name?: string;
+    conductor_name?: string;
+  } | null>(null);
+
   const [editingTrip, setEditingTrip] = useState<{
     id: string;
     trip_no: string;
