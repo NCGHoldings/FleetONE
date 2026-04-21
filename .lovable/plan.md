@@ -1,50 +1,62 @@
 
 
-# Fix: "invalid input syntax for type uuid: customer:..." when selecting a Customer in AP Direct Payment
+# Fix: AP Payments shows "Unknown" for Direct (Float) and Customer payees
 
 ## Root cause
 
-`SearchableVendorSelector` returns customer IDs prefixed with `customer:<uuid>` (line 102) so the consumer can distinguish vendor vs customer rows. But two consumers don't unwrap the prefix:
+`APPaymentsView.getVendorName(vendor_id)` only looks up the `vendors` table. For three types of records, `vendor_id` is NULL by design, so the function falls through to `"Unknown"`:
 
-1. **`APPaymentForm.tsx`** stores the raw `customer:UUID` string in form state and passes it as `vendor_id` to the mutation.
-2. **`useCreateAPPayment` (`useAccountingMutations.ts` lines 1100–1132)** uses that string in `vendors.select(...).eq("id", payment.vendor_id)` *and* inserts it into `ap_payments.vendor_id` (a `uuid` column) → Postgres rejects with `22P02 invalid input syntax for type uuid`.
+| `payee_type` | `vendor_id` | `payee_customer_id` | `bus_no` | What we should show |
+|---|---|---|---|---|
+| `vendor` | uuid | NULL | NULL | Vendor name (works today) |
+| `customer` | NULL | uuid | NULL | Customer name (broken — shows "Unknown") |
+| `direct` (fuel float) | NULL | NULL | e.g. `BF-023` | "Bus BF-023 (Fuel)" (broken — shows "Unknown") |
 
-The DB already has the correct columns to support this case: `payee_type` (text, NOT NULL), `payee_customer_id` (uuid, nullable), `vendor_id` (uuid, nullable). The `payee_consistency_check` constraint we added in the last migration accepts `payee_type='customer' AND payee_customer_id IS NOT NULL AND vendor_id IS NULL`. So the schema is ready — only the code needs to split the prefixed string and route it correctly.
+Verified in DB: 28 `DP-FUEL-*` rows and 1 `PAY-2026-20264` (customer) all show "Unknown" in the table because the resolver never checks `payee_customer_id` or `bus_no`.
+
+Secondary issue: `useAPPayments` joins `vendors` and `bank_accounts` but never joins `customers`, so even if we fix the resolver we'd need the customer record available.
 
 ## What I'll change
 
-### 1. `src/components/accounting/APPaymentForm.tsx`
-- Add a small helper at the top of the component: `parsePayee(value) → { type: 'vendor'|'customer', id: uuid }`. If value starts with `customer:`, type=customer, id=substring(9); else type=vendor, id=value.
-- In `handleVendorChange`: keep storing the prefixed string in local UI state (so the dropdown stays highlighted) but compute the real id/type once and stash it in two new state vars `payeeType`, `payeeId`.
-- In `onSubmit`: pass the real id + type to the mutation as new fields `payee_type` and `payee_id` (instead of always sending `vendor_id`). Skip the vendor-bank-account fetch when payee is a customer.
-- Skip "pending invoices for vendor" panel and bank-account autofill when payee is a customer (those queries assume vendors).
+### 1. `src/hooks/useAccountingData.ts` — `useAPPayments` query
+Add a customer join to the select string so each payment row carries the customer's name when applicable:
+```
+customers!ap_payments_payee_customer_id_fkey (
+  id, customer_code, customer_name
+)
+```
+(If the FK constraint name differs, fall back to `customers ( id, customer_code, customer_name )` — Supabase will infer it from `payee_customer_id`.)
 
-### 2. `src/hooks/useAccountingMutations.ts` — `useCreateAPPayment`
-- Extend the input type with `payee_type?: 'vendor'|'customer'` and `payee_id?: string`. Keep `vendor_id` for backward compatibility — if `payee_type` is missing, derive it (vendor).
-- Before the `vendors` lookup: if `payee_type==='customer'`, fetch from `customers` table for the name instead; otherwise fetch from `vendors`.
-- In the `ap_payments.insert(...)` call, set:
-  - `payee_type: payeeType`
-  - `vendor_id: payeeType==='vendor' ? payeeId : null`
-  - `payee_customer_id: payeeType==='customer' ? payeeId : null`
-- Same split applied to the GL posting block downstream (description text uses the resolved name; AR-vs-AP control account remains AP because the user is paying out — payee being a customer just means a customer refund / vendor payment to a customer entity).
+### 2. `src/components/accounting/APPaymentsView.tsx` — payee resolver
+Replace `getVendorName(vendor_id)` with a new `getPayeeLabel(payment)` that returns:
+- **vendor** → `payment.vendors?.vendor_name` (or vendor lookup as fallback)
+- **customer** → `payment.customers?.customer_name` with a small grey "(Customer)" suffix or badge
+- **direct** → `Bus ${payment.bus_no} (Fuel Float)` when `bus_no` exists, otherwise `"Direct (Float)"`
+- fallback → `"Unknown"` (only when no payee data at all)
 
-### 3. Defensive guard in the selector itself (one-line fix)
-- `SearchableVendorSelector` continues to emit `customer:<uuid>`. No change to its public contract — other call sites already handle/ignore customers because they pass `includeCustomers=false` by default.
+Apply this resolver in:
+- The "Vendor" column cell (line 316)
+- The cheque print payee (line 123)
+- The search filter (line 92) so users can search by customer name and bus_no
+
+### 3. Update the column header label
+Rename the column header `"Vendor"` → `"Payee"` to reflect that the column now correctly shows vendors, customers, and direct payees.
+
+### 4. Empty filter `vendor_id` in select
+The "All Vendors" dropdown filter (line 237) only lists vendors — leave it as is, but make sure searching by customer name / bus_no still works through the `searchTerm` filter (already covered above).
 
 ## Files touched
 
 | File | Change |
 |---|---|
-| `src/components/accounting/APPaymentForm.tsx` | Parse `customer:<uuid>` prefix; track `payee_type` + `payee_id`; pass them to mutation; skip vendor-only side effects when payee is a customer. |
-| `src/hooks/useAccountingMutations.ts` | Extend `useCreateAPPayment` input with `payee_type`/`payee_id`; route lookup + insert to `vendors` or `customers` accordingly; populate `payee_type` + correct id column. |
-
-No DB migration needed — schema and the constraint already accept `payee_type='customer'`.
+| `src/hooks/useAccountingData.ts` | Add `customers` join to `useAPPayments` select |
+| `src/components/accounting/APPaymentsView.tsx` | New `getPayeeLabel` resolver covering vendor + customer + direct/bus; column rename; search update |
 
 ## What you'll see after the fix
 
-1. In **Direct Payment (Without Invoice)**, picking a **Customer** from the Vendor / Payee dropdown no longer throws *"invalid input syntax for type uuid"*.
-2. The payment saves with `payee_type='customer'`, `payee_customer_id=<uuid>`, `vendor_id=NULL` — passing the consistency check.
-3. The toast confirms success and the new payment appears under **AP → Payments** with the customer name in the payee column.
-4. Vendor selections continue to work exactly as before (backward compatible).
-5. Bank-account autofill / pending-invoice panel now correctly stay hidden when the selected payee is a customer.
+1. The 28 **DP-FUEL-2026...** rows now show **"Bus BF-023 (Fuel Float)"**, **"Bus BF-009 (Fuel Float)"**, etc. instead of "Unknown".
+2. **PAY-2026-20264** (the customer payment) shows the actual customer name with a `(Customer)` tag.
+3. Vendor payments continue to show vendor names exactly as before.
+4. The column header reads **"Payee"**, and search now matches vendor names, customer names, and bus numbers.
+5. Cheque preview / print shows the correct payee for all three types.
 
