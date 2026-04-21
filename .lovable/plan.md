@@ -1,63 +1,79 @@
 
 
-# Fix: Direct Payment account selector is empty + add live balance & validation
+# Fix: GL data routed to wrong company COA + AP Payments visibility for Direct Payments
 
-## Root Cause (the bug you're seeing)
+## Root causes (3 connected bugs)
 
-In `src/pages/SchoolBusExpenseImport.tsx` the dropdown is wired to a state called `directAccounts`, but there is **no code that ever fetches and fills it**. The `useEffect` on line 78 loads branches, buses, vendors, and petty cash — but skips the chart-of-accounts query for asset float/bank accounts. So the dropdown opens empty.
+### Bug 1: Cross-company COA contamination
+- The "Pay From Account" dropdown in the import page (`SchoolBusExpenseImport.tsx`) queries `chart_of_accounts` **without filtering by `company_id`**, so it returns accounts from every company in the database.
+- In Test mode the user actually selected `FUEL FLOAT - DIALOG TOUCH_SBS` belonging to **NCG Holding** (`a0000000…`), then the JE was written under **NCG Test** (`f40b0a9d…`).
+- Result: the Holding-side FUEL FLOAT visibly updated (image 2), but the Test-side `VEHICLE FUEL` account did receive the debits (`current_balance` is now Rs 1,858,144) — yet the COA tree only ever shows NCG Holding's COA, so the user sees the stale Holding `VEHICLE FUEL` (Rs 54,900) and thinks nothing posted.
+
+### Bug 2: COA tree is hardcoded to NCG Holding
+- `src/components/accounting/ChartOfAccountsView.tsx` line 25: `const effectiveCompanyId = NCG_HOLDING_ID;` — overrides the company context, so Test-mode users always look at Holding's COA. New entries posted under NCG Test never appear in the drill-down they open.
+
+### Bug 3: Direct Payments are invisible in AP → Payments
+- "Direct Payment" mode skips `ap_invoices` *and* `ap_payments`, so the AP Payments listing never shows the fuel float spend. User wants every cash outflow visible in AP Payments for traceability.
 
 ## What I'll change
 
-### 1. Load the Pay-From accounts from the database
+### Fix 1 — Filter the "Pay From Account" dropdown by the active GL company
+File: `src/pages/SchoolBusExpenseImport.tsx`
+- Add `.eq("company_id", effectiveCompanyId)` to the `chart_of_accounts` fetch in `initData` so only the accounts belonging to the user's GL universe are shown.
+- Add same scoping to the petty-cash funds and vendors queries (defensive — same risk).
 
-Add a Supabase query inside `initData` that fetches all **active asset** accounts whose name contains FLOAT, BANK, or CASH (incl. the SBS fuel float you need: code `13005002` = FUEL FLOAT - DIALOG TOUCH_SBS, current balance Rs 5,000,000). Order by account_code so SBS sits next to the other floats.
+### Fix 2 — Make ChartOfAccountsView respect company context
+File: `src/components/accounting/ChartOfAccountsView.tsx`
+- Replace the hardcoded `const effectiveCompanyId = NCG_HOLDING_ID;` with `const effectiveCompanyId = getEffectiveCompanyId();` from `useCompany()`. Falls back to NCG Holding only if nothing is selected.
+- Same query-key change so React Query refetches when company switches.
 
-### 2. Default to FUEL FLOAT - DIALOG TOUCH_SBS
+### Fix 3 — Validate company match before posting (guard rail)
+File: `src/hooks/useSchoolBusBulkExpenses.ts`
+- Before writing JE lines, verify both `defaultFuelAccountId` and `creditAccountId` belong to `effectiveCompanyId`. If either doesn't, abort with a clear error: *"Selected account belongs to a different company. Pick an account from the current company's COA."*
+- This stops the silent cross-company posting permanently.
 
-After the fetch, auto-select the SBS float (account code `13005002`) so the user doesn't need to pick it manually for the common case. They can change it if needed.
+### Fix 4 — Surface Direct Payments in AP → Payments (the main UX request)
+File: `src/hooks/useSchoolBusBulkExpenses.ts`
+- After the JE is posted in the `direct` branch, also insert one consolidated `ap_payments` row per import batch:
+  - `payment_number`: `DP-FUEL-{date}-{seq}` via the existing numbering pattern
+  - `vendor_id`: null (Direct Payment without vendor)
+  - `payee_type`: `'direct'`
+  - `payment_method`: `'direct'`
+  - `bank_account_id`: null (since the source is a float account, not a bank — store the float account id in `notes`/`reference`)
+  - `is_direct_payment`: true
+  - `amount` / `total_with_fees`: sum of the batch
+  - `journal_entry_id`: null at batch level (each row's JE is per-bus); store the batch JE list in `notes` for traceability
+  - `status`: `paid`, `approval_status`: `approved`
+  - `business_unit_code`: `SBO`, `company_id`: `effectiveCompanyId`
+  - `notes`: includes "Bulk fuel float drawdown — N buses, source: <float account name>"
 
-### 3. Show the live balance next to each option
+  Optional alternative (cleaner): create one `ap_payments` row **per bus** linked to that bus's JE — this makes the per-bus drill-down work in AP Payments. I'll go with this per-bus option since it preserves audit trail and matches existing AP Payments UX.
 
-Each `<SelectItem>` will render: account_code + account_name + current_balance in Rs. So the dropdown looks like:
+- Result: every Direct Payment now appears in the AP → Payments tab with a "Direct" payment method badge, full amount, bus reference, and a click-through to the JE.
 
-```
-13005001  FUEL FLOAT - DIALOG TOUCH         Rs 0.00
-13005002  FUEL FLOAT - DIALOG TOUCH_SBS     Rs 5,000,000.00   ← default
-13005003  FUEL FLOAT - DIALOG TOUCH_SHS     Rs 3,841,959.72
-13001006  NTB BANK C/A - 100530011672       Rs 3,923,411.50
-... (banks)
-```
-
-### 4. Add live validation panel below the dropdown
-
-Once an account is selected AND the Excel preview has rows, show a small validation card:
-
-```
-Selected Account Balance:    Rs 5,000,000.00
-Excel Import Total:          Rs   473,562.40   (sum of Fuel Cost column)
-Balance After Posting:       Rs 4,526,437.60   ← green if ≥ 0
-                                                  ← red + warning if < 0
-```
-
-If the Excel total exceeds the available balance, show a red alert "**Insufficient float balance — top up the float account before importing**" and **disable the Confirm & Post GL button**.
-
-### 5. Lock the Confirm button when nothing is selected
-
-Currently the Confirm button only checks branch + valid rows. Add: when payment mode is `direct`, require `directPaymentAccountId` to be set AND `excelTotal ≤ accountBalance`.
+### Fix 5 — Display "Direct" payment method label in the AP Payments table
+File: `src/components/accounting/APPaymentsView.tsx` (or wherever the method column renders)
+- Add a `'direct'` case to the payment-method label/badge mapping so it renders as **"Direct (Float)"** instead of "—".
 
 ## Files touched
 
-| File | Change |
+| File | Purpose |
 |---|---|
-| `src/pages/SchoolBusExpenseImport.tsx` | (a) Add COA fetch in `initData`. (b) Auto-default to `13005002`. (c) Render code + name + balance in each dropdown item. (d) Compute `excelTotal = sum(parsedData.amount)` and `remainingBalance = balance − excelTotal`; render the validation card. (e) Extend the Confirm button's `disabled` condition. |
-
-No DB schema changes, no new edge functions, no changes to `useSchoolBusBulkExpenses.ts`.
+| `src/pages/SchoolBusExpenseImport.tsx` | Scope COA + petty cash + vendor fetches to `effectiveCompanyId` |
+| `src/components/accounting/ChartOfAccountsView.tsx` | Respect company context instead of hardcoding NCG Holding |
+| `src/hooks/useSchoolBusBulkExpenses.ts` | Cross-company guard + per-bus `ap_payments` insertion in `direct` branch |
+| `src/components/accounting/APPaymentsView.tsx` | Render "Direct (Float)" label for the new method |
 
 ## What you'll see after the fix
 
-1. Open `/school-bus/import-expenses` → pick **Direct Payment** mode.
-2. The "Pay From Account" dropdown now lists all asset float + bank + cash accounts with their **current balance shown next to each name**.
-3. **FUEL FLOAT - DIALOG TOUCH_SBS (Rs 5,000,000)** is pre-selected by default.
-4. After uploading the Excel file, a validation card appears showing: account balance, Excel import total, and balance after posting (green if OK, red + alert if insufficient).
-5. The "Confirm & Post GL" button is disabled until everything checks out.
+1. **In Test mode**, the COA tree now shows NCG Test's accounts (including the correct `VEHICLE FUEL` with the real Rs 1,858,144 balance and 76 transactions).
+2. The "Pay From Account" dropdown only lists accounts that belong to the active GL company — no more cross-company selection.
+3. If anyone tries to post against a foreign-company account, the import is blocked with a clear error.
+4. Every "Direct Payment" fuel batch now creates `ap_payments` rows visible at **/accounting → AP → Payments**, one per bus, marked **Direct (Float)**, showing amount, bus, date, and a link to the JE.
+5. AP Payments KPIs ("Payments Today", "This Month") now correctly include float-funded fuel spend.
+
+## Out of scope (mention if you want them next)
+- Backfill: re-tag the existing 76 mis-routed JE lines so they show under the correct COA tree. Needs a one-time SQL migration once you confirm which company they should belong to.
+- Cleaning the duplicate `61204003` accounts (one in Holding, one in Test) — both can stay if intentional, but worth a separate review.
+- Same Direct Payment visibility for the manual single-bus expense form.
 
