@@ -899,6 +899,16 @@ export function usePostPaymentToGL() {
         throw new Error("Trade Receivables account not configured");
       }
 
+      // Guard against cross-company COA leakage (same root cause as Katunayaka).
+      const paymentValidation = await validateGLAccountsBelongToCompany(effectiveSettings, effectiveCompanyId);
+      if (!paymentValidation.ok) {
+        const codes = paymentValidation.mismatched.map((a) => a.account_code).join(", ");
+        throw new Error(
+          `Cannot post payment: GL accounts (${codes}) belong to a different company. ` +
+          `Open Settings → School Bus Finance for this branch and re-pick the Trade Receivable / Sales / Advance accounts under the active company.`,
+        );
+      }
+
       // Use branch_gl_account_id directly (from COA) instead of looking up from bank_accounts
       // Priority: branch_gl_account_id > cash_account_id
       const bankGLAccountId = effectiveSettings.branch_gl_account_id || effectiveSettings.cash_account_id;
