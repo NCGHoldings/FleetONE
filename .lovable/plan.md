@@ -1,69 +1,59 @@
 
 
-# Fix: Special Hire Invoice — Mileage shows quoted-only, Extra KM (quotation-time + post-trip) not reflected
+# Continue: Special Hire Mileage Fix — Remaining Tasks
 
-## What's broken (verified in code)
+Picking up from the last batch. Three items left from the approved plan.
 
-### Bug 1: Invoice "Mileage" line always shows the quoted KM, never the actual KM traveled
-File: `src/lib/invoice-generator.ts` (lines 305-307, 480-482)
+## 1. Backfill broken adjustment rows (DB migration)
 
-```ts
-const mileage = (data.hasAdjustments && data.actualKmTraveled)
-  ? data.actualKmTraveled
-  : (data.tripDistance || data.totalKm || 0);
+Targeted, Special-Hire-only migration. Scope: `special_hire_trip_adjustments` rows where `original_quoted_km = 0` but parent quotation has `km_trip > 0`.
+
+```sql
+-- Backfill original_quoted_km from quotations.km_trip (+ parking legs if available)
+UPDATE special_hire_trip_adjustments a
+SET original_quoted_km = COALESCE(q.km_trip, 0)
+                       + COALESCE(q.km_parking_to_pickup, 0)
+                       + COALESCE(q.km_drop_to_parking, 0)
+FROM quotations q
+WHERE a.quotation_id = q.id
+  AND a.original_quoted_km = 0
+  AND COALESCE(q.km_trip, 0) > 0;
+
+-- Backfill actual_km_traveled = quoted + extra so existing finalized invoices regenerate correctly
+UPDATE special_hire_trip_adjustments
+SET actual_km_traveled = original_quoted_km + COALESCE(extra_km, 0)
+WHERE actual_km_traveled = 0
+  AND original_quoted_km > 0;
 ```
 
-The fallback uses `data.tripDistance || data.totalKm || 0`. But:
-- `TripDetailsModal.tsx` (lines 301–325) builds `quotationData` for `GenerateBalanceInvoiceModal` and **never passes** `tripDistance` or `totalKm`. They are `undefined`.
-- `GenerateBalanceInvoiceModal.tsx` (lines 238-239) just forwards those undefined values.
-- The screenshot text "Quoted: 0 km | Actual: 0 km" proves the saved adjustment row has `original_quoted_km = 0` and `actual_km_traveled = 0` (because of stale-prop save inside `PostTripAdjustmentModal`).
-- Result: invoice's Mileage cell ends up showing 0 or only the "fixed rate 1 km – 100 km" boilerplate, never the real total traveled distance.
+No SBO / YUT / SNT / LTV rows touched.
 
-### Bug 2: Quotation-time "Additional Distance" (extra km added inside the quotation form via Additional Charges) is invisible on the invoice
-- The quotation form supports `additional_charges` JSONB items of type `additional_distance` (each with its own `distance` + `amount`). See `EnhancedCostCalculator.tsx` line 333-336 (`additionalDistanceFromCharges`) and `SpecialHireForm.tsx` (additional charges loader).
-- These km **never** flow into the invoice's Mileage line, item description, or the "Original Quote Amount". Only the lump-sum money side hits `total_additional_charges` (rolled into `gross_revenue`), but the customer can't see *what* the extra km were.
+## 2. Sync `PostTripAdjustmentPreview.tsx` to the new helper
 
-### Bug 3: Post-trip adjustment row sometimes persists with `original_quoted_km = 0` / `actual_km_traveled = 0`
-- `PostTripAdjustmentModal` props default `originalKm = 0`. If the modal opens before `trip.quotation.km_trip` is hydrated, `buildAdjustment()` snapshots 0.
-- The DB row is then upserted with `original_quoted_km = 0`, even though `extra_km` was calculated using the live KM the user typed.
-- Same for `actual_km_traveled` — if the user only typed the *extra* (or the input went via auto-set), the saved row stores 0 but `extra_km` ≠ 0.
+Replace local mileage math with `getInvoiceMileage(quotation, adjustment)` from `src/lib/special-hire-invoice-helpers.ts` so the post-trip preview shows the same Quoted / Actual / Extras numbers as the final invoice and the document viewer.
 
-## What I'll change
+## 3. Sync `TripDetailsModal.tsx` props to `GenerateBalanceInvoiceModal`
 
-### Files
+Pass the full distance context the invoice generator now expects:
+- `tripDistance` = `km_parking_to_pickup + km_trip + km_drop_to_parking + Σ additional_charges[type='additional_distance'].distance`
+- `totalKm` = same total (legacy alias)
+- `quotationAdditionalDistanceKm` and `quotationAdditionalChargeBreakdown[]` from the loaded quotation
+- `total_additional_charges` for amount-side parity
+
+This closes the "modal opened from spreadsheet" path so the Mileage line is correct without needing a post-trip adjustment.
+
+## Files
 
 | File | Change |
 |---|---|
-| `src/components/special-hire/TripDetailsModal.tsx` | Pass real `tripDistance`, `totalKm`, full bus type, and `total_additional_charges` into `GenerateBalanceInvoiceModal`. Compute total trip distance = `km_parking_to_pickup + km_trip + km_drop_to_parking + Σ additional_charges[type='additional_distance'].distance`. |
-| `src/components/special-hire/GenerateBalanceInvoiceModal.tsx` | Accept and forward `tripDistance`, `totalKm`, plus a new `quotationAdditionalDistanceKm` and `quotationAdditionalChargeBreakdown[]`. Fill `actualKmTraveled` and `originalQuotedKm` on the `InvoiceData` even when only the quotation-time extras exist (no post-trip adjustment). |
-| `src/lib/invoice-generator.ts` | (a) Robust mileage: prefer `actualKmTraveled`, then `tripDistance`, then `totalKm`, then `originalQuotedKm` — never silently 0. (b) When quotation has `additional_distance` charges, append a "Quotation Extra Distance" row right above the Extra KM Adjustment block in the totals table, plus include the quoted-extra km in the Mileage line as `Quoted: X KM (incl. +Y km extras)`. (c) Add the quotation-extra km charge as a visible totals row when present. |
-| `src/components/special-hire/PostTripAdjustmentModal.tsx` | Guard `buildAdjustment()`: if `originalKm` prop is 0 but `actualKm > 0`, refuse to save with explicit toast; always force `original_quoted_km` to the resolved quotation `km_trip` (read once on open, never trust prop default of 0). Also force `actual_km_traveled = actualKm` (never default to 0) — using the `extraKm` value as a sanity check. |
-| `src/hooks/usePostTripAdjustment.ts` | In `saveAdjustmentDraft` and `finalizeAdjustment`, validate that `original_quoted_km > 0` whenever `extra_km !== 0`. Throw a clear error if invariant breaks (so we never silently persist 0/0/+7.8 again). |
-| `src/components/special-hire/EnhancedDocumentViewer.tsx` | Same fix as `GenerateBalanceInvoiceModal`: include `tripDistance` (computed total) and quotation-time additional distance in the rebuilt `InvoiceData` so signed/regenerated PDFs show the right Mileage too. |
-| `src/lib/special-hire-invoice-helpers.ts` | Add `getInvoiceMileage(quotation, adjustment?)` helper that returns `{ quoted: number, actual: number, extras: number }` so all callers (invoice modal, document viewer, post-trip preview) compute the same mileage values. Use everywhere instead of ad-hoc math. |
-| `src/components/special-hire/PostTripAdjustmentPreview.tsx` | Use the new helper so the PDF preview also reflects "Quoted (incl. quotation extras): X km / Actual: Y km" consistently. |
+| `supabase/migrations/<new>.sql` | Backfill `original_quoted_km` and `actual_km_traveled` for Special Hire adjustments only |
+| `src/components/special-hire/PostTripAdjustmentPreview.tsx` | Use `getInvoiceMileage()` instead of inline math |
+| `src/components/special-hire/TripDetailsModal.tsx` | Compute and pass `tripDistance`, `totalKm`, quotation-extra distance breakdown into `GenerateBalanceInvoiceModal` |
 
-### One-time DB cleanup (small migration)
-For existing `special_hire_trip_adjustments` rows where `original_quoted_km = 0` AND a parent quotation has `km_trip > 0`:
-- Backfill `original_quoted_km = quotations.km_trip` (with parking-to-pickup + drop-to-parking added if available).
-- Backfill `actual_km_traveled = original_quoted_km + extra_km` so existing already-finalized invoices regenerate correctly.
-- Scope: Special Hire only; do **not** touch SBO/YUT/SNT/LTV.
+## After this finishes
 
-### Behavior after the fix (matches your screenshots)
-
-1. The Invoice "Mileage" line will show:
-   - With post-trip adjustment: `Mileage: 108 KM (Quoted: 100.2 KM, +7.8 km extra)` instead of `100.2 KM`.
-   - With quotation-time extra distance only (no post-trip adj): `Mileage: 120 KM (Base: 100 KM, +20 km quotation extras)`.
-   - With both: combined display showing base, quotation extras, and post-trip extras.
-2. The "Item Detail" remark line will spell out the route, and the totals table will show:
-   - **Quotation Extra Distance Charge** (when applicable) — separate row, visible to customer.
-   - **Extra KM Adjustment** (post-trip) — already exists, will now also display the correct quoted vs actual values.
-3. The financial flow stays unchanged — `total_additional_charges` already rolls into `Original Quote Amount`. We're just **making it visible** on the customer document.
-4. Future post-trip adjustments cannot be saved with `original_quoted_km = 0` while `extra_km ≠ 0` — the system will throw a clear toast and refuse.
-5. Existing broken invoices (like the one in your screenshot) regenerate correctly after the one-time backfill.
-
-### Out of scope (say the word for any)
-- Re-issuing/auto-resending the already-emailed broken invoices.
-- Adding a "Distance breakdown" sub-table on the QuotationPreview.tsx (only invoice fixed here).
-- Changing the GL posting amounts (numbers stay identical; only display strings change, plus the quotation-extra row that was already in the GL via `total_additional_charges`).
+- Already-finalized broken invoices regenerate with correct Quoted / Actual / Extras KM.
+- Post-trip preview, final invoice PDF, and signed/regenerated PDFs all show identical mileage values (single source of truth).
+- Invoices generated directly from the trip spreadsheet (without a post-trip adjustment) also show the right Mileage and any quotation-time Extra Distance row.
+- No other branch / module is touched.
 
