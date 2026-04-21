@@ -739,6 +739,7 @@ export type Database = {
           invoice_date: string
           invoice_number: string
           journal_entry_id: string | null
+          legacy_number: string | null
           notes: string | null
           paid_amount: number | null
           period_id: string | null
@@ -750,6 +751,7 @@ export type Database = {
           tax_amount: number | null
           total_amount: number
           updated_at: string | null
+          vendor_bill_number: string | null
           vendor_id: string | null
           wht_amount: number | null
         }
@@ -771,6 +773,7 @@ export type Database = {
           invoice_date: string
           invoice_number: string
           journal_entry_id?: string | null
+          legacy_number?: string | null
           notes?: string | null
           paid_amount?: number | null
           period_id?: string | null
@@ -782,6 +785,7 @@ export type Database = {
           tax_amount?: number | null
           total_amount: number
           updated_at?: string | null
+          vendor_bill_number?: string | null
           vendor_id?: string | null
           wht_amount?: number | null
         }
@@ -803,6 +807,7 @@ export type Database = {
           invoice_date?: string
           invoice_number?: string
           journal_entry_id?: string | null
+          legacy_number?: string | null
           notes?: string | null
           paid_amount?: number | null
           period_id?: string | null
@@ -814,6 +819,7 @@ export type Database = {
           tax_amount?: number | null
           total_amount?: number
           updated_at?: string | null
+          vendor_bill_number?: string | null
           vendor_id?: string | null
           wht_amount?: number | null
         }
@@ -1011,7 +1017,10 @@ export type Database = {
           is_advance: boolean | null
           is_direct_payment: boolean | null
           journal_entry_id: string | null
+          legacy_number: string | null
           notes: string | null
+          payee_customer_id: string | null
+          payee_type: string
           payment_date: string
           payment_method: string | null
           payment_number: string
@@ -1046,7 +1055,10 @@ export type Database = {
           is_advance?: boolean | null
           is_direct_payment?: boolean | null
           journal_entry_id?: string | null
+          legacy_number?: string | null
           notes?: string | null
+          payee_customer_id?: string | null
+          payee_type?: string
           payment_date: string
           payment_method?: string | null
           payment_number: string
@@ -1081,7 +1093,10 @@ export type Database = {
           is_advance?: boolean | null
           is_direct_payment?: boolean | null
           journal_entry_id?: string | null
+          legacy_number?: string | null
           notes?: string | null
+          payee_customer_id?: string | null
+          payee_type?: string
           payment_date?: string
           payment_method?: string | null
           payment_number?: string
@@ -1121,6 +1136,13 @@ export type Database = {
             columns: ["journal_entry_id"]
             isOneToOne: false
             referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payments_payee_customer_id_fkey"
+            columns: ["payee_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
           {
@@ -1804,6 +1826,7 @@ export type Database = {
           invoice_date: string
           invoice_number: string
           journal_entry_id: string | null
+          legacy_number: string | null
           notes: string | null
           paid_amount: number | null
           period_id: string | null
@@ -1833,6 +1856,7 @@ export type Database = {
           invoice_date: string
           invoice_number: string
           journal_entry_id?: string | null
+          legacy_number?: string | null
           notes?: string | null
           paid_amount?: number | null
           period_id?: string | null
@@ -1862,6 +1886,7 @@ export type Database = {
           invoice_date?: string
           invoice_number?: string
           journal_entry_id?: string | null
+          legacy_number?: string | null
           notes?: string | null
           paid_amount?: number | null
           period_id?: string | null
@@ -1993,6 +2018,7 @@ export type Database = {
           id: string
           is_advance: boolean | null
           journal_entry_id: string | null
+          legacy_number: string | null
           notes: string | null
           override_gl_account_id: string | null
           payment_method: string | null
@@ -2019,6 +2045,7 @@ export type Database = {
           id?: string
           is_advance?: boolean | null
           journal_entry_id?: string | null
+          legacy_number?: string | null
           notes?: string | null
           override_gl_account_id?: string | null
           payment_method?: string | null
@@ -2045,6 +2072,7 @@ export type Database = {
           id?: string
           is_advance?: boolean | null
           journal_entry_id?: string | null
+          legacy_number?: string | null
           notes?: string | null
           override_gl_account_id?: string | null
           payment_method?: string | null
@@ -6093,6 +6121,7 @@ export type Database = {
         Row: {
           ar_account_id: string | null
           billing_address: string | null
+          business_registration_no: string | null
           business_unit_code: string | null
           company_id: string | null
           contact_person: string | null
@@ -6108,16 +6137,22 @@ export type Database = {
           email: string | null
           id: string
           is_active: boolean | null
+          legacy_number: string | null
+          nic_passport: string | null
+          normalized_phone: string | null
           notes: string | null
           payment_terms: number | null
           phone: string | null
           shipping_address: string | null
+          source_module: string | null
+          source_record_id: string | null
           tax_id: string | null
           updated_at: string | null
         }
         Insert: {
           ar_account_id?: string | null
           billing_address?: string | null
+          business_registration_no?: string | null
           business_unit_code?: string | null
           company_id?: string | null
           contact_person?: string | null
@@ -6133,16 +6168,22 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          legacy_number?: string | null
+          nic_passport?: string | null
+          normalized_phone?: string | null
           notes?: string | null
           payment_terms?: number | null
           phone?: string | null
           shipping_address?: string | null
+          source_module?: string | null
+          source_record_id?: string | null
           tax_id?: string | null
           updated_at?: string | null
         }
         Update: {
           ar_account_id?: string | null
           billing_address?: string | null
+          business_registration_no?: string | null
           business_unit_code?: string | null
           company_id?: string | null
           contact_person?: string | null
@@ -6158,10 +6199,15 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          legacy_number?: string | null
+          nic_passport?: string | null
+          normalized_phone?: string | null
           notes?: string | null
           payment_terms?: number | null
           phone?: string | null
           shipping_address?: string | null
+          source_module?: string | null
+          source_record_id?: string | null
           tax_id?: string | null
           updated_at?: string | null
         }
@@ -10270,6 +10316,7 @@ export type Database = {
           id: string
           is_recurring: boolean | null
           is_reversal: boolean | null
+          legacy_number: string | null
           next_run_date: string | null
           period_id: string | null
           posted_at: string | null
@@ -10298,6 +10345,7 @@ export type Database = {
           id?: string
           is_recurring?: boolean | null
           is_reversal?: boolean | null
+          legacy_number?: string | null
           next_run_date?: string | null
           period_id?: string | null
           posted_at?: string | null
@@ -10326,6 +10374,7 @@ export type Database = {
           id?: string
           is_recurring?: boolean | null
           is_reversal?: boolean | null
+          legacy_number?: string | null
           next_run_date?: string | null
           period_id?: string | null
           posted_at?: string | null
@@ -19355,6 +19404,7 @@ export type Database = {
       }
       sinotruck_customers: {
         Row: {
+          accounting_customer_id: string | null
           address: string | null
           company_name: string | null
           contact_number: string | null
@@ -19368,6 +19418,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          accounting_customer_id?: string | null
           address?: string | null
           company_name?: string | null
           contact_number?: string | null
@@ -19381,6 +19432,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          accounting_customer_id?: string | null
           address?: string | null
           company_name?: string | null
           contact_number?: string | null
@@ -19393,7 +19445,15 @@ export type Database = {
           is_active?: boolean | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_sinotruck_accounting_customer"
+            columns: ["accounting_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sinotruck_finance_settings: {
         Row: {
@@ -20915,6 +20975,7 @@ export type Database = {
           company_name: string | null
           created_at: string | null
           created_by: string | null
+          customer_address: string | null
           customer_email: string | null
           customer_name: string
           customer_phone: string
@@ -21018,6 +21079,7 @@ export type Database = {
           company_name?: string | null
           created_at?: string | null
           created_by?: string | null
+          customer_address?: string | null
           customer_email?: string | null
           customer_name: string
           customer_phone: string
@@ -21121,6 +21183,7 @@ export type Database = {
           company_name?: string | null
           created_at?: string | null
           created_by?: string | null
+          customer_address?: string | null
           customer_email?: string | null
           customer_name?: string
           customer_phone?: string
@@ -24049,6 +24112,7 @@ export type Database = {
           email: string | null
           id: string
           is_active: boolean | null
+          legacy_number: string | null
           notes: string | null
           payment_terms: number | null
           phone: string | null
@@ -24076,6 +24140,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          legacy_number?: string | null
           notes?: string | null
           payment_terms?: number | null
           phone?: string | null
@@ -24103,6 +24168,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          legacy_number?: string | null
           notes?: string | null
           payment_terms?: number | null
           phone?: string | null
@@ -25308,6 +25374,7 @@ export type Database = {
       }
       yutong_customers: {
         Row: {
+          accounting_customer_id: string | null
           address: string | null
           business_registration_no: string | null
           city: string | null
@@ -25332,6 +25399,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accounting_customer_id?: string | null
           address?: string | null
           business_registration_no?: string | null
           city?: string | null
@@ -25356,6 +25424,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accounting_customer_id?: string | null
           address?: string | null
           business_registration_no?: string | null
           city?: string | null
@@ -25380,6 +25449,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_yutong_accounting_customer"
+            columns: ["accounting_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "yutong_customers_parent_customer_id_fkey"
             columns: ["parent_customer_id"]
@@ -28391,6 +28467,15 @@ export type Database = {
       calculate_tyre_condition: { Args: { p_tyre_id: string }; Returns: number }
       can_access_school_branch: {
         Args: { _branch_id: string }
+        Returns: boolean
+      }
+      can_access_tenant_record: {
+        Args: {
+          target_business_unit_code?: string
+          target_company_id: string
+          target_document_number?: string
+          target_source_module?: string
+        }
         Returns: boolean
       }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
