@@ -523,7 +523,8 @@ export const useCreateARReceipt = () => {
       reference?: string;
       notes?: string;
       is_advance?: boolean;
-      party_type?: "customer" | "vendor";
+      party_type?: "customer" | "vendor" | "employee";
+      payee_employee_id?: string;
       override_gl_account_id?: string;
       bus_id?: string;
       bus_no?: string;
@@ -542,27 +543,41 @@ export const useCreateARReceipt = () => {
       // For consolidated GL: post to parent company, tag with business unit
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = getBusinessUnitCode();
-      
+
+      // For employee receipts, customer_id holds the staff_registry id (UI uses one selector).
+      // We must NOT write that into the customers FK column. Persist it on payee_employee_id
+      // and leave customer_id null so the FK does not break.
+      const isEmployeeParty = receipt.party_type === "employee";
+      const employeeId = isEmployeePary
+        ? receipt.customer_id
+        : (receipt.payee_employee_id || null);
+      // typo guard
+      const employeeIdResolved = isEmployeeParty ? receipt.customer_id : (receipt.payee_employee_id || null);
+      const customerFkValue = isEmployeeParty ? null : receipt.customer_id;
+
+      const insertPayload: any = {
+        receipt_number: receipt.receipt_number,
+        customer_id: customerFkValue,
+        receipt_date: receipt.receipt_date,
+        amount: receipt.amount,
+        payment_method: receipt.payment_method,
+        bank_account_id: receipt.bank_account_id,
+        reference: receipt.reference,
+        notes: receipt.notes,
+        is_advance: receipt.is_advance || false,
+        status: "posted",
+        company_id: effectiveCompanyId,
+        business_unit_code: businessUnitCode,
+        override_gl_account_id: receipt.override_gl_account_id || null,
+        bus_id: receipt.bus_id || null,
+        bus_no: receipt.bus_no || null,
+        vehicle_type: receipt.vehicle_type || null,
+        payee_employee_id: employeeIdResolved,
+      };
+
       const { data, error } = await supabase
         .from("ar_receipts")
-        .insert([{
-          receipt_number: receipt.receipt_number,
-          customer_id: receipt.customer_id,
-          receipt_date: receipt.receipt_date,
-          amount: receipt.amount,
-          payment_method: receipt.payment_method,
-          bank_account_id: receipt.bank_account_id,
-          reference: receipt.reference,
-          notes: receipt.notes,
-          is_advance: receipt.is_advance || false,
-          status: "posted",
-          company_id: effectiveCompanyId,
-          business_unit_code: businessUnitCode,
-          override_gl_account_id: receipt.override_gl_account_id || null,
-          bus_id: receipt.bus_id || null,
-          bus_no: receipt.bus_no || null,
-          vehicle_type: receipt.vehicle_type || null,
-        }])
+        .insert([insertPayload])
         .select()
         .single();
       
