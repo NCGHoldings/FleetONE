@@ -353,6 +353,31 @@ export default function SchoolBusExpenseImport() {
                   </div>
                 </div>
               )}
+
+              {/* Dynamic Direct Payment Fields */}
+              {paymentMethod === 'direct' && (
+                <div className="space-y-4 pt-2 border-t border-primary/10">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Pay From Account (Asset)</Label>
+                    <Select value={directPaymentAccountId} onValueChange={setDirectPaymentAccountId}>
+                      <SelectTrigger className="bg-white">
+                         <SelectValue placeholder="Select Float / Bank Account..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {directAccounts.map(a => (
+                          <SelectItem key={a.id} value={a.id}>
+                            <span className="font-mono text-xs text-muted-foreground mr-2">{a.account_code}</span>
+                            {a.account_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      No AP invoice will be created. Journal Entry: DR Fuel Expense / CR Selected Asset.
+                    </p>
+                  </div>
+                </div>
+              )}
               
               <div className="space-y-2 pt-4">
                 <Label>Upload Excel File</Label>
