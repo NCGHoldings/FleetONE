@@ -1,77 +1,50 @@
 
 
-# Fix: Duplicate FUEL-BLK journal entries + Backfill missing AP Payment records
+# Fix: "invalid input syntax for type uuid: customer:..." when selecting a Customer in AP Direct Payment
 
-## What's actually wrong (verified against the database)
+## Root cause
 
-I queried your DB directly and confirmed:
+`SearchableVendorSelector` returns customer IDs prefixed with `customer:<uuid>` (line 102) so the consumer can distinguish vendor vs customer rows. But two consumers don't unwrap the prefix:
 
-| Finding | Evidence |
+1. **`APPaymentForm.tsx`** stores the raw `customer:UUID` string in form state and passes it as `vendor_id` to the mutation.
+2. **`useCreateAPPayment` (`useAccountingMutations.ts` lines 1100–1132)** uses that string in `vendors.select(...).eq("id", payment.vendor_id)` *and* inserts it into `ap_payments.vendor_id` (a `uuid` column) → Postgres rejects with `22P02 invalid input syntax for type uuid`.
+
+The DB already has the correct columns to support this case: `payee_type` (text, NOT NULL), `payee_customer_id` (uuid, nullable), `vendor_id` (uuid, nullable). The `payee_consistency_check` constraint we added in the last migration accepts `payee_type='customer' AND payee_customer_id IS NOT NULL AND vendor_id IS NULL`. So the schema is ready — only the code needs to split the prefixed string and route it correctly.
+
+## What I'll change
+
+### 1. `src/components/accounting/APPaymentForm.tsx`
+- Add a small helper at the top of the component: `parsePayee(value) → { type: 'vendor'|'customer', id: uuid }`. If value starts with `customer:`, type=customer, id=substring(9); else type=vendor, id=value.
+- In `handleVendorChange`: keep storing the prefixed string in local UI state (so the dropdown stays highlighted) but compute the real id/type once and stash it in two new state vars `payeeType`, `payeeId`.
+- In `onSubmit`: pass the real id + type to the mutation as new fields `payee_type` and `payee_id` (instead of always sending `vendor_id`). Skip the vendor-bank-account fetch when payee is a customer.
+- Skip "pending invoices for vendor" panel and bank-account autofill when payee is a customer (those queries assume vendors).
+
+### 2. `src/hooks/useAccountingMutations.ts` — `useCreateAPPayment`
+- Extend the input type with `payee_type?: 'vendor'|'customer'` and `payee_id?: string`. Keep `vendor_id` for backward compatibility — if `payee_type` is missing, derive it (vendor).
+- Before the `vendors` lookup: if `payee_type==='customer'`, fetch from `customers` table for the name instead; otherwise fetch from `vendors`.
+- In the `ap_payments.insert(...)` call, set:
+  - `payee_type: payeeType`
+  - `vendor_id: payeeType==='vendor' ? payeeId : null`
+  - `payee_customer_id: payeeType==='customer' ? payeeId : null`
+- Same split applied to the GL posting block downstream (description text uses the resolved name; AR-vs-AP control account remains AP because the user is paying out — payee being a customer just means a customer refund / vendor payment to a customer entity).
+
+### 3. Defensive guard in the selector itself (one-line fix)
+- `SearchableVendorSelector` continues to emit `customer:<uuid>`. No change to its public contract — other call sites already handle/ignore customers because they pass `includeCustomers=false` by default.
+
+## Files touched
+
+| File | Change |
 |---|---|
-| **47 fuel JEs exist for the same date (2026-04-06), but only 28 unique (bus, date) combos** | 19 buses have 2 JEs and 1 bus has 3 JEs — Excel was imported twice |
-| **Zero `DP-FUEL-*` rows in `ap_payments`** — that's why nothing shows under AP → Payments | The AP-payment insertion code was added AFTER your last import; the existing 47 JEs predate the fix |
-| **VEHICLE FUEL balance Rs 2,913,114** vs Excel Rs ~1.46M — exactly ~2x | Confirms double-posting |
-| **Daily_bus_expenses upserts** (adds amounts) but each call still creates a NEW JE | Source of the duplication |
+| `src/components/accounting/APPaymentForm.tsx` | Parse `customer:<uuid>` prefix; track `payee_type` + `payee_id`; pass them to mutation; skip vendor-only side effects when payee is a customer. |
+| `src/hooks/useAccountingMutations.ts` | Extend `useCreateAPPayment` input with `payee_type`/`payee_id`; route lookup + insert to `vendors` or `customers` accordingly; populate `payee_type` + correct id column. |
 
-## The 3 fixes I'll ship
-
-### Fix A — Stop future duplicates at the source (`useSchoolBusBulkExpenses.ts`)
-
-Before creating each Journal Entry, check if a `journal_entries` row already exists for the same `(bus_id, entry_date, source_module='school_bus_fuel_import')`. If it does, **skip JE creation, skip AP payment, skip COA balance update** — but still allow daily_bus_expense to be updated if the new amount differs.
-
-Concretely:
-1. Stamp every fuel-import JE with `source_module = 'school_bus_fuel_import'` (currently it's null — that's why the integrity scanner can't find them either).
-2. Add a one-line guard before the `journal_entries.insert(...)`:
-   ```
-   const { data: dupe } = await supabase
-     .from("journal_entries")
-     .select("id").eq("source_module","school_bus_fuel_import")
-     .eq("entry_date", expense.expenseDate)
-     .filter("id","in", `(select journal_entry_id from journal_entry_lines where bus_id='${expense.busId}' and journal_entry_id is not null)`)
-     .maybeSingle();
-   if (dupe) { skip the bus, increment a "skipped" counter, continue; }
-   ```
-3. At the end of the batch, toast: *"Imported X buses, skipped Y duplicates already posted on this date."*
-
-### Fix B — Clean up the existing 19 duplicate JEs (one-time SQL migration)
-
-For every `(bus_id, entry_date)` that has more than one `FUEL-BLK-*` JE, **keep the earliest** (first import) and **reverse + delete the later duplicates**:
-1. For each duplicate JE: subtract its debit/credit from `chart_of_accounts.current_balance` (undoes the COA inflation),
-2. Delete the duplicate's `journal_entry_lines`,
-3. Delete the duplicate `journal_entries` row,
-4. Recompute `daily_bus_expenses.fuel_cost` from the remaining single JE (so the per-bus daily total isn't doubled either).
-
-After this runs, VEHICLE FUEL drops from Rs 2,913,114 to ≈Rs 1,456,557 (the true Excel total) and FUEL FLOAT - DIALOG TOUCH_SBS recovers the over-credited amount.
-
-### Fix C — Backfill the missing `ap_payments` for the existing fuel JEs
-
-For each surviving `FUEL-BLK-*` JE (after Fix B dedup), insert one `ap_payments` row with:
-- `payment_method='direct'`, `is_direct_payment=true`, `payee_type='direct'`
-- `payment_number = 'DP-FUEL-' + entry_date + '-' + busSeq`
-- `amount = total_debit`, `journal_entry_id = je.id`, `bus_id`, `bus_no`
-- `status='paid'`, `approval_status='approved'`, `business_unit_code='SBO'`
-- `notes = 'Backfill: bulk fuel float drawdown'`
-
-After this runs, the AP → Payments tab immediately lists all 28 fuel rows with **Direct (Float)** badge, click-through to JE, and the *Payments Today / This Month* KPIs update.
-
-## Files / actions
-
-| Item | Type | Purpose |
-|---|---|---|
-| `src/hooks/useSchoolBusBulkExpenses.ts` | Code edit | Add `source_module` stamp + duplicate guard + skipped-counter toast |
-| One-time SQL migration | DB migration | Reverse + delete the 19 duplicate JEs, recompute `daily_bus_expenses`, recompute COA balances |
-| Same migration | DB migration | Backfill `ap_payments` rows for every surviving fuel JE |
+No DB migration needed — schema and the constraint already accept `payee_type='customer'`.
 
 ## What you'll see after the fix
 
-1. **VEHICLE FUEL drops to the correct ~Rs 1.46M** (matches Excel exactly), no more double-counting.
-2. **FUEL FLOAT - DIALOG TOUCH_SBS rises back** by the duplicated amount that was wrongly credited.
-3. **AP → Payments now lists every fuel transaction** with method **Direct (Float)** and a JE drill-through link.
-4. **Re-running the same Excel** will toast *"Skipped 28 duplicates already posted"* instead of double-posting again.
-5. The COA tree drill-down on VEHICLE FUEL goes from 76 transactions → ~28 (one per bus).
-
-## Out of scope (say the word for any of these)
-- Letting the user re-import a previously imported date intentionally (would need a "force re-import" toggle).
-- Same dedup guard for the manual single-bus expense form.
-- A "Reverse this batch" button on the import history.
+1. In **Direct Payment (Without Invoice)**, picking a **Customer** from the Vendor / Payee dropdown no longer throws *"invalid input syntax for type uuid"*.
+2. The payment saves with `payee_type='customer'`, `payee_customer_id=<uuid>`, `vendor_id=NULL` — passing the consistency check.
+3. The toast confirms success and the new payment appears under **AP → Payments** with the customer name in the payee column.
+4. Vendor selections continue to work exactly as before (backward compatible).
+5. Bank-account autofill / pending-invoice panel now correctly stay hidden when the selected payee is a customer.
 
