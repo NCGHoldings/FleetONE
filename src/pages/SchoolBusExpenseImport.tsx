@@ -53,7 +53,7 @@ export default function SchoolBusExpenseImport() {
   const [buses, setBuses] = useState<{id: string, bus_no: string}[]>([]);
   const [vendors, setVendors] = useState<{id: string, vendor_name: string}[]>([]);
   const [pettyCashFunds, setPettyCashFunds] = useState<{id: string, fund_name: string}[]>([]);
-  const [directAccounts, setDirectAccounts] = useState<{id: string, account_code: string, account_name: string}[]>([]);
+  const [directAccounts, setDirectAccounts] = useState<{id: string, account_code: string, account_name: string, current_balance: number}[]>([]);
   
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<'ap' | 'iou' | 'petty_cash' | 'direct'>('ap');
