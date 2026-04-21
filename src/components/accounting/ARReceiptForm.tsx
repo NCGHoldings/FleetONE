@@ -484,12 +484,12 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                               <span className="truncate">
                                 {selectedParty ? (
                                   <span className="flex items-center gap-1.5 truncate">
-                                    <Badge variant={selectedParty.type === "customer" ? "default" : "secondary"} className="shrink-0 text-[10px] px-1 py-0">
-                                      {selectedParty.type === "customer" ? "C" : "V"}
+                                    <Badge variant={selectedParty.type === "customer" ? "default" : selectedParty.type === "vendor" ? "secondary" : "outline"} className="shrink-0 text-[10px] px-1 py-0">
+                                      {selectedParty.type === "customer" ? "C" : selectedParty.type === "vendor" ? "V" : "E"}
                                     </Badge>
                                     <span className="truncate">{selectedParty.name}</span>
                                   </span>
-                                ) : "Select customer or vendor..."}
+                                ) : "Select customer, vendor or employee..."}
                               </span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
@@ -522,6 +522,22 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                                   <CommandItem
                                     key={item.id}
                                     value={`vendor ${item.name} ${category}`}
+                                    onSelect={() => handlePartyChange(item.id)}
+                                    className="cursor-pointer"
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4", selectedCustomerId === item.id ? "opacity-100" : "opacity-0")} />
+                                    {item.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            ))}
+                            {/* Employee groups */}
+                            {Array.from(groupedOptions.employeesByType.entries()).map(([type, items]) => (
+                              <CommandGroup key={`e-${type}`} heading={`🟡 ${type}`}>
+                                {items.map(item => (
+                                  <CommandItem
+                                    key={item.id}
+                                    value={`employee ${item.name} ${type}`}
                                     onSelect={() => handlePartyChange(item.id)}
                                     className="cursor-pointer"
                                   >
