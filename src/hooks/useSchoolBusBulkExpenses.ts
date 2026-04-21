@@ -345,6 +345,35 @@ export function useSchoolBusBulkExpenses() {
                  .eq('id', payload.pettyCashFundId);
               if (fundError) throw new Error(`Petty Cash balance update failed: ${fundError.message}`);
            }
+        } else if (payload.paymentMethod === 'direct') {
+           // Surface direct payment in AP → Payments for full traceability (one row per bus)
+           const paymentNumber = `DP-FUEL-${format(new Date(), "yyyyMMddHHmmss")}-${i + 1}`;
+           const { error: dpError } = await supabase
+              .from('ap_payments')
+              .insert({
+                 company_id: effectiveCompanyId,
+                 business_unit_code: 'SBO',
+                 payment_number: paymentNumber,
+                 payment_date: expense.expenseDate,
+                 payment_method: 'direct',
+                 payee_type: 'direct',
+                 vendor_id: null,
+                 bank_account_id: null,
+                 bus_id: expense.busId,
+                 bus_no: busNoSafe,
+                 amount: expense.amount,
+                 total_with_fees: expense.amount,
+                 is_direct_payment: true,
+                 status: 'paid',
+                 approval_status: 'approved',
+                 approved_at: new Date().toISOString(),
+                 approved_by: user?.id,
+                 journal_entry_id: journalEntry.id,
+                 reference: `Float Account: ${creditAccountName}`,
+                 notes: `Bulk fuel float drawdown — Bus ${busNoSafe} | Source: ${creditAccountName}`,
+                 created_by: user?.id,
+              });
+           if (dpError) throw new Error(`Failed to record Direct Payment in AP: ${dpError.message}`);
         }
 
         // 6. Create journal entry lines
