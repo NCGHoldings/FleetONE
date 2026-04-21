@@ -587,6 +587,38 @@ export const APPaymentsView = () => {
                 </>
               )}
 
+              {detailPayment.document_url && (
+                <>
+                  <Separator />
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Attachment</p>
+                        <p className="font-medium text-sm break-all">{String(detailPayment.document_url).split("/").pop()}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => openAttachment(detailPayment.document_url)}>
+                          <ExternalLink className="h-4 w-4 mr-1" /> Open
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => openAttachment(detailPayment.document_url, true)}>
+                          <Download className="h-4 w-4 mr-1" /> Download
+                        </Button>
+                      </div>
+                    </div>
+                    {previewUrl && (() => {
+                      const path = String(detailPayment.document_url).toLowerCase();
+                      if (/\.(png|jpe?g|webp|gif)$/.test(path)) {
+                        return <img src={previewUrl} alt="Attachment preview" className="max-h-96 w-auto rounded border" />;
+                      }
+                      if (path.endsWith(".pdf")) {
+                        return <iframe src={previewUrl} className="w-full h-96 rounded border" title="Attachment preview" />;
+                      }
+                      return <p className="text-xs text-muted-foreground">Preview not available — use Open or Download.</p>;
+                    })()}
+                  </div>
+                </>
+              )}
+
               <RelatedJournalEntries sourceId={detailPayment.id} sourceType="ap_payment" />
             </div>
           )}
