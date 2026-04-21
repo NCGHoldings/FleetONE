@@ -1,107 +1,79 @@
 
+# Continue: Finish the 4 fixes (AR Receipt Employee, AP Voucher, Reports, Petty Cash)
 
-# Fix 4 issues: AR Receipt Employee group, AP Payment customer payee on voucher, Reports summary page, Petty Cash create
+Picking up from the last session. AR Employee selection UI + AP voucher placeholder fix + DB migration are already done. Three items remain.
 
-## 1. AR Receipt — Add "Employee" party group (next to Customers + Vendors)
+## 1. AR Receipt — finish wiring Employee submit payload
+**File:** `src/components/accounting/ARReceiptForm.tsx`
 
-**Where:** `src/components/accounting/ARReceiptForm.tsx`
+- On submit, when `partyType === 'employee'`:
+  - Send `payee_employee_id` (the new column added in last migration) instead of `customer_id` / `vendor_id`.
+  - Set `party_type = 'employee'` on the receipt row.
+  - Skip invoice-allocation block entirely (direct amount only).
+  - GL resolver already branches to `gl_settings.staff_advance_account_id` — confirm it's invoked.
+- Validation: require either employee + amount, or customer/vendor + allocation.
 
-**Today:** Party selector groups by Customers (🟢) and Vendors (🔵) only. There is no way to record a receipt from a staff member (e.g. IOU return, salary advance recovery, fuel float refund).
+No further DB change.
 
-**Fix:**
-- Add a third party type `"employee"` populated from `staff_registry` (filter `is_active = true`).
-- Add a new grouped section in the popover: `🟡 Employees` grouped by `staff_type` (Driver / Conductor / Office / Mechanic etc.).
-- When an employee is selected, GL resolution falls back to the **Staff Advance / IOU receivable** GL account (from `gl_settings.staff_advance_account_id`, with category override allowed).
-- Receipt save persists `party_type='employee'` and stores employee id in `payee_employee_id` (new nullable column on `ar_receipts` referencing `staff_registry`).
-- No invoice allocation table is shown for employees — direct amount entry only (same UI path used today for vendors).
+## 2. Petty Cash Fund — fix the create flow
+**Files:** `src/components/accounting/petty-cash/PettyCashFundsTab.tsx`, `src/hooks/usePettyCash.ts`
 
-**Migration:** add `payee_employee_id uuid` column on `ar_receipts` referencing `staff_registry(id)`, nullable, indexed; RLS unchanged.
+Five concrete fixes:
 
----
+1. **Company guard** — abort with toast `"Select a company before creating a fund"` when `selectedCompanyId` is null. Pass `company_id` into the insert payload (currently missing).
+2. **Custodian = staff selector** — replace free-text input with a `Command`/`Popover` searchable list sourced from `staff_registry` (active only). Picking a staff fills `custodian_id` + `custodian_name`. Free-typing a new name auto-creates a `staff_registry` row (`is_active=true`, `staff_type='office'`, `salary_type='monthly'`, `monthly_salary=0`) — same auto-add pattern as the InlineCrewEditor we shipped earlier.
+3. **Validation** — make `gl_account_id`, `custodian_name`, `fund_name`, `branch`, `initial_amount > 0` all required before the Create button enables.
+4. **Error feedback** — wrap submit in try/catch; toast on `onError` with the actual error message so the dialog stops "doing nothing silently".
+5. **Cache refresh** — on success, invalidate `["petty-cash-funds"]` AND `["petty-cash-dashboard"]`, then close dialog.
 
-## 2. AP Payment Voucher PDF — show customer details when payee is a customer
+No DB change.
 
-**Where:** `src/lib/document-template-utils.ts` (case `ap_payment_voucher`, lines 417–512) + `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx`.
+## 3. New Reports tab — Receipts & Payments Summary
+**New file:** `src/components/accounting/reports/ReceiptsPaymentsSummaryView.tsx`
+**Wire-up:** `src/pages/Accounting.tsx` Reports module — add tab between `audit` and `report-builder`.
 
-**Today:** All payee placeholders (`{{vendor_name}}`, `{{payee_name}}`, `{{vendor_address}}`, bank, contact, currency) read **only** from `documentData.vendors`. When `payee_type = 'customer'` the payment row joins `customers` instead, so the printed voucher shows blank payee, blank address, blank bank.
+**Layout (CEO-presentation grade, Corporate Navy):**
 
-**Fix:**
-- In `ap_payment_voucher` template-mapping, branch on `documentData.payee_type`:
-  - When `'customer'`, map `payee_name`, `vendor_name`, `payee_account`, `payee_bank`, `vendor_email`, `vendor_phone`, `vendor_contact`, `vendor_bank_*`, `currency` from `documentData.customers` (already joined via `ap_payments_payee_customer_id_fkey` in `useAccountingData.ts:560`).
-  - When `'employee'` (after fix #1 spreads to AP too — out of scope here), fall back to `documentData.employees`.
-  - Default to `vendors.*` as today.
-- Add a small "Paid To: Customer / Vendor / Employee" badge line in the printed voucher (visible in HTML template via new `{{payee_type_label}}` placeholder).
+```text
+┌─ Filters: [Date Range] [Business Unit] [Export PDF] [Export Excel] ─┐
+├─ KPI ROW ─────────────────────────────────────────────────────────┤
+│ Total Receipts │ Total Payments │ Net Cash │ Receipt:Payment Ratio │
+├─ Two-column body ─────────────────────────────────────────────────┤
+│  CUSTOMERS (sortable list)     │  PREVIEW PANE (right)            │
+│  ─ row click selects ─        │  Header: name, code, balance     │
+│  Customer A  Rs xxx,xxx       │  ▾ Receipt RCT-001  Rs 50,000    │
+│  Customer B  Rs xxx,xxx       │     ┌─ Allocations ─────────┐    │
+│  ...                          │     │ INV-x  Rs 30,000      │    │
+│                               │     │ INV-y  Rs 20,000      │    │
+│  ──────────────                │     └────────────────────────┘    │
+│  VENDORS (sortable list)      │  ▾ Receipt RCT-002 ...           │
+│  Vendor X  Rs xxx,xxx         │                                  │
+│  ...                          │  Totals at bottom                │
+└──────────────────────────────────────────────────────────────────┘
+```
 
-No DB change needed — the join already exists, only the placeholder mapping is wrong.
+**Data joins (existing tables, no new ones):**
+- Customers panel: `ar_receipts` + `ar_receipt_allocations` + `ar_invoices(invoice_number, invoice_date)` + `customers(customer_code, customer_name, current_balance)`.
+- Vendors panel: `ap_payments` + `ap_payment_allocations` + `ap_invoices(invoice_number, invoice_date)` + `vendors(vendor_code, vendor_name, current_balance)`. For `is_direct_payment = true` rows, expand `ap_payment_lines` instead of allocations.
+- Filtered by `business_unit_code` and `payment_date / receipt_date` in the picked range.
+- Default range: current month. All money via `<CurrencyDisplay>` (LKR, `Rs 1,000,000` format).
 
----
+**Export:**
+- Excel: `exportToExcel` util — one sheet per party (Customer Receipts, Vendor Payments, Allocation Detail).
+- PDF: existing `sectionBasedPDF` from `src/lib/pdf-multi-page.ts` — adds `data-pdf-page` markers on each customer/vendor card so multi-page works automatically.
 
-## 3. Reports — new "Receipts & Payments Summary" tab
-
-**Where:** new file `src/components/accounting/reports/ReceiptsPaymentsSummaryView.tsx`, registered as a new tab in `src/pages/Accounting.tsx` Reports module (between `audit` and `report-builder`).
-
-**What it does:**
-- Date-range picker (defaults: current month) + optional Company / Business Unit filter.
-- 4 KPI cards on top: Total Receipts, Total Payments, Net Cash Movement, Receipt-to-Payment Ratio.
-- Two side-by-side panels:
-  - **Customers** panel — list every customer that has at least one receipt in the period, sorted by total received desc. Each row clickable / expandable.
-  - **Vendors** panel — same for AP payments.
-- On click of a customer row → right-side preview pane shows:
-  - Customer header (code, name, contact, current balance).
-  - Per-receipt cards (receipt #, date, method, amount).
-  - **Inside each receipt card**, a nested allocations table: invoice #, invoice date, allocated amount, write-off, balance after — driven by `ar_receipt_allocations` join.
-  - Totals row at the bottom of the customer pane.
-- Same behavior on vendor row → AP payments + `ap_payment_allocations` breakdown (or direct-payment line items if `is_direct_payment`).
-- Top-right "Export PDF" + "Export Excel" buttons (re-uses existing `exportToExcel` and the html-to-pdf canvas pipeline already used by FinanceDocumentPreviewModal).
-
-**Data sources (no new tables):**
-- `ar_receipts` + `ar_receipt_allocations` + `ar_invoices` (joins already in place).
-- `ap_payments` + `ap_payment_allocations` + `ap_invoices` + `ap_payment_lines` (for direct payments).
-- All filtered by `business_unit_code` and date range.
-
-**Visual style:** matches existing CEO-presentation grade (Corporate Navy `#1e3a5f`, mono/tabular numbers via `CurrencyDisplay`, subtle row hover, sticky headers).
-
----
-
-## 4. Petty Cash Fund — fix create flow
-
-**Where:** `src/components/accounting/petty-cash/PettyCashFundsTab.tsx` + `src/hooks/usePettyCash.ts` (`useCreatePettyCashFund`).
-
-**Issues found:**
-1. `selectedCompanyId` from `useCompany()` may be `null` for users on the holding view — insert silently fails the company FK because the form passes nothing for `company_id` validation. Add a preflight check that aborts with a clear toast: *"Select a company before creating a fund"*.
-2. `custodian_name` is a free-text input but the schema also has `custodian_id → staff_registry`. Convert the field to a **searchable staff selector** (mirrors `IOUManagementView.tsx:53` query) — picking a staff fills both `custodian_id` and `custodian_name`, free-typing fills only `custodian_name` and creates a staff row `is_active=true` (auto-add pattern, matching the DriverConductor inline editor we just shipped).
-3. Validation gate is too loose: the Create button stays enabled even when `gl_account_id` is empty, but the GL posting step in `useCreatePettyCashTransaction` later breaks. Add `gl_account_id` to required fields.
-4. Add try/catch + toast at form-submit so the dialog doesn't appear to "do nothing" on a silent error (today the mutation only logs to `onError`, the dialog stays open without feedback).
-5. After create, refresh both `petty-cash-funds` and `petty-cash-dashboard` queries and close the dialog only on success.
-
-**No migration required** — schema already supports everything.
-
----
-
-## Files touched
+## Files touched (this round)
 
 | File | Change |
 |---|---|
-| `src/components/accounting/ARReceiptForm.tsx` | Add Employee party group, GL resolver branch, payload field |
-| `src/hooks/useAccountingData.ts` | Add `staff_registry` employees fetcher used by ARReceipt and AP voucher rendering |
-| `src/hooks/useAccountingMutations.ts` | Persist `payee_employee_id` for AR receipts |
-| `src/lib/document-template-utils.ts` | Branch `ap_payment_voucher` placeholder mapping on `payee_type` |
-| `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx` | Pass `customers` / `employees` joined data through to placeholder builder |
-| `src/components/accounting/reports/ReceiptsPaymentsSummaryView.tsx` | **new** — full summary view |
+| `src/components/accounting/ARReceiptForm.tsx` | Finish employee submit payload + skip allocations branch |
+| `src/components/accounting/petty-cash/PettyCashFundsTab.tsx` | Staff combobox custodian, company guard, stricter validation, error toasts |
+| `src/hooks/usePettyCash.ts` | Auto-create staff on free-typed custodian; invalidate dashboard query on create success |
+| `src/components/accounting/reports/ReceiptsPaymentsSummaryView.tsx` | **new** — full summary view with party preview pane |
 | `src/pages/Accounting.tsx` | Register new "Receipts & Payments" Reports tab |
-| `src/components/accounting/petty-cash/PettyCashFundsTab.tsx` | Custodian = staff selector + `gl_account_id` required + better toasts + company guard |
-| `src/hooks/usePettyCash.ts` | Auto-create staff on free-typed custodian, stricter create validation, invalidate dashboard query |
-
-## Migration
-
-```sql
-alter table public.ar_receipts add column if not exists payee_employee_id uuid references public.staff_registry(id);
-create index if not exists idx_ar_receipts_payee_employee_id on public.ar_receipts(payee_employee_id);
-```
-RLS on `ar_receipts` is unchanged (existing policies cover all columns).
 
 ## Out of scope
-- Changing the AP Payment **form** to support employees (only AR side gets Employee in this round; the AP voucher fix is rendering-only for the existing customer payee type).
-- Re-printing historical vouchers — fix applies on next preview/print.
-- New report templates beyond Receipts & Payments Summary.
-
+- AP Payment **form** does not get an employee picker yet (voucher rendering already handles `payee_type='customer'`).
+- Reprinting historical AP vouchers — fix applies on next preview only.
+- No new report templates beyond Receipts & Payments Summary.
+- TEST environment untouched.
