@@ -94,6 +94,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const [companyLogo, setCompanyLogo] = useState<string>('');
   const [freshTotalPaid, setFreshTotalPaid] = useState<number | null>(null);
   const [freshAdjustmentData, setFreshAdjustmentData] = useState<any>(null);
+  const [fullQuotation, setFullQuotation] = useState<any>(null);
   
   // This modal is specifically for customer-facing balance invoices
   const isCustomerInvoice = true;
