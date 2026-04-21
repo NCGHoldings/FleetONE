@@ -14989,6 +14989,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "petty_cash_funds_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "v_sbo_ar_je_parity"
+            referencedColumns: ["branch_id"]
+          },
+          {
             foreignKeyName: "petty_cash_funds_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -15212,6 +15219,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "school_branches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_transactions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "v_sbo_ar_je_parity"
+            referencedColumns: ["branch_id"]
           },
           {
             foreignKeyName: "petty_cash_transactions_company_id_fkey"
@@ -17777,6 +17791,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "school_ar_invoice_batches_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "v_sbo_ar_je_parity"
+            referencedColumns: ["branch_id"]
+          },
+          {
             foreignKeyName: "school_ar_invoice_batches_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -17958,6 +17979,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "school_bus_expense_gl_mappings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "v_sbo_ar_je_parity"
+            referencedColumns: ["branch_id"]
+          },
+          {
             foreignKeyName: "school_bus_expense_gl_mappings_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -18077,6 +18105,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "school_branches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_bus_finance_settings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "v_sbo_ar_je_parity"
+            referencedColumns: ["branch_id"]
           },
           {
             foreignKeyName: "school_bus_finance_settings_cash_account_id_fkey"
@@ -18263,6 +18298,13 @@ export type Database = {
             referencedRelation: "school_branches"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "school_payment_import_settings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "v_sbo_ar_je_parity"
+            referencedColumns: ["branch_id"]
+          },
         ]
       }
       school_payment_imports: {
@@ -18318,6 +18360,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "school_branches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_payment_imports_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "v_sbo_ar_je_parity"
+            referencedColumns: ["branch_id"]
           },
         ]
       }
@@ -18386,6 +18435,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "school_branches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_payment_pattern_history_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "v_sbo_ar_je_parity"
+            referencedColumns: ["branch_id"]
           },
         ]
       }
@@ -18535,6 +18591,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "school_payments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "v_sbo_ar_je_parity"
+            referencedColumns: ["branch_id"]
+          },
+          {
             foreignKeyName: "school_payments_payment_month_id_fkey"
             columns: ["payment_month_id"]
             isOneToOne: false
@@ -18618,6 +18681,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "school_branches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_receipts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "v_sbo_ar_je_parity"
+            referencedColumns: ["branch_id"]
           },
           {
             foreignKeyName: "school_receipts_payment_id_fkey"
@@ -18712,6 +18782,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "school_branches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_routes_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "v_sbo_ar_je_parity"
+            referencedColumns: ["branch_id"]
           },
         ]
       }
@@ -18882,6 +18959,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "school_branches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_students_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "v_sbo_ar_je_parity"
+            referencedColumns: ["branch_id"]
           },
         ]
       }
@@ -28441,7 +28525,29 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_sbo_ar_je_parity: {
+        Row: {
+          branch_code: string | null
+          branch_id: string | null
+          branch_name: string | null
+          company_id: string | null
+          invoice_month: string | null
+          linked_ar_count: number | null
+          linked_je_count: number | null
+          missing_ar_count: number | null
+          missing_je_count: number | null
+          school_invoice_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_ar_invoice_batches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       apply_payment_to_invoices: {
