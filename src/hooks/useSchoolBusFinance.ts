@@ -462,10 +462,22 @@ export function useGenerateBulkARInvoices() {
       }, 0);
 
       // Create batch record for tracking
+      // Use selectedCompanyId for the operational batch row, but if user selected a
+      // parent company directly (e.g. NCG Holding/NCG Test), fall back to the
+      // canonical School Bus Operations sub-company so batches don't land on the parent.
+      const NCG_HOLDING = 'a0000000-0000-0000-0000-000000000001';
+      const NCG_TEST = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020';
+      const SCHOOL_BUS_OPS_LIVE = 'a0000000-0000-0000-0000-000000000002';
+      const SCHOOL_BUS_OPS_TEST = '0fba4a2f-598b-47e8-b863-283d00380b06';
+      const batchCompanyId =
+        selectedCompanyId === NCG_HOLDING ? SCHOOL_BUS_OPS_LIVE :
+        selectedCompanyId === NCG_TEST ? SCHOOL_BUS_OPS_TEST :
+        selectedCompanyId;
+
       const { data: batch, error: batchError } = await supabase
         .from("school_ar_invoice_batches")
         .insert({
-          company_id: selectedCompanyId,
+          company_id: batchCompanyId,
           branch_id: branchId,
           batch_number: batchNumber,
           invoice_month: format(invoiceMonth, "yyyy-MM-dd"),
@@ -769,9 +781,13 @@ export function useGenerateBulkARInvoices() {
               .select()
               .single();
 
-            if (!arError && arInvoice) {
-              arInvoiceId = arInvoice.id;
+            if (arError || !arInvoice) {
+              // Fail loudly — silent failure here is what made 33 invoices vanish.
+              throw new Error(
+                `Finance AR invoice creation failed for ${student.student_name} (${invoiceNumber}): ${arError?.message || 'unknown error'}`,
+              );
             }
+            arInvoiceId = arInvoice.id;
           }
 
           // 5. Create school invoice linked to Finance AR invoice and Journal Entry

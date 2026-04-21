@@ -248,21 +248,34 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
     return selectedCompanyId;
   };
 
+  // Fallback BU-code mapping by company name when short_code is missing.
+  // Critical for live "School Bus Operations" which currently has no short_code in DB.
+  const inferBusinessUnitCodeByName = (name?: string | null): string | null => {
+    if (!name) return null;
+    const n = name.toLowerCase();
+    if (n.includes("school bus")) return "SBO";
+    if (n.includes("special hire")) return "SPH";
+    if (n.includes("yutong")) return "YUT";
+    if (n.includes("sinotruck") || n.includes("sinotruk")) return "SNT";
+    if (n.includes("light vehicle")) return "LTV";
+    return null;
+  };
+
   // Returns the business unit code (short_code) for NCG Holding or NCG Test sub-companies
   // Used for tagging journal entries with business unit identifier (SBO, YUT, etc.)
   const getBusinessUnitCode = (): string | null => {
     if (!selectedCompanyId || !selectedCompany) return null;
-    
-    // NCG Holding sub-companies have business unit codes
+
+    // NCG Holding sub-companies
     if (isSubCompanyOfNCGHolding(selectedCompanyId)) {
-      return selectedCompany.short_code || null;
+      return selectedCompany.short_code || inferBusinessUnitCodeByName(selectedCompany.name) || null;
     }
-    
-    // NCG Test sub-companies also have business unit codes
+
+    // NCG Test sub-companies
     if (isSubCompanyOfNCGTest(selectedCompanyId)) {
-      return selectedCompany.short_code || null;
+      return selectedCompany.short_code || inferBusinessUnitCodeByName(selectedCompany.name) || null;
     }
-    
+
     return null; // NCG Express and parent companies don't have business unit codes
   };
 
