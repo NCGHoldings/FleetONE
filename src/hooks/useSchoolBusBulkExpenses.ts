@@ -16,7 +16,7 @@ export interface BulkBusExpense {
 
 export interface BulkExpenseUploadPayload {
   branchId: string;
-  paymentMethod: 'ap' | 'iou' | 'petty_cash';
+  paymentMethod: 'ap' | 'iou' | 'petty_cash' | 'direct';
   expenses: BulkBusExpense[];
   
   // AP specific parameters
@@ -27,6 +27,9 @@ export interface BulkExpenseUploadPayload {
   
   // Petty Cash specific parameters
   pettyCashFundId?: string;
+  
+  // Direct Payment specific parameters
+  directPaymentAccountId?: string;
 }
 
 // Helper function to update COA balances after journal entry creation
@@ -160,6 +163,22 @@ export function useSchoolBusBulkExpenses() {
         }
         creditAccountId = iouAccount.id;
         creditAccountName = iouAccount.account_name;
+      } else if (payload.paymentMethod === 'direct') {
+        // Direct Payment - credit a chosen asset account (Fuel Float / Bank)
+        if (!payload.directPaymentAccountId) {
+          throw new Error("Direct Payment requires a 'Pay From Account' to be selected.");
+        }
+        const { data: directAccount, error: directErr } = await supabase
+          .from("chart_of_accounts")
+          .select("id, account_name")
+          .eq("id", payload.directPaymentAccountId)
+          .maybeSingle();
+
+        if (directErr || !directAccount) {
+          throw new Error("Selected Direct Payment account not found.");
+        }
+        creditAccountId = directAccount.id;
+        creditAccountName = directAccount.account_name;
       } else {
         // AP - Trade Payable
         const { data: payableAccount } = await supabase
@@ -179,7 +198,15 @@ export function useSchoolBusBulkExpenses() {
       }
 
       // We will loop through the batch and upload them one by one.
-      for (const expense of payload.expenses) {
+      for (let i = 0; i < payload.expenses.length; i++) {
+        const expense = payload.expenses[i];
+        // Resolve human-readable bus_no for use in invoice number / journal description
+        const { data: busRow } = await supabase
+          .from("buses")
+          .select("bus_no")
+          .eq("id", expense.busId)
+          .maybeSingle();
+        const busNoSafe = (busRow?.bus_no || expense.busId.substring(0, 4)).replace(/\s+/g, '');
         // 3. Upsert into daily_bus_expenses
         // Check if an expense already exists for that day + bus
         const { data: existingDaily } = await supabase
@@ -251,13 +278,15 @@ export function useSchoolBusBulkExpenses() {
 
         // 5.5 Deep ERP Integrations (AP Invoice & Petty Cash Vouchers)
         if (payload.paymentMethod === 'ap') {
+           const baseInv = payload.invoiceNumber || `FUEL-AP-${format(new Date(), "yyyyMMdd")}`;
+           const uniqueInv = `${baseInv}-${busNoSafe}-${expense.expenseDate}-${i + 1}`;
            const { error: apError } = await supabase
               .from('ap_invoices')
               .insert({
                   company_id: effectiveCompanyId,
                   business_unit_code: 'SBO',
                   vendor_id: payload.vendorId || null,
-                  invoice_number: payload.invoiceNumber ? `${payload.invoiceNumber}-${expense.busId.substring(0,4)}` : `FUEL-AP-${format(new Date(), "yyyyMMdd")}-${expense.busId.substring(0,4)}`,
+                  invoice_number: uniqueInv,
                   invoice_date: payload.invoiceDate || expense.expenseDate,
                   due_date: payload.dueDate || expense.expenseDate,
                   total_amount: expense.amount,
