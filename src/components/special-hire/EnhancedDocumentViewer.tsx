@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { RefreshCw, Download, Eye } from 'lucide-react';
 import { format } from 'date-fns';
+import { getInvoiceMileage } from '@/lib/special-hire-invoice-helpers';
 
 interface EnhancedDocumentViewerProps {
   isOpen: boolean;
@@ -266,16 +267,20 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         conductorName: quotationData.assigned_conductor_name,
         invoice_status: 'approved',
         document_type: document.document_type as 'sales_receipt' | 'invoice',
-        // Include adjustment data if available
+        // Include adjustment data if available — and unify mileage so the regenerated PDF
+        // shows the right Mileage line (incl. quotation-time extra distance).
         hasAdjustments: !!adjustmentData,
-        originalQuotedKm: adjustmentData?.original_quoted_km,
-        actualKmTraveled: adjustmentData?.actual_km_traveled,
+        originalQuotedKm: (() => { const m = getInvoiceMileage(quotationData, adjustmentData); return m.quoted || undefined; })(),
+        actualKmTraveled: (() => { const m = getInvoiceMileage(quotationData, adjustmentData); return m.actual || undefined; })(),
         extraKm: adjustmentData?.extra_km,
         extraKmChargePerKm: adjustmentData?.extra_km_charge_per_km,
         extraKmTotalCharge: adjustmentData?.extra_km_total_charge,
         additionalExpenses: (adjustmentData?.additional_expenses as any[]) || [],
         totalAdditionalExpenses: adjustmentData?.total_additional_expenses,
         adjustmentNotes: adjustmentData?.notes,
+        tripDistance: (() => { const m = getInvoiceMileage(quotationData, adjustmentData); return m.quoted || undefined; })(),
+        quotationAdditionalDistanceKm: (() => { const m = getInvoiceMileage(quotationData, adjustmentData); return m.quotationExtras || undefined; })(),
+        quotationAdditionalDistanceAmount: (() => { const m = getInvoiceMileage(quotationData, adjustmentData); return m.quotationExtrasAmount || undefined; })(),
         // Signatures
         preparedBy: approvalSignatures.prepared_by,
         approvedBy: approvalSignatures.approved_by,

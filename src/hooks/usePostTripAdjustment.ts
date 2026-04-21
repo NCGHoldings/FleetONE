@@ -150,9 +150,20 @@ export const usePostTripAdjustment = () => {
     };
   };
 
+  const validateAdjustmentInvariants = (adjustment: TripAdjustment) => {
+    const quoted = Number(adjustment.original_quoted_km) || 0;
+    const extra = Number(adjustment.extra_km) || 0;
+    if (extra !== 0 && quoted <= 0) {
+      throw new Error(
+        "Invalid adjustment: original_quoted_km must be > 0 when extra_km is non-zero. Please reopen the trip and retry."
+      );
+    }
+  };
+
   const saveAdjustmentDraft = async (adjustment: TripAdjustment) => {
     setLoading(true);
     try {
+      validateAdjustmentInvariants(adjustment);
       const adjustmentData: any = {
         ...adjustment,
         adjusted_at: new Date().toISOString(),
@@ -180,6 +191,7 @@ export const usePostTripAdjustment = () => {
   const finalizeAdjustment = async (adjustment: TripAdjustment) => {
     setLoading(true);
     try {
+      validateAdjustmentInvariants(adjustment);
       const adjustmentData: any = {
         ...adjustment,
         adjusted_at: new Date().toISOString(),

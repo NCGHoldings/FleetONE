@@ -226,40 +226,49 @@ export const PostTripAdjustmentModal = ({
     setAdditionalExpenses(updated);
   };
 
-  const buildAdjustment = (status: "draft" | "finalized"): TripAdjustment => ({
-    quotation_id: quotationId,
-    actual_km_traveled: actualKm,
-    original_quoted_km: originalKm,
-    extra_km: extraKm,
-    extra_km_charge_per_km: kmRate,
-    extra_km_total_charge: totals.extra_km_total_charge,
-    additional_expenses: additionalExpenses,
-    total_additional_expenses: totals.total_additional_expenses,
-    original_quotation_amount: originalAmount,
-    adjustment_amount: totals.adjustment_amount,
-    final_trip_amount: totals.final_trip_amount,
-    advance_already_paid: advancePaid,
-    balance_due: totals.balance_due,
-    notes,
-    adjustment_status: status,
-    // Time adjustment fields
-    original_pickup_datetime: originalPickupDatetime,
-    original_drop_datetime: originalDropDatetime,
-    actual_pickup_datetime: actualPickupDatetime || undefined,
-    actual_drop_datetime: actualDropDatetime || undefined,
-    original_hours: timeAdjustmentResult?.originalHours || 0,
-    actual_hours: timeAdjustmentResult?.actualHours || 0,
-    extra_hours: timeAdjustmentResult?.extraHours || 0,
-    original_overtime_charge: timeAdjustmentResult?.originalOvertimeCharge || originalOvertimeCharge,
-    original_overnight_charge: timeAdjustmentResult?.originalOvernightCharge || originalOvernightCharge,
-    actual_overtime_charge: timeAdjustmentResult?.actualOvertimeCharge || 0,
-    actual_overnight_charge: timeAdjustmentResult?.actualOvernightCharge || 0,
-    overtime_charge_adjustment: timeAdjustmentResult?.overtimeAdjustment || 0,
-    overnight_charge_adjustment: timeAdjustmentResult?.overnightAdjustment || 0,
-    total_time_adjustment: timeAdjustmentResult?.totalTimeAdjustment || 0,
-  });
+  const buildAdjustment = (status: "draft" | "finalized"): TripAdjustment => {
+    // Guard: never persist 0 quoted KM when there's a real extra
+    const safeOriginalKm = originalKm > 0 ? originalKm : (actualKm - extraKm);
+    const safeActualKm = actualKm > 0 ? actualKm : safeOriginalKm + extraKm;
+    return {
+      quotation_id: quotationId,
+      actual_km_traveled: safeActualKm,
+      original_quoted_km: safeOriginalKm,
+      extra_km: extraKm,
+      extra_km_charge_per_km: kmRate,
+      extra_km_total_charge: totals.extra_km_total_charge,
+      additional_expenses: additionalExpenses,
+      total_additional_expenses: totals.total_additional_expenses,
+      original_quotation_amount: originalAmount,
+      adjustment_amount: totals.adjustment_amount,
+      final_trip_amount: totals.final_trip_amount,
+      advance_already_paid: advancePaid,
+      balance_due: totals.balance_due,
+      notes,
+      adjustment_status: status,
+      // Time adjustment fields
+      original_pickup_datetime: originalPickupDatetime,
+      original_drop_datetime: originalDropDatetime,
+      actual_pickup_datetime: actualPickupDatetime || undefined,
+      actual_drop_datetime: actualDropDatetime || undefined,
+      original_hours: timeAdjustmentResult?.originalHours || 0,
+      actual_hours: timeAdjustmentResult?.actualHours || 0,
+      extra_hours: timeAdjustmentResult?.extraHours || 0,
+      original_overtime_charge: timeAdjustmentResult?.originalOvertimeCharge || originalOvertimeCharge,
+      original_overnight_charge: timeAdjustmentResult?.originalOvernightCharge || originalOvernightCharge,
+      actual_overtime_charge: timeAdjustmentResult?.actualOvertimeCharge || 0,
+      actual_overnight_charge: timeAdjustmentResult?.actualOvernightCharge || 0,
+      overtime_charge_adjustment: timeAdjustmentResult?.overtimeAdjustment || 0,
+      overnight_charge_adjustment: timeAdjustmentResult?.overnightAdjustment || 0,
+      total_time_adjustment: timeAdjustmentResult?.totalTimeAdjustment || 0,
+    };
+  };
 
   const handleSaveDraft = async () => {
+    if (originalKm <= 0 && extraKm !== 0) {
+      toast.error("Cannot save adjustment: quoted KM is 0. Please reload the trip.");
+      return;
+    }
     const { data, error } = await saveAdjustmentDraft(buildAdjustment("draft"));
     if (!error) {
       onAdjustmentSaved?.();
