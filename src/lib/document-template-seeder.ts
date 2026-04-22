@@ -339,60 +339,113 @@ export const generateARInvoiceTemplate = (): string => `
 
 // ==================== AR Receipt ====================
 export const generateARReceiptTemplate = (): string => `
-<style>${commonStyles}</style>
-<div class="page"><div class="doc">
+<style>
+  body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+  .page { margin: 10px auto; max-width: 850px; background: #ffffff; padding: 30px; color: #000; }
+  
+  /* Use the common header styles for the logo */
+  .header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; }
+  .brand { display: flex; gap: 15px; align-items: center; }
+  .logo-container { width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; }
+  .logo-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .company h1 { margin: 0; font-size: 20px; color: #000; text-transform: uppercase; }
+  .company p { margin: 4px 0 0; font-size: 11px; color: #333; line-height: 1.4; white-space: pre-line; }
+  
+  .meta { text-align: right; }
+  .title .label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .title .value { font-size: 22px; font-weight: bold; color: #000; font-family: monospace; }
+  .chips { margin-top: 8px; display: flex; gap: 6px; justify-content: flex-end; }
+  .chip { padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; text-transform: uppercase; }
+  .chip.gray { background: #f3f4f6; color: #4b5563; border-color: #e5e7eb; }
+  
+  table.voucher-table { width: 100%; border-collapse: collapse; border: 1px solid black; margin-bottom: 20px; font-size: 12px; }
+  table.voucher-table td, table.voucher-table th { border: 1px solid black; padding: 6px; }
+  h4.section-title { margin: 0 0 5px 0; font-size: 14px; font-weight: bold; text-transform: uppercase; }
+  .amount-words-table { width: 100%; border-collapse: collapse; border: 1px solid black; margin-bottom: 20px; font-size: 12px; }
+  .amount-words-table td { border: 1px solid black; padding: 6px; }
+  .auth-table { width: 100%; border-collapse: collapse; border: 1px solid black; margin-bottom: 20px; font-size: 12px; }
+  .auth-table th { border: 1px solid black; padding: 6px; text-align: center; width: 33.33%; font-weight: bold; }
+  .auth-table td { border: 1px solid black; padding: 5px; height: 80px; position: relative; vertical-align: top; }
+</style>
+<div class="page">
   ${buildHeader('Official Receipt', '{{receipt_number}}', '{{receipt_date}}', 'AR Receipt')}
 
-  <div class="body">
-    <div class="grid">
-      <div class="card">
-        <h3>Receipt Details</h3>
-        <div class="kv">
-          <div class="row"><span class="k">Receipt No</span><span class="v">{{receipt_number}}</span></div>
-          <div class="row"><span class="k">Date</span><span class="v">{{receipt_date}}</span></div>
-          <div class="row"><span class="k">Reference</span><span class="v">{{reference}}</span></div>
-        </div>
-      </div>
-      <div class="card">
-        <h3>Received From</h3>
-        <div class="kv">
-          <div class="row"><span class="k">Customer</span><span class="v">{{customer_name}}</span></div>
-          <div class="row"><span class="k">Address</span><span class="v">{{customer_address}}</span></div>
-        </div>
-      </div>
-    </div>
+  <table class="voucher-table">
+    <tr>
+      <td style="width: 20%;">RECEIPT NO.</td>
+      <td style="width: 45%;">{{receipt_number}}</td>
+      <td style="width: 15%;">DATE</td>
+      <td style="width: 20%; text-align: center;">{{receipt_date}}</td>
+    </tr>
+    <tr>
+      <td>RECEIVED FROM</td>
+      <td colspan="3">{{customer_name}}</td>
+    </tr>
+    <tr>
+      <td>ADDRESS</td>
+      <td colspan="3">{{customer_address}}</td>
+    </tr>
+    <tr>
+      <td>REFERENCE</td>
+      <td colspan="3">{{reference}}</td>
+    </tr>
+  </table>
 
-    <div class="grid">
-      <div class="card">
-        <h3>Payment Method</h3>
-        <div class="kv">
-          <div class="row"><span class="k">Method</span><span class="v">{{payment_method}}</span></div>
-          <div class="row"><span class="k">Cheque No</span><span class="v">{{cheque_number}}</span></div>
-        </div>
-      </div>
-      <div class="payment-summary">
-        <div class="total-box">
-          <span class="label">Total Received</span>
-          <span class="value">{{amount}}</span>
-        </div>
-      </div>
-    </div>
+  <h4 class="section-title">RECEIPT INFORMATION</h4>
+  <table class="voucher-table">
+    <tr>
+      <td style="width: 20%;">PAYMENT METHOD</td>
+      <td style="width: 30%;">{{payment_method}}</td>
+      <td style="width: 20%;">TOTAL RECEIVED</td>
+      <td style="width: 30%; font-weight: bold; font-size: 14px;">{{amount}}</td>
+    </tr>
+    <tr>
+      <td>CHEQUE NO.</td>
+      <td colspan="3">{{cheque_number}}</td>
+    </tr>
+  </table>
 
-    <div class="amount-words"><strong>Amount in Words:</strong> {{amount_in_words}}</div>
+  {{allocations}}
 
-    <div class="notes-section">
-      <div class="label">Invoice Allocations</div>
-    </div>
-    {{allocations}}
+  <h4 class="section-title">AMOUNT IN WORDS</h4>
+  <table class="amount-words-table">
+    <tr>
+      <td style="width: 20%;">LKR (In Words)</td>
+      <td style="width: 80%;">{{amount_in_words}}</td>
+    </tr>
+  </table>
 
-    <div class="notes-section">
-      <div class="label">Notes</div>
-      <p>{{notes}}</p>
-    </div>
+  <div style="margin-bottom: 20px;">
+    <strong>Notes:</strong><br/>
+    {{notes}}
   </div>
 
-  ${buildFooter(['Received By', 'Cashier', 'Authorized By', 'Customer Signature'])}
-</div></div>
+  <h4 class="section-title">AUTHORISATION</h4>
+  <table class="auth-table">
+    <tr>
+      <th>PREPARED BY</th>
+      <th>CHECKED BY</th>
+      <th>APPROVED BY</th>
+    </tr>
+    <tr>
+      <td>
+        <div style="position: absolute; top: 5px; left: 5px;">Name: {{prepared_by}}</div>
+        <div style="position: absolute; bottom: 5px; left: 25px;">Signature: _________________</div>
+        <div style="position: absolute; bottom: 15px; left: 85px;">{{prepared_by_signature}}</div>
+      </td>
+      <td>
+        <div style="position: absolute; top: 5px; left: 5px;">Name: {{verified_by}}</div>
+        <div style="position: absolute; bottom: 5px; left: 25px;">Signature: _________________</div>
+        <div style="position: absolute; bottom: 15px; left: 85px;">{{verified_by_signature}}</div>
+      </td>
+      <td>
+        <div style="position: absolute; top: 5px; left: 5px;">Name: {{approved_by}}</div>
+        <div style="position: absolute; bottom: 5px; left: 25px;">Signature: _________________</div>
+        <div style="position: absolute; bottom: 15px; left: 85px;">{{approved_by_signature}}</div>
+      </td>
+    </tr>
+  </table>
+</div>
 `;
 
 // ==================== AR Credit Note ====================

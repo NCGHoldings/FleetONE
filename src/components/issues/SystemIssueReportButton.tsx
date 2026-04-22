@@ -24,6 +24,11 @@ export function SystemIssueReportButton() {
   // Determine current page name from location
   const currentPageName = ALL_PAGES_FLAT.find(p => p.url === location.pathname)?.title || location.pathname;
 
+  // Hide the floating button on the Diary page so it doesn't overlap with the Task Tracker
+  if (location.pathname === '/diary') {
+    return null;
+  }
+
   const handleSubmit = async () => {
     if (!title.trim()) return;
     

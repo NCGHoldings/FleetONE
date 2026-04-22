@@ -8,7 +8,7 @@ import { DocumentSignaturePad, injectSignaturesIntoHtml } from "./DocumentSignat
 import { useDocumentTemplates } from "@/hooks/useDocumentTemplates";
 import { useCompanies } from "@/hooks/useAccountingData";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { mapDocumentToPlaceholders, replacePlaceholders, generatePrintableDocument, HeaderMode } from "@/lib/document-template-utils";
 import { defaultTemplates } from "@/lib/document-template-seeder";
 import html2canvas from "html2canvas";
@@ -36,6 +36,43 @@ export const FinanceDocumentPreviewModal = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleResetTemplate = async () => {
+    if (!selectedTemplateId || selectedTemplateId === 'none') {
+      toast.error("Please select a valid template to reset.");
+      return;
+    }
+
+    const defaultGenerator = defaultTemplates[documentType];
+    if (!defaultGenerator) {
+      toast.error("No default layout available for this document type.");
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const defaultHtml = defaultGenerator();
+      const { error } = await supabase
+        .from('document_templates')
+        .update({ html_content: defaultHtml })
+        .eq('id', selectedTemplateId);
+
+      if (error) throw error;
+
+      toast.success("Template reset to default layout successfully!");
+      
+      // Update local cache manually or invalidate query
+      await queryClient.invalidateQueries({ queryKey: ["document-templates"] });
+      
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to reset template.");
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   // Signature persistence helpers
   const getSignatureStorageKey = () => {
@@ -472,6 +509,17 @@ export const FinanceDocumentPreviewModal = ({
             </Select>
           </div>
           <div className="flex gap-2">
+            {!hasNoTemplate && selectedTemplateId && selectedTemplateId !== 'none' && (
+              <Button 
+                variant="default"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={handleResetTemplate}
+                disabled={isResetting}
+              >
+                <Wand2 className="h-4 w-4 mr-2" />
+                {isResetting ? "Resetting..." : "Reset Layout"}
+              </Button>
+            )}
             <Button 
               variant="outline" 
               onClick={handleDownloadPdf}

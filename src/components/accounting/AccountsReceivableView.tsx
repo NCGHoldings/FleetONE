@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, CheckCircle, Eye, FileText, Printer, Search, Pencil, Trash2 } from "lucide-react";
@@ -49,6 +49,64 @@ export const AccountsReceivableView = () => {
   const [editingInvoice, setEditingInvoice] = useState<any>(null);
   const { data: invoices, isLoading } = useARInvoices(statusFilter);
   const deleteInvoice = useDeleteARInvoice();
+
+  // ── TEMPORARY PATCH: Backfill bus_no for School Bus AR Invoices ──
+  useEffect(() => {
+    const patchOldInvoices = async () => {
+      try {
+        const { data: arInvoices } = await supabase
+          .from('ar_invoices')
+          .select('id, reference, bus_no')
+          .ilike('invoice_number', 'SBS-INV-%');
+          
+        console.log("PATCH: Found SBO invoices:", arInvoices?.length);
+        if (!arInvoices || arInvoices.length === 0) return;
+
+        const { data: students } = await supabase.from('school_students').select('id, student_name, bus_reg_no');
+        const { data: buses } = await supabase.from('buses').select('id, bus_no, category_id');
+        
+        const busMap = new Map();
+        buses?.forEach((b: any) => { if (b.bus_no) busMap.set(b.bus_no, b); });
+
+        const studentMap = new Map();
+        students?.forEach((s: any) => {
+          if (s.student_name && s.bus_reg_no) {
+            const bus = busMap.get(s.bus_reg_no);
+            if (bus) {
+              studentMap.set(s.student_name.trim(), { bus_no: s.bus_reg_no, ...bus });
+            } else {
+              studentMap.set(s.student_name.trim(), { bus_no: s.bus_reg_no, id: null, category_id: null });
+            }
+          }
+        });
+
+        let updated = 0;
+        for (const inv of arInvoices) {
+          if (!inv.bus_no && inv.reference) {
+            const studentName = inv.reference.split(' - ')[0].trim();
+            const busInfo = studentMap.get(studentName);
+            if (busInfo) {
+              await supabase.from('ar_invoices').update({
+                bus_no: busInfo.bus_no,
+                bus_id: busInfo.id,
+                bus_category_id: busInfo.category_id
+              }).eq('id', inv.id);
+              updated++;
+            }
+          }
+        }
+        console.log("PATCH: Successfully updated:", updated);
+        if (updated > 0) {
+          // Force a refetch to show the updated data!
+          window.location.reload();
+        }
+      } catch (err) {
+        console.error("Patch failed", err);
+      }
+    };
+    patchOldInvoices();
+  }, []);
+  // ──────────────────────────────────────────────────────────────────
 
   // Multi-field search filter
   const filteredInvoices = useMemo(() => {

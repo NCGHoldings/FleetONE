@@ -69,6 +69,12 @@ const mainItems = [{
   url: "/system-issues",
   icon: AlertTriangle
 }];
+const personalItems = [{
+  id: "personal_diary",
+  title: "Smart Diary",
+  url: "/diary",
+  icon: BookOpen
+}];
 const governanceItems = [{
   id: "governance_calendar",
   title: "Governance Calendar",
@@ -353,10 +359,12 @@ export function AppSidebar() {
   const visibleNSP = nspItems.filter(i => hasAccess(i.id));
   const visibleGovernance = governanceItems.filter(i => hasAccess(i.id));
   const visibleMarketing = marketingItems.filter(i => hasAccess(i.id));
+  const visiblePersonal = personalItems; // Personal diary is accessible to everyone who is logged in
 
   const [searchQuery, setSearchQuery] = useState("");
 
   const allGroupedItems = useMemo(() => [
+    { group: "Personal", items: visiblePersonal },
     { group: "Main", items: visibleMain },
     { group: "Operations", items: visibleOperations },
     { group: "Business", items: visibleBusiness },
@@ -367,7 +375,7 @@ export function AppSidebar() {
     { group: "Finance", items: visibleFinance },
     { group: "NCG Spare Parts", items: visibleNSP },
     { group: "Governance", items: visibleGovernance },
-  ], [visibleMain, visibleOperations, visibleBusiness, visibleMarketing, visibleYutong, visibleSinotruck, visibleLightVehicle, visibleFinance, visibleNSP, visibleGovernance]);
+  ], [visiblePersonal, visibleMain, visibleOperations, visibleBusiness, visibleMarketing, visibleYutong, visibleSinotruck, visibleLightVehicle, visibleFinance, visibleNSP, visibleGovernance]);
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -501,6 +509,25 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
+            <div className="w-2 h-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full animate-pulse"></div>
+            Personal
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+            {visiblePersonal.map(item => <SidebarMenuItem key={item.title}>
+    <SidebarMenuButton asChild>
+      <NavLink to={item.url} className={getNavCls}>
+        <item.icon className="w-5 h-5 transition-all duration-300" />
+        {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+      </NavLink>
+    </SidebarMenuButton>
+  </SidebarMenuItem>)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

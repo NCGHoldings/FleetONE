@@ -23,6 +23,7 @@ import FleetPerformanceRadar from '@/components/fleet/FleetPerformanceRadar';
 import BusComparisonChart from '@/components/fleet/BusComparisonChart';
 import HourlyActivityHeatmap from '@/components/fleet/HourlyActivityHeatmap';
 import RealTimeFleetStatus from '@/components/fleet/RealTimeFleetStatus';
+import { FleetMasterDataBreakdown } from '@/components/fleet/FleetMasterDataBreakdown';
 import { useFleetAnalytics } from '@/hooks/useFleetAnalytics';
 import { addDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -160,7 +161,9 @@ export default function FleetAnalytics() {
 
           {/* Overview Tab - Enhanced */}
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-2">
+            <FleetMasterDataBreakdown />
+            
+            <div className="grid gap-6 lg:grid-cols-2 mt-6">
               <FleetUtilizationChart />
               <FleetPerformanceRadar />
             </div>

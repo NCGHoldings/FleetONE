@@ -145,26 +145,49 @@ interface Trip {
 
 // Custom Autocomplete Input for mobile reliability
 const AutocompleteInput = ({ 
-  value, 
+  value = '', 
   onChange, 
-  options, 
+  options = [], 
   placeholder, 
-  uppercase = false 
+  uppercase = false,
+  autoFormat
 }: { 
   value: string; 
   onChange: (v: string) => void; 
   options: string[]; 
   placeholder?: string;
   uppercase?: boolean;
+  autoFormat?: 'bus';
 }) => {
   const [show, setShow] = useState(false);
-  const filtered = options.filter(o => o.toLowerCase().includes(value.toLowerCase()) || !value);
+  
+  const safeValue = value || '';
+  const safeOptions = options || [];
+  
+  const filtered = safeOptions.filter(o => 
+    o && o.toLowerCase().includes(safeValue.toLowerCase()) || !safeValue
+  );
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = uppercase ? e.target.value.toUpperCase() : e.target.value;
+    
+    if (autoFormat === 'bus') {
+      // Remove all spaces and hyphens, force uppercase
+      val = val.replace(/[\s-]/g, '').toUpperCase();
+      // If it ends with 4 numbers and has letters/numbers before it, insert a hyphen
+      const match = val.match(/^([A-Z0-9]+?)(\d{4})$/);
+      if (match) {
+        val = `${match[1]}-${match[2]}`;
+      }
+    }
+    onChange(val);
+  };
 
   return (
     <div className="relative">
       <Input 
-        value={value} 
-        onChange={(e) => onChange(uppercase ? e.target.value.toUpperCase() : e.target.value)} 
+        value={safeValue} 
+        onChange={handleChange} 
         onFocus={() => setShow(true)}
         onBlur={() => setTimeout(() => setShow(false), 200)}
         placeholder={placeholder}
@@ -461,6 +484,7 @@ export default function PublicConductorUpload() {
                     options={history.buses || []} 
                     placeholder="NA-1234" 
                     uppercase={true} 
+                    autoFormat="bus"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -527,11 +551,21 @@ export default function PublicConductorUpload() {
                       <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
                         <div className="space-y-1">
                           <Label className="text-xs font-bold text-slate-500">{t.startOdo}</Label>
-                          <Input type="number" placeholder="0" value={trip.startOdo} onChange={(e) => updateTrip(trip.id, 'startOdo', e.target.value)} className="h-8 text-sm" />
+                          <Input 
+                            type="number" inputMode="decimal" placeholder="0" 
+                            value={trip.startOdo} onChange={(e) => updateTrip(trip.id, 'startOdo', e.target.value)} 
+                            onFocus={(e) => e.target.select()}
+                            className="h-8 text-sm" 
+                          />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs font-bold text-slate-500">{t.endOdo}</Label>
-                          <Input type="number" placeholder="0" value={trip.endOdo} onChange={(e) => updateTrip(trip.id, 'endOdo', e.target.value)} className="h-8 text-sm" />
+                          <Input 
+                            type="number" inputMode="decimal" placeholder="0" 
+                            value={trip.endOdo} onChange={(e) => updateTrip(trip.id, 'endOdo', e.target.value)} 
+                            onFocus={(e) => e.target.select()}
+                            className="h-8 text-sm" 
+                          />
                         </div>
                       </div>
 
@@ -548,10 +582,11 @@ export default function PublicConductorUpload() {
                             <Label className="text-sm font-semibold text-slate-600">{inc.label}</Label>
                             <div className="relative w-32">
                               <Input 
-                                type="number" min="0" step="0.01" placeholder="0.00"
+                                type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
                                 className="h-9 text-right font-medium focus-visible:ring-emerald-500" 
                                 value={trip.income?.[inc.key as keyof typeof trip.income] || ''} 
                                 onChange={(e) => updateTripIncome(trip.id, inc.key, e.target.value)} 
+                                onFocus={(e) => e.target.select()}
                               />
                             </div>
                           </div>
@@ -580,10 +615,11 @@ export default function PublicConductorUpload() {
                     </Label>
                     <div className="relative w-28 shrink-0">
                       <Input 
-                        type="number" min="0" step="0.01" placeholder="0.00"
+                        type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
                         className="h-8 text-right font-medium text-sm focus-visible:ring-rose-500 bg-rose-50/30 border-rose-100" 
                         value={expenses[cat.key] || ''} 
                         onChange={(e) => setExpenses({...expenses, [cat.key]: e.target.value})} 
+                        onFocus={(e) => e.target.select()}
                       />
                     </div>
                   </div>

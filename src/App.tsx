@@ -92,6 +92,7 @@ import PublicYutongReport from "./pages/PublicYutongReport";
 import PublicYutongSpreadsheet from "./pages/PublicYutongSpreadsheet";
 import RouteManagement from "./pages/RouteManagement";
 import MagiyaReports from "./pages/MagiyaReports";
+import PersonalDiary from "./pages/PersonalDiary";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -709,6 +710,17 @@ const App = () => (
               } 
             />
             
+            <Route 
+              path="/diary" 
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <PersonalDiary />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            
             
             <Route
               path="/nsp-daily-sales"
@@ -892,3 +904,4 @@ const App = () => (
 );
 
 export default App;
+ 

@@ -57,31 +57,88 @@ export function useFleetAnalytics(dateRange: { start: Date; end: Date }) {
       const prevStartDate = prevPeriodStart.toISOString();
       const prevEndDate = prevPeriodEnd.toISOString();
 
-      // Current period - Total distance from daily mileage
-      const { data: mileageData } = await supabase
-        .from('bus_daily_mileage')
-        .select('daily_km')
-        .gte('date', startDate.split('T')[0])
-        .lte('date', endDate.split('T')[0]);
+      // Execute all independent queries concurrently to prevent waterfall delays
+      const [
+        { data: mileageData },
+        { data: prevMileageData },
+        { data: speedData },
+        { data: prevSpeedData },
+        { data: trackingData },
+        { data: expensesData },
+        { data: prevExpensesData },
+        { data: idlePoints },
+        { count: fuelRecordsCount }
+      ] = await Promise.all([
+        // 1. Current period mileage
+        supabase
+          .from('bus_daily_mileage')
+          .select('daily_km')
+          .gte('date', startDate.split('T')[0])
+          .lte('date', endDate.split('T')[0]),
+        
+        // 2. Previous period mileage
+        supabase
+          .from('bus_daily_mileage')
+          .select('daily_km')
+          .gte('date', prevStartDate.split('T')[0])
+          .lt('date', prevEndDate.split('T')[0]),
+        
+        // 3. Current period speed (Sampled to prevent memory crash)
+        supabase
+          .from('gps_location_history')
+          .select('speed_kmh')
+          .gte('timestamp', startDate)
+          .lte('timestamp', endDate)
+          .gt('speed_kmh', 0)
+          .limit(5000),
+        
+        // 4. Previous period speed (Sampled)
+        supabase
+          .from('gps_location_history')
+          .select('speed_kmh')
+          .gte('timestamp', prevStartDate)
+          .lt('timestamp', prevEndDate)
+          .gt('speed_kmh', 0)
+          .limit(5000),
+        
+        // 5. Active vehicles tracking
+        supabase
+          .from('real_time_tracking')
+          .select('status, bus_no, ignition_status'),
+        
+        // 6. Current period fuel expenses
+        supabase
+          .from('daily_bus_expenses')
+          .select('fuel_liters')
+          .gte('expense_date', startDate.split('T')[0])
+          .lte('expense_date', endDate.split('T')[0]),
+        
+        // 7. Previous period fuel expenses
+        supabase
+          .from('daily_bus_expenses')
+          .select('fuel_liters')
+          .gte('expense_date', prevStartDate.split('T')[0])
+          .lt('expense_date', prevEndDate.split('T')[0]),
+        
+        // 8. Idle points (speed 0) (Sampled)
+        supabase
+          .from('gps_location_history')
+          .select('id')
+          .gte('timestamp', startDate)
+          .lte('timestamp', endDate)
+          .eq('speed_kmh', 0)
+          .limit(5000),
+        
+        // 9. Fuel records count
+        supabase
+          .from('bus_fuel_readings')
+          .select('id', { count: 'exact', head: true })
+          .gte('reading_timestamp', startDate)
+          .lte('reading_timestamp', endDate)
+      ]);
 
       const totalDistance = mileageData?.reduce((sum, row) => sum + (row.daily_km || 0), 0) || 0;
-
-      // Previous period distance
-      const { data: prevMileageData } = await supabase
-        .from('bus_daily_mileage')
-        .select('daily_km')
-        .gte('date', prevStartDate.split('T')[0])
-        .lt('date', prevEndDate.split('T')[0]);
-
       const prevTotalDistance = prevMileageData?.reduce((sum, row) => sum + (row.daily_km || 0), 0) || 0;
-
-      // Current period - Average speed from GPS history (excluding stationary)
-      const { data: speedData } = await supabase
-        .from('gps_location_history')
-        .select('speed_kmh')
-        .gte('timestamp', startDate)
-        .lte('timestamp', endDate)
-        .gt('speed_kmh', 0);
 
       const avgSpeed = speedData && speedData.length > 0
         ? speedData.reduce((sum, row) => sum + (row.speed_kmh || 0), 0) / speedData.length
@@ -91,53 +148,18 @@ export function useFleetAnalytics(dateRange: { start: Date; end: Date }) {
         ? Math.max(...speedData.map(row => row.speed_kmh || 0))
         : 0;
 
-      // Previous period speed
-      const { data: prevSpeedData } = await supabase
-        .from('gps_location_history')
-        .select('speed_kmh')
-        .gte('timestamp', prevStartDate)
-        .lt('timestamp', prevEndDate)
-        .gt('speed_kmh', 0);
-
       const prevAvgSpeed = prevSpeedData && prevSpeedData.length > 0
         ? prevSpeedData.reduce((sum, row) => sum + (row.speed_kmh || 0), 0) / prevSpeedData.length
         : 0;
 
-      // Active vehicles from real-time tracking
-      const { data: trackingData } = await supabase
-        .from('real_time_tracking')
-        .select('status, bus_no, ignition_status');
-
       const activeVehicles = trackingData?.filter(v => v.status === 'active' || v.ignition_status === true).length || 0;
       const totalVehicles = trackingData?.length || 0;
-
-      // Fuel efficiency from daily expenses
-      const { data: expensesData } = await supabase
-        .from('daily_bus_expenses')
-        .select('fuel_liters')
-        .gte('expense_date', startDate.split('T')[0])
-        .lte('expense_date', endDate.split('T')[0]);
 
       const totalFuelLiters = expensesData?.reduce((sum, row) => sum + (row.fuel_liters || 0), 0) || 0;
       const fuelEfficiency = totalFuelLiters > 0 ? totalDistance / totalFuelLiters : 0;
 
-      // Previous period fuel efficiency
-      const { data: prevExpensesData } = await supabase
-        .from('daily_bus_expenses')
-        .select('fuel_liters')
-        .gte('expense_date', prevStartDate.split('T')[0])
-        .lt('expense_date', prevEndDate.split('T')[0]);
-
       const prevTotalFuelLiters = prevExpensesData?.reduce((sum, row) => sum + (row.fuel_liters || 0), 0) || 0;
       const prevFuelEfficiency = prevTotalFuelLiters > 0 ? prevTotalDistance / prevTotalFuelLiters : 0;
-
-      // Idle time calculation from GPS (points where speed = 0 but ignition on)
-      const { data: idlePoints } = await supabase
-        .from('gps_location_history')
-        .select('id')
-        .gte('timestamp', startDate)
-        .lte('timestamp', endDate)
-        .eq('speed_kmh', 0);
 
       // Estimate idle time (each GPS point represents ~30 seconds)
       const totalIdleTime = (idlePoints?.length || 0) * 0.5; // minutes
@@ -155,13 +177,6 @@ export function useFleetAnalytics(dateRange: { start: Date; end: Date }) {
       
       // Utilization trend - compare with previous tracking data snapshot
       const utilizationTrend = 0; // Would need historical tracking data
-
-      // Get fuel readings count
-      const { count: fuelRecordsCount } = await supabase
-        .from('bus_fuel_readings')
-        .select('id', { count: 'exact', head: true })
-        .gte('reading_timestamp', startDate)
-        .lte('reading_timestamp', endDate);
 
       return {
         totalDistance: Math.round(totalDistance),

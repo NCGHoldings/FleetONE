@@ -265,7 +265,7 @@ export const DrillDownModal = ({
     }).reverse();
   }, [filteredTransactions, broughtForwardBalance]);
 
-  const handleViewDocument = async (reference: string, sourceModule: string, jeId: string) => {
+  const handleViewDocument = async (reference: string, sourceModule: string, jeId: string, entryNumber: string = '') => {
     if (!reference) return;
     
     // Auto-detect source_module from reference if it's missing or generic
@@ -273,7 +273,7 @@ export const DrillDownModal = ({
     if (!effectiveSourceModule || effectiveSourceModule === 'general') {
       if (reference.includes('-INV-') || reference.startsWith('INV-')) {
         effectiveSourceModule = 'ar_invoice';
-      } else if (reference.includes('-RCP-') || reference.startsWith('RCP-')) {
+      } else if (reference.includes('-RCP-') || reference.startsWith('RCP-') || entryNumber.startsWith('SBS-PAY-')) {
         effectiveSourceModule = 'ar_receipt';
       } else if (reference.includes('-PAY-') || reference.startsWith('PAY-')) {
         effectiveSourceModule = 'ap_payment';
@@ -318,11 +318,18 @@ export const DrillDownModal = ({
     }
 
     try {
-      const { data, error } = await supabase
-        .from(table as any)
-        .select("*")
-        .eq(matchColumn, reference)
-        .single();
+      let query = supabase.from(table as any).select("*");
+      
+      if (matchColumn && reference) {
+        // If reference looks like a UUID, it might be stored in the 'reference' column instead of receipt_number/invoice_number
+        if (reference.length > 20 && reference.includes('-')) {
+          query = query.or(`${matchColumn}.eq.${reference},reference.eq.${reference}`);
+        } else {
+          query = query.eq(matchColumn, reference);
+        }
+      }
+
+      const { data, error } = await query.maybeSingle();
         
       if (error || !data) {
         toast.error("Original document could not be found.");
@@ -656,7 +663,7 @@ export const DrillDownModal = ({
                               variant="ghost" 
                               size="icon" 
                               className="h-5 w-5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 p-0"
-                              onClick={() => handleViewDocument(entry.reference, entry.source_module, entry.id)}
+                              onClick={() => handleViewDocument(entry.reference, entry.source_module, entry.id, entry.entry_number)}
                               title="View Document"
                             >
                               <FileText className="h-3 w-3" />

@@ -425,6 +425,7 @@ export function useGenerateBulkARInvoices() {
         payment_balance: number;
         current_amount_due: number;
         fixed_monthly_amount?: number;
+        bus_reg_no?: string | null;
       }>;
       settings: SchoolBusFinanceSettings;
       billingPercentage?: number;
@@ -450,6 +451,15 @@ export function useGenerateBulkARInvoices() {
       // Get batch number for tracking
       const { data: batchData } = await supabase.rpc("generate_sbs_batch_number");
       const batchNumber = batchData || `SBS-BATCH-${format(new Date(), "yyyyMMdd")}-0001`;
+
+      // Fetch buses to map category_id and bus_id
+      const { data: buses } = await supabase.from("buses").select("id, bus_no, category_id");
+      const busMap = new Map();
+      buses?.forEach(b => {
+        if (b.bus_no) {
+          busMap.set(b.bus_no, { id: b.id, category_id: b.category_id });
+        }
+      });
 
       // Calculate totals using billing percentage
       const effectivePercentage = billingPercentage ?? settings.billing_percentage ?? 80;
@@ -789,6 +799,9 @@ export function useGenerateBulkARInvoices() {
                 reference: `${student.student_name} - ${format(invoiceMonth, "MMM yyyy")}`,
                 notes: `School Bus AR for ${student.student_name}`,
                 journal_entry_id: journalEntry.id,
+                bus_no: student.bus_reg_no || null,
+                bus_id: student.bus_reg_no ? busMap.get(student.bus_reg_no)?.id || null : null,
+                bus_category_id: student.bus_reg_no ? busMap.get(student.bus_reg_no)?.category_id || null : null,
               } as any)
               .select()
               .single();

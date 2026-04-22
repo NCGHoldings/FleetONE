@@ -102,6 +102,10 @@ export const useCompanyARInvoices = (status?: string) => {
           customers (
             customer_code,
             customer_name
+          ),
+          bus_categories (
+            name,
+            color
           )
         `)
         .order("invoice_date", { ascending: false });

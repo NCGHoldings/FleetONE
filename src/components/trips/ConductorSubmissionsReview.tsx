@@ -242,6 +242,11 @@ export const ConductorSubmissionsReview = () => {
                       <Badge variant={getStatusColor(submission.status)}>
                         {submission.status}
                       </Badge>
+                      {submission.ocr_data?.trips && submission.ocr_data.trips.length > 0 && (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          {submission.ocr_data.trips.length} {submission.ocr_data.trips.length === 1 ? 'Trip' : 'Trips'}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {submission.conductor_name} • {submission.conductor_phone}
