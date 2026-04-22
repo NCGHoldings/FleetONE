@@ -1157,7 +1157,7 @@ export const useItemStock = () => {
       let query = supabase
         .from("item_stock")
         .select(`*, items (item_code, item_name)`)
-        .order("location");
+        .order("warehouse_id");
 
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
@@ -1204,7 +1204,7 @@ export const usePurchaseOrders = (status?: string) => {
       let query = supabase
         .from("purchase_orders")
         .select(`*, vendors (vendor_code, vendor_name)`)
-        .order("po_date", { ascending: false });
+        .order("order_date", { ascending: false });
 
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);

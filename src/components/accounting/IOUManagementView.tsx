@@ -37,9 +37,10 @@ export const IOUManagementView = () => {
   const [previewData, setPreviewData] = useState<any>(null);
 
   // New IOU form state
-  const [newStaffId, setNewStaffId] = useState("");
+  const [newStaffName, setNewStaffName] = useState("");
   const [newAmount, setNewAmount] = useState(0);
   const [newPurpose, setNewPurpose] = useState("");
+  const [newIssuedDate, setNewIssuedDate] = useState(new Date().toISOString().split("T")[0]);
   const [newDueDate, setNewDueDate] = useState("");
   const [newUnit, setNewUnit] = useState("");
 
@@ -62,17 +63,21 @@ export const IOUManagementView = () => {
   });
 
   const handleCreateIOU = async () => {
+    const matchedStaff = staff?.find(s => s.staff_name === newStaffName);
     await createIOU.mutateAsync({
-      staff_id: newStaffId,
+      staff_id: matchedStaff ? matchedStaff.id : undefined,
+      staff_name_draft: matchedStaff ? undefined : newStaffName,
       amount: newAmount,
       purpose: newPurpose,
+      issued_date: newIssuedDate || undefined,
       due_date: newDueDate || undefined,
       business_unit_code: newUnit,
     });
     setShowCreateIOU(false);
-    setNewStaffId("");
+    setNewStaffName("");
     setNewAmount(0);
     setNewPurpose("");
+    setNewIssuedDate(new Date().toISOString().split("T")[0]);
     setNewDueDate("");
     setNewUnit("");
   };
@@ -236,7 +241,7 @@ export const IOUManagementView = () => {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-muted-foreground" />
-                        {iou.staff?.staff_name || "-"}
+                        {iou.staff?.staff_name || iou.staff_name_draft || "-"}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -310,19 +315,18 @@ export const IOUManagementView = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Staff Member</Label>
-              <Select value={newStaffId} onValueChange={setNewStaffId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select staff" />
-                </SelectTrigger>
-                <SelectContent>
-                  {staff?.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.staff_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Payee / Staff Member</Label>
+              <Input
+                list="staff-list"
+                value={newStaffName}
+                onChange={(e) => setNewStaffName(e.target.value)}
+                placeholder="Type name or select from list..."
+              />
+              <datalist id="staff-list">
+                {staff?.map((s) => (
+                  <option key={s.id} value={s.staff_name} />
+                ))}
+              </datalist>
             </div>
             <div>
               <Label>Business Unit</Label>
@@ -357,13 +361,23 @@ export const IOUManagementView = () => {
                 rows={2}
               />
             </div>
-            <div>
-              <Label>Due Date (Optional)</Label>
-              <Input
-                type="date"
-                value={newDueDate}
-                onChange={(e) => setNewDueDate(e.target.value)}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Issued Date</Label>
+                <Input
+                  type="date"
+                  value={newIssuedDate}
+                  onChange={(e) => setNewIssuedDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Due Date (Optional)</Label>
+                <Input
+                  type="date"
+                  value={newDueDate}
+                  onChange={(e) => setNewDueDate(e.target.value)}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -372,7 +386,7 @@ export const IOUManagementView = () => {
             </Button>
             <Button 
               onClick={handleCreateIOU}
-              disabled={!newStaffId || !newUnit || newAmount <= 0 || createIOU.isPending}
+              disabled={!newStaffName || !newUnit || newAmount <= 0 || createIOU.isPending}
             >
               {createIOU.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Issue IOU
@@ -395,8 +409,8 @@ export const IOUManagementView = () => {
                   <p className="font-mono font-semibold">{selectedIOU.iou_number}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Staff</p>
-                  <p className="font-semibold">{selectedIOU.staff?.staff_name || "-"}</p>
+                  <p className="text-muted-foreground">Payee</p>
+                  <p className="font-semibold">{selectedIOU.staff?.staff_name || selectedIOU.staff_name_draft || "-"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Total Amount</p>

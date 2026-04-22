@@ -41,9 +41,9 @@ export const CompositeItemsView = () => {
     queryKey: ["items_composite", selectedCompany?.id],
     queryFn: async () => {
       if (!selectedCompany?.id) return [];
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("items")
-        .select("id, item_code, item_name, selling_price, standard_cost, is_composite")
+        .select("id, item_code, item_name, selling_price, standard_cost, item_type")
         .eq("company_id", selectedCompany.id)
         .eq("is_active", true)
         .order("item_name");
@@ -140,7 +140,7 @@ export const CompositeItemsView = () => {
     }, 0);
   };
 
-  const compositeParents = items?.filter((i: any) => i.is_composite) || [];
+  const compositeParents = items?.filter((i: any) => i.item_type === 'composite' || i.item_type === 'assembly') || [];
   const availableComponents = items?.filter((i: any) => i.id !== selectedParentId) || [];
 
   return (

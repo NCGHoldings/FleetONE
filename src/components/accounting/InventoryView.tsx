@@ -12,6 +12,11 @@ import { ItemForm } from "./ItemForm";
 import { StockAdjustmentForm } from "./StockAdjustmentForm";
 import { ItemCategoryForm } from "./ItemCategoryForm";
 import { Input } from "@/components/ui/input";
+import { RefreshCw } from "lucide-react";
+import { syncBusCategoriesToItems } from "@/utils/bus-category-seeder";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +39,34 @@ export const InventoryView = () => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<any>(null);
   const deleteItem = useDeleteItem();
+  const [isSyncing, setIsSyncing] = useState(false);
+  const { selectedCompanyId } = useCompany();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const handleSyncFleetCategories = async () => {
+    if (!selectedCompanyId) {
+      toast({ title: "Error", description: "Please select a company first.", variant: "destructive" });
+      return;
+    }
+    setIsSyncing(true);
+    const result = await syncBusCategoriesToItems(selectedCompanyId);
+    if (result.success) {
+      toast({ 
+        title: "Sync Complete", 
+        description: result.message || `Successfully synced ${result.count} categoris`  
+      });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["item-categories"] });
+    } else {
+      toast({ 
+        title: "Sync Failed", 
+        description: result.error,
+        variant: "destructive"
+      });
+    }
+    setIsSyncing(false);
+  };
 
   // Multi-field search filter for items
   const filteredItems = useMemo(() => {
@@ -223,6 +256,14 @@ export const InventoryView = () => {
           <Button variant="outline" onClick={() => setShowAdjustmentForm(true)}>
             <BarChart3 className="h-4 w-4 mr-2" />
             Stock Adjustment
+          </Button>
+          <Button 
+            variant="secondary" 
+            onClick={handleSyncFleetCategories} 
+            disabled={isSyncing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? "animate-spin" : ""}`} />
+            {isSyncing ? "Syncing..." : "Sync Fleet Vehicles"}
           </Button>
           <Button onClick={() => { setEditingItem(null); setShowItemForm(true); }}>
             <Plus className="h-4 w-4 mr-2" />

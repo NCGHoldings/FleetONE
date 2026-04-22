@@ -165,7 +165,7 @@ export const DrillDownModal = ({
         .in("account_id", resolvedAccountIds)
         .eq("journal_entries.status", "posted")
         .order("created_at", { ascending: false })
-        .limit(500);
+        .limit(2000);
 
       // Apply date range filter
       if (dateRange.from) {

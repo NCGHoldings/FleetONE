@@ -72,9 +72,9 @@ export const PurchaseOrderView = () => {
       ),
     },
     {
-      accessorKey: "po_date",
+      accessorKey: "order_date",
       header: "PO Date",
-      cell: ({ row }: any) => format(new Date(row.original.po_date), "MMM dd, yyyy"),
+      cell: ({ row }: any) => format(new Date(row.original.order_date), "MMM dd, yyyy"),
     },
     {
       accessorKey: "expected_date",

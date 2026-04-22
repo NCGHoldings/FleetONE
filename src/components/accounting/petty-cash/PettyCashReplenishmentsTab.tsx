@@ -27,6 +27,7 @@ export const PettyCashReplenishmentsTab = () => {
   const [form, setForm] = useState({
     petty_cash_fund_id: "",
     amount: 0,
+    transaction_date: new Date().toISOString().split("T")[0],
     description: "",
     reference_number: "",
     payment_method: "cash",
@@ -101,7 +102,7 @@ export const PettyCashReplenishmentsTab = () => {
   const balanceAfter = selectedFund ? selectedFund.current_balance + form.amount : 0;
 
   const resetForm = () => {
-    setForm({ petty_cash_fund_id: "", amount: 0, description: "", reference_number: "", payment_method: "cash" });
+    setForm({ petty_cash_fund_id: "", amount: 0, transaction_date: new Date().toISOString().split("T")[0], description: "", reference_number: "", payment_method: "cash" });
   };
 
   const handleSubmit = async () => {
@@ -116,6 +117,7 @@ export const PettyCashReplenishmentsTab = () => {
       payment_method: form.payment_method,
       status: "approved",
       branch_id: selectedFund?.branch_id || undefined,
+      created_at: new Date(form.transaction_date).toISOString(),
     } as any);
 
     setShowForm(false);
@@ -132,9 +134,9 @@ export const PettyCashReplenishmentsTab = () => {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="font-semibold">Replenishment History</h3>
+        <h3 className="font-semibold">Reimbursement History</h3>
         <Button onClick={() => { resetForm(); setShowForm(true); }}>
-          <Plus className="h-4 w-4 mr-2" /> Replenish Fund
+          <Plus className="h-4 w-4 mr-2" /> Reimburse Fund
         </Button>
       </div>
 
@@ -159,7 +161,7 @@ export const PettyCashReplenishmentsTab = () => {
               </TableRow>
             ) : transactions?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No replenishments found</TableCell>
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No reimbursements found</TableCell>
               </TableRow>
             ) : (
               transactions?.map((txn) => {
@@ -196,7 +198,7 @@ export const PettyCashReplenishmentsTab = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowUpCircle className="h-5 w-5 text-green-600" />
-              Replenish Fund
+              Fund Reimbursement
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -221,11 +223,15 @@ export const PettyCashReplenishmentsTab = () => {
                   {spentSinceLastReplenishment > 0 && (
                     <p className="text-xs text-amber-600 flex items-center gap-1">
                       <Info className="h-3 w-3" />
-                      Spent since last replenishment: Rs {spentSinceLastReplenishment.toLocaleString()}
+                      Spent since last reimbursement: Rs {spentSinceLastReplenishment.toLocaleString()}
                     </p>
                   )}
                 </div>
               )}
+            </div>
+            <div>
+              <Label>Date</Label>
+              <Input type="date" value={form.transaction_date} onChange={(e) => setForm({ ...form, transaction_date: e.target.value })} />
             </div>
             <div>
               <Label>Amount (LKR) *</Label>
@@ -251,7 +257,7 @@ export const PettyCashReplenishmentsTab = () => {
                     <span>Rs {selectedFund.current_balance.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-green-600 font-medium">
-                    <span>+ Replenishment:</span>
+                    <span>+ Reimbursement:</span>
                     <span>Rs {form.amount.toLocaleString()}</span>
                   </div>
                   <hr className="my-1" />
@@ -282,7 +288,7 @@ export const PettyCashReplenishmentsTab = () => {
             </div>
             <div>
               <Label>Description</Label>
-              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Replenishment details..." />
+              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Reimbursement details..." />
             </div>
           </div>
           <DialogFooter>
@@ -293,7 +299,7 @@ export const PettyCashReplenishmentsTab = () => {
             >
               {createTransaction.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               <ArrowUpCircle className="h-4 w-4 mr-2" />
-              Replenish
+              Reimburse
             </Button>
           </DialogFooter>
         </DialogContent>

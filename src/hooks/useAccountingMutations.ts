@@ -548,8 +548,10 @@ export const useCreateARReceipt = () => {
       // We must NOT write that into the customers FK column. Persist it on payee_employee_id
       // and leave customer_id null so the FK does not break.
       const isEmployeeParty = receipt.party_type === "employee";
+      const isVendorParty = receipt.party_type === "vendor";
       const employeeIdResolved = isEmployeeParty ? receipt.customer_id : (receipt.payee_employee_id || null);
-      const customerFkValue = isEmployeeParty ? null : receipt.customer_id;
+      const vendorIdResolved = isVendorParty ? receipt.customer_id : null;
+      const customerFkValue = (isEmployeeParty || isVendorParty) ? null : receipt.customer_id;
 
       const insertPayload: any = {
         receipt_number: receipt.receipt_number,
@@ -569,6 +571,7 @@ export const useCreateARReceipt = () => {
         bus_no: receipt.bus_no || null,
         vehicle_type: receipt.vehicle_type || null,
         payee_employee_id: employeeIdResolved,
+        vendor_id: vendorIdResolved,
       };
 
       const { data, error } = await supabase

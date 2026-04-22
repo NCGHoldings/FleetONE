@@ -19,7 +19,7 @@ import { VendorForm } from "./VendorForm";
 const poSchema = z.object({
   po_number: z.string().min(1, "PO number is required"),
   vendor_id: z.string().min(1, "Vendor is required"),
-  po_date: z.string().min(1, "PO date is required"),
+  order_date: z.string().min(1, "PO date is required"),
   expected_date: z.string().optional(),
   currency: z.string().default("LKR"),
   notes: z.string().optional(),
@@ -82,7 +82,7 @@ export const PurchaseOrderForm = ({ open, onOpenChange }: PurchaseOrderFormProps
     resolver: zodResolver(poSchema),
     defaultValues: {
       po_number: "",
-      po_date: new Date().toISOString().split("T")[0],
+      order_date: new Date().toISOString().split("T")[0],
       currency: "LKR",
     },
   });
@@ -263,7 +263,7 @@ export const PurchaseOrderForm = ({ open, onOpenChange }: PurchaseOrderFormProps
 
                 <FormField
                   control={form.control}
-                  name="po_date"
+                  name="order_date"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>PO Date</FormLabel>

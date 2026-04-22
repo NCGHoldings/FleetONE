@@ -17,7 +17,7 @@ import { EXPENSE_CATEGORIES, BUSINESS_UNITS, useCompanyExpenseCategories } from 
 import { CurrencyDisplay } from "../shared/CurrencyDisplay";
 import { SearchableAccountSelector } from "../shared/SearchableAccountSelector";
 import { FinanceDocumentPreviewModal } from "../shared/FinanceDocumentPreviewModal";
-import { Printer } from "lucide-react";
+import { Printer, Trash2 } from "lucide-react";
 
 export const PettyCashDisbursementsTab = () => {
   const filteredCategories = useCompanyExpenseCategories();
@@ -35,48 +35,64 @@ export const PettyCashDisbursementsTab = () => {
   });
   const createTransaction = useCreatePettyCashTransaction();
 
+  interface DisbursementLine {
+    id: string;
+    expense_category: string;
+    gl_account_id: string;
+    amount: number;
+    description: string;
+  }
+
   // Form state
   const [form, setForm] = useState({
     petty_cash_fund_id: "",
     payee_name: "",
-    expense_category: "",
-    gl_account_id: "",
-    amount: 0,
-    description: "",
+    transaction_date: new Date().toISOString().split("T")[0],
     reference_number: "",
     payment_method: "cash",
   });
 
+  const [lines, setLines] = useState<DisbursementLine[]>([{
+    id: "1", expense_category: "", gl_account_id: "", amount: 0, description: ""
+  }]);
+
   const selectedFund = funds?.find((f) => f.id === form.petty_cash_fund_id);
+  const totalAmount = lines.reduce((sum, line) => sum + (line.amount || 0), 0);
 
   const resetForm = () => {
     setForm({
-      petty_cash_fund_id: "", payee_name: "", expense_category: "",
-      gl_account_id: "", amount: 0, description: "", reference_number: "", payment_method: "cash",
+      petty_cash_fund_id: "", payee_name: "", transaction_date: new Date().toISOString().split("T")[0],
+      reference_number: "", payment_method: "cash",
     });
+    setLines([{ id: "1", expense_category: "", gl_account_id: "", amount: 0, description: "" }]);
   };
 
   const handleSubmit = async () => {
-    if (!form.petty_cash_fund_id || form.amount <= 0) return;
+    if (!form.petty_cash_fund_id || totalAmount <= 0) return;
     if (submitLock.current) return;
     submitLock.current = true;
 
     try {
-      const needsApproval = selectedFund && selectedFund.approval_required_above > 0 && form.amount > selectedFund.approval_required_above;
+      const needsApproval = selectedFund && selectedFund.approval_required_above > 0 && totalAmount > selectedFund.approval_required_above;
 
-      await createTransaction.mutateAsync({
-        petty_cash_fund_id: form.petty_cash_fund_id,
-        transaction_type: "disbursement",
-        amount: form.amount,
-        description: form.description,
-        payee_name: form.payee_name,
-        expense_category: form.expense_category || undefined,
-        gl_account_id: form.gl_account_id || undefined,
-        reference_number: form.reference_number || undefined,
-        payment_method: form.payment_method,
-        status: needsApproval ? "pending" : "approved",
-        branch_id: selectedFund?.branch_id || undefined,
-      } as any);
+      for (const line of lines) {
+        if (line.amount <= 0) continue;
+        
+        await createTransaction.mutateAsync({
+          petty_cash_fund_id: form.petty_cash_fund_id,
+          transaction_type: "disbursement",
+          amount: line.amount,
+          description: line.description || undefined,
+          payee_name: form.payee_name,
+          expense_category: line.expense_category || undefined,
+          gl_account_id: line.gl_account_id || undefined,
+          reference_number: form.reference_number || undefined,
+          payment_method: form.payment_method,
+          status: needsApproval ? "pending" : "approved",
+          branch_id: selectedFund?.branch_id || undefined,
+          created_at: new Date(form.transaction_date).toISOString(),
+        } as any);
+      }
 
       setShowForm(false);
       resetForm();
@@ -125,7 +141,7 @@ export const PettyCashDisbursementsTab = () => {
           </Select>
         </div>
         <Button onClick={() => { resetForm(); setShowForm(true); }}>
-          <Plus className="h-4 w-4 mr-2" /> New Disbursement
+          <Plus className="h-4 w-4 mr-2" /> New Petty Cash Voucher
         </Button>
       </div>
 
@@ -153,7 +169,7 @@ export const PettyCashDisbursementsTab = () => {
               </TableRow>
             ) : transactions?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No disbursements found</TableCell>
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No vouchers found</TableCell>
               </TableRow>
             ) : (
               transactions?.map((txn) => (
@@ -191,7 +207,7 @@ export const PettyCashDisbursementsTab = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowDownCircle className="h-5 w-5 text-destructive" />
-              Record Disbursement
+              Record Petty Cash Voucher
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 md:grid-cols-2">
@@ -223,31 +239,8 @@ export const PettyCashDisbursementsTab = () => {
               <Input value={form.payee_name} onChange={(e) => setForm({ ...form, payee_name: e.target.value })} placeholder="Who received the money" />
             </div>
             <div>
-              <Label>Expense Category</Label>
-              <Select value={form.expense_category || "none"} onValueChange={(v) => setForm({ ...form, expense_category: v === "none" ? "" : v })}>
-                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Category</SelectItem>
-                  {filteredCategories.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Amount (LKR) *</Label>
-              <Input 
-                type="number" 
-                value={form.amount} 
-                onChange={(e) => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })}
-                className="text-lg font-semibold"
-              />
-              {selectedFund && form.amount > selectedFund.current_balance && (
-                <p className="text-xs text-destructive mt-1">Amount exceeds fund balance!</p>
-              )}
-              {selectedFund && selectedFund.approval_required_above > 0 && form.amount > selectedFund.approval_required_above && (
-                <p className="text-xs text-amber-600 mt-1">⚠ This will require approval</p>
-              )}
+              <Label>Date</Label>
+              <Input type="date" value={form.transaction_date} onChange={(e) => setForm({ ...form, transaction_date: e.target.value })} />
             </div>
             <div>
               <Label>Payment Method</Label>
@@ -263,25 +256,106 @@ export const PettyCashDisbursementsTab = () => {
               <Label>Reference Number</Label>
               <Input value={form.reference_number} onChange={(e) => setForm({ ...form, reference_number: e.target.value })} placeholder="External ref" />
             </div>
-            <div className="md:col-span-2">
-              <Label>GL Account</Label>
-              <SearchableAccountSelector value={form.gl_account_id} onValueChange={(v) => setForm({ ...form, gl_account_id: v })} placeholder="Select expense GL account" />
-            </div>
-            <div className="md:col-span-2">
-              <Label>Description</Label>
-              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description of disbursement..." />
+            
+            <div className="md:col-span-2 border rounded-md p-4 space-y-4 bg-muted/20">
+              <div className="flex justify-between items-center mb-2">
+                <Label className="text-base font-semibold">Voucher Lines</Label>
+                <Button variant="outline" size="sm" onClick={() => setLines([...lines, { id: Date.now().toString(), expense_category: "", gl_account_id: "", amount: 0, description: "" }])}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Line
+                </Button>
+              </div>
+              
+              {lines.map((line, index) => (
+                <div key={line.id} className="grid gap-3 md:grid-cols-12 items-end border-b pb-4 last:border-0 last:pb-0">
+                  <div className="md:col-span-3">
+                    <Label className="text-xs">Category</Label>
+                    <Select value={line.expense_category || "none"} onValueChange={(v) => {
+                      const newLines = [...lines];
+                      newLines[index].expense_category = v === "none" ? "" : v;
+                      setLines(newLines);
+                    }}>
+                      <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Category</SelectItem>
+                        {filteredCategories.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="md:col-span-3">
+                    <Label className="text-xs">GL Account</Label>
+                    <SearchableAccountSelector 
+                      value={line.gl_account_id} 
+                      onValueChange={(v) => {
+                        const newLines = [...lines];
+                        newLines[index].gl_account_id = v;
+                        setLines(newLines);
+                      }} 
+                      placeholder="GL Account" 
+                    />
+                  </div>
+                  <div className="md:col-span-3">
+                    <Label className="text-xs">Description</Label>
+                    <Input 
+                      value={line.description} 
+                      onChange={(e) => {
+                        const newLines = [...lines];
+                        newLines[index].description = e.target.value;
+                        setLines(newLines);
+                      }} 
+                      placeholder="Details" 
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label className="text-xs">Amount</Label>
+                    <Input 
+                      type="number" 
+                      value={line.amount || ""} 
+                      onChange={(e) => {
+                        const newLines = [...lines];
+                        newLines[index].amount = parseFloat(e.target.value) || 0;
+                        setLines(newLines);
+                      }}
+                    />
+                  </div>
+                  <div className="md:col-span-1 text-right">
+                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => {
+                      if (lines.length > 1) {
+                        setLines(lines.filter(l => l.id !== line.id));
+                      }
+                    }}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex justify-between items-center pt-2">
+                <div>
+                  {selectedFund && totalAmount > selectedFund.current_balance && (
+                    <p className="text-xs text-destructive font-medium">Amount exceeds fund balance!</p>
+                  )}
+                  {selectedFund && selectedFund.approval_required_above > 0 && totalAmount > selectedFund.approval_required_above && (
+                    <p className="text-xs text-amber-600 font-medium">⚠ This will require approval</p>
+                  )}
+                </div>
+                <div className="text-lg font-bold">
+                  Total: LKR {totalAmount.toLocaleString()}
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</Button>
             <Button 
               onClick={handleSubmit}
-              disabled={!form.petty_cash_fund_id || !form.payee_name || form.amount <= 0 || createTransaction.isPending || (selectedFund ? form.amount > selectedFund.current_balance : false)}
+              disabled={!form.petty_cash_fund_id || !form.payee_name || totalAmount <= 0 || createTransaction.isPending || (selectedFund ? totalAmount > selectedFund.current_balance : false)}
               variant="destructive"
             >
               {createTransaction.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               <ArrowDownCircle className="h-4 w-4 mr-2" />
-              Disburse
+              Issue Voucher
             </Button>
           </DialogFooter>
         </DialogContent>

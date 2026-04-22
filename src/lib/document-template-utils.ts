@@ -103,69 +103,128 @@ const generateLineItemsTable = (lineItems: any[]): string => {
   `;
 };
 
-// Generate payment line items table for direct payments
+// Generate payment line items table for direct payments (Account Details)
 const generatePaymentLineItemsTable = (lineItems: any[]): string => {
   if (!lineItems?.length) {
-    return '<p>No line items</p>';
+    return '';
   }
-  let html = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
-    <thead><tr style="background:#f3f4f6;">
-      <th style="border:1px solid #ddd;padding:6px;text-align:left;">Account Code</th>
-      <th style="border:1px solid #ddd;padding:6px;text-align:left;">Account Name</th>
-      <th style="border:1px solid #ddd;padding:6px;text-align:left;">Description</th>
-      <th style="border:1px solid #ddd;padding:6px;text-align:right;">Qty</th>
-      <th style="border:1px solid #ddd;padding:6px;text-align:right;">Unit Price</th>
-      <th style="border:1px solid #ddd;padding:6px;text-align:right;">Tax</th>
-      <th style="border:1px solid #ddd;padding:6px;text-align:right;">Amount</th>
+  let html = `<h4 style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">ACCOUNT DETAILS</h4>
+  <table style="width:100%;border-collapse:collapse;border: 2px solid black;font-size:12px;font-weight:bold;margin-bottom:20px;">
+    <thead><tr>
+      <th style="border:1px solid black;padding:6px;text-align:center;">ACCOUNT CODE</th>
+      <th style="border:1px solid black;padding:6px;text-align:center;">ACCOUNT NAME</th>
+      <th style="border:1px solid black;padding:6px;text-align:center;">DESCRIPTION</th>
+      <th style="border:1px solid black;padding:6px;text-align:center;">GROSS AMOUNT<br>(LKR)</th>
+      <th style="border:1px solid black;padding:6px;text-align:center;">TAX<br>(LKR)</th>
+      <th style="border:1px solid black;padding:6px;text-align:center;">NET AMOUNT<br>(LKR)</th>
     </tr></thead><tbody>`;
-  let total = 0;
+  let totalGross = 0;
+  let totalTax = 0;
+  let totalNet = 0;
   lineItems.forEach((item: any) => {
-    const lineTotal = item.line_total || (item.quantity || 1) * (item.unit_price || 0);
-    total += lineTotal;
+    const gross = (item.quantity || 1) * (item.unit_price || 0);
+    const tax = item.tax_amount || 0;
+    const net = gross + tax;
+    totalGross += gross;
+    totalTax += tax;
+    totalNet += net;
     html += `<tr>
-      <td style="border:1px solid #ddd;padding:6px;">${item.chart_of_accounts?.account_code || ''}</td>
-      <td style="border:1px solid #ddd;padding:6px;">${item.chart_of_accounts?.account_name || ''}</td>
-      <td style="border:1px solid #ddd;padding:6px;">${item.description || ''}</td>
-      <td style="border:1px solid #ddd;padding:6px;text-align:right;">${item.quantity || 1}</td>
-      <td style="border:1px solid #ddd;padding:6px;text-align:right;">${formatCurrency(item.unit_price)}</td>
-      <td style="border:1px solid #ddd;padding:6px;text-align:right;">${formatCurrency(item.tax_amount || 0)}</td>
-      <td style="border:1px solid #ddd;padding:6px;text-align:right;">${formatCurrency(lineTotal)}</td>
+      <td style="border:1px solid black;padding:6px;text-align:center;">${item.chart_of_accounts?.account_code || ''}</td>
+      <td style="border:1px solid black;padding:6px;text-align:center;">${item.chart_of_accounts?.account_name || ''}</td>
+      <td style="border:1px solid black;padding:6px;">${item.description || ''}</td>
+      <td style="border:1px solid black;padding:6px;text-align:right;">${formatCurrency(gross).replace('LKR', '').trim()}</td>
+      <td style="border:1px solid black;padding:6px;text-align:right;">${formatCurrency(tax).replace('LKR', '').trim()}</td>
+      <td style="border:1px solid black;padding:6px;text-align:right;">${formatCurrency(net).replace('LKR', '').trim()}</td>
     </tr>`;
   });
-  html += `<tr style="font-weight:bold;background:#f9fafb;">
-    <td colspan="6" style="border:1px solid #ddd;padding:6px;text-align:right;">Total</td>
-    <td style="border:1px solid #ddd;padding:6px;text-align:right;">${formatCurrency(total)}</td>
+  
+  // Add some empty rows to make it look like the template
+  for(let i=0; i<3; i++) {
+    html += `<tr>
+      <td style="border:1px solid black;padding:12px;"></td>
+      <td style="border:1px solid black;padding:12px;"></td>
+      <td style="border:1px solid black;padding:12px;"></td>
+      <td style="border:1px solid black;padding:12px;"></td>
+      <td style="border:1px solid black;padding:12px;"></td>
+      <td style="border:1px solid black;padding:12px;"></td>
+    </tr>`;
+  }
+
+  html += `<tr>
+    <td colspan="3" style="border:1px solid black;padding:6px;text-align:right;">TOTAL</td>
+    <td style="border:1px solid black;padding:6px;text-align:right;">${formatCurrency(totalGross).replace('LKR', '').trim()}</td>
+    <td style="border:1px solid black;padding:6px;text-align:right;">${formatCurrency(totalTax).replace('LKR', '').trim()}</td>
+    <td style="border:1px solid black;padding:6px;text-align:right;">${formatCurrency(totalNet).replace('LKR', '').trim()}</td>
   </tr>`;
   html += '</tbody></table>';
   return html;
 };
 
-// Generate allocations table for receipts/payments
+// Generate allocations table for receipts/payments (Invoice Allocation)
 const generateAllocationsTable = (allocations: any[]): string => {
   if (!allocations?.length) {
-    return '<p>No allocations</p>';
+    return '';
   }
 
-  return `
-    <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+  let html = `<h4 style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">INVOICE ALLOCATION</h4>
+    <table style="width: 100%; border-collapse: collapse; border: 2px solid black; margin-bottom: 20px; font-size: 12px; font-weight: bold;">
       <thead>
-        <tr style="background-color: #f3f4f6;">
-          <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left;">Invoice #</th>
-          <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left;">Description</th>
-          <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">Allocated Amount</th>
+        <tr>
+          <th style="border: 1px solid black; padding: 6px; text-align: center;">INVOICE NO</th>
+          <th style="border: 1px solid black; padding: 6px; text-align: center;">DESCRIPTION</th>
+          <th style="border: 1px solid black; padding: 6px; text-align: center;">GROSS AMOUNT<br>(LKR)</th>
+          <th style="border: 1px solid black; padding: 6px; text-align: center;">TAX<br>(LKR)</th>
+          <th style="border: 1px solid black; padding: 6px; text-align: center;">NET AMOUNT<br>(LKR)</th>
         </tr>
       </thead>
-      <tbody>
-        ${allocations.map((alloc) => `
+      <tbody>`;
+      
+  let totalGross = 0;
+  let totalTax = 0;
+  let totalNet = 0;
+  
+  allocations.forEach((alloc) => {
+    // Usually allocation amount is the net we are paying. Let's assume gross = allocated, tax = 0.
+    const net = alloc.allocated_amount || 0;
+    const tax = 0;
+    const gross = net;
+    totalGross += gross;
+    totalTax += tax;
+    totalNet += net;
+    
+    html += `
           <tr>
-            <td style="border: 1px solid #e5e7eb; padding: 8px;">${alloc.ar_invoices?.invoice_number || alloc.ap_invoices?.invoice_number || alloc.invoice_id}</td>
-            <td style="border: 1px solid #e5e7eb; padding: 8px;">${alloc.ap_invoices?.ap_invoice_lines?.map((l: any) => l.description).filter(Boolean).join(', ') || alloc.ap_invoices?.notes || alloc.ar_invoices?.notes || ''}</td>
-            <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">${formatCurrency(alloc.allocated_amount)}</td>
+            <td style="border: 1px solid black; padding: 6px; text-align: center;">${alloc.ar_invoices?.invoice_number || alloc.ap_invoices?.invoice_number || alloc.invoice_id}</td>
+            <td style="border: 1px solid black; padding: 6px; text-align: center;">${alloc.ap_invoices?.ap_invoice_lines?.map((l: any) => l.description).filter(Boolean).join(', ') || alloc.ap_invoices?.notes || alloc.ar_invoices?.notes || ''}</td>
+            <td style="border: 1px solid black; padding: 6px; text-align: right;">${formatCurrency(gross).replace('LKR', '').trim()}</td>
+            <td style="border: 1px solid black; padding: 6px; text-align: right;">0.00</td>
+            <td style="border: 1px solid black; padding: 6px; text-align: right;">${formatCurrency(net).replace('LKR', '').trim()}</td>
           </tr>
-        `).join('')}
+    `;
+  });
+  
+  // Add some empty rows to make it look like the template
+  for(let i=0; i<3; i++) {
+    html += `<tr>
+      <td style="border:1px solid black;padding:12px;"></td>
+      <td style="border:1px solid black;padding:12px;"></td>
+      <td style="border:1px solid black;padding:12px;"></td>
+      <td style="border:1px solid black;padding:12px;"></td>
+      <td style="border:1px solid black;padding:12px;"></td>
+    </tr>`;
+  }
+  
+  html += `
+      <tr>
+        <td colspan="2" style="border: 1px solid black; padding: 6px; text-align: right;">TOTAL</td>
+        <td style="border: 1px solid black; padding: 6px; text-align: right;">${formatCurrency(totalGross).replace('LKR', '').trim()}</td>
+        <td style="border: 1px solid black; padding: 6px; text-align: right;">${formatCurrency(totalTax).replace('LKR', '').trim()}</td>
+        <td style="border: 1px solid black; padding: 6px; text-align: right;">${formatCurrency(totalNet).replace('LKR', '').trim()}</td>
+      </tr>
       </tbody>
     </table>
   `;
+  return html;
 };
 
 // Header mode type
@@ -523,6 +582,63 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{vendor_email}}'] = payeeEmail;
       placeholders['{{vendor_phone}}'] = payeePhone;
       placeholders['{{vendor_contact}}'] = payeeContact;
+
+      // AP Payment Specific Fields
+      const isCheque = (payMethod || '').toLowerCase() === 'cheque';
+      placeholders['{{date_label}}'] = isCheque ? 'CHEQUE DATE' : 'VALUE DATE';
+      
+      const paymentDateFormatted = formatDate(documentData?.payment_date);
+      placeholders['{{date_value}}'] = isCheque && documentData?.cheque_date ? formatDate(documentData?.cheque_date) : paymentDateFormatted;
+      
+      if (!isCheque) {
+        placeholders['{{beneficiary_bank_details}}'] = `
+        <h4 style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">BENEFICIARY BANK DETAILS</h4>
+        <table style="width: 100%; border-collapse: collapse; border: 2px solid black; margin-bottom: 20px; font-weight: bold;">
+          <tr>
+            <td style="border: 1px solid black; padding: 5px; width: 25%;">BANK NAME</td>
+            <td style="border: 1px solid black; padding: 5px; width: 75%;">${vendorBankAccount?.bank_name || payeeBankName}</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid black; padding: 5px;">BRANCH</td>
+            <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.bank_branch || payeeBankBranch}</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid black; padding: 5px;">PAYEE NAME</td>
+            <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.account_holder_name || payeeName}</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid black; padding: 5px;">ACCOUNT NO.</td>
+            <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.account_number || payeeBankAccount}</td>
+          </tr>
+        </table>
+        `;
+      } else {
+        placeholders['{{beneficiary_bank_details}}'] = '';
+      }
+      
+      if (isCheque) {
+        placeholders['{{payment_received_by}}'] = `
+        <h4 style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">PAYMENT RECEIVED BY</h4>
+        <table style="width: 100%; border-collapse: collapse; border: 2px solid black; margin-bottom: 20px; font-weight: bold;">
+          <tr>
+            <td style="border: 1px solid black; padding: 5px; width: 25%;">NAME</td>
+            <td style="border: 1px solid black; padding: 5px; width: 45%;"></td>
+            <td style="border: 1px solid black; padding: 5px; width: 30%; text-align: center;">Signature</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid black; padding: 5px;">NIC NO.</td>
+            <td style="border: 1px solid black; padding: 5px;"></td>
+            <td style="border: 1px solid black; padding: 5px;" rowspan="2"></td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid black; padding: 5px;">CONTACT NO.</td>
+            <td style="border: 1px solid black; padding: 5px;"></td>
+          </tr>
+        </table>
+        `;
+      } else {
+        placeholders['{{payment_received_by}}'] = '';
+      }
 
       // Currency (resolved by payee type)
       placeholders['{{currency}}'] = payeeCurrency;

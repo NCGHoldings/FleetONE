@@ -62,6 +62,7 @@ export interface IOURecord {
   business_unit_code: string;
   company_id: string | null;
   staff_id: string | null;
+  staff_name_draft?: string | null;
   amount: number;
   purpose: string | null;
   issued_date: string;
@@ -415,6 +416,7 @@ export const useCreatePettyCashTransaction = () => {
           branch_id: data.branch_id || null,
           company_id: selectedCompanyId,
           gl_account_id: data.gl_account_id || null,
+          ...(data.created_at ? { created_at: data.created_at } : {}),
         })
         .select()
         .single();
@@ -539,7 +541,7 @@ export const useCreatePettyCashTransaction = () => {
               .from("journal_entries")
               .insert({
                 entry_number: entryNumber,
-                entry_date: new Date().toISOString().split("T")[0],
+                entry_date: data.created_at ? data.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
                 description: jeDescription,
                 reference: result.receipt_number || result.voucher_number || `PC-TXN-${result.id?.slice(0, 8)}`,
                 total_debit: amount,
@@ -740,6 +742,7 @@ export const useCreateIOU = () => {
           business_unit_code: data.business_unit_code || "SBO",
           company_id: selectedCompanyId,
           staff_id: data.staff_id,
+          staff_name_draft: data.staff_name_draft,
           amount: data.amount || 0,
           purpose: data.purpose,
           issued_date: data.issued_date || new Date().toISOString().split("T")[0],

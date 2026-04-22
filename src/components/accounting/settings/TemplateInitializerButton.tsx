@@ -234,6 +234,58 @@ export const TemplateInitializerButton = ({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <Button 
+          variant="outline" 
+          className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+          disabled={isInitializing} 
+          onClick={async () => {
+            setIsInitializing(true);
+            setProgress(0);
+            
+            const apType = templateTypes.find(t => t.type_code === 'ap_payment_voucher');
+            if (!apType) return;
+            
+            const templateGenerator = defaultTemplates['ap_payment_voucher'];
+            const htmlContent = templateGenerator();
+            
+            let completed = 0;
+            for (const company of companies) {
+              const { data: existing } = await supabase
+                .from('document_templates')
+                .select('id')
+                .eq('company_id', company.id)
+                .eq('template_type_id', apType.id)
+                .single();
+                
+              if (existing) {
+                await supabase.from('document_templates').update({ html_content: htmlContent }).eq('id', existing.id);
+              } else {
+                await supabase.from('document_templates').insert({
+                  company_id: company.id,
+                  template_type_id: apType.id,
+                  template_name: templateDisplayNames['ap_payment_voucher'] || apType.type_name,
+                  template_code: `${company.short_code?.toLowerCase() || company.id.substring(0, 4)}_ap_payment_voucher`,
+                  html_content: htmlContent,
+                  css_styles: "",
+                  is_default: true,
+                  is_active: true,
+                  paper_size: "A4",
+                  orientation: "portrait",
+                  version: 1,
+                });
+              }
+              completed++;
+              setProgress((completed / companies.length) * 100);
+            }
+            setIsInitializing(false);
+            toast.success("Successfully updated ONLY AP Payment Vouchers for all companies!");
+            onComplete?.();
+          }}
+        >
+          <Wand2 className="h-4 w-4 mr-2 text-blue-500" />
+          Update Only AP Vouchers (Safe)
+        </Button>
       </div>
 
       {/* Progress Dialog */}

@@ -45,6 +45,7 @@ import { VendorPerformanceView } from "@/components/accounting/VendorPerformance
 // Gap Analysis - AR/AP Components
 import { ARCreditNotesView } from "@/components/accounting/ARCreditNotesView";
 import { ARAgeingReport } from "@/components/accounting/ARAgeingReport";
+import { ReceiptsAndPaymentsView } from "@/components/accounting/reports/ReceiptsAndPaymentsView";
 import { ARReconciliationWorksheet } from "@/components/accounting/ARReconciliationWorksheet";
 import { APDebitNotesView } from "@/components/accounting/APDebitNotesView";
 import { APAgeingReport } from "@/components/accounting/APAgeingReport";
@@ -838,6 +839,7 @@ const Accounting = () => {
               <ScrollArea className="w-full whitespace-nowrap">
                 <TabsList className="inline-flex w-max">
                   <TabsTrigger value="fleet-costs">Fleet Operating Costs</TabsTrigger>
+                  <TabsTrigger value="receipts-payments">Receipts & Payments</TabsTrigger>
                   <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
                   <TabsTrigger value="statements">Financial Statements</TabsTrigger>
                   <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
@@ -855,6 +857,10 @@ const Accounting = () => {
 
               <TabsContent value="fleet-costs">
                 <VehicleOperatingCostView />
+              </TabsContent>
+
+              <TabsContent value="receipts-payments">
+                <ReceiptsAndPaymentsView />
               </TabsContent>
 
               <TabsContent value="trial-balance">

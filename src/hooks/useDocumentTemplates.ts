@@ -32,12 +32,16 @@ export function useDocumentTemplates(documentTypeCode?: string) {
       setLoading(true);
       let query = supabase
         .from('document_templates')
-        .select('*, document_template_types(type_name, type_code, module)')
+        .select('*, document_template_types!inner(type_name, type_code, module)')
         .eq('is_active', true)
         .order('template_name', { ascending: true });
 
       if (documentTypeCode) {
-        query = query.eq('document_template_types.type_code', documentTypeCode);
+        if (documentTypeCode.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          query = query.eq('template_type_id', documentTypeCode);
+        } else {
+          query = query.eq('document_template_types.type_code', documentTypeCode);
+        }
       }
 
       const { data, error } = await query;
