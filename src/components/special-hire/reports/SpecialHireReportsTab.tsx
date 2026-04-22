@@ -12,16 +12,17 @@ import FuelEfficiencyReport from "./FuelEfficiencyReport";
 import PaymentCollectionReport from "./PaymentCollectionReport";
 import BusRouteAnalytics from "./BusRouteAnalytics";
 import CommissionReport from "./CommissionReport";
+import SpecialHiresIncomeReport from "./SpecialHiresIncomeReport";
 import { format } from "date-fns";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { toast } from "sonner";
 
 export default function SpecialHireReportsTab() {
-  const { filters, setFilters, isLoading, stats, monthlyData, statusBreakdown, revenueBreakdown, expenseBreakdown, topBuses, topRoutes, paymentAging, commissionByAgent, fuelByBusType } = useSpecialHireReports();
+  const { filters, setFilters, isLoading, quotations, stats, monthlyData, statusBreakdown, revenueBreakdown, expenseBreakdown, topBuses, topRoutes, paymentAging, commissionByAgent, fuelByBusType } = useSpecialHireReports();
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    revenue: true, trips: true, financial: false, fuel: false, payment: false, bus: false, commission: false,
+    income: true, revenue: false, trips: true, financial: false, fuel: false, payment: false, bus: false, commission: false,
   });
 
   const reportRef = useRef<HTMLDivElement>(null);
@@ -34,7 +35,7 @@ export default function SpecialHireReportsTab() {
     setExporting(true);
     try {
       // Open all sections for export
-      setOpenSections({ revenue: true, trips: true, financial: true, fuel: true, payment: true, bus: true, commission: true });
+      setOpenSections({ income: true, revenue: true, trips: true, financial: true, fuel: true, payment: true, bus: true, commission: true });
       await new Promise((r) => setTimeout(r, 500));
 
       const canvas = await html2canvas(reportRef.current, { scale: 1.5, useCORS: true, logging: false });
@@ -75,6 +76,7 @@ export default function SpecialHireReportsTab() {
   };
 
   const sections = [
+    { key: "income", title: "💰 Special Hires Income Report", component: <SpecialHiresIncomeReport quotations={quotations} dateTo={filters.dateTo} /> },
     { key: "revenue", title: "📊 Revenue & Profit Overview", component: <RevenueOverview stats={stats} monthlyData={monthlyData} /> },
     { key: "trips", title: "🚌 Trip Performance Analytics", component: <TripPerformance statusBreakdown={statusBreakdown} monthlyData={monthlyData} tripCount={stats.tripCount} /> },
     { key: "financial", title: "💰 Financial Summary", component: <FinancialSummary revenueBreakdown={revenueBreakdown} expenseBreakdown={expenseBreakdown} monthlyData={monthlyData} costPerKm={stats.costPerKm} /> },

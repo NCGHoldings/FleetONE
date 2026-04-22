@@ -547,19 +547,19 @@ export const generateAPPaymentVoucherTemplate = (): string => `
   .header-container { text-align: center; margin-bottom: 20px; }
   .header-container h2 { margin: 0; font-size: 24px; text-transform: uppercase; font-weight: bold; }
   .header-container h3 { margin: 5px 0 0 0; font-size: 16px; text-transform: uppercase; font-weight: bold; }
-  table.voucher-table { width: 100%; border-collapse: collapse; border: 2px solid black; margin-bottom: 20px; font-weight: bold; font-size: 12px; }
+  table.voucher-table { width: 100%; border-collapse: collapse; border: 1px solid black; margin-bottom: 20px; font-size: 12px; }
   table.voucher-table td, table.voucher-table th { border: 1px solid black; padding: 6px; }
   h4.section-title { margin: 0 0 5px 0; font-size: 14px; font-weight: bold; text-transform: uppercase; }
-  .amount-words-table { width: 100%; border-collapse: collapse; border: 2px solid black; margin-bottom: 20px; font-weight: bold; font-size: 12px; }
+  .amount-words-table { width: 100%; border-collapse: collapse; border: 1px solid black; margin-bottom: 20px; font-size: 12px; }
   .amount-words-table td { border: 1px solid black; padding: 6px; }
-  .auth-table { width: 100%; border-collapse: collapse; border: 2px solid black; margin-bottom: 20px; font-size: 12px; font-weight: bold; }
-  .auth-table th { border: 1px solid black; padding: 6px; text-align: center; width: 33.33%; }
+  .auth-table { width: 100%; border-collapse: collapse; border: 1px solid black; margin-bottom: 20px; font-size: 12px; }
+  .auth-table th { border: 1px solid black; padding: 6px; text-align: center; width: 33.33%; font-weight: bold; }
   .auth-table td { border: 1px solid black; padding: 5px; height: 80px; position: relative; vertical-align: top; }
 </style>
 <div class="page">
   <div class="header-container">
     <h2>NCG HOLDINGS PRIVATE LIMITED</h2>
-    <h3>PAYMENT VOUCHER</h3>
+    <h3>{{voucher_title}}</h3>
   </div>
 
   <table class="voucher-table">

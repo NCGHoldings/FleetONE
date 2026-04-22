@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Search, Download, RefreshCw, TrendingUp, DollarSign, Bus, Banknote, Eye, EyeOff, Settings, FileText, Gauge, Wallet, BarChart3, LayoutGrid } from 'lucide-react';
 import { SpreadsheetHire } from '@/hooks/useSpecialHireSpreadsheetData';
 import * as XLSX from 'xlsx';
+import { ImportExcelButton } from './ImportExcelButton';
 
 interface Props {
   hires: SpreadsheetHire[];
@@ -36,8 +37,8 @@ const SECTIONS = [
 
 // Frozen column widths
 const FROZEN_COL_1 = 40;  // #
-const FROZEN_COL_2 = 120; // Quotation No
-const FROZEN_COL_3 = 100; // Bus No
+const FROZEN_COL_2 = 120; // Quotation Number
+const FROZEN_COL_3 = 100; // Status
 const FROZEN_TOTAL = FROZEN_COL_1 + FROZEN_COL_2 + FROZEN_COL_3;
 
 export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh }: Props) {
@@ -157,61 +158,51 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
 
   const exportToExcel = useCallback(() => {
     const data = filtered.map((h, i) => ({
-      '#': i + 1,
-      'Quotation No': h.quotation_no,
-      'Status': h.status,
-      'Company': h.company_name,
-      'Customer': h.customer_name,
-      'Phone': h.customer_phone,
-      'Route': h.route,
-      'Bus Type': h.bus_type_name,
-      'Buses': h.number_of_buses,
-      'KM': h.km_trip,
-      'Quot. Amt': h.gross_revenue,
-      'Paid': h.total_paid,
+      'Quotation Number': h.quotation_no,
+      'Cancelled / Completed': h.status,
+      'Hire Month': h.hire_month,
       'Date': formatDate(h.pickup_datetime),
-      'Request': h.special_request,
-      'Days': h.number_of_days,
-      'Deployed': h.buses_deployed,
-      'Bus No': h.assigned_bus_no,
-      'Model': h.bus_model,
-      'Year': h.bus_year || '',
-      'Capacity': h.bus_capacity || '',
+      'Company Name': h.company_name,
+      'Contacted person': h.contacted_person,
+      'Hire Type': h.hire_type,
+      'Customer Name': h.customer_name,
+      'Contact Number': h.customer_phone,
+      'Route': h.route,
+      'Type of Bus': h.bus_type_name,
+      'No of Bus': h.number_of_buses,
+      'Milage': h.km_trip,
+      'Quotation Amount': h.gross_revenue,
+      'Invoice number': h.invoice_number,
+      'Completed Hires Amount': h.total_paid,
+      'Addi. Cus Requests': h.special_request,
+      'Number Of Days': h.number_of_days,
+      'Bus Number': h.assigned_bus_no,
       'Driver': h.assigned_driver_name,
       'Assistant': h.assigned_conductor_name,
       'From': h.pickup_location,
       'To': h.drop_location,
-      'Pickup': h.pickup_time,
-      'Drop': h.drop_time,
-      'Op Remark': h.operation_remark,
-      'Inv No': h.invoice_number,
-      'Inv KM': h.invoiced_km,
-      'Inv Amt': h.invoice_amount,
+      'Pick up Time': h.pickup_time,
+      'Drop off Time': h.drop_time,
       'Discount': h.discount,
-      'After Disc': h.price_after_discount,
-      'Check In': h.check_in_meter,
-      'Check Out': h.check_out_meter,
-      'Actual KM': h.actual_km,
-      'Dist Charge': h.additional_distance_charge,
-      'Hrs Charge': h.additional_hours_charge,
-      'Fuel Cost': h.fuel_cost_actual,
-      'Price/L': h.fuel_price_per_liter,
-      'Liters': h.fuel_liters_calculated,
-      'KM/L': h.actual_km_per_l,
-      'Std KM/L': h.standard_km_per_l,
-      'Drv Wages': h.driver_wages,
-      'Ast Wages': h.assistant_wages,
-      'Drv Meal': h.driver_meal_allowance,
-      'Ast Meal': h.assistant_meal_allowance,
-      'Wages': h.wages_total,
-      'Maint.': h.maintenance,
-      'Other': h.other_permits_highway,
+      'Price After Discount': h.price_after_discount,
+      'Check In Meter': h.check_in_meter,
+      'Check out Meter': h.check_out_meter,
+      'Actual Kilo Meters': h.actual_km,
+      ' Charges for Additional distance (Income)': h.additional_distance_charge,
+      ' Charges for Additional hours (Income)': h.additional_hours_charge,
+      'Fuel Cost (Actual)': h.fuel_cost_actual,
+      'Driver Wages': h.driver_wages,
+      'Assistance Wages': h.assistant_wages,
+      'Driver Meal Allovance': h.driver_meal_allowance,
+      'Assistance Meal Allovance': h.assistant_meal_allowance,
+      'Maintenance': h.maintenance,
+      'Other (Permit, Highway )': h.other_permits_highway,
       'Net Income': h.net_income,
-      'Day Buses': h.per_day_total_buses,
-      'Advance': h.advance_payment,
-      'Adv Date': formatDate(h.advance_payment_date),
-      'Balance': h.balance_payment,
-      'Bal Date': formatDate(h.balance_payment_date),
+      'Per Day Total Buses': h.per_day_total_buses,
+      'Advance Payment': h.advance_payment,
+      'Advanced Payment Date': formatDate(h.advance_payment_date),
+      'Balance Payment': h.balance_payment,
+      'Date ': formatDate(h.balance_payment_date),
       'Remark': h.remark,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -285,12 +276,12 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
   };
 
   // Section column definitions
-  const hireInfoHeaders = ['Status', 'Company', 'Customer', 'Phone', 'Route', 'Bus Type', 'Buses', 'KM', 'Quot. Amt', 'Paid', 'Date', 'Request', 'Days'];
-  const opsHeaders = ['Deployed', 'Bus No', 'Model', 'Year', 'Cap.', 'Driver', 'Assistant', 'From', 'To', 'Pickup', 'Drop', 'Op Remark'];
-  const invoiceHeaders = ['Inv No', 'Inv KM', 'Inv Amt', 'Discount', 'After Disc'];
-  const meterHeaders = ['Check In', 'Check Out', 'Actual KM', 'Dist Charge', 'Hrs Charge'];
-  const expenseHeaders = ['Fuel Cost', 'Price/L', 'Liters', 'KM/L', 'Drv Wages', 'Ast Wages', 'Drv Meal', 'Ast Meal', 'Wages', 'Maint.', 'Other'];
-  const summaryHeaders = ['Net Income', 'Day Buses', 'Advance', 'Adv Date', 'Balance', 'Bal Date', 'Remark'];
+  const hireInfoHeaders = ['Hire Month', 'Date', 'Company Name', 'Contacted person', 'Hire Type', 'Customer Name', 'Contact Number', 'Route', 'Type of Bus', 'No of Bus', 'Milage', 'Quotation Amount', 'Invoice number', 'Completed Hires Amount', 'Addi. Cus Requests', 'Number Of Days'];
+  const opsHeaders = ['Bus Number', 'Driver', 'Assistant', 'From', 'To', 'Pick up Time', 'Drop off Time'];
+  const invoiceHeaders = ['Discount', 'Price After Discount'];
+  const meterHeaders = ['Check In Meter', 'Check out Meter', 'Actual Kilo Meters', 'Charges for Additional distance (Income)', 'Charges for Additional hours (Income)'];
+  const expenseHeaders = ['Fuel Cost (Actual)', 'Driver Wages', 'Assistance Wages', 'Driver Meal Allovance', 'Assistance Meal Allovance', 'Maintenance', 'Other (Permit, Highway )'];
+  const summaryHeaders = ['Net Income', 'Per Day Total Buses', 'Advance Payment', 'Advanced Payment Date', 'Balance Payment', 'Date', 'Remark'];
 
   const sectionHeaders: Record<string, string[]> = {
     'Hire Info': hireInfoHeaders,
@@ -371,6 +362,7 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
         <Button variant="outline" size="sm" onClick={exportToExcel} className="gap-1">
           <Download className="h-3.5 w-3.5" /> Export
         </Button>
+        <ImportExcelButton onImportComplete={onRefresh} />
         <span className="text-xs text-muted-foreground ml-auto">{filtered.length} of {hires.length}</span>
       </div>
 
@@ -445,8 +437,8 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
               <tr className={`${frozenHeaderBg} backdrop-blur-sm`}>
                 {/* Frozen headers */}
                 <th className={`px-1.5 py-1.5 text-left font-semibold text-muted-foreground border-b border-r whitespace-nowrap sticky left-0 z-40 ${frozenHeaderBg}`} style={{ width: FROZEN_COL_1, minWidth: FROZEN_COL_1 }}>#</th>
-                <th className={`px-1.5 py-1.5 text-left font-semibold text-muted-foreground border-b border-r whitespace-nowrap sticky z-40 ${frozenHeaderBg}`} style={{ left: FROZEN_COL_1, width: FROZEN_COL_2, minWidth: FROZEN_COL_2 }}>Quotation No</th>
-                <th className={`px-1.5 py-1.5 text-left font-semibold text-muted-foreground border-b border-r whitespace-nowrap sticky z-40 ${frozenHeaderBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`} style={{ left: FROZEN_COL_1 + FROZEN_COL_2, width: FROZEN_COL_3, minWidth: FROZEN_COL_3 }}>Bus No</th>
+                <th className={`px-1.5 py-1.5 text-left font-semibold text-muted-foreground border-b border-r whitespace-nowrap sticky z-40 ${frozenHeaderBg}`} style={{ left: FROZEN_COL_1, width: FROZEN_COL_2, minWidth: FROZEN_COL_2 }}>Quotation Number</th>
+                <th className={`px-1.5 py-1.5 text-left font-semibold text-muted-foreground border-b border-r whitespace-nowrap sticky z-40 ${frozenHeaderBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`} style={{ left: FROZEN_COL_1 + FROZEN_COL_2, width: FROZEN_COL_3, minWidth: FROZEN_COL_3 }}>Cancelled / Completed</th>
                 {/* Section headers */}
                 {visibleSectionList.map(section =>
                   sectionHeaders[section.key].map(h => (
@@ -464,20 +456,17 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
                   <td className={`px-1.5 py-1 border-r text-muted-foreground sticky left-0 z-10 ${frozenBg}`} style={{ width: FROZEN_COL_1, minWidth: FROZEN_COL_1 }}>{hire.row_num}</td>
                   <td className={`px-1.5 py-1 border-r font-mono font-medium whitespace-nowrap text-[10px] sticky z-10 ${frozenBg}`} style={{ left: FROZEN_COL_1, width: FROZEN_COL_2, minWidth: FROZEN_COL_2 }}>{hire.quotation_no}</td>
                   <td className={`px-1 py-1 border-r font-medium whitespace-nowrap sticky z-10 ${frozenBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`} style={{ left: FROZEN_COL_1 + FROZEN_COL_2, width: FROZEN_COL_3, minWidth: FROZEN_COL_3 }}>
-                    {hire.bus_id ? (
-                      <a href={`/fleet?bus=${hire.bus_id}`} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 text-[11px]" title="Open in Fleet Management">
-                        {hire.assigned_bus_no || '-'}
-                      </a>
-                    ) : (
-                      hire.assigned_bus_no || '-'
-                    )}
+                    {renderDropdownCell(hire, 'status', STATUS_OPTIONS)}
                   </td>
 
                   {/* Hire Info */}
                   {isSectionVisible('Hire Info') && (
                     <>
-                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderDropdownCell(hire, 'status', STATUS_OPTIONS)}</td>
+                      <td className="px-1.5 py-1 border-r whitespace-nowrap text-muted-foreground">{hire.hire_month || '-'}</td>
+                      <td className="px-1.5 py-1 border-r whitespace-nowrap">{formatDate(hire.pickup_datetime)}</td>
                       <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'company_name')}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'contacted_person')}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'hire_type')}</td>
                       <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'customer_name')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'customer_phone')}</td>
                       <td className="px-1.5 py-1 border-r max-w-[150px] truncate" title={hire.route}>{hire.route}</td>
@@ -485,8 +474,8 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
                       <td className="px-1.5 py-1 border-r text-center">{hire.number_of_buses}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'km_trip', 'number')}</td>
                       <td className="px-1.5 py-1 border-r text-right font-medium">{formatCurrency(hire.gross_revenue)}</td>
+                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'invoice_number')}</td>
                       <td className="px-1.5 py-1 border-r text-right">{formatCurrency(hire.total_paid)}</td>
-                      <td className="px-1.5 py-1 border-r whitespace-nowrap">{formatDate(hire.pickup_datetime)}</td>
                       <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'special_request')}</td>
                       <td className="px-1.5 py-1 border-r text-center">{hire.number_of_days}</td>
                     </>
@@ -495,27 +484,27 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
                   {/* Operations */}
                   {isSectionVisible('Operations') && (
                     <>
-                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'buses_deployed', 'number')}</td>
-                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'assigned_bus_no')}</td>
-                      <td className="px-1.5 py-1 border-r text-muted-foreground">{hire.bus_model || '-'}</td>
-                      <td className="px-1.5 py-1 border-r text-muted-foreground text-center">{hire.bus_year || '-'}</td>
-                      <td className="px-1.5 py-1 border-r text-muted-foreground text-center">{hire.bus_capacity || '-'}</td>
+                      <td className="px-1 py-1 border-r">
+                        {hire.bus_id ? (
+                          <a href={`/fleet?bus=${hire.bus_id}`} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 text-[11px]" title="Open in Fleet Management">
+                            {renderEditableCell(hire, 'assigned_bus_no')}
+                          </a>
+                        ) : (
+                          renderEditableCell(hire, 'assigned_bus_no')
+                        )}
+                      </td>
                       <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'assigned_driver_name')}</td>
                       <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'assigned_conductor_name')}</td>
                       <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'pickup_location')}</td>
                       <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'drop_location')}</td>
                       <td className="px-1.5 py-1 border-r whitespace-nowrap">{hire.pickup_time}</td>
                       <td className="px-1.5 py-1 border-r whitespace-nowrap">{hire.drop_time}</td>
-                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'operation_remark')}</td>
                     </>
                   )}
 
                   {/* Invoice */}
                   {isSectionVisible('Invoice') && (
                     <>
-                      <td className={`px-1 py-1 border-r ${cellMinW}`}>{renderEditableCell(hire, 'invoice_number')}</td>
-                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'invoiced_km', 'number')}</td>
-                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'invoice_amount', 'number')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'discount', 'number')}</td>
                       <td className="px-1.5 py-1 border-r text-right font-medium">{formatCurrency(hire.price_after_discount)}</td>
                     </>
@@ -536,16 +525,10 @@ export function SpecialHireSpreadsheetCore({ hires, loading, onUpdate, onRefresh
                   {isSectionVisible('Expenses') && (
                     <>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'fuel_cost_actual', 'number')}</td>
-                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'fuel_price_per_liter', 'number')}</td>
-                      <td className="px-1.5 py-1 border-r text-right text-muted-foreground">
-                        {hire.fuel_liters_calculated > 0 ? hire.fuel_liters_calculated.toFixed(1) : '-'}
-                      </td>
-                      <td className="px-1.5 py-1 border-r">{renderFuelEfficiencyCell(hire)}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'driver_wages', 'number')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'assistant_wages', 'number')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'driver_meal_allowance', 'number')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'assistant_meal_allowance', 'number')}</td>
-                      <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'wages_total', 'number')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'maintenance', 'number')}</td>
                       <td className="px-1 py-1 border-r">{renderEditableCell(hire, 'other_permits_highway', 'number')}</td>
                     </>

@@ -12,6 +12,9 @@ export interface SpreadsheetHire {
   trip_status: string;
   company_name: string;
   customer_name: string;
+  contacted_person: string;
+  hire_type: string;
+  hire_month: string;
   customer_phone: string;
   route: string;
   bus_type_name: string;
@@ -81,6 +84,30 @@ const calculateDays = (pickup: string, drop: string): number => {
   if (!pickup || !drop) return 1;
   const diff = new Date(drop).getTime() - new Date(pickup).getTime();
   return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+};
+
+// Helper function to safely fetch large numbers of IDs without hitting URL length limits (414)
+const fetchInChunks = async (table: string, columns: string, ids: string[], filter?: { field: string, value: any }) => {
+  if (ids.length === 0) return [];
+  const chunkSize = 150; // Safe chunk size for URL parameters
+  let allData: any[] = [];
+  
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    let query = supabase.from(table).select(columns).in('quotation_id', chunk);
+    
+    if (filter) {
+      query = query.eq(filter.field, filter.value);
+    }
+    
+    const { data, error } = await query;
+    if (error) {
+      console.warn(`[Batch Fetch Error] ${table}:`, error);
+    } else if (data) {
+      allData = allData.concat(data);
+    }
+  }
+  return allData;
 };
 
 export function useSpecialHireSpreadsheetData() {
@@ -165,21 +192,15 @@ export function useSpecialHireSpreadsheetData() {
 
       const quotationIds = quotations.map(q => q.id);
 
-      // Fetch payments, invoices, adjustments in parallel
-      const [paymentsResult, invoicesResult, adjustmentsResult] = await Promise.all([
-        quotationIds.length > 0
-          ? supabase.from('special_hire_payments').select('quotation_id, amount, payment_type, payment_date, status').in('quotation_id', quotationIds).eq('status', 'approved')
-          : Promise.resolve({ data: [] }),
-        quotationIds.length > 0
-          ? supabase.from('special_hire_invoices').select('quotation_id, invoice_number, total_amount').in('quotation_id', quotationIds)
-          : Promise.resolve({ data: [] }),
-        quotationIds.length > 0
-          ? supabase.from('special_hire_trip_adjustments').select('quotation_id, actual_km, check_in_meter, check_out_meter, additional_distance_charge, additional_hours_charge').in('quotation_id', quotationIds)
-          : Promise.resolve({ data: [] }),
+      // Fetch payments, invoices, adjustments in parallel using chunked fetches to avoid 414 URI Too Long errors
+      const [paymentsData, invoicesData, adjustmentsData] = await Promise.all([
+        fetchInChunks('special_hire_payments', 'quotation_id, amount, payment_type, payment_date, status', quotationIds, { field: 'status', value: 'approved' }),
+        fetchInChunks('special_hire_invoices', 'quotation_id, invoice_number, total_amount', quotationIds),
+        fetchInChunks('special_hire_trip_adjustments', 'quotation_id, actual_km, check_in_meter, check_out_meter, additional_distance_charge, additional_hours_charge', quotationIds)
       ]);
 
       let paymentsMap = new Map<string, { advance: number; advanceDate: string; balance: number; balanceDate: string }>();
-      ((paymentsResult as any).data || []).forEach((p: any) => {
+      paymentsData.forEach((p: any) => {
         const existing = paymentsMap.get(p.quotation_id) || { advance: 0, advanceDate: '', balance: 0, balanceDate: '' };
         if (p.payment_type === 'advance') {
           existing.advance += p.amount || 0;
@@ -192,12 +213,12 @@ export function useSpecialHireSpreadsheetData() {
       });
 
       let invoiceMap = new Map<string, { number: string; amount: number }>();
-      ((invoicesResult as any).data || []).forEach((inv: any) => {
+      invoicesData.forEach((inv: any) => {
         invoiceMap.set(inv.quotation_id, { number: inv.invoice_number || '', amount: inv.total_amount || 0 });
       });
 
       let adjustmentMap = new Map<string, any>();
-      ((adjustmentsResult as any).data || []).forEach((adj: any) => {
+      adjustmentsData.forEach((adj: any) => {
         adjustmentMap.set(adj.quotation_id, adj);
       });
 
@@ -241,6 +262,9 @@ export function useSpecialHireSpreadsheetData() {
           trip_status: q.trip_status || '',
           company_name: q.company_name || '',
           customer_name: q.customer_name || '',
+          contacted_person: (expenses as any)?.contacted_person ? String((expenses as any).contacted_person) : '',
+          hire_type: (expenses as any)?.hire_type ? String((expenses as any).hire_type) : '',
+          hire_month: q.pickup_datetime ? new Date(q.pickup_datetime).toLocaleString('en-US', { month: 'short', year: 'numeric' }) : '',
           customer_phone: q.customer_phone || '',
           route: `${q.pickup_location || ''} → ${q.drop_location || ''}`,
           bus_type_name: busType?.name || '',
@@ -315,7 +339,8 @@ export function useSpecialHireSpreadsheetData() {
       const expenseFields = [
         'fuel_cost_actual', 'driver_wages', 'assistant_wages', 'driver_meal_allowance',
         'assistant_meal_allowance', 'wages_total', 'maintenance', 'other_permits_highway',
-        'buses_deployed', 'operation_remark', 'remark', 'fuel_price_per_liter'
+        'buses_deployed', 'operation_remark', 'remark', 'fuel_price_per_liter',
+        'contacted_person', 'hire_type'
       ];
 
       const quotationDirectFields = [

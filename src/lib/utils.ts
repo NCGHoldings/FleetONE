@@ -58,3 +58,21 @@ export const parseDateForDB = (dateStr: string): string => {
   const [day, month, year] = parts;
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 };
+
+/**
+ * Fetch all rows from a Supabase query builder by paginating through the results.
+ * This bypasses the PostgREST max-rows API limit (default 2000).
+ */
+export const fetchAllRows = async (queryBuilder: any, step: number = 2000) => {
+  let allData: any[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await queryBuilder.range(from, from + step - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allData = [...allData, ...data];
+    if (data.length < step) break;
+    from += step;
+  }
+  return allData;
+};

@@ -4,6 +4,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { fetchAllRows } from "@/lib/utils";
 
 // Helper hook to get auto business unit filtering for sub-companies
 const useAutoBusinessUnitFilter = () => {
@@ -117,8 +118,7 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
         }
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = await fetchAllRows(query);
       return data;
     },
     enabled: !!selectedCompanyId,
@@ -223,8 +223,7 @@ export const useCustomers = () => {
         (query as any) = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = await fetchAllRows(query);
       return data;
     },
     enabled: !!selectedCompanyId,
@@ -247,9 +246,8 @@ export const useCustomerBalance = (customerId: string) => {
         query = query.eq("company_id", selectedCompanyId);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data.reduce((sum, inv) => sum + (inv.balance || 0), 0);
+      const data = await fetchAllRows(query);
+      return data.reduce((sum: number, inv: any) => sum + (inv.balance || 0), 0);
     },
     enabled: !!customerId && !!selectedCompanyId,
   });
@@ -279,8 +277,7 @@ export const useVendors = () => {
         (query as any) = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = await fetchAllRows(query);
       return data;
     },
     enabled: !!selectedCompanyId,
@@ -303,9 +300,8 @@ export const useVendorBalance = (vendorId: string) => {
         query = query.eq("company_id", selectedCompanyId);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data.reduce((sum, inv) => sum + (inv.balance || 0), 0);
+      const data = await fetchAllRows(query);
+      return data.reduce((sum: number, inv: any) => sum + (inv.balance || 0), 0);
     },
     enabled: !!vendorId && !!selectedCompanyId,
   });
@@ -369,8 +365,7 @@ export const useARInvoices = (status?: string) => {
         query = query.eq("status", status);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = await fetchAllRows(query);
       return data;
     },
     enabled: !!selectedCompanyId,
@@ -451,8 +446,7 @@ export const useAPInvoices = (status?: string) => {
         query = query.eq("status", status);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = await fetchAllRows(query);
       return data;
     },
     enabled: !!selectedCompanyId,
@@ -508,8 +502,7 @@ export const useARReceipts = () => {
         }
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = await fetchAllRows(query);
       return data;
     },
     enabled: !!selectedCompanyId,
@@ -590,8 +583,10 @@ export const useAPPayments = () => {
         }
       }
 
-      const { data, error } = await query;
-      if (error) {
+      try {
+        const data = await fetchAllRows(query);
+        return data;
+      } catch (error: any) {
         // Fallback: if join fails (e.g. missing FK), retry without bank_accounts join
         console.warn('AP Payments query failed, retrying without bank_accounts join:', error.message);
         let fallbackQuery = supabase
@@ -615,8 +610,7 @@ export const useAPPayments = () => {
           fallbackQuery = fallbackQuery.eq("business_unit_code", autoBusinessUnitCode);
         }
 
-        const { data: fallbackData, error: fallbackError } = await fallbackQuery;
-        if (fallbackError) throw fallbackError;
+        const fallbackData = await fetchAllRows(fallbackQuery);
         return fallbackData;
       }
       return data;
@@ -636,7 +630,7 @@ export const useBankAccounts = () => {
       // Use explicit column selection to avoid PostgREST errors from non-existent columns (e.g. 'status')
       let query = supabase
         .from("bank_accounts")
-        .select("id, account_name, bank_name, account_number, account_type, currency, current_balance, company_id, branch_id, gl_account_id, is_active, opening_balance, notes, created_at, updated_at")
+        .select("id, account_name, bank_name, account_number, account_type, currency, current_balance, company_id, gl_account_id, is_active, opening_balance, notes, created_at, updated_at")
         .order("account_name");
 
       if (selectedCompanyId) {

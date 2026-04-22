@@ -276,13 +276,13 @@ export const AccountsPayableView = () => {
     },
   ];
 
-  const totalOutstanding = invoices?.reduce((sum, inv) => sum + (inv.balance || 0), 0) || 0;
-  const totalWHT = invoices?.reduce((sum, inv) => sum + (inv.wht_amount || 0), 0) || 0;
-  const overdueCount = invoices?.filter(inv => isOverdue(inv.due_date, inv.status || "")).length || 0;
-  const overdueAmount = invoices
-    ?.filter(inv => isOverdue(inv.due_date, inv.status || ""))
-    .reduce((sum, inv) => sum + (inv.balance || 0), 0) || 0;
-  const pendingApproval = invoices?.filter(inv => inv.approval_status === "pending").length || 0;
+  const totalOutstanding = filteredInvoices?.reduce((sum: number, inv: any) => sum + (inv.balance || 0), 0) || 0;
+  const totalWHT = filteredInvoices?.reduce((sum: number, inv: any) => sum + (inv.wht_amount || 0), 0) || 0;
+  const overdueCount = filteredInvoices?.filter((inv: any) => isOverdue(inv.due_date, inv.status || "")).length || 0;
+  const overdueAmount = filteredInvoices
+    ?.filter((inv: any) => isOverdue(inv.due_date, inv.status || ""))
+    .reduce((sum: number, inv: any) => sum + (inv.balance || 0), 0) || 0;
+  const pendingApproval = filteredInvoices?.filter((inv: any) => inv.approval_status === "pending").length || 0;
 
   return (
     <div className="space-y-6">
@@ -290,7 +290,7 @@ export const AccountsPayableView = () => {
       <div className="grid gap-4 md:grid-cols-5">
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">Total Invoices</p>
-          <h3 className="text-2xl font-bold mt-1">{invoices?.length || 0}</h3>
+          <h3 className="text-2xl font-bold mt-1">{filteredInvoices?.length || 0}</h3>
         </Card>
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">Total Outstanding</p>

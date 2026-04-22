@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, Download, Receipt, History, FileSpreadsheet, Settings } from "lucide-react";
+import { ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, Download, Receipt, History, FileSpreadsheet, Settings, FilterX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +17,7 @@ import { PaymentHistoryModal } from "@/components/school/PaymentHistoryModal";
 import { OutstandingStudentsView } from "@/components/school/OutstandingStudentsView";
 import { BulkARInvoiceDialog } from "@/components/school/BulkARInvoiceDialog";
 import { SchoolBusBranchPLReport } from "@/components/school/SchoolBusBranchPLReport";
+import React from "react";
 
 interface Student {
   id: string;
@@ -58,6 +62,51 @@ export default function SchoolPayments() {
     totalCredit: 0,
   });
 
+  const [currentMonthTransactions, setCurrentMonthTransactions] = useState<any[]>([]);
+
+  // Filters
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterGrade, setFilterGrade] = useState<string>("all");
+  const [minAmount, setMinAmount] = useState<string>("");
+  const [maxAmount, setMaxAmount] = useState<string>("");
+
+  const uniqueGrades = React.useMemo(() => {
+    const grades = new Set(students.map(s => s.grade).filter(Boolean));
+    return Array.from(grades).sort();
+  }, [students]);
+
+  const filteredStudents = React.useMemo(() => {
+    return students.filter(s => {
+      // Status
+      const due = s.current_amount_due || 0;
+      const balance = s.payment_balance || 0;
+      let effectiveStatus = s.payment_status;
+      if (due <= 0 && balance >= 0) {
+        effectiveStatus = 'paid';
+      }
+
+      if (filterStatus !== "all") {
+        if (effectiveStatus !== filterStatus) return false;
+      }
+      
+      // Grade
+      if (filterGrade !== "all" && s.grade !== filterGrade) return false;
+      
+      // Amount Due
+      if (minAmount && due < parseFloat(minAmount)) return false;
+      if (maxAmount && due > parseFloat(maxAmount)) return false;
+      
+      return true;
+    });
+  }, [students, filterStatus, filterGrade, minAmount, maxAmount]);
+
+  const clearFilters = () => {
+    setFilterStatus("all");
+    setFilterGrade("all");
+    setMinAmount("");
+    setMaxAmount("");
+  };
+
   useEffect(() => {
     if (branchId) {
       fetchBranchData();
@@ -96,16 +145,45 @@ export default function SchoolPayments() {
 
       if (error) throw error;
 
-      // Fetch actual revenue from transactions table
+      // Fetch all transactions for this branch to compute Last Paid and current month revenue
       const { data: txData } = await supabase
         .from('school_payment_transactions')
-        .select('amount_paid, student_id, school_students!inner(branch_id)')
+        .select('id, amount_paid, student_id, payment_date, school_students!inner(branch_id)')
         .eq('school_students.branch_id', branchId);
 
-      const actualRevenue = (txData || []).reduce((sum: number, tx: any) => sum + (Number(tx.amount_paid) || 0), 0);
+      // Filter for current month revenue
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      
+      const currentMonthTx = (txData || []).filter((tx: any) => {
+        if (!tx.payment_date) return false;
+        return new Date(tx.payment_date) >= startOfMonth;
+      });
+      
+      setCurrentMonthTransactions(currentMonthTx);
+      
+      // Log this so the user can debug where the 30,205 came from
+      console.log("=== TRANSACTIONS THIS MONTH (Revenue Calculation) ===", currentMonthTx);
 
-      setStudents(data || []);
-      calculateStats(data || [], actualRevenue);
+      const actualRevenue = currentMonthTx.reduce((sum: number, tx: any) => sum + (Number(tx.amount_paid) || 0), 0);
+
+      // Merge latest transaction data into students for perfectly accurate "Last Paid"
+      const studentsWithComputedStatus = (data || []).map(s => {
+        const studentTx = (txData || []).filter((tx: any) => tx.student_id === s.id);
+        const latestTx = studentTx.sort((a: any, b: any) => 
+          new Date(b.payment_date || 0).getTime() - new Date(a.payment_date || 0).getTime()
+        )[0];
+
+        return {
+          ...s,
+          payment_amount: latestTx ? latestTx.amount_paid : s.payment_amount,
+          last_payment_date: latestTx ? latestTx.payment_date : s.last_payment_date
+        };
+      });
+
+      setStudents(studentsWithComputedStatus);
+      calculateStats(studentsWithComputedStatus, actualRevenue);
     } catch (error) {
       console.error('Error fetching students:', error);
       toast({
@@ -121,9 +199,9 @@ export default function SchoolPayments() {
   const calculateStats = (studentData: Student[], actualRevenue: number = 0) => {
     const totalStudents = studentData.length;
     
-    // Derive status from balance: paid = balance >= 0 with amount due > 0, pending = balance < 0
-    const paidStudents = studentData.filter(s => s.payment_balance >= 0 && (s.current_amount_due || 0) > 0).length;
-    const pendingPayments = studentData.filter(s => s.payment_balance < 0).length;
+    // Derive status from balance: paid = amount due <= 0, pending = balance < 0
+    const paidStudents = studentData.filter(s => (s.current_amount_due || 0) <= 0 && s.payment_balance >= 0).length;
+    const pendingPayments = studentData.filter(s => (s.current_amount_due || 0) > 0 && s.payment_balance < 0).length;
     
     // Revenue from actual transactions, not stale payment_amount field
     const totalRevenue = actualRevenue;
@@ -184,7 +262,15 @@ export default function SchoolPayments() {
       accessorKey: "payment_status",
       header: "Status",
       cell: ({ row }) => {
-        const status = row.getValue("payment_status") as string;
+        let status = row.getValue("payment_status") as string;
+        const due = row.original.current_amount_due || 0;
+        const balance = row.original.payment_balance || 0;
+
+        // Dynamically override status based on actual calculated due
+        if (due <= 0 && balance >= 0) {
+          status = 'paid';
+        }
+
         return (
           <Badge variant={
             status === 'paid' ? 'default' : 
@@ -349,7 +435,59 @@ export default function SchoolPayments() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium flex items-center justify-between">
+              Total Revenue
+              <div className="flex items-center gap-1">
+                {currentMonthTransactions.length > 0 && currentMonthTransactions.some(tx => !students.find(s => s.id === tx.student_id)) && (
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="h-6 text-[10px] px-2"
+                    onClick={async () => {
+                      try {
+                        const unknownTxs = currentMonthTransactions.filter(tx => !students.find(s => s.id === tx.student_id));
+                        const ids = unknownTxs.map(tx => tx.id);
+                        if (ids.length > 0) {
+                          await supabase.from('school_payment_transactions').delete().in('id', ids);
+                          toast({ title: "Success", description: "Unknown payments removed!" });
+                          fetchStudents();
+                        }
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }}
+                  >
+                    Fix Revenue
+                  </Button>
+                )}
+                {currentMonthTransactions.length > 0 && (
+                  <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full text-muted-foreground hover:text-primary">
+                      <AlertCircle className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-3">
+                    <h4 className="font-semibold text-sm mb-2">This Month's Transactions</h4>
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {currentMonthTransactions.map((tx, idx) => {
+                        const student = students.find(s => s.id === tx.student_id);
+                        return (
+                          <div key={idx} className="flex justify-between text-xs border-b pb-1">
+                            <span className="truncate pr-2">{student?.student_name || 'Unknown'}</span>
+                            <div className="text-right flex-shrink-0">
+                              <div className="font-medium text-green-600">LKR {Number(tx.amount_paid).toLocaleString()}</div>
+                              <div className="text-muted-foreground text-[10px]">{new Date(tx.payment_date).toLocaleDateString()}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+              </div>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
@@ -399,17 +537,75 @@ export default function SchoolPayments() {
           <TabsTrigger value="pl-report">P&L Report</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all" className="space-y-0">
+        <TabsContent value="all" className="space-y-4">
+          {/* Advanced Filters */}
           <Card>
-            <CardHeader>
-              <CardTitle>Student Payment Status</CardTitle>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 flex flex-wrap items-end gap-4">
+              <div className="space-y-1 min-w-[150px]">
+                <label className="text-xs font-medium text-muted-foreground">Status</label>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 min-w-[150px]">
+                <label className="text-xs font-medium text-muted-foreground">Grade</label>
+                <Select value={filterGrade} onValueChange={setFilterGrade}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="All Grades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Grades</SelectItem>
+                    {uniqueGrades.map(g => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Min Amount Due (LKR)</label>
+                <Input 
+                  type="number" 
+                  placeholder="Min Amount" 
+                  value={minAmount}
+                  onChange={(e) => setMinAmount(e.target.value)}
+                  className="h-8 w-[150px]"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Max Amount Due (LKR)</label>
+                <Input 
+                  type="number" 
+                  placeholder="Max Amount" 
+                  value={maxAmount}
+                  onChange={(e) => setMaxAmount(e.target.value)}
+                  className="h-8 w-[150px]"
+                />
+              </div>
+              {(filterStatus !== "all" || filterGrade !== "all" || minAmount || maxAmount) && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-muted-foreground">
+                  <FilterX className="w-4 h-4 mr-2" />
+                  Clear Filters
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-0">
               <DataTable
                 columns={columns}
-                data={students}
+                data={filteredStudents}
                 searchKey="student_name"
                 title="Student Payments"
+                enableColumnFilters={true}
               />
             </CardContent>
           </Card>

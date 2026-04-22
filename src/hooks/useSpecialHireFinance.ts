@@ -1708,7 +1708,7 @@ export async function createSPHARReceipt({
   journalEntryId,
 }: {
   customerId: string;
-  arInvoiceId: string;
+  arInvoiceId?: string | null;
   paymentAmount: number;
   paymentMethod: string;
   reference?: string;

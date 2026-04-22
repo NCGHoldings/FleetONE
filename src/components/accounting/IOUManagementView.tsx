@@ -14,7 +14,7 @@ import {
   AlertTriangle, CheckCircle, Clock, Loader2, Printer
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
-import { useIOURecords, useCreateIOU, useUpdateIOU, IOURecord } from "@/hooks/usePettyCash";
+import { useIOURecords, useCreateIOU, useUpdateIOU, IOURecord, usePettyCashFunds } from "@/hooks/usePettyCash";
 import { BUSINESS_UNITS } from "@/hooks/useExpenseRequests";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
@@ -43,8 +43,10 @@ export const IOUManagementView = () => {
   const [newIssuedDate, setNewIssuedDate] = useState(new Date().toISOString().split("T")[0]);
   const [newDueDate, setNewDueDate] = useState("");
   const [newUnit, setNewUnit] = useState("");
+  const [newFundId, setNewFundId] = useState<string>("");
 
   const { data: ious, isLoading, refetch } = useIOURecords({ status: statusFilter });
+  const { data: pettyCashFunds } = usePettyCashFunds();
   const createIOU = useCreateIOU();
   const updateIOU = useUpdateIOU();
 
@@ -72,6 +74,7 @@ export const IOUManagementView = () => {
       issued_date: newIssuedDate || undefined,
       due_date: newDueDate || undefined,
       business_unit_code: newUnit,
+      petty_cash_fund_id: newFundId || undefined,
     });
     setShowCreateIOU(false);
     setNewStaffName("");
@@ -80,6 +83,7 @@ export const IOUManagementView = () => {
     setNewIssuedDate(new Date().toISOString().split("T")[0]);
     setNewDueDate("");
     setNewUnit("");
+    setNewFundId("");
   };
 
   const openSettleDialog = (iou: IOURecord) => {
@@ -343,6 +347,23 @@ export const IOUManagementView = () => {
                 </SelectContent>
               </Select>
             </div>
+            {pettyCashFunds && pettyCashFunds.length > 0 && (
+              <div>
+                <Label>Source Petty Cash Float <span className="text-destructive">*</span></Label>
+                <Select value={newFundId} onValueChange={setNewFundId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select petty cash float..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pettyCashFunds.map((fund) => (
+                      <SelectItem key={fund.id} value={fund.id}>
+                        {fund.fund_name} (Bal: LKR {(fund.current_balance || 0).toLocaleString()})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label>Amount (LKR)</Label>
               <Input
@@ -386,7 +407,7 @@ export const IOUManagementView = () => {
             </Button>
             <Button 
               onClick={handleCreateIOU}
-              disabled={!newStaffName || !newUnit || newAmount <= 0 || createIOU.isPending}
+              disabled={!newStaffName || !newUnit || newAmount <= 0 || !newFundId || createIOU.isPending}
             >
               {createIOU.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Issue IOU

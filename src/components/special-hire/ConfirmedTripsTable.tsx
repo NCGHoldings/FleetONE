@@ -1568,12 +1568,17 @@ export function ConfirmedTripsTable() {
                                           intermediateStops: (() => {
                                             try {
                                               if (trip.intermediate_stops) {
-                                                const parsed = typeof trip.intermediate_stops === 'string'
+                                                let parsed = typeof trip.intermediate_stops === 'string'
                                                   ? JSON.parse(trip.intermediate_stops)
                                                   : trip.intermediate_stops;
+                                                if (typeof parsed === 'string') {
+                                                  parsed = JSON.parse(parsed);
+                                                }
                                                 return Array.isArray(parsed) ? parsed : [];
                                               }
-                                            } catch {}
+                                            } catch (e) {
+                                              console.error("Failed to parse intermediate stops for reminder", e);
+                                            }
                                             return [];
                                           })(),
                                         };
@@ -1776,6 +1781,7 @@ export function ConfirmedTripsTable() {
             bus_no: selectedTrip.assigned_bus_no,
             tripDistance: getTripDistance(selectedTrip),
             totalKm: calculateTotalKm(selectedTrip),
+            intermediate_stops: selectedTrip.intermediate_stops,
           }}
           adjustmentData={{
             id: selectedAdjustment?.id || '',

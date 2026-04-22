@@ -554,13 +554,30 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{reference}}'] = documentData?.reference || '';
       placeholders['{{cheque_number}}'] = documentData?.cheque_number || '';
       placeholders['{{notes}}'] = documentData?.notes || '';
-      // For direct payments, show payment line items instead of allocations
+      // For direct payments or advance payments, show payment line items instead of allocations
       if (documentData?.is_direct_payment && lineItems?.length) {
         placeholders['{{allocations}}'] = generatePaymentLineItemsTable(lineItems);
         placeholders['{{payment_line_items}}'] = generatePaymentLineItemsTable(lineItems);
+      } else if (documentData?.is_advance) {
+        // For advance payments, show account details with notes as description
+        const mockLineItem = {
+          chart_of_accounts: {
+            account_code: '',
+            account_name: 'Advance Payment',
+          },
+          description: documentData?.notes || 'Advance Payment',
+          quantity: 1,
+          unit_price: documentData?.amount || 0,
+          tax_amount: 0,
+        };
+        placeholders['{{allocations}}'] = generatePaymentLineItemsTable([mockLineItem]);
+        placeholders['{{payment_line_items}}'] = generatePaymentLineItemsTable([mockLineItem]);
       } else {
         placeholders['{{allocations}}'] = generateAllocationsTable(allocations || []);
       }
+      
+      // Voucher title
+      placeholders['{{voucher_title}}'] = documentData?.is_advance ? 'ADVANCE PAYMENT VOUCHER' : 'PAYMENT VOUCHER';
 
       // ===== Yutong / Custom Template Aliases =====
       // Voucher aliases
@@ -856,17 +873,31 @@ export const mapDocumentToPlaceholders = (
       break;
     }
     case 'petty_cash_voucher': {
-      placeholders['{{voucher_number}}'] = documentData?.receipt_number || documentData?.id?.substring(0, 8)?.toUpperCase() || '';
+      const isGrouped = Array.isArray(documentData?.lines) && documentData.lines.length > 0;
+      const totalAmount = isGrouped ? documentData.lines.reduce((sum: number, line: any) => sum + line.amount, 0) : documentData?.amount;
+      const combinedNotes = isGrouped ? documentData.lines.map((l: any) => l.description).filter(Boolean).join(", ") : documentData?.description || documentData?.notes || '';
+      const combinedCategory = isGrouped ? documentData.lines.map((l: any) => l.expense_category).filter(Boolean).join(", ") : documentData?.expense_category || '';
+
+      placeholders['{{voucher_number}}'] = documentData?.voucher_number || documentData?.id?.substring(0, 8)?.toUpperCase() || '';
       placeholders['{{payment_date}}'] = formatDate(documentData?.created_at || new Date().toISOString());
       placeholders['{{fund_name}}'] = documentData?.fund?.fund_name || documentData?.petty_cash_funds?.fund_name || '';
       placeholders['{{payee_name}}'] = documentData?.payee_name || '';
-      placeholders['{{expense_category}}'] = documentData?.expense_category || '';
-      placeholders['{{amount}}'] = formatCurrency(documentData?.amount);
-      placeholders['{{amount_in_words}}'] = numberToWords(documentData?.amount || 0);
-      placeholders['{{notes}}'] = documentData?.description || documentData?.notes || '';
+      placeholders['{{expense_category}}'] = combinedCategory;
+      placeholders['{{amount}}'] = formatCurrency(totalAmount);
+      placeholders['{{amount_in_words}}'] = numberToWords(totalAmount || 0);
+      placeholders['{{notes}}'] = combinedNotes;
       placeholders['{{reference}}'] = documentData?.reference_number || documentData?.reference || '';
       placeholders['{{receipt_number}}'] = documentData?.receipt_number || '';
       placeholders['{{payment_method}}'] = documentData?.payment_method?.toUpperCase() || 'CASH';
+      
+      const linesTable = isGrouped ? generateLineItemsTable(documentData.lines.map((l: any) => ({
+        description: l.description || l.expense_category || 'Disbursement',
+        quantity: 1,
+        unit_price: l.amount,
+        tax_amount: 0,
+        line_total: l.amount
+      }))) : '';
+      placeholders['{{line_items}}'] = linesTable;
       break;
     }
 

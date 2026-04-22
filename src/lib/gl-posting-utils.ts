@@ -743,16 +743,19 @@ export async function recalculateCOABalances(
 
     if (accountsError) throw accountsError;
 
-    // Get all posted journal entry lines
+    // Get all posted journal entry lines for these accounts
+    // We join chart_of_accounts to ensure we get ALL lines hitting these accounts,
+    // regardless of which sub-company the journal entry was created under.
     const { data: journalLines, error: linesError } = await supabase
       .from("journal_entry_lines")
       .select(`
         account_id,
         debit,
         credit,
-        journal_entries!inner(status, company_id)
+        journal_entries!inner(status),
+        chart_of_accounts!inner(company_id)
       `)
-      .eq("journal_entries.company_id", companyId)
+      .eq("chart_of_accounts.company_id", companyId)
       .eq("journal_entries.status", "posted");
 
     if (linesError) throw linesError;

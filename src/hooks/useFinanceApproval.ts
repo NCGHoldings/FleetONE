@@ -231,8 +231,8 @@ effectiveCompanyId: effectiveCompanyId,
     }
 
     // Step 2e: Create AR Receipt
-    if (arInvoiceId && customerId) {
-      if (isBalance) {
+    if (customerId) {
+      if (isBalance && arInvoiceId) {
         await updateSPHARInvoiceOnPayment({
           arInvoiceId,
           paymentAmount: paymentData.amount,
@@ -248,7 +248,7 @@ effectiveCompanyId: effectiveCompanyId,
         paymentMethod: paymentData.payment_method || 'cash',
         reference: paymentData.reference_no,
         paymentId,
-companyId: effectiveCompanyId,
+        companyId: effectiveCompanyId,
         journalEntryId: journalEntry?.id,
       });
 

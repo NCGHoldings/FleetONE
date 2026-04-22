@@ -884,17 +884,10 @@ export function useOrphanARCount(branchId: string | null, invoiceMonth: Date | n
       const monthStart = format(new Date(invoiceMonth.getFullYear(), invoiceMonth.getMonth(), 1), "yyyy-MM-dd");
       const monthEnd = format(new Date(invoiceMonth.getFullYear(), invoiceMonth.getMonth() + 1, 0), "yyyy-MM-dd");
 
-      const { data: studentIds } = await supabase
-        .from("school_students")
-        .select("id")
-        .eq("branch_id", branchId);
-      const ids = (studentIds || []).map((s) => s.id);
-      if (ids.length === 0) return 0;
-
       const { count } = await supabase
         .from("school_ar_invoices")
-        .select("id", { count: "exact", head: true })
-        .in("student_id", ids)
+        .select("id, school_students!inner(branch_id)", { count: "exact", head: true })
+        .eq("school_students.branch_id", branchId)
         .gte("invoice_month", monthStart)
         .lte("invoice_month", monthEnd)
         .is("ar_invoice_id", null)
@@ -967,12 +960,11 @@ export function useRepairOrphanARs() {
         .select("id, student_name")
         .eq("branch_id", branchId);
       const studentMap = new Map((studentIds || []).map((s) => [s.id, s.student_name]));
-      if (studentMap.size === 0) return { repaired: 0 };
 
       const { data: orphans, error: oErr } = await supabase
         .from("school_ar_invoices")
-        .select("id, invoice_number, amount, paid_amount, invoice_month, status, journal_entry_id, student_id")
-        .in("student_id", Array.from(studentMap.keys()))
+        .select("id, invoice_number, amount, paid_amount, invoice_month, status, journal_entry_id, student_id, school_students!inner(branch_id)")
+        .eq("school_students.branch_id", branchId)
         .gte("invoice_month", monthStart)
         .lte("invoice_month", monthEnd)
         .is("ar_invoice_id", null)
@@ -1137,7 +1129,7 @@ export function usePostPaymentToGL() {
       const hasCreditConsumption = creditToConsume > 0 && liabilityAccountId;
 
       // Determine Trade Receivable credit amount:
-      // - Overpay: CR only the fixed amount (excess goes to liability)
+      // - Overpay: CR only the actual amount consumed for AR (cash received - overpayment)
       // - Credit consume: CR the full due amount (shortfall covered by liability DR)
       // - Exact: CR the payment amount
       let tradeReceivableCredit: number;
@@ -1145,7 +1137,7 @@ export function usePostPaymentToGL() {
       let liabilityDebit = 0;  // DR from Advance Liability (credit consumption)
 
       if (hasOverpayment) {
-        tradeReceivableCredit = amountDue;
+        tradeReceivableCredit = amount - overpaymentAmount!;
         liabilityCredit = overpaymentAmount!;
       } else if (hasCreditConsumption) {
         tradeReceivableCredit = amount + creditToConsume; // Full due covered by cash + credit

@@ -95,6 +95,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const [freshTotalPaid, setFreshTotalPaid] = useState<number | null>(null);
   const [freshAdjustmentData, setFreshAdjustmentData] = useState<any>(null);
   const [fullQuotation, setFullQuotation] = useState<any>(null);
+  const [fullQuotationLoaded, setFullQuotationLoaded] = useState(false);
   
   // This modal is specifically for customer-facing balance invoices
   const isCustomerInvoice = true;
@@ -120,12 +121,14 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
     try {
       const { data, error } = await supabase
         .from('special_hire_quotations')
-        .select('km_trip, km_parking_to_pickup, km_drop_to_parking, total_distance_km, additional_charges, bus_fleet_details')
+        .select('km_trip, km_parking_to_pickup, km_drop_to_parking, additional_charges, bus_fleet_details, intermediate_stops, hire_type')
         .eq('id', quotationData.id)
         .maybeSingle();
       if (!error && data) setFullQuotation(data);
     } catch (e) {
       console.error('Error fetching full quotation for mileage:', e);
+    } finally {
+      setFullQuotationLoaded(true);
     }
   };
 
@@ -151,18 +154,18 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   // Auto-save draft when modal opens (ensures document is always recorded)
   useEffect(() => {
     const autoSaveDraft = async () => {
-      if (open && !documentId && !isAutoSaving) {
+      if (open && !documentId && !isAutoSaving && fullQuotationLoaded) {
         setIsAutoSaving(true);
         await handleSaveDraft();
         setIsAutoSaving(false);
       }
     };
     
-    if (open && quotationData.id) {
+    if (open && quotationData.id && fullQuotationLoaded) {
       const timer = setTimeout(autoSaveDraft, 300);
       return () => clearTimeout(timer);
     }
-  }, [open, documentId, quotationData.id]);
+  }, [open, documentId, quotationData.id, fullQuotationLoaded]);
 
   const fetchCompanyLogo = async () => {
     try {
@@ -233,8 +236,13 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
     const actualTotalPaid = freshTotalPaid ?? quotationData.total_paid ?? quotationData.advance_paid ?? 0;
 
     // Resolve unified mileage from full quotation + adjustment (single source of truth)
-    const mileageInfo = getInvoiceMileage(fullQuotation, hasRealAdjustment ? effectiveAdjustment : null);
-    const fallbackTripDistance = quotationData.tripDistance ?? (mileageInfo.quoted || calculateTotalKm(fullQuotation));
+    console.log("=== GenerateBalanceInvoiceModal DEBUG ===");
+    console.log("quotationData.additional_charges:", quotationData.additional_charges);
+    console.log("fullQuotation:", fullQuotation);
+    const mileageInfo = getInvoiceMileage(fullQuotation || quotationData, hasRealAdjustment ? effectiveAdjustment : null);
+    console.log("mileageInfo:", mileageInfo);
+    
+    const fallbackTripDistance = quotationData.tripDistance ?? (mileageInfo.quoted || calculateTotalKm(fullQuotation || quotationData));
 
     return {
       invoiceNo,
@@ -281,13 +289,19 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       hireType: quotationData.hire_type || 'External',
       intermediateStops: (() => {
         try {
-          if (quotationData.intermediate_stops) {
-            const parsed = typeof quotationData.intermediate_stops === 'string'
-              ? JSON.parse(quotationData.intermediate_stops)
-              : quotationData.intermediate_stops;
+          const rawStops = fullQuotation?.intermediate_stops || quotationData.intermediate_stops;
+          if (rawStops) {
+            let parsed = typeof rawStops === 'string'
+              ? JSON.parse(rawStops)
+              : rawStops;
+            if (typeof parsed === 'string') {
+              parsed = JSON.parse(parsed);
+            }
             return Array.isArray(parsed) ? parsed : [];
           }
-        } catch {}
+        } catch (e) {
+          console.error("Failed to parse intermediate stops", e);
+        }
         return [];
       })(),
     };

@@ -237,7 +237,7 @@ export const TemplateInitializerButton = ({
 
         <Button 
           variant="outline" 
-          className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+          className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 font-medium"
           disabled={isInitializing} 
           onClick={async () => {
             setIsInitializing(true);
@@ -283,7 +283,7 @@ export const TemplateInitializerButton = ({
             onComplete?.();
           }}
         >
-          <Wand2 className="h-4 w-4 mr-2 text-blue-500" />
+          <Wand2 className="h-4 w-4 mr-2 text-green-600" />
           Update Only AP Vouchers (Safe)
         </Button>
       </div>

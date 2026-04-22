@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,10 +64,10 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
       const docs: RelatedDocument[] = [];
 
       const [arInv, apInv, arRec, apPay, spPay, bankTx] = await Promise.all([
-        supabase.from("ar_invoices").select("*, customers(name)").eq("journal_entry_id", entryId),
-        supabase.from("ap_invoices").select("*, vendors(name)").eq("journal_entry_id", entryId),
-        supabase.from("ar_receipts").select("*, customers(name)").eq("journal_entry_id", entryId),
-        supabase.from("ap_payments").select("*, vendors(name)").eq("journal_entry_id", entryId),
+        supabase.from("ar_invoices").select("*, customers(customer_name)").eq("journal_entry_id", entryId),
+        supabase.from("ap_invoices").select("*, vendors(vendor_name)").eq("journal_entry_id", entryId),
+        supabase.from("ar_receipts").select("*, customers(customer_name)").eq("journal_entry_id", entryId),
+        supabase.from("ap_payments").select("*, vendors(vendor_name)").eq("journal_entry_id", entryId),
         supabase.from("special_hire_payments").select("*").eq("journal_entry_id", entryId),
         supabase.from("bank_transactions").select("*, bank_accounts(account_name)").eq("journal_entry_id", entryId),
       ]);
@@ -173,7 +174,44 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
               </Badge>
             </DialogTitle>
             {entry.status === "posted" && !isReversal && (
-              <div className="absolute right-12 top-4">
+              <div className="absolute right-12 top-4 flex gap-2">
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        // 1. Fetch lines
+                        const { data: fetchLines } = await supabase.from('journal_entry_lines').select('*').eq('journal_entry_id', entry.id);
+                        if (!fetchLines) return;
+                        
+                        // 2. Fix Trade Receivable Imbalance
+                        const trLine = fetchLines.find((l: any) => l.credit > 0 && l.description?.includes('School Bus Payment'));
+                        if (trLine) {
+                          const otherCredits = fetchLines.reduce((sum: number, l: any) => sum + ((l.credit > 0 && l.id !== trLine.id) ? l.credit : 0), 0);
+                          const correctCredit = entry.total_debit - otherCredits;
+                          await supabase.from('journal_entry_lines').update({ credit: correctCredit }).eq('id', trLine.id);
+                          await supabase.from('journal_entries').update({ total_credit: entry.total_debit }).eq('id', entry.id);
+                        }
+
+                        // 3. Fix wrong Bank Account (Switch SHS to Wattala)
+                        const bankDebitLine = fetchLines.find((l: any) => l.debit > 0 && l.description?.includes('Payment received'));
+                        if (bankDebitLine) {
+                          const { data: wattalaAccounts } = await supabase.from('chart_of_accounts').select('id, account_name').ilike('account_name', '%Wattala%');
+                          if (wattalaAccounts && wattalaAccounts.length > 0) {
+                            await supabase.from('journal_entry_lines').update({ account_id: wattalaAccounts[0].id }).eq('id', bankDebitLine.id);
+                            toast.success(`Switched bank account to ${wattalaAccounts[0].account_name}`);
+                          } else {
+                            toast.error("Could not find a bank account containing 'Wattala'");
+                          }
+                        }
+
+                        window.location.reload();
+                      } catch(e) { console.error(e) }
+                    }}
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    Force Balance & Fix Bank
+                  </Button>
                 <Button 
                   variant="destructive" 
                   size="sm"

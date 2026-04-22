@@ -248,6 +248,27 @@ export const PaymentConfirmationModal = ({
       return;
     }
 
+    if (paymentType === 'balance') {
+      if (balanceDue <= 0) {
+        toast.error('This trip is fully paid. No balance payment is required.');
+        return;
+      }
+      if (amount > balanceDue) {
+        toast.error(`Payment amount cannot exceed the balance due of LKR ${balanceDue.toLocaleString()}`);
+        return;
+      }
+    }
+
+    if (paymentType === 'full' && amount > finalTotal) {
+      toast.error(`Payment amount cannot exceed the total amount of LKR ${finalTotal.toLocaleString()}`);
+      return;
+    }
+
+    if (paymentType === 'advance' && amount > finalTotal) {
+      toast.error(`Advance amount cannot exceed the total amount of LKR ${finalTotal.toLocaleString()}`);
+      return;
+    }
+
     // Validate required fields for all payments (to ensure document quality)
     if (!method) {
       toast.error('Please select a payment method');
@@ -454,6 +475,15 @@ export const PaymentConfirmationModal = ({
             </CardContent>
           </Card>
 
+          {paymentType === 'balance' && balanceDue <= 0 && (
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800 text-sm font-medium">
+                This trip is fully paid. The balance due is 0. No further payments are required.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Payment Details */}
           <div className="space-y-4">
             <Label className="text-base font-medium">Payment Details</Label>
@@ -495,7 +525,8 @@ export const PaymentConfirmationModal = ({
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
                   min="0"
-                  disabled={isProcessing}
+                  max={paymentType === 'balance' ? balanceDue : paymentType === 'full' ? finalTotal : undefined}
+                  disabled={isProcessing || (paymentType === 'balance' && balanceDue <= 0)}
                 />
               </div>
               <div className="space-y-2">
@@ -638,7 +669,10 @@ export const PaymentConfirmationModal = ({
             <Button variant="outline" onClick={onClose} disabled={isProcessing}>
               Cancel
             </Button>
-            <Button onClick={handleConfirm} disabled={isProcessing}>
+            <Button 
+              onClick={handleConfirm} 
+              disabled={isProcessing || (paymentType === 'balance' && balanceDue <= 0)}
+            >
               {isProcessing ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -45,6 +45,7 @@ interface DataTableProps<TData, TValue> {
   onDateRangeChange?: (range: { from: Date; to: Date } | undefined) => void;
   editableFields?: string[];
   onCellEdit?: (rowId: string, field: string, value: any) => Promise<void>;
+  enableColumnFilters?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -60,6 +61,7 @@ export function DataTable<TData, TValue>({
   onDateRangeChange,
   editableFields = [],
   onCellEdit,
+  enableColumnFilters = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -256,6 +258,17 @@ export function DataTable<TData, TValue>({
                             </span>
                           )}
                         </div>
+                        {enableColumnFilters && header.column.getCanFilter() && (
+                          <div className="mt-2 pr-2">
+                            <Input
+                              placeholder={`Filter ${header.column.columnDef.header as string}...`}
+                              value={(header.column.getFilterValue() ?? '') as string}
+                              onChange={e => header.column.setFilterValue(e.target.value)}
+                              className="h-7 text-xs font-normal"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                        )}
                       </TableHead>
                     );
                   })}

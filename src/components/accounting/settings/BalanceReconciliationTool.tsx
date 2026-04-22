@@ -47,7 +47,7 @@ interface OrphanedJE {
 }
 
 export const BalanceReconciliationTool = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const [isRunning, setIsRunning] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
   const [discrepancies, setDiscrepancies] = useState<Discrepancy[] | null>(null);
@@ -60,14 +60,15 @@ export const BalanceReconciliationTool = () => {
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
 
   const runReconciliation = async () => {
-    if (!selectedCompanyId) {
+    const effectiveCompanyId = getEffectiveCompanyId() || selectedCompanyId;
+    if (!effectiveCompanyId) {
       toast.error("Please select a company first");
       return;
     }
 
     setIsRunning(true);
     try {
-      const result = await recalculateCOABalances(selectedCompanyId);
+      const result = await recalculateCOABalances(effectiveCompanyId);
       
       if (result.success) {
         setDiscrepancies(result.discrepancies);

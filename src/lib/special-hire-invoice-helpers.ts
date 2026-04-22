@@ -55,10 +55,10 @@ export function resolveBusType(quotation: any): string {
  * DB columns: km_parking_to_pickup, km_trip, km_drop_to_parking
  */
 export function calculateTotalKm(quotation: any): number {
-  const parkingToPickup = Number(quotation?.km_parking_to_pickup) || 0;
-  const trip = Number(quotation?.km_trip) || 0;
-  const dropToParking = Number(quotation?.km_drop_to_parking) || 0;
-  return parkingToPickup + trip + dropToParking;
+  // As requested by user: ONLY use the actual trip distance.
+  // Do NOT include parking_to_pickup or drop_to_parking empty mileage.
+  const trip = Number(quotation?.km_trip) || Number(quotation?.total_distance_km) || 0;
+  return Math.round(trip * 10) / 10;
 }
 
 /**
@@ -82,8 +82,12 @@ export function getQuotationAdditionalDistance(quotation: any): {
   try {
     const raw = quotation?.additional_charges;
     if (!raw) return { distanceKm: 0, amount: 0, breakdown: [] };
-    charges = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    if (!Array.isArray(charges)) return { distanceKm: 0, amount: 0, breakdown: [] };
+    let parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (typeof parsed === 'string') {
+      parsed = JSON.parse(parsed);
+    }
+    if (!Array.isArray(parsed)) return { distanceKm: 0, amount: 0, breakdown: [] };
+    charges = parsed;
   } catch {
     return { distanceKm: 0, amount: 0, breakdown: [] };
   }
@@ -118,7 +122,12 @@ export function getQuotationAdditionalDistance(quotation: any): {
  * - postTripExtras = actual - quoted (can be negative)
  */
 export function getInvoiceMileage(quotation: any, adjustment?: any | null): InvoiceMileage {
-  const base = calculateTotalKm(quotation);
+  let base = calculateTotalKm(quotation);
+  // Fallback to total_distance_km or tripDistance if individual legs are 0
+  if (base === 0) {
+    base = Number(quotation?.total_distance_km) || Number(quotation?.tripDistance) || Number(quotation?.totalKm) || 0;
+  }
+  
   const { distanceKm: quotationExtras, amount: quotationExtrasAmount, breakdown: quotationExtrasBreakdown } =
     getQuotationAdditionalDistance(quotation);
   const quoted = base + quotationExtras;

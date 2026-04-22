@@ -4565,3 +4565,37 @@ export const useDeleteJournalEntry = () => {
     onError: (error) => toast.error(`Failed to delete journal entry: ${error.message}`),
   });
 };
+
+// ============ Reconcile Journal Entry Lines ============
+export const useReconcileJournalLines = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (lineIds: string[]) => {
+      if (!lineIds || lineIds.length === 0) throw new Error("No lines selected for reconciliation");
+      
+      const reconciliationId = crypto.randomUUID();
+      const reconciliationDate = new Date().toISOString();
+      
+      const { data, error } = await supabase
+        .from("journal_entry_lines")
+        .update({ 
+          reconciliation_id: reconciliationId,
+          reconciliation_date: reconciliationDate
+        })
+        .in("id", lineIds)
+        .select();
+        
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["journal-entry-lines"] });
+      queryClient.invalidateQueries({ queryKey: ["account-transactions"] });
+      toast.success("Transactions successfully reconciled!");
+    },
+    onError: (error) => {
+      toast.error(`Failed to reconcile: ${error.message}`);
+    },
+  });
+};

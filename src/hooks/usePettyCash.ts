@@ -412,6 +412,7 @@ export const useCreatePettyCashTransaction = () => {
           payment_method: data.payment_method || "cash",
           reference_number: data.reference_number || null,
           status: data.status || "approved",
+          voucher_number: data.voucher_number || undefined,
           attachment_url: data.attachment_url || null,
           branch_id: data.branch_id || null,
           company_id: selectedCompanyId,
@@ -727,7 +728,23 @@ export const useCreateIOU = () => {
   const { selectedCompanyId } = useCompany();
 
   return useMutation({
-    mutationFn: async (data: Partial<IOURecord>) => {
+    mutationFn: async (data: Partial<IOURecord> & { petty_cash_fund_id?: string }) => {
+      // Validate petty cash float if selected
+      let fund: any = null;
+      if (data.petty_cash_fund_id) {
+        const { data: f, error: fErr } = await supabase
+          .from("petty_cash_funds")
+          .select("*")
+          .eq("id", data.petty_cash_fund_id)
+          .single();
+        if (fErr || !f) throw new Error("Selected Petty Cash Float not found.");
+        
+        if ((f.current_balance || 0) < (data.amount || 0)) {
+          throw new Error(`Insufficient float balance. Available: LKR ${(f.current_balance || 0).toLocaleString()}`);
+        }
+        fund = f;
+      }
+
       // Generate IOU number
       const { data: numData } = await supabase.rpc("generate_entity_number", {
         p_entity_type: "iou",
@@ -753,18 +770,46 @@ export const useCreateIOU = () => {
 
       if (error) throw error;
 
-      // Auto-create GL Journal Entry: DR Staff Advance / CR Cash or Bank
       const amount = data.amount || 0;
+
+      // Handle Petty Cash Transaction & Balance Reduction
+      if (fund && data.petty_cash_fund_id && amount > 0) {
+        const newBalance = (fund.current_balance || 0) - amount;
+
+        // Update fund balance
+        await supabase
+          .from("petty_cash_funds")
+          .update({ current_balance: newBalance, updated_at: new Date().toISOString() })
+          .eq("id", data.petty_cash_fund_id);
+
+        // Create petty cash transaction for the IOU
+        await supabase
+          .from("petty_cash_transactions")
+          .insert({
+            petty_cash_fund_id: data.petty_cash_fund_id,
+            transaction_type: "disbursement",
+            amount,
+            balance_after: newBalance,
+            description: `IOU Issued: ${data.purpose || "Staff Advance"} (${iouNumber})`,
+            payee_name: data.staff_name_draft || "Staff",
+            expense_category: "IOU Advance",
+            payment_method: "cash",
+            status: "approved",
+            company_id: selectedCompanyId,
+          });
+      }
+
+      // Auto-create GL Journal Entry
       if (amount > 0 && selectedCompanyId) {
         try {
-          // Find a staff advance / cash advance account
+          // Find a staff advance / cash advance account. Target OTHER CASH ADVANCE first!
           let debitAccountId = "";
           const { data: advanceAcct } = await supabase
             .from("chart_of_accounts")
             .select("id")
             .eq("company_id", selectedCompanyId)
             .eq("account_type", "asset")
-            .or("account_name.ilike.%advance%,account_name.ilike.%iou%,account_name.ilike.%staff receivable%")
+            .or("account_name.ilike.%other cash advance%,account_name.ilike.%advance%,account_name.ilike.%iou%,account_name.ilike.%staff receivable%")
             .limit(1)
             .maybeSingle();
           debitAccountId = advanceAcct?.id || "";
@@ -779,14 +824,17 @@ export const useCreateIOU = () => {
             debitAccountId = (glSettings as any)?.customer_advance_account_id || "";
           }
 
-          // Find credit account (cash or bank)
-          let creditAccountId = "";
-          const { data: glSettings2 } = await supabase
-            .from("gl_settings" as any)
-            .select("bank_account_id")
-            .eq("company_id", selectedCompanyId)
-            .maybeSingle();
-          creditAccountId = (glSettings2 as any)?.bank_account_id || "";
+          // Find credit account: Use selected Float's GL account, otherwise fallback to Bank/Cash
+          let creditAccountId = fund?.gl_account_id || "";
+          
+          if (!creditAccountId) {
+            const { data: glSettings2 } = await supabase
+              .from("gl_settings" as any)
+              .select("bank_account_id")
+              .eq("company_id", selectedCompanyId)
+              .maybeSingle();
+            creditAccountId = (glSettings2 as any)?.bank_account_id || "";
+          }
 
           if (!creditAccountId) {
             const { data: cashAcct } = await supabase
@@ -831,7 +879,7 @@ export const useCreateIOU = () => {
                 {
                   journal_entry_id: je.id,
                   account_id: creditAccountId,
-                  description: `Cash/Bank disbursement for IOU`,
+                  description: fund ? `Float disbursement: ${fund.fund_name} for IOU` : `Cash/Bank disbursement for IOU`,
                   debit: 0,
                   credit: amount,
                   company_id: selectedCompanyId,
@@ -877,6 +925,8 @@ export const useCreateIOU = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["iou-records"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       toast({ title: "IOU Created", description: "The IOU record has been created and posted to GL." });
     },

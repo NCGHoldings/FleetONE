@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import { CurrencyDisplay } from "../shared/CurrencyDisplay";
 import { SearchableAccountSelector } from "../shared/SearchableAccountSelector";
 import { FinanceDocumentPreviewModal } from "../shared/FinanceDocumentPreviewModal";
 import { Printer, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const PettyCashDisbursementsTab = () => {
   const filteredCategories = useCompanyExpenseCategories();
@@ -75,6 +76,8 @@ export const PettyCashDisbursementsTab = () => {
     try {
       const needsApproval = selectedFund && selectedFund.approval_required_above > 0 && totalAmount > selectedFund.approval_required_above;
 
+      const { data: voucherNum } = await supabase.rpc("generate_petty_cash_voucher_number");
+
       for (const line of lines) {
         if (line.amount <= 0) continue;
         
@@ -89,6 +92,7 @@ export const PettyCashDisbursementsTab = () => {
           reference_number: form.reference_number || undefined,
           payment_method: form.payment_method,
           status: needsApproval ? "pending" : "approved",
+          voucher_number: voucherNum || undefined,
           branch_id: selectedFund?.branch_id || undefined,
           created_at: new Date(form.transaction_date).toISOString(),
         } as any);
@@ -114,6 +118,28 @@ export const PettyCashDisbursementsTab = () => {
       default: return "secondary";
     }
   };
+
+  const groupedTransactions = useMemo(() => {
+    if (!transactions) return [];
+    
+    const map = new Map<string, any>();
+    
+    for (const txn of transactions) {
+      const key = txn.voucher_number || txn.id;
+      if (!map.has(key)) {
+        map.set(key, { ...txn, lines: [txn] });
+      } else {
+        const existing = map.get(key);
+        existing.amount += txn.amount;
+        existing.lines.push(txn);
+        if (existing.expense_category !== txn.expense_category) {
+          existing.expense_category_display = "Multiple";
+        }
+      }
+    }
+    
+    return Array.from(map.values());
+  }, [transactions]);
 
   return (
     <div className="space-y-4">
@@ -167,18 +193,24 @@ export const PettyCashDisbursementsTab = () => {
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell>
               </TableRow>
-            ) : transactions?.length === 0 ? (
+            ) : groupedTransactions?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No vouchers found</TableCell>
               </TableRow>
             ) : (
-              transactions?.map((txn) => (
+              groupedTransactions?.map((txn) => (
                 <TableRow key={txn.id}>
                   <TableCell className="font-mono text-sm">{txn.voucher_number || "-"}</TableCell>
                   <TableCell>{format(new Date(txn.created_at), "MMM dd, yyyy")}</TableCell>
                   <TableCell>{txn.fund?.fund_name || "-"}</TableCell>
                   <TableCell>{txn.payee_name || "-"}</TableCell>
-                  <TableCell>{txn.expense_category ? getCategoryLabel(txn.expense_category) : "-"}</TableCell>
+                  <TableCell>
+                    {txn.expense_category_display === "Multiple" ? (
+                      <Badge variant="outline">Multiple Categories</Badge>
+                    ) : (
+                      txn.expense_category ? getCategoryLabel(txn.expense_category) : "-"
+                    )}
+                  </TableCell>
                   <TableCell className="text-right font-semibold text-destructive">
                     <CurrencyDisplay amount={txn.amount} />
                   </TableCell>

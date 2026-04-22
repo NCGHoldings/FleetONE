@@ -250,24 +250,31 @@ export const AccountsReceivableView = () => {
     },
   ];
 
-  const totalOutstanding = invoices?.reduce((sum, inv) => sum + (inv.balance || 0), 0) || 0;
-  const overdueCount = invoices?.filter(inv => isOverdue(inv.due_date, inv.status || "")).length || 0;
-  const overdueAmount = invoices
-    ?.filter(inv => isOverdue(inv.due_date, inv.status || ""))
-    .reduce((sum, inv) => sum + (inv.balance || 0), 0) || 0;
+  const totalOutstanding = filteredInvoices?.reduce((sum: number, inv: any) => sum + (inv.balance || 0), 0) || 0;
+  const totalPaid = filteredInvoices?.reduce((sum: number, inv: any) => sum + (inv.paid_amount || 0), 0) || 0;
+  const overdueCount = filteredInvoices?.filter((inv: any) => isOverdue(inv.due_date, inv.status || "")).length || 0;
+  const overdueAmount = filteredInvoices
+    ?.filter((inv: any) => isOverdue(inv.due_date, inv.status || ""))
+    .reduce((sum: number, inv: any) => sum + (inv.balance || 0), 0) || 0;
 
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">Total Invoices</p>
-          <h3 className="text-2xl font-bold mt-1">{invoices?.length || 0}</h3>
+          <h3 className="text-2xl font-bold mt-1">{filteredInvoices?.length || 0}</h3>
         </Card>
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">Total Outstanding</p>
           <h3 className="text-2xl font-bold text-primary mt-1">
             <CurrencyDisplay amount={totalOutstanding} />
+          </h3>
+        </Card>
+        <Card className="p-4 bg-green-50/50 border-green-100">
+          <p className="text-sm text-green-700 font-medium">Total Collected</p>
+          <h3 className="text-2xl font-bold text-green-700 mt-1">
+            <CurrencyDisplay amount={totalPaid} />
           </h3>
         </Card>
         <Card className="p-4">
@@ -334,16 +341,17 @@ export const AccountsReceivableView = () => {
             <DataTable
               columns={columns}
               data={filteredInvoices}
+              enableColumnFilters
             />
           </TabsContent>
           <TabsContent value="unpaid">
-            <DataTable columns={columns} data={filteredInvoices} />
+            <DataTable columns={columns} data={filteredInvoices} enableColumnFilters />
           </TabsContent>
           <TabsContent value="partial">
-            <DataTable columns={columns} data={filteredInvoices} />
+            <DataTable columns={columns} data={filteredInvoices} enableColumnFilters />
           </TabsContent>
           <TabsContent value="paid">
-            <DataTable columns={columns} data={filteredInvoices} />
+            <DataTable columns={columns} data={filteredInvoices} enableColumnFilters />
           </TabsContent>
         </Tabs>
       </Card>

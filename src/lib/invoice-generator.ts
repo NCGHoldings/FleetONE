@@ -80,7 +80,13 @@ function buildBusRows(data: InvoiceData, itemDetail: string, subTotal: number): 
   const driverList = (data.driverName || '').split(',').map(v => v.trim());
   const conductorList = (data.conductorName || '').split(',').map(v => v.trim());
   const busCount = Math.max(data.numberOfBuses || 1, vehicleList.length);
-  const descLine = `${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- ${data.hireType || 'External'}`;
+  const quotationExtraKm = Number(data.quotationAdditionalDistanceKm) || 0;
+  const baseQuotedKm = data.originalQuotedKm 
+    ? (data.originalQuotedKm - quotationExtraKm)
+    : (Number(data.tripDistance) || Number(data.totalKm) || 0);
+
+  const baseRateText = baseQuotedKm > 0 ? `Fixed Rate for ${baseQuotedKm} KM` : 'Fixed Rate';
+  const descLine = `${data.busType.toUpperCase()} - ${baseRateText}<br>- ${data.hireType || 'External'}`;
 
   if (busCount > 1 && vehicleList.length > 1) {
     const perBusAmount = Math.round(subTotal / busCount);
@@ -152,6 +158,15 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
   const companyLogo = data.companyLogo || '/lovable-uploads/ncg-holdings-logo.png';
   const isDraft = data.invoice_status === 'draft' && !data.forCustomer;
   const documentTitle = isSalesReceipt ? 'SALES RECEIPT' : 'INVOICE';
+
+  // Build route with intermediate stops
+  const itemDetail = data.itemDetail || (() => {
+    if (data.intermediateStops && data.intermediateStops.length > 0) {
+      const stops = data.intermediateStops.map(s => s.location).join(' → ');
+      return `${data.pickupLocation || ''} → ${stops} → ${data.dropLocation || ''}`;
+    }
+    return `${data.pickupLocation || ''} → ${data.dropLocation || ''}`;
+  })();
 
   const draftWatermarkStyles = isDraft ? `
     .draft-watermark {
@@ -232,7 +247,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         ${data.totalPaidToDate != null ? `<p style="text-align: right; font-weight: bold; margin: 10px 0;">Total Paid to Date: LKR ${data.totalPaidToDate.toLocaleString()}.00</p>` : ''}
         <p style="text-align: right; font-weight: bold; margin: 10px 0; color: #b91c1c;">Balance Due: LKR ${(data.totalAmount - (data.totalPaidToDate ?? data.paidAmount)).toLocaleString()}.00</p>
 
-        <p style="font-style: italic; margin: 15px 0;">Trip Details: ${format(data.pickupDate, 'dd/MM/yyyy')} - ${format(data.dropDate, 'dd/MM/yyyy')} | ${data.pickupLocation} to ${data.dropLocation} | ${data.numberOfPassengers} Pax | ${data.busType}</p>
+        <p style="font-style: italic; margin: 15px 0;">Trip Details: ${format(data.pickupDate, 'dd/MM/yyyy')} - ${format(data.dropDate, 'dd/MM/yyyy')} | ${itemDetail} | ${data.numberOfPassengers} Pax | ${data.busType}</p>
 
         <p style="font-size: 12px; margin: 10px 0;">
           *Note: Please make sure to place the name, signature and date in the given space accordingly.
@@ -299,23 +314,24 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
   const totalPaid = data.paidAmount || 0;
   const balanceDue = data.balanceAmount != null ? data.balanceAmount : Math.max(0, priceAfterDiscount - totalPaid);
 
-  // Build route with intermediate stops
-  const itemDetail = data.itemDetail || (() => {
-    if (data.intermediateStops && data.intermediateStops.length > 0) {
-      const stops = data.intermediateStops.map(s => s.location).join(' → ');
-      return `${data.pickupLocation || ''} → ${stops} → ${data.dropLocation || ''}`;
-    }
-    return `${data.pickupLocation || ''} → ${data.dropLocation || ''}`;
-  })();
+  // (itemDetail defined above)
 
   // ---- Robust mileage resolution ----
   const quotationExtraKm = Number(data.quotationAdditionalDistanceKm) || 0;
   const quotationExtraAmt = Number(data.quotationAdditionalDistanceAmount) || 0;
-  const baseQuotedKm = Number(data.originalQuotedKm) || Number(data.tripDistance) || Number(data.totalKm) || 0;
+  
+  // baseQuotedKm should NOT include quotation extras. It should be just the base.
+  // If originalQuotedKm is provided, it means (base + extras). So base = original - extras.
+  const baseQuotedKm = data.originalQuotedKm 
+    ? (data.originalQuotedKm - quotationExtraKm)
+    : (Number(data.tripDistance) || Number(data.totalKm) || 0);
+
   // "Quoted" shown to customer always includes quotation-time extras
-  const quotedKmDisplay = baseQuotedKm + (data.originalQuotedKm ? 0 : quotationExtraKm);
+  const quotedKmDisplay = baseQuotedKm + quotationExtraKm;
+
   // "Actual" prefers post-trip actual; otherwise the quoted total (incl. quotation extras)
   const actualKmDisplay = Number(data.actualKmTraveled) || quotedKmDisplay || Number(data.tripDistance) || Number(data.totalKm) || 0;
+  
   const mileage = actualKmDisplay || quotedKmDisplay;
   const originalKm = quotedKmDisplay;
 
@@ -345,15 +361,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Original Quote Amount</td>
         <td style="border: 1px solid #ddd; padding: 8px;">${subTotal.toLocaleString()}.00</td>
       </tr>
-      ${quotationExtraKm > 0 ? `
-      <tr style="background: #eef6ff;">
-        <td style="border: 1px solid #ddd; padding: 8px; font-size: 12px;" colspan="2">
-          <strong>Quotation Extra Distance:</strong><br>
-          +${quotationExtraKm} km added at quotation time
-          ${quotationExtraAmt > 0 ? `<br>Charge: LKR ${quotationExtraAmt.toLocaleString()}.00 (included in Original Quote Amount above)` : ''}
-        </td>
-      </tr>
-      ` : ''}
+
       ${data.hasAdjustments && data.extraKm && data.extraKm !== 0 ? `
       <tr style="background: #fff9e6;">
         <td style="border: 1px solid #ddd; padding: 8px; font-size: 12px;" colspan="2">
@@ -483,7 +491,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             <td style="padding: 5px; vertical-align: top; font-weight: bold;">Contact Person</td>
             <td style="padding: 5px; vertical-align: top;">${data.customerName}</td>
             <td style="padding: 5px; vertical-align: top; font-weight: bold;">Dates of Hire</td>
-            <td style="padding: 5px; vertical-align: top;">${format(data.pickupDate, 'dd/MM/yyyy HH:mm:ss')}AM</td>
+            <td style="padding: 5px; vertical-align: top;">${format(data.pickupDate, 'dd/MM/yyyy hh:mm a')} - ${format(data.dropDate, 'dd/MM/yyyy hh:mm a')}</td>
           </tr>
           <tr>
             <td style="padding: 5px; vertical-align: top; font-weight: bold;">Contact Number</td>
