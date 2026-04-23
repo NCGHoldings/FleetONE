@@ -9,13 +9,16 @@ import {
     CalendarDays, Bus, MapPin, Clock, CheckCircle, XCircle,
     AlertCircle, DollarSign, Users, Eye, Building, Phone,
     TrendingUp, Loader2, FileText, CreditCard, Pause, GitBranch,
-    MessageSquare
+    MessageSquare, Download
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { QuotationModal } from './QuotationModal';
 import { SpecialHireRemarkDialog } from './SpecialHireRemarkDialog';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface CalendarQuotation {
     id: string;
@@ -149,6 +152,7 @@ export function SpecialHireCalendarView() {
     const [viewMode, setViewMode] = useState<'hires' | 'created'>('hires');
     const [remarkDialogOpen, setRemarkDialogOpen] = useState(false);
     const [remarkTarget, setRemarkTarget] = useState<{ id: string; quotationNo: string; customerName: string } | null>(null);
+    const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
     const safeParseJSON = <T,>(value: any, fallback: T): T => {
         if (value === null || value === undefined || value === '') return fallback;
@@ -342,6 +346,9 @@ export function SpecialHireCalendarView() {
         groupedHires.forEach(g => {
             const status = getDisplayStatus(g.displayQuotation);
             counts[status] = (counts[status] || 0) + 1;
+            if (['draft', 'sent', 'accepted'].includes(status)) {
+                counts['follow_up'] = (counts['follow_up'] || 0) + 1;
+            }
         });
         const totalRevenue = groupedHires.reduce((sum, g) => sum + calculateFinalTotal(g.displayQuotation), 0);
         return { total, counts, totalRevenue };
@@ -350,6 +357,17 @@ export function SpecialHireCalendarView() {
     const hasHiresDates = useMemo(() => {
         return Array.from(monthDates).map(d => new Date(d + 'T00:00:00'));
     }, [monthDates]);
+
+    const filteredHires = useMemo(() => {
+        return groupedHires.filter(group => {
+            if (!statusFilter || statusFilter === 'total') return true;
+            const status = getDisplayStatus(group.displayQuotation);
+            if (statusFilter === 'follow_up') {
+                return ['draft', 'sent', 'accepted'].includes(status);
+            }
+            return status === statusFilter;
+        });
+    }, [groupedHires, statusFilter]);
 
     const handleViewQuotation = (quotation: CalendarQuotation) => {
         setSelectedQuotation(quotation);
@@ -362,6 +380,78 @@ export function SpecialHireCalendarView() {
 
     const handleVersionChange = (groupId: string, versionId: string) => {
         setSelectedVersions(prev => ({ ...prev, [groupId]: versionId }));
+    };
+
+    const exportToExcel = () => {
+        if (filteredHires.length === 0) {
+            toast.error("No hires to export for this date.");
+            return;
+        }
+
+        const data = filteredHires.map(group => {
+            const q = group.displayQuotation;
+            return {
+                "Quotation No": getBaseQuotationNo(q.quotation_no),
+                "Customer": q.customer_name,
+                "Phone": q.customer_phone,
+                "Bus Type": q.bus_type,
+                "No. of Buses": q.number_of_buses,
+                "Pickup Date & Time": format(new Date(q.pickup_datetime), 'yyyy-MM-dd hh:mm a'),
+                "Route": `${q.pickup_location} to ${q.drop_location}`,
+                "Total Amount (LKR)": calculateFinalTotal(q),
+                "Status": getDisplayStatus(q).replace(/_/g, ' ').toUpperCase()
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Hires");
+        
+        const fileName = `Special_Hires_${format(selectedDate, 'yyyy_MM_dd')}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+        toast.success("Excel exported successfully.");
+    };
+
+    const exportToPDF = () => {
+        if (filteredHires.length === 0) {
+            toast.error("No hires to export for this date.");
+            return;
+        }
+
+        const doc = new jsPDF();
+        const dateStr = format(selectedDate, 'MMMM d, yyyy');
+        
+        doc.setFontSize(16);
+        doc.text(`Special Hires Summary - ${dateStr}`, 14, 20);
+        
+        const tableColumn = ["Quotation", "Customer", "Phone", "Route", "Bus", "Time", "Status"];
+        const tableRows: any[] = [];
+
+        filteredHires.forEach(group => {
+            const q = group.displayQuotation;
+            const rowData = [
+                getBaseQuotationNo(q.quotation_no),
+                q.customer_name,
+                q.customer_phone || '-',
+                `${q.pickup_location} -> ${q.drop_location}`,
+                `${q.bus_type} (x${q.number_of_buses})`,
+                format(new Date(q.pickup_datetime), 'hh:mm a'),
+                getDisplayStatus(q).replace(/_/g, ' ').toUpperCase()
+            ];
+            tableRows.push(rowData);
+        });
+
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 30,
+            theme: 'grid',
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [41, 128, 185] },
+        });
+
+        doc.save(`Special_Hires_${format(selectedDate, 'yyyy_MM_dd')}.pdf`);
+        toast.success("PDF exported successfully.");
     };
 
     const renderStatusBadge = (status: string) => {
@@ -377,6 +467,7 @@ export function SpecialHireCalendarView() {
 
     const statCards = [
         { key: 'total', label: 'Total Hires', value: stats.total, icon: CalendarDays, bg: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800', text: 'text-blue-700 dark:text-blue-300' },
+        { key: 'follow_up', label: 'Follow Up', value: stats.counts['follow_up'] || 0, icon: AlertCircle, bg: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800', text: 'text-orange-700 dark:text-orange-300' },
         { key: 'confirmed', label: 'Confirmed', value: stats.counts['confirmed'] || 0, icon: Clock, bg: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800', text: 'text-blue-700 dark:text-blue-300' },
         { key: 'advance_paid', label: 'Advance Paid', value: stats.counts['advance_paid'] || 0, icon: CreditCard, bg: 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800', text: 'text-teal-700 dark:text-teal-300' },
         { key: 'fully_paid', label: 'Fully Paid', value: stats.counts['fully_paid'] || 0, icon: DollarSign, bg: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800', text: 'text-green-700 dark:text-green-300' },
@@ -474,14 +565,29 @@ export function SpecialHireCalendarView() {
                 {/* Right Panel — Hire Details */}
                 <div className="space-y-4">
                     {/* Date Header */}
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold">
-                            {viewMode === 'hires' ? 'Hires on ' : 'Created on '}
-                            {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-                        </h2>
-                        <Badge variant="outline" className="text-sm">
-                            {stats.total} {viewMode === 'hires' ? 'hire' : 'quotation'}{stats.total !== 1 ? 's' : ''}
-                        </Badge>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-lg font-semibold">
+                                {viewMode === 'hires' ? 'Hires on ' : 'Created on '}
+                                {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                            </h2>
+                            <Badge variant="outline" className="text-sm hidden sm:inline-flex">
+                                {stats.total} {viewMode === 'hires' ? 'hire' : 'quotation'}{stats.total !== 1 ? 's' : ''}
+                            </Badge>
+                        </div>
+                        
+                        {stats.total > 0 && (
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm" onClick={exportToExcel} className="text-xs h-8">
+                                    <Download className="w-3.5 h-3.5 mr-1" />
+                                    Excel
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={exportToPDF} className="text-xs h-8">
+                                    <FileText className="w-3.5 h-3.5 mr-1 text-red-500" />
+                                    PDF
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Status Summary Cards */}
@@ -492,7 +598,10 @@ export function SpecialHireCalendarView() {
                                 return (
                                     <div
                                         key={stat.key}
-                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${stat.bg} transition-all`}
+                                        onClick={() => setStatusFilter(statusFilter === stat.key ? null : stat.key)}
+                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${stat.bg} cursor-pointer hover:brightness-95 transition-all ${
+                                            statusFilter === stat.key ? 'ring-2 ring-primary ring-offset-1' : ''
+                                        } ${statusFilter && statusFilter !== stat.key ? 'opacity-50' : 'opacity-100'}`}
                                     >
                                         <Icon className={`h-4 w-4 ${stat.text}`} />
                                         <span className={`text-xs font-medium ${stat.text}`}>{stat.label}</span>
@@ -536,9 +645,9 @@ export function SpecialHireCalendarView() {
                     )}
 
                     {/* Hire Cards — Deduplicated */}
-                    {!loading && groupedHires.length > 0 && (
+                    {!loading && filteredHires.length > 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {groupedHires.map((group) => {
+                            {filteredHires.map((group) => {
                                 const q = group.displayQuotation;
                                 const displayStatus = getDisplayStatus(q);
                                 const finalTotal = calculateFinalTotal(q);
