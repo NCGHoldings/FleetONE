@@ -6,6 +6,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { fetchAllRows } from "@/lib/utils";
 
 // ============ Types ============
 
@@ -746,7 +747,7 @@ export async function recalculateCOABalances(
     // Get all posted journal entry lines for these accounts
     // We join chart_of_accounts to ensure we get ALL lines hitting these accounts,
     // regardless of which sub-company the journal entry was created under.
-    const { data: journalLines, error: linesError } = await supabase
+    const query = supabase
       .from("journal_entry_lines")
       .select(`
         account_id,
@@ -758,7 +759,7 @@ export async function recalculateCOABalances(
       .eq("chart_of_accounts.company_id", companyId)
       .eq("journal_entries.status", "posted");
 
-    if (linesError) throw linesError;
+    const journalLines = await fetchAllRows(query);
 
     const discrepancies: Array<{
       accountId: string;

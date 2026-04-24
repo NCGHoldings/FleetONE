@@ -11,12 +11,19 @@ export interface BulkBusExpense {
   fuelLiters?: number;
   odometerEnd?: number; // Optional mileage
   notes?: string;
-  expenseType: 'fuel' | 'repair' | 'other';
+  expenseType: 'fuel' | 'parking' | 'highway' | 'other';
+  // Additional fields for Parking/Highway/Other
+  accountName?: string;
+  bankName?: string;
+  bankAccNo?: string;
+  bankBranch?: string;
 }
 
 export interface BulkExpenseUploadPayload {
   branchId: string;
   paymentMethod: 'ap' | 'iou' | 'petty_cash' | 'direct';
+  globalExpenseType?: 'fuel' | 'parking' | 'highway' | 'other';
+  expenseAccountId?: string;
   expenses: BulkBusExpense[];
   
   // AP specific parameters
@@ -98,28 +105,52 @@ export function useSchoolBusBulkExpenses() {
           .maybeSingle();
       }
 
-      const financeSettings = settings.data;
+      const financeSettings = settings?.data;
       if (!financeSettings) {
-        throw new Error("Finance settings not configured for School Bus Operations");
+        console.warn("Finance settings not configured for School Bus Operations. Relying on fallbacks.");
       }
 
-      // Validate Expense Account (Use fuel expense account natively, or fallback to an auto-search)
-      let defaultFuelAccountId = financeSettings?.fuel_expense_account_id;
+      // Validate Expense Account (Use explicit UI selection, or configured account, or fallback to auto-search)
+      let defaultExpenseAccountId = payload.expenseAccountId;
+
+      if (!defaultExpenseAccountId && payload.globalExpenseType === 'fuel') {
+         defaultExpenseAccountId = financeSettings?.fuel_expense_account_id;
+      }
       
-      if (!defaultFuelAccountId) {
-        const { data: fuelCOA } = await supabase
+      if (!defaultExpenseAccountId) {
+        let searchString = "%Fuel%";
+        if (payload.globalExpenseType === 'parking') searchString = "%Parking%";
+        else if (payload.globalExpenseType === 'highway') searchString = "%Highway%";
+        else if (payload.globalExpenseType === 'other') searchString = "%Other Expense%";
+
+        const { data: expCOA } = await supabase
           .from("chart_of_accounts")
           .select("id")
           .eq("company_id", effectiveCompanyId)
-          .ilike("account_name", "%Fuel%")
+          .ilike("account_name", searchString)
           .eq("account_type", "expense")
           .limit(1)
           .maybeSingle();
           
-        if (fuelCOA) {
-          defaultFuelAccountId = fuelCOA.id;
+        if (expCOA) {
+          defaultExpenseAccountId = expCOA.id;
         } else {
-          throw new Error("Fuel Expense Account not configured in Finance Settings, and no default 'Fuel' expense account found in Chart of Accounts.");
+          // Fallback to generic "Other Expense" if specific ones are not found
+          if (payload.globalExpenseType !== 'fuel') {
+             const { data: genericExp } = await supabase
+               .from("chart_of_accounts")
+               .select("id")
+               .eq("company_id", effectiveCompanyId)
+               .ilike("account_name", "%Other Expense%")
+               .eq("account_type", "expense")
+               .limit(1)
+               .maybeSingle();
+             if (genericExp) defaultExpenseAccountId = genericExp.id;
+          }
+          
+          if (!defaultExpenseAccountId) {
+             throw new Error(`Expense Account for ${payload.globalExpenseType || 'fuel'} not found in Chart of Accounts. Please create a "${searchString.replace(/%/g, '')}" expense account.`);
+          }
         }
       }
 
@@ -200,14 +231,36 @@ export function useSchoolBusBulkExpenses() {
         creditAccountName = payableAccount.account_name;
       }
 
-      // Cross-company guard: ensure the fuel expense account also belongs to this company
-      const { data: fuelAcctCheck } = await supabase
+      // Cross-company guard: ensure the expense account also belongs to this company
+      let { data: expAcctCheck } = await supabase
         .from("chart_of_accounts")
         .select("company_id")
-        .eq("id", defaultFuelAccountId)
+        .eq("id", defaultExpenseAccountId)
         .maybeSingle();
-      if (fuelAcctCheck && fuelAcctCheck.company_id !== effectiveCompanyId) {
-        throw new Error("Fuel Expense account belongs to a different company. Update Finance Settings to use a COA from the current company.");
+        
+      if (expAcctCheck && expAcctCheck.company_id !== effectiveCompanyId) {
+        console.warn(`Mapped Expense account belongs to a different company. Finding a valid one from current company COA...`);
+        
+        let searchString = "%Fuel%";
+        if (payload.globalExpenseType === 'parking') searchString = "%Parking%";
+        else if (payload.globalExpenseType === 'highway') searchString = "%Highway%";
+        else if (payload.globalExpenseType === 'other') searchString = "%Other Expense%";
+
+        // Find a valid one instead of throwing
+        const { data: validExpCOA } = await supabase
+          .from("chart_of_accounts")
+          .select("id")
+          .eq("company_id", effectiveCompanyId)
+          .ilike("account_name", searchString)
+          .eq("account_type", "expense")
+          .limit(1)
+          .maybeSingle();
+          
+        if (validExpCOA) {
+          defaultExpenseAccountId = validExpCOA.id;
+        } else {
+          throw new Error(`Expense account belongs to a different company, and no default account found in ${effectiveCompanyId}. Update Finance Settings.`);
+        }
       }
 
       // We will loop through the batch and upload them one by one.
@@ -241,29 +294,65 @@ export function useSchoolBusBulkExpenses() {
         // Check if an expense already exists for that day + bus
         const { data: existingDaily } = await supabase
           .from("daily_bus_expenses")
-          .select("id, fuel_cost, fuel_liters, notes")
+          .select("id, fuel_cost, fuel_liters, parking, highway_charges, other, notes")
           .eq("bus_id", expense.busId)
           .eq("expense_date", expense.expenseDate)
           .maybeSingle();
 
         let dailyExpenseId = existingDaily?.id;
 
-        // Note: For simplicity we only overwrite fuel for this flow, representing fuel import.
-        const expenseData = {
+        const baseNotes = `[${payload.globalExpenseType?.toUpperCase() || 'FUEL'} Import]`;
+        let combinedNotes = expense.notes ? `${baseNotes} ${expense.notes}` : baseNotes;
+        if (expense.accountName || expense.bankName) {
+           combinedNotes += ` | Bank: ${expense.bankName || ''} Acc: ${expense.bankAccNo || ''} Branch: ${expense.bankBranch || ''} Holder: ${expense.accountName || ''}`;
+        }
+        
+        const expenseData: any = {
           expense_date: expense.expenseDate,
           bus_id: expense.busId,
-          fuel_cost: (existingDaily?.fuel_cost || 0) + expense.amount,
-          fuel_liters: (existingDaily?.fuel_liters || 0) + (expense.fuelLiters || 0),
-          notes: expense.notes ? `${existingDaily?.notes || ''} | [Fuel Import] ${expense.notes}` : existingDaily?.notes,
+          notes: existingDaily?.notes ? `${existingDaily.notes} | ${combinedNotes}` : combinedNotes,
           gl_posted: true,
           created_by: user?.id,
         };
+
+        if (payload.globalExpenseType === 'parking') {
+           expenseData.parking = (existingDaily?.parking || 0) + expense.amount;
+        } else if (payload.globalExpenseType === 'highway') {
+           expenseData.highway_charges = (existingDaily?.highway_charges || 0) + expense.amount;
+        } else if (payload.globalExpenseType === 'other') {
+           expenseData.other = (existingDaily?.other || 0) + expense.amount;
+        } else {
+           expenseData.fuel_cost = (existingDaily?.fuel_cost || 0) + expense.amount;
+           expenseData.fuel_liters = (existingDaily?.fuel_liters || 0) + (expense.fuelLiters || 0);
+        }
 
         if (dailyExpenseId) {
           await supabase.from("daily_bus_expenses").update(expenseData).eq("id", dailyExpenseId);
         } else {
           const res = await supabase.from("daily_bus_expenses").insert(expenseData).select().single();
           if (res.data) dailyExpenseId = res.data.id;
+        }
+
+        // 3.5. Also insert into route_expenses so it shows up in P&L reports
+        const { data: routeMatch } = await supabase
+          .from("school_routes")
+          .select("id")
+          .eq("bus_reg_no", busNoSafe)
+          .eq("branch_id", payload.branchId)
+          .maybeSingle();
+
+        if (routeMatch?.id) {
+          await supabase.from("route_expenses").insert({
+            route_id: routeMatch.id,
+            branch_id: payload.branchId,
+            bus_id: expense.busId,
+            expense_type: payload.globalExpenseType || "fuel",
+            description: `Bulk ${payload.globalExpenseType || 'Fuel'} Import - ${busNoSafe}`,
+            amount: expense.amount,
+            expense_date: expense.expenseDate,
+            created_by: user?.id,
+            // journal_entry_id will be linked later if needed, but for P&L this is enough
+          });
         }
 
         // 4. Update Odometer (current_mileage in buses) if provided
@@ -275,8 +364,10 @@ export function useSchoolBusBulkExpenses() {
         }
 
         // 5. Create Journal Entry
-        const entryNumber = `FUEL-BLK-${format(new Date(), "yyyyMMddHHmmss")}-${Math.floor(Math.random() * 1000)}`;
-        const description = `Bulk Fuel Expense - Bus ${expense.busId}`;
+        const prefix = payload.globalExpenseType === 'fuel' ? 'FUEL' : 'EXP';
+        const entryNumber = `${prefix}-BLK-${format(new Date(), "yyyyMMddHHmmss")}-${Math.floor(Math.random() * 1000)}`;
+        const expTypeTitle = payload.globalExpenseType ? payload.globalExpenseType.charAt(0).toUpperCase() + payload.globalExpenseType.slice(1) : 'Fuel';
+        const description = `Bulk ${expTypeTitle} Expense - Bus ${expense.busId}`;
 
         const { data: journalEntry, error: jeError } = await supabase
           .from("journal_entries")
@@ -284,14 +375,14 @@ export function useSchoolBusBulkExpenses() {
             entry_number: entryNumber,
             entry_date: expense.expenseDate,
             description: description,
-            reference: expense.notes || `IMP-${format(new Date(), "yyyyMMdd")}`,
+            reference: combinedNotes || `IMP-${format(new Date(), "yyyyMMdd")}`,
             total_debit: expense.amount,
             total_credit: expense.amount,
             status: "posted",
             company_id: effectiveCompanyId,
             business_unit_code: 'SBO',
             business_unit_id: selectedCompanyId,
-            source_module: 'school_bus_fuel_import',
+            source_module: `school_bus_${payload.globalExpenseType || 'fuel'}_import`,
             posted_at: new Date().toISOString(),
           })
           .select()
@@ -310,7 +401,7 @@ export function useSchoolBusBulkExpenses() {
 
         // 5.5 Deep ERP Integrations (AP Invoice & Petty Cash Vouchers)
         if (payload.paymentMethod === 'ap') {
-           const baseInv = payload.invoiceNumber || `FUEL-AP-${format(new Date(), "yyyyMMdd")}`;
+           const baseInv = payload.invoiceNumber || `${prefix}-AP-${format(new Date(), "yyyyMMdd")}`;
            const uniqueInv = `${baseInv}-${busNoSafe}-${expense.expenseDate}-${i + 1}`;
            const { error: apError } = await supabase
               .from('ap_invoices')
@@ -329,7 +420,7 @@ export function useSchoolBusBulkExpenses() {
                   approved_by: user?.id,
                   bus_id: expense.busId,
                   journal_entry_id: journalEntry.id,
-                  notes: `Bulk Fuel Load - ${expense.expenseDate}`,
+                  notes: `Bulk ${expTypeTitle} Load - ${expense.expenseDate} | ${combinedNotes}`,
                   created_by: user?.id,
               });
            if (apError) throw new Error(`Failed to generate AP Invoice: ${apError.message}`);
@@ -350,9 +441,9 @@ export function useSchoolBusBulkExpenses() {
                    transaction_type: 'expense',
                    amount: expense.amount,
                    balance_after: newBalance,
-                   description: `Bulk Fuel Import - Bus ${expense.busId}`,
+                   description: `Bulk ${expTypeTitle} Import - Bus ${expense.busId}`,
                    journal_entry_id: journalEntry.id,
-                   voucher_number: `PCV-FUEL-${format(new Date(), "yyyyMMddHHmmss")}-${Math.floor(Math.random() * 1000)}`,
+                   voucher_number: `PCV-${prefix}-${format(new Date(), "yyyyMMddHHmmss")}-${Math.floor(Math.random() * 1000)}`,
                    created_by: user?.id,
                    status: 'approved' // Auto-approved via bulk sync
                  });
@@ -366,7 +457,7 @@ export function useSchoolBusBulkExpenses() {
            }
         } else if (payload.paymentMethod === 'direct') {
            // Surface direct payment in AP → Payments for full traceability (one row per bus)
-           const paymentNumber = `DP-FUEL-${format(new Date(), "yyyyMMddHHmmss")}-${i + 1}`;
+           const paymentNumber = `DP-${prefix}-${format(new Date(), "yyyyMMddHHmmss")}-${i + 1}`;
            const { error: dpError } = await supabase
               .from('ap_payments')
               .insert({
@@ -381,7 +472,6 @@ export function useSchoolBusBulkExpenses() {
                  bus_id: expense.busId,
                  bus_no: busNoSafe,
                  amount: expense.amount,
-                 total_with_fees: expense.amount,
                  is_direct_payment: true,
                  status: 'paid',
                  approval_status: 'approved',
@@ -389,22 +479,22 @@ export function useSchoolBusBulkExpenses() {
                  approved_by: user?.id,
                  journal_entry_id: journalEntry.id,
                  reference: `Float Account: ${creditAccountName}`,
-                 notes: `Bulk fuel float drawdown — Bus ${busNoSafe} | Source: ${creditAccountName}`,
+                 notes: `Bulk ${expTypeTitle.toLowerCase()} float drawdown — Bus ${busNoSafe} | Source: ${creditAccountName} | ${combinedNotes}`,
                  created_by: user?.id,
               });
            if (dpError) throw new Error(`Failed to record Direct Payment in AP: ${dpError.message}`);
         }
 
         // 6. Create journal entry lines
-        // DR: Fuel Expense Account 
+        // DR: Expense Account 
         // CR: Petty Cash / IOU / Trade Payable
         const { error: linesError } = await supabase
           .from("journal_entry_lines")
           .insert([
             {
               journal_entry_id: journalEntry.id,
-              account_id: defaultFuelAccountId, // DEBIT expense
-              description: `Bulk Fuel Expense | Date: ${expense.expenseDate}`,
+              account_id: defaultExpenseAccountId, // DEBIT expense
+              description: `Bulk ${expTypeTitle} Expense | Date: ${expense.expenseDate}`,
               debit: expense.amount,
               credit: 0,
               company_id: effectiveCompanyId,

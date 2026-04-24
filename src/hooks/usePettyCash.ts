@@ -802,26 +802,35 @@ export const useCreateIOU = () => {
       // Auto-create GL Journal Entry
       if (amount > 0 && selectedCompanyId) {
         try {
-          // Find a staff advance / cash advance account. Target OTHER CASH ADVANCE first!
-          let debitAccountId = "";
-          const { data: advanceAcct } = await supabase
-            .from("chart_of_accounts")
-            .select("id")
+          // Get GL Settings
+          const { data: glSettings } = await supabase
+            .from("gl_settings" as any)
+            .select("staff_advance_account_id, bank_account_id")
             .eq("company_id", selectedCompanyId)
-            .eq("account_type", "asset")
-            .or("account_name.ilike.%other cash advance%,account_name.ilike.%advance%,account_name.ilike.%iou%,account_name.ilike.%staff receivable%")
-            .limit(1)
             .maybeSingle();
-          debitAccountId = advanceAcct?.id || "";
 
-          // Fallback: use customer_advance_account_id from gl_settings
+          let debitAccountId = (glSettings as any)?.staff_advance_account_id || "";
+
+          // First attempt to find Staff Advances or Other Cash Advances before falling back to Customer Advances
           if (!debitAccountId) {
-            const { data: glSettings } = await supabase
-              .from("gl_settings" as any)
-              .select("customer_advance_account_id")
+            const { data: staffAcct } = await supabase
+              .from("chart_of_accounts")
+              .select("id")
               .eq("company_id", selectedCompanyId)
+              .or("account_name.ilike.%staff%advance%,account_name.ilike.%other%advance%,account_name.ilike.%other cash advance%")
+              .limit(1)
               .maybeSingle();
-            debitAccountId = (glSettings as any)?.customer_advance_account_id || "";
+
+            if (staffAcct?.id) {
+              debitAccountId = staffAcct.id;
+            } else {
+              const { data: fallbackSettings } = await supabase
+                .from("gl_settings" as any)
+                .select("customer_advance_account_id")
+                .eq("company_id", selectedCompanyId)
+                .maybeSingle();
+              debitAccountId = (fallbackSettings as any)?.customer_advance_account_id || "";
+            }
           }
 
           // Find credit account: Use selected Float's GL account, otherwise fallback to Bank/Cash
@@ -979,23 +988,26 @@ export const useUpdateIOU = () => {
             // Try gl_settings first (most reliable)
             const { data: glSettings } = await supabase
               .from("gl_settings" as any)
-              .select("customer_advance_account_id, bank_account_id")
+              .select("staff_advance_account_id, customer_advance_account_id, bank_account_id")
               .eq("company_id", selectedCompanyId)
               .maybeSingle();
             
-            advanceAccountId = (glSettings as any)?.customer_advance_account_id || "";
-            
-            // Fallback: search COA
+            advanceAccountId = (glSettings as any)?.staff_advance_account_id || "";
+
             if (!advanceAccountId) {
-              const { data: advAcct } = await supabase
+              const { data: staffAcct } = await supabase
                 .from("chart_of_accounts")
                 .select("id")
                 .eq("company_id", selectedCompanyId)
-                .eq("account_type", "asset")
-                .or("account_name.ilike.%advance%,account_name.ilike.%iou%,account_name.ilike.%receivable%,account_name.ilike.%prepaid%")
+                .or("account_name.ilike.%staff%advance%,account_name.ilike.%other%advance%,account_name.ilike.%other cash advance%")
                 .limit(1)
                 .maybeSingle();
-              advanceAccountId = advAcct?.id || "";
+              
+              if (staffAcct?.id) {
+                advanceAccountId = staffAcct.id;
+              } else {
+                advanceAccountId = (glSettings as any)?.customer_advance_account_id || "";
+              }
             }
 
             // Find cash/bank account

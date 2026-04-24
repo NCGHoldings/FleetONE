@@ -1237,211 +1237,349 @@ export const generateTaxInvoiceTemplate = (): string => `
 `;
 // ==================== Petty Cash Voucher ====================
 export const generatePettyCashVoucherTemplate = (): string => `
-<style>\${commonStyles}
-  :root { 
-    --ink: #0f172a; 
-    --muted: #64748b; 
-    --divider: #e2e8f0;
-    --accent: #0ea5e9; 
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; font-size: 13px; }
+  .page { margin: 20px auto; max-width: 800px; padding: 0; }
+  .header-grid { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
+  .logo-area { display: flex; align-items: center; }
+  
+  /* HIGH SPECIFICITY TO BEAT GLOBAL ERP OVERRIDES */
+  img#strict-ncg-logo {
+    width: 200px !important;
+    max-height: 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    object-fit: contain !important;
+    object-position: left !important;
   }
-  .page { margin: 10px auto; max-width: 850px; }
-  .doc-minimal {
-    background: #ffffff;
-    padding: 48px 56px;
-    color: var(--ink);
-    border: 1px solid var(--divider);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  }
-  .flex-between { display: flex; justify-content: space-between; align-items: flex-start; }
-  .divider { border-bottom: 2px solid var(--ink); margin: 28px 0 32px 0; }
-  .light-divider { border-bottom: 1px solid var(--divider); margin: 24px 0; }
   
-  .meta-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; margin-bottom: 6px; }
-  .meta-value { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .company-info { text-align: right; }
+  .company-name { font-size: 20px; font-weight: bold; margin: 0; }
+  .company-address { font-size: 11px; margin: 2px 0; }
   
-  .header-title { font-size: 26px; font-weight: 800; letter-spacing: 0.05em; color: var(--accent); margin: 0 0 12px 0; }
+  .title-container { display: flex; justify-content: center; align-items: flex-end; position: relative; margin-top: 10px; margin-bottom: 5px; }
+  .doc-title { text-align: center; font-size: 16px; font-weight: bold; }
+  .doc-meta-right { position: absolute; right: 0; bottom: 0; font-size: 10px; }
   
-  .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; }
+  table.meta-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 13px; }
+  table.meta-table td { border: 1px solid #000; padding: 6px; }
+  .meta-table td:nth-child(odd) { width: 15%; font-weight: normal; }
+  .meta-table td:nth-child(even) { width: 35%; }
+
+  table.main-table { width: 100%; border-collapse: collapse; font-size: 13px; border-bottom: none; }
+  table.main-table th { border: 1px solid #000; padding: 6px; background: #e0e0e0; font-weight: bold; text-align: center; }
+  table.main-table td { border: 1px solid #000; padding: 6px; }
+  .main-table .col-code { width: 25%; text-align: center; }
+  .main-table .col-desc { width: 55%; text-align: left; }
+  .main-table .col-amount { width: 20%; text-align: right; }
   
-  .total-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); margin-top: 40px; }
-  .total-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 4px; }
-  .total-amount { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+  /* Ensure fixed height for empty rows to fill space */
+  .empty-row td { height: 25px; }
   
-  .text-xs { font-size: 11px; line-height: 1.6; color: var(--muted); }
-  .text-sm { font-size: 13px; line-height: 1.6; }
+  table.total-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 13px; border-top: none; }
+  table.total-table td { border: 1px solid #000; padding: 6px; }
+  .total-table .total-label { width: 80%; text-align: right; background: #e0e0e0; font-weight: bold; }
+  .total-table .total-value { width: 20%; text-align: right; font-weight: bold; }
+
+  table.words-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 13px; }
+  table.words-table td { border: 1px solid #000; padding: 6px; }
+  .words-table .words-label { width: 20%; font-weight: bold; }
+  .words-table .words-value { width: 80%; }
+
+  .note { font-style: italic; font-size: 11px; font-weight: bold; margin-bottom: 15px; }
+  
+  table.sig-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 13px; text-align: center; }
+  table.sig-table th { font-weight: bold; font-style: italic; padding-bottom: 20px; }
+  table.sig-table td { vertical-align: bottom; padding: 10px 5px; }
+  .dotted-line { border-bottom: 1px dotted #000; display: inline-block; width: 80%; height: 15px; margin-top: 5px; }
+  .sig-row-label { text-align: left; font-weight: normal; width: 10%; }
+
+  table.footer-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+  table.footer-table td { border: 1px solid #000; padding: 4px; text-align: center; width: 33.33%; }
 </style>
-<div class="page"><div class="doc-minimal">
-  <div class="flex-between">
-    <div>
-      <img src="{{ncg_master_logo}}" style="width: 220px !important; height: auto !important; max-height: 75px !important; object-fit: contain !important; margin-bottom: 12px !important; mix-blend-mode: multiply;" />
-      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">{{sector_name}}</div>
-      <div class="text-xs">{{company_address}}<br>Tel: {{company_phone}} | Email: {{company_email}}</div>
+<div class="page">
+  <div class="header-grid">
+    <div class="logo-area">
+      <img id="strict-ncg-logo" src="{{ncg_master_logo}}" />
     </div>
-    <div style="text-align: right;">
-      <h1 class="header-title">PETTY CASH VOUCHER</h1>
-      <div style="display: flex; gap: 32px; justify-content: flex-end; margin-top: 24px;">
-        <div style="text-align: left;">
-          <div class="meta-label">Voucher No</div>
-          <div class="meta-value">{{voucher_number}}</div>
-        </div>
-        <div style="text-align: left;">
-          <div class="meta-label">Date</div>
-          <div class="meta-value">{{payment_date}}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="details-grid">
-    <div>
-      <div class="meta-label" style="border-bottom: 1px solid var(--divider); padding-bottom: 8px; margin-bottom: 16px; color: var(--ink);">Issued To</div>
-      <div class="meta-value" style="font-size: 15px; margin-bottom: 4px;">{{payee_name}}</div>
-      <div class="text-sm" style="color: var(--muted);">Category: {{expense_category}}</div>
-    </div>
-    <div>
-      <div class="meta-label" style="border-bottom: 1px solid var(--divider); padding-bottom: 8px; margin-bottom: 16px; color: var(--ink);">Payment Information</div>
-      <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin-bottom: 6px;">
-        <span class="text-sm" style="color: var(--muted);">Fund:</span>
-        <span class="meta-value" style="font-size: 13px;">{{fund_name}}</span>
-      </div>
-      <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin-bottom: 6px;">
-        <span class="text-sm" style="color: var(--muted);">Ref / Receipt:</span>
-        <span class="meta-value" style="font-size: 13px;">{{receipt_number}}</span>
-      </div>
-      <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px;">
-        <span class="text-sm" style="color: var(--muted);">Method:</span>
-        <span class="meta-value" style="font-size: 13px;">{{payment_method}}</span>
-      </div>
+    <div class="company-info">
+      <div class="company-name">NCG HOLDINGS (PRIVATE) LIMITED</div>
+      <div class="company-address">{{company_address}}</div>
+      <div class="company-address">Tel: {{company_phone}} | Email: {{company_email}}</div>
     </div>
   </div>
   
-  <div class="light-divider" style="margin-top: 32px;"></div>
-  
-  <div style="margin-top: 16px;">
-    <div class="meta-label">Description / Purpose</div>
-    <div class="text-sm" style="margin-top: 8px; color: var(--ink);">{{notes}}</div>
+  <div class="title-container">
+    <div class="doc-title">PETTY CASH PAYMENT VOUCHER</div>
+    <div class="doc-meta-right">DTM/CDD/RT/FOM12/V1/2023.01.13</div>
   </div>
 
-  <div class="total-row" style="margin-top: 32px; border-top-color: var(--accent); border-bottom-color: var(--accent);">
-    <div>
-      <div class="meta-label" style="margin-bottom: 4px;">Amount in Words</div>
-      <div style="font-size: 13px; font-style: italic; color: var(--muted); max-width: 400px; line-height: 1.5;">{{amount_in_words}}</div>
-    </div>
-    <div style="text-align: right;">
-      <div class="total-label">Amount Paid</div>
-      <div class="total-amount" style="color: var(--accent);">{{amount}}</div>
-    </div>
-  </div>
+  <table class="meta-table">
+    <tr>
+      <td>Date</td>
+      <td style="color:#999">{{payment_date}}</td>
+      <td>Voucher No.</td>
+      <td>{{voucher_number}}</td>
+    </tr>
+    <tr>
+      <td>Payee</td>
+      <td>{{payee_name}}</td>
+      <td>IOU No.</td>
+      <td>{{receipt_number}}</td>
+    </tr>
+  </table>
 
-  <div style="margin-top: 80px;">
-    ${buildFooter(['Prepared By', 'Verified By', 'Approved By', 'Received By (Payee)'])}
-  </div>
-</div></div>
+  <table class="main-table">
+    <tr>
+      <th class="col-code">Acc Code</th>
+      <th class="col-desc">Description</th>
+      <th class="col-amount">Amount</th>
+    </tr>
+    <tr>
+      <td class="col-code"></td>
+      <td class="col-desc">{{notes}}</td>
+      <td class="col-amount">{{amount}}</td>
+    </tr>
+    <tr class="empty-row"><td></td><td></td><td></td></tr>
+    <tr class="empty-row"><td></td><td></td><td></td></tr>
+    <tr class="empty-row"><td></td><td></td><td></td></tr>
+    <tr class="empty-row"><td></td><td></td><td></td></tr>
+  </table>
+
+  <table class="total-table">
+    <tr>
+      <td class="total-label">Total</td>
+      <td class="total-value">Rs. {{amount}}</td>
+    </tr>
+  </table>
+
+  <table class="words-table">
+    <tr>
+      <td class="words-label">Total Amount (in words)</td>
+      <td class="words-value">{{amount_in_words}}</td>
+    </tr>
+  </table>
+
+  <div class="note">* Note : Please make sure to place the name, signature and date in the given space accordingly.</div>
+
+  <table class="sig-table">
+    <tr>
+      <th></th>
+      <th>Prepared By</th>
+      <th>Checked By</th>
+      <th>Approved By</th>
+      <th>Received By</th>
+    </tr>
+    <tr>
+      <td class="sig-row-label">Name</td>
+      <td><span class="dotted-line"></span><div style="font-size:10px; margin-top:-5px; position:absolute">{{prepared_by}}</div></td>
+      <td><span class="dotted-line"></span><div style="font-size:10px; margin-top:-5px; position:absolute">{{verified_by}}</div></td>
+      <td><span class="dotted-line"></span><div style="font-size:10px; margin-top:-5px; position:absolute">{{approved_by}}</div></td>
+      <td><span class="dotted-line"></span><div style="font-size:10px; margin-top:-5px; position:absolute">{{payee_name}}</div></td>
+    </tr>
+    <tr>
+      <td class="sig-row-label">Signature</td>
+      <td style="position:relative"><div style="height:35px; width:80%; margin: 0 auto">{{prepared_by_signature}}</div><span class="dotted-line" style="position:absolute; bottom:10px; left:10%"></span></td>
+      <td style="position:relative"><div style="height:35px; width:80%; margin: 0 auto">{{verified_by_signature}}</div><span class="dotted-line" style="position:absolute; bottom:10px; left:10%"></span></td>
+      <td style="position:relative"><div style="height:35px; width:80%; margin: 0 auto">{{approved_by_signature}}</div><span class="dotted-line" style="position:absolute; bottom:10px; left:10%"></span></td>
+      <td style="position:relative"><div style="height:35px; width:80%; margin: 0 auto">{{received_by_signature}}</div><span class="dotted-line" style="position:absolute; bottom:10px; left:10%"></span></td>
+    </tr>
+    <tr>
+      <td class="sig-row-label">Date</td>
+      <td><span class="dotted-line"></span><div style="color:#999;font-size:11px; margin-top:-5px;">YYYY / MM / DD</div></td>
+      <td><span class="dotted-line"></span><div style="color:#999;font-size:11px; margin-top:-5px;">YYYY / MM / DD</div></td>
+      <td><span class="dotted-line"></span><div style="color:#999;font-size:11px; margin-top:-5px;">YYYY / MM / DD</div></td>
+      <td><span class="dotted-line"></span><div style="color:#999;font-size:11px; margin-top:-5px;">YYYY / MM / DD</div></td>
+    </tr>
+  </table>
+
+  <table class="footer-table">
+    <tr>
+      <td>Date of Issue : 2022/09/09</td>
+      <td>Date of Revision : 2023/01/13</td>
+      <td>Version No. : 01</td>
+    </tr>
+  </table>
+</div>
 `;
 
 // ==================== IOU Voucher ====================
 export const generateIOUVoucherTemplate = (): string => `
-<style>${commonStyles}
-  :root { 
-    --ink: #0f172a; 
-    --muted: #64748b; 
-    --divider: #e2e8f0;
-    --accent: #eab308; 
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; font-size: 13px; }
+  .page { margin: 20px auto; max-width: 800px; padding: 0; }
+  .header-grid { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
+  .logo-area { display: flex; align-items: center; }
+  
+  /* HIGH SPECIFICITY TO BEAT GLOBAL ERP OVERRIDES */
+  img#strict-ncg-logo {
+    width: 200px !important;
+    max-height: 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    object-fit: contain !important;
+    object-position: left !important;
   }
-  .page { margin: 10px auto; max-width: 850px; }
-  .doc-minimal {
-    background: #ffffff;
-    padding: 48px 56px;
-    color: var(--ink);
-    border: 1px solid var(--divider);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  }
-  .flex-between { display: flex; justify-content: space-between; align-items: flex-start; }
-  .divider { border-bottom: 2px solid var(--ink); margin: 28px 0 32px 0; }
-  .light-divider { border-bottom: 1px solid var(--divider); margin: 24px 0; }
   
-  .meta-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; margin-bottom: 6px; }
-  .meta-value { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .company-info { text-align: right; }
+  .company-name { font-size: 20px; font-weight: bold; margin: 0; }
+  .company-address { font-size: 11px; margin: 2px 0; }
   
-  .header-title { font-size: 26px; font-weight: 800; letter-spacing: 0.05em; color: var(--accent); margin: 0 0 12px 0; }
+  .title-container { display: flex; justify-content: center; align-items: flex-end; position: relative; margin-top: 10px; margin-bottom: 5px; }
+  .doc-title { text-align: center; font-size: 16px; font-weight: bold; }
+  .doc-meta-right { position: absolute; right: 0; bottom: 0; font-size: 10px; }
+
+  .iou-no-box { border: 1px solid #000; padding: 4px; display: inline-flex; margin-bottom: 5px; font-size: 13px; width: 300px; }
+  .iou-no-label { border-right: 1px solid #000; padding-right: 8px; margin-right: 8px; width: 60px; }
+
+  table.main-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 13px; }
+  table.main-table th, table.main-table td { border: 1px solid #000; padding: 6px; }
+  .main-table th { background: #e0e0e0; font-weight: bold; text-align: center; }
   
-  .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; }
-  
-  .total-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); margin-top: 40px; }
-  .total-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 4px; }
-  .total-amount { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
-  
-  .text-xs { font-size: 11px; line-height: 1.6; color: var(--muted); }
-  .text-sm { font-size: 13px; line-height: 1.6; }
+  /* Layout columns for split table */
+  .col-1 { width: 20%; }
+  .col-2 { width: 30%; }
+  .col-3 { width: 25%; }
+  .col-4 { width: 25%; }
+
+  .sig-block { padding: 5px 0 0 0; }
+  .sig-line { display: flex; margin-bottom: 5px; }
+  .sig-line-label { width: 70px; }
+  .sig-line-input { border-bottom: 1px solid #000; flex: 1; min-height: 20px; position: relative; margin-left: 5px; }
+
+  table.footer-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+  table.footer-table td { border: 1px solid #000; padding: 4px; text-align: center; width: 33.33%; }
 </style>
-<div class="page"><div class="doc-minimal">
-  <div class="flex-between">
-    <div>
-      <img src="{{ncg_master_logo}}" style="width: 220px !important; height: auto !important; max-height: 75px !important; object-fit: contain !important; margin-bottom: 12px !important; mix-blend-mode: multiply;" />
-      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">{{sector_name}}</div>
-      <div class="text-xs">{{company_address}}<br>Tel: {{company_phone}} | Email: {{company_email}}</div>
+<div class="page">
+  <div class="header-grid">
+    <div class="logo-area">
+      <img id="strict-ncg-logo" src="{{ncg_master_logo}}" />
     </div>
-    <div style="text-align: right;">
-      <h1 class="header-title">STAFF IOU VOUCHER</h1>
-      <div style="display: flex; gap: 32px; justify-content: flex-end; margin-top: 24px;">
-        <div style="text-align: left;">
-          <div class="meta-label">IOU No</div>
-          <div class="meta-value">{{iou_number}}</div>
-        </div>
-        <div style="text-align: left;">
-          <div class="meta-label">Date</div>
-          <div class="meta-value">{{issued_date}}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="details-grid">
-    <div>
-      <div class="meta-label" style="border-bottom: 1px solid var(--divider); padding-bottom: 8px; margin-bottom: 16px; color: var(--ink);">Issued To</div>
-      <div class="meta-value" style="font-size: 15px; margin-bottom: 4px;">{{staff_name}}</div>
-      <div class="text-sm" style="color: var(--muted);">Business Unit: {{business_unit}}</div>
-    </div>
-    <div>
-      <div class="meta-label" style="border-bottom: 1px solid var(--divider); padding-bottom: 8px; margin-bottom: 16px; color: var(--ink);">Repayment Terms</div>
-      <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin-bottom: 6px;">
-        <span class="text-sm" style="color: var(--muted);">Due Date:</span>
-        <span class="meta-value" style="font-size: 13px; color: #dc2626;">{{due_date}}</span>
-      </div>
+    <div class="company-info">
+      <div class="company-name">NCG HOLDINGS (PRIVATE) LIMITED</div>
+      <div class="company-address">{{company_address}}</div>
+      <div class="company-address">Tel: {{company_phone}} | Email: {{company_email}}</div>
     </div>
   </div>
   
-  <div class="light-divider" style="margin-top: 32px;"></div>
-  
-  <div style="margin-top: 16px;">
-    <div class="meta-label">Purpose</div>
-    <div class="text-sm" style="margin-top: 8px; color: var(--ink);">{{purpose}}</div>
+  <div class="title-container">
+    <div class="doc-title">IOU REQUISITION FORM</div>
+    <div class="doc-meta-right">DTM/CDD/RT/FOM11/V1/2023.01.13</div>
   </div>
 
-  <div class="total-row" style="margin-top: 32px; border-top-color: var(--accent); border-bottom-color: var(--accent);">
-    <div>
-      <div class="meta-label" style="margin-bottom: 4px;">Amount in Words</div>
-      <div style="font-size: 13px; font-style: italic; color: var(--muted); max-width: 400px; line-height: 1.5;">{{amount_in_words}}</div>
-    </div>
-    <div style="text-align: right;">
-      <div class="total-label">Amount Issued</div>
-      <div class="total-amount" style="color: var(--accent);">{{amount}}</div>
-    </div>
+  <div class="iou-no-box">
+    <span class="iou-no-label">IOU No.</span>
+    <span>{{iou_number}}</span>
   </div>
 
-  <div style="margin-top: 32px; background: #fffbeb; border: 1px solid #fde68a; padding: 16px; border-radius: 6px;">
-    <div class="meta-label" style="color: #92400e; margin-bottom: 8px;">Staff Acknowledgment</div>
-    <p style="margin: 0; font-size: 12px; color: #92400e; line-height: 1.6;">I hereby acknowledge receipt of the above amount. I authorize the company to deduct this outstanding amount from my salary or final settlement if not settled in full by the stipulated due date.</p>
-  </div>
+  <table class="main-table">
+    <tr>
+      <th colspan="2">IOU REQUISITION</th>
+      <th colspan="2">IOU SETTLEMENT</th>
+    </tr>
+    <tr>
+      <td class="col-1">Date</td>
+      <td class="col-2" style="color:#999">{{issued_date}}</td>
+      <td class="col-3">Date</td>
+      <td class="col-4" style="color:#999">YYYY / MM / DD</td>
+    </tr>
+    <tr>
+      <td class="col-1">Amount</td>
+      <td class="col-2">Rs. {{amount}}</td>
+      <td class="col-3">Amount Requested</td>
+      <td class="col-4">Rs. {{amount}}</td>
+    </tr>
+    <tr>
+      <td class="col-1">Purpose of Request</td>
+      <td colspan="3">{{purpose}}</td>
+    </tr>
+    <tr>
+      <td class="col-1">Name of Requestor</td>
+      <td class="col-2">{{staff_name}}</td>
+      <td class="col-3">Value of Total Bills</td>
+      <td class="col-4">Rs. </td>
+    </tr>
+    <tr>
+      <td class="col-1">Division / Department</td>
+      <td class="col-2">{{business_unit}}</td>
+      <td class="col-3">Balance Returned</td>
+      <td class="col-4">Rs. </td>
+    </tr>
+    <tr>
+      <td class="col-1">Requestor's Sig.</td>
+      <td class="col-2"></td>
+      <td class="col-3">Balance Claimed</td>
+      <td class="col-4">Rs. </td>
+    </tr>
+    <!-- Signatures Row 1 -->
+    <tr>
+      <td colspan="2" style="vertical-align: top; padding: 10px;">
+        <strong><i>Approved by</i></strong>
+        <div class="sig-block">
+          <div class="sig-line"><div class="sig-line-label">Name</div><div>:</div><div class="sig-line-input"><div style="font-size:11px;position:absolute;bottom:2px">{{approved_by}}</div></div></div>
+          <div class="sig-line"><div class="sig-line-label">Signature</div><div>:</div><div class="sig-line-input"><div style="position:absolute;bottom:2px;height:35px">{{approved_by_signature}}</div></div></div>
+          <div class="sig-line"><div class="sig-line-label">Date</div><div>:</div><div class="sig-line-input" style="color:#999;font-size:11px;display:flex;align-items:flex-end">YYYY / MM / DD</div></div>
+        </div>
+      </td>
+      <td colspan="2" style="vertical-align: top; padding: 10px;">
+        <strong><i>Approved by</i></strong>
+        <div class="sig-block">
+          <div class="sig-line"><div class="sig-line-label">Name</div><div>:</div><div class="sig-line-input"></div></div>
+          <div class="sig-line"><div class="sig-line-label">Signature</div><div>:</div><div class="sig-line-input"></div></div>
+          <div class="sig-line"><div class="sig-line-label">Date</div><div>:</div><div class="sig-line-input" style="color:#999;font-size:11px;display:flex;align-items:flex-end">YYYY / MM / DD</div></div>
+        </div>
+      </td>
+    </tr>
+    <!-- Signatures Row 2 -->
+    <tr>
+      <td colspan="2" style="vertical-align: top; padding: 10px;">
+        <strong><i>Issued by</i></strong>
+        <div class="sig-block">
+          <div class="sig-line"><div class="sig-line-label">Name</div><div>:</div><div class="sig-line-input"><div style="font-size:11px;position:absolute;bottom:2px">{{prepared_by}}</div></div></div>
+          <div class="sig-line"><div class="sig-line-label">Signature</div><div>:</div><div class="sig-line-input"><div style="position:absolute;bottom:2px;height:35px">{{prepared_by_signature}}</div></div></div>
+          <div class="sig-line"><div class="sig-line-label">Date</div><div>:</div><div class="sig-line-input" style="color:#999;font-size:11px;display:flex;align-items:flex-end">YYYY / MM / DD</div></div>
+        </div>
+      </td>
+      <td colspan="2" style="vertical-align: top; padding: 10px;">
+        <strong><i>Settled by</i></strong>
+        <div class="sig-block">
+          <div class="sig-line"><div class="sig-line-label">Name</div><div>:</div><div class="sig-line-input"></div></div>
+          <div class="sig-line"><div class="sig-line-label">Signature</div><div>:</div><div class="sig-line-input"></div></div>
+          <div class="sig-line"><div class="sig-line-label">Date</div><div>:</div><div class="sig-line-input" style="color:#999;font-size:11px;display:flex;align-items:flex-end">YYYY / MM / DD</div></div>
+        </div>
+      </td>
+    </tr>
+    <!-- Signatures Row 3 -->
+    <tr>
+      <td colspan="2" style="vertical-align: top; padding: 10px;">
+        <strong><i>Received by</i></strong>
+        <div class="sig-block">
+          <div class="sig-line"><div class="sig-line-label">Name</div><div>:</div><div class="sig-line-input"><div style="font-size:11px;position:absolute;bottom:2px">{{staff_name}}</div></div></div>
+          <div class="sig-line"><div class="sig-line-label">Signature</div><div>:</div><div class="sig-line-input"></div></div>
+          <div class="sig-line"><div class="sig-line-label">Date</div><div>:</div><div class="sig-line-input" style="color:#999;font-size:11px;display:flex;align-items:flex-end">YYYY / MM / DD</div></div>
+        </div>
+      </td>
+      <td colspan="2" style="vertical-align: top; padding: 10px;">
+        <strong><i>Returned / Claimed by</i></strong>
+        <div class="sig-block">
+          <div class="sig-line"><div class="sig-line-label">Name</div><div>:</div><div class="sig-line-input"></div></div>
+          <div class="sig-line"><div class="sig-line-label">Signature</div><div>:</div><div class="sig-line-input"></div></div>
+          <div class="sig-line"><div class="sig-line-label">Date</div><div>:</div><div class="sig-line-input" style="color:#999;font-size:11px;display:flex;align-items:flex-end">YYYY / MM / DD</div></div>
+        </div>
+      </td>
+    </tr>
+  </table>
 
-  <div style="margin-top: 60px;">
-    ${buildFooter(['Prepared By', 'Authorized By', 'Staff Signature'])}
-  </div>
-</div></div>
+  <table class="footer-table">
+    <tr>
+      <td>Date of Issue : 2022/09/09</td>
+      <td>Date of Revision : 2023/01/13</td>
+      <td>Version No. : 01</td>
+    </tr>
+  </table>
+</div>
 `;
 
 // Export all templates as a map

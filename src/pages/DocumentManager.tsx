@@ -12,36 +12,27 @@ import { format } from "date-fns";
 
 interface Document {
   id: string;
-  linked_table: string;
-  linked_row_id: string;
+  bucket_id: string;
+  file_path: string;
   file_name: string;
   file_type: string;
   file_size: number;
-  file_url: string;
-  storage_path: string;
-  tag: string;
   uploaded_at: string;
-  uploaded_by: string;
-  description?: string;
+  updated_at: string;
 }
 
 export default function DocumentManager() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTable, setSelectedTable] = useState('');
-  const [selectedTag, setSelectedTag] = useState('');
+  const [selectedBucket, setSelectedBucket] = useState('');
 
   const fetchDocuments = async () => {
     try {
-      let query = supabase.from('documents').select('*').order('uploaded_at', { ascending: false });
+      let query = supabase.from('v_all_system_documents').select('*').order('uploaded_at', { ascending: false });
 
-      if (selectedTable) {
-        query = query.eq('linked_table', selectedTable);
-      }
-
-      if (selectedTag) {
-        query = query.eq('tag', selectedTag);
+      if (selectedBucket) {
+        query = query.eq('bucket_id', selectedBucket);
       }
 
       if (searchTerm) {
@@ -62,13 +53,13 @@ export default function DocumentManager() {
 
   useEffect(() => {
     fetchDocuments();
-  }, [searchTerm, selectedTable, selectedTag]);
+  }, [searchTerm, selectedBucket]);
 
-  const handleDownload = async (storagePath: string, fileName: string) => {
+  const handleDownload = async (bucketId: string, storagePath: string, fileName: string) => {
     try {
       // Create signed URL for downloading
       const { data, error } = await supabase.storage
-        .from('documents')
+        .from(bucketId)
         .createSignedUrl(storagePath, 60); // 60 seconds expiry
 
       if (error) throw error;
@@ -90,25 +81,18 @@ export default function DocumentManager() {
     }
   };
 
-  const handleDelete = async (documentId: string, storagePath: string) => {
+  const handleDelete = async (bucketId: string, storagePath: string) => {
     if (!confirm('Are you sure you want to delete this document?')) return;
 
     try {
       // Delete from storage
       const { error: storageError } = await supabase.storage
-        .from('documents')
+        .from(bucketId)
         .remove([storagePath]);
 
       if (storageError) throw storageError;
 
-      // Delete from database
-      const { error: dbError } = await supabase
-        .from('documents')
-        .delete()
-        .eq('id', documentId);
-
-      if (dbError) throw dbError;
-
+      // No need to delete from DB, storage.objects trigger handles it automatically
       toast.success('Document deleted successfully');
       fetchDocuments();
     } catch (error: any) {
@@ -135,26 +119,28 @@ export default function DocumentManager() {
       accessorKey: "file_name",
       header: "File Name",
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          {getFileIcon(row.original.file_type)}
-          <span className="font-medium">{row.getValue("file_name")}</span>
+        <div className="flex items-center gap-2 max-w-[200px] sm:max-w-[300px]">
+          {getFileIcon(row.original.file_type || '')}
+          <span className="font-medium truncate" title={row.getValue("file_name")}>{row.getValue("file_name")}</span>
         </div>
       ),
     },
     {
-      accessorKey: "linked_table",
-      header: "Table",
+      accessorKey: "bucket_id",
+      header: "Category (Bucket)",
       cell: ({ row }) => (
-        <Badge variant="outline">
-          {(row.getValue("linked_table") as string).replace('_', ' ')}
+        <Badge variant="outline" className="capitalize">
+          {(row.getValue("bucket_id") as string).replace(/-/g, ' ')}
         </Badge>
       ),
     },
     {
-      accessorKey: "tag",
+      accessorKey: "file_type",
       header: "Type",
       cell: ({ row }) => (
-        <Badge variant="secondary">{row.getValue("tag")}</Badge>
+        <Badge variant="secondary" className="max-w-[100px] truncate">
+          {row.getValue("file_type") || 'Unknown'}
+        </Badge>
       ),
     },
     {
@@ -181,8 +167,8 @@ export default function DocumentManager() {
             onClick={async () => {
               try {
                 const { data, error } = await supabase.storage
-                  .from('documents')
-                  .createSignedUrl(row.original.storage_path, 60);
+                  .from(row.original.bucket_id)
+                  .createSignedUrl(row.original.file_path, 60);
                 
                 if (error) throw error;
                 window.open(data.signedUrl, '_blank');
@@ -197,14 +183,14 @@ export default function DocumentManager() {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => handleDownload(row.original.storage_path, row.original.file_name)}
+            onClick={() => handleDownload(row.original.bucket_id, row.original.file_path, row.original.file_name)}
           >
             <Download className="h-4 w-4" />
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => handleDelete(row.original.id, row.original.storage_path)}
+            onClick={() => handleDelete(row.original.bucket_id, row.original.file_path)}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -214,8 +200,7 @@ export default function DocumentManager() {
   ];
 
   const totalSize = documents.reduce((sum, doc) => sum + doc.file_size, 0);
-  const uniqueTables = [...new Set(documents.map(doc => doc.linked_table))];
-  const uniqueTags = [...new Set(documents.map(doc => doc.tag))];
+  const uniqueBuckets = [...new Set(documents.map(doc => doc.bucket_id))];
 
   return (
     <div className="space-y-6 p-6">
@@ -246,11 +231,11 @@ export default function DocumentManager() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tables</CardTitle>
+            <CardTitle className="text-sm font-medium">Categories (Buckets)</CardTitle>
             <Filter className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{uniqueTables.length}</div>
+            <div className="text-2xl font-bold">{uniqueBuckets.length}</div>
           </CardContent>
         </Card>
       </div>
@@ -273,29 +258,19 @@ export default function DocumentManager() {
             <div>
               <select
                 className="w-full border border-input bg-background px-3 py-2 text-sm ring-offset-background rounded-md"
-                value={selectedTable}
-                onChange={(e) => setSelectedTable(e.target.value)}
+                value={selectedBucket}
+                onChange={(e) => setSelectedBucket(e.target.value)}
               >
-                <option value="">All Tables</option>
-                {uniqueTables.map(table => (
-                  <option key={table} value={table}>
-                    {table.replace('_', ' ').toUpperCase()}
+                <option value="">All Categories</option>
+                {uniqueBuckets.map(bucket => (
+                  <option key={bucket} value={bucket}>
+                    {bucket.replace(/-/g, ' ').toUpperCase()}
                   </option>
                 ))}
               </select>
             </div>
-            <div>
-              <select
-                className="w-full border border-input bg-background px-3 py-2 text-sm ring-offset-background rounded-md"
-                value={selectedTag}
-                onChange={(e) => setSelectedTag(e.target.value)}
-              >
-                <option value="">All Types</option>
-                {uniqueTags.map(tag => (
-                  <option key={tag} value={tag}>{tag}</option>
-                ))}
-              </select>
-            </div>
+            {/* Tag filter removed as we use bucket_id now */}
+            <div className="hidden"></div>
           </div>
         </CardContent>
       </Card>

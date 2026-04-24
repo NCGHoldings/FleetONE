@@ -399,11 +399,43 @@ export const SubmissionReviewModal = ({
                     <span className="font-medium">Total Expenses</span>
                     <span className="text-red-400 font-bold text-lg">- Rs. {editedData.expenses?.total?.toFixed(2)}</span>
                   </div>
+                  
+                  {editedData.fuel_details?.payment_method === 'card' && (
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="font-medium flex items-center gap-1">
+                        Fuel by Card
+                        <Badge variant="outline" className="border-orange-500/30 text-orange-400 bg-orange-500/10 text-[9px] h-4 py-0">Not Deducted</Badge>
+                      </span>
+                      <span className="text-orange-400 font-bold">+ Rs. {(parseFloat(editedData.expenses?.fuel_cost || '0')).toFixed(2)}</span>
+                    </div>
+                  )}
+
                   <div className="pt-3 border-t border-slate-700 flex justify-between font-black text-xl">
                     <span>Net Balance</span>
                     <span className="text-white">Rs. {editedData.net_balance?.toFixed(2)}</span>
                   </div>
                 </div>
+
+                {editedData.bank_deposit && (
+                  <div className="mt-4 p-3 bg-purple-900/30 rounded-lg border border-purple-500/30 space-y-2">
+                    <p className="text-xs text-purple-300 font-bold uppercase tracking-wider mb-2">Bank Deposit Declared</p>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-400">Bank Name</span>
+                      <span className="font-bold text-purple-100">{editedData.bank_deposit.bank_name || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-400">Actual Deposit</span>
+                      <span className="font-bold text-purple-400">Rs. {(parseFloat(editedData.bank_deposit.actual_amount || '0')).toFixed(2)}</span>
+                    </div>
+                    {editedData.bank_deposit.slip_url && (
+                      <div className="pt-2 border-t border-purple-500/20 mt-2">
+                        <a href={editedData.bank_deposit.slip_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 w-fit">
+                          <ExternalLink className="w-3 h-3" /> View Deposit Slip Image
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* detailed Trip breakdown */}
                 {editedData.trips && editedData.trips.length > 0 && (
@@ -450,22 +482,45 @@ export const SubmissionReviewModal = ({
                 )}
 
                 {/* Expenses Breakdown */}
-                {editedData.expenses && Object.keys(editedData.expenses).length > 1 && (
+                {(editedData.expenses && Object.keys(editedData.expenses).length > 1) || editedData.fuel_details ? (
                   <div className="mt-4 pt-4 border-t border-slate-800">
-                    <p className="text-xs text-red-400 font-bold uppercase mb-2 tracking-wider">Expense Breakdown</p>
+                    <p className="text-xs text-red-400 font-bold uppercase mb-3 tracking-wider">Expenses & Fuel Details</p>
+                    
+                    {editedData.fuel_details && (
+                      <div className="mb-4 bg-orange-900/20 p-2 rounded border border-orange-500/20 space-y-1">
+                        <div className="flex justify-between text-xs text-orange-200">
+                          <span>Fuel Time</span>
+                          <span>{editedData.fuel_details.time || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-orange-200">
+                          <span>Fuel Odo</span>
+                          <span>{editedData.fuel_details.odometer || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-orange-200">
+                          <span>Fuel Liters</span>
+                          <span>{editedData.fuel_details.liters || 'N/A'} L</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-semibold text-orange-300">
+                          <span>Payment Method</span>
+                          <span className="uppercase">{editedData.fuel_details.payment_method}</span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-1 text-xs text-slate-300">
-                      {Object.entries(editedData.expenses).map(([key, val]) => {
+                      {Object.entries(editedData.expenses || {}).map(([key, val]) => {
                         if (key === 'total') return null;
                         return (
                           <div key={key} className="flex justify-between">
-                            <span>{key}</span>
+                            <span className="capitalize">{key.replace(/_/g, ' ')}</span>
                             <span>{Number(val).toFixed(2)}</span>
                           </div>
                         );
                       })}
                     </div>
                   </div>
-                )}
+                ) : null}
+
               </div>
             ) : (
               <div className="p-4 bg-slate-100 rounded-lg text-slate-500 text-center">

@@ -23,6 +23,18 @@ interface FleetMasterSpreadsheetProps {
 export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate || new Date());
   const [editMode, setEditMode] = useState<EditMode>('master');
+  const [dieselPrice, setDieselPrice] = useState<number>(() => {
+    const saved = localStorage.getItem('fleet_diesel_price');
+    return saved ? Number(saved) : 350; // Default to 350 if not set
+  });
+
+  const handleDieselPriceChange = (val: string) => {
+    const num = Number(val);
+    if (!isNaN(num)) {
+      setDieselPrice(num);
+      localStorage.setItem('fleet_diesel_price', num.toString());
+    }
+  };
   
   const { 
     roster,
@@ -35,7 +47,7 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
     addRosterEntry, 
     bulkAddAllBuses, 
     refetch 
-  } = useFleetMasterSpreadsheet(selectedDate, editMode);
+  } = useFleetMasterSpreadsheet(selectedDate, editMode, dieselPrice);
   const [bulkAdding, setBulkAdding] = useState(false);
   const [showAddBus, setShowAddBus] = useState(false);
   const [availableBuses, setAvailableBuses] = useState<any[]>([]);
@@ -157,9 +169,9 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
         <div className="flex items-center gap-2 flex-wrap">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("w-[200px] justify-start text-left font-normal")}>
+              <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal")}>
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(selectedDate, "PPP")}
+                {format(selectedDate, "MMM dd, yyyy")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -172,6 +184,16 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
               />
             </PopoverContent>
           </Popover>
+
+          <div className="flex items-center gap-2 border rounded-md px-2 h-9">
+            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Diesel (LKR):</span>
+            <input 
+              type="number" 
+              className="w-16 h-7 text-sm bg-transparent border-none focus:outline-none font-semibold" 
+              value={dieselPrice} 
+              onChange={(e) => handleDieselPriceChange(e.target.value)} 
+            />
+          </div>
 
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-1" /> Refresh

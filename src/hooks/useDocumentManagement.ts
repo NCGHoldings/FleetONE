@@ -160,12 +160,23 @@ export const useDocumentManagement = () => {
 
       if (paymentError) throw paymentError;
 
+      // Fetch adjustments if any
+      const { data: adjustmentData } = await supabase
+        .from('special_hire_trip_adjustments')
+        .select('extra_km_total_charge, total_additional_expenses')
+        .eq('quotation_id', paymentData.quotation.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
       const calculateTotalAmount = (quotation: any) => {
-        return quotation.gross_revenue + 
+        const base = quotation.gross_revenue + 
                (quotation.fuel_cost_fuel_only || 0) + 
                (quotation.commission_pass_through_amount || 0) +
                (quotation.total_additional_charges || 0) - 
                (quotation.discount_amount_lkr || 0);
+        const adj = (adjustmentData?.extra_km_total_charge || 0) + (adjustmentData?.total_additional_expenses || 0);
+        return base + adj;
       };
 
       // Compute total approved payments for accurate Balance Due
@@ -176,6 +187,7 @@ export const useDocumentManagement = () => {
         .eq('status', 'approved');
       if (approvedPaymentsError) throw approvedPaymentsError;
       const totalApprovedPaid = (approvedPaymentsList || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+      const computedTotalPaidToDate = totalApprovedPaid + (paymentData.status !== 'approved' ? (paymentData.amount || 0) : 0);
 
 
       // Fetch current signatures for the document using actual document ID
@@ -221,7 +233,7 @@ export const useDocumentManagement = () => {
         totalAmount: calculateTotalAmount(paymentData.quotation),
         advanceAmount: paymentData.quotation.advance_paid || 0,
         paidAmount: paymentData.amount || 0,
-        totalPaidToDate: totalApprovedPaid,
+        totalPaidToDate: computedTotalPaidToDate,
         vehicleNo: paymentData.quotation.assigned_bus_no,
         driverName: paymentData.quotation.assigned_driver_name,
         conductorName: paymentData.quotation.assigned_conductor_name,
@@ -307,12 +319,23 @@ export const useDocumentManagement = () => {
 
       if (paymentError) throw paymentError;
 
+      // Fetch adjustments if any
+      const { data: adjustmentData2 } = await supabase
+        .from('special_hire_trip_adjustments')
+        .select('extra_km_total_charge, total_additional_expenses')
+        .eq('quotation_id', paymentData.quotation.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
       const calculateTotalAmount = (quotation: any) => {
-        return quotation.gross_revenue + 
+        const base = quotation.gross_revenue + 
                (quotation.fuel_cost_fuel_only || 0) + 
                (quotation.commission_pass_through_amount || 0) +
                (quotation.total_additional_charges || 0) - 
                (quotation.discount_amount_lkr || 0);
+        const adj = (adjustmentData2?.extra_km_total_charge || 0) + (adjustmentData2?.total_additional_expenses || 0);
+        return base + adj;
       };
 
       // Compute total approved payments for accurate Balance Due
@@ -323,6 +346,7 @@ export const useDocumentManagement = () => {
         .eq('status', 'approved');
       if (approvedPaymentsError2) throw approvedPaymentsError2;
       const totalApprovedPaid2 = (approvedPaymentsList2 || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+      const computedTotalPaidToDate2 = totalApprovedPaid2 + (paymentData.status !== 'approved' ? (paymentData.amount || 0) : 0);
 
       // Fetch current signatures for the document using actual document ID
       const { data: signatures } = await supabase
@@ -367,7 +391,7 @@ export const useDocumentManagement = () => {
         totalAmount: calculateTotalAmount(paymentData.quotation),
         advanceAmount: paymentData.quotation.advance_paid || 0,
         paidAmount: paymentData.amount || 0,
-        totalPaidToDate: totalApprovedPaid2,
+        totalPaidToDate: computedTotalPaidToDate2,
         vehicleNo: paymentData.quotation.assigned_bus_no,
         driverName: paymentData.quotation.assigned_driver_name,
         conductorName: paymentData.quotation.assigned_conductor_name,

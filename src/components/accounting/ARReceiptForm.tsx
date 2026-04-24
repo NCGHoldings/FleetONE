@@ -704,7 +704,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                           className="text-2xl h-14 font-bold"
                           placeholder="Enter advance amount"
                           min={0}
-                          step="0.01"
+                          step="any"
                         />
                       </FormControl>
                       <p className="text-sm text-muted-foreground mt-1">
@@ -779,7 +779,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                                   onChange={(e) => updateAllocation(alloc.invoice_id, "write_off_amount", parseFloat(e.target.value) || 0)}
                                   className="h-8 text-right"
                                   min={0}
-                                  step="0.01"
+                                  step="any"
                                   placeholder="0.00"
                                 />
                               </td>
@@ -791,7 +791,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                                   className="h-8 text-right"
                                   max={alloc.balance}
                                   min={0}
-                                  step="0.01"
+                                  step="any"
                                 />
                               </td>
                             </tr>
@@ -820,7 +820,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                                 className="text-2xl h-14 font-bold"
                                 placeholder="Enter receipt amount"
                                 min={0}
-                                step="0.01"
+                                step="any"
                               />
                             </FormControl>
                             <FormMessage />
@@ -881,7 +881,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                           className="text-2xl h-14 font-bold"
                           placeholder="Enter receipt amount"
                           min={0}
-                          step="0.01"
+                          step="any"
                         />
                       </FormControl>
                       <FormMessage />
@@ -918,7 +918,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                     onChange={(e) => setBankFeeAmount(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
                     min={0}
-                    step="0.01"
+                    step="any"
                     className="mt-1"
                   />
                 </div>

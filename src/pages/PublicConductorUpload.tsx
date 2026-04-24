@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Check, Loader2, Send, Languages, Calculator, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Loader2, Send, Languages, Calculator, Plus, Trash2, ChevronDown, ChevronUp, Upload, CreditCard, Banknote, Camera } from 'lucide-react';
 import { createAnonymousClient } from '@/integrations/supabase/public-client';
 
 type Language = 'en' | 'si' | 'ta';
@@ -34,6 +34,19 @@ const translations = {
     totalIncome: "Total Income",
     totalExpenses: "Total Expenses",
     netBalance: "Net Balance (Cash to handover)",
+    fuelDetails: "Fuel Details",
+    fuelTime: "Fuel Time",
+    fuelOdo: "Fuel Odometer",
+    fuelLiters: "Fuel Liters",
+    fuelCost: "Fuel Cost",
+    fuelPayment: "Fuel Payment Method",
+    cash: "Cash",
+    card: "Card",
+    bankDeposit: "Bank Deposit",
+    suggestedDeposit: "Suggested Deposit",
+    actualDeposit: "Actual Deposit Amount",
+    bankName: "Bank / Branch Name",
+    uploadSlip: "Upload Bank Slip",
     submit: "Submit Details",
     submitting: "Submitting...",
     successTitle: "Submission Received!",
@@ -55,16 +68,29 @@ const translations = {
     tripTitle: "ගමන",
     startOdo: "ආරම්භක මීටරය",
     endOdo: "අවසන් මීටරය",
-    callBooking: "CALL BOOKING",
-    agentBooking: "AGENT BOOKING",
-    busCollection: "BUS COLLECTION",
-    luggage: "LUGGAGE INCOME",
-    miscIncome: "MISCELLANEOUS INCOME",
+    callBooking: "දුරකථන ඇණවුම් (Call Booking)",
+    agentBooking: "නියෝජිත ඇණවුම් (Agent Booking)",
+    busCollection: "බස් එකතු කිරීම (Bus Collection)",
+    luggage: "ගමන් මලු ආදායම (Luggage Income)",
+    miscIncome: "වෙනත් ආදායම් (Misc Income)",
     showAllExpenses: "සියලුම වියදම් පෙන්වන්න",
     hideExpenses: "අමතර වියදම් සඟවන්න",
     totalIncome: "මුළු ආදායම",
     totalExpenses: "මුළු වියදම",
     netBalance: "ශුද්ධ ශේෂය (භාර දිය යුතු මුදල)",
+    fuelDetails: "ඉන්ධන විස්තර",
+    fuelTime: "ඉන්ධන ලබාගත් වේලාව",
+    fuelOdo: "මීටරය",
+    fuelLiters: "ලීටර",
+    fuelCost: "මුළු මුදල",
+    fuelPayment: "ගෙවීම් ක්‍රමය",
+    cash: "මුදල්",
+    card: "කාඩ්පත",
+    bankDeposit: "බැංකු තැන්පතුව",
+    suggestedDeposit: "යෝජිත තැන්පතුව",
+    actualDeposit: "තැන්පත් කළ මුදල",
+    bankName: "බැංකුවේ නම / ශාඛාව",
+    uploadSlip: "බැංකු රිසිට්පත යොදන්න",
     submit: "ගමන් විස්තර ඉදිරිපත් කරන්න",
     submitting: "ඉදිරිපත් කරමින්...",
     successTitle: "සාර්ථකයි!",
@@ -86,16 +112,29 @@ const translations = {
     tripTitle: "பயணம்",
     startOdo: "தொடக்க மீட்டர்",
     endOdo: "முடிவு மீட்டர்",
-    callBooking: "CALL BOOKING",
-    agentBooking: "AGENT BOOKING",
-    busCollection: "BUS COLLECTION",
-    luggage: "LUGGAGE INCOME",
-    miscIncome: "MISCELLANEOUS INCOME",
+    callBooking: "தொலைபேசி முன்பதிவு (Call Booking)",
+    agentBooking: "முகவர் முன்பதிவு (Agent Booking)",
+    busCollection: "பேருந்து வசூல் (Bus Collection)",
+    luggage: "பொருட்கள் வருமானம் (Luggage)",
+    miscIncome: "இதர வருமானம் (Misc Income)",
     showAllExpenses: "அனைத்து செலவுகளையும் காட்டு",
     hideExpenses: "கூடுதல் செலவுகளை மறை",
     totalIncome: "மொத்த வருமானம்",
     totalExpenses: "மொத்த செலவுகள்",
     netBalance: "நிகர இருப்பு",
+    fuelDetails: "எரிபொருள் விவரங்கள்",
+    fuelTime: "எரிபொருள் நேரம்",
+    fuelOdo: "மீட்டர்",
+    fuelLiters: "லிட்டர்",
+    fuelCost: "எரிபொருள் செலவு",
+    fuelPayment: "செலுத்தும் முறை",
+    cash: "ரொக்கம்",
+    card: "அட்டை",
+    bankDeposit: "வங்கி வைப்பு",
+    suggestedDeposit: "பரிந்துரைக்கப்பட்ட வைப்பு",
+    actualDeposit: "உண்மையான வைப்பு தொகை",
+    bankName: "வங்கி / கிளை பெயர்",
+    uploadSlip: "ரசீதை பதிவேற்றவும்",
     submit: "சமர்ப்பிக்கவும்",
     submitting: "சமர்ப்பிக்கிறது...",
     successTitle: "வெற்றி!",
@@ -251,6 +290,24 @@ export default function PublicConductorUpload() {
 
   const [expenses, setExpenses] = useState<Record<string, string>>(() => loadState('expenses', {}));
   const [showAllExpenses, setShowAllExpenses] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+
+  // Fuel Details
+  const getCurrentTime = () => new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  const [fuelDetails, setFuelDetails] = useState(() => loadState('fuelDetails', {
+    time: getCurrentTime(),
+    odometer: '',
+    liters: '',
+    paymentMethod: 'card' as 'cash' | 'card'
+  }));
+
+  // Bank Deposit Details
+  const [bankDeposit, setBankDeposit] = useState(() => loadState('bankDeposit', {
+    amount: '',
+    bankName: ''
+  }));
+  const [slipFile, setSlipFile] = useState<File | null>(null);
+  const [slipPreview, setSlipPreview] = useState<string | null>(null);
 
   // Auto-save Effect
   useEffect(() => {
@@ -258,8 +315,10 @@ export default function PublicConductorUpload() {
       localStorage.setItem('conductor_form_global', JSON.stringify(formData));
       localStorage.setItem('conductor_form_trips', JSON.stringify(trips));
       localStorage.setItem('conductor_form_expenses', JSON.stringify(expenses));
+      localStorage.setItem('conductor_form_fuelDetails', JSON.stringify(fuelDetails));
+      localStorage.setItem('conductor_form_bankDeposit', JSON.stringify(bankDeposit));
     }
-  }, [formData, trips, expenses, submitted]);
+  }, [formData, trips, expenses, fuelDetails, bankDeposit, submitted]);
 
   // Derived calculations
   const calculateTripTotal = (incomeObj?: Record<string, string>) => {
@@ -270,6 +329,12 @@ export default function PublicConductorUpload() {
   const totalIncome = trips.reduce((sum, trip) => sum + calculateTripTotal(trip.income), 0);
   const totalExpenses = Object.values(expenses).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
   const netBalance = totalIncome - totalExpenses;
+  
+  // Suggested deposit includes fuel cost if it was paid by card
+  const fuelCostValue = parseFloat(expenses['fuel_cost']) || 0;
+  const isFuelCard = fuelDetails.paymentMethod === 'card';
+  
+  const suggestedDeposit = (netBalance > 0 ? netBalance : 0) + (isFuelCard ? fuelCostValue : 0);
 
   // Autocomplete DataLists
   const saveToHistory = (type: 'buses' | 'drivers' | 'conductors', value: string) => {
@@ -318,6 +383,24 @@ export default function PublicConductorUpload() {
     setTrips(trips.map(t => t.id === id ? { ...t, expanded: !t.expanded } : t));
   };
 
+  const handleFuelCostChange = (val: string) => {
+    // Auto-sync with expenses
+    setExpenses(prev => ({ ...prev, fuel_cost: val }));
+  };
+
+  const handleSlipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSlipFile(file);
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSlipPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -356,12 +439,38 @@ export default function PublicConductorUpload() {
       }, {});
       formattedExpenses.total = totalExpenses;
 
+      let slipUrl = null;
+      if (slipFile) {
+        const ext = slipFile.name.split('.').pop();
+        const filePath = `slips/${formData.busNumber}_${Date.now()}.${ext}`;
+        const { data: uploadData, error: uploadError } = await supabasePublic.storage
+          .from('conductor-submissions')
+          .upload(filePath, slipFile);
+          
+        if (!uploadError && uploadData) {
+          const { data: { publicUrl } } = supabasePublic.storage.from('conductor-submissions').getPublicUrl(uploadData.path);
+          slipUrl = publicUrl;
+        }
+      }
+
       const structuredData = {
         driver_name: formData.driverName,
         bus_number: formData.busNumber,
         trip_date: formData.tripDate,
         trips: formattedTrips,
         expenses: formattedExpenses,
+        fuel_details: {
+          time: fuelDetails.time,
+          odometer: fuelDetails.odometer,
+          liters: parseFloat(fuelDetails.liters) || null,
+          payment_method: fuelDetails.paymentMethod
+        },
+        bank_deposit: {
+          suggested_amount: suggestedDeposit,
+          actual_amount: parseFloat(bankDeposit.amount) || 0,
+          bank_name: bankDeposit.bankName,
+          slip_url: slipUrl
+        },
         total_income: totalIncome,
         net_balance: netBalance,
         data_entry_method: 'manual_form_v2'
@@ -396,6 +505,8 @@ export default function PublicConductorUpload() {
       localStorage.removeItem('conductor_form_global');
       localStorage.removeItem('conductor_form_trips');
       localStorage.removeItem('conductor_form_expenses');
+      localStorage.removeItem('conductor_form_fuelDetails');
+      localStorage.removeItem('conductor_form_bankDeposit');
 
       toast({ title: t.successTitle, description: t.successDesc });
     } catch (error: any) {
@@ -465,8 +576,28 @@ export default function PublicConductorUpload() {
 
         <CardContent className="p-4 sm:p-6 bg-slate-50/50">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Global Details */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            {/* Step Navigation */}
+            <div className="flex bg-slate-200/50 p-1 rounded-lg mb-6 shadow-inner">
+              <button 
+                type="button" 
+                onClick={() => setCurrentStep(1)} 
+                className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${currentStep === 1 ? 'bg-white shadow text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                1. Trips & Details
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setCurrentStep(2)} 
+                className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${currentStep === 2 ? 'bg-white shadow text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                2. {t.expenses} & Deposit
+              </button>
+            </div>
+
+            {/* STEP 1: Global Details & Trips */}
+            <div className={currentStep === 1 ? 'space-y-6 animate-in fade-in duration-300' : 'hidden'}>
+              {/* Global Details */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-1.5 h-5 bg-blue-500 rounded-full" />
                 <h3 className="font-bold text-slate-800">{t.globalDetails}</h3>
@@ -634,6 +765,174 @@ export default function PublicConductorUpload() {
                 {showAllExpenses ? t.hideExpenses : t.showAllExpenses}
               </Button>
             </div>
+          </div>
+
+            {/* STEP 2: Expenses & Fuel & Bank */}
+            <div className={currentStep === 2 ? 'space-y-6 animate-in fade-in duration-300' : 'hidden'}>
+
+            {/* Fuel Details Section */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-5 bg-orange-500 rounded-full" />
+                  <h3 className="font-bold text-slate-800">{t.fuelDetails}</h3>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3 bg-orange-50/50 p-3 rounded-lg border border-orange-100/50">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-600 flex justify-between">
+                    {t.fuelTime}
+                    <button type="button" onClick={() => setFuelDetails({...fuelDetails, time: getCurrentTime()})} className="text-[10px] text-blue-600 hover:underline">Now</button>
+                  </Label>
+                  <Input type="time" value={fuelDetails.time} onChange={e => setFuelDetails({...fuelDetails, time: e.target.value})} className="h-9 bg-white" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-600">{t.fuelOdo}</Label>
+                  <Input type="number" inputMode="decimal" placeholder="0" value={fuelDetails.odometer} onChange={e => setFuelDetails({...fuelDetails, odometer: e.target.value})} className="h-9 bg-white" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-600">{t.fuelLiters}</Label>
+                  <Input type="number" inputMode="decimal" placeholder="0.0" value={fuelDetails.liters} onChange={e => setFuelDetails({...fuelDetails, liters: e.target.value})} className="h-9 bg-white" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-600">{t.fuelCost}</Label>
+                  <Input type="number" inputMode="decimal" placeholder="0.00" value={expenses['fuel_cost'] || ''} onChange={e => handleFuelCostChange(e.target.value)} className="h-9 bg-white" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-600">{t.fuelPayment}</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div 
+                    onClick={() => setFuelDetails({...fuelDetails, paymentMethod: 'cash'})}
+                    className={`flex items-center justify-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${fuelDetails.paymentMethod === 'cash' ? 'bg-orange-100 border-orange-300 text-orange-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                  >
+                    <Banknote className="w-4 h-4" /> {t.cash}
+                  </div>
+                  <div 
+                    onClick={() => setFuelDetails({...fuelDetails, paymentMethod: 'card'})}
+                    className={`flex items-center justify-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${fuelDetails.paymentMethod === 'card' ? 'bg-orange-100 border-orange-300 text-orange-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                  >
+                    <CreditCard className="w-4 h-4" /> {t.card}
+                  </div>
+                </div>
+                {isFuelCard && (
+                  <p className="text-[10px] text-orange-600 font-medium px-1">
+                    * Card payment will not be deducted from the cash handover amount.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Bank Deposit Section */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-5 bg-purple-500 rounded-full" />
+                  <h3 className="font-bold text-slate-800">{t.bankDeposit}</h3>
+                </div>
+              </div>
+
+              <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 flex items-center justify-between">
+                <span className="text-sm font-semibold text-purple-800 flex flex-col">
+                  {t.suggestedDeposit}
+                  {isFuelCard && fuelCostValue > 0 && (
+                    <span className="text-[10px] text-purple-600/80 font-normal mt-0.5">+ Rs. {fuelCostValue.toFixed(2)} Card Fuel added to deposit</span>
+                  )}
+                </span>
+                <span className="text-lg font-black text-purple-700">Rs. {suggestedDeposit.toFixed(2)}</span>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-600">{t.actualDeposit}</Label>
+                  <Input 
+                    type="number" inputMode="decimal" placeholder="0.00" 
+                    value={bankDeposit.amount} onChange={e => setBankDeposit({...bankDeposit, amount: e.target.value})} 
+                    className="h-10 text-lg font-bold" 
+                  />
+                </div>
+                
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-600">{t.bankName}</Label>
+                  <Input 
+                    placeholder="e.g. BOC / Commercial Bank" 
+                    value={bankDeposit.bankName} onChange={e => setBankDeposit({...bankDeposit, bankName: e.target.value})} 
+                  />
+                </div>
+
+                <div className="space-y-1.5 pt-2">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-xs font-bold text-slate-600">{t.uploadSlip}</Label>
+                    <span className="text-[10px] text-slate-400 font-medium">(Optional)</span>
+                  </div>
+                  
+                  {!slipPreview ? (
+                    <div className="flex gap-2">
+                      {/* Camera Button */}
+                      <div className="relative flex-1">
+                        <input 
+                          type="file" accept="image/*" capture="environment"
+                          onChange={handleSlipChange}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        />
+                        <div className="flex flex-col items-center justify-center gap-1 p-3 border border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors h-full text-center">
+                          <Camera className="w-5 h-5 text-slate-500" />
+                          <span className="text-[11px] font-bold text-slate-600">Take Photo</span>
+                        </div>
+                      </div>
+
+                      {/* Gallery / File Button */}
+                      <div className="relative flex-1">
+                        <input 
+                          type="file" accept="image/*"
+                          onChange={handleSlipChange}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        />
+                        <div className="flex flex-col items-center justify-center gap-1 p-3 border border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors h-full text-center">
+                          <Upload className="w-5 h-5 text-slate-500" />
+                          <span className="text-[11px] font-bold text-slate-600">Upload Slip</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 mt-3 animate-in zoom-in-95 duration-200">
+                      <div className="relative rounded-xl overflow-hidden border-2 border-emerald-500/50 bg-black/5 flex justify-center p-2">
+                        <img src={slipPreview} alt="Bank Slip Preview" className="w-auto h-auto max-h-48 object-contain rounded-md shadow-sm" />
+                        <button 
+                          type="button" 
+                          onClick={() => { setSlipFile(null); setSlipPreview(null); }}
+                          className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-all active:scale-95"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => { setSlipFile(null); setSlipPreview(null); }}
+                          className="flex-1 text-xs border-slate-300 text-slate-600 h-10 hover:bg-slate-100"
+                        >
+                          Re-upload
+                        </Button>
+                        <Button 
+                          type="button" 
+                          className="flex-[2] text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white h-10 shadow-lg shadow-emerald-600/20"
+                          onClick={(e) => { e.preventDefault(); }}
+                        >
+                          <Check className="w-4 h-4 mr-1.5" /> Use this Photo
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            </div>
+            {/* End Step 2 */}
 
             {/* Fixed Bottom Summary & Submit */}
             <div className="sticky bottom-4 z-10 bg-slate-900 text-white p-4 sm:p-5 rounded-2xl shadow-2xl space-y-3 mt-8 border border-slate-700/50 backdrop-blur-xl">
@@ -649,14 +948,41 @@ export default function PublicConductorUpload() {
                 <span className="text-rose-400 text-sm font-medium">{t.totalExpenses}</span>
                 <span className="font-mono text-rose-400 font-bold">- Rs. {totalExpenses.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between items-center pt-1 pb-3">
+              <div className="flex justify-between items-center pt-1 pb-3 border-b border-slate-700/50">
                 <span className="font-black text-slate-100">{t.netBalance}</span>
                 <span className="font-mono font-black text-xl text-white">Rs. {netBalance.toFixed(2)}</span>
               </div>
 
-              <Button type="submit" disabled={loading} className="w-full h-14 text-lg font-black bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all active:scale-[0.98]">
-                {loading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t.submitting}</> : <><Send className="mr-2 h-5 w-5" /> {t.submit}</>}
-              </Button>
+              <div className="pt-2 flex gap-3">
+                {currentStep === 2 && (
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCurrentStep(1)} 
+                    className="flex-1 h-14 border-slate-600 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+                  >
+                    ← Back
+                  </Button>
+                )}
+                
+                {currentStep === 1 ? (
+                  <Button 
+                    type="button"
+                    onClick={() => setCurrentStep(2)} 
+                    className="w-full h-14 bg-blue-600 hover:bg-blue-500 text-white font-black text-lg rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all active:scale-[0.98] border-0"
+                  >
+                    Next: Expenses →
+                  </Button>
+                ) : (
+                  <Button 
+                    type="submit" 
+                    disabled={loading} 
+                    className="flex-[2] h-14 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all active:scale-[0.98] border-0"
+                  >
+                    {loading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t.submitting}</> : <><Send className="mr-2 h-5 w-5" /> {t.submit}</>}
+                  </Button>
+                )}
+              </div>
             </div>
 
           </form>

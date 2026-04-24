@@ -408,9 +408,15 @@ export function TripDetailsModal({
               customer_name: trip.quotation.customer_name,
               gross_revenue: trip.quotation.gross_revenue || 0,
               advance_paid: trip.advance_paid || 0,
+              balance_due: trip.balance_due || 0,
+              total_paid: trip.total_paid || 0,
+              assigned_driver_name: trip.assigned_driver_name,
+              assigned_conductor_name: trip.assigned_conductor_name,
+              assigned_bus_no: trip.assigned_bus_no,
               fuel_cost_fuel_only: trip.quotation.fuel_cost_fuel_only || 0,
               commission_pass_through_amount: trip.quotation.commission_pass_through_amount || 0,
               discount_amount_lkr: trip.quotation.discount_amount_lkr || 0,
+              total_additional_charges: trip.quotation.total_additional_charges || 0,
             }}
             adjustmentData={effectiveAdjustment}
             balanceInvoiceSent={!!effectiveAdjustment?.balance_invoice_document_id}

@@ -50,7 +50,7 @@ export interface ExpandedFleetRow extends FleetRosterRow {
 
 export type EditMode = 'master' | 'daily';
 
-export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode = 'master') {
+export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode = 'master', dieselPrice: number = 350) {
   const [roster, setRoster] = useState<FleetRosterRow[]>([]);
   const [expandedRows, setExpandedRows] = useState<ExpandedFleetRow[]>([]);
   const [availableRoutes, setAvailableRoutes] = useState<any[]>([]);
@@ -76,9 +76,14 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
 
       const { data: routesData } = await supabase
         .from("routes")
-        .select("id, route_no, route_name")
+        .select("id, route_no, route_name, distance_km")
         .eq("is_active", true);
       setAvailableRoutes(routesData || []);
+      
+      const routeDict = (routesData || []).reduce((acc: any, curr: any) => {
+        acc[curr.id] = curr;
+        return acc;
+      }, {});
 
       const rosterRows: FleetRosterRow[] = (rosterData || []).map((r: any) => ({
         id: r.id,
@@ -135,6 +140,8 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
           .in("bus_id", busIds);
 
         (expData || []).forEach((e: any) => {
+          fuelExpenseMap[e.bus_id] = (fuelExpenseMap[e.bus_id] || 0) + (e.fuel_cost || 0);
+          
           const total = (e.fuel_cost || 0) + (e.repair || 0) + (e.tyre_tube || 0) + (e.salary || 0) +
             (e.police || 0) + (e.food || 0) + (e.emission_fitness || 0) + (e.permits_renewal || 0) +
             (e.staff_accommodation || 0) + (e.highway_charges || 0) + (e.accident_compensation || 0) +
@@ -178,20 +185,32 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
             }
           }
 
-          // Meter & Fuel data from matched trip
-          const startMeter = matchedTrip?.odometer_start || 0;
-          const endMeter = matchedTrip?.odometer_end || 0;
-          const totalMileage = matchedTrip?.distance_km || (endMeter > startMeter ? endMeter - startMeter : 0);
-          const fuelLiters = matchedTrip?.fuel_liters || 0;
-          const fuelConsumption = fuelLiters > 0 && totalMileage > 0 ? totalMileage / fuelLiters : 0;
-          const standardRate = row.expected_km_per_liter;
-          const performance = fuelConsumption > 0 ? standardRate - fuelConsumption : 0;
-
           // Use per-trip route from daily_trips if available, else check local overrides, else roster default
           const overrideKey = `${row.id}__${seq}`;
           const override = tripOverrides[overrideKey];
           const tripRouteLabel = matchedTrip?.route_label || override?.route_label || row.route_label;
           const tripRouteId = matchedTrip?.route_id || override?.route_id || row.route_id;
+
+          // Meter & Fuel data from matched trip
+          const startMeter = matchedTrip?.odometer_start || 0;
+          const endMeter = matchedTrip?.odometer_end || 0;
+          let totalMileage = matchedTrip?.distance_km || (endMeter > startMeter ? endMeter - startMeter : 0);
+          
+          // Fallback distance to Route Dictionary average distance if Odometer readings are missing
+          if (totalMileage === 0 && tripRouteId && routeDict[tripRouteId]?.distance_km) {
+            totalMileage = routeDict[tripRouteId].distance_km;
+          }
+
+          // Auto-calculate Fuel Liters from expenses if not explicitly entered in daily_trips
+          let fuelLiters = matchedTrip?.fuel_liters || 0;
+          if (fuelLiters === 0 && fuelExpenseMap[row.bus_id || ''] && dieselPrice > 0) {
+             const busTotalFuelLiters = fuelExpenseMap[row.bus_id || ''] / dieselPrice;
+             fuelLiters = Math.round((busTotalFuelLiters / effectiveTripsPerDay) * 100) / 100;
+          }
+
+          const fuelConsumption = fuelLiters > 0 && totalMileage > 0 ? totalMileage / fuelLiters : 0;
+          const standardRate = row.expected_km_per_liter;
+          const performance = fuelConsumption > 0 ? standardRate - fuelConsumption : 0;
 
           expanded.push({
             ...row,
@@ -229,7 +248,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [dateStr]);
+  }, [dateStr, dieselPrice]);
 
   useEffect(() => {
     fetchRoster();

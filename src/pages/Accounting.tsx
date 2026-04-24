@@ -96,6 +96,7 @@ import { ExpenseReviewView } from "@/components/accounting/ExpenseReviewView";
 import { CompanyExpensesView } from "@/components/accounting/CompanyExpensesView";
 import { PettyCashView } from "@/components/accounting/PettyCashView";
 import { IOUManagementView } from "@/components/accounting/IOUManagementView";
+import MasterExpensesView from "@/components/accounting/expenses/MasterExpensesView";
 // Automation Components (Phase 1 - Zoho Parity)
 import { RecurringInvoicesView } from "@/components/accounting/automation/RecurringInvoicesView";
 import { PaymentReminderRulesView } from "@/components/accounting/automation/PaymentReminderRulesView";
@@ -560,6 +561,7 @@ const Accounting = () => {
                   <TabsTrigger value="company">Company Expenses</TabsTrigger>
                   <TabsTrigger value="petty-cash">Petty Cash</TabsTrigger>
                   <TabsTrigger value="iou">IOUs</TabsTrigger>
+                  <TabsTrigger value="master-expenses">Master Expenses</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
@@ -578,6 +580,10 @@ const Accounting = () => {
 
               <TabsContent value="iou">
                 <IOUManagementView />
+              </TabsContent>
+
+              <TabsContent value="master-expenses">
+                <MasterExpensesView />
               </TabsContent>
             </Tabs>
           )}

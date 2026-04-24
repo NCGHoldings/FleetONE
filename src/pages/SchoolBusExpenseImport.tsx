@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Upload, ListFilter as SelectIcon, CheckCircle2, AlertCircle, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, Upload, ListFilter as SelectIcon, CheckCircle2, AlertCircle, FileSpreadsheet, Check, ChevronsUpDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { read, utils } from "xlsx";
 import { format, parse } from "date-fns";
+import { recalculateCOABalances, fixBalanceDiscrepancies } from "@/lib/gl-posting-utils";
+import { cn } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import {
   Table,
   TableBody,
@@ -55,9 +59,13 @@ export default function SchoolBusExpenseImport() {
   const [vendors, setVendors] = useState<{id: string, vendor_name: string}[]>([]);
   const [pettyCashFunds, setPettyCashFunds] = useState<{id: string, fund_name: string}[]>([]);
   const [directAccounts, setDirectAccounts] = useState<{id: string, account_code: string, account_name: string, current_balance: number}[]>([]);
+  const [expenseAccounts, setExpenseAccounts] = useState<{id: string, account_code: string, account_name: string}[]>([]);
   
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<'ap' | 'iou' | 'petty_cash' | 'direct'>('ap');
+  const [globalExpenseType, setGlobalExpenseType] = useState<'fuel' | 'parking' | 'highway' | 'other'>('fuel');
+  const [expenseAccountId, setExpenseAccountId] = useState<string>("default");
+  const [expenseAccountOpen, setExpenseAccountOpen] = useState(false);
   
   // AP specific inputs
   const [vendorId, setVendorId] = useState<string>("");
@@ -102,6 +110,16 @@ export default function SchoolBusExpenseImport() {
         .eq("company_id", effectiveCompanyId);
       if (pcData) setPettyCashFunds(pcData);
 
+      // Fetch expense accounts for explicit mapping
+      const { data: expData } = await supabase
+        .from("chart_of_accounts")
+        .select("id, account_code, account_name")
+        .eq("company_id", effectiveCompanyId)
+        .eq("account_type", "expense")
+        .eq("is_active", true)
+        .order("account_name");
+      if (expData) setExpenseAccounts(expData as any);
+
       // Fetch float / bank / cash asset accounts for Direct Payment — scoped to active company
       const { data: acctData } = await supabase
         .from("chart_of_accounts")
@@ -121,6 +139,26 @@ export default function SchoolBusExpenseImport() {
     };
     initData();
   }, [effectiveCompanyId]);
+
+  // Auto-suggest the expense account based on type
+  useEffect(() => {
+    if (globalExpenseType === 'fuel' || expenseAccounts.length === 0) return;
+    
+    let searchWord = "other expense";
+    if (globalExpenseType === 'parking') searchWord = "parking";
+    if (globalExpenseType === 'highway') searchWord = "highway";
+    
+    // Try to find an account matching the word
+    const matchedAccount = expenseAccounts.find(a => 
+      a.account_name.toLowerCase().includes(searchWord)
+    );
+    
+    if (matchedAccount) {
+      setExpenseAccountId(matchedAccount.id);
+    } else {
+      setExpenseAccountId("default");
+    }
+  }, [globalExpenseType, expenseAccounts]);
 
   const parseExcelDate = (excelDate: string | number) => {
     if (!excelDate) return format(new Date(), "yyyy-MM-dd");
@@ -168,33 +206,60 @@ export default function SchoolBusExpenseImport() {
         
         // Map to our structure
         const mapped: MappedExpense[] = data.map((row) => {
-          const vehicleNo = row["Vehicle number"] ? String(row["Vehicle number"]).trim() : "Unknown";
-          
-          // Try to exact match Bus NO ignoring spaces
-          const matchedBus = buses.find(b => 
-            b.bus_no.toLowerCase().replace(/\s/g, '') === vehicleNo.toLowerCase().replace(/\s/g, '')
-          );
+          if (globalExpenseType === 'fuel') {
+            const vehicleNo = row["Vehicle number"] ? String(row["Vehicle number"]).trim() : "Unknown";
+            
+            // Try to exact match Bus NO ignoring spaces
+            const matchedBus = buses.find(b => 
+              b.bus_no.toLowerCase().replace(/\s/g, '') === vehicleNo.toLowerCase().replace(/\s/g, '')
+            );
 
-          // We'll capture route loosely if provided
-          const route = String(row["Bus Route"] || row["Route Code"] || "-");
+            // We'll capture route loosely if provided
+            const route = String(row["Bus Route"] || row["Route Code"] || "-");
 
-          const fuelCost = Number(row["Fuel Cost"]) || 0;
-          const liters = Number(row["Liters"]) || 0;
-          const mileage = Number(row["Mileage"]) || undefined;
+            const fuelCost = Number(row["Fuel Cost"]) || 0;
+            const liters = Number(row["Liters"]) || 0;
+            const mileage = Number(row["Mileage"]) || undefined;
 
-          return {
-            expenseDate: parseExcelDate(row["Date"]!),
-            busId: matchedBus?.id || "",
-            amount: fuelCost,
-            fuelLiters: liters,
-            odometerEnd: mileage,
-            routeTitle: route,
-            notes: row["Ref."] ? String(row["Ref."]) : undefined,
-            expenseType: 'fuel',
-            originalVehicleNumber: vehicleNo,
-            matchedBusNo: matchedBus?.bus_no,
-            isValid: !!matchedBus?.id && (fuelCost > 0),
-          };
+            return {
+              expenseDate: parseExcelDate(row["Date"]!),
+              busId: matchedBus?.id || "",
+              amount: fuelCost,
+              fuelLiters: liters,
+              odometerEnd: mileage,
+              routeTitle: route,
+              notes: row["Ref."] ? String(row["Ref."]) : undefined,
+              expenseType: 'fuel',
+              originalVehicleNumber: vehicleNo,
+              matchedBusNo: matchedBus?.bus_no,
+              isValid: !!matchedBus?.id && (fuelCost > 0),
+            };
+          } else {
+            // Parking / Highway / Other mapping
+            // Expected format: No | Bus No | Route Name | Account Name | Bank Name | Bank Acc No | Bank Branch | Amount
+            const vehicleNo = row["Bus No"] ? String(row["Bus No"]).trim() : "Unknown";
+            const matchedBus = buses.find(b => 
+              b.bus_no.toLowerCase().replace(/\s/g, '') === vehicleNo.toLowerCase().replace(/\s/g, '')
+            );
+            const route = String(row["Route Name"] || "-");
+            const amount = Number(row["Amount"]) || 0;
+
+            return {
+              expenseDate: format(new Date(), "yyyy-MM-dd"), // Assuming "Today" since there's no date column
+              busId: matchedBus?.id || "",
+              amount: amount,
+              routeTitle: route,
+              notes: row["No"] ? `Ref/No: ${row["No"]}` : undefined,
+              expenseType: globalExpenseType,
+              originalVehicleNumber: vehicleNo,
+              matchedBusNo: matchedBus?.bus_no,
+              isValid: !!matchedBus?.id && (amount > 0),
+              accountName: row["Account Name"] ? String(row["Account Name"]) : undefined,
+              bankName: row["Bank Name"] ? String(row["Bank Name"]) : undefined,
+              bankAccNo: row["Bank Acc No"] ? String(row["Bank Acc No"]) : undefined,
+              bankBranch: row["Bank Branch"] ? String(row["Bank Branch"]) : undefined,
+            };
+          }
         });
 
         // Filter out completely empty/invalid rows that just have 0 cost
@@ -249,6 +314,8 @@ export default function SchoolBusExpenseImport() {
       await uploadExpenses({
         branchId: selectedBranchId,
         paymentMethod: paymentMethod,
+        globalExpenseType: globalExpenseType,
+        expenseAccountId: expenseAccountId === 'default' ? undefined : expenseAccountId,
         vendorId: paymentMethod === 'ap' ? vendorId : undefined,
         invoiceNumber: paymentMethod === 'ap' ? invoiceNumber : undefined,
         invoiceDate: paymentMethod === 'ap' ? invoiceDate : undefined,
@@ -263,35 +330,176 @@ export default function SchoolBusExpenseImport() {
           odometerEnd: d.odometerEnd,
           notes: d.notes,
           expenseType: d.expenseType,
+          accountName: d.accountName,
+          bankName: d.bankName,
+          bankAccNo: d.bankAccNo,
+          bankBranch: d.bankBranch,
         }))
       });
-      navigate("/school-bus");
+      navigate("/school-bus-service");
     } catch (error: any) {
       console.error(error);
       // Toast displayed inside hook
     }
   };
 
+  const cleanupImports = async () => {
+    try {
+      toast.info("Cleaning up...", { description: "Removing corrupted imports for April 6th." });
+      
+      // 1. Delete AP Payments for DP-FUEL on April 6
+      const { error: apError } = await supabase.from("ap_payments").delete().like("payment_number", "DP-FUEL-%").eq("payment_date", "2026-04-06");
+      if (apError) throw new Error("AP Payments: " + apError.message);
+
+      // Get the IDs of the corrupted journal entries
+      const { data: jes } = await supabase.from("journal_entries").select("id").eq("source_module", "school_bus_fuel_import").eq("entry_date", "2026-04-06");
+      if (jes && jes.length > 0) {
+         const jeIds = jes.map(je => je.id);
+
+         // 1.5 Delete AP Invoices created from this import
+         const { error: invError } = await supabase.from("ap_invoices").delete().in("journal_entry_id", jeIds);
+         if (invError) throw new Error("AP Invoices: " + invError.message);
+         
+         // 2. Delete Journal Entry Lines
+         const { error: lineError } = await supabase.from("journal_entry_lines").delete().in("journal_entry_id", jeIds);
+         if (lineError) throw new Error("JE Lines: " + lineError.message);
+         
+         // 2.5 Delete Journal Entries
+         const { error: jeError } = await supabase.from("journal_entries").delete().in("id", jeIds);
+         if (jeError) throw new Error("JE: " + jeError.message);
+      }
+      
+      // 3. Delete Route Expenses
+      const { error: routeError } = await supabase.from("route_expenses").delete().eq("expense_type", "fuel").eq("expense_date", "2026-04-06");
+      if (routeError) throw new Error("Route Expenses: " + routeError.message);
+      
+      // 4. Delete Daily Bus Expenses
+      const { error: dailyError } = await supabase.from("daily_bus_expenses").delete().eq("expense_date", "2026-04-06");
+      if (dailyError) throw new Error("Daily Expenses: " + dailyError.message);
+
+      // 5. Restore the Float Balance!
+      const effectiveCompanyId = getEffectiveCompanyId("SBO");
+      if (effectiveCompanyId) {
+         const reconResult = await recalculateCOABalances(effectiveCompanyId);
+         if (reconResult.success && reconResult.discrepancies.length > 0) {
+            await fixBalanceDiscrepancies(reconResult.discrepancies);
+         }
+      }
+
+      toast.success("Success!", { description: "All April 6th imports cleared. Your Float Balance has been restored to 5,000,000! Please re-upload your Excel sheet now." });
+      
+      // Reload after a short delay so the React Query cache refreshes and shows 5M
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } catch (e: any) {
+      toast.error("Cleanup Error", { description: e.message });
+    }
+  };
+
   return (
     <AppLayout>
       <div className="p-6 max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/school-bus")}>
-             <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Import Fuel Expenses</h1>
-            <p className="text-muted-foreground mt-1">Upload daily bulk fuel and maintenance expenses via Excel.</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/school-bus")}>
+               <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Import Bulk Expenses</h1>
+              <p className="text-muted-foreground mt-1">Upload daily bulk fuel, parking, and maintenance expenses via Excel.</p>
+            </div>
           </div>
+          <Button variant="destructive" onClick={cleanupImports}>
+            Fix Missing Float Deductions (Clear April 6)
+          </Button>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
           <Card className="md:col-span-1 border-primary/20 bg-primary/5">
             <CardHeader>
                <CardTitle className="text-lg flex items-center gap-2"><SelectIcon className="h-4 w-4"/> Import Settings</CardTitle>
-               <CardDescription>Select Branch and Payment GL mapping.</CardDescription>
+               <CardDescription>Select Type, Branch and Payment mapping.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Expense Type</Label>
+                <Select value={globalExpenseType} onValueChange={(val: any) => setGlobalExpenseType(val)}>
+                  <SelectTrigger className="bg-white">
+                     <SelectValue placeholder="Select Expense Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fuel">Fuel Expenses</SelectItem>
+                    <SelectItem value="parking">Parking</SelectItem>
+                    <SelectItem value="highway">Highway Tolls</SelectItem>
+                    <SelectItem value="other">Other Expenses</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {globalExpenseType !== 'fuel' && (() => {
+                const selectedAccount = expenseAccounts.find(a => a.id === expenseAccountId);
+                
+                return (
+                  <div className="space-y-2">
+                    <Label>Expense Account (Debit)</Label>
+                    <Popover open={expenseAccountOpen} onOpenChange={setExpenseAccountOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={expenseAccountOpen}
+                          className="w-full justify-between bg-white border-primary/20"
+                        >
+                          {expenseAccountId === 'default' 
+                            ? <span className="italic">Auto-detect based on type</span>
+                            : selectedAccount ? selectedAccount.account_name : "Select GL Account..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search GL account..." />
+                          <CommandEmpty>No accounts found.</CommandEmpty>
+                          <CommandGroup className="max-h-[300px] overflow-auto">
+                            <CommandItem
+                              value="default"
+                              onSelect={() => {
+                                setExpenseAccountId("default");
+                                setExpenseAccountOpen(false);
+                              }}
+                              className="italic font-medium"
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", expenseAccountId === "default" ? "opacity-100" : "opacity-0")} />
+                              Auto-detect based on type
+                            </CommandItem>
+                            {expenseAccounts.map((a) => (
+                              <CommandItem
+                                key={a.id}
+                                value={a.account_name}
+                                onSelect={() => {
+                                  setExpenseAccountId(a.id);
+                                  setExpenseAccountOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    expenseAccountId === a.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {a.account_name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <p className="text-[10px] text-muted-foreground">Search and select a specific sector or account to override.</p>
+                  </div>
+                );
+              })()}
+
               <div className="space-y-2">
                 <Label>Branch (SBU)</Label>
                 <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
@@ -468,10 +676,31 @@ export default function SchoolBusExpenseImport() {
 
           <Card className="md:col-span-2">
              <CardHeader className="flex flex-row items-center justify-between pb-2 border-b">
-               <div>
-                 <CardTitle className="text-lg">Preview & Validate</CardTitle>
-                 <CardDescription>Verify system matching before confirming import.</CardDescription>
+               <div className="flex flex-col gap-1">
+                 <CardTitle className="text-lg flex items-center gap-2">
+                   Preview & Validate {globalExpenseType === 'fuel' ? 'Fuel' : globalExpenseType.charAt(0).toUpperCase() + globalExpenseType.slice(1)} Data
+                 </CardTitle>
+                 <CardDescription>
+                   {globalExpenseType === 'fuel' 
+                     ? "Ensure columns match: Ref, Date, Liters, Fuel Cost, Route Code, Vehicle number, Mileage"
+                     : "Ensure columns match: No, Bus No, Route Name, Account Name, Bank Name, Bank Acc No, Bank Branch, Amount"}
+                 </CardDescription>
                </div>
+               
+               <div className="flex items-center gap-3">
+                  <Button variant="outline" size="sm" onClick={() => {
+                     const a = document.createElement("a");
+                     if (globalExpenseType === 'fuel') {
+                        a.href = "data:text/csv;charset=utf-8,Ref.,Date,Liters,Fuel Cost,SBU,Route Code,Vehicle number,Mileage,Bus Route\nREF-001,2026-04-06,50,15000,SBU1,RT-1,NB-1234,12000,Colombo";
+                        a.download = "fuel_import_template.csv";
+                     } else {
+                        a.href = "data:text/csv;charset=utf-8,No,Bus No,Route Name,Account Name,Bank Name,Bank Acc No,Bank Branch,Amount\n01,NB-1234,Colombo,John Doe,BOC,123456789,Colombo 01,5000";
+                        a.download = `${globalExpenseType}_import_template.csv`;
+                     }
+                     a.click();
+                  }}>
+                     <FileSpreadsheet className="w-4 h-4 mr-2" /> Template
+                  </Button>
                
                {(() => {
                  const selectedAcct = directAccounts.find(a => a.id === directPaymentAccountId);
@@ -492,6 +721,7 @@ export default function SchoolBusExpenseImport() {
                    </Button>
                  );
                })()}
+               </div>
              </CardHeader>
              <CardContent className="p-0">
                {isProcessing ? (
@@ -512,9 +742,10 @@ export default function SchoolBusExpenseImport() {
                           <TableHead>Vehicle (Excel)</TableHead>
                           <TableHead>Mapped Bus</TableHead>
                           <TableHead>Route</TableHead>
-                          <TableHead className="text-right">Fuel Cost</TableHead>
-                          <TableHead className="text-right">Liters</TableHead>
-                          <TableHead className="text-right">Mileage</TableHead>
+                          {globalExpenseType !== 'fuel' && <TableHead>Bank Details</TableHead>}
+                          <TableHead className="text-right">{globalExpenseType === 'fuel' ? 'Fuel Cost' : 'Amount'}</TableHead>
+                          {globalExpenseType === 'fuel' && <TableHead className="text-right">Liters</TableHead>}
+                          {globalExpenseType === 'fuel' && <TableHead className="text-right">Mileage</TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -546,9 +777,15 @@ export default function SchoolBusExpenseImport() {
                                )}
                             </TableCell>
                             <TableCell className="text-muted-foreground">{row.routeTitle}</TableCell>
+                            {globalExpenseType !== 'fuel' && (
+                              <TableCell className="text-xs">
+                                <div className="font-medium">{row.bankName} - {row.bankAccNo}</div>
+                                <div className="text-muted-foreground">{row.accountName} {row.bankBranch ? `(${row.bankBranch})` : ''}</div>
+                              </TableCell>
+                            )}
                             <TableCell className="text-right font-medium">Rs. {row.amount.toLocaleString()}</TableCell>
-                            <TableCell className="text-right">{row.fuelLiters}L</TableCell>
-                            <TableCell className="text-right text-muted-foreground">{row.odometerEnd ? `${row.odometerEnd} km` : '-'}</TableCell>
+                            {globalExpenseType === 'fuel' && <TableCell className="text-right">{row.fuelLiters}L</TableCell>}
+                            {globalExpenseType === 'fuel' && <TableCell className="text-right text-muted-foreground">{row.odometerEnd ? `${row.odometerEnd} km` : '-'}</TableCell>}
                           </TableRow>
                         ))}
                       </TableBody>

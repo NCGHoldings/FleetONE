@@ -776,7 +776,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                     onChange={(e) => setBankFeeAmount(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
                     min={0}
-                    step="0.01"
+                    step="any"
                     className="mt-1"
                   />
                 </div>
@@ -810,7 +810,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                     className="text-2xl h-14 font-bold"
                     placeholder="Enter advance amount"
                     min={0}
-                    step="0.01"
+                    step="any"
                   />
                   <p className="text-sm text-muted-foreground mt-1">
                     This amount will be recorded as an advance and can be allocated to invoices later.
@@ -896,7 +896,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                               onChange={(e) => updateLine(line.id, "tax_rate", parseFloat(e.target.value) || 0)}
                               className="h-8 text-right"
                               min={0}
-                              step="0.01"
+                              step="any"
                             />
                           </td>
                           <td className="px-2 py-2 text-right font-mono text-sm">
@@ -1016,7 +1016,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                                   onChange={(e) => updateAllocation(alloc.invoice_id, "write_off_amount", parseFloat(e.target.value) || 0)}
                                   className="h-8 text-right"
                                   min={0}
-                                  step="0.01"
+                                  step="any"
                                   placeholder="0.00"
                                 />
                               </td>
@@ -1027,7 +1027,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                                   onChange={(e) => updateAllocation(alloc.invoice_id, "wht_deducted", parseFloat(e.target.value) || 0)}
                                   className="h-8 text-right"
                                   min={0}
-                                  step="0.01"
+                                  step="any"
                                   placeholder="WHT"
                                 />
                               </td>
@@ -1039,7 +1039,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                                   className="h-8 text-right"
                                   max={alloc.balance}
                                   min={0}
-                                  step="0.01"
+                                  step="any"
                                 />
                               </td>
                             </tr>

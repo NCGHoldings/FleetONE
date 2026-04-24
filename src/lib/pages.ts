@@ -34,6 +34,7 @@ export const PAGES: PageCategories = {
     { id: "staff_management", title: "Staff Management", url: "/staff" },
     { id: "staff_performance", title: "Staff Performance", url: "/staff-performance" },
     { id: "system_issues", title: "System Issues", url: "/system-issues" },
+    { id: "smart_diary", title: "Smart Diary", url: "/diary" },
   ],
   operations: [
     { id: "route_permits", title: "Route Permits", url: "/permits" },

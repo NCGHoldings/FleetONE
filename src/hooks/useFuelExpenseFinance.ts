@@ -94,28 +94,44 @@ export function usePostFuelExpenseToGL() {
           .maybeSingle();
       }
 
-      const financeSettings = settings.data;
-
+      const financeSettings = settings?.data;
       if (!financeSettings) {
-        throw new Error("Finance settings not configured for School Bus Operations");
+        console.warn("Finance settings not configured for School Bus Operations. Relying on fallbacks.");
       }
 
       // Validate required accounts
-      if (!financeSettings.fuel_expense_account_id) {
-        throw new Error("Fuel Expense Account not configured in Finance Settings");
+      let fuelAccountId = financeSettings?.fuel_expense_account_id;
+      if (!fuelAccountId) {
+        const { data: fuelCOA } = await supabase
+          .from("chart_of_accounts")
+          .select("id")
+          .eq("company_id", effectiveCompanyId)
+          .ilike("account_name", "%Fuel%")
+          .eq("account_type", "expense")
+          .limit(1)
+          .maybeSingle();
+        if (fuelCOA) fuelAccountId = fuelCOA.id;
+        else throw new Error("Fuel Expense Account not configured in Finance Settings, and no default 'Fuel' account found.");
       }
 
-      if (expense.paymentMethod === 'direct' && !financeSettings.fuel_bank_account_id) {
-        throw new Error("Fuel Bank Account not configured in Finance Settings. Please add it in Settings → School Bus Finance");
-      }
-
-      // 2. Prepare GL accounts based on payment method
       let creditAccountId: string;
       let creditAccountName: string;
 
       if (expense.paymentMethod === 'direct') {
-        // Direct payment from fuel bank
-        creditAccountId = financeSettings.fuel_bank_account_id!;
+        let bankAccountId = financeSettings?.fuel_bank_account_id;
+        if (!bankAccountId) {
+          const { data: bankCOA } = await supabase
+            .from("chart_of_accounts")
+            .select("id")
+            .eq("company_id", effectiveCompanyId)
+            .ilike("account_name", "%Bank%")
+            .eq("account_type", "asset")
+            .limit(1)
+            .maybeSingle();
+          if (bankCOA) bankAccountId = bankCOA.id;
+          else throw new Error("Fuel Bank Account not configured in Finance Settings, and no default 'Bank' account found.");
+        }
+        creditAccountId = bankAccountId;
         creditAccountName = "Fuel Bank Account";
       } else {
         // Credit purchase - need trade payable account
@@ -173,7 +189,7 @@ export function usePostFuelExpenseToGL() {
         .insert([
           {
             journal_entry_id: journalEntry.id,
-            account_id: financeSettings.fuel_expense_account_id,
+            account_id: fuelAccountId,
             description: `Fuel Expense - ${expense.fuelStation || expense.billNumber || 'General'}`,
             debit: expense.amount,
             credit: 0,
@@ -203,7 +219,7 @@ export function usePostFuelExpenseToGL() {
         const { data: bankAccount } = await supabase
           .from("bank_accounts")
           .select("id, current_balance")
-          .eq("gl_account_id", financeSettings.fuel_bank_account_id)
+          .eq("gl_account_id", creditAccountId)
           .maybeSingle();
 
         if (bankAccount) {

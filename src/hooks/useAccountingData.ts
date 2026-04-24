@@ -106,15 +106,15 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
         // Fallback to prefix matching for legacy bridged records natively prefixed with short_code
         const cName = selectedCompany.name.toLowerCase();
         if (cName.includes("yutong")) {
-          query = query.ilike("entry_number", "YUT-%");
+          query = query.or("entry_number.ilike.YUT-%,business_unit_code.eq.YUT");
         } else if (cName.includes("sinotruck")) {
-          query = query.ilike("entry_number", "SNT-%");
+          query = query.or("entry_number.ilike.SNT-%,business_unit_code.eq.SNT");
         } else if (cName.includes("school bus")) {
-          query = query.ilike("entry_number", "SBS-%");
+          query = query.or("entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,business_unit_code.eq.SBO");
         } else if (cName.includes("special hire")) {
-          query = query.ilike("entry_number", "SPH-%");
+          query = query.or("entry_number.ilike.SPH-%,business_unit_code.eq.SPH");
         } else if (cName.includes("light vehicle")) {
-          query = query.ilike("entry_number", "LTV-%");
+          query = query.or("entry_number.ilike.LTV-%,business_unit_code.eq.LTV");
         }
       }
 

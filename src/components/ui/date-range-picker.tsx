@@ -10,6 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface DateRangePickerProps {
   onDateRangeChange: (dateRange: { from?: Date; to?: Date } | undefined) => void;
@@ -21,10 +22,22 @@ export function DateRangePicker({
   className 
 }: DateRangePickerProps) {
   const [date, setDate] = useState<DateRange | undefined>();
+  const [pickerMode, setPickerMode] = useState<"single" | "range">("range");
 
-  const handleDateSelect = (selectedDate: DateRange | undefined) => {
+  const handleRangeSelect = (selectedDate: DateRange | undefined) => {
     setDate(selectedDate);
     onDateRangeChange(selectedDate);
+  };
+
+  const handleSingleSelect = (selectedDate: Date | undefined) => {
+    if (!selectedDate) {
+      setDate(undefined);
+      onDateRangeChange(undefined);
+    } else {
+      const newRange = { from: selectedDate, to: selectedDate };
+      setDate(newRange);
+      onDateRangeChange(newRange);
+    }
   };
 
   const handleClear = () => {
@@ -46,7 +59,7 @@ export function DateRangePicker({
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {date?.from ? (
-              date.to ? (
+              date.to && date.to.getTime() !== date.from.getTime() ? (
                 <>
                   {format(date.from, "LLL dd, y")} -{" "}
                   {format(date.to, "LLL dd, y")}
@@ -55,7 +68,7 @@ export function DateRangePicker({
                 format(date.from, "LLL dd, y")
               )
             ) : (
-              <span>Pick a date range</span>
+              <span>Pick a date</span>
             )}
             {date && (
               <Button
@@ -73,15 +86,35 @@ export function DateRangePicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={date?.from}
-            selected={date}
-            onSelect={handleDateSelect}
-            numberOfMonths={2}
-            className="p-3 pointer-events-auto"
-          />
+          <div className="border-b p-2">
+            <Tabs value={pickerMode} onValueChange={(v) => setPickerMode(v as "single" | "range")}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="single">Single Date</TabsTrigger>
+                <TabsTrigger value="range">Date Range</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          {pickerMode === "range" ? (
+            <Calendar
+              initialFocus
+              mode="range"
+              defaultMonth={date?.from}
+              selected={date}
+              onSelect={handleRangeSelect}
+              numberOfMonths={2}
+              className="p-3 pointer-events-auto"
+            />
+          ) : (
+            <Calendar
+              initialFocus
+              mode="single"
+              defaultMonth={date?.from}
+              selected={date?.from}
+              onSelect={handleSingleSelect}
+              numberOfMonths={1}
+              className="p-3 pointer-events-auto"
+            />
+          )}
         </PopoverContent>
       </Popover>
     </div>

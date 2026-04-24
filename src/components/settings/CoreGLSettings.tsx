@@ -31,6 +31,8 @@ interface CoreGLSettingsData {
   tax_payable_account_id: string | null;     // Output VAT (AR side - liability)
   // Banking
   bank_account_id: string | null;            // Default bank for receipts/payments
+  // Staff & Employee
+  staff_advance_account_id: string | null;   // IOU and Staff Advances
 }
 
 const defaultSettings: CoreGLSettingsData = {
@@ -43,6 +45,7 @@ const defaultSettings: CoreGLSettingsData = {
   input_tax_account_id: null,
   tax_payable_account_id: null,
   bank_account_id: null,
+  staff_advance_account_id: null,
 };
 
 export function CoreGLSettings() {
@@ -247,6 +250,23 @@ export function CoreGLSettings() {
                 'input_tax_account_id',
                 'Select Input Tax Account',
                 'DR when VAT is paid on AP Invoices (e.g. 18% VAT on purchases)'
+              )}
+            </div>
+          </div>
+
+          <Separator />
+
+          <div>
+            <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-orange-500" />
+              Staff & Employee Accounts
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {renderAccountSelect(
+                'Staff Advance / IOU Account (Asset)',
+                'staff_advance_account_id',
+                'Select Staff Advance Account',
+                'Default account to debit when issuing IOUs or Staff Advances'
               )}
             </div>
           </div>
