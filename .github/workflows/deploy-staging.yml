@@ -94,7 +94,7 @@ jobs:
       - name: Smoke Test & Health Check
         run: |
           echo "🏥 Running post-deploy smoke test on Staging..."
-          STAGING_URL="http://${{ secrets.VPS_HOST }}"
+          STAGING_URL="https://staging.fleetone.ncg.lk"
 
           MAX_RETRIES=5
           RETRY_DELAY=15

@@ -10,6 +10,8 @@
 |-----|-------|
 | **Project Name** | FleetONE |
 | **Repository** | NCGHoldings/FleetONE |
+| **Production URL** | `https://fleetone.ncg.lk` |
+| **Staging URL** | `https://staging.fleetone.ncg.lk` |
 | **Framework** | React 18 + Vite 5 + TypeScript 5 |
 | **Package Version** | 1.4.0 |
 | **Node Target** | 20 (LTS) |

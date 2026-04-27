@@ -1,6 +1,7 @@
 name: Deploy to Production
 # ⚠️  This workflow ONLY fires on push to 'deploy/live' branch or manual dispatch.
 # To deploy to production: git push origin main:deploy/live
+# Production URL: https://fleetone.ncg.lk
 
 on:
   push:
@@ -97,7 +98,7 @@ jobs:
           RELEASE_DIR: ${{ steps.timestamp.outputs.DIR }}
         run: |
           echo "🏥 Running post-deploy smoke test on Production..."
-          PROD_URL="http://${{ secrets.VPS_HOST }}"
+          PROD_URL="https://fleetone.ncg.lk"
 
           MAX_RETRIES=5
           RETRY_DELAY=15
