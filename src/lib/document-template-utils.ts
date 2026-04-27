@@ -288,8 +288,8 @@ export const mapDocumentToPlaceholders = (
     case 'logo_and_html':
     default: {
       // Standard mode: logo on left + company details (default)
-      // Try headerImageUrl first, then fall back to company logo_url
-      const logoToUse = headerImageUrl || companyLogoUrl;
+      // Try headerImageUrl first, then fall back to company logo_url, then NCG master logo
+      const logoToUse = headerImageUrl || companyLogoUrl || `${window.location.origin}/ncg-holdings-logo.png`;
       placeholders['{{company_logo}}'] = logoToUse 
         ? `<img src="${logoToUse}" style="max-height: 200px; max-width: 400px; object-fit: contain;" alt="Company Logo" />`
         : '';
@@ -304,6 +304,90 @@ export const mapDocumentToPlaceholders = (
 
   // Document-type specific mappings
   switch (documentType) {
+    case 'purchase_order': {
+      const isYutongOrder = documentData?.bus_model !== undefined;
+
+      placeholders['{{po_number}}'] = documentData?.po_number || documentData?.order_no || '';
+      placeholders['{{order_date}}'] = formatDate(documentData?.order_date);
+      placeholders['{{expected_date}}'] = formatDate(documentData?.expected_date || documentData?.expected_delivery_date);
+      
+      if (isYutongOrder) {
+        placeholders['{{vendor_name}}'] = 'ZHENGZHOU YUTONG BUS CO., LTD.';
+        placeholders['{{vendor_address}}'] = 'Yutong Industrial Park, Zhengzhou, Henan, China';
+        placeholders['{{vendor_contact}}'] = 'Export Division';
+        placeholders['{{delivery_address}}'] = 'As per LC instructions';
+      } else {
+        placeholders['{{vendor_name}}'] = documentData?.vendors?.vendor_name || '';
+        placeholders['{{vendor_address}}'] = documentData?.vendors?.address || '';
+        placeholders['{{vendor_contact}}'] = documentData?.vendors?.contact_person || documentData?.vendors?.phone || '';
+        placeholders['{{delivery_address}}'] = documentData?.delivery_address || 'As per instructions';
+      }
+
+      placeholders['{{sub_total}}'] = formatCurrency(documentData?.total_amount); // We assume total_amount is gross here, or calculate from lines if possible
+      placeholders['{{tax_amount}}'] = formatCurrency(0); // If PO doesn't store tax, assume 0 or calculate from lines
+      placeholders['{{grand_total}}'] = formatCurrency(documentData?.total_amount);
+      placeholders['{{currency}}'] = documentData?.currency || (isYutongOrder ? 'USD' : 'LKR');
+      placeholders['{{amount_in_words}}'] = numberToWords(documentData?.total_amount || 0);
+      placeholders['{{terms_conditions}}'] = documentData?.notes || 'Standard terms and conditions apply.';
+      placeholders['{{prepared_by}}'] = documentData?.prepared_by || '';
+
+      // Generate HTML items table
+      if (isYutongOrder && (!lineItems || lineItems.length === 0)) {
+        const qty = documentData.quantity || 1;
+        const total = documentData.total_amount || 0;
+        const price = qty > 0 ? total / qty : total;
+        
+        let desc = `Yutong ${documentData.bus_model}`;
+        if (documentData.engine_type) desc += `<br/>Engine: ${documentData.engine_type}`;
+        if (documentData.color_scheme) desc += `<br/>Color: ${documentData.color_scheme}`;
+        
+        let itemsHtml = `
+          <tr>
+            <td style="border: 1px solid #000; padding: 8px; text-align: center;">1</td>
+            <td style="border: 1px solid #000; padding: 8px;">${desc}</td>
+            <td style="border: 1px solid #000; padding: 8px; text-align: center;">${qty}</td>
+            <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatCurrency(price).replace('LKR', '').trim()}</td>
+            <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatCurrency(total).replace('LKR', '').trim()}</td>
+          </tr>
+        `;
+        placeholders['{{items_html}}'] = itemsHtml;
+        placeholders['{{sub_total}}'] = formatCurrency(total).replace('LKR', '').trim();
+        placeholders['{{grand_total}}'] = formatCurrency(total).replace('LKR', '').trim();
+      } else if (lineItems && lineItems.length > 0) {
+        let itemsHtml = '';
+        let subtotal = 0;
+        
+        const poCurrency = documentData?.currency || (isYutongOrder ? 'USD' : 'LKR');
+        const currencyPrefix = poCurrency === 'USD' ? '$' : '';
+        
+        lineItems.forEach((item: any, idx: number) => {
+          const qty = item.quantity || 1;
+          const price = item.unit_price || 0;
+          const total = qty * price;
+          subtotal += total;
+          
+          const itemName = item.items?.item_name || item.description || item.item_id || '';
+          
+          itemsHtml += `
+            <tr>
+              <td style="border: 1px solid #000; padding: 8px; text-align: center;">${idx + 1}</td>
+              <td style="border: 1px solid #000; padding: 8px;">${itemName}</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: center;">${qty}</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${currencyPrefix}${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${currencyPrefix}${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>
+          `;
+        });
+        placeholders['{{items_html}}'] = itemsHtml;
+        placeholders['{{sub_total}}'] = `${currencyPrefix}${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        placeholders['{{grand_total}}'] = `${currencyPrefix}${(documentData?.total_amount || subtotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      } else {
+        placeholders['{{items_html}}'] = '<tr><td colspan="5" style="border: 1px solid #000; padding: 8px; text-align: center;">No items found</td></tr>';
+        placeholders['{{sub_total}}'] = formatCurrency(documentData?.total_amount).replace('LKR', '').trim();
+        placeholders['{{grand_total}}'] = formatCurrency(documentData?.total_amount).replace('LKR', '').trim();
+      }
+      break;
+    }
     case 'ar_invoice': {
       placeholders['{{invoice_number}}'] = documentData?.invoice_number || '';
       placeholders['{{invoice_date}}'] = formatDate(documentData?.invoice_date);
@@ -924,6 +1008,9 @@ export const mapDocumentToPlaceholders = (
       
       if (value === null || value === undefined) {
         placeholders[placeholder] = '';
+      } else if (typeof value === 'string' && key.endsWith('_signature') && value.length > 10) {
+        // Automatically wrap signature fields in an img tag
+        placeholders[placeholder] = `<img src="${value}" style="max-height: 60px; max-width: 150px; object-fit: contain;" alt="Signature" />`;
       } else if (typeof value === 'object' && !Array.isArray(value)) {
         // For nested objects (e.g. vendors, customers), flatten as {{parent_child}}
         Object.entries(value as Record<string, any>).forEach(([nestedKey, nestedValue]) => {

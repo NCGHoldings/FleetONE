@@ -1079,18 +1079,47 @@ export function usePostPaymentToGL() {
 
       // Try default settings if no branch-specific settings
       let effectiveSettings = settings;
-      if (!settings) {
-        const { data: defaultSettings } = await supabase
+      if (!settings || !settings.trade_receivable_account_id) {
+        // Fallback 1: Any company's settings for this branch with configured accounts
+        const { data: crossBranchSettings } = await supabase
           .from("school_bus_finance_settings")
           .select("*")
-          .eq("company_id", selectedCompanyId)
-          .is("branch_id", null)
+          .eq("branch_id", branchId)
+          .not("trade_receivable_account_id", "is", null)
+          .not("sbs_collection_account_id", "is", null)
+          .limit(1)
           .maybeSingle();
-        effectiveSettings = defaultSettings;
+
+        if (crossBranchSettings) {
+          effectiveSettings = crossBranchSettings;
+        } else {
+          // Fallback 2: Default settings (branch_id is null) for selected company
+          const { data: defaultSettings } = await supabase
+            .from("school_bus_finance_settings")
+            .select("*")
+            .eq("company_id", selectedCompanyId)
+            .is("branch_id", null)
+            .maybeSingle();
+          effectiveSettings = defaultSettings;
+
+          // Fallback 3: Any default settings with configured accounts
+          if (!effectiveSettings || !effectiveSettings.trade_receivable_account_id) {
+            const { data: anyDefault } = await supabase
+              .from("school_bus_finance_settings")
+              .select("*")
+              .is("branch_id", null)
+              .not("trade_receivable_account_id", "is", null)
+              .not("sbs_collection_account_id", "is", null)
+              .limit(1)
+              .maybeSingle();
+            if (anyDefault) effectiveSettings = anyDefault;
+          }
+        }
       }
 
       if (!effectiveSettings) {
-        throw new Error("Finance settings not configured for this branch");
+        console.warn("No finance settings found for branch", branchId, "- skipping GL posting");
+        return null; // Gracefully skip GL posting instead of blocking the payment
       }
 
       if (!effectiveSettings.trade_receivable_account_id) {
@@ -1298,7 +1327,7 @@ export function usePostPaymentToGL() {
             reference: referenceNo || paymentId,
             status: 'posted',
             journal_entry_id: journalEntry.id,
-            bank_account_id: null,
+            bank_account_id: effectiveSettings.bank_account_id || null,
             notes: `School Bus Payment - ${studentName}`,
             is_advance: (overpaymentAmount && overpaymentAmount > 0) ? true : false,
           } as any)
@@ -1311,6 +1340,36 @@ export function usePostPaymentToGL() {
             .from("school_payment_transactions")
             .update({ ar_receipt_id: arReceipt.id })
             .eq("id", paymentId);
+
+          // If a bank account is configured, record the bank transaction and update balance
+          if (effectiveSettings.bank_account_id && amount > 0) {
+            await supabase.from("bank_transactions").insert([{
+              bank_account_id: effectiveSettings.bank_account_id,
+              transaction_date: format(new Date(), "yyyy-MM-dd"),
+              transaction_type: "receipt",
+              description: `School Bus Payment from ${studentName} - ${receiptNumber}`,
+              debit_amount: amount,
+              credit_amount: 0,
+              reference: referenceNo || paymentId,
+              company_id: effectiveCompanyId,
+              source_type: "ar_receipt",
+              source_id: arReceipt.id,
+            }]);
+
+            // Update running balance on the bank account
+            const { data: bankAccount } = await supabase
+              .from("bank_accounts")
+              .select("current_balance")
+              .eq("id", effectiveSettings.bank_account_id)
+              .single();
+
+            if (bankAccount) {
+              await supabase
+                .from("bank_accounts")
+                .update({ current_balance: (bankAccount.current_balance || 0) + amount })
+                .eq("id", effectiveSettings.bank_account_id);
+            }
+          }
         }
       } catch (receiptError) {
         console.error("AR Receipt creation failed (non-critical):", receiptError);

@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface PaymentTransaction {
   id: string;
@@ -55,6 +56,63 @@ export function PaymentHistoryModal({ isOpen, onClose, studentId, studentName }:
     } catch (error: any) {
       console.error("Error fetching payment history:", error);
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteTransaction = async (transaction: PaymentTransaction) => {
+    if (!studentId) return;
+    
+    if (!confirm("Are you sure you want to delete this payment? This will adjust the student's balance back.")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Calculate how much this transaction actually changed the balance
+      const balanceImpact = transaction.payment_balance_after - transaction.payment_balance_before;
+      
+      // 1. Fetch current student balance
+      const { data: studentData, error: studentError } = await supabase
+        .from("school_students")
+        .select("payment_balance")
+        .eq("id", studentId)
+        .single();
+        
+      if (studentError) throw studentError;
+      
+      // 2. Reverse the exact impact
+      const newBalance = (studentData.payment_balance || 0) - balanceImpact;
+      const newAmountDue = Math.max(0, -newBalance);
+
+      // 3. Delete the transaction
+      const { error: deleteError } = await supabase
+        .from("school_payment_transactions")
+        .delete()
+        .eq("id", transaction.id);
+        
+      if (deleteError) throw deleteError;
+
+      // 4. Update student
+      const { error: updateError } = await supabase
+        .from("school_students")
+        .update({
+          payment_balance: newBalance,
+          current_amount_due: newAmountDue
+        })
+        .eq("id", studentId);
+
+      if (updateError) throw updateError;
+      
+      // 5. If there's an AR Receipt linked in Finance, we should probably warn them
+      if (transaction.reference_no?.startsWith('IMPORT-')) {
+         alert("Note: This was a bank import. You may need to manually void the corresponding AR Receipt in the Finance module if it was created.");
+      }
+
+      fetchPaymentHistory();
+    } catch (error: any) {
+      console.error("Error deleting transaction:", error);
+      alert(error.message || "Failed to delete transaction");
       setLoading(false);
     }
   };
@@ -150,6 +208,7 @@ export function PaymentHistoryModal({ isOpen, onClose, studentId, studentName }:
                     <TableHead className="text-right">Balance After</TableHead>
                     <TableHead>Method</TableHead>
                     <TableHead>Reference</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -198,6 +257,17 @@ export function PaymentHistoryModal({ isOpen, onClose, studentId, studentName }:
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {transaction.reference_no || "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteTransaction(transaction)}
+                            title="Delete this payment"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))

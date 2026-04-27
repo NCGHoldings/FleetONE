@@ -46,6 +46,7 @@ export interface InvoiceData {
   extraKm?: number;
   extraKmChargePerKm?: number;
   extraKmTotalCharge?: number;
+  totalTimeAdjustment?: number;
   additionalExpenses?: Array<{
     description: string;
     amount: number;
@@ -308,7 +309,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
   // ============ BALANCE / INVOICE FORMAT — with multi-page pagination ============
   const discount = data.discountAmount || 0;
   const subTotal = data.totalAmount;
-  const adjustmentTotal = (data.extraKmTotalCharge || 0) + (data.totalAdditionalExpenses || 0);
+  const adjustmentTotal = (data.extraKmTotalCharge || 0) + (data.totalAdditionalExpenses || 0) + (data.totalTimeAdjustment || 0);
   const adjustedSubTotal = subTotal + adjustmentTotal;
   const priceAfterDiscount = adjustedSubTotal - discount;
   const totalPaid = data.paidAmount || 0;
@@ -351,8 +352,9 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
 
   // Determine total page count
   const showSignaturePage = !data.forCustomer && !data.hideSignaturePage;
+  const forceTotalsToNewPage = (itemDetail || '').length > 250;
   const itemPageCount = pageChunks.length;
-  const totalPages = itemPageCount + (showSignaturePage ? 1 : 0);
+  const totalPages = itemPageCount + (forceTotalsToNewPage ? 1 : 0) + (showSignaturePage ? 1 : 0);
 
   // ---- Build totals / summary HTML ----
   const totalsHTML = `
@@ -375,6 +377,12 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${(data.extraKmTotalCharge || 0).toLocaleString()}.00</td>
       </tr>
       ` : ''}
+      ${data.hasAdjustments && data.totalTimeAdjustment && data.totalTimeAdjustment !== 0 ? `
+      <tr style="background: #fdf4ff;">
+        <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Time Adjustment (Overtime/Overnight)</td>
+        <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${data.totalTimeAdjustment > 0 ? '+' : ''}${(data.totalTimeAdjustment || 0).toLocaleString()}.00</td>
+      </tr>
+      ` : ''}
       ${data.hasAdjustments && data.additionalExpenses && data.additionalExpenses.length > 0 ? `
       <tr style="background: #ffe6f0;">
         <td style="border: 1px solid #ddd; padding: 6px; font-size: 12px;" colspan="2">
@@ -392,7 +400,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
       ${data.hasAdjustments ? `
       <tr style="background: #e6f7ff;">
         <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Total Adjustments</td>
-        <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">+${adjustmentTotal.toLocaleString()}.00</td>
+        <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${adjustmentTotal > 0 ? '+' : ''}${adjustmentTotal.toLocaleString()}.00</td>
       </tr>
       <tr>
         <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; background: #f5f5f5;">Adjusted Sub-Total</td>
@@ -538,7 +546,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     `;
 
     // If this is the last item page, append totals + payment info
-    if (isLastItemPage) {
+    if (isLastItemPage && !forceTotalsToNewPage) {
       pageContent += totalsHTML;
     }
 
@@ -557,9 +565,26 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     `);
   });
 
+  if (forceTotalsToNewPage) {
+    const totalsPageNum = itemPageCount + 1;
+    let totalsPageContent = miniHeader(companyLogo, documentTitle, data.invoiceNo, data.quotationNo, currentDate);
+    totalsPageContent += totalsHTML;
+    totalsPageContent += `
+      <div style="margin-top: 15px; padding-top: 10px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
+        Page ${totalsPageNum} of ${totalPages}<br>
+         NCG Holding - Transport Management System
+      </div>
+    `;
+    pagesHTML.push(`
+      <div data-pdf-page="${totalsPageNum}" style="position: relative; width: 210mm; min-height: 297mm; padding: 15px 15px 25px 15px; box-sizing: border-box; background: #fff;">
+        ${totalsPageContent}
+      </div>
+    `);
+  }
+
   // ---- Signature page ----
   if (showSignaturePage) {
-    const sigPageNum = itemPageCount + 1;
+    const sigPageNum = itemPageCount + (forceTotalsToNewPage ? 1 : 0) + 1;
     pagesHTML.push(`
       <div data-pdf-page="${sigPageNum}" style="position: relative; width: 210mm; min-height: 297mm; padding: 15px 15px 25px 15px; box-sizing: border-box; background: #fff;">
         ${miniHeader(companyLogo, documentTitle, data.invoiceNo, data.quotationNo, currentDate)}
@@ -674,8 +699,24 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
         const imgData = canvas.toDataURL('image/jpeg', 0.85);
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
+        const pageHeight = 297;
+
         if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+        
+        if (imgHeight > pageHeight) {
+          let heightLeft = imgHeight;
+          let position = 0;
+          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+          while (heightLeft > 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+          }
+        } else {
+          pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+        }
       }
     } else {
       // Fallback: single-page rendering (sales receipts etc.)

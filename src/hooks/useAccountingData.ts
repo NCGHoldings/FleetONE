@@ -622,10 +622,11 @@ export const useAPPayments = () => {
 // ============ Bank Accounts ============
 // Bank accounts are section-specific (each sub-company can have its own bank accounts)
 export const useBankAccounts = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["bank-accounts", selectedCompanyId],
+    queryKey: ["bank-accounts", effectiveCompanyId],
     queryFn: async () => {
       // Use explicit column selection to avoid PostgREST errors from non-existent columns (e.g. 'status')
       let query = supabase
@@ -633,8 +634,8 @@ export const useBankAccounts = () => {
         .select("id, account_name, bank_name, account_number, account_type, currency, current_balance, company_id, gl_account_id, is_active, opening_balance, notes, created_at, updated_at")
         .order("account_name");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       const { data, error } = await query;
@@ -655,10 +656,11 @@ export const useBankAccounts = () => {
 };
 
 export const useBankTransactions = (bankAccountId?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["bank-transactions", bankAccountId, selectedCompanyId],
+    queryKey: ["bank-transactions", bankAccountId, effectiveCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("bank_transactions")
@@ -666,8 +668,8 @@ export const useBankTransactions = (bankAccountId?: string) => {
         .order("transaction_date", { ascending: false })
         .limit(100);
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       if (bankAccountId) {
@@ -688,10 +690,11 @@ export const useBankTransactionsForRecon = (
   fromDate?: string,
   toDate?: string
 ) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["bank-transactions-recon", bankAccountId, selectedCompanyId, fromDate, toDate],
+    queryKey: ["bank-transactions-recon", bankAccountId, effectiveCompanyId, fromDate, toDate],
     queryFn: async () => {
       // Fetch all unreconciled transactions (no limit)
       let unreconciledQuery = supabase
@@ -700,8 +703,8 @@ export const useBankTransactionsForRecon = (
         .eq("is_reconciled", false)
         .order("transaction_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        unreconciledQuery = unreconciledQuery.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        unreconciledQuery = unreconciledQuery.eq("company_id", effectiveCompanyId);
       }
       if (bankAccountId) {
         unreconciledQuery = unreconciledQuery.eq("bank_account_id", bankAccountId);
@@ -720,8 +723,8 @@ export const useBankTransactionsForRecon = (
           .order("transaction_date", { ascending: false })
           .limit(500);
 
-        if (selectedCompanyId) {
-          reconciledQuery = reconciledQuery.eq("company_id", selectedCompanyId);
+        if (effectiveCompanyId) {
+          reconciledQuery = reconciledQuery.eq("company_id", effectiveCompanyId);
         }
         if (bankAccountId) {
           reconciledQuery = reconciledQuery.eq("bank_account_id", bankAccountId);
@@ -751,23 +754,24 @@ export const useBankTransactionsForRecon = (
         new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
       );
     },
-    enabled: !!selectedCompanyId && !!bankAccountId,
+    enabled: !!effectiveCompanyId && !!bankAccountId,
   });
 };
 
 export const useBankReconciliations = (bankAccountId?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["bank-reconciliations", bankAccountId, selectedCompanyId],
+    queryKey: ["bank-reconciliations", bankAccountId, effectiveCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("bank_reconciliations")
         .select("*")
         .order("reconciliation_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       if (bankAccountId) {
@@ -778,16 +782,17 @@ export const useBankReconciliations = (bankAccountId?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // Fetch the last completed reconciliation for a bank account (for "Last Statement Balance")
 export const useLastReconciliation = (bankAccountId: string | null) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["last-reconciliation", bankAccountId, selectedCompanyId],
+    queryKey: ["last-reconciliation", bankAccountId, effectiveCompanyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bank_reconciliations")
@@ -800,7 +805,7 @@ export const useLastReconciliation = (bankAccountId: string | null) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!bankAccountId && !!selectedCompanyId,
+    enabled: !!bankAccountId && !!effectiveCompanyId,
   });
 };
 

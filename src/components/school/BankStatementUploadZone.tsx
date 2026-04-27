@@ -219,12 +219,12 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
 
       setProgress(35);
 
-      // *** KEY FIX: Fetch ONLY ACTIVE students for this branch ***
-      const { data: allStudents } = await (supabase as any)
+      // *** Fetch ONLY ACTIVE students for this branch ***
+      const { data: allStudents } = await supabase
         .from('school_students')
         .select('*')
         .eq('branch_id', branchId)
-        .in('status', ['active', 'Active']);
+        .eq('is_active', true);
 
       const students = allStudents || [];
 

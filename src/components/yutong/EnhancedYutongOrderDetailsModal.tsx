@@ -26,6 +26,7 @@ import { YutongOrderJourney } from './YutongOrderJourney';
 import { ProcessManagement } from './ProcessManagement';
 import { YutongOrderInvoiceGenerator } from './YutongOrderInvoiceGenerator';
 import { YutongPaymentTracking } from './YutongPaymentTracking';
+import { FinanceDocumentPreviewModal } from '../accounting/shared/FinanceDocumentPreviewModal';
 
 interface EnhancedYutongOrderDetailsModalProps {
   order: YutongOrder | null;
@@ -51,6 +52,7 @@ export function EnhancedYutongOrderDetailsModal({
   onRefresh 
 }: EnhancedYutongOrderDetailsModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [showPOPreview, setShowPOPreview] = useState(false);
 
   if (!order) return null;
 
@@ -58,10 +60,16 @@ export function EnhancedYutongOrderDetailsModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Eye className="h-5 w-5" />
-            Order Management - {order.order_no}
-          </DialogTitle>
+          <div className="flex items-center justify-between pr-8">
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Order Management - {order.order_no}
+            </DialogTitle>
+            <Button size="sm" variant="outline" onClick={() => setShowPOPreview(true)}>
+              <FileText className="h-4 w-4 mr-2" />
+              Print PO Template
+            </Button>
+          </div>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -242,6 +250,15 @@ export function EnhancedYutongOrderDetailsModal({
           </TabsContent>
         </Tabs>
       </DialogContent>
+      
+      {showPOPreview && (
+        <FinanceDocumentPreviewModal
+          open={showPOPreview}
+          onOpenChange={setShowPOPreview}
+          documentType="purchase_order"
+          documentData={order}
+        />
+      )}
     </Dialog>
   );
 }

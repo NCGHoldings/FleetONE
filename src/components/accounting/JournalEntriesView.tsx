@@ -59,6 +59,7 @@ export const JournalEntriesView = () => {
   const reverseEntry = useReverseJournalEntry();
   const deleteEntry = useDeleteJournalEntry();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [reverseConfirmEntry, setReverseConfirmEntry] = useState<any>(null);
 
   // Filter entries based on multiple criteria
   const filteredEntries = useMemo(() => {
@@ -148,8 +149,14 @@ export const JournalEntriesView = () => {
 
   const handleReverse = (entryId: string) => {
     reverseEntry.mutate(entryId, {
-      onSuccess: () => toast.success("Journal entry reversed"),
-      onError: (error) => toast.error(`Failed to reverse: ${error.message}`),
+      onSuccess: () => {
+        setReverseConfirmEntry(null);
+        toast.success("Journal entry reversed successfully");
+      },
+      onError: (error) => {
+        setReverseConfirmEntry(null);
+        toast.error(`Failed to reverse: ${error.message}`);
+      },
     });
   };
 
@@ -238,13 +245,14 @@ export const JournalEntriesView = () => {
               </Button>
             </>
           )}
-          {row.original.status === "posted" && (
+          {row.original.status === "posted" && !row.original.is_reversal && !row.original.entry_number?.startsWith('REV-') && (
             <Button 
               size="sm" 
               variant="outline" 
               className="text-amber-600 hover:text-amber-700"
-              onClick={() => handleReverse(row.original.id)}
+              onClick={() => setReverseConfirmEntry(row.original)}
               disabled={reverseEntry.isPending}
+              title="Reverse this entry"
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
@@ -441,6 +449,47 @@ export const JournalEntriesView = () => {
               }}
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reverse Confirmation Dialog */}
+      <AlertDialog open={!!reverseConfirmEntry} onOpenChange={(open) => !open && setReverseConfirmEntry(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-amber-600">⚠️ Reverse Journal Entry?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>You are about to <strong>reverse</strong> this journal entry. This action will:</p>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  <li>Create a new <strong>REV-</strong> entry with swapped debits/credits</li>
+                  <li>Mark the original entry as <strong>"Reversed"</strong></li>
+                  <li>Reverse all Chart of Accounts balance impacts</li>
+                </ul>
+                {reverseConfirmEntry && (
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mt-3">
+                    <p className="text-sm font-medium">Entry: <span className="font-mono">{reverseConfirmEntry.entry_number}</span></p>
+                    <p className="text-sm">Amount: <span className="font-semibold">LKR {Number(reverseConfirmEntry.total_debit).toLocaleString()}</span></p>
+                    <p className="text-sm text-muted-foreground truncate">{reverseConfirmEntry.description}</p>
+                  </div>
+                )}
+                <p className="text-destructive font-medium text-sm">This action cannot be easily undone. Please confirm you want to proceed.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 text-white hover:bg-amber-700"
+              disabled={reverseEntry.isPending}
+              onClick={() => {
+                if (reverseConfirmEntry) {
+                  handleReverse(reverseConfirmEntry.id);
+                }
+              }}
+            >
+              {reverseEntry.isPending ? "Reversing..." : "Yes, Reverse Entry"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

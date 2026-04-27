@@ -161,7 +161,7 @@ export const useCompanyBankAccounts = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bank_accounts")
-        .select("*")
+        .select("id, account_name, bank_name, account_number, account_type, currency, current_balance, company_id, gl_account_id, is_active, opening_balance, notes, created_at, updated_at")
         .order("account_name");
       
       if (error) throw error;

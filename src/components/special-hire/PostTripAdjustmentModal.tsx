@@ -758,7 +758,7 @@ export const PostTripAdjustmentModal = ({
               </div>
 
               <div className="flex justify-between">
-                <span>Less: Advance Already Paid:</span>
+                <span>Less: Total Paid to Date:</span>
                 <span className="font-semibold text-green-600">
                   -LKR {advancePaid.toLocaleString()}
                 </span>

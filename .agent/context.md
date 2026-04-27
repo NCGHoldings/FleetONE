@@ -21,6 +21,18 @@
 
 > **WARNING:** Any DB schema changes must be run manually via the Supabase SQL Editor. Never trust MCP results for this project.
 
+### 1.1 Git & GitHub
+
+| Key | Value |
+|-----|-------|
+| **Primary Remote** | `origin` → `NCGHoldings/FleetONE` (private) |
+| **Branch** | `main` |
+| **GitHub PAT** | `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` |
+| **Push Command** | `git push origin main` |
+
+> **IMPORTANT:** When pushing, always use the token above. If auth fails, update the remote URL:  
+> `git remote set-url origin https://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@github.com/NCGHoldings/FleetONE.git`
+
 ---
 
 ## 2. SYSTEM MODULES OVERVIEW

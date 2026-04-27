@@ -82,6 +82,7 @@ export const FinanceDocumentPreviewModal = ({
 
   const loadSavedSignatures = (): Record<string, { dataUrl: string; name: string }> => {
     const defaultSigs = {
+      prepared_by: { dataUrl: "", name: "" },
       verified_by: { dataUrl: "", name: "" },
       approved_by: { dataUrl: "", name: "" },
       received_by: { dataUrl: "", name: "" },
@@ -195,6 +196,15 @@ export const FinanceDocumentPreviewModal = ({
         if (error) throw error;
         return data;
       }
+      
+      if (documentType === "purchase_order") {
+        const { data, error } = await supabase
+          .from("purchase_order_lines")
+          .select("*, items(item_name)")
+          .eq("purchase_order_id", documentData.id);
+        if (error) throw error;
+        return data;
+      }
 
       // Fetch ap_payment_lines for direct payments with account info
       if (isDirectPayment) {
@@ -208,7 +218,7 @@ export const FinanceDocumentPreviewModal = ({
       
       return [];
     },
-    enabled: !!documentData?.id && (documentType === "ar_invoice" || documentType === "ap_invoice" || !!isDirectPayment),
+    enabled: !!documentData?.id && (documentType === "purchase_order" || documentType === "ar_invoice" || documentType === "ap_invoice" || !!isDirectPayment),
   });
 
   // Fetch vendor's default bank account as fallback when payment has no vendor_bank_account_id
@@ -311,7 +321,7 @@ export const FinanceDocumentPreviewModal = ({
   const hasNoTemplate = !availableTemplates || availableTemplates.length === 0;
 
   // Generate fallback HTML using default template
-  const generateFallbackHtml = (): string => {
+  const generateFallbackHtml = (docData: any): string => {
     const templateGenerator = defaultTemplates[documentType];
     if (!templateGenerator) {
       return `
@@ -329,7 +339,7 @@ export const FinanceDocumentPreviewModal = ({
     const defaultHtml = templateGenerator();
     const placeholders = mapDocumentToPlaceholders(
       documentType,
-      enrichedDocumentData,
+      docData,
       company,
       lineItems || [],
       allocations || [],
@@ -350,30 +360,31 @@ export const FinanceDocumentPreviewModal = ({
       `);
     }
 
+    const enrichedDocData = {
+      ...enrichedDocumentData,
+      verified_by: signatures.verified_by.name || enrichedDocumentData?.verified_by || '',
+      verified_by_signature: signatures.verified_by.dataUrl || enrichedDocumentData?.verified_by_signature || '',
+      approved_by: signatures.approved_by.name || enrichedDocumentData?.approved_by || '',
+      approved_by_signature: signatures.approved_by.dataUrl || enrichedDocumentData?.approved_by_signature || '',
+      received_by: signatures.received_by.name || enrichedDocumentData?.received_by || '',
+      received_by_signature: signatures.received_by.dataUrl || enrichedDocumentData?.received_by_signature || '',
+      finance_controller: signatures.finance_controller.name || enrichedDocumentData?.finance_controller || '',
+      finance_controller_signature: signatures.finance_controller.dataUrl || enrichedDocumentData?.finance_controller_signature || '',
+      prepared_by: signatures.prepared_by.name || enrichedDocumentData?.prepared_by || '',
+      prepared_by_signature: signatures.prepared_by.dataUrl || enrichedDocumentData?.prepared_by_signature || '',
+    };
+
     // Use selected template if available, otherwise use fallback
     if (selectedTemplate) {
-      const enrichedDocData = {
-        ...enrichedDocumentData,
-        verified_by: signatures.verified_by.name || enrichedDocumentData?.verified_by || '',
-        verified_by_signature: signatures.verified_by.dataUrl || enrichedDocumentData?.verified_by_signature || '',
-        approved_by: signatures.approved_by.name || enrichedDocumentData?.approved_by || '',
-        approved_by_signature: signatures.approved_by.dataUrl || enrichedDocumentData?.approved_by_signature || '',
-        received_by: signatures.received_by.name || enrichedDocumentData?.received_by || '',
-        received_by_signature: signatures.received_by.dataUrl || enrichedDocumentData?.received_by_signature || '',
-        finance_controller: signatures.finance_controller.name || enrichedDocumentData?.finance_controller || '',
-        finance_controller_signature: signatures.finance_controller.dataUrl || enrichedDocumentData?.finance_controller_signature || '',
-        prepared_by: signatures.verified_by.name || enrichedDocumentData?.prepared_by || '', // Alias
-      };
-
-    const placeholders = mapDocumentToPlaceholders(
-      documentType,
-      enrichedDocData,
-      company,
-      lineItems || [],
-      allocations || [],
-      (selectedTemplate as any).header_image_url || undefined,
-      ((selectedTemplate as any).header_mode as HeaderMode) || 'logo_and_html'
-    );
+      const placeholders = mapDocumentToPlaceholders(
+        documentType,
+        enrichedDocData,
+        company,
+        lineItems || [],
+        allocations || [],
+        (selectedTemplate as any).header_image_url || undefined,
+        ((selectedTemplate as any).header_mode as HeaderMode) || 'logo_and_html'
+      );
 
       const renderedHtml = replacePlaceholders((selectedTemplate as any).html_content || "", placeholders);
       
@@ -389,7 +400,7 @@ export const FinanceDocumentPreviewModal = ({
     }
 
     // Fallback to default template  
-    const fallbackHtml = generateFallbackHtml();
+    const fallbackHtml = generateFallbackHtml(enrichedDocData);
     const fallbackWithSigs = injectSignaturesIntoHtml(fallbackHtml, signatures);
     return generatePrintableDocument(fallbackWithSigs);
   };

@@ -2340,7 +2340,7 @@ export const useCreatePurchaseOrder = () => {
     mutationFn: async (data: any) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
-      const { lines, ...poData } = data;
+      const { lines, currency, ...poData } = data;
       const { data: result, error } = await supabase
         .from("purchase_orders")
         .insert([{ ...poData, status: "draft", company_id: selectedCompanyId }])
@@ -2348,12 +2348,17 @@ export const useCreatePurchaseOrder = () => {
         .single();
       if (error) throw error;
       if (lines?.length) {
-        await supabase.from("purchase_order_lines" as any).insert(lines.map((l: any) => ({ ...l, purchase_order_id: result.id, company_id: selectedCompanyId })));
+        const linePayloads = lines.map((l: any) => {
+          const { id, ...rest } = l;
+          return { ...rest, purchase_order_id: result.id, company_id: selectedCompanyId };
+        });
+        const { error: lineError } = await supabase.from("purchase_order_lines" as any).insert(linePayloads);
+        if (lineError) throw lineError;
       }
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["purchase-orders", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
       toast.success("Purchase order created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),

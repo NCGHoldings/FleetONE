@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { PurchaseOrderForm } from "./PurchaseOrderForm";
 import { GoodsReceiptForm } from "./GoodsReceiptForm";
 import { InvoiceMatchingView } from "./InvoiceMatchingView";
+import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +33,7 @@ export const PurchaseOrderView = () => {
   const [showGRNForm, setShowGRNForm] = useState(false);
   const [selectedPO, setSelectedPO] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const deletePO = useDeletePurchaseOrder();
 
   const getStatusBadge = (status: string) => {
@@ -114,7 +116,7 @@ export const PurchaseOrderView = () => {
         const status = row.original.status || "draft";
         return (
           <div className="flex gap-1">
-            <Button size="sm" variant="ghost">
+            <Button size="sm" variant="ghost" onClick={() => setPreviewDoc(row.original)}>
               <Eye className="h-4 w-4" />
             </Button>
             {status === "draft" && (
@@ -304,6 +306,13 @@ export const PurchaseOrderView = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <FinanceDocumentPreviewModal
+        open={!!previewDoc}
+        onOpenChange={(open) => !open && setPreviewDoc(null)}
+        documentType="purchase_order"
+        documentData={previewDoc}
+      />
     </div>
   );
 };

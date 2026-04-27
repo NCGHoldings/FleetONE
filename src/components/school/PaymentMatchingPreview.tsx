@@ -84,7 +84,7 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
       const studentIds = [...new Set(confirmableItems.flatMap(item => item.matched_student_ids || []))];
       const { data: students, error: studentsError } = await supabase
         .from('school_students')
-        .select('id, fixed_monthly_amount, payment_balance')
+        .select('id, fixed_monthly_amount, payment_balance, current_amount_due')
         .in('id', studentIds);
 
       if (studentsError) throw studentsError;
@@ -103,8 +103,9 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
           const student = studentMap.get(studentId);
           const fixedAmount = student?.fixed_monthly_amount || 0;
           const balanceBefore = student?.payment_balance || 0;
-          const difference = splitAmount - fixedAmount;
-          const balanceAfter = balanceBefore + difference;
+          const amountDue = student?.current_amount_due || fixedAmount;
+          const difference = splitAmount - amountDue;
+          const balanceAfter = balanceBefore + splitAmount;
 
           return {
             student_id: studentId,

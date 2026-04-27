@@ -94,10 +94,29 @@ export const extractAdmissionTokens = (text: string, prefixes: string[]): string
   }
 
   // 2. Wrapped IDs like NEX-000W14929 → extract the trailing letter+digits portion (e.g. W14929)
+  //    AND strip the leading letter to get pure digits (e.g. 14929)
   const wrappedRe = /[A-Z]{2,5}[\-_.]?[0-9A-Z]*?([A-Z]\d{4,6})/g;
   let m;
   while ((m = wrappedRe.exec(upper)) !== null) {
     if (!tokens.includes(m[1])) tokens.push(m[1]);
+    // Also extract just the digits after the letter (e.g. W14929 → 14929)
+    const pureDigits = m[1].replace(/^[A-Z]+/, '');
+    if (pureDigits.length >= 4 && !tokens.includes(pureDigits)) {
+      tokens.push(pureDigits);
+    }
+  }
+
+  // 2b. NEX-style: NEX-000W12869 → extract the full numeric after "000" prefix (e.g. 12869)
+  const nexRe = /NEX[\-_.]?\d{3}([A-Z]?)(\d{4,6})/g;
+  let nm;
+  while ((nm = nexRe.exec(upper)) !== null) {
+    const digitPart = nm[2]; // Pure digits e.g. 12869
+    if (!tokens.includes(digitPart)) tokens.push(digitPart);
+    // Also try with any single-letter prefix from the student admission system
+    if (nm[1]) {
+      const withPrefix = nm[1] + digitPart; // e.g. W12869
+      if (!tokens.includes(withPrefix)) tokens.push(withPrefix);
+    }
   }
 
   // 3. Standalone 5-6 digit numbers (not part of longer sequences)
@@ -132,10 +151,10 @@ export const buildCanonicalStudentMap = (students: any[]): {
   byNumeric: Map<string, any[]>;
   activeStudents: any[];
 } => {
-  // Filter to active only
+  // Filter to active only (is_active boolean column)
   const active = students.filter(s =>
     s.admission_no &&
-    (s.status === 'active' || s.status === 'Active' || !s.status)
+    (s.is_active === true || s.is_active === undefined || s.is_active === null)
   );
 
   const byFullId = new Map<string, any[]>();

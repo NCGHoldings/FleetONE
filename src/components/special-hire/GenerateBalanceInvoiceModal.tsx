@@ -104,8 +104,9 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const effectiveAdjustment = freshAdjustmentData || adjustmentData;
 
   const hasRealAdjustment = !!(effectiveAdjustment.id && (
-    (effectiveAdjustment.extra_km_total_charge || 0) > 0 || 
-    (effectiveAdjustment.total_additional_expenses || 0) > 0
+    (effectiveAdjustment.extra_km_total_charge || 0) !== 0 || 
+    (effectiveAdjustment.total_additional_expenses || 0) !== 0 ||
+    (effectiveAdjustment.total_time_adjustment || 0) !== 0
   ));
 
   useEffect(() => {
@@ -276,6 +277,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       extraKm: hasRealAdjustment ? effectiveAdjustment.extra_km : undefined,
       extraKmChargePerKm: hasRealAdjustment ? (effectiveAdjustment.extra_km_rate || effectiveAdjustment.extra_km_charge_per_km) : undefined,
       extraKmTotalCharge: hasRealAdjustment ? effectiveAdjustment.extra_km_total_charge : undefined,
+      totalTimeAdjustment: hasRealAdjustment ? effectiveAdjustment.total_time_adjustment : undefined,
       // Always pass the resolved quoted/actual KM so the Mileage line is never silently 0
       originalQuotedKm: mileageInfo.quoted || undefined,
       actualKmTraveled: mileageInfo.actual || undefined,

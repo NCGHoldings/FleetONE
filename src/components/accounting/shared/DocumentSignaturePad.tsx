@@ -348,6 +348,19 @@ export const injectSignaturesIntoHtml = (
       ? `<div style="text-align: center; font-size: 11px; font-weight: 500; margin-bottom: 2px;">${sig.name}</div>`
       : "";
 
+    // 0. If the signature is ALREADY in the HTML (via native placeholder replacePlaceholders), skip!
+    if (html.includes(sig.dataUrl)) {
+      continue;
+    }
+
+    // 1. Try explicit placeholder first (fallback for [[signature_role]] if ever used)
+    const exactPlaceholder = `[[signature_${role}]]`;
+    if (html.includes(exactPlaceholder)) {
+      html = html.replace(exactPlaceholder, `${sigImgTag}${nameTag}`);
+      continue;
+    }
+
+    // 2. Fallback to label regex search
     for (const label of labels) {
       // Pattern: find any HTML element containing the label text and inject signature above it
       // Handle various template patterns:
