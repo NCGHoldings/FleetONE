@@ -1,0 +1,131 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+env:
+  # Reuses the same VPS secrets already configured in the production environment
+  STAGING_IP: ${{ secrets.VPS_HOST }}
+  STAGING_PORT: "22"
+  APP_DIR: ${{ secrets.VPS_APP_DIR }}
+
+jobs:
+  # ── Quality Gate (must pass before deploy) ──────────────────────────────────
+  quality-gate:
+    name: Quality Gate
+    uses: ./.github/workflows/ci-check.yml
+
+  deploy-staging:
+    name: Deploy to Staging Environment
+    runs-on: ubuntu-latest
+    environment: staging
+    needs: [quality-gate]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install Dependencies & Build Source
+        env:
+          VITE_APP_ENV: staging
+          VITE_SUPABASE_URL: ${{ secrets.STAGING_VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.STAGING_VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          npm ci --legacy-peer-deps
+          NODE_OPTIONS="--max-old-space-size=6144" npm run build
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Deploy to Staging Server (Zero-Downtime)
+        run: |
+          echo "🚀 Starting zero-downtime deployment to STAGING (${{ env.STAGING_IP }})..."
+
+          # 1. Generate Timestamp for new release folder
+          RELEASE_DIR="20$(date +'%y%m%d%H%M%S')"
+          TARGET_PATH="${{ env.APP_DIR }}/releases/staging/$RELEASE_DIR"
+          SYMLINK_PATH="${{ env.APP_DIR }}/FleetONE-Staging"
+
+          echo "📂 Creating new release directory: $TARGET_PATH"
+          ssh -p ${{ env.STAGING_PORT }} -o StrictHostKeyChecking=no root@${{ env.STAGING_IP }} "mkdir -p $TARGET_PATH"
+
+          # 2. Sync ONLY the compiled dist/
+          echo "📦 Syncing compiled source code..."
+          rsync -avz \
+            -e "ssh -p ${{ env.STAGING_PORT }} -o StrictHostKeyChecking=no" \
+            dist/ root@${{ env.STAGING_IP }}:$TARGET_PATH/dist/
+
+          rsync -avz \
+            package.json \
+            -e "ssh -p ${{ env.STAGING_PORT }} -o StrictHostKeyChecking=no" \
+            ./ root@${{ env.STAGING_IP }}:$TARGET_PATH/
+
+          # 3. Create .env file with STAGING secrets
+          echo "📝 Creating .env file..."
+          ssh -p ${{ env.STAGING_PORT }} -o StrictHostKeyChecking=no root@${{ env.STAGING_IP }} "cat > $TARGET_PATH/.env << 'EOF'
+          VITE_APP_ENV=staging
+          VITE_SUPABASE_URL=${{ secrets.STAGING_VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.STAGING_VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.STAGING_VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_GEMINI_API_KEY=${{ secrets.VITE_GEMINI_API_KEY }}
+          EOF
+          chmod 600 $TARGET_PATH/.env"
+
+          # 4. ATOMIC SYMLINK PIVOT (Zero Downtime) 🚀
+          echo "🔄 Pivoting staging traffic to new release (atomic symlink swap)..."
+          ssh -p ${{ env.STAGING_PORT }} -o StrictHostKeyChecking=no root@${{ env.STAGING_IP }} \
+            "ln -sfn $TARGET_PATH $SYMLINK_PATH && sudo systemctl reload nginx"
+          echo "✅ Traffic is now live on release: $RELEASE_DIR"
+
+          # 5. Housekeeping (Keep last 5 releases)
+          echo "🧹 Cleaning up old releases (Keeping last 5)..."
+          ssh -p ${{ env.STAGING_PORT }} -o StrictHostKeyChecking=no root@${{ env.STAGING_IP }} "cd ${{ env.APP_DIR }}/releases/staging && ls -1t | tail -n +6 | xargs -I {} rm -rf {}"
+
+      - name: Smoke Test & Health Check
+        run: |
+          echo "🏥 Running post-deploy smoke test on Staging..."
+          STAGING_URL="http://${{ secrets.VPS_HOST }}"
+
+          MAX_RETRIES=5
+          RETRY_DELAY=15
+          SUCCESS=false
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "  Attempt $i/$MAX_RETRIES — checking $STAGING_URL ..."
+            HTTP_STATUS=$(curl -o /tmp/staging_response.html -s -w "%{http_code}" -k --max-time 20 "$STAGING_URL" || echo "000")
+
+            if [ "$HTTP_STATUS" = "200" ]; then
+              if grep -q '<div id="root">' /tmp/staging_response.html 2>/dev/null; then
+                echo "  ✅ App shell confirmed — React root div found."
+                SUCCESS=true
+                break
+              else
+                echo "  ⚠️  HTTP 200 but app shell missing."
+              fi
+            else
+              echo "  ⚠️  Got HTTP $HTTP_STATUS"
+            fi
+
+            if [ $i -lt $MAX_RETRIES ]; then
+              echo "  Retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+            fi
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "❌ Staging health check failed after $MAX_RETRIES attempts."
+            exit 1
+          fi
+
+          echo "✅ Staging smoke test passed!"
