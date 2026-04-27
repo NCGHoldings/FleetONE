@@ -1,13 +1,15 @@
 name: Deploy to Production
+# ⚠️  This workflow ONLY fires on push to 'deploy/live' branch or manual dispatch.
+# To deploy to production: git push origin main:deploy/live
 
 on:
   push:
     branches:
-      - deploy/live
+      - "deploy/live"
   workflow_dispatch:
 
 env:
-  # Reuses the same VPS secrets already configured in the production environment
+  # Reuses the same VPS secrets already configured in the repository secrets
   PRIMARY_IP: ${{ secrets.VPS_HOST }}
   APP_DIR: ${{ secrets.VPS_APP_DIR }}
 
@@ -20,9 +22,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: [quality-gate]
-    environment:
-      name: production
-      url: "http://${{ secrets.VPS_HOST }}"
 
     steps:
       - name: Checkout code
