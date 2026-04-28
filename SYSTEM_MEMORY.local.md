@@ -79,11 +79,21 @@ src/
 | `.github/workflows/mirror.yml` | Repository mirror sync |
 | `.github/workflows/sync-lovable.yml` | Lovable ↔ GitHub bidirectional sync |
 
+### VPS — fleetflow-vps-01 (159.223.82.119)
+- **OS:** Ubuntu 24.04 LTS
+- **Nginx:** 1.24.0 (static file serving)
+- **App Base:** `/var/www/fleetone/`
+- **Production root:** `/var/www/fleetone/FleetONE/dist/`
+- **Staging root:** `/var/www/fleetone/FleetONE-Staging/dist/`
+- **Release dirs:** `/var/www/fleetone/releases/{production,staging}/`
+- **Docker:** `fleetflow` container retired from Nginx — static files now served directly
+- **SSL:** Certbot managed for `fleetone.ncg.lk`
+- **Disk:** 77GB total, 14% used (53GB freed by Docker prune on 2026-04-28)
+
 ### Required GitHub Secrets (for deploy.yml)
-- `VPS_HOST` — Production server IP
-- `VPS_USER` — SSH username
-- `VPS_SSH_KEY` — Private SSH key (ED25519 recommended)
-- `VPS_APP_DIR` — Path to app on server (e.g. `/var/www/fleetone`)
+- `VPS_HOST` — `159.223.82.119`
+- `VPS_SSH_KEY` — `fleetone_deploy` ED25519 private key
+- ~~`VPS_APP_DIR`~~ — Now hardcoded to `/var/www/fleetone` in workflows
 
 ### Green Gate Rules
 1. **No direct push to `main`** — all changes via PR
@@ -148,6 +158,12 @@ src/
 | 2026-04-27 | `deploy-staging.yml` + `deploy-production.yml` created — zero-downtime pattern | Antigravity |
 | 2026-04-27 | `nightly_maintenance.md` created — Jules AI loop established | Antigravity |
 | 2026-04-27 | All GitHub secrets configured — CI/CD fully wired ✅ | Staff |
+| 2026-04-28 | SSH access granted via `fleetone_deploy` key — manager added to authorized_keys | Staff + Manager |
+| 2026-04-28 | Docker pruned 53GB stale images — disk freed from 97% → 14% | Antigravity |
+| 2026-04-28 | Server bootstrapped: `/var/www/fleetone/` structure created | Antigravity |
+| 2026-04-28 | Nginx migrated: Docker proxy → static file serving from `FleetONE/dist/` | Antigravity |
+| 2026-04-28 | Staging vhost `staging.fleetone.ncg.lk` configured (awaiting DNS A record) | Antigravity |
+| 2026-04-28 | Production smoke test ✅ HTTP 200 + React root confirmed | Antigravity |
 
 ## 🔐 GITHUB SECRETS STATUS (2026-04-27)
 

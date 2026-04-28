@@ -6,10 +6,9 @@ on:
   workflow_dispatch:
 
 env:
-  # Reuses the same VPS secrets already configured in the production environment
   STAGING_IP: ${{ secrets.VPS_HOST }}
   STAGING_PORT: "22"
-  APP_DIR: ${{ secrets.VPS_APP_DIR }}
+  APP_DIR: /var/www/fleetone
 
 jobs:
   # ── Quality Gate (must pass before deploy) ──────────────────────────────────
