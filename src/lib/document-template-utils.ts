@@ -5,8 +5,8 @@ const ones = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT'
   'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
 const tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
 
-const numberToWords = (num: number): string => {
-  if (num === 0) return 'ZERO RUPEES ONLY';
+const numberToWords = (num: number, currencyWord: string = 'RUPEES'): string => {
+  if (num === 0) return `ZERO ${currencyWord} ONLY`;
 
   const convertHundreds = (n: number): string => {
     let result = '';
@@ -38,7 +38,7 @@ const numberToWords = (num: number): string => {
   if (thousand) result += convertHundreds(thousand) + 'THOUSAND ';
   if (remainder) result += convertHundreds(remainder);
 
-  result = result.trim() + ' RUPEES';
+  result = result.trim() + ' ' + currencyWord;
 
   if (cents > 0) {
     result += ' AND ' + convertHundreds(cents).trim() + ' CENTS';
@@ -245,8 +245,13 @@ export const mapDocumentToPlaceholders = (
   // Company placeholders (always available) - with fallback guidance for empty fields
   placeholders['{{company_name}}'] = companyData?.name || '';
   placeholders['{{company_address}}'] = companyData?.address || '';
-  placeholders['{{company_phone}}'] = companyData?.phone || '';
-  placeholders['{{company_email}}'] = companyData?.email || '';
+  
+  // Override old contact details with the new requested values
+  const phone = companyData?.phone === '+94 77 766 5501' || !companyData?.phone ? '0763682859' : companyData.phone;
+  const email = companyData?.email === 'info@ncgholdings.lk' || !companyData?.email ? 'info_ncgholdings@ncg.lk' : companyData.email;
+  
+  placeholders['{{company_phone}}'] = phone;
+  placeholders['{{company_email}}'] = email;
   placeholders['{{company_tax_id}}'] = companyData?.tax_number || companyData?.registration_number || companyData?.tax_registration_number || '';
   placeholders['{{company_registration}}'] = companyData?.registration_number || '';
   // Raw logo URL for templates that use src="{{company_logo}}" directly (not as <img> tag)
@@ -305,17 +310,21 @@ export const mapDocumentToPlaceholders = (
   // Document-type specific mappings
   switch (documentType) {
     case 'purchase_order': {
-      const isYutongOrder = documentData?.bus_model !== undefined;
+      const companyShortCode = companyData?.short_code || '';
+      const isYutongCompany = companyShortCode === 'YUT' || companyData?.name?.toLowerCase().includes('yutong');
+      const isYutongOrder = documentData?.bus_model !== undefined || isYutongCompany;
+      const poCurrency = documentData?.currency || (isYutongOrder ? 'USD' : 'LKR');
+      const currencyWord = poCurrency === 'USD' ? 'DOLLARS' : 'RUPEES';
 
       placeholders['{{po_number}}'] = documentData?.po_number || documentData?.order_no || '';
       placeholders['{{order_date}}'] = formatDate(documentData?.order_date);
       placeholders['{{expected_date}}'] = formatDate(documentData?.expected_date || documentData?.expected_delivery_date);
       
       if (isYutongOrder) {
-        placeholders['{{vendor_name}}'] = 'ZHENGZHOU YUTONG BUS CO., LTD.';
-        placeholders['{{vendor_address}}'] = 'Yutong Industrial Park, Zhengzhou, Henan, China';
-        placeholders['{{vendor_contact}}'] = 'Export Division';
-        placeholders['{{delivery_address}}'] = 'As per LC instructions';
+        placeholders['{{vendor_name}}'] = documentData?.vendors?.vendor_name || 'ZHENGZHOU YUTONG BUS CO., LTD.';
+        placeholders['{{vendor_address}}'] = documentData?.vendors?.address || 'Yutong Industrial Park, Zhengzhou, Henan, China';
+        placeholders['{{vendor_contact}}'] = documentData?.vendors?.contact_person || documentData?.vendors?.phone || 'Export Division';
+        placeholders['{{delivery_address}}'] = documentData?.delivery_address || 'As per LC instructions';
       } else {
         placeholders['{{vendor_name}}'] = documentData?.vendors?.vendor_name || '';
         placeholders['{{vendor_address}}'] = documentData?.vendors?.address || '';
@@ -323,11 +332,11 @@ export const mapDocumentToPlaceholders = (
         placeholders['{{delivery_address}}'] = documentData?.delivery_address || 'As per instructions';
       }
 
-      placeholders['{{sub_total}}'] = formatCurrency(documentData?.total_amount); // We assume total_amount is gross here, or calculate from lines if possible
-      placeholders['{{tax_amount}}'] = formatCurrency(0); // If PO doesn't store tax, assume 0 or calculate from lines
-      placeholders['{{grand_total}}'] = formatCurrency(documentData?.total_amount);
-      placeholders['{{currency}}'] = documentData?.currency || (isYutongOrder ? 'USD' : 'LKR');
-      placeholders['{{amount_in_words}}'] = numberToWords(documentData?.total_amount || 0);
+      placeholders['{{sub_total}}'] = formatCurrency(documentData?.total_amount).replace('LKR', poCurrency).trim(); 
+      placeholders['{{tax_amount}}'] = formatCurrency(0).replace('LKR', poCurrency).trim();
+      placeholders['{{grand_total}}'] = formatCurrency(documentData?.total_amount).replace('LKR', '').trim();
+      placeholders['{{currency}}'] = poCurrency;
+      placeholders['{{amount_in_words}}'] = numberToWords(documentData?.total_amount || 0, currencyWord);
       placeholders['{{terms_conditions}}'] = documentData?.notes || 'Standard terms and conditions apply.';
       placeholders['{{prepared_by}}'] = documentData?.prepared_by || '';
 
@@ -351,14 +360,11 @@ export const mapDocumentToPlaceholders = (
           </tr>
         `;
         placeholders['{{items_html}}'] = itemsHtml;
-        placeholders['{{sub_total}}'] = formatCurrency(total).replace('LKR', '').trim();
+        placeholders['{{sub_total}}'] = formatCurrency(total).replace('LKR', poCurrency).trim();
         placeholders['{{grand_total}}'] = formatCurrency(total).replace('LKR', '').trim();
       } else if (lineItems && lineItems.length > 0) {
         let itemsHtml = '';
         let subtotal = 0;
-        
-        const poCurrency = documentData?.currency || (isYutongOrder ? 'USD' : 'LKR');
-        const currencyPrefix = poCurrency === 'USD' ? '$' : '';
         
         lineItems.forEach((item: any, idx: number) => {
           const qty = item.quantity || 1;
@@ -373,17 +379,17 @@ export const mapDocumentToPlaceholders = (
               <td style="border: 1px solid #000; padding: 8px; text-align: center;">${idx + 1}</td>
               <td style="border: 1px solid #000; padding: 8px;">${itemName}</td>
               <td style="border: 1px solid #000; padding: 8px; text-align: center;">${qty}</td>
-              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${currencyPrefix}${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${currencyPrefix}${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td style="border: 1px solid #000; padding: 8px; text-align: right;">${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
           `;
         });
         placeholders['{{items_html}}'] = itemsHtml;
-        placeholders['{{sub_total}}'] = `${currencyPrefix}${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        placeholders['{{grand_total}}'] = `${currencyPrefix}${(documentData?.total_amount || subtotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        placeholders['{{sub_total}}'] = `${poCurrency} ${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        placeholders['{{grand_total}}'] = (documentData?.total_amount || subtotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       } else {
         placeholders['{{items_html}}'] = '<tr><td colspan="5" style="border: 1px solid #000; padding: 8px; text-align: center;">No items found</td></tr>';
-        placeholders['{{sub_total}}'] = formatCurrency(documentData?.total_amount).replace('LKR', '').trim();
+        placeholders['{{sub_total}}'] = formatCurrency(documentData?.total_amount).replace('LKR', poCurrency).trim();
         placeholders['{{grand_total}}'] = formatCurrency(documentData?.total_amount).replace('LKR', '').trim();
       }
       break;
@@ -572,7 +578,7 @@ export const mapDocumentToPlaceholders = (
         ? (customerPayee?.customer_name || '')
         : isEmployeePayee
           ? (employeePayee?.staff_name || '')
-          : (documentData?.vendors?.vendor_name || '');
+          : (documentData?.vendors?.vendor_name || (payeeType === 'direct' ? 'Direct Float / Internal' : ''));
       const payeeAddress = isCustomerPayee
         ? (customerPayee?.billing_address || '')
         : isEmployeePayee
@@ -692,27 +698,34 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{date_value}}'] = isCheque && documentData?.cheque_date ? formatDate(documentData?.cheque_date) : paymentDateFormatted;
       
       if (!isCheque) {
-        placeholders['{{beneficiary_bank_details}}'] = `
-        <h4 style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">BENEFICIARY BANK DETAILS</h4>
-        <table style="width: 100%; border-collapse: collapse; border: 2px solid black; margin-bottom: 20px; font-weight: bold;">
-          <tr>
-            <td style="border: 1px solid black; padding: 5px; width: 25%;">BANK NAME</td>
-            <td style="border: 1px solid black; padding: 5px; width: 75%;">${vendorBankAccount?.bank_name || payeeBankName}</td>
-          </tr>
-          <tr>
-            <td style="border: 1px solid black; padding: 5px;">BRANCH</td>
-            <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.bank_branch || payeeBankBranch}</td>
-          </tr>
-          <tr>
-            <td style="border: 1px solid black; padding: 5px;">PAYEE NAME</td>
-            <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.account_holder_name || payeeName}</td>
-          </tr>
-          <tr>
-            <td style="border: 1px solid black; padding: 5px;">ACCOUNT NO.</td>
-            <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.account_number || payeeBankAccount}</td>
-          </tr>
-        </table>
-        `;
+        const hasBeneficiaryBank = vendorBankAccount?.bank_name || payeeBankName || vendorBankAccount?.account_number || payeeBankAccount;
+        
+        if (!hasBeneficiaryBank && (payeeType === 'direct' || documentData?.is_direct_payment || documentData?.is_advance)) {
+          // Hide beneficiary details for internal float transfers or direct payments without bank info
+          placeholders['{{beneficiary_bank_details}}'] = '';
+        } else {
+          placeholders['{{beneficiary_bank_details}}'] = `
+          <h4 style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">BENEFICIARY BANK DETAILS</h4>
+          <table style="width: 100%; border-collapse: collapse; border: 2px solid black; margin-bottom: 20px; font-weight: bold;">
+            <tr>
+              <td style="border: 1px solid black; padding: 5px; width: 25%;">BANK NAME</td>
+              <td style="border: 1px solid black; padding: 5px; width: 75%;">${vendorBankAccount?.bank_name || payeeBankName}</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid black; padding: 5px;">BRANCH</td>
+              <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.bank_branch || payeeBankBranch}</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid black; padding: 5px;">PAYEE NAME</td>
+              <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.account_holder_name || payeeName}</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid black; padding: 5px;">ACCOUNT NO.</td>
+              <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.account_number || payeeBankAccount}</td>
+            </tr>
+          </table>
+          `;
+        }
       } else {
         placeholders['{{beneficiary_bank_details}}'] = '';
       }
@@ -749,8 +762,8 @@ export const mapDocumentToPlaceholders = (
 
       // Source bank account (from joined bank_accounts)
       placeholders['{{source_account}}'] = documentData?.bank_accounts?.account_name || '';
-      placeholders['{{source_bank}}'] = documentData?.bank_accounts?.bank_name || '';
-      placeholders['{{source_account_number}}'] = documentData?.bank_accounts?.account_number || '';
+      placeholders['{{source_bank}}'] = documentData?.bank_accounts?.bank_name || (payeeType === 'direct' ? 'Internal Float' : '');
+      placeholders['{{source_account_number}}'] = documentData?.bank_accounts?.account_number || (payeeType === 'direct' ? documentData?.reference?.replace('Float Account: ', '') || '' : '');
 
       // Narration alias for notes
       placeholders['{{narration}}'] = documentData?.notes || '';

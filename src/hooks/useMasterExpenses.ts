@@ -23,6 +23,9 @@ export interface MasterExpenseRecord {
   amount: number;
   mapped_vehicle_id: string | null;
   mapped_quotation_id: string | null;
+  mapped_expense_account_id?: string | null;
+  mapped_payment_account_id?: string | null;
+  gl_journal_id?: string | null;
   is_confirmed: boolean;
   notes: string | null;
   

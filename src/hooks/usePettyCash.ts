@@ -52,6 +52,7 @@ export interface PettyCashTransaction {
   branch_id: string | null;
   company_id: string | null;
   gl_account_id: string | null;
+  vehicle_no: string | null;
   // Joined
   fund?: { fund_name: string; business_unit_code: string } | null;
 }
@@ -72,10 +73,14 @@ export interface IOURecord {
   status: string;
   expense_request_ids: string[];
   journal_entry_id: string | null;
+  petty_cash_fund_id: string | null;
+  bank_account_id?: string | null;
+  settlement_type: "expense" | "cash_return" | "mixed" | null;
   issued_by: string | null;
   created_at: string;
   updated_at: string;
   staff?: { staff_name: string } | null;
+  fund?: { fund_name: string } | null;
 }
 
 // ============ Petty Cash Funds ============
@@ -417,6 +422,7 @@ export const useCreatePettyCashTransaction = () => {
           branch_id: data.branch_id || null,
           company_id: selectedCompanyId,
           gl_account_id: data.gl_account_id || null,
+          vehicle_no: data.vehicle_no || null,
           ...(data.created_at ? { created_at: data.created_at } : {}),
         })
         .select()
@@ -764,6 +770,8 @@ export const useCreateIOU = () => {
           purpose: data.purpose,
           issued_date: data.issued_date || new Date().toISOString().split("T")[0],
           due_date: data.due_date,
+          petty_cash_fund_id: data.petty_cash_fund_id || null,
+          bank_account_id: data.bank_account_id || null,
         }])
         .select()
         .single();
@@ -797,6 +805,62 @@ export const useCreateIOU = () => {
             status: "approved",
             company_id: selectedCompanyId,
           });
+      } else if (data.bank_account_id && amount > 0) {
+        // Handle Bank Account Advance
+        // 1. Generate AP Payment Voucher Number
+        const { data: paymentNum } = await supabase.rpc("generate_entity_number", {
+          p_entity_type: "payment",
+          p_company_id: selectedCompanyId,
+        });
+        const paymentNumber = paymentNum || `PAY-${Date.now()}`;
+
+        // 2. Create AP Payment Voucher
+        const { data: apPayment } = await supabase
+          .from("ap_payments")
+          .insert({
+            payment_number: paymentNumber,
+            payment_date: data.issued_date || new Date().toISOString().split("T")[0],
+            amount: amount,
+            payment_method: "transfer",
+            bank_account_id: data.bank_account_id,
+            payee_type: "direct",
+            notes: `Bank Advance IOU Issued: ${data.purpose || "Staff Advance"} (${iouNumber})`,
+            is_advance: true,
+            is_direct_payment: true,
+            status: "posted",
+            company_id: selectedCompanyId,
+            business_unit_code: data.business_unit_code || "SBO",
+          })
+          .select()
+          .single();
+
+        // 3. Create Bank Transaction to deduct balance
+        await supabase.from("bank_transactions").insert({
+          bank_account_id: data.bank_account_id,
+          transaction_date: data.issued_date || new Date().toISOString().split("T")[0],
+          transaction_type: "payment",
+          description: `Bank Advance IOU: ${data.purpose || "Staff Advance"} (${iouNumber})`,
+          credit_amount: amount,
+          debit_amount: 0,
+          reference: paymentNumber,
+          company_id: selectedCompanyId,
+          source_type: "ap_payment",
+          source_id: apPayment?.id,
+        });
+
+        // 4. Update Bank Account Balance
+        const { data: bankAccount } = await supabase
+          .from("bank_accounts")
+          .select("current_balance")
+          .eq("id", data.bank_account_id)
+          .single();
+        if (bankAccount) {
+          const newBankBalance = (bankAccount.current_balance || 0) - amount;
+          await supabase
+            .from("bank_accounts")
+            .update({ current_balance: newBankBalance })
+            .eq("id", data.bank_account_id);
+        }
       }
 
       // Auto-create GL Journal Entry
@@ -833,9 +897,18 @@ export const useCreateIOU = () => {
             }
           }
 
-          // Find credit account: Use selected Float's GL account, otherwise fallback to Bank/Cash
+          // Find credit account: Use selected Float's GL account or Bank Account GL
           let creditAccountId = fund?.gl_account_id || "";
           
+          if (!creditAccountId && data.bank_account_id) {
+            const { data: bankData } = await supabase
+              .from("bank_accounts")
+              .select("gl_account_id")
+              .eq("id", data.bank_account_id)
+              .single();
+            creditAccountId = bankData?.gl_account_id || "";
+          }
+
           if (!creditAccountId) {
             const { data: glSettings2 } = await supabase
               .from("gl_settings" as any)
@@ -888,7 +961,7 @@ export const useCreateIOU = () => {
                 {
                   journal_entry_id: je.id,
                   account_id: creditAccountId,
-                  description: fund ? `Float disbursement: ${fund.fund_name} for IOU` : `Cash/Bank disbursement for IOU`,
+                  description: fund ? `Float disbursement: ${fund.fund_name} for IOU` : (data.bank_account_id ? `Bank Advance for IOU` : `Cash/Bank disbursement for IOU`),
                   debit: 0,
                   credit: amount,
                   company_id: selectedCompanyId,
@@ -950,7 +1023,20 @@ export const useUpdateIOU = () => {
   const { selectedCompanyId } = useCompany();
 
   return useMutation({
-    mutationFn: async ({ id, ...data }: Partial<IOURecord> & { id: string }) => {
+    mutationFn: async ({ 
+      id, 
+      return_fund_id,
+      return_bank_account_id,
+      expense_account_id,
+      expense_amount,
+      ...data 
+    }: Partial<IOURecord> & { 
+      id: string;
+      return_fund_id?: string;
+      return_bank_account_id?: string;
+      expense_account_id?: string;
+      expense_amount?: number;
+    }) => {
       // Calculate balance if settling partially
       const updateData: any = { ...data };
       if (data.settled_amount !== undefined && data.status !== undefined) {
@@ -961,7 +1047,7 @@ export const useUpdateIOU = () => {
           .eq("id", id)
           .single();
         if (origIou) {
-          updateData.balance = Math.max(0, (origIou.amount || 0) - (data.settled_amount || 0));
+          // balance is a generated column in PostgreSQL, so we don't manually update it
         }
       }
 
@@ -974,18 +1060,15 @@ export const useUpdateIOU = () => {
 
       if (error) throw error;
 
-      // Auto-create GL reversal when IOU is settled or partially settled
+      // Handle GL & Petty Cash when IOU is settled or partially settled
       const shouldPostGL = (data.status === "settled" || data.status === "partially_settled") && selectedCompanyId;
       if (shouldPostGL) {
         try {
-          // Get the original IOU to know the amount
-          const settledAmount = (result as any).amount || data.settled_amount || 0;
+          const settledAmount = data.settled_amount || 0;
 
           if (settledAmount > 0) {
-            // Find staff advance account (same resolution as creation)
+            // Find staff advance account
             let advanceAccountId = "";
-            
-            // Try gl_settings first (most reliable)
             const { data: glSettings } = await supabase
               .from("gl_settings" as any)
               .select("staff_advance_account_id, customer_advance_account_id, bank_account_id")
@@ -1002,32 +1085,65 @@ export const useUpdateIOU = () => {
                 .or("account_name.ilike.%staff%advance%,account_name.ilike.%other%advance%,account_name.ilike.%other cash advance%")
                 .limit(1)
                 .maybeSingle();
-              
-              if (staffAcct?.id) {
-                advanceAccountId = staffAcct.id;
-              } else {
-                advanceAccountId = (glSettings as any)?.customer_advance_account_id || "";
+              advanceAccountId = staffAcct?.id || (glSettings as any)?.customer_advance_account_id || "";
+            }
+
+            const iouRef = (result as any).iou_number || `IOU-${id.slice(0, 8)}`;
+            const entryNumber = `IOU-SETTLE-${Date.now()}`;
+            const isExpense = data.settlement_type === "expense";
+            const isCashReturn = data.settlement_type === "cash_return";
+            const isMixed = data.settlement_type === "mixed";
+
+            // Determine actual amounts based on UI inputs
+            const expenseAmt = isCashReturn ? 0 : (expense_amount !== undefined ? expense_amount : settledAmount);
+            const cashDifference = settledAmount - expenseAmt; 
+            // If > 0: Underspend (We got cash back from employee)
+            // If < 0: Overspend (We gave extra cash to employee)
+
+            // Identify Cash/Bank/Float Account
+            let cashAccountId = "";
+            let pettyCashFund = null;
+            let bankAccountId = null;
+            
+            if (return_fund_id) {
+              const { data: f } = await supabase
+                .from("petty_cash_funds")
+                .select("id, gl_account_id, fund_name, current_balance")
+                .eq("id", return_fund_id)
+                .single();
+              if (f) {
+                pettyCashFund = f;
+                cashAccountId = f.gl_account_id || "";
+              }
+            } else if (return_bank_account_id) {
+               bankAccountId = return_bank_account_id;
+               const { data: b } = await supabase
+                .from("bank_accounts")
+                .select("id, gl_account_id, current_balance")
+                .eq("id", return_bank_account_id)
+                .single();
+               if (b) {
+                 cashAccountId = b.gl_account_id || "";
+               }
+            }
+
+            // Fallback to bank/cash GL
+            if (!cashAccountId) {
+              cashAccountId = (glSettings as any)?.bank_account_id || "";
+              if (!cashAccountId) {
+                const { data: cashAcct } = await supabase
+                  .from("chart_of_accounts")
+                  .select("id")
+                  .eq("company_id", selectedCompanyId)
+                  .eq("account_type", "asset")
+                  .or("account_name.ilike.%cash%,account_name.ilike.%bank%")
+                  .limit(1)
+                  .maybeSingle();
+                cashAccountId = cashAcct?.id || "";
               }
             }
 
-            // Find cash/bank account
-            let cashAccountId = (glSettings as any)?.bank_account_id || "";
-            if (!cashAccountId) {
-              const { data: cashAcct } = await supabase
-                .from("chart_of_accounts")
-                .select("id")
-                .eq("company_id", selectedCompanyId)
-                .eq("account_type", "asset")
-                .or("account_name.ilike.%cash%,account_name.ilike.%bank%")
-                .limit(1)
-                .maybeSingle();
-              cashAccountId = cashAcct?.id || "";
-            }
-
-            if (advanceAccountId && cashAccountId) {
-              const entryNumber = `IOU-SETTLE-${Date.now()}`;
-              const iouRef = (result as any).iou_number || `IOU-${id.slice(0, 8)}`;
-
+            if (advanceAccountId && (expenseAmt > 0 ? expense_account_id : true) && cashAccountId) {
               const { data: je, error: jeError } = await supabase
                 .from("journal_entries")
                 .insert({
@@ -1035,8 +1151,8 @@ export const useUpdateIOU = () => {
                   entry_date: new Date().toISOString().split("T")[0],
                   description: `IOU Settlement: ${(result as any).purpose || "Staff Advance"} (${iouRef})`,
                   reference: iouRef,
-                  total_debit: settledAmount,
-                  total_credit: settledAmount,
+                  total_debit: Math.max(settledAmount, expenseAmt),
+                  total_credit: Math.max(settledAmount, expenseAmt),
                   status: "posted",
                   company_id: selectedCompanyId,
                   posted_at: new Date().toISOString(),
@@ -1045,54 +1161,243 @@ export const useUpdateIOU = () => {
                 .single();
 
               if (!jeError && je) {
-                // Settlement reversal: DR Cash/Bank (money comes back), CR Staff Advance (clear the advance)
-                await supabase.from("journal_entry_lines").insert([
-                  {
-                    journal_entry_id: je.id,
-                    account_id: cashAccountId,
-                    description: `IOU settlement received: ${iouRef}`,
-                    debit: settledAmount,
-                    credit: 0,
-                    company_id: selectedCompanyId,
-                  },
-                  {
+                const jeLines = [];
+
+                // 1. Credit Staff Advance for the IOU portion being cleared
+                if (settledAmount > 0) {
+                  jeLines.push({
                     journal_entry_id: je.id,
                     account_id: advanceAccountId,
                     description: `Staff advance cleared: ${iouRef}`,
                     debit: 0,
                     credit: settledAmount,
                     company_id: selectedCompanyId,
-                  },
-                ]);
+                  });
+                }
+
+                // 2. Debit Expense Account for the actual expense amount
+                if (expenseAmt > 0 && expense_account_id) {
+                  jeLines.push({
+                    journal_entry_id: je.id,
+                    account_id: expense_account_id,
+                    description: `Expense settled against IOU: ${iouRef}`,
+                    debit: expenseAmt,
+                    credit: 0,
+                    company_id: selectedCompanyId,
+                  });
+                }
+
+                // 3. Handle Cash Difference (Underspend vs Overspend)
+                if (cashDifference > 0) {
+                  // Underspend: Debit Cash (Cash returned to us)
+                  jeLines.push({
+                    journal_entry_id: je.id,
+                    account_id: cashAccountId,
+                    description: `Cash returned for IOU: ${iouRef}`,
+                    debit: cashDifference,
+                    credit: 0,
+                    company_id: selectedCompanyId,
+                  });
+                } else if (cashDifference < 0) {
+                  // Overspend: Credit Cash (Extra cash given to employee)
+                  jeLines.push({
+                    journal_entry_id: je.id,
+                    account_id: cashAccountId,
+                    description: `Reimbursement for IOU overspend: ${iouRef}`,
+                    debit: 0,
+                    credit: Math.abs(cashDifference),
+                    company_id: selectedCompanyId,
+                  });
+                }
+
+                await supabase.from("journal_entry_lines").insert(jeLines);
 
                 // Update COA balances
-                for (const acctId of [cashAccountId, advanceAccountId]) {
+                for (const line of jeLines) {
                   const { data: acct } = await supabase
                     .from("chart_of_accounts")
                     .select("current_balance, account_type")
-                    .eq("id", acctId)
+                    .eq("id", line.account_id)
                     .single();
                   if (acct) {
-                    const isDebit = acctId === cashAccountId;
                     const isDebitNormal = ["asset", "expense"].includes(acct.account_type || "");
-                    const adjustment = isDebit
-                      ? (isDebitNormal ? settledAmount : -settledAmount)
-                      : (isDebitNormal ? -settledAmount : settledAmount);
+                    let adjustment = 0;
+                    if (line.debit > 0) adjustment = isDebitNormal ? line.debit : -line.debit;
+                    if (line.credit > 0) adjustment = isDebitNormal ? -line.credit : line.credit;
+                    
                     await supabase
                       .from("chart_of_accounts")
                       .update({ current_balance: (acct.current_balance || 0) + adjustment, updated_at: new Date().toISOString() })
-                      .eq("id", acctId);
+                      .eq("id", line.account_id);
                   }
                 }
 
-                // Update IOU with journal entry link
+                // Handle Petty Cash Payment Voucher Logic
+                // We create a voucher for the expense, but we offset it with the IOU advance clearance to keep the float perfectly balanced.
+                if (pettyCashFund && expenseAmt > 0) {
+                  // 1. Create the Petty Cash Voucher (Disbursement) for the Expense
+                  const { data: voucherNum } = await supabase.rpc("generate_petty_cash_voucher_number");
+                  const balanceAfterDisbursement = (pettyCashFund.current_balance || 0) - expenseAmt;
+                  
+                  await supabase.from("petty_cash_transactions").insert({
+                    petty_cash_fund_id: pettyCashFund.id,
+                    transaction_type: "disbursement",
+                    amount: expenseAmt,
+                    balance_after: balanceAfterDisbursement,
+                    description: `IOU Settlement Expense: ${iouRef}`,
+                    expense_category: "IOU Settlement",
+                    payment_method: "cash",
+                    status: "approved",
+                    voucher_number: voucherNum || undefined,
+                    company_id: selectedCompanyId,
+                    journal_entry_id: je.id,
+                  });
+
+                  // 2. Create the Offsetting Replenishment for the IOU Advance being cleared
+                  const finalBalance = balanceAfterDisbursement + settledAmount;
+                  await supabase.from("petty_cash_transactions").insert({
+                    petty_cash_fund_id: pettyCashFund.id,
+                    transaction_type: "replenishment",
+                    amount: settledAmount,
+                    balance_after: finalBalance,
+                    description: `IOU Advance Cleared: ${iouRef}`,
+                    payment_method: "cash",
+                    status: "approved",
+                    company_id: selectedCompanyId,
+                    journal_entry_id: je.id,
+                  });
+
+                  // Ensure fund matches the true final balance
+                  await supabase
+                    .from("petty_cash_funds")
+                    .update({ current_balance: finalBalance, updated_at: new Date().toISOString() })
+                    .eq("id", pettyCashFund.id);
+                } else if (pettyCashFund && cashDifference > 0) {
+                   // Only cash returned, no expenses (Cash Return type)
+                   const finalBalance = (pettyCashFund.current_balance || 0) + cashDifference;
+                   await supabase.from("petty_cash_transactions").insert({
+                    petty_cash_fund_id: pettyCashFund.id,
+                    transaction_type: "replenishment",
+                    amount: cashDifference,
+                    balance_after: finalBalance,
+                    description: `Cash Returned from IOU: ${iouRef}`,
+                    payment_method: "cash",
+                    status: "approved",
+                    company_id: selectedCompanyId,
+                    journal_entry_id: je.id,
+                  });
+                  await supabase
+                    .from("petty_cash_funds")
+                    .update({ current_balance: finalBalance, updated_at: new Date().toISOString() })
+                    .eq("id", pettyCashFund.id);
+                }
+
+                // Handle Bank Account Payment Voucher Logic
+                if (bankAccountId && expenseAmt > 0) {
+                  // 1. Generate AP Payment Voucher Number
+                  const { data: paymentNum } = await supabase.rpc("generate_entity_number", {
+                    p_entity_type: "payment",
+                    p_company_id: selectedCompanyId,
+                  });
+                  const paymentNumber = paymentNum || `PAY-${Date.now()}`;
+
+                  // 2. Create the AP Payment Voucher (Disbursement) for the Expense
+                  const { data: apPayment } = await supabase.from("ap_payments").insert({
+                    payment_number: paymentNumber,
+                    payment_date: new Date().toISOString().split("T")[0],
+                    amount: expenseAmt,
+                    payment_method: "transfer",
+                    bank_account_id: bankAccountId,
+                    payee_type: "direct",
+                    notes: `Bank Advance Settlement Expense: ${iouRef}`,
+                    is_direct_payment: true,
+                    status: "posted",
+                    company_id: selectedCompanyId,
+                    business_unit_code: data.business_unit_code || "SBO",
+                    journal_entry_id: je.id,
+                  }).select().single();
+
+                  // 3. Create Bank Transactions (Offsetting logic similar to Petty Cash)
+                  // Expense Disbursement
+                  await supabase.from("bank_transactions").insert({
+                    bank_account_id: bankAccountId,
+                    transaction_date: new Date().toISOString().split("T")[0],
+                    transaction_type: "payment",
+                    description: `IOU Settlement Expense: ${iouRef}`,
+                    credit_amount: expenseAmt,
+                    debit_amount: 0,
+                    reference: paymentNumber,
+                    company_id: selectedCompanyId,
+                    source_type: "ap_payment",
+                    source_id: apPayment?.id,
+                  });
+
+                  // Offsetting Advance Cleared Receipt
+                  await supabase.from("bank_transactions").insert({
+                    bank_account_id: bankAccountId,
+                    transaction_date: new Date().toISOString().split("T")[0],
+                    transaction_type: "receipt",
+                    description: `IOU Advance Cleared: ${iouRef}`,
+                    credit_amount: 0,
+                    debit_amount: settledAmount,
+                    reference: `IOU-CLR-${iouRef}`,
+                    company_id: selectedCompanyId,
+                    source_type: "journal_entry",
+                    source_id: je.id,
+                  });
+
+                  // 4. Ensure Bank Account reflects net change
+                  const { data: bAcc } = await supabase
+                    .from("bank_accounts")
+                    .select("current_balance")
+                    .eq("id", bankAccountId)
+                    .single();
+                  if (bAcc) {
+                    // Net impact: settledAmount (returned conceptually) - expenseAmt (spent conceptually)
+                    // If overspend, net is negative. If underspend, net is positive.
+                    // Which is exactly `cashDifference`
+                    const finalBankBalance = (bAcc.current_balance || 0) + cashDifference;
+                    await supabase
+                      .from("bank_accounts")
+                      .update({ current_balance: finalBankBalance, updated_at: new Date().toISOString() })
+                      .eq("id", bankAccountId);
+                  }
+                } else if (bankAccountId && cashDifference > 0) {
+                   // Only cash returned, no expenses
+                   await supabase.from("bank_transactions").insert({
+                    bank_account_id: bankAccountId,
+                    transaction_date: new Date().toISOString().split("T")[0],
+                    transaction_type: "receipt",
+                    description: `Cash Returned from IOU: ${iouRef}`,
+                    credit_amount: 0,
+                    debit_amount: cashDifference,
+                    reference: `IOU-RET-${iouRef}`,
+                    company_id: selectedCompanyId,
+                    source_type: "journal_entry",
+                    source_id: je.id,
+                  });
+                  
+                  const { data: bAcc } = await supabase
+                    .from("bank_accounts")
+                    .select("current_balance")
+                    .eq("id", bankAccountId)
+                    .single();
+                  if (bAcc) {
+                    const finalBankBalance = (bAcc.current_balance || 0) + cashDifference;
+                    await supabase
+                      .from("bank_accounts")
+                      .update({ current_balance: finalBankBalance, updated_at: new Date().toISOString() })
+                      .eq("id", bankAccountId);
+                  }
+                }
+
                 await supabase
                   .from("iou_records")
                   .update({ journal_entry_id: je.id })
                   .eq("id", id);
               }
             } else {
-              console.warn("IOU settlement GL posting skipped: missing advance or cash/bank account", { advanceAccountId, cashAccountId });
+              console.warn("IOU settlement GL posting skipped: missing advance or target debit account");
             }
           }
         } catch (glErr) {
@@ -1106,7 +1411,9 @@ export const useUpdateIOU = () => {
       queryClient.invalidateQueries({ queryKey: ["iou-records"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
-      toast({ title: "IOU Updated", description: "The IOU record has been updated and posted to GL." });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });
+      toast({ title: "IOU Updated", description: "The IOU record has been updated and processed." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });

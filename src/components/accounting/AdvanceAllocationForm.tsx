@@ -24,7 +24,10 @@ import { Badge } from "@/components/ui/badge";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { ArrowRight, CheckCircle, Wallet } from "lucide-react";
+import { ArrowRight, CheckCircle, Wallet, Check, ChevronsUpDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 interface AdvanceAllocationFormProps {
   type: "ar" | "ap";
@@ -38,6 +41,7 @@ interface Allocation {
 export const AdvanceAllocationForm = ({ type }: AdvanceAllocationFormProps) => {
   const queryClient = useQueryClient();
   const [selectedParty, setSelectedParty] = useState<string>("");
+  const [partyOpen, setPartyOpen] = useState(false);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
 
   const isAR = type === "ar";
@@ -49,9 +53,9 @@ export const AdvanceAllocationForm = ({ type }: AdvanceAllocationFormProps) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
-        .select("id, name")
+        .select("id, customer_name")
         .eq("is_active", true)
-        .order("name");
+        .order("customer_name");
       if (error) throw error;
       return data;
     },
@@ -196,20 +200,56 @@ export const AdvanceAllocationForm = ({ type }: AdvanceAllocationFormProps) => {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 mb-6">
-          <div className="space-y-2">
+          <div className="space-y-2 flex flex-col">
             <Label>{partyLabel}</Label>
-            <Select value={selectedParty} onValueChange={setSelectedParty}>
-              <SelectTrigger>
-                <SelectValue placeholder={`Select ${partyLabel}`} />
-              </SelectTrigger>
-              <SelectContent>
-                {parties?.map((party) => (
-                  <SelectItem key={party.id} value={party.id}>
-                    {isAR ? (party as any).name : (party as any).vendor_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={partyOpen} onOpenChange={setPartyOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={partyOpen}
+                  className="justify-between w-full font-normal"
+                >
+                  {selectedParty
+                    ? isAR 
+                      ? parties?.find((p) => p.id === selectedParty)?.customer_name 
+                      : parties?.find((p) => p.id === selectedParty)?.vendor_name
+                    : `Select ${partyLabel}`}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[400px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder={`Search ${partyLabel}...`} />
+                  <CommandList>
+                    <CommandEmpty>No {partyLabel.toLowerCase()} found.</CommandEmpty>
+                    <CommandGroup>
+                      {parties?.map((party) => {
+                        const name = isAR ? (party as any).customer_name : (party as any).vendor_name;
+                        return (
+                          <CommandItem
+                            key={party.id}
+                            value={name}
+                            onSelect={() => {
+                              setSelectedParty(party.id);
+                              setPartyOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedParty === party.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {name}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {selectedParty && (

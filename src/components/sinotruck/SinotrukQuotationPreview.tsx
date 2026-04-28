@@ -833,7 +833,7 @@ export const SinotrukQuotationPreview = forwardRef<HTMLDivElement, SinotrukQuota
 
           <div className="footer-contact">
             <div style={{ display: "flex", alignItems: "center" }}>
-              📞 {responsiblePerson?.phone || "+94 77 766 5501"}
+              📞 {responsiblePerson?.phone || "0763682859"}
             </div>
             <div>📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita</div>
             <div style={{ display: "flex", alignItems: "center" }}>
@@ -1024,7 +1024,7 @@ export const SinotrukQuotationPreview = forwardRef<HTMLDivElement, SinotrukQuota
 
           <div className="footer-contact">
             <div style={{ display: "flex", alignItems: "center" }}>
-              📞 {responsiblePerson?.phone || "+94 77 766 5501"}
+              📞 {responsiblePerson?.phone || "0763682859"}
             </div>
             <div>📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita</div>
             <div style={{ display: "flex", alignItems: "center" }}>

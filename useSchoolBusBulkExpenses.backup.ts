@@ -263,19 +263,18 @@ export function useSchoolBusBulkExpenses() {
         }
       }
 
-            // 3. Pre-process to filter duplicates and calculate totals
+      // We will loop through the batch and upload them one by one.
       let skippedCount = 0;
       let postedCount = 0;
-      let totalAmount = 0;
-      const validExpenses = [];
+      for (let i = 0; i < payload.expenses.length; i++) {
+        const expense = payload.expenses[i];
 
-      for (const expense of payload.expenses) {
         // Duplicate guard: skip if a fuel-import JE already exists for (bus, date)
         const { data: existingFuelLine } = await supabase
           .from("journal_entry_lines")
           .select("journal_entry_id, journal_entries!inner(id, entry_date, source_module)")
           .eq("bus_id", expense.busId)
-          .eq("journal_entries.source_module", `school_bus_${payload.globalExpenseType || 'fuel'}_import`)
+          .eq("journal_entries.source_module", "school_bus_fuel_import")
           .eq("journal_entries.entry_date", expense.expenseDate)
           .limit(1)
           .maybeSingle();
@@ -284,143 +283,15 @@ export function useSchoolBusBulkExpenses() {
           skippedCount += 1;
           continue;
         }
-        
-        validExpenses.push(expense);
-        totalAmount += expense.amount;
-      }
-
-      if (validExpenses.length === 0) {
-        return { posted: 0, skipped: skippedCount };
-      }
-
-      // 4. Generate ONE Journal Entry
-      const prefix = payload.globalExpenseType === 'fuel' ? 'FUEL' : 'EXP';
-      const entryNumber = `${prefix}-BLK-${format(new Date(), "yyyyMMddHHmmss")}-${Math.floor(Math.random() * 1000)}`;
-      const expTypeTitle = payload.globalExpenseType ? payload.globalExpenseType.charAt(0).toUpperCase() + payload.globalExpenseType.slice(1) : 'Fuel';
-      const description = `Bulk ${expTypeTitle} Expense - ${validExpenses.length} Buses`;
-
-      const { data: journalEntry, error: jeError } = await supabase
-        .from("journal_entries")
-        .insert({
-          entry_number: entryNumber,
-          entry_date: validExpenses[0].expenseDate,
-          description: description,
-          reference: `IMP-${format(new Date(), "yyyyMMdd")}`,
-          total_debit: totalAmount,
-          total_credit: totalAmount,
-          status: "posted",
-          company_id: effectiveCompanyId,
-          business_unit_code: 'SBO',
-          business_unit_id: selectedCompanyId,
-          source_module: `school_bus_${payload.globalExpenseType || 'fuel'}_import`,
-          posted_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (jeError) throw jeError;
-
-      // 5. Generate ONE Parent Payment/Invoice Record
-      let parentDocId = null;
-      if (payload.paymentMethod === 'ap') {
-         const uniqueInv = `${payload.invoiceNumber || prefix + '-AP-' + format(new Date(), "yyyyMMdd")}-${format(new Date(), "HHmmss")}`;
-         const { data: apInv, error: apError } = await supabase
-            .from('ap_invoices')
-            .insert({
-                company_id: effectiveCompanyId,
-                business_unit_code: 'SBO',
-                vendor_id: payload.vendorId || null,
-                invoice_number: uniqueInv,
-                invoice_date: payload.invoiceDate || validExpenses[0].expenseDate,
-                due_date: payload.dueDate || validExpenses[0].expenseDate,
-                total_amount: totalAmount,
-                balance: totalAmount,
-                status: 'unpaid',
-                approval_status: 'approved',
-                approved_at: new Date().toISOString(),
-                approved_by: user?.id,
-                journal_entry_id: journalEntry.id,
-                notes: `Bulk ${expTypeTitle} Load | ${validExpenses.length} Buses`,
-                created_by: user?.id,
-            }).select().single();
-         if (apError) throw new Error(`Failed to generate AP Invoice: ${apError.message}`);
-         parentDocId = apInv.id;
-      } else if (payload.paymentMethod === 'petty_cash' && payload.pettyCashFundId) {
-         const { data: fund } = await supabase
-            .from('petty_cash_funds')
-            .select('current_balance')
-            .eq('id', payload.pettyCashFundId)
-            .maybeSingle();
-
-         if (fund) {
-            const newBalance = fund.current_balance - totalAmount;
-            const { error: pcError } = await supabase
-               .from('petty_cash_transactions')
-               .insert({
-                 petty_cash_fund_id: payload.pettyCashFundId,
-                 company_id: effectiveCompanyId,
-                 transaction_type: 'expense',
-                 amount: totalAmount,
-                 balance_after: newBalance,
-                 description: `Bulk ${expTypeTitle} Import - ${validExpenses.length} Buses`,
-                 journal_entry_id: journalEntry.id,
-                 voucher_number: `PCV-${prefix}-${format(new Date(), "yyyyMMddHHmmss")}-${Math.floor(Math.random() * 1000)}`,
-                 created_by: user?.id,
-                 status: 'approved' 
-               });
-            if (pcError) throw new Error(`Petty Cash transaction failed: ${pcError.message}`);
-            
-            const { error: fundError } = await supabase
-               .from('petty_cash_funds')
-               .update({ current_balance: newBalance })
-               .eq('id', payload.pettyCashFundId);
-            if (fundError) throw new Error(`Petty Cash balance update failed: ${fundError.message}`);
-         }
-      } else if (payload.paymentMethod === 'direct') {
-         const paymentNumber = `DP-${prefix}-${format(new Date(), "yyyyMMddHHmmss")}-${Math.floor(Math.random() * 1000)}`;
-         const { data: apPay, error: dpError } = await supabase
-            .from('ap_payments')
-            .insert({
-               company_id: effectiveCompanyId,
-               business_unit_code: 'SBO',
-               payment_number: paymentNumber,
-               payment_date: validExpenses[0].expenseDate,
-               payment_method: 'direct',
-               payee_type: 'direct',
-               vendor_id: null,
-               bank_account_id: payload.directPaymentAccountId || null,
-               amount: totalAmount,
-               is_direct_payment: true,
-               status: 'paid',
-               approval_status: 'approved',
-               approved_at: new Date().toISOString(),
-               approved_by: user?.id,
-               journal_entry_id: journalEntry.id,
-               reference: `Float Account: ${creditAccountName}`,
-               notes: `Bulk ${expTypeTitle.toLowerCase()} float drawdown — ${validExpenses.length} Buses | Source: ${creditAccountName}`,
-               created_by: user?.id,
-            }).select().single();
-         if (dpError) throw new Error(`Failed to record Direct Payment in AP: ${dpError.message}`);
-         parentDocId = apPay.id;
-      }
-
-      // 6. Loop to process individual expenses (Upserts & Line Items)
-      const jeLines = [];
-      const apInvoiceLines = [];
-      const apPaymentLines = [];
-
-      for (let i = 0; i < validExpenses.length; i++) {
-        const expense = validExpenses[i];
-        postedCount++;
-
+        // Resolve human-readable bus_no for use in invoice number / journal description
         const { data: busRow } = await supabase
           .from("buses")
           .select("bus_no")
           .eq("id", expense.busId)
           .maybeSingle();
         const busNoSafe = (busRow?.bus_no || expense.busId.substring(0, 4)).replace(/\s+/g, '');
-        
-        // 6.1 Upsert into daily_bus_expenses
+        // 3. Upsert into daily_bus_expenses
+        // Check if an expense already exists for that day + bus
         const { data: existingDaily } = await supabase
           .from("daily_bus_expenses")
           .select("id, fuel_cost, fuel_liters, parking, highway_charges, other, notes")
@@ -442,7 +313,6 @@ export function useSchoolBusBulkExpenses() {
           notes: existingDaily?.notes ? `${existingDaily.notes} | ${combinedNotes}` : combinedNotes,
           gl_posted: true,
           created_by: user?.id,
-          journal_entry_id: journalEntry.id,
         };
 
         if (payload.globalExpenseType === 'parking') {
@@ -459,10 +329,11 @@ export function useSchoolBusBulkExpenses() {
         if (dailyExpenseId) {
           await supabase.from("daily_bus_expenses").update(expenseData).eq("id", dailyExpenseId);
         } else {
-          await supabase.from("daily_bus_expenses").insert(expenseData);
+          const res = await supabase.from("daily_bus_expenses").insert(expenseData).select().single();
+          if (res.data) dailyExpenseId = res.data.id;
         }
 
-        // 6.2 Also insert into route_expenses so it shows up in P&L reports
+        // 3.5. Also insert into route_expenses so it shows up in P&L reports
         const { data: routeMatch } = await supabase
           .from("school_routes")
           .select("id")
@@ -480,11 +351,11 @@ export function useSchoolBusBulkExpenses() {
             amount: expense.amount,
             expense_date: expense.expenseDate,
             created_by: user?.id,
-            journal_entry_id: journalEntry.id,
+            // journal_entry_id will be linked later if needed, but for P&L this is enough
           });
         }
 
-        // 6.3 Update Odometer (current_mileage in buses) if provided
+        // 4. Update Odometer (current_mileage in buses) if provided
         if (expense.odometerEnd) {
           await supabase
             .from("buses")
@@ -492,65 +363,158 @@ export function useSchoolBusBulkExpenses() {
             .eq("id", expense.busId);
         }
 
-        // 6.4 JE Line for this bus
-        jeLines.push({
-          journal_entry_id: journalEntry.id,
-          account_id: defaultExpenseAccountId, // DEBIT expense
-          description: `Bus ${busNoSafe} | ${expTypeTitle} Expense | Date: ${expense.expenseDate}`,
-          debit: expense.amount,
-          credit: 0,
-          company_id: effectiveCompanyId,
-          bus_id: expense.busId,
-        });
+        // 5. Create Journal Entry
+        const prefix = payload.globalExpenseType === 'fuel' ? 'FUEL' : 'EXP';
+        const entryNumber = `${prefix}-BLK-${format(new Date(), "yyyyMMddHHmmss")}-${Math.floor(Math.random() * 1000)}`;
+        const expTypeTitle = payload.globalExpenseType ? payload.globalExpenseType.charAt(0).toUpperCase() + payload.globalExpenseType.slice(1) : 'Fuel';
+        const description = `Bulk ${expTypeTitle} Expense - Bus ${expense.busId}`;
 
-        // 6.5 AP Lines
-        if (payload.paymentMethod === 'ap' && parentDocId) {
-          apInvoiceLines.push({
-            invoice_id: parentDocId,
-            account_id: defaultExpenseAccountId,
-            description: `Bus ${busNoSafe} - ${expTypeTitle}`,
-            quantity: expense.fuelLiters || 1,
-            unit_price: expense.fuelLiters ? (expense.amount / expense.fuelLiters) : expense.amount,
-            line_total: expense.amount,
+        const { data: journalEntry, error: jeError } = await supabase
+          .from("journal_entries")
+          .insert({
+            entry_number: entryNumber,
+            entry_date: expense.expenseDate,
+            description: description,
+            reference: combinedNotes || `IMP-${format(new Date(), "yyyyMMdd")}`,
+            total_debit: expense.amount,
+            total_credit: expense.amount,
+            status: "posted",
             company_id: effectiveCompanyId,
-          });
-        } else if (payload.paymentMethod === 'direct' && parentDocId) {
-          apPaymentLines.push({
-            payment_id: parentDocId,
-            account_id: defaultExpenseAccountId,
-            description: `Bus ${busNoSafe} - ${expTypeTitle}`,
-            quantity: expense.fuelLiters || 1,
-            unit_price: expense.fuelLiters ? (expense.amount / expense.fuelLiters) : expense.amount,
-            line_total: expense.amount,
-            company_id: effectiveCompanyId,
-          });
+            business_unit_code: 'SBO',
+            business_unit_id: selectedCompanyId,
+            source_module: `school_bus_${payload.globalExpenseType || 'fuel'}_import`,
+            posted_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (jeError) throw jeError;
+        postedCount += 1;
+
+        // Link journal entry back to daily_bus_expenses if it lacked one
+        if (dailyExpenseId) {
+            await supabase.from("daily_bus_expenses")
+               .update({ journal_entry_id: journalEntry.id })
+               .eq("id", dailyExpenseId)
+               .is("journal_entry_id", null);
         }
-      }
 
-      // 7. Add the single CREDIT line for the total amount
-      jeLines.push({
-        journal_entry_id: journalEntry.id,
-        account_id: creditAccountId, // CREDIT liability/asset
-        description: `${creditAccountName.toUpperCase()} | Bulk ${expTypeTitle} Total`,
-        debit: 0,
-        credit: totalAmount,
-        company_id: effectiveCompanyId,
-      });
+        // 5.5 Deep ERP Integrations (AP Invoice & Petty Cash Vouchers)
+        if (payload.paymentMethod === 'ap') {
+           const baseInv = payload.invoiceNumber || `${prefix}-AP-${format(new Date(), "yyyyMMdd")}`;
+           const uniqueInv = `${baseInv}-${busNoSafe}-${expense.expenseDate}-${i + 1}`;
+           const { error: apError } = await supabase
+              .from('ap_invoices')
+              .insert({
+                  company_id: effectiveCompanyId,
+                  business_unit_code: 'SBO',
+                  vendor_id: payload.vendorId || null,
+                  invoice_number: uniqueInv,
+                  invoice_date: payload.invoiceDate || expense.expenseDate,
+                  due_date: payload.dueDate || expense.expenseDate,
+                  total_amount: expense.amount,
+                  balance: expense.amount,
+                  status: 'unpaid',
+                  approval_status: 'approved',
+                  approved_at: new Date().toISOString(),
+                  approved_by: user?.id,
+                  bus_id: expense.busId,
+                  journal_entry_id: journalEntry.id,
+                  notes: `Bulk ${expTypeTitle} Load - ${expense.expenseDate} | ${combinedNotes}`,
+                  created_by: user?.id,
+              });
+           if (apError) throw new Error(`Failed to generate AP Invoice: ${apError.message}`);
+        } else if (payload.paymentMethod === 'petty_cash' && payload.pettyCashFundId) {
+           const { data: fund } = await supabase
+              .from('petty_cash_funds')
+              .select('current_balance')
+              .eq('id', payload.pettyCashFundId)
+              .maybeSingle();
 
-      // 8. Insert all lines in batches
-      if (jeLines.length > 0) {
-        const { error: jeLinesError } = await supabase.from("journal_entry_lines").insert(jeLines);
-        if (jeLinesError) throw jeLinesError;
-      }
-      if (apInvoiceLines.length > 0) {
-        await supabase.from("ap_invoice_lines").insert(apInvoiceLines);
-      }
-      if (apPaymentLines.length > 0) {
-        await supabase.from("ap_payment_lines").insert(apPaymentLines);
-      }
+           if (fund) {
+              const newBalance = fund.current_balance - expense.amount;
+              const { error: pcError } = await supabase
+                 .from('petty_cash_transactions')
+                 .insert({
+                   petty_cash_fund_id: payload.pettyCashFundId,
+                   company_id: effectiveCompanyId,
+                   transaction_type: 'expense',
+                   amount: expense.amount,
+                   balance_after: newBalance,
+                   description: `Bulk ${expTypeTitle} Import - Bus ${expense.busId}`,
+                   journal_entry_id: journalEntry.id,
+                   voucher_number: `PCV-${prefix}-${format(new Date(), "yyyyMMddHHmmss")}-${Math.floor(Math.random() * 1000)}`,
+                   created_by: user?.id,
+                   status: 'approved' // Auto-approved via bulk sync
+                 });
+              if (pcError) throw new Error(`Petty Cash transaction failed: ${pcError.message}`);
+              
+              const { error: fundError } = await supabase
+                 .from('petty_cash_funds')
+                 .update({ current_balance: newBalance })
+                 .eq('id', payload.pettyCashFundId);
+              if (fundError) throw new Error(`Petty Cash balance update failed: ${fundError.message}`);
+           }
+        } else if (payload.paymentMethod === 'direct') {
+           // Surface direct payment in AP → Payments for full traceability (one row per bus)
+           const paymentNumber = `DP-${prefix}-${format(new Date(), "yyyyMMddHHmmss")}-${i + 1}`;
+           const { error: dpError } = await supabase
+              .from('ap_payments')
+              .insert({
+                 company_id: effectiveCompanyId,
+                 business_unit_code: 'SBO',
+                 payment_number: paymentNumber,
+                 payment_date: expense.expenseDate,
+                 payment_method: 'direct',
+                 payee_type: 'direct',
+                 vendor_id: null,
+                 bank_account_id: null,
+                 bus_id: expense.busId,
+                 bus_no: busNoSafe,
+                 amount: expense.amount,
+                 is_direct_payment: true,
+                 status: 'paid',
+                 approval_status: 'approved',
+                 approved_at: new Date().toISOString(),
+                 approved_by: user?.id,
+                 journal_entry_id: journalEntry.id,
+                 reference: `Float Account: ${creditAccountName}`,
+                 notes: `Bulk ${expTypeTitle.toLowerCase()} float drawdown — Bus ${busNoSafe} | Source: ${creditAccountName} | ${combinedNotes}`,
+                 created_by: user?.id,
+              });
+           if (dpError) throw new Error(`Failed to record Direct Payment in AP: ${dpError.message}`);
+        }
 
-      // 9. Update COA balances
-      await updateAccountBalancesFromJournalEntry(journalEntry.id);
+        // 6. Create journal entry lines
+        // DR: Expense Account 
+        // CR: Petty Cash / IOU / Trade Payable
+        const { error: linesError } = await supabase
+          .from("journal_entry_lines")
+          .insert([
+            {
+              journal_entry_id: journalEntry.id,
+              account_id: defaultExpenseAccountId, // DEBIT expense
+              description: `Bulk ${expTypeTitle} Expense | Date: ${expense.expenseDate}`,
+              debit: expense.amount,
+              credit: 0,
+              company_id: effectiveCompanyId,
+              bus_id: expense.busId,
+            },
+            {
+              journal_entry_id: journalEntry.id,
+              account_id: creditAccountId, // CREDIT liability/asset
+              description: `${creditAccountName.toUpperCase()} | Bulk Fuel`,
+              debit: 0,
+              credit: expense.amount,
+              company_id: effectiveCompanyId,
+            },
+          ]);
+
+        if (linesError) throw linesError;
+
+        // 7. Update COA balances
+        await updateAccountBalancesFromJournalEntry(journalEntry.id);
+      }
 
       return { posted: postedCount, skipped: skippedCount };
     },

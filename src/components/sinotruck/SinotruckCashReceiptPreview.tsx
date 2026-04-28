@@ -303,11 +303,11 @@ export const SinotruckCashReceiptPreview = forwardRef<HTMLDivElement, SinotruckC
           {/* Footer */}
           <div className="footer-contact">
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              📞 +94 77 766 5501
+              📞 0763682859
             </div>
             <div>📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita</div>
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              ✉️ {receipt.companyEmail || 'info@ncgholdings.lk'}
+              ✉️ {receipt.companyEmail || 'info_ncgholdings@ncg.lk'}
             </div>
           </div>
         </div>

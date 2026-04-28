@@ -302,9 +302,13 @@ export const DrillDownModal = ({
       matchColumn = "receipt_number";
       docType = "ar_receipt";
     } else if (effectiveSourceModule === "ap_payment" || effectiveSourceModule === "advance_payment") {
-      table = "ap_payment_vouchers";
+      table = "ap_payments";
       matchColumn = "payment_number";
       docType = "ap_payment_voucher";
+    } else if (effectiveSourceModule === "special_hire_payment") {
+      table = "special_hire_payments";
+      matchColumn = "receipt_number";
+      docType = "ar_receipt";
     } else if (effectiveSourceModule === "petty_cash") {
       table = "petty_cash_disbursements";
       matchColumn = "voucher_number";

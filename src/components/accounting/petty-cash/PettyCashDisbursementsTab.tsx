@@ -14,6 +14,7 @@ import {
   PettyCashFund
 } from "@/hooks/usePettyCash";
 import { EXPENSE_CATEGORIES, BUSINESS_UNITS, useCompanyExpenseCategories } from "@/hooks/useExpenseRequests";
+import { useQuery } from "@tanstack/react-query";
 import { CurrencyDisplay } from "../shared/CurrencyDisplay";
 import { SearchableAccountSelector } from "../shared/SearchableAccountSelector";
 import { FinanceDocumentPreviewModal } from "../shared/FinanceDocumentPreviewModal";
@@ -42,6 +43,7 @@ export const PettyCashDisbursementsTab = () => {
     gl_account_id: string;
     amount: number;
     description: string;
+    vehicle_no: string;
   }
 
   // Form state
@@ -54,8 +56,22 @@ export const PettyCashDisbursementsTab = () => {
   });
 
   const [lines, setLines] = useState<DisbursementLine[]>([{
-    id: "1", expense_category: "", gl_account_id: "", amount: 0, description: ""
+    id: "1", expense_category: "", gl_account_id: "", amount: 0, description: "", vehicle_no: ""
   }]);
+
+  // Fetch buses for vehicle selection
+  const { data: buses } = useQuery({
+    queryKey: ["buses-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("buses")
+        .select("id, bus_no, vehicle_type")
+        .eq("status", "Active")
+        .order("bus_no");
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const selectedFund = funds?.find((f) => f.id === form.petty_cash_fund_id);
   const totalAmount = lines.reduce((sum, line) => sum + (line.amount || 0), 0);
@@ -65,7 +81,7 @@ export const PettyCashDisbursementsTab = () => {
       petty_cash_fund_id: "", payee_name: "", transaction_date: new Date().toISOString().split("T")[0],
       reference_number: "", payment_method: "cash",
     });
-    setLines([{ id: "1", expense_category: "", gl_account_id: "", amount: 0, description: "" }]);
+    setLines([{ id: "1", expense_category: "", gl_account_id: "", amount: 0, description: "", vehicle_no: "" }]);
   };
 
   const handleSubmit = async () => {
@@ -89,6 +105,7 @@ export const PettyCashDisbursementsTab = () => {
           payee_name: form.payee_name,
           expense_category: line.expense_category || undefined,
           gl_account_id: line.gl_account_id || undefined,
+          vehicle_no: line.vehicle_no || undefined,
           reference_number: form.reference_number || undefined,
           payment_method: form.payment_method,
           status: needsApproval ? "pending" : "approved",
@@ -208,7 +225,10 @@ export const PettyCashDisbursementsTab = () => {
                     {txn.expense_category_display === "Multiple" ? (
                       <Badge variant="outline">Multiple Categories</Badge>
                     ) : (
-                      txn.expense_category ? getCategoryLabel(txn.expense_category) : "-"
+                      <div className="flex flex-col gap-1">
+                        <span>{txn.expense_category ? getCategoryLabel(txn.expense_category) : "-"}</span>
+                        {txn.vehicle_no && <Badge variant="secondary" className="w-fit text-[10px] h-4 px-1">{txn.vehicle_no}</Badge>}
+                      </div>
                     )}
                   </TableCell>
                   <TableCell className="text-right font-semibold text-destructive">
@@ -298,8 +318,8 @@ export const PettyCashDisbursementsTab = () => {
               </div>
               
               {lines.map((line, index) => (
-                <div key={line.id} className="grid gap-3 md:grid-cols-12 items-end border-b pb-4 last:border-0 last:pb-0">
-                  <div className="md:col-span-3">
+                <div key={line.id} className="grid gap-3 md:grid-cols-12 items-start border-b pb-4 last:border-0 last:pb-0">
+                  <div className="md:col-span-3 space-y-2">
                     <Label className="text-xs">Category</Label>
                     <Select value={line.expense_category || "none"} onValueChange={(v) => {
                       const newLines = [...lines];
@@ -314,8 +334,31 @@ export const PettyCashDisbursementsTab = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    
+                    {["fuel", "vehicle_hire", "repairs", "tyre", "body_wash", "emission", "temp_permits", "permits_renewal", "police_fines", "log_sheet", "ntc_charges", "accident"].includes(line.expense_category) && (
+                      <div className="mt-2">
+                        <Select 
+                          value={line.vehicle_no || "none"} 
+                          onValueChange={(v) => {
+                            const newLines = [...lines];
+                            newLines[index].vehicle_no = v === "none" ? "" : v;
+                            setLines(newLines);
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select Vehicle (Optional)" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No Vehicle</SelectItem>
+                            {buses?.map((bus) => (
+                              <SelectItem key={bus.id} value={bus.bus_no}>
+                                {bus.bus_no} {bus.vehicle_type ? `(${bus.vehicle_type})` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
-                  <div className="md:col-span-3">
+                  <div className="md:col-span-3 space-y-2">
                     <Label className="text-xs">GL Account</Label>
                     <SearchableAccountSelector 
                       value={line.gl_account_id} 
@@ -327,7 +370,7 @@ export const PettyCashDisbursementsTab = () => {
                       placeholder="GL Account" 
                     />
                   </div>
-                  <div className="md:col-span-3">
+                  <div className="md:col-span-3 space-y-2">
                     <Label className="text-xs">Description</Label>
                     <Input 
                       value={line.description} 
@@ -339,7 +382,7 @@ export const PettyCashDisbursementsTab = () => {
                       placeholder="Details" 
                     />
                   </div>
-                  <div className="md:col-span-2">
+                  <div className="md:col-span-2 space-y-2">
                     <Label className="text-xs">Amount</Label>
                     <Input 
                       type="number" 
@@ -351,7 +394,7 @@ export const PettyCashDisbursementsTab = () => {
                       }}
                     />
                   </div>
-                  <div className="md:col-span-1 text-right">
+                  <div className="md:col-span-1 text-right pt-6">
                     <Button variant="ghost" size="icon" className="text-destructive" onClick={() => {
                       if (lines.length > 1) {
                         setLines(lines.filter(l => l.id !== line.id));

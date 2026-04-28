@@ -101,7 +101,7 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
 
       apPay.data?.forEach((d: any) => docs.push({
         type: "AP Payment",
-        documentType: "ap_payment",
+        documentType: "ap_payment_voucher",
         documentNumber: d.payment_number,
         amount: d.amount,
         date: d.payment_date,
@@ -123,7 +123,7 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
           const linkedDoc = storedDocs?.find((sd: any) => sd.payment_id === d.id);
           docs.push({
             type: "Special Hire Payment",
-            documentType: "special_hire_payment",
+            documentType: "ar_receipt",
             documentNumber: d.receipt_number || d.id?.slice(0, 8),
             amount: d.amount,
             date: d.payment_date,
@@ -135,7 +135,7 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
 
       bankTx.data?.forEach((d: any) => docs.push({
         type: "Bank Transaction",
-        documentType: "bank_transaction",
+        documentType: "journal_voucher",
         documentNumber: d.reference || d.id?.slice(0, 8),
         amount: d.amount,
         date: d.transaction_date,

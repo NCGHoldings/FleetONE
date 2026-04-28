@@ -1278,15 +1278,11 @@ export const useRecurringEntries = () => {
         .select("*")
         .order("template_name");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
-      }
-
       const { data, error } = await query;
       if (error) throw error;
       return data as any[];
     },
-    enabled: !!selectedCompanyId,
+    enabled: true,
   });
 };
 

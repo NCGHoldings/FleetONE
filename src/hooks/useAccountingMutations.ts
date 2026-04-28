@@ -2422,7 +2422,6 @@ export const useCreateRecurringEntry = () => {
           debit_account_id: entry.debit_account_id,
           credit_account_id: entry.credit_account_id,
           is_active: true,
-          company_id: selectedCompanyId,
         }])
         .select()
         .single();

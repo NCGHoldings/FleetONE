@@ -73,7 +73,6 @@ export const useOverdueRecurringEntries = () => {
       const { data, error } = await (supabase as any)
         .from("recurring_journal_entries")
         .select("*")
-        .eq("company_id", selectedCompanyId)
         .eq("is_active", true)
         .lte("next_run_date", today)
         .order("next_run_date", { ascending: true });

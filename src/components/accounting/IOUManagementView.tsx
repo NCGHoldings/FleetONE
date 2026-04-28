@@ -20,6 +20,7 @@ import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useChartOfAccounts, useBankAccounts } from "@/hooks/useAccountingData";
 
 const statusConfig = {
   pending: { label: "Pending", color: "bg-yellow-500", icon: Clock },
@@ -34,6 +35,7 @@ export const IOUManagementView = () => {
   const [selectedIOU, setSelectedIOU] = useState<IOURecord | null>(null);
   const [showSettleDialog, setShowSettleDialog] = useState(false);
   const [settleAmount, setSettleAmount] = useState(0);
+  const [expenseAmount, setExpenseAmount] = useState(0);
   const [previewData, setPreviewData] = useState<any>(null);
 
   // New IOU form state
@@ -43,10 +45,21 @@ export const IOUManagementView = () => {
   const [newIssuedDate, setNewIssuedDate] = useState(new Date().toISOString().split("T")[0]);
   const [newDueDate, setNewDueDate] = useState("");
   const [newUnit, setNewUnit] = useState("");
+  const [sourceType, setSourceType] = useState<"petty_cash" | "bank">("petty_cash");
   const [newFundId, setNewFundId] = useState<string>("");
+  const [newBankAccountId, setNewBankAccountId] = useState<string>("");
+
+  // Settlement Form State
+  const [settlementType, setSettlementType] = useState<"expense" | "cash_return" | "mixed">("cash_return");
+  const [expenseAccountId, setExpenseAccountId] = useState<string>("");
+  const [returnSourceType, setReturnSourceType] = useState<"petty_cash" | "bank">("petty_cash");
+  const [returnFundId, setReturnFundId] = useState<string>("none");
+  const [returnBankAccountId, setReturnBankAccountId] = useState<string>("none");
 
   const { data: ious, isLoading, refetch } = useIOURecords({ status: statusFilter });
   const { data: pettyCashFunds } = usePettyCashFunds();
+  const { data: bankAccounts } = useBankAccounts();
+  const { data: accounts } = useChartOfAccounts();
   const createIOU = useCreateIOU();
   const updateIOU = useUpdateIOU();
 
@@ -74,7 +87,8 @@ export const IOUManagementView = () => {
       issued_date: newIssuedDate || undefined,
       due_date: newDueDate || undefined,
       business_unit_code: newUnit,
-      petty_cash_fund_id: newFundId || undefined,
+      petty_cash_fund_id: sourceType === "petty_cash" ? newFundId : undefined,
+      bank_account_id: sourceType === "bank" ? newBankAccountId : undefined,
     });
     setShowCreateIOU(false);
     setNewStaffName("");
@@ -84,11 +98,25 @@ export const IOUManagementView = () => {
     setNewDueDate("");
     setNewUnit("");
     setNewFundId("");
+    setNewBankAccountId("");
   };
 
   const openSettleDialog = (iou: IOURecord) => {
     setSelectedIOU(iou);
     setSettleAmount(iou.balance);
+    setExpenseAmount(iou.balance);
+    setSettlementType("cash_return");
+    setExpenseAccountId("");
+    if (iou.petty_cash_fund_id) {
+      setReturnSourceType("petty_cash");
+      setReturnFundId(iou.petty_cash_fund_id);
+    } else if (iou.bank_account_id) {
+      setReturnSourceType("bank");
+      setReturnBankAccountId(iou.bank_account_id);
+    } else {
+      setReturnSourceType("petty_cash");
+      setReturnFundId("none");
+    }
     setShowSettleDialog(true);
   };
 
@@ -102,6 +130,11 @@ export const IOUManagementView = () => {
       id: selectedIOU.id,
       settled_amount: newSettledAmount,
       status: newStatus,
+      settlement_type: settlementType,
+      expense_account_id: expenseAccountId || undefined,
+      return_fund_id: returnSourceType === "petty_cash" && returnFundId !== "none" ? returnFundId : undefined,
+      return_bank_account_id: returnSourceType === "bank" && returnBankAccountId !== "none" ? returnBankAccountId : undefined,
+      expense_amount: settlementType === "cash_return" ? undefined : expenseAmount,
     });
     setShowSettleDialog(false);
     setSelectedIOU(null);
@@ -347,23 +380,56 @@ export const IOUManagementView = () => {
                 </SelectContent>
               </Select>
             </div>
-            {pettyCashFunds && pettyCashFunds.length > 0 && (
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Source Petty Cash Float <span className="text-destructive">*</span></Label>
-                <Select value={newFundId} onValueChange={setNewFundId}>
+                <Label>Advance Source Type</Label>
+                <Select value={sourceType} onValueChange={(val: any) => setSourceType(val)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select petty cash float..." />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {pettyCashFunds.map((fund) => (
-                      <SelectItem key={fund.id} value={fund.id}>
-                        {fund.fund_name} (Bal: LKR {(fund.current_balance || 0).toLocaleString()})
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="petty_cash">Petty Cash Float</SelectItem>
+                    <SelectItem value="bank">Bank Account</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
+
+              {sourceType === "petty_cash" && pettyCashFunds && pettyCashFunds.length > 0 && (
+                <div>
+                  <Label>Source Float <span className="text-destructive">*</span></Label>
+                  <Select value={newFundId} onValueChange={setNewFundId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select float..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pettyCashFunds.map((fund) => (
+                        <SelectItem key={fund.id} value={fund.id}>
+                          {fund.fund_name} (Bal: LKR {(fund.current_balance || 0).toLocaleString()})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {sourceType === "bank" && bankAccounts && bankAccounts.length > 0 && (
+                <div>
+                  <Label>Source Bank <span className="text-destructive">*</span></Label>
+                  <Select value={newBankAccountId} onValueChange={setNewBankAccountId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select bank..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.bank_name} - {account.account_name} (Bal: LKR {(account.current_balance || 0).toLocaleString()})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
             <div>
               <Label>Amount (LKR)</Label>
               <Input
@@ -407,7 +473,7 @@ export const IOUManagementView = () => {
             </Button>
             <Button 
               onClick={handleCreateIOU}
-              disabled={!newStaffName || !newUnit || newAmount <= 0 || !newFundId || createIOU.isPending}
+              disabled={!newStaffName || !newUnit || newAmount <= 0 || (sourceType === "petty_cash" ? !newFundId : !newBankAccountId) || createIOU.isPending}
             >
               {createIOU.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Issue IOU
@@ -418,39 +484,55 @@ export const IOUManagementView = () => {
 
       {/* Settle IOU Dialog */}
       <Dialog open={showSettleDialog} onOpenChange={setShowSettleDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Settle IOU</DialogTitle>
           </DialogHeader>
           {selectedIOU && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-4 text-sm bg-muted/50 p-3 rounded-md">
                 <div>
-                  <p className="text-muted-foreground">IOU Number</p>
+                  <p className="text-muted-foreground text-xs">IOU Number</p>
                   <p className="font-mono font-semibold">{selectedIOU.iou_number}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Payee</p>
+                  <p className="text-muted-foreground text-xs">Payee</p>
                   <p className="font-semibold">{selectedIOU.staff?.staff_name || selectedIOU.staff_name_draft || "-"}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Total Amount</p>
+                  <p className="text-muted-foreground text-xs">Total Amount</p>
                   <p className="font-semibold"><CurrencyDisplay amount={selectedIOU.amount} /></p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Outstanding Balance</p>
+                  <p className="text-muted-foreground text-xs">Outstanding Balance</p>
                   <p className="font-semibold text-destructive"><CurrencyDisplay amount={selectedIOU.balance} /></p>
                 </div>
               </div>
+
               <div>
-                <Label>Settlement Amount (LKR)</Label>
+                <Label>Settlement Type</Label>
+                <Select value={settlementType} onValueChange={(val: any) => setSettlementType(val)}>
+                  <SelectTrigger className="w-full mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash_return">Cash Return (Refund to Float/Bank)</SelectItem>
+                    <SelectItem value="expense">Expense Receipts (Spent)</SelectItem>
+                    <SelectItem value="mixed">Mixed (Cash + Expense)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Advance Cleared (LKR)</Label>
                 <Input
                   type="number"
                   value={settleAmount}
                   onChange={(e) => setSettleAmount(parseFloat(e.target.value) || 0)}
-                  className="text-lg font-semibold"
+                  className="text-lg font-semibold mt-1"
                   max={selectedIOU.balance}
                 />
+                <p className="text-xs text-muted-foreground mt-1">Amount of the IOU advance being settled.</p>
                 {settleAmount < selectedIOU.balance && settleAmount > 0 && (
                   <p className="text-xs text-blue-600 mt-1">
                     Partial settlement — remaining balance: LKR {(selectedIOU.balance - settleAmount).toLocaleString()}
@@ -460,6 +542,105 @@ export const IOUManagementView = () => {
                   <p className="text-xs text-destructive mt-1">Amount exceeds outstanding balance</p>
                 )}
               </div>
+
+              {(settlementType === "expense" || settlementType === "mixed") && (
+                <div className="bg-muted/30 p-3 rounded-md border mt-2">
+                  <Label>Actual Expense Receipts (LKR)</Label>
+                  <Input
+                    type="number"
+                    value={expenseAmount}
+                    onChange={(e) => setExpenseAmount(parseFloat(e.target.value) || 0)}
+                    className="text-lg font-semibold mt-1 border-primary"
+                  />
+                  {settlementType === "mixed" && settleAmount > expenseAmount && (
+                    <p className="text-xs text-blue-600 mt-1 font-medium">
+                      Underspend: Employee owes LKR {(settleAmount - expenseAmount).toLocaleString()} back.
+                    </p>
+                  )}
+                  {settlementType === "mixed" && settleAmount < expenseAmount && (
+                    <p className="text-xs text-destructive mt-1 font-medium">
+                      Overspend: We owe employee LKR {(expenseAmount - settleAmount).toLocaleString()} extra.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {(settlementType === "expense" || settlementType === "mixed") && (
+                <div>
+                  <Label>Expense Account (GL) <span className="text-destructive">*</span></Label>
+                  <Select value={expenseAccountId} onValueChange={setExpenseAccountId}>
+                    <SelectTrigger className="w-full mt-1">
+                      <SelectValue placeholder="Select expense account..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts?.filter(a => a.account_type === "expense").map(account => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.account_code} - {account.account_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {(settlementType === "cash_return" || settlementType === "mixed") && (
+                <div className="grid grid-cols-2 gap-4 border p-3 rounded-md mt-2">
+                  <div>
+                    <Label>Return Advance Source</Label>
+                    <Select value={returnSourceType} onValueChange={(val: any) => setReturnSourceType(val)}>
+                      <SelectTrigger className="w-full mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="petty_cash">Petty Cash Float</SelectItem>
+                        <SelectItem value="bank">Bank Account</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {returnSourceType === "petty_cash" && pettyCashFunds && pettyCashFunds.length > 0 && (
+                    <div>
+                      <Label>Return to Petty Cash Float</Label>
+                      <Select value={returnFundId} onValueChange={setReturnFundId}>
+                        <SelectTrigger className="w-full mt-1">
+                          <SelectValue placeholder="Select float to return cash to..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None (General GL)</SelectItem>
+                          {pettyCashFunds.map((fund) => (
+                            <SelectItem key={fund.id} value={fund.id}>
+                              {fund.fund_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {returnSourceType === "bank" && bankAccounts && bankAccounts.length > 0 && (
+                    <div>
+                      <Label>Return to Bank Account</Label>
+                      <Select value={returnBankAccountId} onValueChange={setReturnBankAccountId}>
+                        <SelectTrigger className="w-full mt-1">
+                          <SelectValue placeholder="Select bank to return cash to..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None (General GL)</SelectItem>
+                          {bankAccounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.bank_name} - {account.account_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1 col-span-2">
+                    Select the target if the cash is physically returned to a petty cash box or deposited to a bank.
+                  </p>
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => setSettleAmount(selectedIOU.balance)}>
                   Full Settlement
@@ -471,7 +652,12 @@ export const IOUManagementView = () => {
             <Button variant="outline" onClick={() => setShowSettleDialog(false)}>Cancel</Button>
             <Button
               onClick={handleSettle}
-              disabled={settleAmount <= 0 || (selectedIOU ? settleAmount > selectedIOU.balance : true) || updateIOU.isPending}
+              disabled={
+                settleAmount <= 0 || 
+                (selectedIOU ? settleAmount > selectedIOU.balance : true) || 
+                updateIOU.isPending ||
+                ((settlementType === "expense" || settlementType === "mixed") && !expenseAccountId)
+              }
             >
               {updateIOU.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               <CheckCircle className="h-4 w-4 mr-1" />

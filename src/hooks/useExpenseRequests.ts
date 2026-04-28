@@ -239,7 +239,6 @@ export const useCreateExpenseRequest = () => {
               .from("iou_records")
               .update({
                 settled_amount: newSettledAmount,
-                balance: Math.max(0, newBalance),
                 status: newStatus,
                 updated_at: new Date().toISOString(),
               })

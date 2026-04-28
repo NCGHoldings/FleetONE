@@ -166,6 +166,9 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Filter companies based on user permissions
   const companies = useMemo(() => {
+    const userEmail = session?.user?.email?.toLowerCase() || '';
+    const isSpecialAdmin = userEmail === 'abishekai34@gmail.com';
+
     // If user has explicit company access configured, use that
     if (hasExplicitAccess) {
       return allCompanies.filter(c => allowedCompanyIds.includes(c.id));
@@ -173,12 +176,17 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
     
     // Management roles see all companies when no explicit permissions set
     if (isManagementRole) {
-      return allCompanies;
+      if (isSpecialAdmin) {
+        return allCompanies; // Special admin sees everything (Live + Test)
+      } else {
+        // Normal management roles ONLY see non-test companies
+        return allCompanies.filter(c => c.business_unit_type !== 'test');
+      }
     }
     
     // Other roles see no companies (zero-trust)
     return [];
-  }, [allCompanies, allowedCompanyIds, hasExplicitAccess, isManagementRole]);
+  }, [allCompanies, allowedCompanyIds, hasExplicitAccess, isManagementRole, session]);
 
   // Check if user has access to a specific company
   const hasCompanyAccess = (companyId: string): boolean => {

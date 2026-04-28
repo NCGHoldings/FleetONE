@@ -733,7 +733,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
             <div className="footer-contact">
               <div style={{ display: "flex", alignItems: "center" }}>📞 {responsiblePerson?.phone || "+94 77 123 4567"}</div>
               <div>📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita</div>
-              <div style={{ display: "flex", alignItems: "center" }}>✉️ {responsiblePerson?.email || "info@ncgholdings.lk"}</div>
+              <div style={{ display: "flex", alignItems: "center" }}>✉️ {responsiblePerson?.email || "info_ncgholdings@ncg.lk"}</div>
             </div>
           </div>
         </div>
@@ -927,7 +927,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
             <div className="footer-contact">
               <div style={{ display: "flex", alignItems: "center" }}>📞 {responsiblePerson?.phone || "+94 77 123 4567"}</div>
               <div>📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita</div>
-              <div style={{ display: "flex", alignItems: "center" }}>✉️ {responsiblePerson?.email || "info@ncgholdings.lk"}</div>
+              <div style={{ display: "flex", alignItems: "center" }}>✉️ {responsiblePerson?.email || "info_ncgholdings@ncg.lk"}</div>
             </div>
           </div>
         </div>

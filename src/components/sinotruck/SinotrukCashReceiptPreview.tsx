@@ -286,7 +286,7 @@ export const SinotrukCashReceiptPreview = forwardRef<HTMLDivElement, SinotrukCas
           {/* Footer */}
           <div className="footer-contact">
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              📞 +94 77 766 5501
+              📞 0763682859
             </div>
             <div>📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita</div>
             <div style={{ display: 'flex', alignItems: 'center' }}>

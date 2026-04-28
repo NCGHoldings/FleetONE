@@ -766,23 +766,17 @@ export function useSpecialHireFinanceSettings() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("special_hire_finance_settings")
-        .select(`
-          *,
-          revenue_internal_account:chart_of_accounts!special_hire_finance_settings_revenue_internal_account_id_fkey(id, account_code, account_name),
-          revenue_external_account:chart_of_accounts!special_hire_finance_settings_revenue_external_account_id_fkey(id, account_code, account_name),
-          trade_receivable_account:chart_of_accounts!special_hire_finance_settings_trade_receivable_account_id_fkey(id, account_code, account_name),
-          customer_advance_account:chart_of_accounts!special_hire_finance_settings_customer_advance_account_id_fkey(id, account_code, account_name),
-          default_bank_account:chart_of_accounts!special_hire_finance_settings_default_bank_account_id_fkey(id, account_code, account_name),
-          discount_expense_account:chart_of_accounts!special_hire_finance_settings_discount_expense_account_id_fkey(id, account_code, account_name),
-          commission_expense_account:chart_of_accounts!special_hire_finance_settings_commission_expense_account_id_fkey(id, account_code, account_name),
-          refund_expense_account:chart_of_accounts!special_hire_finance_settings_refund_expense_account_id_fkey(id, account_code, account_name),
-          vat_output_account:chart_of_accounts!special_hire_finance_settings_vat_output_account_id_fkey(id, account_code, account_name),
-          wht_payable_account:chart_of_accounts!special_hire_finance_settings_wht_payable_account_id_fkey(id, account_code, account_name)
-        `)
+        .select("*")
         .eq("company_id", effectiveCompanyId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching special hire settings:", error);
+        // Do not throw so UI doesn't break, return null to allow insert
+        return null; 
+      }
       return data;
     },
     enabled: !!effectiveCompanyId,
@@ -803,6 +797,8 @@ export function useUpdateSpecialHireFinanceSettings() {
         .from("special_hire_finance_settings")
         .select("id")
         .eq("company_id", effectiveCompanyId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (existing) {

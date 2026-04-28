@@ -6,7 +6,9 @@ if (!process.env.VITE_SUPABASE_PUBLISHABLE_KEY && process.env.VITE_SUPABASE_ANON
 }
 const sb = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY);
 async function run() {
-  const { data, error } = await sb.from('iou_records').select('*').limit(1);
-  console.log(Object.keys(data?.[0] || {}));
+  const { data, error } = await sb.rpc('execute_sql', { query: `
+    SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND (table_name LIKE '%petty_cash%' OR table_name LIKE '%iou%');
+  `});
+  console.log(data || error);
 }
 run();

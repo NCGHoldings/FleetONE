@@ -20,8 +20,11 @@ import {
   Wallet,
   TrendingUp,
   RefreshCw,
-  Info
+  Info,
+  Wand2,
+  AlertTriangle
 } from "lucide-react";
+import { toast } from "sonner";
 import { useSpecialHireFinanceSettings, useUpdateSpecialHireFinanceSettings } from "@/hooks/useSpecialHireFinance";
 import { useChartOfAccounts } from "@/hooks/useAccountingData";
 import { SearchableFinanceAccountSelector } from "@/components/settings/SearchableFinanceAccountSelector";
@@ -95,302 +98,260 @@ export function SpecialHireFinanceSettings() {
         refund_expense_account_id: existingSettings.refund_expense_account_id || "",
         vat_output_account_id: existingSettings.vat_output_account_id || "",
         wht_payable_account_id: existingSettings.wht_payable_account_id || "",
-        auto_post_advance_payments: existingSettings.auto_post_advance_payments || false,
-        auto_post_invoices: existingSettings.auto_post_invoices || false,
-        auto_post_balance_payments: existingSettings.auto_post_balance_payments || false,
+        auto_post_advance_payments: (existingSettings as any).auto_post_advances ?? (existingSettings as any).auto_post_advance_payments ?? true,
+        auto_post_invoices: existingSettings.auto_post_invoices ?? true,
+        auto_post_balance_payments: existingSettings.auto_post_balance_payments ?? true,
         invoice_prefix: existingSettings.invoice_prefix || "SPH-INV",
         advance_receipt_prefix: existingSettings.advance_receipt_prefix || "SPH-ADV",
         quotation_bank_name: (existingSettings as any).quotation_bank_name || "Commercial Bank - Nugegoda",
         quotation_account_name: (existingSettings as any).quotation_account_name || "NCG Holding (Pvt) Ltd",
-        quotation_account_no: (existingSettings as any).quotation_account_no || "1001077213",
+        quotation_account_no: (existingSettings as any).quotation_account_no || "1001077213"
       });
     }
   }, [existingSettings]);
 
   const handleSave = async () => {
     try {
-      await updateSettings.mutateAsync(settings);
-    } catch (error) {
-      // Error handled by mutation
+      // Create a clean payload mapping state to DB columns
+      const payload = {
+        revenue_internal_account_id: settings.revenue_internal_account_id,
+        revenue_external_account_id: settings.revenue_external_account_id,
+        trade_receivable_account_id: settings.trade_receivable_account_id,
+        customer_advance_account_id: settings.customer_advance_account_id,
+        default_bank_account_id: settings.default_bank_account_id,
+        discount_expense_account_id: settings.discount_expense_account_id,
+        commission_expense_account_id: settings.commission_expense_account_id,
+        refund_expense_account_id: settings.refund_expense_account_id,
+        vat_output_account_id: settings.vat_output_account_id,
+        wht_payable_account_id: settings.wht_payable_account_id,
+        auto_post_advance_payments: settings.auto_post_advance_payments,
+        auto_post_invoices: settings.auto_post_invoices,
+        auto_post_balance_payments: settings.auto_post_balance_payments,
+        invoice_prefix: settings.invoice_prefix,
+        advance_receipt_prefix: settings.advance_receipt_prefix,
+        quotation_bank_name: settings.quotation_bank_name,
+        quotation_account_name: settings.quotation_account_name,
+        quotation_account_no: settings.quotation_account_no,
+      };
+      await updateSettings.mutateAsync(payload as any);
+      toast.success("Settings saved successfully.");
+    } catch (e: any) {
+      toast.error("Failed to save settings: " + e.message);
     }
   };
 
-  // Filter accounts by type
-  const assetAccounts = chartOfAccounts?.filter((a) => a.account_type === "asset") || [];
-  const liabilityAccounts = chartOfAccounts?.filter((a) => a.account_type === "liability") || [];
-  const revenueAccounts = chartOfAccounts?.filter((a) => a.account_type === "revenue") || [];
-  const expenseAccounts = chartOfAccounts?.filter((a) => a.account_type === "expense") || [];
-  
-  // Pass ALL accounts of correct type — no name filtering that hides saved values
-  const receivableAccounts = assetAccounts;
-  const bankCashAccounts = assetAccounts;
-  const advanceAccounts = liabilityAccounts;
+  const handleAutoFill = () => {
+    if (!chartOfAccounts || chartOfAccounts.length === 0) {
+      toast.error("Accounts list is not loaded yet.");
+      return;
+    }
+    
+    const matchAccount = (keywords: string[], type?: string) => {
+      return chartOfAccounts.find(a => 
+        (!type || a.account_type === type) && 
+        keywords.some(k => a.account_name.toLowerCase().includes(k))
+      )?.id || "";
+    };
 
-  // Check if core accounts are configured
-  const isCoreConfigured = 
-    settings.trade_receivable_account_id &&
-    settings.customer_advance_account_id &&
-    settings.default_bank_account_id &&
+    const revInternal = matchAccount(["special hire revenue - internal", "internal revenue"], "revenue");
+    const revExternal = matchAccount(["special hire revenue - external", "external revenue", "sales", "revenue"], "revenue");
+    const ar = matchAccount(["trade receivable", "accounts receivable", "trade debtor"], "asset");
+    const adv = matchAccount(["customer advance", "advance receipt", "advance"], "liability");
+    const bank = matchAccount(["bank", "cash", "petty cash"], "asset");
+
+    setSettings(prev => ({
+      ...prev,
+      revenue_internal_account_id: prev.revenue_internal_account_id || revInternal,
+      revenue_external_account_id: prev.revenue_external_account_id || revExternal,
+      trade_receivable_account_id: prev.trade_receivable_account_id || ar,
+      customer_advance_account_id: prev.customer_advance_account_id || adv,
+      default_bank_account_id: prev.default_bank_account_id || bank,
+    }));
+    toast.success("Default accounts auto-filled. Please review and Save.");
+  };
+
+  const isConfigured = 
+    settings.trade_receivable_account_id && 
+    settings.customer_advance_account_id && 
+    settings.default_bank_account_id && 
     (settings.revenue_internal_account_id || settings.revenue_external_account_id);
 
   if (settingsLoading) {
-    return <div className="flex items-center justify-center h-64">Loading settings...</div>;
+    return <div className="p-8 text-center text-muted-foreground">Loading finance settings...</div>;
   }
 
   return (
     <div className="space-y-6">
-      {/* Configuration Status */}
-      {!isCoreConfigured && (
+      {!isConfigured && (
         <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
+          <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Configuration Required</AlertTitle>
           <AlertDescription>
-            Please configure the core GL accounts (Trade Receivable, Customer Advance, Bank Account, and Revenue) 
-            to enable automatic posting to the General Ledger.
+            Please configure the core GL accounts (Trade Receivable, Customer Advance, Bank Account, and Revenue) to enable automatic posting to the General Ledger.
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Revenue & Receivable Mappings */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Revenue & Receivable Account Mappings
-          </CardTitle>
-          <CardDescription>
-            Configure accounts for recognizing Special Hire revenue and tracking customer receivables
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Revenue &amp; Receivable Account Mappings</CardTitle>
+            <CardDescription>
+              Configure accounts for recognizing Special Hire revenue and tracking customer receivables.
+            </CardDescription>
+          </div>
+          <Button variant="secondary" onClick={handleAutoFill} size="sm" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200">
+            <Wand2 className="h-4 w-4 mr-2" />
+            Auto-Fill Accounts
+          </Button>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Revenue - Internal */}
             <div className="space-y-2">
               <Label>Special Hire Revenue - Internal (Credit on Invoice)</Label>
               <SearchableFinanceAccountSelector
                 value={settings.revenue_internal_account_id || null}
-                onValueChange={(value) =>
+                onValueChange={(value) => 
                   setSettings({ ...settings, revenue_internal_account_id: value || "" })
                 }
-                accounts={revenueAccounts}
-                placeholder="Select internal revenue account"
+                accounts={chartOfAccounts || []}
+                placeholder="Select internal revenue account..."
               />
-              <p className="text-xs text-muted-foreground">
-                Used for internal/inter-company special hire bookings
-              </p>
+              <p className="text-xs text-muted-foreground">Used for internal/inter-company special hire bookings</p>
             </div>
-
-            {/* Revenue - External */}
+            
             <div className="space-y-2">
               <Label>Special Hire Revenue - External (Credit on Invoice)</Label>
               <SearchableFinanceAccountSelector
                 value={settings.revenue_external_account_id || null}
-                onValueChange={(value) =>
+                onValueChange={(value) => 
                   setSettings({ ...settings, revenue_external_account_id: value || "" })
                 }
-                accounts={revenueAccounts}
-                placeholder="Select external revenue account"
+                accounts={chartOfAccounts || []}
+                placeholder="Select external revenue account..."
               />
-              <p className="text-xs text-muted-foreground">
-                Used for external customer special hire bookings
-              </p>
+              <p className="text-xs text-muted-foreground">Used for external customer special hire bookings</p>
             </div>
 
-            {/* Trade Receivable */}
             <div className="space-y-2">
               <Label>Trade Receivable Account (Debit on Invoice)</Label>
               <SearchableFinanceAccountSelector
                 value={settings.trade_receivable_account_id || null}
-                onValueChange={(value) =>
+                onValueChange={(value) => 
                   setSettings({ ...settings, trade_receivable_account_id: value || "" })
                 }
-                accounts={receivableAccounts.length > 0 ? receivableAccounts : assetAccounts}
-                placeholder="Select receivable account"
+                accounts={chartOfAccounts || []}
+                placeholder="Select receivable account..."
               />
-              <p className="text-xs text-muted-foreground">
-                Debited when invoice is generated, credited when payment received
-              </p>
+              <p className="text-xs text-muted-foreground">Debited when invoice is generated, credited when payment received</p>
             </div>
 
-            {/* Customer Advance (Liability) */}
             <div className="space-y-2">
               <Label>Customer Advance Receipt Account (Credit on Advance)</Label>
               <SearchableFinanceAccountSelector
                 value={settings.customer_advance_account_id || null}
-                onValueChange={(value) =>
+                onValueChange={(value) => 
                   setSettings({ ...settings, customer_advance_account_id: value || "" })
                 }
-                accounts={advanceAccounts.length > 0 ? advanceAccounts : liabilityAccounts}
-                placeholder="Select advance receipt account"
+                accounts={chartOfAccounts || []}
+                placeholder="Select advance account..."
               />
-              <p className="text-xs text-muted-foreground">
-                <strong>Liability account</strong> - Credited when advance received, debited when applied to invoice
-              </p>
+              <p className="text-xs text-muted-foreground">Liability account - Credited when advance received, debited when applied to invoice</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Bank/Cash Account */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wallet className="h-5 w-5" />
-            Bank/Cash Account Mapping
-          </CardTitle>
+          <CardTitle>Bank/Cash Account Mapping</CardTitle>
           <CardDescription>
             Configure the default bank account for receiving Special Hire payments
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="max-w-md space-y-2">
-            <Label>Default Bank/Cash Account (Debit on Payment Received)</Label>
-            <SearchableFinanceAccountSelector
-              value={settings.default_bank_account_id || null}
-              onValueChange={(value) =>
-                setSettings({ ...settings, default_bank_account_id: value || "" })
-              }
-              accounts={bankCashAccounts.length > 0 ? bankCashAccounts : assetAccounts}
-              placeholder="Select bank/cash account"
-            />
-            <p className="text-xs text-muted-foreground">
-              This account is debited when advance or balance payments are received
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label>Default Bank/Cash Account (Debit on Payment Received)</Label>
+              <SearchableFinanceAccountSelector
+                value={settings.default_bank_account_id || null}
+                onValueChange={(value) => 
+                  setSettings({ ...settings, default_bank_account_id: value || "" })
+                }
+                accounts={chartOfAccounts || []}
+                placeholder="Select bank/cash account..."
+              />
+              <p className="text-xs text-muted-foreground">This account is debited when advance or balance payments are received</p>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Expense Accounts */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Receipt className="h-5 w-5" />
-            Expense Account Mappings
-          </CardTitle>
+          <CardTitle>Expense Account Mappings</CardTitle>
           <CardDescription>
             Configure accounts for discounts, commissions, and refunds
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Discount Expense */}
             <div className="space-y-2">
               <Label>Discount Expense Account</Label>
               <SearchableFinanceAccountSelector
                 value={settings.discount_expense_account_id || null}
-                onValueChange={(value) =>
+                onValueChange={(value) => 
                   setSettings({ ...settings, discount_expense_account_id: value || "" })
                 }
-                accounts={expenseAccounts}
-                placeholder="Select discount account"
+                accounts={chartOfAccounts || []}
+                placeholder="Select discount account..."
               />
-              <p className="text-xs text-muted-foreground">
-                Debited when discounts are given
-              </p>
+              <p className="text-xs text-muted-foreground">Debited when discounts are given</p>
             </div>
 
-            {/* Commission Expense */}
             <div className="space-y-2">
               <Label>Commission Expense Account</Label>
               <SearchableFinanceAccountSelector
                 value={settings.commission_expense_account_id || null}
-                onValueChange={(value) =>
+                onValueChange={(value) => 
                   setSettings({ ...settings, commission_expense_account_id: value || "" })
                 }
-                accounts={expenseAccounts}
-                placeholder="Select commission account"
+                accounts={chartOfAccounts || []}
+                placeholder="Select commission account..."
               />
-              <p className="text-xs text-muted-foreground">
-                Debited when referral commissions are paid
-              </p>
+              <p className="text-xs text-muted-foreground">Debited when referral commissions are paid</p>
             </div>
 
-            {/* Refund Expense */}
             <div className="space-y-2">
               <Label>Refund Expense Account</Label>
               <SearchableFinanceAccountSelector
                 value={settings.refund_expense_account_id || null}
-                onValueChange={(value) =>
+                onValueChange={(value) => 
                   setSettings({ ...settings, refund_expense_account_id: value || "" })
                 }
-                accounts={expenseAccounts}
-                placeholder="Select refund account"
+                accounts={chartOfAccounts || []}
+                placeholder="Select refund account..."
               />
-              <p className="text-xs text-muted-foreground">
-                Used for tracking refund expenses
-              </p>
+              <p className="text-xs text-muted-foreground">Used for tracking refund expenses</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Tax Accounts (Optional) */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Tax Account Mappings (Optional)
-          </CardTitle>
+          <CardTitle>Automation &amp; Workflow Rules</CardTitle>
           <CardDescription>
-            Configure accounts for VAT and withholding tax if applicable
+            Configure which events trigger automatic journal entries in the General Ledger
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* VAT Output */}
-            <div className="space-y-2">
-              <Label>VAT Output Account</Label>
-              <SearchableFinanceAccountSelector
-                value={settings.vat_output_account_id || null}
-                onValueChange={(value) =>
-                  setSettings({ ...settings, vat_output_account_id: value || "" })
-                }
-                accounts={liabilityAccounts}
-                placeholder="Select VAT output account"
-              />
-              <p className="text-xs text-muted-foreground">
-                Credited when VAT is charged on invoices
-              </p>
-            </div>
-
-            {/* WHT Payable */}
-            <div className="space-y-2">
-              <Label>WHT Payable Account</Label>
-              <SearchableFinanceAccountSelector
-                value={settings.wht_payable_account_id || null}
-                onValueChange={(value) =>
-                  setSettings({ ...settings, wht_payable_account_id: value || "" })
-                }
-                accounts={liabilityAccounts}
-                placeholder="Select WHT payable account"
-              />
-              <p className="text-xs text-muted-foreground">
-                Used when withholding tax is applicable
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Auto-Posting Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings2 className="h-5 w-5" />
-            Auto-Posting & Numbering Settings
-          </CardTitle>
-          <CardDescription>
-            Configure automatic GL posting and document numbering
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Auto-posting toggles */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid gap-4">
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="space-y-0.5">
-                <Label className="text-base">Auto-Post Advance Payments</Label>
+                <Label className="text-base">Auto-Post Advance Receipts</Label>
                 <p className="text-sm text-muted-foreground">
-                  Post to GL when advance is confirmed
+                  Automatically create journal entries when advance payments are received
                 </p>
               </div>
               <Switch
@@ -405,7 +366,7 @@ export function SpecialHireFinanceSettings() {
               <div className="space-y-0.5">
                 <Label className="text-base">Auto-Post Invoices</Label>
                 <p className="text-sm text-muted-foreground">
-                  Post to GL when invoice is generated
+                  Recognize revenue automatically upon trip completion/invoice generation
                 </p>
               </div>
               <Switch
@@ -415,26 +376,10 @@ export function SpecialHireFinanceSettings() {
                 }
               />
             </div>
-
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="space-y-0.5">
-                <Label className="text-base">Auto-Post Balance Payments</Label>
-                <p className="text-sm text-muted-foreground">
-                  Post to GL when balance is received
-                </p>
-              </div>
-              <Switch
-                checked={settings.auto_post_balance_payments}
-                onCheckedChange={(checked) =>
-                  setSettings({ ...settings, auto_post_balance_payments: checked })
-                }
-              />
-            </div>
           </div>
 
           <Separator />
 
-          {/* Numbering */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label>Invoice Number Prefix</Label>
@@ -445,11 +390,7 @@ export function SpecialHireFinanceSettings() {
                 }
                 placeholder="SPH-INV"
               />
-              <p className="text-xs text-muted-foreground">
-                Preview: {settings.invoice_prefix}-202601-00001
-              </p>
             </div>
-
             <div className="space-y-2">
               <Label>Advance Receipt Number Prefix</Label>
               <Input
@@ -459,20 +400,16 @@ export function SpecialHireFinanceSettings() {
                 }
                 placeholder="SPH-ADV"
               />
-              <p className="text-xs text-muted-foreground">
-                Preview: {settings.advance_receipt_prefix}-202601-00001
-              </p>
             </div>
+          </div>
 
-            <Separator />
+          <Separator />
 
+          <div className="space-y-4">
             <h3 className="font-semibold flex items-center gap-2">
               <CreditCard className="h-4 w-4" />
               Quotation Bank Details (Printed on PDF)
             </h3>
-            <p className="text-sm text-muted-foreground">
-              These bank details will be captured on each new quotation at creation time. Changing them here only affects future quotations.
-            </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Bank Name &amp; Branch</Label>
@@ -481,7 +418,6 @@ export function SpecialHireFinanceSettings() {
                   onChange={(e) =>
                     setSettings({ ...settings, quotation_bank_name: e.target.value })
                   }
-                  placeholder="Commercial Bank - Nugegoda"
                 />
               </div>
               <div className="space-y-2">
@@ -491,7 +427,6 @@ export function SpecialHireFinanceSettings() {
                   onChange={(e) =>
                     setSettings({ ...settings, quotation_account_name: e.target.value })
                   }
-                  placeholder="NCG Holding (Pvt) Ltd"
                 />
               </div>
               <div className="space-y-2">
@@ -501,112 +436,17 @@ export function SpecialHireFinanceSettings() {
                   onChange={(e) =>
                     setSettings({ ...settings, quotation_account_no: e.target.value })
                   }
-                  placeholder="1001077213"
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-4">
             <Button onClick={handleSave} disabled={updateSettings.isPending}>
               <Save className="h-4 w-4 mr-2" />
               Save Settings
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Journal Entry Flow Preview */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Info className="h-5 w-5" />
-            Journal Entry Flow Preview
-          </CardTitle>
-          <CardDescription>
-            Visual representation of how journal entries will be created for each transaction type
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Advance Payment */}
-          <div className="p-4 border rounded-lg bg-muted/30">
-            <h4 className="font-medium mb-2 flex items-center gap-2">
-              <Badge variant="outline">Step 1</Badge>
-              Advance Payment Received (50%)
-            </h4>
-            <div className="grid grid-cols-2 gap-4 text-sm font-mono">
-              <div className="flex items-center gap-2">
-                <Badge className="bg-green-500/20 text-green-700">DR</Badge>
-                Cash/Bank Account
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge className="bg-red-500/20 text-red-700">CR</Badge>
-                Customer Advance (Liability)
-              </div>
-            </div>
-          </div>
-
-          {/* Invoice Generated */}
-          <div className="p-4 border rounded-lg bg-muted/30">
-            <h4 className="font-medium mb-2 flex items-center gap-2">
-              <Badge variant="outline">Step 2</Badge>
-              Trip Completed → Invoice Generated
-            </h4>
-            <div className="grid grid-cols-2 gap-4 text-sm font-mono">
-              <div className="flex items-center gap-2">
-                <Badge className="bg-green-500/20 text-green-700">DR</Badge>
-                Trade Receivable
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge className="bg-red-500/20 text-red-700">CR</Badge>
-                Special Hire Revenue
-              </div>
-            </div>
-          </div>
-
-          {/* Apply Advance */}
-          <div className="p-4 border rounded-lg bg-muted/30">
-            <h4 className="font-medium mb-2 flex items-center gap-2">
-              <Badge variant="outline">Step 3</Badge>
-              Apply Advance to Invoice
-            </h4>
-            <div className="grid grid-cols-2 gap-4 text-sm font-mono">
-              <div className="flex items-center gap-2">
-                <Badge className="bg-green-500/20 text-green-700">DR</Badge>
-                Customer Advance (Clears Liability)
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge className="bg-red-500/20 text-red-700">CR</Badge>
-                Trade Receivable (Reduces AR)
-              </div>
-            </div>
-          </div>
-
-          {/* Balance Payment */}
-          <div className="p-4 border rounded-lg bg-muted/30">
-            <h4 className="font-medium mb-2 flex items-center gap-2">
-              <Badge variant="outline">Step 4</Badge>
-              Balance Payment Received (50%)
-            </h4>
-            <div className="grid grid-cols-2 gap-4 text-sm font-mono">
-              <div className="flex items-center gap-2">
-                <Badge className="bg-green-500/20 text-green-700">DR</Badge>
-                Cash/Bank Account
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge className="bg-red-500/20 text-red-700">CR</Badge>
-                Trade Receivable (Clears AR)
-              </div>
-            </div>
-          </div>
-
-          <Alert>
-            <CheckCircle className="h-4 w-4" />
-            <AlertTitle>Result</AlertTitle>
-            <AlertDescription>
-              Revenue recognized = 100% | Cash received = 100% | All balances cleared
-            </AlertDescription>
-          </Alert>
         </CardContent>
       </Card>
     </div>

@@ -4,12 +4,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Search, Wand2, FileSpreadsheet, MapPin } from "lucide-react";
+import { CheckCircle2, Search, Wand2, FileSpreadsheet, MapPin, CheckSquare, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { SearchableSelect } from "@/components/accounting/expenses/SearchableSelect";
 import { toast } from "sonner";
+import { useChartOfAccounts } from "@/hooks/useAccountingData";
+import { useCreateJournalEntry, usePostJournalEntry } from "@/hooks/useAccountingMutations";
+import { useCompany } from "@/contexts/CompanyContext";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Props {
   importData: MasterExpenseImport;
@@ -18,12 +22,61 @@ interface Props {
 export function ExpenseMappingGrid({ importData }: Props) {
   const [records, setRecords] = useState<MasterExpenseRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Accounting mapping hooks
+  const { data: accounts } = useChartOfAccounts();
+  const createJournal = useCreateJournalEntry();
+  const postJournal = usePostJournalEntry();
+  const { selectedCompanyId, currentCompany } = useCompany();
+  
+  // Memoized Account Options
+  const expenseOptions = useMemo(() => {
+    return (accounts || [])
+      .filter(a => a.account_type === "expense" || a.account_type === "cost_of_goods_sold")
+      .map(a => ({ value: a.id, label: `${a.account_code || ""} - ${a.account_name}`.replace(/^ - /, "") }));
+  }, [accounts]);
+
+  const paymentOptions = useMemo(() => {
+    return (accounts || [])
+      .filter(a => a.account_type === "asset" || a.account_type === "liability" || a.account_type === "equity")
+      .map(a => ({ value: a.id, label: `${a.account_code || ""} - ${a.account_name}`.replace(/^ - /, "") }));
+  }, [accounts]);
   
   // Mapping options
   const [vehicles, setVehicles] = useState<{id: string, bus_no: string}[]>([]);
-  const [quotations, setQuotations] = useState<{id: string, quotation_no: string, trip_start_date: string, trip_end_date: string}[]>([]);
+  const [quotations, setQuotations] = useState<{id: string, quotation_no: string, pickup_datetime: string, drop_datetime: string, customer_name?: string}[]>([]);
   
   const [isAutoSuggesting, setIsAutoSuggesting] = useState(false);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
+  const [bulkExpenseAccountId, setBulkExpenseAccountId] = useState<string>("");
+  const [bulkPaymentAccountId, setBulkPaymentAccountId] = useState<string>("");
+
+  // Move hooks above early returns!
+  const vehicleOptions = useMemo(() => vehicles.map(v => ({ value: v.id, label: v.bus_no })), [vehicles]);
+  const quotationOptions = useMemo(() => quotations.map(q => {
+    const custName = (q as any).customer_name || "No Customer";
+    const start = q.pickup_datetime ? format(new Date(q.pickup_datetime), "MMM d") : "";
+    const end = q.drop_datetime ? format(new Date(q.drop_datetime), "MMM d") : "";
+    return { 
+      value: q.id, 
+      label: `${q.quotation_no} - ${custName} (${start} - ${end})` 
+    };
+  }), [quotations]);
+
+  // Global search filter
+  const [searchTerm, setSearchTerm] = useState("");
+  const filteredRecords = useMemo(() => {
+    if (!searchTerm.trim()) return records;
+    const q = searchTerm.toLowerCase();
+    return records.filter(r => {
+      const raw = JSON.stringify(r.raw_data).toLowerCase();
+      const amt = String(r.amount);
+      const date = r.expense_date || "";
+      return raw.includes(q) || amt.includes(q) || date.includes(q);
+    });
+  }, [records, searchTerm]);
 
   useEffect(() => {
     loadData();
@@ -66,15 +119,18 @@ export function ExpenseMappingGrid({ importData }: Props) {
     const { data: bData } = await supabase.from("buses").select("id, bus_no");
     if (bData) setVehicles(bData);
     
-    // Fetch recent Special Hire quotations
-    const { data: qData } = await supabase
+    // Fetch recent Special Hire quotations with customer details
+    const { data: qData, error } = await supabase
       .from("special_hire_quotations")
-      .select("id, quotation_no, trip_start_date, trip_end_date")
-      .in("status", ["approved", "ongoing", "completed"]) // relevant statuses
+      .select("id, quotation_no, pickup_datetime, drop_datetime, customer_name")
       .order("created_at", { ascending: false })
       .limit(500);
       
-    if (qData) setQuotations(qData);
+    if (error) {
+      console.error("Failed to load quotations:", error);
+    }
+      
+    if (qData) setQuotations(qData as any);
   };
 
   const runAutoSuggest = async () => {
@@ -82,18 +138,15 @@ export function ExpenseMappingGrid({ importData }: Props) {
     let mappedCount = 0;
     
     try {
-      // Create a copy to update local state without full reload
       const newRecords = [...records];
       
       for (let i = 0; i < newRecords.length; i++) {
         const record = newRecords[i];
-        if (record.is_confirmed) continue; // Skip already confirmed
+        if (record.is_confirmed) continue; 
         
         let updates: Partial<MasterExpenseRecord> = {};
         
-        // 1. Vehicle Auto-Suggest based on Card_ID (for Fuel)
         if (importData.expense_type === "Fuel" && record.raw_data["Card_ID"]) {
-           // Heuristic: Does the Card_ID contain the bus number? (e.g., card "LIOC-NB-1234" -> Bus NB-1234)
            const cardStr = String(record.raw_data["Card_ID"]).toUpperCase();
            const matchedBus = vehicles.find(v => cardStr.includes(v.bus_no.toUpperCase().replace(/\s/g, "")));
            if (matchedBus) {
@@ -102,14 +155,12 @@ export function ExpenseMappingGrid({ importData }: Props) {
            }
         }
         
-        // 2. Quotation Auto-Suggest based on TRNX_Time and Trip Dates
         if (importData.expense_type === "Fuel" && record.expense_date) {
            const expDate = new Date(record.expense_date).getTime();
            
-           // Find quotations that were active on or around this date
            const matchedQuotation = quotations.find(q => {
-             const start = new Date(q.trip_start_date).getTime() - (86400 * 1000); // 1 day before
-             const end = new Date(q.trip_end_date).getTime() + (86400 * 1000);   // 1 day after
+             const start = new Date(q.pickup_datetime).getTime() - (86400 * 1000); 
+             const end = new Date(q.drop_datetime).getTime() + (86400 * 1000);   
              return expDate >= start && expDate <= end;
            });
            
@@ -139,21 +190,25 @@ export function ExpenseMappingGrid({ importData }: Props) {
     try {
       await updateRecordInDb(record.id, { is_confirmed: true });
       setRecords(records.map(r => r.id === record.id ? { ...r, is_confirmed: true } : r));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(record.id);
+        return next;
+      });
       toast.success("Record mapping confirmed.");
     } catch (e: any) {
       toast.error("Failed to confirm", { description: e.message });
     }
   };
   
-  const handleManualMapping = async (recordId: string, field: "mapped_vehicle_id" | "mapped_quotation_id", value: string) => {
+  const handleManualMapping = async (recordId: string, field: "mapped_vehicle_id" | "mapped_quotation_id" | "mapped_expense_account_id" | "mapped_payment_account_id", value: string | null) => {
      try {
        await updateRecordInDb(recordId, { [field]: value });
-       // Optimistic UI update
        setRecords(records.map(r => {
          if (r.id === recordId) {
             const upd = { ...r, [field]: value };
-            if (field === "mapped_vehicle_id") upd.buses = { bus_no: vehicles.find(v => v.id === value)?.bus_no || "" };
-            if (field === "mapped_quotation_id") upd.special_hire_quotations = { quotation_no: quotations.find(q => q.id === value)?.quotation_no || "", customer_id: "" };
+            if (field === "mapped_vehicle_id") upd.buses = value ? { bus_no: vehicles.find(v => v.id === value)?.bus_no || "" } : undefined;
+            if (field === "mapped_quotation_id") upd.special_hire_quotations = value ? { quotation_no: quotations.find(q => q.id === value)?.quotation_no || "", customer_id: "" } : undefined;
             return upd;
          }
          return r;
@@ -163,28 +218,201 @@ export function ExpenseMappingGrid({ importData }: Props) {
      }
   };
 
+  const postSingleToGL = async (record: MasterExpenseRecord) => {
+    if (!record.mapped_expense_account_id || !record.mapped_payment_account_id) {
+      throw new Error("Missing Expense Account or Payment Mode");
+    }
+
+    const description = `Expense Import: ${importData.expense_type} - ${record.raw_data["TRIP ID"] || record.raw_data["TRNX_ID"] || "Generic"}`;
+    
+    const journalEntry = await createJournal.mutateAsync({
+      entry_number: `EXP-${record.id.substring(0, 8).toUpperCase()}`,
+      entry_date: record.expense_date || new Date().toISOString().split('T')[0],
+      description: description,
+      company_id: selectedCompanyId,
+      source_module: "expense",
+      total_debit: record.amount,
+      total_credit: record.amount,
+      lines: [
+        {
+          account_id: record.mapped_expense_account_id,
+          debit_amount: record.amount,
+          credit_amount: 0,
+          description: description
+        },
+        {
+          account_id: record.mapped_payment_account_id,
+          debit_amount: 0,
+          credit_amount: record.amount,
+          description: description
+        }
+      ]
+    });
+
+    if (journalEntry?.id) {
+      await postJournal.mutateAsync(journalEntry.id);
+      await updateRecordInDb(record.id, { 
+        is_confirmed: true,
+        gl_journal_id: journalEntry.id 
+      });
+      return journalEntry.id;
+    }
+    throw new Error("Failed to create Journal Entry");
+  };
+
+  const handlePostToGL = async (record: MasterExpenseRecord) => {
+    try {
+      const gl_journal_id = await postSingleToGL(record);
+      setRecords(records.map(r => r.id === record.id ? { ...r, is_confirmed: true, gl_journal_id } : r));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(record.id);
+        return next;
+      });
+      toast.success("Expense successfully posted to General Ledger");
+    } catch (e: any) {
+      toast.error("Failed to post to GL", { description: e.message });
+    }
+  };
+
+  // Bulk Operations
+  const handleApplyBulkMapping = async () => {
+    if (!bulkExpenseAccountId && !bulkPaymentAccountId) return;
+    
+    let successCount = 0;
+    try {
+      const updates: any = {};
+      if (bulkExpenseAccountId) updates.mapped_expense_account_id = bulkExpenseAccountId;
+      if (bulkPaymentAccountId) updates.mapped_payment_account_id = bulkPaymentAccountId;
+
+      const targetRecords = records.filter(r => selectedIds.has(r.id) && !r.is_confirmed);
+      
+      for (const record of targetRecords) {
+        await updateRecordInDb(record.id, updates);
+        successCount++;
+      }
+      
+      setRecords(records.map(r => {
+        if (selectedIds.has(r.id) && !r.is_confirmed) {
+          return { ...r, ...updates };
+        }
+        return r;
+      }));
+      
+      toast.success(`Applied mapping to ${successCount} records.`);
+      setBulkExpenseAccountId("");
+      setBulkPaymentAccountId("");
+    } catch (e: any) {
+      toast.error("Failed to apply bulk mapping", { description: e.message });
+    }
+  };
+
+  const handleBulkConfirm = async () => {
+    setIsBulkProcessing(true);
+    let successCount = 0;
+    const errors: string[] = [];
+    
+    try {
+      const targetRecords = records.filter(r => selectedIds.has(r.id) && !r.is_confirmed);
+      
+      for (const record of targetRecords) {
+        if (!record.mapped_quotation_id || !record.mapped_vehicle_id) {
+          errors.push(`Record ${record.id} is missing mapping`);
+          continue;
+        }
+        
+        try {
+          await updateRecordInDb(record.id, { is_confirmed: true });
+          successCount++;
+        } catch (e: any) {
+          errors.push(`Record ${record.id}: ${e.message}`);
+        }
+      }
+      
+      // Refresh local state for successful ones
+      setRecords(records.map(r => {
+        if (selectedIds.has(r.id) && r.mapped_quotation_id && r.mapped_vehicle_id) {
+          return { ...r, is_confirmed: true };
+        }
+        return r;
+      }));
+      
+      setSelectedIds(new Set());
+      
+      if (successCount > 0) {
+        toast.success(`Successfully confirmed ${successCount} records.`);
+      }
+      if (errors.length > 0) {
+        toast.error(`Failed to confirm ${errors.length} records. Check missing mappings.`);
+      }
+      
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkPostToGL = async () => {
+    setIsBulkProcessing(true);
+    let successCount = 0;
+    const errors: string[] = [];
+    
+    try {
+      const targetRecords = records.filter(r => selectedIds.has(r.id) && !r.is_confirmed);
+      const newRecords = [...records];
+      
+      for (const record of targetRecords) {
+        try {
+          const gl_journal_id = await postSingleToGL(record);
+          const index = newRecords.findIndex(r => r.id === record.id);
+          if (index !== -1) {
+             newRecords[index] = { ...newRecords[index], is_confirmed: true, gl_journal_id };
+          }
+          successCount++;
+        } catch (e: any) {
+          errors.push(`Failed for record ${record.id.substring(0, 8)}: ${e.message}`);
+        }
+      }
+      
+      setRecords(newRecords);
+      setSelectedIds(new Set());
+      
+      if (successCount > 0) {
+        toast.success(`Successfully posted ${successCount} records to GL.`);
+      }
+      if (errors.length > 0) {
+        toast.error(`Failed to post ${errors.length} records. Ensure all accounts are mapped.`);
+      }
+      
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const toggleAllSelection = () => {
+    const processableRecords = filteredRecords.filter(r => !r.is_confirmed);
+    if (selectedIds.size === processableRecords.length && processableRecords.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(processableRecords.map(r => r.id)));
+    }
+  };
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   if (isLoading) {
     return <div className="p-12 text-center text-muted-foreground flex-1 flex items-center justify-center">Loading records...</div>;
   }
 
   const isSpecialHire = importData.sector === "Special Hire";
-
-  // Build option arrays for the searchable selects
-  const vehicleOptions = useMemo(() => vehicles.map(v => ({ value: v.id, label: v.bus_no })), [vehicles]);
-  const quotationOptions = useMemo(() => quotations.map(q => ({ value: q.id, label: q.quotation_no })), [quotations]);
-
-  // Global search filter
-  const [searchTerm, setSearchTerm] = useState("");
-  const filteredRecords = useMemo(() => {
-    if (!searchTerm.trim()) return records;
-    const q = searchTerm.toLowerCase();
-    return records.filter(r => {
-      const raw = JSON.stringify(r.raw_data).toLowerCase();
-      const amt = String(r.amount);
-      const date = r.expense_date || "";
-      return raw.includes(q) || amt.includes(q) || date.includes(q);
-    });
-  }, [records, searchTerm]);
+  const unconfirmedCount = records.filter(r => !r.is_confirmed).length;
+  const processableFiltered = filteredRecords.filter(r => !r.is_confirmed);
 
   return (
     <div className="flex flex-col h-full">
@@ -199,15 +427,39 @@ export function ExpenseMappingGrid({ importData }: Props) {
              <Badge variant="outline">{importData.expense_type}</Badge>
              <span>|</span>
              <span>Uploaded on {format(new Date(importData.upload_date), "MMM d, yyyy")}</span>
+             <span>|</span>
+             <span>{unconfirmedCount} Pending</span>
           </CardDescription>
         </div>
         
         <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            isSpecialHire ? (
+              <Button 
+                onClick={handleBulkConfirm} 
+                disabled={isBulkProcessing}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <CheckSquare className="h-4 w-4 mr-2" />
+                Bulk Confirm ({selectedIds.size})
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleBulkPostToGL} 
+                disabled={isBulkProcessing || createJournal.isPending || postJournal.isPending}
+                className="bg-primary hover:bg-primary/90"
+              >
+                <CheckSquare className="h-4 w-4 mr-2" />
+                Bulk Post to GL ({selectedIds.size})
+              </Button>
+            )
+          )}
+
           {isSpecialHire && (
              <Button 
                variant="secondary" 
                onClick={runAutoSuggest} 
-               disabled={isAutoSuggesting || records.every(r => r.is_confirmed)}
+               disabled={isAutoSuggesting || unconfirmedCount === 0}
                className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
              >
                <Wand2 className="h-4 w-4 mr-2" />
@@ -218,31 +470,78 @@ export function ExpenseMappingGrid({ importData }: Props) {
       </CardHeader>
       
       <CardContent className="p-0 flex-1 overflow-auto">
-        {/* Global search bar */}
-        <div className="p-3 border-b bg-muted/10 sticky top-0 z-20">
-          <div className="relative">
+        <div className="p-3 border-b bg-muted/10 sticky top-0 z-20 flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full sm:w-1/3 shrink-0">
             <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search across all columns..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="pl-8 h-8 text-xs bg-white"
+              className="pl-8 h-8 text-xs bg-white w-full"
             />
           </div>
+          
+          {!isSpecialHire && selectedIds.size > 0 && (
+            <div className="flex items-center gap-2 w-full sm:w-auto bg-blue-50/50 p-1.5 rounded-md border border-blue-100">
+              <span className="text-xs font-medium text-blue-800 whitespace-nowrap pl-2">Bulk Map ({selectedIds.size}):</span>
+              <div className="w-[200px]">
+                <SearchableSelect
+                  options={expenseOptions}
+                  value={bulkExpenseAccountId || "none"}
+                  onValueChange={(val) => setBulkExpenseAccountId(val === "none" ? "" : val)}
+                  placeholder="Select Expense..."
+                  searchPlaceholder="Search..."
+                  triggerClassName="h-8 text-xs bg-white"
+                />
+              </div>
+              <div className="w-[200px]">
+                <SearchableSelect
+                  options={paymentOptions}
+                  value={bulkPaymentAccountId || "none"}
+                  onValueChange={(val) => setBulkPaymentAccountId(val === "none" ? "" : val)}
+                  placeholder="Select Payment..."
+                  searchPlaceholder="Search..."
+                  triggerClassName="h-8 text-xs bg-white"
+                />
+              </div>
+              <Button 
+                size="sm" 
+                variant="default"
+                className="h-8 text-xs bg-blue-600 hover:bg-blue-700"
+                onClick={handleApplyBulkMapping}
+                disabled={!bulkExpenseAccountId && !bulkPaymentAccountId}
+              >
+                Apply
+              </Button>
+            </div>
+          )}
         </div>
         <Table>
           <TableHeader className="bg-white sticky top-[52px] z-10 shadow-sm">
             <TableRow>
+              <TableHead className="w-[40px] text-center">
+                <Checkbox 
+                  checked={processableFiltered.length > 0 && selectedIds.size === processableFiltered.length}
+                  onCheckedChange={toggleAllSelection}
+                  disabled={processableFiltered.length === 0}
+                />
+              </TableHead>
               <TableHead className="w-[50px]">#</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Amount (Rs)</TableHead>
               <TableHead>Raw Detail</TableHead>
               
-              {isSpecialHire && (
+              {isSpecialHire ? (
                 <>
                   <TableHead className="w-[200px]">Vehicle Mapping</TableHead>
                   <TableHead className="w-[200px]">Quotation Mapping</TableHead>
                   <TableHead className="w-[100px] text-right">Action</TableHead>
+                </>
+              ) : (
+                <>
+                  <TableHead className="w-[200px]">Expense Account</TableHead>
+                  <TableHead className="w-[200px]">Payment Mode</TableHead>
+                  <TableHead className="w-[120px] text-right">Action</TableHead>
                 </>
               )}
             </TableRow>
@@ -250,12 +549,11 @@ export function ExpenseMappingGrid({ importData }: Props) {
           <TableBody>
             {filteredRecords.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isSpecialHire ? 7 : 4} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={isSpecialHire ? 8 : 5} className="text-center py-12 text-muted-foreground">
                   No records found for this import. The records may not have been saved during upload. Try re-uploading the file.
                 </TableCell>
               </TableRow>
             ) : filteredRecords.map((r, idx) => {
-              // Extract primary identifier from raw data based on type
               let rawSummary = "";
               if (importData.expense_type === "Fuel") {
                 rawSummary = `${r.raw_data["TRNX_ID"] || ''} | ${r.raw_data["Card_ID"] || ''} | ${r.raw_data["Stn_Name"] || ''}`;
@@ -266,7 +564,15 @@ export function ExpenseMappingGrid({ importData }: Props) {
               }
 
               return (
-                <TableRow key={r.id} className={r.is_confirmed ? "bg-green-50/50" : ""}>
+                <TableRow key={r.id} className={r.is_confirmed ? "bg-green-50/50" : (selectedIds.has(r.id) ? "bg-blue-50/30" : "")}>
+                  <TableCell className="text-center">
+                    {!r.is_confirmed && (
+                      <Checkbox 
+                        checked={selectedIds.has(r.id)}
+                        onCheckedChange={() => toggleSelection(r.id)}
+                      />
+                    )}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                   <TableCell className="font-medium">{r.expense_date ? format(new Date(r.expense_date), "MMM d, yyyy") : "-"}</TableCell>
                   <TableCell className="font-mono">{r.amount.toLocaleString()}</TableCell>
@@ -276,13 +582,13 @@ export function ExpenseMappingGrid({ importData }: Props) {
                     </span>
                   </TableCell>
                   
-                  {isSpecialHire && (
+                  {isSpecialHire ? (
                     <>
                       <TableCell>
                          <SearchableSelect
                            options={vehicleOptions}
                            value={r.mapped_vehicle_id || "none"}
-                           onValueChange={(val) => handleManualMapping(r.id, "mapped_vehicle_id", val === "none" ? "" : val)}
+                           onValueChange={(val) => handleManualMapping(r.id, "mapped_vehicle_id", val === "none" ? null : val)}
                            disabled={r.is_confirmed}
                            placeholder="Map Vehicle..."
                            searchPlaceholder="Search bus number..."
@@ -293,7 +599,7 @@ export function ExpenseMappingGrid({ importData }: Props) {
                          <SearchableSelect
                            options={quotationOptions}
                            value={r.mapped_quotation_id || "none"}
-                           onValueChange={(val) => handleManualMapping(r.id, "mapped_quotation_id", val === "none" ? "" : val)}
+                           onValueChange={(val) => handleManualMapping(r.id, "mapped_quotation_id", val === "none" ? null : val)}
                            disabled={r.is_confirmed}
                            placeholder="Map Quotation..."
                            searchPlaceholder="Search quotation no..."
@@ -311,9 +617,51 @@ export function ExpenseMappingGrid({ importData }: Props) {
                              variant="outline"
                              className="h-8 text-xs"
                              onClick={() => handleConfirmRecord(r)}
-                             disabled={!r.mapped_quotation_id || !r.mapped_vehicle_id}
+                             disabled={!r.mapped_quotation_id || !r.mapped_vehicle_id || isBulkProcessing}
                            >
                              Confirm
+                           </Button>
+                         )}
+                      </TableCell>
+                    </>
+                  ) : (
+                    <>
+                      <TableCell>
+                         <SearchableSelect
+                           options={expenseOptions}
+                           value={r.mapped_expense_account_id || "none"}
+                           onValueChange={(val) => handleManualMapping(r.id, "mapped_expense_account_id", val === "none" ? null : val)}
+                           disabled={r.is_confirmed || createJournal.isPending || postJournal.isPending}
+                           placeholder="Select Expense Account..."
+                           searchPlaceholder="Search account..."
+                           emptyLabel="None"
+                         />
+                      </TableCell>
+                      <TableCell>
+                         <SearchableSelect
+                           options={paymentOptions}
+                           value={r.mapped_payment_account_id || "none"}
+                           onValueChange={(val) => handleManualMapping(r.id, "mapped_payment_account_id", val === "none" ? null : val)}
+                           disabled={r.is_confirmed || createJournal.isPending || postJournal.isPending}
+                           placeholder="Select Payment Mode..."
+                           searchPlaceholder="Search account..."
+                           emptyLabel="None"
+                         />
+                      </TableCell>
+                      <TableCell className="text-right">
+                         {r.is_confirmed ? (
+                           <Badge variant="outline" className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200" title={`Posted: GL Journal ${r.gl_journal_id}`}>
+                             <CheckCircle2 className="h-3 w-3 mr-1" /> Posted
+                           </Badge>
+                         ) : (
+                           <Button 
+                             size="sm" 
+                             variant="default"
+                             className="h-8 text-xs bg-primary hover:bg-primary/90"
+                             onClick={() => handlePostToGL(r)}
+                             disabled={!r.mapped_expense_account_id || !r.mapped_payment_account_id || createJournal.isPending || postJournal.isPending || isBulkProcessing}
+                           >
+                             Post to GL
                            </Button>
                          )}
                       </TableCell>
