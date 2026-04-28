@@ -59,6 +59,17 @@ export const useFinanceApproval = () => {
       console.log('[SPH Finance] ========== APPROVAL START ==========');
       console.log('[SPH Finance] Payment ID:', paymentId);
 
+      const effectiveCompanyId = selectedCompanyId || '93010b42-701d-4007-88ba-5d2daeb611ab';
+
+      // Pre-flight check: Verify settings exist before approving anything
+      const settings = await fetchSpecialHireFinanceSettings(effectiveCompanyId);
+      if (!settings || !settings.default_bank_account_id || !settings.trade_receivable_account_id) {
+        console.warn('[SPH Finance] ❌ APPROVAL FAILED: Special Hire Finance settings not fully configured.');
+        toast.error('Finance settings incomplete. Please go to Settings > Special Hire Finance, auto-fill, and click Save Settings.');
+        setIsLoading(false);
+        return { success: false, error: new Error('Settings not configured') };
+      }
+
       // ========================
       // STEP 1: Update payment status FIRST (critical path - must succeed)
       // ========================
@@ -115,11 +126,11 @@ export const useFinanceApproval = () => {
       console.warn('[SPH Finance] ⚠️ No document found for payment. Proceeding anyway...');
     }
 
-const settings = await fetchSpecialHireFinanceSettings(effectiveCompanyId);
+    // Fetch settings again just to have it in the local scope, we know it exists now
+    const settings = await fetchSpecialHireFinanceSettings(companyId);
     
     if (!settings) {
-      console.warn('[SPH Finance] ⚠️ Special Hire Finance settings not configured');
-      toast.warning('Special Hire Finance settings not configured. Go to Settings > Special Hire Finance.');
+      console.warn('[SPH Finance] ⚠️ Special Hire Finance settings vanished mid-process');
       return;
     }
 

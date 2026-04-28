@@ -13,6 +13,8 @@ export async function fetchSpecialHireFinanceSettings(companyId?: string): Promi
     .from("special_hire_finance_settings")
     .select("*")
     .eq("company_id", effectiveCompanyId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (error) {

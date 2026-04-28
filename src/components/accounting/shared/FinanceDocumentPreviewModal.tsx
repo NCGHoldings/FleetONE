@@ -349,6 +349,46 @@ export const FinanceDocumentPreviewModal = ({
     return replacePlaceholders(defaultHtml, placeholders);
   };
 
+  // Find all UUIDs in signature fields to fetch their names
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const signatureFields = ['prepared_by', 'verified_by', 'approved_by', 'received_by', 'finance_controller', 'authorized_by'] as const;
+  
+  const profileIdsToFetch = useMemo(() => {
+    const ids = new Set<string>();
+    if (enrichedDocumentData) {
+      signatureFields.forEach(field => {
+        const val = enrichedDocumentData[field];
+        if (typeof val === 'string' && uuidRegex.test(val)) {
+          ids.add(val);
+        }
+      });
+    }
+    return Array.from(ids);
+  }, [enrichedDocumentData]);
+
+  const { data: profileNames } = useQuery({
+    queryKey: ['profiles-for-signatures', profileIdsToFetch],
+    queryFn: async () => {
+      if (profileIdsToFetch.length === 0) return {};
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name')
+        .in('user_id', profileIdsToFetch);
+        
+      if (error) {
+        console.error('Failed to fetch profiles for signatures', error);
+        return {};
+      }
+      
+      const profileMap: Record<string, string> = {};
+      data?.forEach(p => {
+        profileMap[p.user_id] = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.user_id;
+      });
+      return profileMap;
+    },
+    enabled: profileIdsToFetch.length > 0
+  });
+
   // Generate rendered HTML
   const getRenderedHtml = (): string => {
     if (!documentData) {
@@ -360,17 +400,26 @@ export const FinanceDocumentPreviewModal = ({
       `);
     }
 
+    const resolveName = (field: keyof typeof signatures, fallbackValue: any) => {
+      const explicitName = signatures[field]?.name;
+      if (explicitName) return explicitName;
+      if (typeof fallbackValue === 'string' && uuidRegex.test(fallbackValue)) {
+        return profileNames?.[fallbackValue] || fallbackValue;
+      }
+      return fallbackValue || '';
+    };
+
     const enrichedDocData = {
       ...enrichedDocumentData,
-      verified_by: signatures.verified_by.name || enrichedDocumentData?.verified_by || '',
+      verified_by: resolveName('verified_by', enrichedDocumentData?.verified_by),
       verified_by_signature: signatures.verified_by.dataUrl || enrichedDocumentData?.verified_by_signature || '',
-      approved_by: signatures.approved_by.name || enrichedDocumentData?.approved_by || '',
+      approved_by: resolveName('approved_by', enrichedDocumentData?.approved_by),
       approved_by_signature: signatures.approved_by.dataUrl || enrichedDocumentData?.approved_by_signature || '',
-      received_by: signatures.received_by.name || enrichedDocumentData?.received_by || '',
+      received_by: resolveName('received_by', enrichedDocumentData?.received_by),
       received_by_signature: signatures.received_by.dataUrl || enrichedDocumentData?.received_by_signature || '',
-      finance_controller: signatures.finance_controller.name || enrichedDocumentData?.finance_controller || '',
+      finance_controller: resolveName('finance_controller', enrichedDocumentData?.finance_controller),
       finance_controller_signature: signatures.finance_controller.dataUrl || enrichedDocumentData?.finance_controller_signature || '',
-      prepared_by: signatures.prepared_by.name || enrichedDocumentData?.prepared_by || '',
+      prepared_by: resolveName('prepared_by', enrichedDocumentData?.prepared_by),
       prepared_by_signature: signatures.prepared_by.dataUrl || enrichedDocumentData?.prepared_by_signature || '',
     };
 
