@@ -108,12 +108,12 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex" style={{ background: "#1a1f2e" }}>
+    <div className="min-h-screen flex" style={{ background: "#1e293b" }}>
 
       {/* ── LEFT — Login Panel ─────────────────────────────────── */}
       <div
         className="flex flex-col justify-between w-full lg:w-1/2 px-8 sm:px-12 lg:px-14 py-10"
-        style={{ background: "#1a1f2e" }}
+        style={{ background: "#1e293b" }}
       >
         {/* Top: Logo + Form */}
         <div className="w-full max-w-[380px] mx-auto lg:mx-0">
@@ -142,7 +142,7 @@ export default function Auth() {
           {/* Form card */}
           <div
             className="rounded-2xl p-6 mb-5"
-            style={{ background: "#242938", border: "1px solid rgba(255,255,255,0.06)" }}
+            style={{ background: "#1f2937", border: "1px solid rgba(255,255,255,0.06)" }}
           >
             <form onSubmit={handleSignIn} className="space-y-5">
 
@@ -168,7 +168,7 @@ export default function Auth() {
                     disabled={loading}
                     className="h-11 pl-9 text-sm rounded-xl border-0 text-white placeholder:text-gray-600
                                focus-visible:ring-1 focus-visible:ring-amber-500/50"
-                    style={{ background: "#2e3548" }}
+                    style={{ background: "#334155" }}
                   />
                 </div>
               </div>
@@ -206,7 +206,7 @@ export default function Auth() {
                     disabled={loading}
                     className="h-11 pl-9 pr-10 text-sm rounded-xl border-0 text-white placeholder:text-gray-600
                                focus-visible:ring-1 focus-visible:ring-amber-500/50"
-                    style={{ background: "#2e3548" }}
+                    style={{ background: "#334155" }}
                   />
                   <button
                     type="button"
@@ -252,7 +252,7 @@ export default function Auth() {
               <div
                 key={f.label}
                 className="p-4 rounded-xl"
-                style={{ background: "#242938", border: "1px solid rgba(255,255,255,0.06)" }}
+                style={{ background: "#1f2937", border: "1px solid rgba(255,255,255,0.06)" }}
               >
                 <f.icon className="w-5 h-5 mb-2.5" style={{ color: "#f59e0b" }} />
                 <p className="text-xs font-bold text-white mb-1">{f.label}</p>
