@@ -34,8 +34,9 @@ jobs:
       - name: Install Dependencies & Build Source
         env:
           VITE_APP_ENV: staging
-          VITE_SUPABASE_URL: ${{ secrets.STAGING_VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.STAGING_VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
           npm ci --legacy-peer-deps
           NODE_OPTIONS="--max-old-space-size=6144" npm run build
@@ -68,14 +69,14 @@ jobs:
             -e "ssh -p ${{ env.STAGING_PORT }} -o StrictHostKeyChecking=no" \
             ./ root@${{ env.STAGING_IP }}:$TARGET_PATH/
 
-          # 3. Create .env file with STAGING secrets
+          # 3. Create .env file with secrets
           echo "📝 Creating .env file..."
           ssh -p ${{ env.STAGING_PORT }} -o StrictHostKeyChecking=no root@${{ env.STAGING_IP }} "cat > $TARGET_PATH/.env << 'EOF'
           VITE_APP_ENV=staging
-          VITE_SUPABASE_URL=${{ secrets.STAGING_VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.STAGING_VITE_SUPABASE_PUBLISHABLE_KEY }}
-          VITE_SUPABASE_ANON_KEY=${{ secrets.STAGING_VITE_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           VITE_GEMINI_API_KEY=${{ secrets.VITE_GEMINI_API_KEY }}
           EOF
           chmod 600 $TARGET_PATH/.env"
