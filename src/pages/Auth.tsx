@@ -48,6 +48,13 @@ const IconShield = () => (
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
   </svg>
 );
+const IconLayers = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+    <polyline points="2 12 12 17 22 12" />
+    <polyline points="2 17 12 22 22 17" />
+  </svg>
+);
 const IconLoader = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="animate-spin mr-2">
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
@@ -107,10 +114,10 @@ export default function Auth() {
   };
 
   /* ── palette ── */
-  const BG   = "#1a1f2e";   /* left panel */
-  const CARD = "#242938";   /* form card  */
-  const CHIP = "#1e2538";   /* feature chips */
-  const AMB  = "#f59e0b";   /* amber accent */
+  const BG   = "#181d2a";   /* left panel */
+  const CARD = "#212735";   /* form card  */
+  const CHIP = "#212735";   /* feature chips */
+  const AMB  = "#eab308";   /* amber accent */
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
@@ -128,7 +135,7 @@ export default function Auth() {
             width: 36, height: 36, borderRadius: 9, background: AMB,
             display: "flex", alignItems: "center", justifyContent: "center", color: "#000",
           }}>
-            <IconBus />
+            <IconLayers />
           </div>
           <span style={{ fontSize: 20, fontWeight: 800, color: "#fff", letterSpacing: "-0.3px" }}>
             Fleet<span style={{ color: AMB }}>ONE</span>
@@ -142,17 +149,17 @@ export default function Auth() {
         </div>
 
         {/* Form card */}
-        <div style={{ background: CARD, borderRadius: 16, padding: "24px 24px 20px", marginBottom: 16 }}>
+        <div style={{ background: CARD, borderRadius: 12, padding: "24px", marginBottom: 20, border: "1px solid rgba(255,255,255,0.05)" }}>
           <form onSubmit={handleSignIn}>
 
             {/* Email */}
-            <div style={{ marginBottom: 18 }}>
-              <label style={{ display: "block", fontSize: 12, color: "#8892a4", marginBottom: 6, fontWeight: 500 }}>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 12, color: "#8892a4", marginBottom: 8, fontWeight: 500 }}>
                 Email Address
               </label>
               <div style={{ position: "relative" }}>
                 <span style={{
-                  position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
+                  position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)",
                   color: "#9ca3af", display: "flex", alignItems: "center",
                 }}>
                   <IconEnvelope />
@@ -166,9 +173,9 @@ export default function Auth() {
                   placeholder="name@ncgholdings.com"
                   style={{
                     width: "100%", boxSizing: "border-box",
-                    height: 42, paddingLeft: 38, paddingRight: 12,
-                    borderRadius: 10, border: "1px solid #e5e7eb",
-                    fontSize: 13, color: "#111827", background: "#fff",
+                    height: 44, paddingLeft: 42, paddingRight: 14,
+                    borderRadius: 8, border: "1px solid #e5e7eb",
+                    fontSize: 14, color: "#111827", background: "#f1f5f9",
                     outline: "none", fontFamily: "inherit",
                   }}
                 />
@@ -176,8 +183,8 @@ export default function Auth() {
             </div>
 
             {/* Password */}
-            <div style={{ marginBottom: error ? 14 : 18 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ marginBottom: error ? 16 : 24 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                 <label style={{ fontSize: 12, color: "#8892a4", fontWeight: 500 }}>Password</label>
                 <button
                   type="button"
@@ -190,7 +197,7 @@ export default function Auth() {
               </div>
               <div style={{ position: "relative" }}>
                 <span style={{
-                  position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
+                  position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)",
                   color: "#9ca3af", display: "flex", alignItems: "center",
                 }}>
                   <IconLock />
@@ -204,17 +211,18 @@ export default function Auth() {
                   placeholder="••••••••••"
                   style={{
                     width: "100%", boxSizing: "border-box",
-                    height: 42, paddingLeft: 38, paddingRight: 42,
-                    borderRadius: 10, border: "1px solid #e5e7eb",
-                    fontSize: 13, color: "#111827", background: "#fff",
+                    height: 44, paddingLeft: 42, paddingRight: 42,
+                    borderRadius: 8, border: "1px solid #e5e7eb",
+                    fontSize: 14, color: "#111827", background: "#f1f5f9",
                     outline: "none", fontFamily: "inherit",
+                    letterSpacing: password && !showPw ? "2px" : "normal"
                   }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
                   style={{
-                    position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+                    position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
                     background: "none", border: "none", cursor: "pointer", color: "#9ca3af",
                     display: "flex", alignItems: "center", padding: 0,
                   }}
@@ -227,9 +235,9 @@ export default function Auth() {
             {/* Error */}
             {error && (
               <div style={{
-                marginBottom: 14, padding: "10px 14px", borderRadius: 8,
+                marginBottom: 16, padding: "12px 14px", borderRadius: 8,
                 background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)",
-                fontSize: 12, color: "#fca5a5",
+                fontSize: 13, color: "#fca5a5",
               }}>
                 {error}
               </div>
@@ -240,12 +248,11 @@ export default function Auth() {
               type="submit"
               disabled={loading}
               style={{
-                width: "100%", height: 42, background: AMB, color: "#000",
-                border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700,
+                width: "100%", height: 44, background: AMB, color: "#000",
+                border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600,
                 cursor: loading ? "not-allowed" : "pointer", display: "flex",
                 alignItems: "center", justifyContent: "center", fontFamily: "inherit",
-                boxShadow: "0 4px 16px rgba(245,158,11,0.35)",
-                opacity: loading ? 0.8 : 1, transition: "opacity 0.15s",
+                opacity: loading ? 0.8 : 1, transition: "all 0.2s",
               }}
             >
               {loading ? <><IconLoader />Signing in…</> : "Sign In"}
@@ -254,18 +261,18 @@ export default function Auth() {
         </div>
 
         {/* Feature chips */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           {[
             { icon: <IconBus />,    label: "Transit Operations",  desc: "Real-time fleet tracking & scheduling" },
             { icon: <IconShield />, label: "Smart Diagnostics",   desc: "AI-powered checks & quality control" },
           ].map(f => (
             <div key={f.label} style={{
-              background: CHIP, borderRadius: 12, padding: "14px 14px 12px",
-              border: "1px solid rgba(255,255,255,0.06)",
+              background: CHIP, borderRadius: 12, padding: "16px",
+              border: "1px solid rgba(255,255,255,0.05)",
             }}>
-              <div style={{ color: AMB, marginBottom: 8 }}>{f.icon}</div>
-              <p style={{ fontSize: 12, fontWeight: 700, color: "#fff", margin: "0 0 3px" }}>{f.label}</p>
-              <p style={{ fontSize: 11, color: "#8892a4", margin: 0, lineHeight: 1.4 }}>{f.desc}</p>
+              <div style={{ color: AMB, marginBottom: 10 }}>{f.icon}</div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#fff", margin: "0 0 4px" }}>{f.label}</p>
+              <p style={{ fontSize: 12, color: "#8892a4", margin: 0, lineHeight: 1.4 }}>{f.desc}</p>
             </div>
           ))}
         </div>
@@ -276,48 +283,69 @@ export default function Auth() {
         flex: 1, background: AMB, display: "flex", flexDirection: "column",
         position: "relative", overflow: "hidden",
       }}>
-        {/* subtle dot pattern */}
+        {/* subtle radial gradient for depth */}
         <div style={{
-          position: "absolute", inset: 0, opacity: 0.07,
-          backgroundImage: "radial-gradient(circle, #000 1px, transparent 1px)",
-          backgroundSize: "28px 28px", pointerEvents: "none",
+          position: "absolute", inset: 0,
+          background: "radial-gradient(circle at center, rgba(255,255,255,0.15) 0%, transparent 70%)",
+        }} />
+
+        {/* subtle rings pattern like in the screenshot */}
+        <div style={{
+          position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+          width: "120%", height: "120%", border: "1px solid rgba(0,0,0,0.03)", borderRadius: "50%",
+          pointerEvents: "none"
+        }} />
+        <div style={{
+          position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+          width: "90%", height: "90%", border: "1px solid rgba(0,0,0,0.03)", borderRadius: "50%",
+          pointerEvents: "none"
+        }} />
+        <div style={{
+          position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+          width: "60%", height: "60%", border: "1px solid rgba(0,0,0,0.03)", borderRadius: "50%",
+          pointerEvents: "none"
         }} />
 
         {/* Quote */}
         <div style={{
           flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-          padding: "0 64px", position: "relative", zIndex: 1,
+          padding: "0 80px", position: "relative", zIndex: 1,
         }}>
-          <div style={{ maxWidth: 440, textAlign: "center" }}>
+          <div style={{ maxWidth: 520, textAlign: "center", width: "100%" }}>
             {/* quotation mark */}
-            <div style={{ fontSize: 64, lineHeight: 1, color: "rgba(0,0,0,0.18)", marginBottom: 16, fontFamily: "Georgia, serif" }}>"</div>
+            <div style={{ fontSize: 56, lineHeight: 1, color: "rgba(0,0,0,0.15)", marginBottom: 24, fontFamily: "Georgia, serif" }}>"</div>
 
-            {/* slides */}
-            <div style={{ position: "relative", minHeight: 140 }}>
+            {/* slides wrapper to constrain width and center content */}
+            <div style={{ position: "relative", width: "100%", minHeight: 180, display: "flex", justifyContent: "center" }}>
               {SLIDES.map((s, i) => (
-                <p key={i} style={{
-                  position: "absolute", inset: 0,
-                  fontSize: 20, fontWeight: 600, lineHeight: 1.55,
-                  color: "rgba(0,0,0,0.72)", margin: 0,
+                <div key={i} style={{
+                  position: "absolute", top: 0, width: "100%",
                   opacity: i === slide ? 1 : 0,
-                  transition: "opacity 0.7s ease",
+                  transition: "opacity 0.6s ease-in-out",
                   pointerEvents: i === slide ? "auto" : "none",
+                  display: "flex", flexDirection: "column", alignItems: "center"
                 }}>
-                  "{s}"
-                </p>
+                  <p style={{
+                    fontSize: 26, fontWeight: 600, lineHeight: 1.4,
+                    color: "rgba(0,0,0,0.75)", margin: 0,
+                    textAlign: "center", letterSpacing: "-0.5px"
+                  }}>
+                    "{s}"
+                  </p>
+                </div>
               ))}
             </div>
 
             {/* dots */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 28 }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
               {SLIDES.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setSlide(i)}
                   style={{
                     height: 6, border: "none", cursor: "pointer", borderRadius: 3,
-                    width: i === slide ? 28 : 8,
-                    background: i === slide ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0.2)",
+                    width: i === slide ? 24 : 6,
+                    background: i === slide ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.2)",
                     transition: "all 0.3s ease", padding: 0,
                   }}
                 />
@@ -329,10 +357,10 @@ export default function Auth() {
         {/* Footer */}
         <div style={{
           position: "relative", zIndex: 1, textAlign: "right",
-          padding: "0 28px 20px", fontSize: 11, color: "rgba(0,0,0,0.42)",
+          padding: "0 32px 24px", fontSize: 11, color: "rgba(0,0,0,0.42)",
         }}>
-          Built with ♥ by <span style={{ color: "rgba(0,0,0,0.58)", fontWeight: 600 }}>NCG Tech</span>
-          {"  "}<span style={{ color: "rgba(0,0,0,0.32)" }}>Build v3.35.0</span>
+          Built with ♥ by <span style={{ color: "rgba(0,0,0,0.65)", fontWeight: 600 }}>NCG Tech</span>
+          {"  "}<span style={{ color: "rgba(0,0,0,0.35)" }}>Build v3.36.0</span>
         </div>
       </div>
     </div>
