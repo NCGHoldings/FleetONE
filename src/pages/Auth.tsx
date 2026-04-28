@@ -4,11 +4,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Truck, Eye, EyeOff, Loader2, Bus, BarChart3, MapPin, Shield } from "lucide-react";
+import { Eye, EyeOff, Loader2, Bus, BarChart3, Shield, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import luxuryBusHero from "@/assets/luxury-bus-hero.jpg";
+
+const CAROUSEL_SLIDES = [
+  {
+    quote: "Elevating passenger experience with intelligent fleet management, seamless scheduling, and optimized transit operations.",
+    author: "NCG Holdings",
+    role: "Transport Excellence",
+  },
+  {
+    quote: "Real-time visibility across your entire fleet — from dispatch to destination — in one unified command center.",
+    author: "FleetONE Operations",
+    role: "Live Fleet Intelligence",
+  },
+  {
+    quote: "Data-driven decisions, automated reporting, and zero-downtime deployments powering the future of transport.",
+    author: "NCG Tech Division",
+    role: "Enterprise Platform",
+  },
+];
 
 export default function Auth() {
   const [email, setEmail] = useState("");
@@ -16,20 +32,26 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [slide, setSlide] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if user is already logged in
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate("/");
-      }
+      if (session) navigate("/");
     };
     checkUser();
   }, [navigate]);
+
+  // Auto-advance carousel
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSlide((s) => (s + 1) % CAROUSEL_SLIDES.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, []);
 
   const [forgotLoading, setForgotLoading] = useState(false);
 
@@ -84,10 +106,9 @@ export default function Auth() {
 
       toast({
         title: "Welcome back!",
-        description: "Successfully signed in to NCG Speed Transport System.",
+        description: "Successfully signed in to FleetONE.",
       });
 
-      // Navigate to dashboard
       const from = (location.state as any)?.from?.pathname || "/";
       navigate(from);
     } catch (err) {
@@ -99,211 +120,226 @@ export default function Auth() {
   };
 
   const features = [
-    { icon: Bus, label: "Fleet Management", description: "Track your entire fleet" },
-    { icon: MapPin, label: "Real-time Tracking", description: "GPS-enabled monitoring" },
-    { icon: BarChart3, label: "Analytics Dashboard", description: "Data-driven insights" },
-    { icon: Shield, label: "Secure & Reliable", description: "Enterprise-grade security" },
+    { icon: Bus, label: "Transit Operations", description: "Real-time fleet tracking & scheduling" },
+    { icon: Shield, label: "Smart Diagnostics", description: "AI-powered checks & quality control" },
+    { icon: BarChart3, label: "Fleet Analytics", description: "Data-driven operational insights" },
+    { icon: Zap, label: "Live Dispatch", description: "Instant driver & route coordination" },
   ];
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50 dark:bg-slate-950 relative overflow-hidden">
-      {/* Decorative ambient blobs for the very background */}
-      <div className="absolute top-0 right-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-primary/10 blur-[100px] animate-pulse" />
-        <div className="absolute bottom-[-10%] left-[40%] w-[400px] h-[400px] rounded-full bg-blue-400/10 blur-[100px] animate-pulse delay-700" />
-      </div>
+    <div className="min-h-screen flex bg-[#0f0f0f] text-white overflow-hidden">
 
-      {/* Left Side - Image Section */}
-      <div className="relative lg:w-[55%] h-64 lg:h-auto overflow-hidden z-10 shadow-2xl">
-        {/* Background Image */}
-        <img
-          src={luxuryBusHero}
-          alt="Luxury Bus Fleet"
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-[20s] hover:scale-110"
-        />
-        
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-primary/80 to-transparent mix-blend-multiply" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-        
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/30 rounded-full blur-[120px] animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-[120px] animate-pulse delay-1000" />
+      {/* ── LEFT — Login Panel ───────────────────────────────────────── */}
+      <div className="flex flex-col justify-center w-full lg:w-[42%] px-8 sm:px-12 lg:px-16 py-12 relative z-10">
+        {/* Subtle background glow */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-0 w-80 h-80 bg-amber-500/5 rounded-full blur-[120px]" />
+          <div className="absolute bottom-0 right-0 w-60 h-60 bg-amber-400/5 rounded-full blur-[100px]" />
         </div>
 
-        {/* Content Overlay */}
-        <div className="relative z-10 h-full flex flex-col justify-between p-8 lg:p-16 text-white pt-12 lg:pt-16">
-          {/* Logo & Tagline */}
-          <div className="animate-fade-in group cursor-default">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 shadow-xl group-hover:bg-white/20 transition-all duration-500">
-                <Truck className="w-7 h-7 text-white" />
+        <div className="relative w-full max-w-[400px] mx-auto">
+
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/30">
+              <Bus className="w-5 h-5 text-black" />
+            </div>
+            <span className="text-2xl font-extrabold tracking-tight text-white">
+              Fleet<span className="text-amber-400">ONE</span>
+            </span>
+          </div>
+
+          {/* Heading */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-white mb-2">Welcome back</h1>
+            <p className="text-gray-400 text-sm">Enter your credentials to access the workspace</p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSignIn} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="signin-email" className="text-sm font-medium text-gray-300">
+                Email Address
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </span>
+                <Input
+                  id="signin-email"
+                  type="email"
+                  placeholder="name@ncgholdings.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="h-12 pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-600
+                             focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/20 rounded-xl
+                             transition-all duration-200"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="signin-password" className="text-sm font-medium text-gray-300">
+                  Password
+                </Label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={loading || forgotLoading}
+                  className="text-xs text-amber-400 hover:text-amber-300 font-medium transition-colors disabled:opacity-50"
+                >
+                  {forgotLoading ? "Sending..." : "Forgot password?"}
+                </button>
+              </div>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </span>
+                <Input
+                  id="signin-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="h-12 pl-10 pr-12 bg-white/5 border-white/10 text-white placeholder:text-gray-600
+                             focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/20 rounded-xl
+                             transition-all duration-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={loading}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <Alert variant="destructive" className="bg-red-950/50 border-red-900/50 rounded-xl">
+                <AlertDescription className="text-red-400 text-sm">{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full h-12 bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm
+                         rounded-xl shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40
+                         hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200"
+            >
+              {loading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</>
+              ) : (
+                "Sign In"
+              )}
+            </Button>
+          </form>
+
+          {/* Feature chips — mobile only */}
+          <div className="lg:hidden mt-8 grid grid-cols-2 gap-3">
+            {features.map((f) => (
+              <div key={f.label} className="flex items-center gap-2.5 p-3 bg-white/5 rounded-xl border border-white/10">
+                <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                  <f.icon className="w-3.5 h-3.5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-white/90">{f.label}</p>
+                  <p className="text-[10px] text-white/40 leading-tight">{f.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <p className="mt-10 text-center text-xs text-gray-600">
+            Built with ♥ by{" "}
+            <span className="text-amber-500/70 font-medium">NCG Tech</span>
+            {" · "}
+            <span className="text-gray-700">Build v3.35.0</span>
+          </p>
+        </div>
+      </div>
+
+      {/* ── RIGHT — Carousel Panel ───────────────────────────────────── */}
+      <div className="hidden lg:flex flex-col flex-1 bg-amber-500 relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-[-20%] right-[-10%] w-96 h-96 bg-amber-300/30 rounded-full blur-[80px]" />
+          <div className="absolute bottom-[-10%] left-[-5%] w-72 h-72 bg-amber-700/30 rounded-full blur-[80px]" />
+          {/* Grid pattern */}
+          <div
+            className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage: `linear-gradient(rgba(0,0,0,0.3) 1px, transparent 1px),
+                                linear-gradient(90deg, rgba(0,0,0,0.3) 1px, transparent 1px)`,
+              backgroundSize: "40px 40px",
+            }}
+          />
+        </div>
+
+        {/* Feature grid — top */}
+        <div className="relative z-10 p-12 grid grid-cols-2 gap-4 mt-auto">
+          {features.map((f) => (
+            <div
+              key={f.label}
+              className="flex items-start gap-3 p-4 bg-black/10 backdrop-blur-sm rounded-2xl border border-black/10 hover:bg-black/20 transition-all duration-300"
+            >
+              <div className="w-9 h-9 rounded-xl bg-black/20 flex items-center justify-center flex-shrink-0">
+                <f.icon className="w-4 h-4 text-black" />
               </div>
               <div>
-                <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
-                  NCG Speed
-                </h1>
-                <p className="text-white/80 font-medium tracking-wide mt-1">Enterprise Transport Management</p>
+                <p className="text-sm font-bold text-black/90">{f.label}</p>
+                <p className="text-xs text-black/60 leading-snug mt-0.5">{f.description}</p>
               </div>
             </div>
-          </div>
-
-          {/* Features Grid */}
-          <div className="hidden lg:block space-y-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            <div>
-              <h2 className="text-2xl font-bold mb-2">Your Journey, Our Priority</h2>
-              <p className="text-white/60 text-sm max-w-md">Seamlessly monitor, manage, and optimize your luxury fleet operations from a single unified command center.</p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-5">
-              {features.map((feature, index) => (
-                <div 
-                  key={feature.label}
-                  className="group bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 hover:-translate-y-1 shadow-lg"
-                  style={{ animationDelay: `${0.3 + index * 0.1}s` }}
-                >
-                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-primary/50 transition-all">
-                    <feature.icon className="w-5 h-5 text-white" />
-                  </div>
-                  <h3 className="font-semibold text-white/90 mb-1">{feature.label}</h3>
-                  <p className="text-xs text-white/60 leading-relaxed">{feature.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Bottom Stats */}
-          <div className="hidden lg:flex items-center gap-10 animate-fade-in bg-black/20 backdrop-blur-md p-6 rounded-3xl border border-white/10 w-fit" style={{ animationDelay: '0.5s' }}>
-            <div className="text-center">
-              <p className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">100+</p>
-              <p className="text-xs font-medium text-white/60 uppercase tracking-widest mt-1">Active Buses</p>
-            </div>
-            <div className="w-px h-12 bg-white/20" />
-            <div className="text-center">
-              <p className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">50+</p>
-              <p className="text-xs font-medium text-white/60 uppercase tracking-widest mt-1">Routes</p>
-            </div>
-            <div className="w-px h-12 bg-white/20" />
-            <div className="text-center">
-              <p className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">24/7</p>
-              <p className="text-xs font-medium text-white/60 uppercase tracking-widest mt-1">Operations</p>
-            </div>
-          </div>
+          ))}
         </div>
-      </div>
 
-      {/* Right Side - Login Section */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 z-10 relative">
-        <div className="w-full max-w-[420px] animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <Card className="border border-white/20 shadow-2xl shadow-primary/5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2rem]">
-            <CardHeader className="text-center pb-6 pt-10">
-              <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary to-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-primary/30 ring-4 ring-primary/10">
-                <Truck className="w-8 h-8 text-white" />
-              </div>
-              <CardTitle className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">Welcome Back</CardTitle>
-              <CardDescription className="text-slate-500 dark:text-slate-400 mt-2 text-base">
-                Sign in to access your command center
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="px-8 pb-10">
-              <form onSubmit={handleSignIn} className="space-y-6">
-                <div className="space-y-2.5">
-                  <Label htmlFor="signin-email" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Email Address</Label>
-                  <Input
-                    id="signin-email"
-                    type="email"
-                    placeholder="name@ncgholdings.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="h-12 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all rounded-xl"
-                  />
-                </div>
-
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="signin-password" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Password</Label>
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="px-0 h-auto font-medium text-xs text-primary/80 hover:text-primary transition-colors"
-                      onClick={handleForgotPassword}
-                      disabled={loading || forgotLoading}
-                    >
-                      {forgotLoading ? "Sending..." : "Forgot Password?"}
-                    </Button>
-                  </div>
-                  <div className="relative">
-                    <Input
-                      id="signin-password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={loading}
-                      className="h-12 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all rounded-xl pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1 h-10 w-10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-transparent rounded-lg"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={loading}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-5 w-5" />
-                      ) : (
-                        <Eye className="h-5 w-5" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                {error && (
-                  <Alert variant="destructive" className="animate-fade-in border-red-200 bg-red-50 dark:bg-red-950/50 dark:border-red-900 rounded-xl">
-                    <AlertDescription className="text-red-600 dark:text-red-400 font-medium text-sm">{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 text-base font-semibold shadow-xl shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 transition-all duration-300 rounded-xl bg-gradient-to-r from-primary to-blue-600 hover:from-primary hover:to-blue-700 active:scale-[0.98]" 
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  ) : (
-                    "Sign In to Dashboard"
-                  )}
-                </Button>
-              </form>
-
-              <div className="mt-8 p-5 bg-slate-50 dark:bg-slate-950/50 rounded-2xl border border-slate-200 dark:border-slate-800">
-                <p className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed">
-                  New account registration is restricted to administrators only. 
-                  Contact your system administrator to securely provision a new account.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Mobile Features - Show only on mobile */}
-          <div className="lg:hidden mt-8 grid grid-cols-2 gap-3">
-            {features.map((feature) => (
-              <div 
-                key={feature.label}
-                className="flex flex-col items-center justify-center text-center gap-2 p-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-2xl border border-white/20 shadow-sm"
+        {/* Quote carousel — bottom */}
+        <div className="relative z-10 p-12 pt-6">
+          <div className="relative min-h-[160px]">
+            {CAROUSEL_SLIDES.map((s, i) => (
+              <div
+                key={i}
+                className={`absolute inset-0 transition-opacity duration-700 ${
+                  i === slide ? "opacity-100" : "opacity-0 pointer-events-none"
+                }`}
               >
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <feature.icon className="w-4 h-4 text-primary" />
+                <div className="text-6xl text-black/20 font-serif leading-none mb-4">"</div>
+                <p className="text-black/80 text-lg font-medium leading-relaxed mb-5">
+                  {s.quote}
+                </p>
+                <div>
+                  <p className="text-black font-bold text-sm">{s.author}</p>
+                  <p className="text-black/60 text-xs">{s.role}</p>
                 </div>
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{feature.label}</span>
               </div>
+            ))}
+          </div>
+
+          {/* Dot indicators */}
+          <div className="flex gap-2 mt-6">
+            {CAROUSEL_SLIDES.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setSlide(i)}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  i === slide ? "w-8 bg-black" : "w-3 bg-black/30 hover:bg-black/50"
+                }`}
+              />
             ))}
           </div>
         </div>

@@ -162,7 +162,7 @@ src/
 | 2026-04-28 | Docker pruned 53GB stale images — disk freed from 97% → 14% | Antigravity |
 | 2026-04-28 | Server bootstrapped: `/var/www/fleetone/` structure created | Antigravity |
 | 2026-04-28 | Nginx migrated: Docker proxy → static file serving from `FleetONE/dist/` | Antigravity |
-| 2026-04-28 | Staging vhost `staging.fleetone.ncg.lk` configured (awaiting DNS A record) | Antigravity |
+| 2026-04-28 | Staging vhost `staging.fleetone.ncg.lk` configured + SSL cert issued by Certbot ✅ | Antigravity |
 | 2026-04-28 | Production smoke test ✅ HTTP 200 + React root confirmed | Antigravity |
 
 ## 🔐 GITHUB SECRETS STATUS (2026-04-27)
