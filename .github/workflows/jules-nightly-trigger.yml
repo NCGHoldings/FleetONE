@@ -1,0 +1,62 @@
+name: Jules Nightly Stabilization Pass
+
+on:
+  schedule:
+    # Run at midnight Sri Lanka Time (IST, UTC+5:30) -> 18:30 UTC
+    - cron: '30 18 * * *'
+  workflow_dispatch: # Enable manual triggering from GitHub UI
+
+jobs:
+  nightly-maintenance:
+    name: Execute Jules Nightly Workflow
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: google-labs-code/jules-action@v1.0.0
+        with:
+          # Assumes you add GEMINI_API_KEY to your GitHub Repo Secrets
+          jules_api_key: ${{ secrets.GEMINI_API_KEY }}
+          starting_branch: main
+          include_last_commit: true
+          include_commit_log: true
+          prompt: |
+            You are Jules, the FleetONE ERP Nightly Stabilization Agent for NCG Holdings.
+
+            ### 1. GUIDELINES
+            - JULES NEVER MERGES DIRECTLY. Open a PR and stop.
+            - Read `.agent/workflows/nightly_maintenance.md` to understand all your tasks in full detail.
+            - Run `npx tsc --noEmit` and `npm run build` as a baseline BEFORE starting any changes.
+            - If the baseline fails, ABORT immediately and open a PR reporting only the failure.
+            - The Supabase project ID is: wwjpdszkmtnzshbulkon
+            - CRITICAL: Do NOT modify `src/lib/gl-posting-utils.ts` without explicit engineering approval.
+
+            ### 2. TASKS (execute in order)
+            1. Read `SYSTEM_MEMORY.local.md` for full architectural context before doing anything.
+            2. AI Anti-Pattern Sweep (Dead/Duplicate code, Bloat, `useMemo` optimizations).
+            3. Type Safety Hardening (replace `any` types with strict interfaces from `src/integrations/supabase/types.ts`).
+            4. Console Log Purge (remove `console.log` in `src/` — preserve `console.error` and `console.warn`).
+            5. Database Integrity (RLS InitPlan optimization: wrap `auth.uid()` in sub-selects).
+            6. Security Hardening (secrets scan, XSS audit of raw HTML usage).
+            7. Mandatory Verification Gate (`npx tsc --noEmit` AND `npm run build` MUST both pass).
+            8. Documentation Update — update the "Jules Nightly Overrides & Logs" section in `SYSTEM_MEMORY.local.md`.
+
+            ### 3. PR FORMAT
+            - Push changes to a new branch: `jules/nightly-{YYYY-MM-DD}`
+            - Open a Pull Request targeting `main` with the following structure:
+              - **Title**: `[Jules] Nightly Stabilization — {date}`
+              - **Body**:
+                - Summary of all changes made
+                - TypeScript errors fixed (if any)
+                - RLS policies optimized
+                - `any` types replaced
+                - Console logs removed
+                - Build verification status (`tsc` + `build`)
+                - Any items flagged for human review
