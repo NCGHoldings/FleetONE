@@ -1,352 +1,327 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Eye, EyeOff, Loader2, Bus, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const SLIDES = [
-  "Elevating passenger experience with intelligent fleet management, seamless scheduling, and optimized transit operations.",
-  "Real-time visibility across your entire fleet — from dispatch to destination — in one unified command center.",
-  "Data-driven decisions, automated reporting, and zero-downtime deployments powering the future of transport.",
+const CAROUSEL_SLIDES = [
+  {
+    quote:
+      "Elevating passenger experience with intelligent fleet management, seamless scheduling, and optimized transit operations.",
+  },
+  {
+    quote:
+      "Real-time visibility across your entire fleet — from dispatch to destination — in one unified command center.",
+  },
+  {
+    quote:
+      "Data-driven decisions, automated reporting, and zero-downtime deployments powering the future of transport.",
+  },
 ];
 
-/* ─── inline SVGs so there's zero dependency on lucide sizing quirks ─── */
-const IconEnvelope = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="4" width="20" height="16" rx="2" />
-    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-  </svg>
-);
-const IconLock = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-  </svg>
-);
-const IconEye = ({ off }: { off?: boolean }) => off ? (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-    <line x1="1" y1="1" x2="23" y2="23" />
-  </svg>
-) : (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
-const IconBus = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M8 6v6" /><path d="M15 6v6" />
-    <path d="M2 12h19.6" />
-    <path d="M18 18h2a1 1 0 0 0 1-1v-5H3v5a1 1 0 0 0 1 1h2" />
-    <path d="M8 18h8" />
-    <circle cx="6.5" cy="18.5" r="1.5" /><circle cx="17.5" cy="18.5" r="1.5" />
-    <path d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8H3V6Z" />
-  </svg>
-);
-const IconShield = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-  </svg>
-);
-const IconLayers = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-    <polyline points="2 12 12 17 22 12" />
-    <polyline points="2 17 12 22 22 17" />
-  </svg>
-);
-const IconLoader = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="animate-spin mr-2">
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-  </svg>
-);
-
-/* ─────────────────────────────────────────────────── */
 export default function Auth() {
-  const [email, setEmail]             = useState("");
-  const [password, setPassword]       = useState("");
-  const [showPw, setShowPw]           = useState(false);
-  const [loading, setLoading]         = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
-  const [error, setError]             = useState("");
-  const [slide, setSlide]             = useState(0);
-  const navigate  = useNavigate();
-  const location  = useLocation();
+  const [error, setError] = useState("");
+  const [slide, setSlide] = useState(0);
+  const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       if (session) navigate("/");
-    });
+    };
+    checkUser();
   }, [navigate]);
 
   useEffect(() => {
-    const t = setInterval(() => setSlide(s => (s + 1) % SLIDES.length), 4500);
-    return () => clearInterval(t);
+    const timer = setInterval(() => {
+      setSlide((s) => (s + 1) % CAROUSEL_SLIDES.length);
+    }, 4500);
+    return () => clearInterval(timer);
   }, []);
 
   const handleForgotPassword = async () => {
-    if (!email.trim()) { setError("Enter your email first, then click Forgot password."); return; }
-    setForgotLoading(true); setError("");
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setForgotLoading(false);
-    if (error) setError(error.message);
-    else toast({ title: "Reset email sent", description: "Check your inbox." });
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError("Please enter your email address first, then click Forgot Password.");
+      return;
+    }
+    setForgotLoading(true);
+    setError("");
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) {
+        setError(error.message);
+      } else {
+        toast({
+          title: "Password reset email sent",
+          description: "Check your inbox for a link to reset your password.",
+        });
+      }
+    } catch {
+      setError("Failed to send reset email. Please try again.");
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true); setError("");
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    setLoading(false);
-    if (error) {
-      setError(error.message.includes("Invalid login credentials")
-        ? "Invalid email or password."
-        : error.message.includes("Email not confirmed")
-          ? "Please confirm your email before signing in."
-          : error.message);
-      return;
+    setLoading(true);
+    setError("");
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) {
+        if (error.message.includes("Invalid login credentials")) {
+          setError("Invalid email or password. Please check your credentials and try again.");
+        } else if (error.message.includes("Email not confirmed")) {
+          setError("Please check your email and click the confirmation link before signing in.");
+        } else {
+          setError(error.message);
+        }
+        return;
+      }
+      toast({ title: "Welcome back!", description: "Successfully signed in to FleetONE." });
+      const from = (location.state as any)?.from?.pathname || "/";
+      navigate(from);
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      console.error("Sign in error:", err);
+    } finally {
+      setLoading(false);
     }
-    toast({ title: "Welcome back!", description: "Signed in to FleetONE." });
-    navigate((location.state as any)?.from?.pathname || "/");
   };
 
-  /* ── palette ── */
-  const BG   = "#181d2a";   /* left panel */
-  const CARD = "#212735";   /* form card  */
-  const CHIP = "#212735";   /* feature chips */
-  const AMB  = "#eab308";   /* amber accent */
-
   return (
-    <div style={{ minHeight: "100vh", display: "flex", fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+    <div className="min-h-screen flex" style={{ background: "#1a1f2e" }}>
 
-      {/* ════════ LEFT PANEL ════════ */}
-      <div style={{
-        width: "50%", minWidth: 420, background: BG,
-        display: "flex", flexDirection: "column", padding: "40px 56px",
-        boxSizing: "border-box",
-      }}>
+      {/* ── LEFT — Login Panel ─────────────────────────────────── */}
+      <div
+        className="flex flex-col justify-between w-full lg:w-1/2 px-8 sm:px-12 lg:px-14 py-10"
+        style={{ background: "#1a1f2e" }}
+      >
+        {/* Top: Logo + Form */}
+        <div className="w-full max-w-[380px] mx-auto lg:mx-0">
 
-        {/* Logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 40 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 9, background: AMB,
-            display: "flex", alignItems: "center", justifyContent: "center", color: "#000",
-          }}>
-            <IconLayers />
-          </div>
-          <span style={{ fontSize: 20, fontWeight: 800, color: "#fff", letterSpacing: "-0.3px" }}>
-            Fleet<span style={{ color: AMB }}>ONE</span>
-          </span>
-        </div>
-
-        {/* Heading */}
-        <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>Welcome back</h1>
-          <p style={{ fontSize: 13, color: "#8892a4", margin: 0 }}>Enter your credentials to access the workspace</p>
-        </div>
-
-        {/* Form card */}
-        <div style={{ background: CARD, borderRadius: 12, padding: "24px", marginBottom: 20, border: "1px solid rgba(255,255,255,0.05)" }}>
-          <form onSubmit={handleSignIn}>
-
-            {/* Email */}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ display: "block", fontSize: 12, color: "#8892a4", marginBottom: 8, fontWeight: 500 }}>
-                Email Address
-              </label>
-              <div style={{ position: "relative" }}>
-                <span style={{
-                  position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)",
-                  color: "#9ca3af", display: "flex", alignItems: "center",
-                }}>
-                  <IconEnvelope />
-                </span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                  placeholder="name@ncgholdings.com"
-                  style={{
-                    width: "100%", boxSizing: "border-box",
-                    height: 44, paddingLeft: 42, paddingRight: 14,
-                    borderRadius: 8, border: "1px solid #e5e7eb",
-                    fontSize: 14, color: "#111827", background: "#f1f5f9",
-                    outline: "none", fontFamily: "inherit",
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Password */}
-            <div style={{ marginBottom: error ? 16 : 24 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: "#8892a4", fontWeight: 500 }}>Password</label>
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  disabled={loading || forgotLoading}
-                  style={{ fontSize: 12, color: AMB, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}
-                >
-                  {forgotLoading ? "Sending…" : "Forgot password?"}
-                </button>
-              </div>
-              <div style={{ position: "relative" }}>
-                <span style={{
-                  position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)",
-                  color: "#9ca3af", display: "flex", alignItems: "center",
-                }}>
-                  <IconLock />
-                </span>
-                <input
-                  type={showPw ? "text" : "password"}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                  placeholder="••••••••••"
-                  style={{
-                    width: "100%", boxSizing: "border-box",
-                    height: 44, paddingLeft: 42, paddingRight: 42,
-                    borderRadius: 8, border: "1px solid #e5e7eb",
-                    fontSize: 14, color: "#111827", background: "#f1f5f9",
-                    outline: "none", fontFamily: "inherit",
-                    letterSpacing: password && !showPw ? "2px" : "normal"
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw(!showPw)}
-                  style={{
-                    position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
-                    background: "none", border: "none", cursor: "pointer", color: "#9ca3af",
-                    display: "flex", alignItems: "center", padding: 0,
-                  }}
-                >
-                  <IconEye off={showPw} />
-                </button>
-              </div>
-            </div>
-
-            {/* Error */}
-            {error && (
-              <div style={{
-                marginBottom: 16, padding: "12px 14px", borderRadius: 8,
-                background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)",
-                fontSize: 13, color: "#fca5a5",
-              }}>
-                {error}
-              </div>
-            )}
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: "100%", height: 44, background: AMB, color: "#000",
-                border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600,
-                cursor: loading ? "not-allowed" : "pointer", display: "flex",
-                alignItems: "center", justifyContent: "center", fontFamily: "inherit",
-                opacity: loading ? 0.8 : 1, transition: "all 0.2s",
-              }}
+          {/* Logo */}
+          <div className="flex items-center gap-2.5 mb-10">
+            <div
+              className="w-9 h-9 rounded-lg flex items-center justify-center"
+              style={{ background: "#f59e0b" }}
             >
-              {loading ? <><IconLoader />Signing in…</> : "Sign In"}
-            </button>
-          </form>
+              <Bus className="w-4.5 h-4.5 text-black w-[18px] h-[18px]" />
+            </div>
+            <span className="text-xl font-extrabold tracking-tight text-white">
+              Fleet<span style={{ color: "#f59e0b" }}>ONE</span>
+            </span>
+          </div>
+
+          {/* Heading */}
+          <div className="mb-7">
+            <h1 className="text-3xl font-bold text-white mb-1.5">Welcome back</h1>
+            <p className="text-sm" style={{ color: "#8b9ab3" }}>
+              Enter your credentials to access the workspace
+            </p>
+          </div>
+
+          {/* Form card */}
+          <div
+            className="rounded-2xl p-6 mb-5"
+            style={{ background: "#242938", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <form onSubmit={handleSignIn} className="space-y-5">
+
+              {/* Email */}
+              <div className="space-y-1.5">
+                <Label htmlFor="signin-email" className="text-xs font-medium" style={{ color: "#8b9ab3" }}>
+                  Email Address
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#8b9ab3" }}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </span>
+                  <Input
+                    id="signin-email"
+                    type="email"
+                    placeholder="name@ncgholdings.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={loading}
+                    className="h-11 pl-9 text-sm rounded-xl border-0 text-white placeholder:text-gray-600
+                               focus-visible:ring-1 focus-visible:ring-amber-500/50"
+                    style={{ background: "#2e3548" }}
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="signin-password" className="text-xs font-medium" style={{ color: "#8b9ab3" }}>
+                    Password
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={loading || forgotLoading}
+                    className="text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-40"
+                    style={{ color: "#f59e0b" }}
+                  >
+                    {forgotLoading ? "Sending..." : "Forgot password?"}
+                  </button>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#8b9ab3" }}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </span>
+                  <Input
+                    id="signin-password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={loading}
+                    className="h-11 pl-9 pr-10 text-sm rounded-xl border-0 text-white placeholder:text-gray-600
+                               focus-visible:ring-1 focus-visible:ring-amber-500/50"
+                    style={{ background: "#2e3548" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-80"
+                    style={{ color: "#8b9ab3" }}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <Alert variant="destructive" className="rounded-xl py-2.5 border-red-900/50 bg-red-950/40">
+                  <AlertDescription className="text-red-400 text-xs">{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {/* Submit */}
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full h-11 font-bold text-sm rounded-xl text-black transition-all
+                           hover:opacity-90 active:scale-[0.98] shadow-lg"
+                style={{ background: "#f59e0b", boxShadow: "0 4px 20px rgba(245,158,11,0.3)" }}
+              >
+                {loading ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</>
+                ) : (
+                  "Sign In"
+                )}
+              </Button>
+            </form>
+          </div>
+
+          {/* Feature chips — always visible, 2 items */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { icon: Bus, label: "Transit Operations", desc: "Real-time fleet tracking & scheduling" },
+              { icon: Shield, label: "Smart Diagnostics", desc: "AI-powered checks & quality control" },
+            ].map((f) => (
+              <div
+                key={f.label}
+                className="p-4 rounded-xl"
+                style={{ background: "#242938", border: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <f.icon className="w-5 h-5 mb-2.5" style={{ color: "#f59e0b" }} />
+                <p className="text-xs font-bold text-white mb-1">{f.label}</p>
+                <p className="text-[11px] leading-snug" style={{ color: "#8b9ab3" }}>{f.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Feature chips */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          {[
-            { icon: <IconBus />,    label: "Transit Operations",  desc: "Real-time fleet tracking & scheduling" },
-            { icon: <IconShield />, label: "Smart Diagnostics",   desc: "AI-powered checks & quality control" },
-          ].map(f => (
-            <div key={f.label} style={{
-              background: CHIP, borderRadius: 12, padding: "16px",
-              border: "1px solid rgba(255,255,255,0.05)",
-            }}>
-              <div style={{ color: AMB, marginBottom: 10 }}>{f.icon}</div>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#fff", margin: "0 0 4px" }}>{f.label}</p>
-              <p style={{ fontSize: 12, color: "#8892a4", margin: 0, lineHeight: 1.4 }}>{f.desc}</p>
-            </div>
-          ))}
+        {/* Bottom: Footer */}
+        <div className="w-full max-w-[380px] mx-auto lg:mx-0 mt-8">
+          {/* spacer on desktop */}
         </div>
       </div>
 
-      {/* ════════ RIGHT PANEL — amber ════════ */}
-      <div style={{
-        flex: 1, background: AMB, display: "flex", flexDirection: "column",
-        position: "relative", overflow: "hidden",
-      }}>
-        {/* subtle radial gradient for depth */}
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "radial-gradient(circle at center, rgba(255,255,255,0.15) 0%, transparent 70%)",
-        }} />
+      {/* ── RIGHT — Quote Carousel ──────────────────────────────── */}
+      <div
+        className="hidden lg:flex flex-col flex-1 relative overflow-hidden"
+        style={{ background: "#f59e0b" }}
+      >
+        {/* Subtle pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.07] pointer-events-none"
+          style={{
+            backgroundImage: `radial-gradient(circle, #000 1px, transparent 1px)`,
+            backgroundSize: "28px 28px",
+          }}
+        />
 
-        {/* subtle rings pattern like in the screenshot */}
-        <div style={{
-          position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-          width: "120%", height: "120%", border: "1px solid rgba(0,0,0,0.03)", borderRadius: "50%",
-          pointerEvents: "none"
-        }} />
-        <div style={{
-          position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-          width: "90%", height: "90%", border: "1px solid rgba(0,0,0,0.03)", borderRadius: "50%",
-          pointerEvents: "none"
-        }} />
-        <div style={{
-          position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-          width: "60%", height: "60%", border: "1px solid rgba(0,0,0,0.03)", borderRadius: "50%",
-          pointerEvents: "none"
-        }} />
+        {/* Centered quote */}
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-16">
+          <div className="w-full max-w-[440px]">
+            {/* Quote mark */}
+            <div
+              className="text-7xl font-serif leading-none mb-6 select-none"
+              style={{ color: "rgba(0,0,0,0.18)" }}
+            >
+              "
+            </div>
 
-        {/* Quote */}
-        <div style={{
-          flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-          padding: "0 80px", position: "relative", zIndex: 1,
-        }}>
-          <div style={{ maxWidth: 520, textAlign: "center", width: "100%" }}>
-            {/* quotation mark */}
-            <div style={{ fontSize: 56, lineHeight: 1, color: "rgba(0,0,0,0.15)", marginBottom: 24, fontFamily: "Georgia, serif" }}>"</div>
-
-            {/* slides wrapper to constrain width and center content */}
-            <div style={{ position: "relative", width: "100%", minHeight: 180, display: "flex", justifyContent: "center" }}>
-              {SLIDES.map((s, i) => (
-                <div key={i} style={{
-                  position: "absolute", top: 0, width: "100%",
-                  opacity: i === slide ? 1 : 0,
-                  transition: "opacity 0.6s ease-in-out",
-                  pointerEvents: i === slide ? "auto" : "none",
-                  display: "flex", flexDirection: "column", alignItems: "center"
-                }}>
-                  <p style={{
-                    fontSize: 26, fontWeight: 600, lineHeight: 1.4,
-                    color: "rgba(0,0,0,0.75)", margin: 0,
-                    textAlign: "center", letterSpacing: "-0.5px"
-                  }}>
-                    "{s}"
+            {/* Slides */}
+            <div className="relative min-h-[160px]">
+              {CAROUSEL_SLIDES.map((s, i) => (
+                <div
+                  key={i}
+                  className={`absolute inset-0 transition-opacity duration-700 ${
+                    i === slide ? "opacity-100" : "opacity-0 pointer-events-none"
+                  }`}
+                >
+                  <p
+                    className="text-xl font-semibold leading-relaxed"
+                    style={{ color: "rgba(0,0,0,0.75)" }}
+                  >
+                    "{s.quote}"
                   </p>
                 </div>
               ))}
             </div>
 
-            {/* dots */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
-              {SLIDES.map((_, i) => (
+            {/* Dot indicators */}
+            <div className="flex gap-2 mt-8">
+              {CAROUSEL_SLIDES.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setSlide(i)}
+                  className="h-1.5 rounded-full transition-all duration-300"
                   style={{
-                    height: 6, border: "none", cursor: "pointer", borderRadius: 3,
-                    width: i === slide ? 24 : 6,
-                    background: i === slide ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.2)",
-                    transition: "all 0.3s ease", padding: 0,
+                    width: i === slide ? "2rem" : "0.75rem",
+                    background: i === slide ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.2)",
                   }}
                 />
               ))}
@@ -355,12 +330,13 @@ export default function Auth() {
         </div>
 
         {/* Footer */}
-        <div style={{
-          position: "relative", zIndex: 1, textAlign: "right",
-          padding: "0 32px 24px", fontSize: 11, color: "rgba(0,0,0,0.42)",
-        }}>
-          Built with ♥ by <span style={{ color: "rgba(0,0,0,0.65)", fontWeight: 600 }}>NCG Tech</span>
-          {"  "}<span style={{ color: "rgba(0,0,0,0.35)" }}>Build v3.36.0</span>
+        <div className="relative z-10 flex justify-end px-8 pb-6">
+          <p className="text-xs" style={{ color: "rgba(0,0,0,0.45)" }}>
+            Built with ♥ by{" "}
+            <span style={{ color: "rgba(0,0,0,0.6)" }} className="font-medium">NCG Tech</span>
+            {"  "}
+            <span style={{ color: "rgba(0,0,0,0.35)" }}>Build v3.35.0</span>
+          </p>
         </div>
       </div>
     </div>
