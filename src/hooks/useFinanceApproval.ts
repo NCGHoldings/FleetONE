@@ -24,8 +24,8 @@ const NCG_HOLDING_ID = '93010b42-701d-4007-88ba-5d2daeb611ab';
 export const useFinanceApproval = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
-  const { selectedCompanyId } = useCompany();
-  const effectiveCompanyId = selectedCompanyId || '93010b42-701d-4007-88ba-5d2daeb611ab'; // Fallback to NCG Holdings if context missing
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId() || selectedCompanyId || '93010b42-701d-4007-88ba-5d2daeb611ab'; // Fallback to NCG Holdings if context missing
 
   // Helper function to get approval signatures for a document
   const getDocumentApprovals = async (documentId: string) => {
@@ -59,7 +59,7 @@ export const useFinanceApproval = () => {
       console.log('[SPH Finance] ========== APPROVAL START ==========');
       console.log('[SPH Finance] Payment ID:', paymentId);
 
-      const effectiveCompanyId = selectedCompanyId || '93010b42-701d-4007-88ba-5d2daeb611ab';
+      const effectiveCompanyId = companyId || getEffectiveCompanyId() || selectedCompanyId || '93010b42-701d-4007-88ba-5d2daeb611ab';
 
       // Pre-flight check: Verify settings exist before approving anything
       const settings = await fetchSpecialHireFinanceSettings(effectiveCompanyId);
@@ -726,6 +726,11 @@ effectiveCompanyId: effectiveCompanyId,
         throw new Error('Only approved payments can have AR integration retried');
       }
 
+      const paymentType = paymentData.payment_type || 'advance';
+      if (paymentType === 'advance' || paymentType === 'full') {
+        throw new Error('AR Invoices are deferred until the trip is completed (Final Invoice generation). Cannot create AR Invoice for upfront payments.');
+      }
+
 const settings = await fetchSpecialHireFinanceSettings(effectiveCompanyId);
       if (!settings) {
         throw new Error('Special Hire Finance settings not configured');
@@ -810,11 +815,132 @@ companyId: effectiveCompanyId,
     }
   };
 
+  // NEW: Robust retry for fully syncing GL and AR when missed
+  const retryFinanceIntegration = async (paymentId: string) => {
+    try {
+      setIsLoading(true);
+      console.log('[SPH Finance] ========== MANUAL RETRY FINANCE INTEGRATION ==========');
+
+      // Get payment and quotation data
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('special_hire_payments')
+        .select(`
+          *,
+          quotation:special_hire_quotations(*)
+        `)
+        .eq('id', paymentId)
+        .single();
+
+      if (paymentError || !paymentData) {
+        throw new Error('Payment not found');
+      }
+
+      if (paymentData.status !== 'approved') {
+        throw new Error('Only approved payments can be synced to GL');
+      }
+
+      if (paymentData.journal_entry_id) {
+        throw new Error('Payment is already synced to GL (Journal Entry exists)');
+      }
+
+      const settings = await fetchSpecialHireFinanceSettings(effectiveCompanyId);
+      if (!settings || !settings.default_bank_account_id || !settings.trade_receivable_account_id) {
+        throw new Error('Special Hire Finance settings not fully configured. Please check settings.');
+      }
+
+      const paymentType = paymentData.payment_type || 'advance';
+      const isAdvance = paymentType === 'advance';
+      const isFullPayment = paymentType === 'full';
+      const isBalance = paymentType === 'balance';
+
+      let journalEntry: any = null;
+
+      // 1. Post GL Entry
+      if (isAdvance && settings.auto_post_advance_payments) {
+        journalEntry = await postAdvancePaymentToGLStandalone({
+          quotationNo: paymentData.quotation.quotation_no,
+          customerName: paymentData.quotation.customer_name,
+          amount: paymentData.amount,
+          settings,
+          effectiveCompanyId,
+        });
+      } else if (isFullPayment && settings.auto_post_advance_payments) {
+        journalEntry = await postFullPaymentToGLStandalone({
+          quotationNo: paymentData.quotation.quotation_no,
+          customerName: paymentData.quotation.customer_name,
+          amount: paymentData.amount,
+          settings,
+          effectiveCompanyId,
+        });
+      } else if (isBalance && settings.auto_post_balance_payments) {
+        journalEntry = await postBalancePaymentToGLStandalone({
+          quotationNo: paymentData.quotation.quotation_no,
+          customerName: paymentData.quotation.customer_name,
+          balanceAmount: paymentData.amount,
+          settings,
+          effectiveCompanyId,
+        });
+      }
+
+      if (!journalEntry) {
+        throw new Error('Failed to generate Journal Entry. Check finance settings and auto-post flags.');
+      }
+
+      console.log('[SPH Finance] ✅ Manual GL posted:', journalEntry.entry_number);
+
+      // 2. Link journal entry to payment
+      await supabase
+        .from('special_hire_payments')
+        .update({ journal_entry_id: journalEntry.id })
+        .eq('id', paymentId);
+
+      // 3. Fallback AR check - Only for balance payments since Advance/Full AR creation is deferred to Final Invoice
+      if (isBalance) {
+        try {
+          await retryARIntegration(paymentId, effectiveCompanyId);
+        } catch (arErr) {
+          console.warn('[SPH Finance] AR link failed during GL retry, but GL succeeded.', arErr);
+        }
+      } else {
+        // Just create customer if missing for advance payments
+        try {
+          let customerId = paymentData.quotation.finance_customer_id;
+          if (!customerId) {
+            customerId = await createOrGetSPHCustomer({
+              customerName: paymentData.quotation.customer_name,
+              customerPhone: paymentData.quotation.customer_phone,
+              customerEmail: paymentData.quotation.customer_email,
+              companyId: effectiveCompanyId,
+            });
+            if (customerId) {
+              await supabase
+                .from('special_hire_quotations')
+                .update({ finance_customer_id: customerId })
+                .eq('id', paymentData.quotation.id);
+            }
+          }
+        } catch (custErr) {
+          console.warn('[SPH Finance] Customer creation failed during GL retry.', custErr);
+        }
+      }
+
+      toast.success(`Finance Sync successful! GL Entry: ${journalEntry.entry_number}`);
+      return { success: true, journalEntry };
+    } catch (error: any) {
+      console.error('[SPH Finance] Manual Finance Integration failed:', error);
+      toast.error(error.message || 'Failed to sync to Finance');
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     isLoading,
     approvePayment,
     rejectPayment,
     generateApprovedInvoice,
     retryARIntegration,
+    retryFinanceIntegration,
   };
 };

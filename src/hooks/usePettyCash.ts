@@ -128,7 +128,8 @@ export const usePettyCashTransactions = (fundId?: string, filters?: { status?: s
         .from("petty_cash_transactions")
         .select(`
           *,
-          fund:petty_cash_funds(fund_name, business_unit_code)
+          fund:petty_cash_funds(fund_name, business_unit_code),
+          gl_account:chart_of_accounts(account_code, account_name)
         `)
         .order("created_at", { ascending: false });
 
@@ -169,7 +170,8 @@ export const useAllPettyCashTransactions = (filters?: {
         .from("petty_cash_transactions")
         .select(`
           *,
-          fund:petty_cash_funds(fund_name, business_unit_code)
+          fund:petty_cash_funds(fund_name, business_unit_code),
+          gl_account:chart_of_accounts(account_code, account_name)
         `)
         .order("created_at", { ascending: false })
         .limit(500);
@@ -1251,6 +1253,7 @@ export const useUpdateIOU = () => {
                     voucher_number: voucherNum || undefined,
                     company_id: selectedCompanyId,
                     journal_entry_id: je.id,
+                    gl_account_id: expense_account_id || null,
                   });
 
                   // 2. Create the Offsetting Replenishment for the IOU Advance being cleared

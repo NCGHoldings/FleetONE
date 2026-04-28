@@ -1336,15 +1336,7 @@ export const generatePettyCashVoucherTemplate = (): string => `
       <th class="col-desc">Description</th>
       <th class="col-amount">Amount</th>
     </tr>
-    <tr>
-      <td class="col-code"></td>
-      <td class="col-desc">{{notes}}</td>
-      <td class="col-amount">{{amount}}</td>
-    </tr>
-    <tr class="empty-row"><td></td><td></td><td></td></tr>
-    <tr class="empty-row"><td></td><td></td><td></td></tr>
-    <tr class="empty-row"><td></td><td></td><td></td></tr>
-    <tr class="empty-row"><td></td><td></td><td></td></tr>
+    {{petty_cash_rows}}
   </table>
 
   <table class="total-table">
@@ -1499,19 +1491,19 @@ export const generateIOUVoucherTemplate = (): string => `
       <td class="col-1">Name of Requestor</td>
       <td class="col-2">{{staff_name}}</td>
       <td class="col-3">Value of Total Bills</td>
-      <td class="col-4">Rs. </td>
+      <td class="col-4">Rs. {{settled_amount}}</td>
     </tr>
     <tr>
       <td class="col-1">Division / Department</td>
       <td class="col-2">{{business_unit}}</td>
       <td class="col-3">Balance Returned</td>
-      <td class="col-4">Rs. </td>
+      <td class="col-4">Rs. {{balance_returned}}</td>
     </tr>
     <tr>
       <td class="col-1">Requestor's Sig.</td>
       <td class="col-2"></td>
       <td class="col-3">Balance Claimed</td>
-      <td class="col-4">Rs. </td>
+      <td class="col-4">Rs. {{balance_claimed}}</td>
     </tr>
     <!-- Signatures Row 1 -->
     <tr>
@@ -1545,9 +1537,9 @@ export const generateIOUVoucherTemplate = (): string => `
       <td colspan="2" style="vertical-align: top; padding: 10px;">
         <strong><i>Settled by</i></strong>
         <div class="sig-block">
-          <div class="sig-line"><div class="sig-line-label">Name</div><div>:</div><div class="sig-line-input"></div></div>
-          <div class="sig-line"><div class="sig-line-label">Signature</div><div>:</div><div class="sig-line-input"></div></div>
-          <div class="sig-line"><div class="sig-line-label">Date</div><div>:</div><div class="sig-line-input" style="color:#999;font-size:11px;display:flex;align-items:flex-end">YYYY / MM / DD</div></div>
+          <div class="sig-line"><div class="sig-line-label">Name</div><div>:</div><div class="sig-line-input"><div style="font-size:11px;position:absolute;bottom:2px">{{settled_by_name}}</div></div></div>
+          <div class="sig-line"><div class="sig-line-label">Signature</div><div>:</div><div class="sig-line-input"><div style="position:absolute;bottom:2px;height:35px">{{settled_by_signature}}</div></div></div>
+          <div class="sig-line"><div class="sig-line-label">Date</div><div>:</div><div class="sig-line-input" style="color:#999;font-size:11px;display:flex;align-items:flex-end">{{settled_date}}</div></div>
         </div>
       </td>
     </tr>
@@ -1564,9 +1556,9 @@ export const generateIOUVoucherTemplate = (): string => `
       <td colspan="2" style="vertical-align: top; padding: 10px;">
         <strong><i>Returned / Claimed by</i></strong>
         <div class="sig-block">
-          <div class="sig-line"><div class="sig-line-label">Name</div><div>:</div><div class="sig-line-input"></div></div>
+          <div class="sig-line"><div class="sig-line-label">Name</div><div>:</div><div class="sig-line-input"><div style="font-size:11px;position:absolute;bottom:2px">{{staff_name}}</div></div></div>
           <div class="sig-line"><div class="sig-line-label">Signature</div><div>:</div><div class="sig-line-input"></div></div>
-          <div class="sig-line"><div class="sig-line-label">Date</div><div>:</div><div class="sig-line-input" style="color:#999;font-size:11px;display:flex;align-items:flex-end">YYYY / MM / DD</div></div>
+          <div class="sig-line"><div class="sig-line-label">Date</div><div>:</div><div class="sig-line-input" style="color:#999;font-size:11px;display:flex;align-items:flex-end">{{returned_date}}</div></div>
         </div>
       </td>
     </tr>

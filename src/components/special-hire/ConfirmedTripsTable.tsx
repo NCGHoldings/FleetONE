@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { 
   Eye, Download, Upload, Receipt, Users, UserPlus, Bus, Settings, ChevronDown, 
   Search, Filter, MoreHorizontal, MapPin, Calendar, DollarSign, TrendingUp,
-  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck, RotateCcw, FileText, Mail, Calculator
+  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck, RotateCcw, FileText, Mail, Calculator, BookOpen
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -32,6 +32,7 @@ import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib
 import { resolveBusType, calculateTotalKm, getTripDistance } from '@/lib/special-hire-invoice-helpers';
 import { getDocumentLabel } from '@/lib/special-hire-document-helpers';
 import { PaymentTimelineFresh } from './PaymentTimelineFresh';
+import { SpecialHireFinanceSettlement } from './SpecialHireFinanceSettlement';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SignatureWorkflowIndicator, type SignerSetting } from './SignatureWorkflowIndicator';
@@ -70,6 +71,7 @@ export function ConfirmedTripsTable() {
   const [balanceInvoiceModalOpen, setBalanceInvoiceModalOpen] = useState(false);
   const [selectedAdjustment, setSelectedAdjustment] = useState<any | null>(null);
   const [paymentHistoryModalOpen, setPaymentHistoryModalOpen] = useState(false);
+  const [financeSettlementModalOpen, setFinanceSettlementModalOpen] = useState(false);
   const [vehicleAssignmentModalOpen, setVehicleAssignmentModalOpen] = useState(false);
   
   const [loading, setLoading] = useState(false);
@@ -340,13 +342,17 @@ export function ConfirmedTripsTable() {
         throw new Error('User not authenticated. Please refresh the page and try again.');
       }
       
+      // Enforce 'advance' payment type if the trip is not completed yet
+      const isTripCompleted = selectedTrip.trip_status === 'completed';
+      const effectivePaymentType = isTripCompleted ? paymentData.paymentType : 'advance';
+      
       // Create payment record with pending status
       const { data: paymentResponse, error: paymentError } = await supabase
         .from('special_hire_payments')
         .insert({
           quotation_id: selectedTrip.id,
           amount: paymentData.amount,
-          payment_type: paymentData.paymentType,
+          payment_type: effectivePaymentType,
           payment_method: paymentData.method,
           reference_no: paymentData.reference,
           payment_proof_url: paymentData.paymentProofUrl,
@@ -1379,6 +1385,18 @@ export function ConfirmedTripsTable() {
                                     Payment History
                                   </DropdownMenuItem>
                                 )}
+                                
+                                {/* Finance Settlement Hub */}
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setSelectedTrip(trip);
+                                    setFinanceSettlementModalOpen(true);
+                                  }}
+                                  className="text-blue-700 bg-blue-50 font-medium my-1"
+                                >
+                                  <BookOpen className="w-4 h-4 mr-2" />
+                                  Finance Settlement Hub
+                                </DropdownMenuItem>
 
                                 <DropdownMenuSeparator />
 
@@ -2147,6 +2165,20 @@ export function ConfirmedTripsTable() {
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Finance Settlement Hub */}
+      {financeSettlementModalOpen && selectedTrip && (
+        <SpecialHireFinanceSettlement
+          quotationId={selectedTrip.id}
+          isOpen={financeSettlementModalOpen}
+          onClose={() => setFinanceSettlementModalOpen(false)}
+          onGenerateInvoice={() => {
+            const adj = adjustmentsData[selectedTrip.id];
+            setSelectedAdjustment(adj || null);
+            setBalanceInvoiceModalOpen(true);
+          }}
+        />
       )}
     </div>
   );

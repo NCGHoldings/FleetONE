@@ -819,7 +819,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                             value={line.account_id || ""}
                             onValueChange={(val) => updateLine(line.id, "account_id", val)}
                             placeholder="Select GL account"
-                            accountTypes={["expense", "asset"]}
+                            accountTypes={["expense", "asset", "equity"]}
                             className="h-9 text-sm"
                           />
                         </td>

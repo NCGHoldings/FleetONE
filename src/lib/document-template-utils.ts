@@ -995,6 +995,33 @@ export const mapDocumentToPlaceholders = (
         line_total: l.amount
       }))) : '';
       placeholders['{{line_items}}'] = linesTable;
+
+      // Custom Petty Cash Rows for Template
+      let pettyCashRows = '';
+      if (isGrouped) {
+        pettyCashRows = documentData.lines.map((l: any) => `
+          <tr>
+            <td class="col-code">${l.gl_account?.account_code || ''}</td>
+            <td class="col-desc">${l.description || l.expense_category || 'Disbursement'}</td>
+            <td class="col-amount">${formatCurrency(l.amount)}</td>
+          </tr>
+        `).join('');
+      } else {
+        pettyCashRows = `
+          <tr>
+            <td class="col-code">${documentData?.gl_account?.account_code || ''}</td>
+            <td class="col-desc">${documentData?.description || documentData?.notes || ''}</td>
+            <td class="col-amount">${formatCurrency(documentData?.amount)}</td>
+          </tr>
+        `;
+      }
+      
+      const rowCount = isGrouped ? documentData.lines.length : 1;
+      for (let i = rowCount; i < 4; i++) {
+        pettyCashRows += `<tr class="empty-row"><td></td><td></td><td></td></tr>`;
+      }
+      placeholders['{{petty_cash_rows}}'] = pettyCashRows;
+      
       break;
     }
 
@@ -1007,6 +1034,34 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{amount}}'] = formatCurrency(documentData?.amount);
       placeholders['{{amount_in_words}}'] = numberToWords(documentData?.amount || 0);
       placeholders['{{purpose}}'] = documentData?.purpose || documentData?.notes || '';
+      
+      // Settled amounts
+      placeholders['{{settled_amount}}'] = formatCurrency(documentData?.settled_amount || 0);
+      
+      const amt = documentData?.amount || 0;
+      const settled = documentData?.settled_amount || 0;
+      const returned = amt > settled ? amt - settled : 0;
+      const claimed = settled > amt ? settled - amt : 0;
+      
+      placeholders['{{balance_returned}}'] = formatCurrency(returned);
+      placeholders['{{balance_claimed}}'] = formatCurrency(claimed);
+      
+      // IOU Settlement Dates & Signatures
+      // Fallback: If it's fully settled, we might use updated_at as the settled date if not explicitly stored
+      const isSettled = documentData?.status === 'settled';
+      const settledDateFormatted = isSettled ? formatDate(documentData?.updated_at) : 'YYYY / MM / DD';
+      placeholders['{{settled_date}}'] = settledDateFormatted;
+      placeholders['{{returned_date}}'] = returned > 0 || claimed > 0 ? settledDateFormatted : 'YYYY / MM / DD';
+      
+      // Placeholder for Names/Signatures (we default to empty strings if no data, leaving visual space)
+      placeholders['{{settled_by_name}}'] = documentData?.settled_by_name || '';
+      placeholders['{{settled_by_signature}}'] = documentData?.settled_by_signature 
+        ? `<img src="${documentData.settled_by_signature}" style="max-height: 35px; object-fit: contain;" alt="Signature" />` 
+        : '';
+      placeholders['{{returned_by_signature}}'] = documentData?.returned_by_signature 
+        ? `<img src="${documentData.returned_by_signature}" style="max-height: 35px; object-fit: contain;" alt="Signature" />` 
+        : '';
+        
       break;
     }
   }

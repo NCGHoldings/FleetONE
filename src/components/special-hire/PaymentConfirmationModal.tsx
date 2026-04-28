@@ -253,20 +253,6 @@ export const PaymentConfirmationModal = ({
         toast.error('This trip is fully paid. No balance payment is required.');
         return;
       }
-      if (amount > balanceDue) {
-        toast.error(`Payment amount cannot exceed the balance due of LKR ${balanceDue.toLocaleString()}`);
-        return;
-      }
-    }
-
-    if (paymentType === 'full' && amount > finalTotal) {
-      toast.error(`Payment amount cannot exceed the total amount of LKR ${finalTotal.toLocaleString()}`);
-      return;
-    }
-
-    if (paymentType === 'advance' && amount > finalTotal) {
-      toast.error(`Advance amount cannot exceed the total amount of LKR ${finalTotal.toLocaleString()}`);
-      return;
     }
 
     // Validate required fields for all payments (to ensure document quality)
@@ -525,9 +511,14 @@ export const PaymentConfirmationModal = ({
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
                   min="0"
-                  max={paymentType === 'balance' ? balanceDue : paymentType === 'full' ? finalTotal : undefined}
                   disabled={isProcessing || (paymentType === 'balance' && balanceDue <= 0)}
                 />
+                {((paymentType === 'balance' && amount > balanceDue) || (paymentType !== 'balance' && amount > finalTotal)) && (
+                  <p className="text-xs text-blue-600 font-medium flex items-center mt-1 bg-blue-50 p-1.5 rounded">
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    Overpayment of LKR {((amount - (paymentType === 'balance' ? balanceDue : finalTotal))).toLocaleString()} will be recorded as linked credit.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="method">Payment Method</Label>

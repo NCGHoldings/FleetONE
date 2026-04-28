@@ -13,6 +13,7 @@ import { PostTripAdjustmentModal } from './PostTripAdjustmentModal';
 import { PaymentConfirmationModal } from './PaymentConfirmationModal';
 import { usePostTripAdjustment } from '@/hooks/usePostTripAdjustment';
 import { supabase } from '@/integrations/supabase/client';
+import { useCompany } from '@/contexts/CompanyContext';
 import {
   getQuotationAdditionalDistance,
   calculateTotalKm,
@@ -87,6 +88,7 @@ export function TripDetailsModal({
   const [isBalanceInvoiceModalOpen, setIsBalanceInvoiceModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const { getAdjustment } = usePostTripAdjustment();
+  const { getEffectiveCompanyId } = useCompany();
   const [localAdjustmentData, setLocalAdjustmentData] = useState<any>(null);
   const [fullQuotation, setFullQuotation] = useState<any>(null);
 
@@ -327,6 +329,7 @@ export function TripDetailsModal({
           <GenerateBalanceInvoiceModal
             open={isBalanceInvoiceModalOpen}
             onOpenChange={setIsBalanceInvoiceModalOpen}
+            effectiveCompanyId={getEffectiveCompanyId() || undefined}
             quotationData={{
               id: trip.quotation_id,
               quotation_no: trip.quotation.quotation_no,

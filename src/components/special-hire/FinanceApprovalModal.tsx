@@ -6,12 +6,17 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle, XCircle, Clock, ExternalLink, FileText, Download, Eye, PenTool, User, Calendar } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { CheckCircle, XCircle, Clock, ExternalLink, FileText, Download, Eye, PenTool, User, Calendar, AlertTriangle, Wand2, Loader2, Database } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDocumentManagement } from '@/hooks/useDocumentManagement';
 import { useSignatureManagement } from '@/hooks/useSignatureManagement';
 import { DocumentViewer } from './DocumentViewer';
 import { SignatureCaptureModal } from './SignatureCaptureModal';
+import { SearchableFinanceAccountSelector } from '@/components/settings/SearchableFinanceAccountSelector';
+import { useSpecialHireFinanceSettings, useUpdateSpecialHireFinanceSettings } from '@/hooks/useSpecialHireFinance';
+import { useChartOfAccounts } from '@/hooks/useAccountingData';
+import { useCompany } from '@/contexts/CompanyContext';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -37,6 +42,7 @@ interface FinanceApprovalModalProps {
     };
   };
   loading?: boolean;
+  isSyncMode?: boolean;
 }
 
 export const FinanceApprovalModal = ({ 
@@ -45,7 +51,8 @@ export const FinanceApprovalModal = ({
   onApprove, 
   onReject, 
   paymentData, 
-  loading = false 
+  loading = false,
+  isSyncMode = false
 }: FinanceApprovalModalProps) => {
   const [notes, setNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
@@ -65,6 +72,75 @@ export const FinanceApprovalModal = ({
   
   const { getDocumentsByQuotation, approveDocument } = useDocumentManagement();
   const { saveApproval, getDocumentApprovals } = useSignatureManagement();
+  const { selectedCompany, isTestCompany } = useCompany();
+
+  // GL Configuration State
+  const { data: settings, isLoading: settingsLoading } = useSpecialHireFinanceSettings();
+  const { data: chartOfAccounts } = useChartOfAccounts();
+  const updateSettings = useUpdateSpecialHireFinanceSettings();
+  
+  const [localSettings, setLocalSettings] = useState<any>({});
+  
+  const isSettingsComplete = 
+    settings?.trade_receivable_account_id && 
+    settings?.customer_advance_account_id && 
+    settings?.default_bank_account_id && 
+    (settings?.revenue_internal_account_id || settings?.revenue_external_account_id);
+
+  useEffect(() => {
+    if (settings && !isSettingsComplete) {
+      setLocalSettings({
+        revenue_external_account_id: settings.revenue_external_account_id || '',
+        trade_receivable_account_id: settings.trade_receivable_account_id || '',
+        customer_advance_account_id: settings.customer_advance_account_id || '',
+        default_bank_account_id: settings.default_bank_account_id || '',
+      });
+    }
+  }, [settings, isSettingsComplete]);
+
+  const handleAutoFill = () => {
+    if (!chartOfAccounts || chartOfAccounts.length === 0) return;
+    
+    const matchAccount = (keywords: string[], type?: string) => {
+      return chartOfAccounts.find(a => 
+        (!type || a.account_type === type) && 
+        keywords.some(k => a.account_name.toLowerCase().includes(k))
+      )?.id || "";
+    };
+
+    setLocalSettings({
+      revenue_external_account_id: localSettings.revenue_external_account_id || matchAccount(["special hire revenue - external", "external revenue", "sales", "revenue"], "revenue"),
+      trade_receivable_account_id: localSettings.trade_receivable_account_id || matchAccount(["trade receivable", "accounts receivable", "trade debtor"], "asset"),
+      customer_advance_account_id: localSettings.customer_advance_account_id || matchAccount(["customer advance", "advance receipt", "advance"], "liability"),
+      default_bank_account_id: localSettings.default_bank_account_id || matchAccount(["bank", "cash", "petty cash"], "asset"),
+    });
+    toast.success("Accounts auto-filled. Please save.");
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      // If we are creating the settings for the first time, we must include all required NOT NULL fields
+      const payload = {
+        ...localSettings,
+        auto_post_advance_payments: settings?.auto_post_advance_payments ?? false,
+        auto_post_invoices: settings?.auto_post_invoices ?? false,
+        auto_post_balance_payments: settings?.auto_post_balance_payments ?? false,
+        invoice_prefix: settings?.invoice_prefix ?? 'SPH-INV',
+        advance_receipt_prefix: settings?.advance_receipt_prefix ?? 'SPH-ADV',
+        quotation_bank_name: settings?.quotation_bank_name ?? 'Commercial Bank',
+        quotation_account_name: settings?.quotation_account_name ?? 'NCG Holding',
+        quotation_account_no: settings?.quotation_account_no ?? '1001077213'
+      };
+      
+      await updateSettings.mutateAsync(payload);
+    } catch (e: any) {
+      console.error('Settings save failed:', e);
+    }
+  };
+
+  const getAccountName = (id: string) => {
+    return chartOfAccounts?.find(a => a.id === id)?.account_name || 'Unknown Account';
+  };
 
   // Load documents and signatures when modal opens
   useEffect(() => {
@@ -220,15 +296,199 @@ export const FinanceApprovalModal = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Finance Payment Approval</DialogTitle>
+          <DialogTitle>{isSyncMode ? "Confirm GL Sync" : "Finance Payment Approval"}</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="payment" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+        {selectedCompany?.name && !selectedCompany.name.toLowerCase().includes('special hire') && (
+          <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-900">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle className="font-semibold">
+              Database Mismatch Warning
+            </AlertTitle>
+            <AlertDescription>
+              You are approving a Special Hire finance transaction, but you are currently connected to the <strong>{selectedCompany?.name}</strong> ledger. 
+              Please ensure you are connected to the correct database before confirming.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <Tabs defaultValue={isSyncMode || !isSettingsComplete ? "gl_preview" : "payment"} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="payment">Payment Details</TabsTrigger>
+            <TabsTrigger value="gl_preview" className={!isSettingsComplete ? "text-red-600 font-semibold" : ""}>
+              {!isSettingsComplete && <AlertTriangle className="w-4 h-4 mr-1" />}
+              GL Preview
+            </TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="signatures">Signatures</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="gl_preview" className="space-y-6">
+            <Card>
+              <CardContent className="pt-6">
+                {settingsLoading ? (
+                  <div className="flex flex-col items-center justify-center p-8 space-y-4">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Checking finance configurations...</p>
+                  </div>
+                ) : !isSettingsComplete ? (
+                  <div className="space-y-6">
+                    <Alert variant="destructive" className="bg-red-50 text-red-900 border-red-200">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Configuration Required</AlertTitle>
+                      <AlertDescription>
+                        You must map the core General Ledger accounts before approving any Special Hire payments. 
+                        This ensures accurate automatic posting.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="flex justify-end">
+                      <Button variant="outline" size="sm" onClick={handleAutoFill}>
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        Auto-Fill Defaults
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-4">
+                      <div className="space-y-2">
+                        <Label>Default Bank/Cash Account (Debit)</Label>
+                        <SearchableFinanceAccountSelector
+                          value={localSettings.default_bank_account_id || null}
+                          onValueChange={(val) => setLocalSettings((p: any) => ({ ...p, default_bank_account_id: val || '' }))}
+                          accounts={chartOfAccounts || []}
+                          placeholder="Select bank account..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Customer Advance Liability Account (Credit)</Label>
+                        <SearchableFinanceAccountSelector
+                          value={localSettings.customer_advance_account_id || null}
+                          onValueChange={(val) => setLocalSettings((p: any) => ({ ...p, customer_advance_account_id: val || '' }))}
+                          accounts={chartOfAccounts || []}
+                          placeholder="Select advance account..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Trade Receivable Account (AR)</Label>
+                        <SearchableFinanceAccountSelector
+                          value={localSettings.trade_receivable_account_id || null}
+                          onValueChange={(val) => setLocalSettings((p: any) => ({ ...p, trade_receivable_account_id: val || '' }))}
+                          accounts={chartOfAccounts || []}
+                          placeholder="Select receivable account..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Special Hire Revenue Account</Label>
+                        <SearchableFinanceAccountSelector
+                          value={localSettings.revenue_external_account_id || null}
+                          onValueChange={(val) => setLocalSettings((p: any) => ({ ...p, revenue_external_account_id: val || '' }))}
+                          accounts={chartOfAccounts || []}
+                          placeholder="Select revenue account..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                      <Button onClick={handleSaveSettings} disabled={updateSettings.isPending}>
+                        {updateSettings.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Save Settings
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-sm text-slate-500 flex items-center gap-2">
+                          PROJECTED JOURNAL ENTRY
+                        </h4>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground font-medium flex items-center">
+                            <Database className="w-3 h-3 mr-1" />
+                            Database Link:
+                          </span>
+                          <Badge variant={isTestCompany ? "destructive" : "default"} className={!isTestCompany ? "bg-green-600 hover:bg-green-700" : ""}>
+                            {isTestCompany ? "Test Environment" : "Live Database"}
+                          </Badge>
+                          <span className="text-muted-foreground ml-1">
+                            ({selectedCompany?.name || 'Unknown Company'})
+                          </span>
+                        </div>
+                      </div>
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-100 text-slate-600">
+                            <tr>
+                              <th className="px-4 py-2 text-left font-medium">Account</th>
+                              <th className="px-4 py-2 text-right font-medium">Debit</th>
+                              <th className="px-4 py-2 text-right font-medium">Credit</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {(paymentData.payment_type === 'advance' || paymentData.payment_type === 'full') && (
+                              <>
+                                <tr>
+                                  <td className="px-4 py-3 font-medium">
+                                    {getAccountName(settings?.default_bank_account_id)}
+                                    <p className="text-xs text-muted-foreground font-normal">Asset - Bank/Cash</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-green-600 font-medium">
+                                    {paymentData.amount.toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-slate-400">-</td>
+                                </tr>
+                                <tr>
+                                  <td className="px-4 py-3 font-medium pl-8">
+                                    {getAccountName(settings?.customer_advance_account_id)}
+                                    <p className="text-xs text-muted-foreground font-normal">Liability - Customer Advance</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-slate-400">-</td>
+                                  <td className="px-4 py-3 text-right font-medium">
+                                    {paymentData.amount.toLocaleString()}
+                                  </td>
+                                </tr>
+                              </>
+                            )}
+                            {paymentData.payment_type === 'balance' && (
+                              <>
+                                <tr>
+                                  <td className="px-4 py-3 font-medium">
+                                    {getAccountName(settings?.default_bank_account_id)}
+                                    <p className="text-xs text-muted-foreground font-normal">Asset - Bank/Cash</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-green-600 font-medium">
+                                    {paymentData.amount.toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-slate-400">-</td>
+                                </tr>
+                                <tr>
+                                  <td className="px-4 py-3 font-medium pl-8">
+                                    {getAccountName(settings?.trade_receivable_account_id)}
+                                    <p className="text-xs text-muted-foreground font-normal">Asset - Trade Receivable</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-slate-400">-</td>
+                                  <td className="px-4 py-3 text-right font-medium">
+                                    {paymentData.amount.toLocaleString()}
+                                  </td>
+                                </tr>
+                              </>
+                            )}
+                          </tbody>
+                          <tfoot className="bg-slate-50 font-semibold border-t-2">
+                            <tr>
+                              <td className="px-4 py-2 text-right">Total:</td>
+                              <td className="px-4 py-2 text-right text-primary">LKR {paymentData.amount.toLocaleString()}</td>
+                              <td className="px-4 py-2 text-right text-primary">LKR {paymentData.amount.toLocaleString()}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="payment" className="space-y-6">
             {/* Payment Summary */}
@@ -467,50 +727,54 @@ export const FinanceApprovalModal = ({
           </TabsContent>
         </Tabs>
 
-        {/* Finance Review */}
-        <div className="space-y-4">
-          <Label className="text-base font-medium">Finance Review</Label>
-          
-          <div className="space-y-2">
-            <Label htmlFor="notes">Approval Notes (Optional)</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add any notes for the approval..."
-              rows={3}
-            />
-          </div>
+        {/* Finance Review (Hidden in Sync Mode) */}
+        {!isSyncMode && (
+          <div className="space-y-4">
+            <Label className="text-base font-medium">Finance Review</Label>
+            
+            <div className="space-y-2">
+              <Label htmlFor="notes">Approval Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add any notes for the approval..."
+                rows={3}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="rejection">Rejection Reason (Required if rejecting)</Label>
-            <Textarea
-              id="rejection"
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              placeholder="Provide detailed reason for rejection..."
-              rows={3}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="rejection">Rejection Reason (Required if rejecting)</Label>
+              <Textarea
+                id="rejection"
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Provide detailed reason for rejection..."
+                rows={3}
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         <DialogFooter className="flex gap-2">
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button 
-            variant="destructive" 
-            onClick={handleReject} 
-            disabled={loading || !rejectionReason.trim() || action === 'approve'}
-          >
-            {loading && action === 'reject' ? 'Rejecting...' : 'Reject Payment'}
-          </Button>
+          {!isSyncMode && (
+            <Button 
+              variant="destructive" 
+              onClick={handleReject} 
+              disabled={loading || !rejectionReason.trim() || action === 'approve'}
+            >
+              {loading && action === 'reject' ? 'Rejecting...' : 'Reject Payment'}
+            </Button>
+          )}
           <Button 
             onClick={handleApprove} 
-            disabled={loading || action === 'reject'}
+            disabled={loading || action === 'reject' || !isSettingsComplete}
             className="bg-green-600 hover:bg-green-700"
           >
-            {loading && action === 'approve' ? 'Approving...' : 'Approve Payment'}
+            {loading && action === 'approve' ? (isSyncMode ? 'Syncing...' : 'Approving...') : (isSyncMode ? 'Confirm GL Sync' : 'Approve Payment')}
           </Button>
         </DialogFooter>
       </DialogContent>
