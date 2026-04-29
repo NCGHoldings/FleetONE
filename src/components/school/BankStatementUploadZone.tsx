@@ -381,7 +381,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           auto_matched_count: autoMatched,
           manual_matched_count: 0,
           unmatched_count: unmatched + needsReview,
-          status: 'completed',
+          status: 'pending',
         })
         .eq('id', importRecord.id);
 

@@ -644,8 +644,9 @@ export const useAPPayments = () => {
 // ============ Bank Accounts ============
 // Bank accounts are section-specific (each sub-company can have its own bank accounts)
 export const useBankAccounts = () => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
     queryKey: ["bank-accounts", effectiveCompanyId],
@@ -653,21 +654,48 @@ export const useBankAccounts = () => {
       // Use explicit column selection to avoid PostgREST errors from non-existent columns (e.g. 'status')
       let query = supabase
         .from("bank_accounts")
-        .select("id, account_name, bank_name, account_number, account_type, currency, current_balance, company_id, gl_account_id, is_active, opening_balance, notes, created_at, updated_at")
+        .select("id, account_name, bank_name, account_number, account_type, currency, current_balance, company_id, gl_account_id, is_active, opening_balance, notes, created_at, updated_at, business_unit_code")
         .order("account_name");
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
 
+      // Filter by business unit for sub-company views
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
+      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
+        // Parent companies drop filter
+      } else if (selectedCompany) {
+        // Fallback for legacy setups if autoBusinessUnitCode isn't explicitly set
+        const cName = selectedCompany.name.toLowerCase();
+        if (cName.includes("school bus")) {
+          query = query.eq("business_unit_code", "SBO");
+        } else if (cName.includes("special hire")) {
+          query = query.eq("business_unit_code", "SPH");
+        } else if (cName.includes("yutong")) {
+          query = query.eq("business_unit_code", "YUT");
+        } else if (cName.includes("sinotruck")) {
+          query = query.eq("business_unit_code", "SNT");
+        } else if (cName.includes("light vehicle")) {
+          query = query.eq("business_unit_code", "LTV");
+        }
+      }
+
       const { data, error } = await query;
       if (error) {
         // Fallback: if explicit columns fail (schema mismatch), try minimal safe columns
         console.warn("Bank accounts query failed, retrying with minimal columns:", error.message);
-        const { data: fallbackData, error: fallbackError } = await supabase
+        let fallbackQuery = supabase
           .from("bank_accounts")
           .select("id, account_name, bank_name, account_number, company_id, current_balance, is_active, created_at, updated_at")
           .order("account_name");
+          
+        if (effectiveCompanyId) {
+          fallbackQuery = fallbackQuery.eq("company_id", effectiveCompanyId);
+        }
+        
+        const { data: fallbackData, error: fallbackError } = await fallbackQuery;
         if (fallbackError) throw fallbackError;
         return fallbackData;
       }

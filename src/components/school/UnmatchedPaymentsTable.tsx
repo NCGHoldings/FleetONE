@@ -9,13 +9,8 @@ import { Search, UserPlus, X } from "lucide-react";
 import { formatDateDisplay } from "@/lib/utils";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SearchableStudentSelector } from "./SearchableStudentSelector";
+import { usePostPaymentToGL } from "@/hooks/useSchoolBusFinance";
 
 interface UnmatchedPaymentsTableProps {
   importId: string;
@@ -29,35 +24,52 @@ export function UnmatchedPaymentsTable({ importId, branchId, onStatsUpdate }: Un
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStudents, setSelectedStudents] = useState<Record<string, string>>({});
+  const postPaymentToGL = usePostPaymentToGL();
 
   useEffect(() => {
-    fetchData();
-  }, [importId]);
+    if (importId && branchId) {
+      fetchData();
+    }
+  }, [importId, branchId]);
 
   const fetchData = async () => {
-    setLoading(true);
+    if (!importId || !branchId) return;
     
-    // Fetch unmatched items
-    const { data: itemsData } = await supabase
-      .from('school_payment_import_items')
-      .select('*')
-      .eq('import_id', importId)
-      .eq('match_status', 'unmatched')
-      .order('txn_date', { ascending: false });
+    try {
+      setLoading(true);
+      
+      // Fetch unmatched and posted_unmatched items
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('school_payment_import_items')
+        .select('*')
+        .eq('import_id', importId)
+        .in('match_status', ['unmatched', 'posted_unmatched'])
+        .order('txn_date', { ascending: false });
 
-    // Fetch ACTIVE students only for this branch
-    const studentsQuery: any = await (supabase as any)
-      .from('school_students')
-      .select('*')
-      .eq('branch_id', branchId)
-      .in('status', ['active', 'Active'])
-      .order('student_name');
-    
-    const studentsData = studentsQuery.data;
+      if (itemsError) {
+        console.error("Error fetching items:", itemsError);
+      }
 
-    if (itemsData) setItems(itemsData);
-    if (studentsData) setStudents(studentsData);
-    setLoading(false);
+      // Fetch ACTIVE students only for this branch
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('school_students')
+        .select('*')
+        .eq('branch_id', branchId)
+        .eq('is_active', true)
+        .order('student_name');
+      
+      if (studentsError) {
+        console.error("Error fetching students:", studentsError);
+      }
+
+      if (itemsData) setItems(itemsData);
+      if (studentsData) setStudents(studentsData);
+    } catch (e) {
+      console.error("Failed to fetch data:", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleManualMatch = async (itemId: string, studentId: string) => {
@@ -82,50 +94,90 @@ export function UnmatchedPaymentsTable({ importId, branchId, onStatsUpdate }: Un
 
       if (studentError || !studentData) throw new Error('Student not found in this branch');
 
-      const amountPaid = item.amount;
-      const fixedAmount = studentData.fixed_monthly_amount || 0;
-      const balanceBefore = studentData.payment_balance || 0;
-      const difference = amountPaid - fixedAmount;
-      const balanceAfter = balanceBefore + difference;
-      
-      // Get payment month (format: YYYY-MM)
-      const paymentDate = new Date(item.txn_date);
-      const paymentMonth = paymentDate.toISOString().slice(0, 7);
+      if (item.match_status === 'unmatched') {
+        // Just mark as ready for Finance (Operations matched it before Finance approval)
+        await supabase
+          .from('school_payment_import_items')
+          .update({
+            matched_student_ids: [studentId],
+            match_status: 'ready_for_finance',
+            processed_at: new Date().toISOString(),
+          })
+          .eq('id', itemId);
+      } else if (item.match_status === 'posted_unmatched') {
+        // Finance already posted this to Suspense. Create transaction and Reverse Suspense -> AR.
+        const amountPaid = item.amount;
+        const fixedAmount = studentData.fixed_monthly_amount || 0;
+        const balanceBefore = studentData.payment_balance || 0;
+        const difference = amountPaid - fixedAmount;
+        const balanceAfter = balanceBefore + difference;
+        
+        // Get payment month (format: YYYY-MM-01 to satisfy PostgreSQL date type)
+        const paymentDate = new Date(item.txn_date);
+        const paymentMonth = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}-01`;
 
-      // Create payment transaction
-      const { error: txnError } = await supabase
-        .from('school_payment_transactions')
-        .insert([{
-          student_id: studentId,
-          payment_date: item.txn_date,
-          payment_month: paymentMonth,
-          amount_paid: amountPaid,
-          fixed_amount: fixedAmount,
-          difference: difference,
-          payment_balance_before: balanceBefore,
-          payment_balance_after: balanceAfter,
-          payment_method: 'Bank Transfer',
-          reference_no: `IMPORT-${importId.slice(0, 8)}`,
-          notes: `Manually matched from import: ${item.description}`,
-        }]);
+        // Create payment transaction
+        const { data: insertedTxns, error: txnError } = await supabase
+          .from('school_payment_transactions')
+          .insert([{
+            student_id: studentId,
+            payment_date: item.txn_date,
+            payment_month: paymentMonth,
+            amount_paid: amountPaid,
+            fixed_amount: fixedAmount,
+            difference: difference,
+            payment_balance_before: balanceBefore,
+            payment_balance_after: balanceAfter,
+            payment_method: 'Bank Transfer',
+            reference_no: `IMPORT-${importId.slice(0, 8)}`,
+            notes: `Manually matched from suspense: ${item.description}`,
+          }])
+          .select();
 
-      if (txnError) throw txnError;
+        if (txnError) throw txnError;
 
-      // Update student balance
-      await supabase
-        .from('school_students')
-        .update({ payment_balance: balanceAfter })
-        .eq('id', studentId);
+        // Post to GL (Suspense -> AR)
+        const suspenseCoaId = item.notes?.split('Suspense COA: ')[1]?.trim();
+        if (suspenseCoaId && insertedTxns && insertedTxns.length > 0) {
+          try {
+            await postPaymentToGL.mutateAsync({
+              paymentId: insertedTxns[0].id,
+              amount: amountPaid,
+              branchId: branchId,
+              studentName: student.student_name || 'Student',
+              paymentMethod: 'Bank Transfer',
+              referenceNo: `REVERSAL-${item.description}`,
+              fixedAmount: fixedAmount,
+              overpaymentAmount: difference > 0 ? difference : undefined,
+              previousBalance: balanceBefore,
+              customBankAccountId: suspenseCoaId // Dr Suspense
+            });
+          } catch (e) {
+            console.error("Suspense reversal GL posting failed", e);
+            toast({ title: "GL Warning", description: "Payment recorded but GL reversal failed.", variant: "destructive" });
+          }
+        }
 
-      // Update import item
-      await supabase
-        .from('school_payment_import_items')
-        .update({
-          matched_student_ids: [studentId],
-          match_status: 'manual_matched',
-          processed_at: new Date().toISOString(),
-        })
-        .eq('id', itemId);
+        // Update student balance and payment status
+        await supabase
+          .from('school_students')
+          .update({ 
+            payment_balance: balanceAfter,
+            payment_status: 'paid',
+            last_payment_date: item.txn_date
+          })
+          .eq('id', studentId);
+
+        // Update import item
+        await supabase
+          .from('school_payment_import_items')
+          .update({
+            matched_student_ids: [studentId],
+            match_status: 'manual_matched',
+            processed_at: new Date().toISOString(),
+          })
+          .eq('id', itemId);
+      }
 
       // Save pattern for future learning
       try {
@@ -144,6 +196,13 @@ export function UnmatchedPaymentsTable({ importId, branchId, onStatsUpdate }: Un
       toast({
         title: "Payment Matched",
         description: "Payment has been successfully recorded",
+      });
+
+      // Clear the selection for this row
+      setSelectedStudents(prev => {
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
       });
 
       fetchData();
@@ -206,27 +265,34 @@ export function UnmatchedPaymentsTable({ importId, branchId, onStatsUpdate }: Un
       header: "Match to Student",
       cell: ({ row }) => (
         <div className="flex gap-2">
-          <Select
-            onValueChange={(value) => handleManualMatch(row.original.id, value)}
+          <SearchableStudentSelector
+            students={students.filter(s => {
+              if (!searchTerm) return true;
+              const name = (s.student_name || '').toLowerCase();
+              const admNo = (s.admission_no || '').toLowerCase();
+              const term = searchTerm.toLowerCase();
+              return name.includes(term) || admNo.includes(term);
+            })}
+            value={selectedStudents[row.original.id] || null}
+            onValueChange={(value) => {
+              if (value !== null) {
+                setSelectedStudents(prev => ({ ...prev, [row.original.id]: value }));
+              } else {
+                setSelectedStudents(prev => {
+                  const next = { ...prev };
+                  delete next[row.original.id];
+                  return next;
+                });
+              }
+            }}
+          />
+          <Button
+            onClick={() => handleManualMatch(row.original.id, selectedStudents[row.original.id])}
+            disabled={!selectedStudents[row.original.id]}
+            size="sm"
           >
-            <SelectTrigger className="w-[250px]">
-              <SelectValue placeholder="Select student..." />
-            </SelectTrigger>
-            <SelectContent>
-              {students
-                .filter(s => {
-                  const name = (s.student_name || '').toLowerCase();
-                  const admNo = (s.admission_no || '').toLowerCase();
-                  const term = searchTerm.toLowerCase();
-                  return name.includes(term) || admNo.includes(term);
-                })
-                .map(student => (
-                  <SelectItem key={student.id} value={student.id}>
-                    {student.admission_no || 'N/A'} - {student.student_name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+            Confirm
+          </Button>
           <Button
             variant="ghost"
             size="icon"

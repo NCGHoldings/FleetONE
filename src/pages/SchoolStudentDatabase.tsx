@@ -175,7 +175,9 @@ export default function SchoolStudentDatabase() {
 
     // Status filter
     if (statusFilter !== "all") {
-      filtered = filtered.filter(student => student.payment_status === statusFilter);
+      filtered = filtered.filter(student => 
+        student.payment_status && String(student.payment_status).toLowerCase().trim() === statusFilter.toLowerCase().trim()
+      );
     }
 
     // Grade filter

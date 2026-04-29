@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { ChevronRight, ChevronDown, Folder, FileText, Eye, Plus, Check, X, Edit } from "lucide-react";
+import { ChevronRight, ChevronDown, Folder, FileText, Eye, Plus, Check, X, Edit, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { DrillDownModal } from "./DrillDownModal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AccountEditForm } from "./AccountEditForm";
-import { useCompanyCreateAccount } from "@/hooks/useCompanyMutations";
+import { useCompanyCreateAccount, useCompanyDeleteAccount } from "@/hooks/useCompanyMutations";
 
 interface Account {
   id: string;
@@ -174,6 +174,7 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
   const [isSaving, setIsSaving] = useState(false);
 
   const createAccount = useCompanyCreateAccount();
+  const deleteAccount = useCompanyDeleteAccount();
 
   const filteredAccounts = useMemo(() => {
     if (!searchTerm) return accounts;
@@ -430,6 +431,13 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
     setDrillDownOpen(true);
   };
 
+  const handleDeleteAccount = (account: Account, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to delete ${account.account_code} - ${account.account_name}?`)) {
+      deleteAccount.mutate(account.id);
+    }
+  };
+
   // Recursively collect all account IDs under a tree node
   const collectAccountIds = (node: TreeNode): string[] => {
     const ids: string[] = node.accounts.map((a) => a.id);
@@ -565,6 +573,16 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
                   title={`Add child under ${account.account_code}`}
                 >
                   <Plus className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={(e) => handleDeleteAccount(account, e)}
+                  title={`Delete ${account.account_code}`}
+                  disabled={deleteAccount.isPending}
+                >
+                  <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
             ))}

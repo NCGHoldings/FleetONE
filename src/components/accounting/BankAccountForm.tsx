@@ -12,7 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { useCreateBankAccount, useUpdateBankAccount } from "@/hooks/useAccountingMutations";
 import { useChartOfAccounts, useCurrencies } from "@/hooks/useAccountingData";
 import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const bankAccountSchema = z.object({
   account_code: z.string().min(1, "Account code is required"),
@@ -24,6 +25,7 @@ const bankAccountSchema = z.object({
   currency: z.string().optional(),
   opening_balance: z.number().optional(),
   gl_account_id: z.string().optional(),
+  business_unit_code: z.string().optional().nullable(),
   is_active: z.boolean().optional(),
   is_default: z.boolean().optional(),
   notes: z.string().optional(),
@@ -51,7 +53,16 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
   const { data: currencies = [] } = useCurrencies();
   const createBankAccount = useCreateBankAccount();
   const updateBankAccount = useUpdateBankAccount();
+  const { selectedCompanyId, getSubCompaniesFor } = useCompany();
   const isEditing = !!bankAccount;
+
+  // If the current selected company has sub-companies, it's a holding/parent company
+  const availableBusinessUnits = useMemo(() => {
+    if (!selectedCompanyId) return [];
+    return getSubCompaniesFor(selectedCompanyId);
+  }, [selectedCompanyId, getSubCompaniesFor]);
+
+  const isHoldingCompany = availableBusinessUnits.length > 0;
 
   const bankAccounts = accounts?.filter(a => 
     a.account_type === "asset" && 
@@ -69,6 +80,7 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
       account_type: "current",
       currency: "LKR",
       opening_balance: 0,
+      business_unit_code: null,
       is_active: true,
       is_default: false,
       notes: "",
@@ -88,6 +100,7 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
         currency: bankAccount.currency || "LKR",
         opening_balance: bankAccount.opening_balance || 0,
         gl_account_id: bankAccount.gl_account_id || undefined,
+        business_unit_code: bankAccount.business_unit_code || null,
         is_active: bankAccount.is_active ?? true,
         is_default: bankAccount.is_default ?? false,
         notes: bankAccount.notes || "",
@@ -112,6 +125,7 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
         currency: data.currency || "LKR",
         opening_balance: data.opening_balance || 0,
         gl_account_id: data.gl_account_id,
+        business_unit_code: data.business_unit_code,
         is_active: data.is_active ?? true,
         is_default: data.is_default ?? false,
         notes: data.notes,
@@ -282,6 +296,33 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
               </Select>
             </div>
           </div>
+
+          {isHoldingCompany && (
+            <div className="space-y-2">
+              <Label htmlFor="business_unit_code">Business Unit (Optional)</Label>
+              <Select 
+                value={form.watch("business_unit_code") || "none"} 
+                onValueChange={(v) => form.setValue("business_unit_code", v === "none" ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Assign to Business Unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Shared / None</SelectItem>
+                  {availableBusinessUnits.map((bu) => (
+                    bu.short_code ? (
+                      <SelectItem key={bu.id} value={bu.short_code}>
+                        {bu.name}
+                      </SelectItem>
+                    ) : null
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                If assigned, this bank account will only be visible when accessing that specific business unit.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>

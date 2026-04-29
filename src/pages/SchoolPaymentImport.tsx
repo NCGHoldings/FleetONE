@@ -9,6 +9,8 @@ import { BankStatementUploadZone } from "@/components/school/BankStatementUpload
 import { PaymentMatchingPreview } from "@/components/school/PaymentMatchingPreview";
 import { UnmatchedPaymentsTable } from "@/components/school/UnmatchedPaymentsTable";
 import { ImportHistoryTable } from "@/components/school/ImportHistoryTable";
+import { FinanceImportApprovalDialog } from "@/components/school/FinanceImportApprovalDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function SchoolPaymentImport() {
   const { branchId } = useParams();
@@ -31,20 +33,39 @@ export default function SchoolPaymentImport() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate(`/school-bus/branch/${branchId}/payments`)}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Bank Statement Payment Import</h1>
-          <p className="text-muted-foreground">
-            Automatically match and record student payments from bank statements
-          </p>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(`/school-bus/branch/${branchId}/payments`)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Bank Statement Payment Import</h1>
+            <p className="text-muted-foreground">
+              Automatically match and record student payments from bank statements
+            </p>
+          </div>
         </div>
+        {importId && (
+          <Button 
+            onClick={async () => {
+              const { error } = await supabase
+                .from('school_payment_imports')
+                .update({ status: 'pending_finance' })
+                .eq('id', importId);
+              if (!error) {
+                setActiveTab("history");
+                setImportId(null);
+              }
+            }}
+            className="bg-primary text-primary-foreground"
+          >
+            Submit Batch to Finance
+          </Button>
+        )}
       </div>
 
       {stats.total > 0 && (
@@ -166,9 +187,23 @@ export default function SchoolPaymentImport() {
         </TabsContent>
 
         <TabsContent value="history" className="mt-6">
-          <ImportHistoryTable branchId={branchId!} />
+          <ImportHistoryTable 
+            branchId={branchId!} 
+            onContinue={(importRecord) => {
+              setImportId(importRecord.id);
+              setStats({
+                total: importRecord.total_transactions || 0,
+                autoMatched: importRecord.auto_matched_count || 0,
+                needsReview: importRecord.manual_matched_count || 0,
+                unmatched: importRecord.unmatched_count || 0,
+              });
+              setActiveTab("unmatched");
+            }}
+          />
         </TabsContent>
       </Tabs>
+
+      <FinanceImportApprovalDialog />
     </div>
   );
 }

@@ -25,6 +25,11 @@ import { useCompanyCreateAccount } from "@/hooks/useCompanyMutations";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 const accountSchema = z.object({
   account_code: z.string().min(1, "Account code is required"),
@@ -126,8 +131,9 @@ const deriveLevelFields = (
   return result;
 };
 
-export const AccountForm = ({ onSuccess }: AccountFormProps) => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+export const AccountForm = ({ onSuccess, initialParentId }: AccountFormProps) => {
+  const { getEffectiveCompanyId } = useCompany();
+  const [openCombobox, setOpenCombobox] = useState(false);
   const effectiveCompanyId = getEffectiveCompanyId();
   const createAccount = useCompanyCreateAccount();
 
@@ -267,30 +273,81 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="parent_account_id"
-          render={({ field }) => (
-            <FormItem>
+        <FormField control={form.control} name="parent_account_id" render={({ field }) => {
+          const selectedValue = field.value && field.value !== "_none" ? field.value : null;
+          const selectedAccount = parentAccounts?.find(a => a.id === selectedValue);
+          const displayValue = selectedAccount 
+            ? `${selectedAccount.account_code} - ${selectedAccount.account_name}`
+            : "No Parent (Top Level)";
+
+          return (
+            <FormItem className="flex flex-col">
               <FormLabel>Parent Account *</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value || undefined}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select parent account" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {parentAccounts?.filter(account => account.id && account.id.trim() !== '').map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openCombobox}
+                      className={cn(
+                        "w-full justify-between font-normal",
+                        !selectedValue && "text-muted-foreground"
+                      )}
+                    >
+                      {displayValue}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0 z-[100]" align="start">
+                  <Command shouldFilter={true}>
+                    <CommandInput placeholder="Search parent account..." />
+                    <CommandList className="max-h-[300px] overflow-y-auto">
+                      <CommandEmpty>No account found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="no parent top level"
+                          onSelect={() => {
+                            field.onChange("_none");
+                            setOpenCombobox(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              !selectedValue ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          No Parent (Top Level)
+                        </CommandItem>
+                        {parentAccounts?.filter(a => a.id && a.id.trim() !== '').map((a) => (
+                          <CommandItem
+                            key={a.id}
+                            value={`${a.account_code} ${a.account_name}`}
+                            onSelect={() => {
+                              field.onChange(a.id);
+                              setOpenCombobox(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedValue === a.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {a.account_code} - {a.account_name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               <FormMessage />
             </FormItem>
-          )}
-        />
+          );
+        }} />
 
         <FormField
           control={form.control}
