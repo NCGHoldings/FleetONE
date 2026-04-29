@@ -19,8 +19,9 @@ jobs:
 
       - uses: google-labs-code/jules-action@v1.0.0
         with:
-          # Assumes you add GEMINI_API_KEY to your GitHub Repo Secrets
-          jules_api_key: ${{ secrets.GEMINI_API_KEY }}
+          # Get your Jules API key from jules.google.com → Settings → API Keys
+          # Add it to GitHub Repo Secrets as JULES_API_KEY (NOT GEMINI_API_KEY)
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
           starting_branch: main
           include_last_commit: true
           include_commit_log: true
