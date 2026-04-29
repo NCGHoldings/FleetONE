@@ -1,7 +1,7 @@
 name: Sync to Lovable
 on:
   push:
-    branches: [main]
+    branches: [] # Temporarily disabled: target repo inaccessible
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
