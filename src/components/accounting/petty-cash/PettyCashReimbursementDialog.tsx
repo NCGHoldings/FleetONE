@@ -32,9 +32,13 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange }: PettyCashRe
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<string[]>([]);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
 
-  // Only show approved disbursements that haven't been reimbursed yet
+  // Only show approved disbursements and specific replenishments (like IOU returns) that haven't been reimbursed yet
   const eligibleVouchers = transactions?.filter(
-    (t: any) => t.transaction_type === "disbursement" && t.status === "approved" && !t.reimbursement_ap_payment_id
+    (t: any) => 
+      ((t.transaction_type === "disbursement") || 
+       (t.transaction_type === "replenishment" && t.expense_category === "IOU Cash Return")) &&
+      t.status === "approved" && 
+      !t.reimbursement_ap_payment_id
   ) || [];
 
   const handleSelectAll = (checked: boolean) => {
@@ -54,8 +58,12 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange }: PettyCashRe
   };
 
   const totalAmount = eligibleVouchers
-    .filter(v => selectedVoucherIds.includes(v.id))
-    .reduce((sum, v) => sum + Number(v.amount), 0);
+    .filter((v: any) => selectedVoucherIds.includes(v.id))
+    .reduce((sum: number, v: any) => {
+      // Disbursements ADD to reimbursement total, Replenishments (returns) SUBTRACT from it
+      const amount = v.transaction_type === "disbursement" ? Number(v.amount) : -Number(v.amount);
+      return sum + amount;
+    }, 0);
 
   const handleReimburse = async () => {
     if (selectedVoucherIds.length === 0 || !selectedBankAccountId) return;
@@ -160,7 +168,10 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange }: PettyCashRe
                             {voucher.description}
                           </TableCell>
                           <TableCell className="text-right font-medium">
-                            <CurrencyDisplay amount={voucher.amount} />
+                            <span className={voucher.transaction_type === "replenishment" ? "text-green-600" : ""}>
+                              {voucher.transaction_type === "replenishment" ? "-" : ""}
+                              <CurrencyDisplay amount={voucher.amount} />
+                            </span>
                           </TableCell>
                         </TableRow>
                       ))

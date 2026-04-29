@@ -8,7 +8,7 @@ import { ARAgeingReport } from "./ARAgeingReport";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { useARInvoices } from "@/hooks/useAccountingData";
+import { useARInvoices, useAllProfiles } from "@/hooks/useAccountingData";
 import { useDeleteARInvoice } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -48,7 +48,15 @@ export const AccountsReceivableView = () => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<any>(null);
   const { data: invoices, isLoading } = useARInvoices(statusFilter);
+  const { data: profiles } = useAllProfiles();
   const deleteInvoice = useDeleteARInvoice();
+
+  const getCreatorName = (userId: string | null) => {
+    if (!userId) return "System";
+    const profile = profiles?.find((p: any) => p.user_id === userId || p.id === userId);
+    if (profile) return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown User";
+    return userId.substring(0, 8);
+  };
 
   // ── TEMPORARY PATCH: Backfill bus_no for School Bus AR Invoices ──
   useEffect(() => {
@@ -264,6 +272,15 @@ export const AccountsReceivableView = () => {
       cell: ({ row }: any) => (
         <span className={row.original.balance > 0 ? "text-destructive font-semibold" : "text-green-600"}>
           <CurrencyDisplay amount={row.original.balance || 0} />
+        </span>
+      ),
+    },
+    {
+      accessorKey: "created_by",
+      header: "Created By",
+      cell: ({ row }: any) => (
+        <span className="text-xs text-muted-foreground">
+          {getCreatorName(row.original.created_by)}
         </span>
       ),
     },

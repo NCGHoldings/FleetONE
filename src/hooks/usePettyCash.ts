@@ -53,6 +53,7 @@ export interface PettyCashTransaction {
   company_id: string | null;
   gl_account_id: string | null;
   vehicle_no: string | null;
+  reimbursement_ap_payment_id?: string | null;
   // Joined
   fund?: { fund_name: string; business_unit_code: string } | null;
 }
@@ -784,8 +785,33 @@ export const useCreateIOU = () => {
 
       // Handle Petty Cash Transaction & Balance Reduction
       if (fund && data.petty_cash_fund_id && amount > 0) {
-        // Intentionally skipping petty_cash_transactions insert and balance deduction here.
-        // The voucher and balance deduction only occur at settlement time per accountant workflow.
+        // 1. Generate Voucher Number
+        const { data: voucherNum } = await supabase.rpc("generate_petty_cash_voucher_number");
+
+        // 2. Insert PC Transaction (Advance)
+        const newBalance = (fund.current_balance || 0) - amount;
+        
+        const { data: pcTx, error: pcError } = await supabase.from("petty_cash_transactions").insert({
+          petty_cash_fund_id: data.petty_cash_fund_id,
+          transaction_type: "disbursement",
+          amount: amount,
+          balance_after: newBalance,
+          description: `IOU Advance: ${data.purpose || "Staff Advance"} (${iouNumber})`,
+          expense_category: "IOU Advance",
+          payment_method: "cash",
+          status: "pending", // Pending until settled
+          voucher_number: voucherNum || undefined,
+          company_id: selectedCompanyId,
+          reference_number: iouNumber,
+        }).select().single();
+
+        if (pcError) throw pcError;
+
+        // 3. Update Fund Balance
+        await supabase
+          .from("petty_cash_funds")
+          .update({ current_balance: newBalance, updated_at: new Date().toISOString() })
+          .eq("id", data.petty_cash_fund_id);
       } else if (data.bank_account_id && amount > 0) {
         // Handle Bank Account Advance
         // 1. Generate AP Payment Voucher Number
@@ -1214,36 +1240,75 @@ export const useUpdateIOU = () => {
                 }
 
                 // Handle Petty Cash Payment Voucher Logic
-                // We create a voucher for the expense, but we offset it with the IOU advance clearance to keep the float perfectly balanced.
-                if (pettyCashFund && expenseAmt > 0) {
-                  // 1. Create the Petty Cash Voucher (Disbursement) for the Expense
-                  const { data: voucherNum } = await supabase.rpc("generate_petty_cash_voucher_number");
-                  const balanceAfterDisbursement = (pettyCashFund.current_balance || 0) - expenseAmt;
-                  
-                  await supabase.from("petty_cash_transactions").insert({
-                    petty_cash_fund_id: pettyCashFund.id,
-                    transaction_type: "disbursement",
-                    amount: expenseAmt,
-                    balance_after: balanceAfterDisbursement,
-                    description: `IOU Settlement Expense: ${iouRef}`,
-                    expense_category: "IOU Settlement",
-                    payment_method: "cash",
-                    status: "approved",
-                    voucher_number: voucherNum || undefined,
-                    company_id: selectedCompanyId,
-                    journal_entry_id: je.id,
-                    gl_account_id: expense_account_id || null,
-                  });
-
-                  // Ensure fund matches the true final balance
+                if (pettyCashFund) {
+                  // 1. Mark original advance voucher as approved
                   await supabase
-                    .from("petty_cash_funds")
-                    .update({ current_balance: balanceAfterDisbursement, updated_at: new Date().toISOString() })
-                    .eq("id", pettyCashFund.id);
-                } else if (pettyCashFund && cashDifference > 0) {
-                   // Only cash returned, no expenses (Cash Return type). 
-                   // Since we didn't deduct the advance initially, we don't need to do anything here.
-                   // The fund balance remains unchanged because the cash was returned.
+                    .from("petty_cash_transactions")
+                    .update({
+                      status: "approved",
+                      expense_category: "IOU Settlement",
+                      description: `IOU Settled: ${iouRef}`,
+                      journal_entry_id: je.id,
+                      gl_account_id: expense_account_id || null,
+                    })
+                    .eq("reference_number", iouRef)
+                    .eq("petty_cash_fund_id", pettyCashFund.id)
+                    .eq("status", "pending")
+                    .eq("transaction_type", "disbursement");
+
+                  let balanceAdjustment = 0;
+
+                  // 2. Handle Cash Return (Underspend)
+                  if (cashDifference > 0) {
+                    const { data: voucherNum } = await supabase.rpc("generate_petty_cash_voucher_number");
+                    balanceAdjustment = cashDifference; // Balance increases
+                    await supabase.from("petty_cash_transactions").insert({
+                      petty_cash_fund_id: pettyCashFund.id,
+                      transaction_type: "replenishment",
+                      amount: cashDifference,
+                      balance_after: (pettyCashFund.current_balance || 0) + balanceAdjustment,
+                      description: `IOU Cash Return: ${iouRef}`,
+                      expense_category: "IOU Cash Return",
+                      payment_method: "cash",
+                      status: "approved",
+                      voucher_number: voucherNum || undefined,
+                      company_id: selectedCompanyId,
+                      journal_entry_id: je.id,
+                      reference_number: iouRef,
+                    });
+                  }
+                  
+                  // 3. Handle Additional Cash Given (Overspend)
+                  if (cashDifference < 0) {
+                    const additionalCash = Math.abs(cashDifference);
+                    const { data: voucherNum } = await supabase.rpc("generate_petty_cash_voucher_number");
+                    balanceAdjustment = -additionalCash; // Balance decreases
+                    await supabase.from("petty_cash_transactions").insert({
+                      petty_cash_fund_id: pettyCashFund.id,
+                      transaction_type: "disbursement",
+                      amount: additionalCash,
+                      balance_after: (pettyCashFund.current_balance || 0) + balanceAdjustment,
+                      description: `IOU Additional Cash: ${iouRef}`,
+                      expense_category: "IOU Settlement Overspend",
+                      payment_method: "cash",
+                      status: "approved",
+                      voucher_number: voucherNum || undefined,
+                      company_id: selectedCompanyId,
+                      journal_entry_id: je.id,
+                      reference_number: iouRef,
+                    });
+                  }
+
+                  // 4. Update Fund Balance
+                  if (balanceAdjustment !== 0) {
+                    await supabase
+                      .from("petty_cash_funds")
+                      .update({ 
+                        current_balance: (pettyCashFund.current_balance || 0) + balanceAdjustment, 
+                        updated_at: new Date().toISOString() 
+                      })
+                      .eq("id", pettyCashFund.id);
+                  }
                 }
 
                 // Handle Bank Account Payment Voucher Logic

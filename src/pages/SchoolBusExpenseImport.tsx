@@ -58,7 +58,7 @@ export default function SchoolBusExpenseImport() {
   const [buses, setBuses] = useState<{id: string, bus_no: string}[]>([]);
   const [vendors, setVendors] = useState<{id: string, vendor_name: string}[]>([]);
   const [pettyCashFunds, setPettyCashFunds] = useState<{id: string, fund_name: string}[]>([]);
-  const [directAccounts, setDirectAccounts] = useState<{id: string, account_code: string, account_name: string, current_balance: number}[]>([]);
+  const [directAccounts, setDirectAccounts] = useState<{id: string, account_name: string, bank_name: string, account_number: string, current_balance: number}[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<{id: string, account_code: string, account_name: string}[]>([]);
   
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
@@ -120,20 +120,16 @@ export default function SchoolBusExpenseImport() {
         .order("account_name");
       if (expData) setExpenseAccounts(expData as any);
 
-      // Fetch float / bank / cash asset accounts for Direct Payment — scoped to active company
+      // Fetch bank accounts for Direct Payment — scoped to active company
       const { data: acctData } = await supabase
-        .from("chart_of_accounts")
-        .select("id, account_code, account_name, current_balance")
+        .from("bank_accounts")
+        .select("id, account_name, bank_name, account_number, current_balance")
         .eq("company_id", effectiveCompanyId)
-        .eq("account_type", "asset")
         .eq("is_active", true)
-        .or("account_name.ilike.%FLOAT%,account_name.ilike.%BANK%,account_name.ilike.%CASH%")
-        .order("account_code");
+        .order("account_name");
       if (acctData) {
         setDirectAccounts(acctData as any);
-        // Default to FUEL FLOAT - DIALOG TOUCH_SBS (13005002) if available in this company
-        const sbsFloat = acctData.find((a: any) => a.account_code === "13005002");
-        if (sbsFloat) setDirectPaymentAccountId(sbsFloat.id);
+        if (acctData.length > 0) setDirectPaymentAccountId(acctData[0].id);
         else setDirectPaymentAccountId("");
       }
     };
@@ -614,7 +610,7 @@ export default function SchoolBusExpenseImport() {
                         {directAccounts.map(a => (
                           <SelectItem key={a.id} value={a.id}>
                             <div className="flex items-center gap-2 w-full">
-                              <span className="font-mono text-xs text-muted-foreground">{a.account_code}</span>
+                              <span className="font-mono text-xs text-muted-foreground">{a.bank_name || 'Cash'} {a.account_number ? `- ${a.account_number}` : ''}</span>
                               <span className="flex-1">{a.account_name}</span>
                               <span className="text-xs font-semibold text-primary ml-2">{fmt(Number(a.current_balance || 0))}</span>
                             </div>
@@ -644,7 +640,7 @@ export default function SchoolBusExpenseImport() {
                       {insufficient && (
                         <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-destructive/30 text-destructive">
                           <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                          <span className="font-medium">Insufficient float balance — top up the float account before importing.</span>
+                          <span className="font-medium">Warning: Insufficient float balance — this will result in a negative balance. You can still proceed.</span>
                         </div>
                       )}
                     </div>
@@ -706,7 +702,7 @@ export default function SchoolBusExpenseImport() {
                  const selectedAcct = directAccounts.find(a => a.id === directPaymentAccountId);
                  const acctBalance = Number(selectedAcct?.current_balance || 0);
                  const excelTotal = parsedData.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
-                 const directInvalid = paymentMethod === 'direct' && (!directPaymentAccountId || excelTotal > acctBalance);
+                 const directInvalid = paymentMethod === 'direct' && !directPaymentAccountId;
                  return (
                    <Button 
                       onClick={handleConfirmImport} 

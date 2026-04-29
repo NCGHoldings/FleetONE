@@ -13,6 +13,7 @@ import {
   usePettyCashFunds, useAllPettyCashTransactions, useCreatePettyCashTransaction,
   PettyCashFund
 } from "@/hooks/usePettyCash";
+import { useAllProfiles } from "@/hooks/useAccountingData";
 import { EXPENSE_CATEGORIES, BUSINESS_UNITS, useCompanyExpenseCategories } from "@/hooks/useExpenseRequests";
 import { useQuery } from "@tanstack/react-query";
 import { CurrencyDisplay } from "../shared/CurrencyDisplay";
@@ -35,7 +36,15 @@ export const PettyCashDisbursementsTab = () => {
     category: filterCategory,
     status: filterStatus,
   });
+  const { data: profiles } = useAllProfiles();
   const createTransaction = useCreatePettyCashTransaction();
+
+  const getCreatorName = (userId: string | null) => {
+    if (!userId) return "System";
+    const profile = profiles?.find((p: any) => p.user_id === userId || p.id === userId);
+    if (profile) return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown User";
+    return userId.substring(0, 8);
+  };
 
   interface DisbursementLine {
     id: string;
@@ -201,6 +210,7 @@ export const PettyCashDisbursementsTab = () => {
               <TableHead className="text-right">Amount</TableHead>
               <TableHead>Method</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Created By</TableHead>
               <TableHead>Reference</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -239,6 +249,11 @@ export const PettyCashDisbursementsTab = () => {
                     <Badge variant={getStatusColor(txn.status || "approved") as any}>
                       {txn.status || "approved"}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs text-muted-foreground">
+                      {getCreatorName(txn.created_by)}
+                    </span>
                   </TableCell>
                   <TableCell className="text-sm">{txn.reference_number || "-"}</TableCell>
                   <TableCell className="text-right">

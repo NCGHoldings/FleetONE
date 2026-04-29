@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { EditHistoryDialog } from "./shared/EditHistoryDialog";
 import { ARReceiptEditDialog } from "./ARReceiptEditDialog";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
-import { useARReceipts, useCustomers } from "@/hooks/useAccountingData";
+import { useARReceipts, useCustomers, useAllProfiles } from "@/hooks/useAccountingData";
 import { useDeleteARReceipt } from "@/hooks/useAccountingMutations";
 import { useBankFees } from "@/hooks/useBankFees";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
@@ -32,6 +32,7 @@ export const ARReceiptsView = () => {
   const { data: customers } = useCustomers();
   const deleteReceipt = useDeleteARReceipt();
   const { data: bankFees } = useBankFees();
+  const { data: profiles } = useAllProfiles();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<string>("_all");
@@ -51,6 +52,13 @@ export const ARReceiptsView = () => {
   const getCustomerName = (customerId: string) => {
     const customer = customers?.find(c => c.id === customerId);
     return customer?.customer_name || "Unknown";
+  };
+
+  const getCreatorName = (userId: string | null) => {
+    if (!userId) return "System";
+    const profile = profiles?.find((p: any) => p.user_id === userId || p.id === userId);
+    if (profile) return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown User";
+    return userId.substring(0, 8);
   };
 
   const hasLinkedFees = (receiptId: string) => {
@@ -226,6 +234,7 @@ export const ARReceiptsView = () => {
               <TableHead>Method</TableHead>
               <TableHead>Reference</TableHead>
               <TableHead className="text-right">Amount</TableHead>
+              <TableHead>Created By</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -263,6 +272,11 @@ export const ARReceiptsView = () => {
                   <TableCell className="text-muted-foreground">{receipt.reference || "-"}</TableCell>
                   <TableCell className="text-right font-semibold">
                     <CurrencyDisplay amount={receipt.amount} />
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs text-muted-foreground">
+                      {getCreatorName(receipt.created_by)}
+                    </span>
                   </TableCell>
                   <TableCell>{getStatusBadge(receipt)}</TableCell>
                   <TableCell className="text-right">

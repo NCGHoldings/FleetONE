@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { JournalEntryForm } from "./JournalEntryForm";
 import { JournalEntryDetailDialog } from "./JournalEntryDetailDialog";
-import { useJournalEntries } from "@/hooks/useAccountingData";
+import { useJournalEntries, useAllProfiles } from "@/hooks/useAccountingData";
 import { usePostJournalEntry, useRejectJournalEntry, useReverseJournalEntry, useDeleteJournalEntry } from "@/hooks/useAccountingMutations";
 import { useCompany } from "@/contexts/CompanyContext";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -54,12 +54,20 @@ export const JournalEntriesView = () => {
     : [];
 
   const { data: entries, isLoading } = useJournalEntries(undefined, filterBusinessUnit);
+  const { data: profiles } = useAllProfiles();
   const postEntry = usePostJournalEntry();
   const rejectEntry = useRejectJournalEntry();
   const reverseEntry = useReverseJournalEntry();
   const deleteEntry = useDeleteJournalEntry();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [reverseConfirmEntry, setReverseConfirmEntry] = useState<any>(null);
+
+  const getCreatorName = (userId: string | null) => {
+    if (!userId) return "System";
+    const profile = profiles?.find((p: any) => p.user_id === userId || p.id === userId);
+    if (profile) return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown User";
+    return userId.substring(0, 8);
+  };
 
   // Filter entries based on multiple criteria
   const filteredEntries = useMemo(() => {
@@ -209,6 +217,15 @@ export const JournalEntriesView = () => {
       accessorKey: "total_credit",
       header: "Credit",
       cell: ({ row }: any) => <CurrencyDisplay amount={row.original.total_credit} />,
+    },
+    {
+      accessorKey: "created_by",
+      header: "Created By",
+      cell: ({ row }: any) => (
+        <span className="text-sm text-muted-foreground">
+          {getCreatorName(row.original.created_by)}
+        </span>
+      ),
     },
     {
       accessorKey: "status",

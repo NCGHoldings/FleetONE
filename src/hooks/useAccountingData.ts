@@ -15,6 +15,21 @@ const useAutoBusinessUnitFilter = () => {
 
   return autoBusinessUnitCode;
 };
+// ============ Profiles (Users) ============
+export const useAllProfiles = () => {
+  return useQuery({
+    queryKey: ["all-profiles"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, user_id, first_name, last_name");
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 5 * 60 * 1000, // cache for 5 minutes
+  });
+};
+
 // ============ Chart of Accounts ============
 // For sub-companies, fetch parent company's COA (consolidated GL)
 export const useChartOfAccounts = () => {

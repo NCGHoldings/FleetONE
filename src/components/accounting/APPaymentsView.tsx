@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ConsolidatePaymentsDialog } from "./ConsolidatePaymentsDialog";
 import { ChequePrintPreview } from "./ChequePrintPreview";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
-import { useAPPayments, useVendors } from "@/hooks/useAccountingData";
+import { useAPPayments, useVendors, useAllProfiles } from "@/hooks/useAccountingData";
 import { useDeleteAPPayment, useApproveAPPayment } from "@/hooks/useAccountingMutations";
 import { useBankFees } from "@/hooks/useBankFees";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,6 +39,7 @@ export const APPaymentsView = () => {
   const deletePayment = useDeleteAPPayment();
   const approvePayment = useApproveAPPayment();
   const { data: bankFees } = useBankFees();
+  const { data: profiles } = useAllProfiles();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVendor, setSelectedVendor] = useState<string>("_all");
@@ -59,10 +60,16 @@ export const APPaymentsView = () => {
   const [selectedPaymentsToConsolidate, setSelectedPaymentsToConsolidate] = useState<any[]>([]);
   const [consolidateDialogOpen, setConsolidateDialogOpen] = useState(false);
 
-  // Get vendor name helper (legacy - kept for vendor-only lookups)
   const getVendorName = (vendorId: string) => {
     const vendor = vendors?.find(v => v.id === vendorId);
     return vendor?.vendor_name || "Unknown";
+  };
+
+  const getCreatorName = (userId: string | null) => {
+    if (!userId) return "System";
+    const profile = profiles?.find((p: any) => p.user_id === userId || p.id === userId);
+    if (profile) return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown User";
+    return userId.substring(0, 8);
   };
 
   // Resolve display label for any payee type (vendor / customer / direct float)
@@ -351,6 +358,7 @@ export const APPaymentsView = () => {
               <TableHead className="text-right">Amount</TableHead>
               <TableHead className="text-right">Bank Fee</TableHead>
               <TableHead className="text-right">Total</TableHead>
+              <TableHead>Created By</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -416,6 +424,11 @@ export const APPaymentsView = () => {
                   </TableCell>
                   <TableCell className="text-right font-semibold">
                     <CurrencyDisplay amount={(payment as any).total_with_fees || payment.amount} />
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs text-muted-foreground">
+                      {getCreatorName(payment.created_by)}
+                    </span>
                   </TableCell>
                   <TableCell>{getStatusBadge(payment)}</TableCell>
                   <TableCell className="text-right">
