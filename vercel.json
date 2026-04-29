@@ -1,7 +1,7 @@
 {
   "rewrites": [
     {
-      "source": "/fios-api/:path*",
+      "source": "/telemetry/:path*",
       "destination": "https://fios-api.kloudip.com/:path*"
     },
     {

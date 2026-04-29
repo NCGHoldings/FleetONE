@@ -10,10 +10,10 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     proxy: {
-      '/fios-api': {
+      '/telemetry': {
         target: 'https://fios-api.kloudip.com',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/fios-api/, '')
+        rewrite: (path) => path.replace(/^\/telemetry/, '')
       }
     }
   },
