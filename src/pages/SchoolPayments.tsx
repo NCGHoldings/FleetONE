@@ -68,6 +68,7 @@ export default function SchoolPayments() {
   // Filters
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterGrade, setFilterGrade] = useState<string>("all");
+  const [filterActive, setFilterActive] = useState<string>("active");
   const [minAmount, setMinAmount] = useState<string>("");
   const [maxAmount, setMaxAmount] = useState<string>("");
 
@@ -78,10 +79,15 @@ export default function SchoolPayments() {
 
   const filteredStudents = React.useMemo(() => {
     return students.filter(s => {
+      // Active status filter
+      if (filterActive === "active" && s.is_active === false) return false;
+      if (filterActive === "inactive" && s.is_active !== false) return false;
+
       // Status
       const due = s.current_amount_due || 0;
       const balance = s.payment_balance || 0;
-      let effectiveStatus = s.payment_status;
+      let effectiveStatus = s.payment_status ? String(s.payment_status).toLowerCase().trim() : 'pending';
+      
       if (due <= 0 && balance >= 0) {
         effectiveStatus = 'paid';
       }
@@ -99,11 +105,12 @@ export default function SchoolPayments() {
       
       return true;
     });
-  }, [students, filterStatus, filterGrade, minAmount, maxAmount]);
+  }, [students, filterStatus, filterGrade, filterActive, minAmount, maxAmount]);
 
   const clearFilters = () => {
     setFilterStatus("all");
     setFilterGrade("all");
+    setFilterActive("active");
     setMinAmount("");
     setMaxAmount("");
   };
@@ -206,26 +213,38 @@ export default function SchoolPayments() {
   };
 
   const calculateStats = (studentData: Student[], actualRevenue: number = 0) => {
-    // Total students should only count ACTIVE students
-    const totalStudents = studentData.filter(s => s.is_active !== false).length;
+    // Only calculate stats for ACTIVE students to match the Total Students count
+    const activeStudents = studentData.filter(s => s.is_active !== false);
     
-    // Derive status from balance: paid = amount due <= 0, pending = balance < 0
-    const paidStudents = studentData.filter(s => (s.current_amount_due || 0) <= 0 && s.payment_balance >= 0).length;
-    const pendingPayments = studentData.filter(s => (s.current_amount_due || 0) > 0 && s.payment_balance < 0).length;
+    const totalStudents = activeStudents.length;
     
-    // Revenue from actual transactions, not stale payment_amount field
+    // Derive status from balance OR database payment_status to match dashboard
+    const paidStudents = activeStudents.filter(s => {
+      const isMathematicallyPaid = (s.current_amount_due || 0) <= 0 && (s.payment_balance || 0) >= 0;
+      const isStatusPaid = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'paid';
+      return isMathematicallyPaid || isStatusPaid;
+    }).length;
+    
+    const pendingPayments = activeStudents.filter(s => {
+      const isMathematicallyPending = (s.current_amount_due || 0) > 0 || (s.payment_balance || 0) < 0;
+      const isStatusPaid = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'paid';
+      const isStatusPending = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'pending';
+      return (isMathematicallyPending && !isStatusPaid) || isStatusPending;
+    }).length;
+    
+    // Revenue from actual transactions (we can keep this as total actual revenue for the branch regardless of student status)
     const totalRevenue = actualRevenue;
     
     // Overdue = all outstanding (balance < 0)
-    const overdueAmount = studentData
+    const overdueAmount = activeStudents
       .filter(s => s.payment_balance < 0)
       .reduce((sum, s) => sum + (s.current_amount_due || Math.abs(s.payment_balance) || 0), 0);
     
     // Total owed = sum of negative balances
-    const totalOwed = studentData.reduce((sum, s) => sum + (s.payment_balance < 0 ? Math.abs(s.payment_balance) : 0), 0);
+    const totalOwed = activeStudents.reduce((sum, s) => sum + (s.payment_balance < 0 ? Math.abs(s.payment_balance) : 0), 0);
     
     // Advance/credit = sum of positive balances
-    const totalCredit = studentData.reduce((sum, s) => sum + (s.payment_balance > 0 ? s.payment_balance : 0), 0);
+    const totalCredit = activeStudents.reduce((sum, s) => sum + (s.payment_balance > 0 ? s.payment_balance : 0), 0);
 
     setStats({
       totalStudents,
@@ -716,7 +735,20 @@ export default function SchoolPayments() {
           <Card>
             <CardContent className="p-4 flex flex-wrap items-end gap-4">
               <div className="space-y-1 min-w-[150px]">
-                <label className="text-xs font-medium text-muted-foreground">Status</label>
+                <label className="text-xs font-medium text-muted-foreground">Student Status</label>
+                <Select value={filterActive} onValueChange={setFilterActive}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="All Students" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active Only</SelectItem>
+                    <SelectItem value="inactive">Inactive Only</SelectItem>
+                    <SelectItem value="all">All Students</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 min-w-[150px]">
+                <label className="text-xs font-medium text-muted-foreground">Payment Status</label>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
                   <SelectTrigger className="h-8">
                     <SelectValue placeholder="All Status" />
