@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
+import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -22,7 +23,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle, ArrowLeftRight, Eye, ExternalLink, FileText, Info } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Eye, ExternalLink, FileText, Info, Check, ChevronsUpDown } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -53,8 +68,113 @@ interface RelatedDocument {
 export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalEntryDetailDialogProps) => {
   const { data: lines, isLoading } = useJournalEntryLines(entry?.id);
   const reverseEntry = useReverseJournalEntry();
+  const { selectedCompanyId } = useCompany();
   const [showConfirm, setShowConfirm] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<RelatedDocument | null>(null);
+
+  // States for Fix Bank Account dialog
+  const [showFixBankDialog, setShowFixBankDialog] = useState(false);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
+  const [isFixingBank, setIsFixingBank] = useState(false);
+  const [comboboxOpen, setComboboxOpen] = useState(false);
+
+  const { data: bankAccounts } = useQuery({
+    queryKey: ['bank-accounts-fix'],
+    queryFn: async () => {
+       // First fetch all configured bank accounts from school bus settings for the CURRENT company
+       const { data: settings } = await supabase.from('school_bus_finance_settings')
+          .select('bank_account_id, cash_account_id, sbs_collection_account_id, trade_receivable_account_id')
+          .eq('company_id', selectedCompanyId || entry?.company_id);
+       
+       let validIds = new Set<string>();
+       settings?.forEach(s => {
+         if (s.bank_account_id) validIds.add(s.bank_account_id);
+         if (s.cash_account_id) validIds.add(s.cash_account_id);
+         if (s.sbs_collection_account_id) validIds.add(s.sbs_collection_account_id);
+         if (s.trade_receivable_account_id) validIds.add(s.trade_receivable_account_id);
+       });
+
+       if (validIds.size === 0) {
+         // Fallback: fetch all bank and cash accounts for the current company
+         const { data, error } = await supabase.from('chart_of_accounts')
+          .select('id, account_code, account_name, account_type')
+          .eq('company_id', selectedCompanyId || entry?.company_id)
+          .in('account_type', ['Bank', 'Cash'])
+          .order('account_name');
+          
+         if (error) {
+           console.error("Error fetching fallback accounts:", error);
+           return [];
+         }
+         return data || [];
+       }
+
+       // Fetch ONLY the accounts that have been mapped in the settings
+       const { data, error } = await supabase.from('chart_of_accounts')
+        .select('id, account_code, account_name, account_type')
+        .in('id', Array.from(validIds))
+        .order('account_name');
+        
+       if (error) {
+         console.error("Error fetching accounts:", error);
+         return [];
+       }
+       
+       return data || [];
+    },
+    enabled: showFixBankDialog
+  });
+
+  const handleFixBank = async () => {
+    if (!selectedBankAccountId) {
+      toast.error("Please select a bank account first");
+      return;
+    }
+
+    try {
+      setIsFixingBank(true);
+      const bankDebitLine = lines?.find((l: any) => l.debit > 0 && l.description?.includes('Payment received'));
+      if (!bankDebitLine) throw new Error("Could not find bank debit line");
+
+      const oldAccountId = bankDebitLine.account_id;
+      if (oldAccountId === selectedBankAccountId) {
+        toast.info("This is already the selected account.");
+        setShowFixBankDialog(false);
+        return;
+      }
+
+      const { data: newAccount } = await supabase.from('chart_of_accounts').select('account_name, current_balance').eq('id', selectedBankAccountId).single();
+      const { data: oldAccount } = await supabase.from('chart_of_accounts').select('account_name, current_balance').eq('id', oldAccountId).single();
+
+      // 1. Revert old account balance
+      if (oldAccount) {
+        await supabase.from('chart_of_accounts')
+          .update({ current_balance: Number(oldAccount.current_balance || 0) - Number(bankDebitLine.debit) })
+          .eq('id', oldAccountId);
+      }
+
+      // 2. Add to new account balance
+      if (newAccount) {
+        await supabase.from('chart_of_accounts')
+          .update({ current_balance: Number(newAccount.current_balance || 0) + Number(bankDebitLine.debit) })
+          .eq('id', selectedBankAccountId);
+      }
+
+      // 3. Update journal entry line
+      await supabase.from('journal_entry_lines')
+        .update({ account_id: selectedBankAccountId })
+        .eq('id', bankDebitLine.id);
+
+      toast.success(`Successfully switched bank account to ${newAccount?.account_name || 'selected account'} and corrected COA balances!`);
+      setShowFixBankDialog(false);
+      window.location.reload();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to fix bank account");
+    } finally {
+      setIsFixingBank(false);
+    }
+  };
 
   const { data: relatedDocs, isLoading: docsLoading } = useQuery({
     queryKey: ["je-related-docs", entry?.id],
@@ -165,7 +285,7 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               Journal Entry: {entry.entry_number}
@@ -178,39 +298,17 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
                   <Button 
                     variant="destructive" 
                     size="sm"
-                    onClick={async () => {
-                      try {
-                        // 1. Fetch lines
-                        const { data: fetchLines } = await supabase.from('journal_entry_lines').select('*').eq('journal_entry_id', entry.id);
-                        if (!fetchLines) return;
-                        
-                        // 2. Fix Trade Receivable Imbalance
-                        const trLine = fetchLines.find((l: any) => l.credit > 0 && l.description?.includes('School Bus Payment'));
-                        if (trLine) {
-                          const otherCredits = fetchLines.reduce((sum: number, l: any) => sum + ((l.credit > 0 && l.id !== trLine.id) ? l.credit : 0), 0);
-                          const correctCredit = entry.total_debit - otherCredits;
-                          await supabase.from('journal_entry_lines').update({ credit: correctCredit }).eq('id', trLine.id);
-                          await supabase.from('journal_entries').update({ total_credit: entry.total_debit }).eq('id', entry.id);
-                        }
-
-                        // 3. Fix wrong Bank Account (Switch SHS to Wattala)
-                        const bankDebitLine = fetchLines.find((l: any) => l.debit > 0 && l.description?.includes('Payment received'));
-                        if (bankDebitLine) {
-                          const { data: wattalaAccounts } = await supabase.from('chart_of_accounts').select('id, account_name').ilike('account_name', '%Wattala%');
-                          if (wattalaAccounts && wattalaAccounts.length > 0) {
-                            await supabase.from('journal_entry_lines').update({ account_id: wattalaAccounts[0].id }).eq('id', bankDebitLine.id);
-                            toast.success(`Switched bank account to ${wattalaAccounts[0].account_name}`);
-                          } else {
-                            toast.error("Could not find a bank account containing 'Wattala'");
-                          }
-                        }
-
-                        window.location.reload();
-                      } catch(e) { console.error(e) }
+                    onClick={() => {
+                      const bankDebitLine = lines?.find((l: any) => l.debit > 0 && l.description?.includes('Payment received'));
+                      if (!bankDebitLine) {
+                        toast.error("Could not identify the Bank/Cash debit line to fix.");
+                        return;
+                      }
+                      setShowFixBankDialog(true);
                     }}
                   >
                     <AlertTriangle className="h-4 w-4 mr-1" />
-                    Force Balance & Fix Bank
+                    Fix Bank Account
                   </Button>
                 <Button 
                   variant="destructive" 
@@ -473,6 +571,84 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
           companyId={entry.company_id}
         />
       )}
+
+      {/* Fix Bank Account Dialog */}
+      <Dialog open={showFixBankDialog} onOpenChange={setShowFixBankDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Fix Bank Account Mapping</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              The system mapped the payment debit to: 
+              <br />
+              <strong className="text-foreground">
+                {lines?.find((l: any) => l.debit > 0 && l.description?.includes('Payment received'))?.chart_of_accounts?.account_name || "Unknown"}
+              </strong>
+            </p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Correct Bank/Cash Account</label>
+              
+              <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={comboboxOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedBankAccountId
+                      ? bankAccounts?.find((acc) => acc.id === selectedBankAccountId)?.account_name
+                      : "Search and select correct account..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search bank accounts..." />
+                    <CommandList>
+                      <CommandEmpty>No bank account found.</CommandEmpty>
+                      <CommandGroup>
+                        {bankAccounts?.map((acc) => (
+                          <CommandItem
+                            key={acc.id}
+                            value={acc.account_name}
+                            onSelect={() => {
+                              setSelectedBankAccountId(acc.id);
+                              setComboboxOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedBankAccountId === acc.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {acc.account_code} - {acc.account_name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              This will automatically update the Journal Entry and correct the Chart of Accounts running balances for both the old and new accounts.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowFixBankDialog(false)}>Cancel</Button>
+            <Button 
+              onClick={handleFixBank} 
+              disabled={!selectedBankAccountId || isFixingBank}
+            >
+              {isFixingBank ? "Fixing..." : "Confirm & Fix"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

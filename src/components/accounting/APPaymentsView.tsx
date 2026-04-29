@@ -9,7 +9,8 @@ import { Plus, Search, DollarSign, TrendingDown, Wallet, Eye, Printer, ArrowRigh
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { EditHistoryDialog } from "./shared/EditHistoryDialog";
 import { APPaymentEditDialog } from "./APPaymentEditDialog";
-
+import { Checkbox } from "@/components/ui/checkbox";
+import { ConsolidatePaymentsDialog } from "./ConsolidatePaymentsDialog";
 import { ChequePrintPreview } from "./ChequePrintPreview";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
 import { useAPPayments, useVendors } from "@/hooks/useAccountingData";
@@ -55,6 +56,8 @@ export const APPaymentsView = () => {
   const [detailPayment, setDetailPayment] = useState<any>(null);
   const [editingPayment, setEditingPayment] = useState<any>(null);
   const [historyPayment, setHistoryPayment] = useState<any>(null);
+  const [selectedPaymentsToConsolidate, setSelectedPaymentsToConsolidate] = useState<any[]>([]);
+  const [consolidateDialogOpen, setConsolidateDialogOpen] = useState(false);
 
   // Get vendor name helper (legacy - kept for vendor-only lookups)
   const getVendorName = (vendorId: string) => {
@@ -139,6 +142,22 @@ export const APPaymentsView = () => {
 
     return matchesSearch && matchesVendor && matchesMethod;
   }) || [];
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedPaymentsToConsolidate(filteredPayments);
+    } else {
+      setSelectedPaymentsToConsolidate([]);
+    }
+  };
+
+  const handleSelectPayment = (checked: boolean, payment: any) => {
+    if (checked) {
+      setSelectedPaymentsToConsolidate(prev => [...prev, payment]);
+    } else {
+      setSelectedPaymentsToConsolidate(prev => prev.filter(p => p.id !== payment.id));
+    }
+  };
 
   const handleOpenPayment = (advance: boolean = false) => {
     setIsAdvanceMode(advance);
@@ -262,6 +281,12 @@ export const APPaymentsView = () => {
             <Wallet className="h-4 w-4 mr-2" />
             Record Advance
           </Button>
+          {selectedPaymentsToConsolidate.length >= 2 && (
+            <Button variant="secondary" onClick={() => setConsolidateDialogOpen(true)}>
+              <ArrowRightLeft className="h-4 w-4 mr-2" />
+              Consolidate {selectedPaymentsToConsolidate.length} Payments
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -309,6 +334,13 @@ export const APPaymentsView = () => {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">
+                <Checkbox 
+                  checked={selectedPaymentsToConsolidate.length === filteredPayments.length && filteredPayments.length > 0}
+                  onCheckedChange={handleSelectAll}
+                  aria-label="Select all"
+                />
+              </TableHead>
               <TableHead>Payment #</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Payee</TableHead>
@@ -339,6 +371,13 @@ export const APPaymentsView = () => {
             ) : (
               filteredPayments.map((payment) => (
                 <TableRow key={payment.id}>
+                  <TableCell>
+                    <Checkbox 
+                      checked={selectedPaymentsToConsolidate.some(p => p.id === payment.id)}
+                      onCheckedChange={(checked) => handleSelectPayment(!!checked, payment)}
+                      aria-label={`Select payment ${payment.payment_number}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-mono font-medium">
                     <div className="flex items-center gap-1">
                       {payment.payment_number}
@@ -638,6 +677,15 @@ export const APPaymentsView = () => {
         onOpenChange={(open) => { if (!open) setHistoryPayment(null); }}
         history={(historyPayment as any)?.edit_history || []}
         documentNumber={historyPayment?.payment_number || ""}
+      />
+
+      <ConsolidatePaymentsDialog
+        open={consolidateDialogOpen}
+        onOpenChange={(open) => {
+          setConsolidateDialogOpen(open);
+          if (!open) setSelectedPaymentsToConsolidate([]);
+        }}
+        selectedPayments={selectedPaymentsToConsolidate}
       />
     </div>
   );

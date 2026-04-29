@@ -119,6 +119,9 @@ export const AccountsReceivableView = () => {
       inv.status?.toLowerCase().includes(query) ||
       inv.reference?.toLowerCase().includes(query) ||
       inv.bus_no?.toLowerCase().includes(query) ||
+      inv.school_ar_invoices?.[0]?.school_students?.bus_reg_no?.toLowerCase().includes(query) ||
+      inv.school_ar_invoices?.[0]?.school_students?.route?.toLowerCase().includes(query) ||
+      inv.school_ar_invoices?.[0]?.school_students?.school_location?.toLowerCase().includes(query) ||
       inv.bus_categories?.name?.toLowerCase().includes(query)
     );
   }, [invoices, searchQuery]);
@@ -182,7 +185,7 @@ export const AccountsReceivableView = () => {
       accessorKey: "bus_no",
       header: "Bus No.",
       cell: ({ row }: any) => {
-        const busNo = row.original.bus_no;
+        const busNo = row.original.bus_no || row.original.school_ar_invoices?.[0]?.school_students?.bus_reg_no;
         if (!busNo) return <span className="text-muted-foreground text-xs">—</span>;
         return <span className="font-mono text-sm">{busNo}</span>;
       },
@@ -204,6 +207,22 @@ export const AccountsReceivableView = () => {
           >
             {cat.name}
           </Badge>
+        );
+      },
+    },
+    {
+      id: "route_branch",
+      header: "Route / Branch",
+      cell: ({ row }: any) => {
+        const schInfo = row.original.school_ar_invoices?.[0]?.school_students;
+        if (!schInfo) return <span className="text-muted-foreground text-xs">—</span>;
+        
+        return (
+          <div className="flex flex-col">
+            {schInfo.route && <span className="font-medium text-xs">{schInfo.route}</span>}
+            {schInfo.school_location && <span className="text-muted-foreground text-[10px]">{schInfo.school_location}</span>}
+            {(!schInfo.route && !schInfo.school_location) && <span className="text-muted-foreground text-xs">—</span>}
+          </div>
         );
       },
     },
@@ -470,10 +489,22 @@ export const AccountsReceivableView = () => {
                     {format(new Date(viewInvoice.due_date), "MMM dd, yyyy")}
                   </p>
                 </div>
-                {viewInvoice.bus_no && (
+                {(viewInvoice.bus_no || viewInvoice.school_ar_invoices?.[0]?.school_students?.bus_reg_no) && (
                   <div>
                     <p className="text-sm text-muted-foreground">Bus Number</p>
-                    <p className="font-medium font-mono">{viewInvoice.bus_no}</p>
+                    <p className="font-medium font-mono">{viewInvoice.bus_no || viewInvoice.school_ar_invoices?.[0]?.school_students?.bus_reg_no}</p>
+                  </div>
+                )}
+                {viewInvoice.school_ar_invoices?.[0]?.school_students?.route && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Route</p>
+                    <p className="font-medium">{viewInvoice.school_ar_invoices[0].school_students.route}</p>
+                  </div>
+                )}
+                {viewInvoice.school_ar_invoices?.[0]?.school_students?.school_location && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">School Branch</p>
+                    <p className="font-medium">{viewInvoice.school_ar_invoices[0].school_students.school_location}</p>
                   </div>
                 )}
                 {viewInvoice.bus_categories?.name && (

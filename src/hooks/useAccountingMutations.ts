@@ -1596,6 +1596,675 @@ export const useCreateAPPayment = () => {
   });
 };
 
+// ============ Merge AP Invoice to Payment ============
+export const useMergeInvoiceToAPPayment = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+
+  return useMutation({
+    mutationFn: async ({ payment_id, invoice_id, allocated_amount }: {
+      payment_id: string;
+      invoice_id: string;
+      allocated_amount: number;
+    }) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = getBusinessUnitCode();
+
+      // Fetch payment
+      const { data: payment, error: fetchPayErr } = await supabase
+        .from("ap_payments")
+        .select("*")
+        .eq("id", payment_id)
+        .single();
+      if (fetchPayErr || !payment) throw fetchPayErr || new Error("Payment not found");
+
+      // Fetch invoice
+      const { data: invoice, error: fetchInvErr } = await supabase
+        .from("ap_invoices")
+        .select("*")
+        .eq("id", invoice_id)
+        .single();
+      if (fetchInvErr || !invoice) throw fetchInvErr || new Error("Invoice not found");
+
+      if (payment.vendor_id !== invoice.vendor_id) {
+        throw new Error("Payment and Invoice must belong to the same vendor");
+      }
+
+      // Step 1: Reverse existing JE if exists
+      let reversedJeId: string | null = null;
+      if (payment.journal_entry_id) {
+        const { reverseJournalEntry } = await import("@/hooks/useEditAccountingMutations");
+        reversedJeId = await reverseJournalEntry(payment.journal_entry_id, effectiveCompanyId);
+      }
+
+      // Step 2: Reverse bank balance change from old payment
+      if (payment.bank_account_id && payment.amount > 0) {
+        const totalOld = payment.amount + (payment.bank_fee_amount || 0);
+        const { data: bankAcc } = await supabase
+          .from("bank_accounts")
+          .select("current_balance")
+          .eq("id", payment.bank_account_id)
+          .single();
+        if (bankAcc) {
+          await supabase
+            .from("bank_accounts")
+            .update({ current_balance: (bankAcc.current_balance || 0) + totalOld })
+            .eq("id", payment.bank_account_id);
+        }
+      }
+
+      // Step 2b: Delete old bank transactions
+      await supabase
+        .from("bank_transactions")
+        .delete()
+        .eq("source_id", payment_id)
+        .in("source_type", ["ap_payment", "bank_fee"]);
+
+      // Step 2c: Delete old bank fee records
+      await supabase
+        .from("bank_fee_charges")
+        .delete()
+        .eq("ap_payment_id", payment_id);
+
+      // Step 3: Insert allocation
+      await supabase
+        .from("ap_payment_allocations")
+        .insert([{
+          payment_id,
+          invoice_id,
+          amount_allocated: allocated_amount,
+        }]);
+
+      // Step 4: Update invoice
+      const oldInvoiceValues = {
+        paid_amount: invoice.paid_amount,
+        balance: invoice.balance,
+        status: invoice.status,
+      };
+      
+      const newPaidAmount = (invoice.paid_amount || 0) + allocated_amount;
+      const newBalance = (invoice.total_amount || 0) - newPaidAmount;
+      
+      await supabase
+        .from("ap_invoices")
+        .update({
+          paid_amount: newPaidAmount,
+          balance: newBalance,
+          status: newBalance <= 0 ? "paid" : "partial",
+        })
+        .eq("id", invoice_id);
+
+      // Step 5: Update payment amount
+      const oldPaymentValues = { amount: payment.amount };
+      const newAmount = payment.amount + allocated_amount;
+
+      await supabase
+        .from("ap_payments")
+        .update({
+          amount: newAmount,
+          journal_entry_id: null, // to be updated
+        })
+        .eq("id", payment_id);
+
+      // Step 6: GL Posting
+      let newJeId: string | null = null;
+      let bankGLAccountId: string | null = null;
+      
+      if (payment.bank_account_id) {
+        const { data: bankAccount } = await supabase
+          .from("bank_accounts")
+          .select("gl_account_id")
+          .eq("id", payment.bank_account_id)
+          .single();
+        bankGLAccountId = bankAccount?.gl_account_id || null;
+      }
+
+      if (bankGLAccountId && newAmount > 0) {
+        if (payment.is_direct_payment) {
+          throw new Error("Cannot merge into a direct payment");
+        } else {
+          const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
+          const resolved = await resolveVendorAPAccounts(payment.vendor_id, effectiveCompanyId);
+          const tradePayableId = payment.is_advance
+            ? (resolved.advanceAccountId || resolved.apAccountId)
+            : resolved.apAccountId;
+
+          if (tradePayableId) {
+            const { data: vendorData } = await supabase.from("vendors").select("vendor_name").eq("id", payment.vendor_id).single();
+            const { postAPPaymentToGL } = await import("@/lib/gl-posting-utils");
+            const glResult = await postAPPaymentToGL({
+              paymentNumber: payment.payment_number,
+              paymentDate: payment.payment_date,
+              amount: newAmount,
+              bankAccountId: bankGLAccountId,
+              tradePayableId,
+              companyId: effectiveCompanyId,
+              businessUnitCode: businessUnitCode || undefined,
+              vendorName: vendorData?.vendor_name || "",
+            });
+            if (glResult.success && glResult.journalEntryId) {
+              newJeId = glResult.journalEntryId;
+              await supabase.from("ap_payments").update({ journal_entry_id: newJeId }).eq("id", payment_id);
+            }
+          }
+        }
+
+        // Handle Bank Fee
+        if (payment.bank_fee_amount && payment.bank_fee_amount > 0) {
+          try {
+            const { data: bankChargesAccounts } = await supabase
+              .from("chart_of_accounts")
+              .select("id")
+              .eq("company_id", effectiveCompanyId)
+              .eq("is_active", true)
+              .or("account_name.ilike.%bank charge%,account_name.ilike.%bank fee%")
+              .eq("account_type", "expense")
+              .limit(1);
+            const bankChargesAccountId = bankChargesAccounts?.[0]?.id || null;
+
+            if (bankChargesAccountId && newJeId) {
+              await supabase.from("journal_entry_lines").insert([
+                {
+                  journal_entry_id: newJeId,
+                  account_id: bankChargesAccountId,
+                  description: "Bank charges",
+                  debit: payment.bank_fee_amount,
+                  credit: 0,
+                  company_id: effectiveCompanyId,
+                },
+                {
+                  journal_entry_id: newJeId,
+                  account_id: bankGLAccountId,
+                  description: "Bank charges - bank",
+                  debit: 0,
+                  credit: payment.bank_fee_amount,
+                  company_id: effectiveCompanyId,
+                },
+              ]);
+              
+              const { data: jeData } = await supabase.from("journal_entries").select("total_debit, total_credit").eq("id", newJeId).single();
+              if (jeData) {
+                await supabase.from("journal_entries").update({
+                  total_debit: (jeData.total_debit || 0) + payment.bank_fee_amount,
+                  total_credit: (jeData.total_credit || 0) + payment.bank_fee_amount,
+                }).eq("id", newJeId);
+              }
+              
+              const { data: chargesAcc } = await supabase.from("chart_of_accounts").select("current_balance, account_type").eq("id", bankChargesAccountId).single();
+              if (chargesAcc) {
+                const isDebitNormal = ["asset", "expense"].includes(chargesAcc.account_type);
+                await supabase.from("chart_of_accounts").update({
+                  current_balance: (chargesAcc.current_balance || 0) + (isDebitNormal ? payment.bank_fee_amount : -payment.bank_fee_amount),
+                }).eq("id", bankChargesAccountId);
+              }
+              const { data: bankGLAcc } = await supabase.from("chart_of_accounts").select("current_balance, account_type").eq("id", bankGLAccountId).single();
+              if (bankGLAcc) {
+                const isDebitNormal = ["asset", "expense"].includes(bankGLAcc.account_type);
+                await supabase.from("chart_of_accounts").update({
+                  current_balance: (bankGLAcc.current_balance || 0) + (isDebitNormal ? -payment.bank_fee_amount : payment.bank_fee_amount),
+                }).eq("id", bankGLAccountId);
+              }
+
+              await supabase.from("bank_fee_charges").insert([{
+                bank_account_id: payment.bank_account_id,
+                fee_date: payment.payment_date,
+                amount: payment.bank_fee_amount,
+                fee_type: payment.bank_fee_type || "bank_charge",
+                description: `Bank fee for AP Payment ${payment.payment_number}`,
+                ap_payment_id: payment_id,
+                company_id: effectiveCompanyId,
+                status: "posted",
+                journal_entry_id: newJeId,
+              }]);
+            }
+          } catch (e) {
+            console.error("[Edit AP Payment - Bank Fee]", e);
+          }
+        }
+      }
+
+      // Step 7: Apply new bank balance
+      if (payment.bank_account_id && newAmount > 0) {
+        const totalNew = newAmount + (payment.bank_fee_amount || 0);
+        const { data: bankAcc } = await supabase
+          .from("bank_accounts")
+          .select("current_balance")
+          .eq("id", payment.bank_account_id)
+          .single();
+        if (bankAcc) {
+          await supabase
+            .from("bank_accounts")
+            .update({ current_balance: (bankAcc.current_balance || 0) - totalNew })
+            .eq("id", payment.bank_account_id);
+        }
+      }
+
+      // Step 8: Re-create bank transaction
+      if (payment.bank_account_id && newAmount > 0) {
+        const totalWithFees = newAmount + (payment.bank_fee_amount || 0);
+        await supabase.from("bank_transactions").insert([{
+          bank_account_id: payment.bank_account_id,
+          transaction_date: payment.payment_date,
+          transaction_type: "payment",
+          description: `AP Payment ${payment.payment_number}`,
+          debit_amount: 0,
+          credit_amount: totalWithFees,
+          reference: payment.reference || payment.payment_number,
+          source_type: "ap_payment",
+          source_id: payment_id,
+          company_id: effectiveCompanyId,
+        }]);
+        
+        if (payment.bank_fee_amount && payment.bank_fee_amount > 0) {
+          await supabase.from("bank_transactions").insert([{
+            bank_account_id: payment.bank_account_id,
+            transaction_date: payment.payment_date,
+            transaction_type: "fee",
+            description: `Bank fee - AP Payment ${payment.payment_number}`,
+            debit_amount: 0,
+            credit_amount: payment.bank_fee_amount,
+            reference: `FEE-${payment.payment_number}`,
+            source_type: "bank_fee",
+            source_id: payment_id,
+            company_id: effectiveCompanyId,
+          }]);
+        }
+      }
+
+      // Step 9: Log edit history
+      const { appendEditHistory } = await import("@/hooks/useEditAccountingMutations");
+      await appendEditHistory("ap_payments", payment_id, oldPaymentValues, { amount: newAmount }, reversedJeId, newJeId);
+      await appendEditHistory("ap_invoices", invoice_id, oldInvoiceValues, { paid_amount: newPaidAmount, balance: newBalance, status: newBalance <= 0 ? "paid" : "partial" });
+
+      return { payment_id, invoice_id, reversedJeId, newJeId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      toast.success("Invoice successfully merged into Payment");
+    },
+    onError: (error) => {
+      toast.error(`Failed to merge invoice: ${error.message}`);
+    },
+  });
+};
+
+// ============ Consolidate AP Payments ============
+export const useConsolidateAPPayments = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+
+  return useMutation({
+    mutationFn: async ({ payment_ids }: { payment_ids: string[] }) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = getBusinessUnitCode();
+
+      if (!payment_ids || payment_ids.length < 2) {
+        throw new Error("Select at least two payments to consolidate");
+      }
+
+      // Fetch all payments
+      const { data: payments, error: fetchPayErr } = await supabase
+        .from("ap_payments")
+        .select("*")
+        .in("id", payment_ids)
+        .order("payment_date", { ascending: true });
+      
+      if (fetchPayErr || !payments || payments.length !== payment_ids.length) {
+        throw fetchPayErr || new Error("Some payments were not found");
+      }
+
+      const masterPayment = payments[0];
+      const mergedPayments = payments.slice(1);
+
+      // Validation
+      const vendorId = masterPayment.vendor_id;
+      const bankAccountId = masterPayment.bank_account_id;
+      const paymentMethod = masterPayment.payment_method;
+      const isDirect = masterPayment.is_direct_payment;
+      
+      for (const p of payments) {
+        if (p.vendor_id !== vendorId) throw new Error("All payments must belong to the same vendor");
+        if (p.bank_account_id !== bankAccountId) throw new Error("All payments must belong to the same bank account");
+        if (p.payment_method !== paymentMethod) throw new Error("All payments must have the same payment method");
+        if (p.is_direct_payment !== isDirect) throw new Error("Cannot mix direct and invoice payments");
+        if (p.company_id !== masterPayment.company_id) throw new Error("Company mismatch");
+      }
+
+      const { reverseJournalEntry, appendEditHistory } = await import("@/hooks/useEditAccountingMutations");
+      
+      let totalAmount = 0;
+      let totalBankFee = 0;
+
+      // Reverse existing JEs, bank balances, and bank transactions for ALL payments
+      for (const p of payments) {
+        totalAmount += Number(p.amount) || 0;
+        totalBankFee += Number(p.bank_fee_amount) || 0;
+
+        if (p.journal_entry_id) {
+          await reverseJournalEntry(p.journal_entry_id, effectiveCompanyId);
+        }
+
+        if (p.bank_account_id && Number(p.amount) > 0) {
+          const totalOld = (Number(p.amount) || 0) + (Number(p.bank_fee_amount) || 0);
+          const { data: bankAcc } = await supabase
+            .from("bank_accounts")
+            .select("current_balance")
+            .eq("id", p.bank_account_id)
+            .single();
+          if (bankAcc) {
+            await supabase
+              .from("bank_accounts")
+              .update({ current_balance: (bankAcc.current_balance || 0) + totalOld })
+              .eq("id", p.bank_account_id);
+          }
+        }
+
+        await supabase
+          .from("bank_transactions")
+          .delete()
+          .eq("source_id", p.id)
+          .in("source_type", ["ap_payment", "bank_fee"]);
+
+        await supabase
+          .from("bank_fee_charges")
+          .delete()
+          .eq("ap_payment_id", p.id);
+      }
+
+      // Move allocations and lines to Master
+      const mergedIds = mergedPayments.map(p => p.id);
+      
+      if (!isDirect) {
+        await supabase
+          .from("ap_payment_allocations")
+          .update({ payment_id: masterPayment.id })
+          .in("payment_id", mergedIds);
+      } else {
+        await supabase
+          .from("ap_payment_lines")
+          .update({ payment_id: masterPayment.id })
+          .in("payment_id", mergedIds);
+      }
+
+      // Update Master Payment
+      await supabase
+        .from("ap_payments")
+        .update({
+          amount: totalAmount,
+          bank_fee_amount: totalBankFee,
+          journal_entry_id: null,
+          notes: `Consolidated payments: ${payment_ids.join(", ")}. \n` + (masterPayment.notes || ""),
+        })
+        .eq("id", masterPayment.id);
+
+      // Delete Merged Payments
+      await supabase
+        .from("ap_payments")
+        .delete()
+        .in("id", mergedIds);
+
+      // Generate New JE
+      let newJeId: string | null = null;
+      let bankGLAccountId: string | null = null;
+      
+      if (bankAccountId) {
+        const { data: bankAccount } = await supabase
+          .from("bank_accounts")
+          .select("gl_account_id")
+          .eq("id", bankAccountId)
+          .single();
+        bankGLAccountId = bankAccount?.gl_account_id || null;
+      }
+
+      if (bankGLAccountId && totalAmount > 0) {
+        if (isDirect) {
+          // Direct Payment Re-post
+          const { data: paymentLines } = await supabase
+            .from("ap_payment_lines")
+            .select("*, chart_of_accounts(account_code, account_name)")
+            .eq("payment_id", masterPayment.id);
+
+          if (paymentLines && paymentLines.length > 0) {
+            let vendorName = "";
+            if (vendorId) {
+              const { data: vd } = await supabase.from("vendors").select("vendor_name").eq("id", vendorId).single();
+              vendorName = vd?.vendor_name || "";
+            }
+            const jeLines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
+            for (const line of paymentLines) {
+              if (line.account_id && (line.line_total || 0) > 0) {
+                jeLines.push({
+                  account_id: line.account_id,
+                  description: line.description || "Direct payment line",
+                  debit: line.line_total,
+                  credit: 0,
+                });
+              }
+            }
+            jeLines.push({
+              account_id: bankGLAccountId,
+              description: `Consolidated Direct Payment ${masterPayment.payment_number}`,
+              debit: 0,
+              credit: totalAmount,
+            });
+            const tDebit = jeLines.reduce((s, l) => s + l.debit, 0);
+            const tCredit = jeLines.reduce((s, l) => s + l.credit, 0);
+
+            const { data: je, error: jeError } = await supabase
+              .from("journal_entries")
+              .insert([{
+                entry_number: `JE-DP-${masterPayment.payment_number}`,
+                entry_date: masterPayment.payment_date,
+                description: `Consolidated Direct Payment ${masterPayment.payment_number}`,
+                reference: masterPayment.reference || masterPayment.payment_number,
+                total_debit: tDebit,
+                total_credit: tCredit,
+                status: "posted",
+                company_id: effectiveCompanyId,
+                business_unit_code: businessUnitCode,
+              }])
+              .select()
+              .single();
+
+            if (!jeError && je) {
+              const jelLines = jeLines.map((l) => ({
+                journal_entry_id: je.id,
+                account_id: l.account_id,
+                description: l.description,
+                debit: l.debit,
+                credit: l.credit,
+                company_id: effectiveCompanyId,
+                business_unit_code: businessUnitCode,
+              }));
+              await supabase.from("journal_entry_lines").insert(jelLines);
+              for (const l of jelLines) {
+                const netAmount = (l.debit || 0) - (l.credit || 0);
+                const { data: acc } = await supabase.from("chart_of_accounts").select("current_balance, account_type").eq("id", l.account_id).single();
+                if (acc && netAmount !== 0) {
+                  const isDebitNormal = ["asset", "expense"].includes(acc.account_type);
+                  const adjustment = isDebitNormal ? netAmount : -netAmount;
+                  await supabase.from("chart_of_accounts").update({ current_balance: (acc.current_balance || 0) + adjustment }).eq("id", l.account_id);
+                }
+              }
+              newJeId = je.id;
+              await supabase.from("ap_payments").update({ journal_entry_id: newJeId }).eq("id", masterPayment.id);
+            }
+          }
+        } else {
+          // Standard AP Payment Re-post
+          const { resolveVendorAPAccounts } = await import("@/hooks/useVendorCategories");
+          const resolved = await resolveVendorAPAccounts(vendorId, effectiveCompanyId);
+          const tradePayableId = masterPayment.is_advance
+            ? (resolved.advanceAccountId || resolved.apAccountId)
+            : resolved.apAccountId;
+
+          if (tradePayableId) {
+            const { data: vendorData } = await supabase.from("vendors").select("vendor_name").eq("id", vendorId).single();
+            const { postAPPaymentToGL } = await import("@/lib/gl-posting-utils");
+            const glResult = await postAPPaymentToGL({
+              paymentNumber: masterPayment.payment_number,
+              paymentDate: masterPayment.payment_date,
+              amount: totalAmount,
+              bankAccountId: bankGLAccountId,
+              tradePayableId,
+              companyId: effectiveCompanyId,
+              businessUnitCode: businessUnitCode || undefined,
+              vendorName: vendorData?.vendor_name || "",
+            });
+            if (glResult.success && glResult.journalEntryId) {
+              newJeId = glResult.journalEntryId;
+              await supabase.from("ap_payments").update({ journal_entry_id: newJeId }).eq("id", masterPayment.id);
+            }
+          }
+        }
+
+        // Handle Bank Fee Re-post
+        if (totalBankFee > 0) {
+          try {
+            const { data: bankChargesAccounts } = await supabase
+              .from("chart_of_accounts")
+              .select("id")
+              .eq("company_id", effectiveCompanyId)
+              .eq("is_active", true)
+              .or("account_name.ilike.%bank charge%,account_name.ilike.%bank fee%")
+              .eq("account_type", "expense")
+              .limit(1);
+            const bankChargesAccountId = bankChargesAccounts?.[0]?.id || null;
+
+            if (bankChargesAccountId && newJeId) {
+              await supabase.from("journal_entry_lines").insert([
+                {
+                  journal_entry_id: newJeId,
+                  account_id: bankChargesAccountId,
+                  description: "Bank charges",
+                  debit: totalBankFee,
+                  credit: 0,
+                  company_id: effectiveCompanyId,
+                },
+                {
+                  journal_entry_id: newJeId,
+                  account_id: bankGLAccountId,
+                  description: "Bank charges - bank",
+                  debit: 0,
+                  credit: totalBankFee,
+                  company_id: effectiveCompanyId,
+                },
+              ]);
+              
+              const { data: jeData } = await supabase.from("journal_entries").select("total_debit, total_credit").eq("id", newJeId).single();
+              if (jeData) {
+                await supabase.from("journal_entries").update({
+                  total_debit: (jeData.total_debit || 0) + totalBankFee,
+                  total_credit: (jeData.total_credit || 0) + totalBankFee,
+                }).eq("id", newJeId);
+              }
+              
+              const { data: chargesAcc } = await supabase.from("chart_of_accounts").select("current_balance, account_type").eq("id", bankChargesAccountId).single();
+              if (chargesAcc) {
+                const isDebitNormal = ["asset", "expense"].includes(chargesAcc.account_type);
+                await supabase.from("chart_of_accounts").update({
+                  current_balance: (chargesAcc.current_balance || 0) + (isDebitNormal ? totalBankFee : -totalBankFee),
+                }).eq("id", bankChargesAccountId);
+              }
+              const { data: bankGLAcc } = await supabase.from("chart_of_accounts").select("current_balance, account_type").eq("id", bankGLAccountId).single();
+              if (bankGLAcc) {
+                const isDebitNormal = ["asset", "expense"].includes(bankGLAcc.account_type);
+                await supabase.from("chart_of_accounts").update({
+                  current_balance: (bankGLAcc.current_balance || 0) + (isDebitNormal ? -totalBankFee : totalBankFee),
+                }).eq("id", bankGLAccountId);
+              }
+
+              await supabase.from("bank_fee_charges").insert([{
+                bank_account_id: bankAccountId,
+                fee_date: masterPayment.payment_date,
+                amount: totalBankFee,
+                fee_type: masterPayment.bank_fee_type || "bank_charge",
+                description: `Bank fee for Consolidated AP Payment ${masterPayment.payment_number}`,
+                ap_payment_id: masterPayment.id,
+                company_id: effectiveCompanyId,
+                status: "posted",
+                journal_entry_id: newJeId,
+              }]);
+            }
+          } catch (e) {
+            console.error("[Consolidate AP Payment - Bank Fee]", e);
+          }
+        }
+      }
+
+      // Step 7: Apply new consolidated bank balance
+      if (bankAccountId && totalAmount > 0) {
+        const totalNew = totalAmount + totalBankFee;
+        const { data: bankAcc } = await supabase
+          .from("bank_accounts")
+          .select("current_balance")
+          .eq("id", bankAccountId)
+          .single();
+        if (bankAcc) {
+          await supabase
+            .from("bank_accounts")
+            .update({ current_balance: (bankAcc.current_balance || 0) - totalNew })
+            .eq("id", bankAccountId);
+        }
+      }
+
+      // Step 8: Re-create consolidated bank transaction
+      if (bankAccountId && totalAmount > 0) {
+        const totalWithFees = totalAmount + totalBankFee;
+        await supabase.from("bank_transactions").insert([{
+          bank_account_id: bankAccountId,
+          transaction_date: masterPayment.payment_date,
+          transaction_type: "payment",
+          description: `Consolidated AP Payment ${masterPayment.payment_number}`,
+          debit_amount: 0,
+          credit_amount: totalWithFees,
+          reference: masterPayment.reference || masterPayment.payment_number,
+          source_type: "ap_payment",
+          source_id: masterPayment.id,
+          company_id: effectiveCompanyId,
+        }]);
+        
+        if (totalBankFee > 0) {
+          await supabase.from("bank_transactions").insert([{
+            bank_account_id: bankAccountId,
+            transaction_date: masterPayment.payment_date,
+            transaction_type: "fee",
+            description: `Bank fee - Consolidated AP Payment ${masterPayment.payment_number}`,
+            debit_amount: 0,
+            credit_amount: totalBankFee,
+            reference: `FEE-${masterPayment.payment_number}`,
+            source_type: "bank_fee",
+            source_id: masterPayment.id,
+            company_id: effectiveCompanyId,
+          }]);
+        }
+      }
+
+      await appendEditHistory("ap_payments", masterPayment.id, { amount: masterPayment.amount }, { amount: totalAmount }, null, newJeId);
+
+      return { masterPaymentId: masterPayment.id, mergedIds, newJeId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      toast.success("Payments consolidated successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to consolidate payments: ${error.message}`);
+    },
+  });
+};
+
 // ============ Bank Transactions ============
 export const useCreateBankTransaction = () => {
   const queryClient = useQueryClient();

@@ -470,19 +470,18 @@ export function useSchoolBusBulkExpenses() {
           .eq("branch_id", payload.branchId)
           .maybeSingle();
 
-        if (routeMatch?.id) {
-          await supabase.from("route_expenses").insert({
-            route_id: routeMatch.id,
-            branch_id: payload.branchId,
-            bus_id: expense.busId,
-            expense_type: payload.globalExpenseType || "fuel",
-            description: `Bulk ${payload.globalExpenseType || 'Fuel'} Import - ${busNoSafe}`,
-            amount: expense.amount,
-            expense_date: expense.expenseDate,
-            created_by: user?.id,
-            journal_entry_id: journalEntry.id,
-          });
-        }
+        // Always insert so P&L can pick it up by bus_no even if route_id is missing
+        await supabase.from("route_expenses").insert({
+          route_id: routeMatch?.id || null,
+          branch_id: payload.branchId,
+          bus_id: expense.busId,
+          expense_type: payload.globalExpenseType || "fuel",
+          description: `Bulk ${payload.globalExpenseType || 'Fuel'} Import - ${busNoSafe}`,
+          amount: expense.amount,
+          expense_date: expense.expenseDate,
+          created_by: user?.id,
+          journal_entry_id: journalEntry.id,
+        });
 
         // 6.3 Update Odometer (current_mileage in buses) if provided
         if (expense.odometerEnd) {

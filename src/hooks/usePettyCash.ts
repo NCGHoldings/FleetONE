@@ -784,29 +784,8 @@ export const useCreateIOU = () => {
 
       // Handle Petty Cash Transaction & Balance Reduction
       if (fund && data.petty_cash_fund_id && amount > 0) {
-        const newBalance = (fund.current_balance || 0) - amount;
-
-        // Update fund balance
-        await supabase
-          .from("petty_cash_funds")
-          .update({ current_balance: newBalance, updated_at: new Date().toISOString() })
-          .eq("id", data.petty_cash_fund_id);
-
-        // Create petty cash transaction for the IOU
-        await supabase
-          .from("petty_cash_transactions")
-          .insert({
-            petty_cash_fund_id: data.petty_cash_fund_id,
-            transaction_type: "disbursement",
-            amount,
-            balance_after: newBalance,
-            description: `IOU Issued: ${data.purpose || "Staff Advance"} (${iouNumber})`,
-            payee_name: data.staff_name_draft || "Staff",
-            expense_category: "IOU Advance",
-            payment_method: "cash",
-            status: "approved",
-            company_id: selectedCompanyId,
-          });
+        // Intentionally skipping petty_cash_transactions insert and balance deduction here.
+        // The voucher and balance deduction only occur at settlement time per accountant workflow.
       } else if (data.bank_account_id && amount > 0) {
         // Handle Bank Account Advance
         // 1. Generate AP Payment Voucher Number
@@ -1256,43 +1235,15 @@ export const useUpdateIOU = () => {
                     gl_account_id: expense_account_id || null,
                   });
 
-                  // 2. Create the Offsetting Replenishment for the IOU Advance being cleared
-                  const finalBalance = balanceAfterDisbursement + settledAmount;
-                  await supabase.from("petty_cash_transactions").insert({
-                    petty_cash_fund_id: pettyCashFund.id,
-                    transaction_type: "replenishment",
-                    amount: settledAmount,
-                    balance_after: finalBalance,
-                    description: `IOU Advance Cleared: ${iouRef}`,
-                    payment_method: "cash",
-                    status: "approved",
-                    company_id: selectedCompanyId,
-                    journal_entry_id: je.id,
-                  });
-
                   // Ensure fund matches the true final balance
                   await supabase
                     .from("petty_cash_funds")
-                    .update({ current_balance: finalBalance, updated_at: new Date().toISOString() })
+                    .update({ current_balance: balanceAfterDisbursement, updated_at: new Date().toISOString() })
                     .eq("id", pettyCashFund.id);
                 } else if (pettyCashFund && cashDifference > 0) {
-                   // Only cash returned, no expenses (Cash Return type)
-                   const finalBalance = (pettyCashFund.current_balance || 0) + cashDifference;
-                   await supabase.from("petty_cash_transactions").insert({
-                    petty_cash_fund_id: pettyCashFund.id,
-                    transaction_type: "replenishment",
-                    amount: cashDifference,
-                    balance_after: finalBalance,
-                    description: `Cash Returned from IOU: ${iouRef}`,
-                    payment_method: "cash",
-                    status: "approved",
-                    company_id: selectedCompanyId,
-                    journal_entry_id: je.id,
-                  });
-                  await supabase
-                    .from("petty_cash_funds")
-                    .update({ current_balance: finalBalance, updated_at: new Date().toISOString() })
-                    .eq("id", pettyCashFund.id);
+                   // Only cash returned, no expenses (Cash Return type). 
+                   // Since we didn't deduct the advance initially, we don't need to do anything here.
+                   // The fund balance remains unchanged because the cash was returned.
                 }
 
                 // Handle Bank Account Payment Voucher Logic
@@ -1420,6 +1371,130 @@ export const useUpdateIOU = () => {
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+};
+
+// ============ Reimbursement Workflow ============
+
+export const useCreatePettyCashReimbursement = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+
+  return useMutation({
+    mutationFn: async (data: {
+      voucher_ids: string[];
+      bank_account_id: string;
+      total_amount: number;
+      reimbursement_date: string;
+      petty_cash_fund_id: string;
+    }) => {
+      // 1. Generate AP Payment Voucher Number
+      const { data: paymentNum } = await supabase.rpc("generate_entity_number", {
+        p_entity_type: "payment",
+        p_company_id: selectedCompanyId,
+      });
+      const paymentNumber = paymentNum || `PAY-${Date.now()}`;
+
+      // 2. Create the AP Payment Voucher
+      const { data: apPayment, error: apError } = await supabase
+        .from("ap_payments")
+        .insert({
+          payment_number: paymentNumber,
+          payment_date: data.reimbursement_date,
+          amount: data.total_amount,
+          payment_method: "transfer",
+          bank_account_id: data.bank_account_id,
+          payee_type: "direct",
+          notes: `Petty Cash Float Reimbursement for ${data.voucher_ids.length} vouchers`,
+          is_direct_payment: true,
+          status: "posted",
+          company_id: selectedCompanyId,
+        })
+        .select()
+        .single();
+
+      if (apError) throw apError;
+
+      // 3. Create Bank Transaction
+      await supabase.from("bank_transactions").insert({
+        bank_account_id: data.bank_account_id,
+        transaction_date: data.reimbursement_date,
+        transaction_type: "payment",
+        description: `Petty Cash Reimbursement: ${paymentNumber}`,
+        credit_amount: data.total_amount,
+        debit_amount: 0,
+        reference: paymentNumber,
+        company_id: selectedCompanyId,
+        source_type: "ap_payment",
+        source_id: apPayment.id,
+      });
+
+      // 4. Update Bank Balance
+      const { data: bankAccount } = await supabase
+        .from("bank_accounts")
+        .select("current_balance")
+        .eq("id", data.bank_account_id)
+        .single();
+      if (bankAccount) {
+        await supabase
+          .from("bank_accounts")
+          .update({ current_balance: (bankAccount.current_balance || 0) - data.total_amount })
+          .eq("id", data.bank_account_id);
+      }
+
+      // 5. Update the Petty Cash Fund Balance (Add the replenished cash)
+      const { data: fund } = await supabase
+        .from("petty_cash_funds")
+        .select("current_balance")
+        .eq("id", data.petty_cash_fund_id)
+        .single();
+      if (fund) {
+        await supabase
+          .from("petty_cash_funds")
+          .update({ current_balance: (fund.current_balance || 0) + data.total_amount })
+          .eq("id", data.petty_cash_fund_id);
+      }
+
+      // 6. Link Petty Cash Transactions and mark as reimbursed
+      // Note: we're using 'reimbursement_ap_payment_id' which was added to the DB
+      for (const id of data.voucher_ids) {
+        await supabase
+          .from("petty_cash_transactions")
+          .update({ reimbursement_ap_payment_id: apPayment.id } as any) // suppress TS until synced
+          .eq("id", id);
+      }
+
+      // 7. Log reimbursement as a dummy transaction for the float?
+      // Wait, a replenishment should just be a transaction of type 'replenishment'.
+      await supabase.from("petty_cash_transactions").insert({
+        petty_cash_fund_id: data.petty_cash_fund_id,
+        transaction_type: "replenishment",
+        amount: data.total_amount,
+        balance_after: (fund?.current_balance || 0) + data.total_amount,
+        description: `Float Replenishment from AP Payment: ${paymentNumber}`,
+        payment_method: "transfer",
+        status: "approved",
+        company_id: selectedCompanyId,
+      });
+
+      return apPayment;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+      toast({
+        title: "Reimbursement Successful",
+        description: `Generated AP Payment for LKR ${variables.total_amount.toLocaleString()}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Reimbursement Failed",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 };

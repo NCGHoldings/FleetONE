@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { APInvoiceForm } from "./APInvoiceForm";
 import { APPaymentForm } from "./APPaymentForm";
 import { APAgeingReport } from "./APAgeingReport";
+import { ArrowRightLeft } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
 import { RelatedJournalEntries } from "./shared/RelatedJournalEntries";
+import { MergeToPaymentDialog } from "./MergeToPaymentDialog";
 import { Input } from "@/components/ui/input";
 
 export const AccountsPayableView = () => {
@@ -47,6 +49,7 @@ export const AccountsPayableView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<any>(null);
+  const [mergeInvoice, setMergeInvoice] = useState<any>(null);
   const { data: invoices, isLoading } = useAPInvoices(statusFilter);
   const approveInvoice = useApproveAPInvoice();
   const deleteInvoice = useDeleteAPInvoice();
@@ -261,14 +264,25 @@ export const AccountsPayableView = () => {
               </Button>
             )}
             {row.original.balance > 0 && row.original.approval_status === "approved" && (
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => handlePayClick(row.original)}
-              >
-                <DollarSign className="h-4 w-4 mr-1" />
-                Pay
-              </Button>
+              <>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  title="Merge into Payment"
+                  onClick={() => setMergeInvoice(row.original)}
+                >
+                  <ArrowRightLeft className="h-4 w-4 mr-1" />
+                  Merge
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => handlePayClick(row.original)}
+                >
+                  <DollarSign className="h-4 w-4 mr-1" />
+                  Pay
+                </Button>
+              </>
             )}
           </div>
         );
@@ -571,6 +585,13 @@ export const AccountsPayableView = () => {
           businessUnitCode={printDocumentData?.business_unit_code}
         />
       )}
+
+      {/* Merge Invoice into Payment Dialog */}
+      <MergeToPaymentDialog
+        open={!!mergeInvoice}
+        onOpenChange={(open) => { if (!open) setMergeInvoice(null); }}
+        invoice={mergeInvoice}
+      />
     </div>
   );
 };

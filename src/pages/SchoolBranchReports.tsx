@@ -97,7 +97,7 @@ export default function SchoolBranchReports() {
       const toStr = format(periodEnd, "yyyy-MM-dd");
 
       // Fetch all data in parallel
-      const [studentsRes, expensesRes, staffRes] = await Promise.all([
+      const [studentsRes, expensesRes, staffRes, busesRes] = await Promise.all([
         supabase
           .from("school_students")
           .select("bus_reg_no, route, payment_amount, payment_status")
@@ -105,29 +105,47 @@ export default function SchoolBranchReports() {
           .eq("is_active", true),
         supabase
           .from("route_expenses")
-          .select("route_id, expense_type, amount")
+          .select("route_id, expense_type, amount, bus_id")
           .eq("branch_id", branchId!)
           .gte("expense_date", fromStr)
           .lte("expense_date", toStr),
         supabase
           .from("route_staff_costs")
-          .select("route_id, staff_type, monthly_salary")
+          .select("route_id, staff_type, monthly_salary, bus_id")
           .eq("branch_id", branchId!)
           .eq("is_active", true),
+        supabase
+          .from("buses")
+          .select("id, bus_no")
       ]);
 
       const students = studentsRes.data || [];
       const expenses = expensesRes.data || [];
       const staff = staffRes.data || [];
+      const busesList = busesRes.data || [];
+
+      // Helper to find bus_no from bus_id
+      const getBusNo = (busId: string | null) => {
+        if (!busId) return null;
+        const bus = busesList.find(b => b.id === busId);
+        return bus ? bus.bus_no : null;
+      };
+
+      const normalizeReg = (val: string | null | undefined) => {
+        if (!val) return "";
+        return val.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+      };
 
       // Build per-bus financials
       const financials: BusFinancial[] = routes.map(route => {
-        const routeStudents = students.filter(s => s.route === route.route_name || s.bus_reg_no === route.bus_reg_no);
+        const normRouteBus = normalizeReg(route.bus_reg_no);
+        
+        const routeStudents = students.filter(s => s.route === route.route_name || normalizeReg(s.bus_reg_no) === normRouteBus);
         const income = routeStudents
           .filter(s => s.payment_status === "paid")
           .reduce((sum, s) => sum + (Number(s.payment_amount) || 0), 0);
 
-        const routeExpenses = expenses.filter(e => e.route_id === route.id);
+        const routeExpenses = expenses.filter(e => e.route_id === route.id || (normRouteBus && normalizeReg(getBusNo(e.bus_id)) === normRouteBus));
         const fuel = routeExpenses.filter(e => e.expense_type === "fuel").reduce((s, e) => s + Number(e.amount), 0);
         const maintenance = routeExpenses.filter(e => e.expense_type === "maintenance").reduce((s, e) => s + Number(e.amount), 0);
         const parking = routeExpenses.filter(e => e.expense_type === "parking").reduce((s, e) => s + Number(e.amount), 0);
@@ -135,7 +153,7 @@ export default function SchoolBranchReports() {
         const knownTypes = ["fuel", "maintenance", "parking", "lease", "lease_installment"];
         const other = routeExpenses.filter(e => !knownTypes.includes(e.expense_type)).reduce((s, e) => s + Number(e.amount), 0);
 
-        const routeStaff = staff.filter(s => s.route_id === route.id);
+        const routeStaff = staff.filter(s => s.route_id === route.id || (normRouteBus && normalizeReg(getBusNo(s.bus_id)) === normRouteBus));
         const driverSalary = routeStaff.filter(s => s.staff_type === "driver").reduce((s, st) => s + Number(st.monthly_salary), 0);
         const caretakerSalary = routeStaff.filter(s => s.staff_type === "caretaker").reduce((s, st) => s + Number(st.monthly_salary), 0);
 

@@ -332,6 +332,13 @@ export const useARInvoices = (status?: string) => {
             name,
             color,
             code
+          ),
+          school_ar_invoices (
+            school_students (
+              route,
+              school_location,
+              bus_reg_no
+            )
           )
         `)
         .order("created_at", { ascending: false });

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useCompany } from "@/contexts/CompanyContext";
 
 // Helper to reverse a journal entry and return the reversal entry id
-async function reverseJournalEntry(entryId: string, companyId: string): Promise<string | null> {
+export async function reverseJournalEntry(entryId: string, companyId: string): Promise<string | null> {
   const { data: entry, error } = await supabase
     .from("journal_entries")
     .select(`*, journal_entry_lines (account_id, description, debit, credit, cost_center_id)`)
@@ -77,7 +77,7 @@ async function reverseJournalEntry(entryId: string, companyId: string): Promise<
 }
 
 // Append to edit_history JSONB array
-async function appendEditHistory(
+export async function appendEditHistory(
   table: string,
   recordId: string,
   oldValues: Record<string, any>,

@@ -15390,6 +15390,7 @@ export type Database = {
           status: string | null
           transaction_type: string
           voucher_number: string | null
+          reimbursement_ap_payment_id: string | null
         }
         Insert: {
           amount: number
@@ -15414,6 +15415,7 @@ export type Database = {
           status?: string | null
           transaction_type: string
           voucher_number?: string | null
+          reimbursement_ap_payment_id?: string | null
         }
         Update: {
           amount?: number
@@ -15438,6 +15440,7 @@ export type Database = {
           status?: string | null
           transaction_type?: string
           voucher_number?: string | null
+          reimbursement_ap_payment_id?: string | null
         }
         Relationships: [
           {

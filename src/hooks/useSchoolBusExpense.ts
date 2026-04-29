@@ -359,7 +359,6 @@ export function useAddRouteExpenseWithGL() {
           route_id: routeId,
           branch_id: branchId,
           bus_id: busId || null,
-          bus_no: busNo || null,
           ...expense,
           created_by: user?.id,
         })
