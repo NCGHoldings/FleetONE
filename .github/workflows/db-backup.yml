@@ -1,0 +1,42 @@
+name: Daily Database Backup (Supabase to DO Spaces)
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Run daily at 2:00 AM UTC
+  workflow_dispatch: # Allow manual triggering from GitHub UI
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL Client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Dump Supabase Database
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          echo "Starting pg_dump..."
+          # Dump the database in custom format (-Fc) which is compressed and suitable for pg_restore
+          pg_dump "$DATABASE_URL" -Fc -Z 9 -f supabase-backup.dump
+          echo "Backup created successfully."
+
+      - name: Upload to DigitalOcean Spaces
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET }}
+          DO_SPACE_ENDPOINT: https://sgp1.digitaloceanspaces.com
+          DO_SPACE_BUCKET: ncg-db-backup
+        run: |
+          TIMESTAMP=$(date +%Y-%m-%d_%H-%M)
+          FILE_NAME="supabase-backup-$TIMESTAMP.dump"
+          
+          echo "Uploading $FILE_NAME to DigitalOcean Spaces..."
+          # AWS CLI comes pre-installed on ubuntu-latest GitHub runners
+          aws s3 cp supabase-backup.dump s3://$DO_SPACE_BUCKET/$FILE_NAME \
+            --endpoint-url $DO_SPACE_ENDPOINT \
+            --acl private
+            
+          echo "Upload complete!"
