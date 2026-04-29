@@ -75,8 +75,15 @@ export function SchoolBusFinanceSettings() {
 
   // Load existing settings
   useEffect(() => {
-    if (existingSettings) {
-      const defaultSetting = existingSettings.find((s: any) => !s.branch_id);
+    if (existingSettings && existingSettings.length > 0) {
+      // Sort settings by created_at ascending to ensure we always pick the oldest row
+      // This matches the useUpdateSchoolBusFinanceSettings mutation which updates the oldest row
+      // to handle cases where duplicate rows exist in the database.
+      const sortedSettings = [...existingSettings].sort(
+        (a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+      );
+
+      const defaultSetting = sortedSettings.find((s: any) => !s.branch_id);
       if (defaultSetting) {
         // Fetch liability account via RPC (PostgREST might not return this column)
         const loadLiabilityAccount = async () => {
@@ -128,9 +135,12 @@ export function SchoolBusFinanceSettings() {
       }
 
       const branchMap: Record<string, { branch_gl_account_id: string }> = {};
-      existingSettings.forEach((s: any) => {
+      sortedSettings.forEach((s: any) => {
         if (s.branch_id) {
-          branchMap[s.branch_id] = { branch_gl_account_id: s.branch_gl_account_id || "" };
+          // Only set if not already set to ensure we pick the oldest row's value
+          if (!branchMap[s.branch_id]) {
+            branchMap[s.branch_id] = { branch_gl_account_id: s.branch_gl_account_id || "" };
+          }
         }
       });
       setBranchSettings(branchMap);

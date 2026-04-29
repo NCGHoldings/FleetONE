@@ -119,8 +119,8 @@ export const extractAdmissionTokens = (text: string, prefixes: string[]): string
     }
   }
 
-  // 3. Standalone 5-6 digit numbers (not part of longer sequences)
-  const standalone = upper.match(/\b\d{5,6}\b/g);
+  // 3. Standalone 4-6 digit numbers (not part of longer sequences)
+  const standalone = upper.match(/\b\d{4,6}\b/g);
   if (standalone) {
     for (const s of standalone) {
       if (!tokens.includes(s)) tokens.push(s);
@@ -202,31 +202,38 @@ export const matchStudentsFromTokens = (
   const map = studentMap || buildCanonicalStudentMap(students);
   const normalizedTokens = tokens.map(normalizeAdmissionToken);
 
-  // === TIER 1: Exact full normalized match ===
+  let accumulatedMatches: any[] = [];
+  let highestConfidence = 0;
+  let highestPattern = '';
+
   for (const token of normalizedTokens) {
-    const candidates = map.byFullId.get(token.full);
+    let candidates = map.byFullId.get(token.full);
     if (candidates && candidates.length > 0) {
-      return {
-        matched: candidates,
-        confidence: candidates.length === 1 ? 95 : 80, // lower confidence if ambiguous
-        pattern: candidates.length === 1 ? 'Exact admission match' : 'Ambiguous admission match (multiple active students)',
-      };
+      accumulatedMatches.push(...candidates);
+      highestConfidence = Math.max(highestConfidence, 95);
+      highestPattern = 'Exact admission match';
+      continue;
+    }
+
+    if (token.numeric.length >= 4) {
+      candidates = map.byNumeric.get(token.numericStripped);
+      if (candidates && candidates.length > 0) {
+        accumulatedMatches.push(...candidates);
+        highestConfidence = Math.max(highestConfidence, 90);
+        if (!highestPattern) highestPattern = 'Numeric suffix match';
+        continue;
+      }
     }
   }
 
-  // === TIER 2: Exact numeric suffix match ===
-  for (const token of normalizedTokens) {
-    if (token.numeric.length >= 4) {
-      const candidates = map.byNumeric.get(token.numericStripped);
-      if (candidates && candidates.length > 0) {
-        // Verify it's not a coincidental match — check that the prefix chars are compatible
-        return {
-          matched: candidates,
-          confidence: candidates.length === 1 ? 90 : 75,
-          pattern: candidates.length === 1 ? 'Numeric suffix match' : 'Ambiguous numeric match',
-        };
-      }
-    }
+  if (accumulatedMatches.length > 0) {
+    const uniqueMatches = Array.from(new Set(accumulatedMatches));
+    // If it's a multiple match, slightly adjust confidence so it doesn't drop too low, but still high enough to be processed.
+    return {
+      matched: uniqueMatches,
+      confidence: highestConfidence,
+      pattern: highestPattern + (uniqueMatches.length > 1 ? ' (Multiple)' : ''),
+    };
   }
 
   // === TIER 3: Zero-padded numeric equivalence ===
@@ -802,7 +809,7 @@ export const extractAdmissionNumbers = (
 
   // Fallback - standalone numbers
   if (extractedIds.length === 0) {
-    const standaloneNumbers = normalized.match(/\b\d{5,6}\b/g);
+    const standaloneNumbers = normalized.match(/\b\d{4,6}\b/g);
     if (standaloneNumbers) {
       extractedIds.push(...standaloneNumbers);
       confidence = 50;

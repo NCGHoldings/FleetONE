@@ -1058,6 +1058,8 @@ export function usePostPaymentToGL() {
       fixedAmount,
       overpaymentAmount,
       previousBalance,
+      customArAccountId,
+      customBankAccountId,
     }: {
       paymentId: string;
       amount: number;
@@ -1068,6 +1070,8 @@ export function usePostPaymentToGL() {
       fixedAmount?: number;        // The fixed monthly amount due
       overpaymentAmount?: number;  // Positive if student overpaid (credit balance)
       previousBalance?: number;    // Student's credit balance from previous months (positive = credit)
+      customArAccountId?: string;  // Override Trade Receivables account (e.g. for Suspense)
+      customBankAccountId?: string; // Override Bank account (e.g. for Suspense -> AR reversals)
     }) => {
       // Get finance settings for this branch
       const { data: settings } = await supabase
@@ -1122,7 +1126,7 @@ export function usePostPaymentToGL() {
         return null; // Gracefully skip GL posting instead of blocking the payment
       }
 
-      if (!effectiveSettings.trade_receivable_account_id) {
+      if (!customArAccountId && !effectiveSettings.trade_receivable_account_id) {
         throw new Error("Trade Receivables account not configured");
       }
 
@@ -1137,8 +1141,8 @@ export function usePostPaymentToGL() {
       }
 
       // Use branch_gl_account_id directly (from COA) instead of looking up from bank_accounts
-      // Priority: branch_gl_account_id > cash_account_id
-      const bankGLAccountId = effectiveSettings.branch_gl_account_id || effectiveSettings.cash_account_id;
+      // Priority: customBankAccountId > branch_gl_account_id > cash_account_id
+      const bankGLAccountId = customBankAccountId || effectiveSettings.branch_gl_account_id || effectiveSettings.cash_account_id;
 
       if (!bankGLAccountId) {
         throw new Error("Bank/Cash GL account not configured for this branch. Please configure in School Bus Finance Settings.");
@@ -1235,7 +1239,7 @@ export function usePostPaymentToGL() {
         },
         {
           journal_entry_id: journalEntry.id,
-          account_id: effectiveSettings.trade_receivable_account_id!,
+          account_id: customArAccountId || effectiveSettings.trade_receivable_account_id!,
           description: `School Bus Payment - ${studentName}`,
           debit: 0,
           credit: tradeReceivableCredit,
@@ -1340,6 +1344,17 @@ export function usePostPaymentToGL() {
             .from("school_payment_transactions")
             .update({ ar_receipt_id: arReceipt.id })
             .eq("id", paymentId);
+            
+          // CRITICAL FIX: Update the operational student record to mark them as paid
+          if (studentId) {
+            await supabase
+              .from("school_students")
+              .update({
+                payment_status: 'paid',
+                last_payment_date: format(new Date(), "yyyy-MM-dd")
+              })
+              .eq("id", studentId);
+          }
 
           // If a bank account is configured, record the bank transaction and update balance
           if (effectiveSettings.bank_account_id && amount > 0) {
@@ -1386,9 +1401,331 @@ export function usePostPaymentToGL() {
       queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
       toast.success("Payment posted to GL successfully");
     },
+  });
+}
+
+// Post grouped payments to GL (Single Bank Transaction, Multiple AR Credits)
+export function usePostGroupedPaymentToGL() {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+  
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = getBusinessUnitCode();
+
+  return useMutation({
+    mutationFn: async ({
+      totalAmount,
+      branchId,
+      paymentMethod,
+      referenceNo,
+      description,
+      allocations,
+    }: {
+      totalAmount: number;
+      branchId: string;
+      paymentMethod: string;
+      referenceNo?: string;
+      description?: string;
+      allocations: Array<{
+        paymentId: string;
+        amount: number;
+        studentName: string;
+        studentId: string;
+        fixedAmount?: number;
+        overpaymentAmount?: number;
+        previousBalance?: number;
+        customArAccountId?: string;
+      }>;
+    }) => {
+      // Get finance settings
+      let effectiveSettings: any = null;
+      const { data: branchSettings } = await supabase
+        .from("school_bus_finance_settings")
+        .select("*")
+        .eq("company_id", selectedCompanyId)
+        .eq("branch_id", branchId)
+        .maybeSingle();
+
+      if (branchSettings && branchSettings.trade_receivable_account_id) {
+        effectiveSettings = branchSettings;
+      } else {
+        const { data: crossBranchSettings } = await supabase
+          .from("school_bus_finance_settings")
+          .select("*")
+          .eq("branch_id", branchId)
+          .not("trade_receivable_account_id", "is", null)
+          .not("sbs_collection_account_id", "is", null)
+          .limit(1)
+          .maybeSingle();
+        
+        if (crossBranchSettings) effectiveSettings = crossBranchSettings;
+        else {
+          const { data: defSettings } = await supabase
+            .from("school_bus_finance_settings")
+            .select("*")
+            .eq("company_id", selectedCompanyId)
+            .is("branch_id", null)
+            .maybeSingle();
+          
+          if (defSettings && defSettings.trade_receivable_account_id) effectiveSettings = defSettings;
+          else {
+            const { data: anyDef } = await supabase
+              .from("school_bus_finance_settings")
+              .select("*")
+              .is("branch_id", null)
+              .not("trade_receivable_account_id", "is", null)
+              .limit(1)
+              .maybeSingle();
+            if (anyDef) effectiveSettings = anyDef;
+          }
+        }
+      }
+
+      if (!effectiveSettings) {
+        console.warn("No finance settings found for branch", branchId, "- skipping GL posting");
+        return null;
+      }
+
+      const paymentValidation = await validateGLAccountsBelongToCompany(effectiveSettings, effectiveCompanyId);
+      if (!paymentValidation.ok) {
+        const codes = paymentValidation.mismatched.map((a) => a.account_code).join(", ");
+        throw new Error(`Cannot post payment: GL accounts (${codes}) belong to a different company.`);
+      }
+
+      const bankGLAccountId = effectiveSettings.branch_gl_account_id || effectiveSettings.cash_account_id;
+      if (!bankGLAccountId) {
+        throw new Error("Bank/Cash GL account not configured for this branch.");
+      }
+
+      let liabilityAccountId: string | null = null;
+      try {
+        const { data: rpcResult } = await supabase.rpc('get_liability_account_setting' as any, { p_setting_id: effectiveSettings.id });
+        liabilityAccountId = rpcResult as string | null;
+      } catch {
+        liabilityAccountId = effectiveSettings.advance_payments_liability_account_id;
+      }
+
+      let totalTradeReceivableCredit = 0;
+      let totalLiabilityCredit = 0;
+      let totalLiabilityDebit = 0;
+      
+      const jeLines: any[] = [];
+
+      allocations.forEach(alloc => {
+        const existingCredit = (alloc.previousBalance && alloc.previousBalance > 0) ? alloc.previousBalance : 0;
+        const amountDue = alloc.fixedAmount || alloc.amount;
+        const shortfall = amountDue - alloc.amount;
+        const creditToConsume = Math.min(existingCredit, Math.max(0, shortfall));
+        
+        const hasOverpayment = alloc.overpaymentAmount && alloc.overpaymentAmount > 0 && liabilityAccountId;
+        const hasCreditConsumption = creditToConsume > 0 && liabilityAccountId;
+
+        let trCredit = 0;
+        let lCredit = 0;
+        let lDebit = 0;
+
+        if (hasOverpayment) {
+          trCredit = alloc.amount - alloc.overpaymentAmount!;
+          lCredit = alloc.overpaymentAmount!;
+        } else if (hasCreditConsumption) {
+          trCredit = alloc.amount + creditToConsume;
+          lDebit = creditToConsume;
+        } else {
+          trCredit = alloc.amount;
+        }
+
+        totalTradeReceivableCredit += trCredit;
+        totalLiabilityCredit += lCredit;
+        totalLiabilityDebit += lDebit;
+
+        jeLines.push({
+          account_id: alloc.customArAccountId || effectiveSettings!.trade_receivable_account_id!,
+          description: `School Bus Payment - ${alloc.studentName}`,
+          debit: 0,
+          credit: trCredit,
+          company_id: effectiveCompanyId,
+        });
+
+        if (hasOverpayment && liabilityAccountId) {
+          jeLines.push({
+            account_id: liabilityAccountId,
+            description: `Advance payment credited - ${alloc.studentName}`,
+            debit: 0,
+            credit: lCredit,
+            company_id: effectiveCompanyId,
+          });
+        }
+
+        if (hasCreditConsumption && liabilityAccountId) {
+          jeLines.push({
+            account_id: liabilityAccountId,
+            description: `Credit applied from advance - ${alloc.studentName}`,
+            debit: lDebit,
+            credit: 0,
+            company_id: effectiveCompanyId,
+          });
+        }
+      });
+
+      const totalDebitAmount = totalAmount + totalLiabilityDebit;
+      const totalCreditAmount = totalTradeReceivableCredit + totalLiabilityCredit;
+      const entryNumber = `SBS-PAY-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      const { data: journalEntry, error: jeError } = await supabase
+        .from("journal_entries")
+        .insert({
+          entry_number: entryNumber,
+          entry_date: format(new Date(), "yyyy-MM-dd"),
+          description: description || `Grouped School Bus Payment - ${allocations.length} Student(s)`,
+          reference: referenceNo || allocations[0]?.paymentId,
+          total_debit: totalDebitAmount,
+          total_credit: totalCreditAmount,
+          status: "posted",
+          company_id: effectiveCompanyId,
+          business_unit_code: 'SBO',
+          business_unit_id: selectedCompanyId,
+          posted_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (jeError) throw jeError;
+
+      const allLines = [
+        {
+          journal_entry_id: journalEntry.id,
+          account_id: bankGLAccountId,
+          description: description || `Payment received - ${paymentMethod}`,
+          debit: totalAmount,
+          credit: 0,
+          company_id: effectiveCompanyId,
+        },
+        ...jeLines.map(line => ({ ...line, journal_entry_id: journalEntry.id }))
+      ];
+
+      const { error: linesError } = await supabase.from("journal_entry_lines").insert(allLines);
+      if (linesError) throw linesError;
+
+      await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
+      let receiptCustomerId: string | null = null;
+      const { data: existingCust } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("company_id", effectiveCompanyId)
+        .eq("customer_code", "SBS-DEFAULT")
+        .maybeSingle();
+      
+      receiptCustomerId = existingCust?.id || null;
+      if (!receiptCustomerId) {
+        const { data: newCust } = await supabase
+          .from("customers")
+          .insert({
+            company_id: effectiveCompanyId,
+            business_unit_code: 'SBO',
+            customer_code: "SBS-DEFAULT",
+            customer_name: "School Bus Students",
+            is_active: true,
+          } as any)
+          .select()
+          .single();
+        receiptCustomerId = newCust?.id || null;
+      }
+
+      for (const alloc of allocations) {
+        await supabase
+          .from("school_payment_transactions")
+          .update({
+            gl_posted: true,
+            journal_entry_id: journalEntry.id,
+          })
+          .eq("id", alloc.paymentId);
+
+        try {
+          const receiptNumber = `SBS-REC-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+          const { data: arReceipt } = await supabase
+            .from("ar_receipts")
+            .insert({
+              company_id: effectiveCompanyId,
+              business_unit_code: 'SBO',
+              customer_id: receiptCustomerId,
+              receipt_number: receiptNumber,
+              receipt_date: format(new Date(), "yyyy-MM-dd"),
+              amount: alloc.amount,
+              payment_method: paymentMethod === 'Bank Transfer' ? 'bank_transfer' : paymentMethod.toLowerCase(),
+              reference: referenceNo || alloc.paymentId,
+              status: 'posted',
+              journal_entry_id: journalEntry.id,
+              bank_account_id: effectiveSettings.bank_account_id || null,
+              notes: `School Bus Payment - ${alloc.studentName}`,
+              is_advance: (alloc.overpaymentAmount && alloc.overpaymentAmount > 0) ? true : false,
+            } as any)
+            .select()
+            .single();
+
+          if (arReceipt) {
+            await supabase
+              .from("school_payment_transactions")
+              .update({ ar_receipt_id: arReceipt.id })
+              .eq("id", alloc.paymentId);
+          }
+          
+          // CRITICAL FIX: Update the operational student record to mark them as paid
+          if (alloc.studentId) {
+            await supabase
+              .from("school_students")
+              .update({
+                payment_status: 'paid',
+                last_payment_date: format(new Date(), "yyyy-MM-dd")
+              })
+              .eq("id", alloc.studentId);
+          }
+        } catch (receiptError) {
+          console.error("AR Receipt creation failed:", receiptError);
+        }
+      }
+
+      if (effectiveSettings.bank_account_id && totalAmount > 0) {
+        await supabase.from("bank_transactions").insert([{
+          bank_account_id: effectiveSettings.bank_account_id,
+          transaction_date: format(new Date(), "yyyy-MM-dd"),
+          transaction_type: "receipt",
+          description: description || `Grouped School Bus Payment - ${referenceNo || ''}`,
+          debit_amount: totalAmount,
+          credit_amount: 0,
+          reference: referenceNo,
+          company_id: effectiveCompanyId,
+          source_type: "journal_entry",
+          source_id: journalEntry.id,
+        }]);
+
+        const { data: bankAccount } = await supabase
+          .from("bank_accounts")
+          .select("current_balance")
+          .eq("id", effectiveSettings.bank_account_id)
+          .single();
+
+        if (bankAccount) {
+          await supabase
+            .from("bank_accounts")
+            .update({ current_balance: (bankAccount.current_balance || 0) + totalAmount })
+            .eq("id", effectiveSettings.bank_account_id);
+        }
+      }
+
+      return journalEntry;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["school-students"] });
+      queryClient.invalidateQueries({ queryKey: ["school-ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      toast.success("Grouped payment posted to GL successfully");
+    },
     onError: (error) => {
-      console.error("GL posting error:", error);
-      // Don't show error toast - payment was still recorded
+      console.error("Grouped GL posting error:", error);
     },
   });
 }

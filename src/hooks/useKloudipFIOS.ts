@@ -1,8 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-// Using Vite proxy locally to prevent Mixed Content / CORS, but use direct CORS-enabled URL in production.
-const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-const FIOS_URL = isLocal ? "/fios-api/api" : "https://fios-api.kloudip.com/api";
+// ALWAYS route through our proxy to bypass AdBlockers in production (Vercel/Netlify rewrites)
+const FIOS_URL = "/telemetry/api";
 export interface FIOSUnit {
   nm: string;
   id: number;
@@ -98,6 +97,8 @@ export const useKloudipFIOS = (token: string, refreshIntervalSeconds: number = 3
       return [];
     } catch (err: any) {
       console.error("Kloudip Proxy Fetch Error", err);
+      // Surface the error to the user so they know if AdBlockers are blocking it
+      toast.error(`FIOS Connection Failed: ${err.message}. Please check if an AdBlocker is blocking fios-api.kloudip.com`);
       setError(err.message);
       return [];
     } finally {

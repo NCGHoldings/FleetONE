@@ -5,7 +5,7 @@ import { Plus, DollarSign, Eye, FileText, Printer, Search, CheckCircle, Pencil, 
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { useAPInvoices } from "@/hooks/useAccountingData";
+import { useAPInvoices, useAllProfiles } from "@/hooks/useAccountingData";
 import { useApproveAPInvoice, useDeleteAPInvoice } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -51,8 +51,16 @@ export const AccountsPayableView = () => {
   const [editingInvoice, setEditingInvoice] = useState<any>(null);
   const [mergeInvoice, setMergeInvoice] = useState<any>(null);
   const { data: invoices, isLoading } = useAPInvoices(statusFilter);
+  const { data: profiles } = useAllProfiles();
   const approveInvoice = useApproveAPInvoice();
   const deleteInvoice = useDeleteAPInvoice();
+
+  const getCreatorName = (userId: string | null) => {
+    if (!userId) return "System";
+    const profile = profiles?.find((p: any) => p.user_id === userId || p.id === userId);
+    if (profile) return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown User";
+    return userId.substring(0, 8);
+  };
 
   const filteredInvoices = useMemo(() => {
     if (!invoices || !searchQuery.trim()) return invoices || [];
@@ -206,6 +214,15 @@ export const AccountsPayableView = () => {
       accessorKey: "approval_status",
       header: "Approval",
       cell: ({ row }: any) => getApprovalBadge(row.original.approval_status),
+    },
+    {
+      accessorKey: "created_by",
+      header: "Created By",
+      cell: ({ row }: any) => (
+        <span className="text-xs text-muted-foreground">
+          {getCreatorName(row.original.created_by)}
+        </span>
+      ),
     },
     {
       accessorKey: "status",

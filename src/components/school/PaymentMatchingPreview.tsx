@@ -19,6 +19,7 @@ interface PaymentMatchingPreviewProps {
 export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }: PaymentMatchingPreviewProps) {
   const { toast } = useToast();
   const [items, setItems] = useState<any[]>([]);
+  const [allocationsPreview, setAllocationsPreview] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const postPaymentToGL = usePostPaymentToGL();
@@ -38,6 +39,57 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
 
     if (!error && data) {
       setItems(data);
+
+      // Pre-calculate allocations for preview
+      const studentIds = [...new Set(data.flatMap(item => item.matched_student_ids || []))];
+      if (studentIds.length > 0) {
+        const { data: students } = await supabase
+          .from('school_students')
+          .select('id, fixed_monthly_amount, payment_balance, current_amount_due')
+          .in('id', studentIds);
+          
+        if (students) {
+          const studentMap = new Map(students.map(s => [s.id, s]));
+          const newAllocations: Record<string, any> = {};
+          
+          data.forEach(item => {
+            const matchedStudents = item.matched_student_ids || [];
+            if (matchedStudents.length === 0) return;
+            
+            const studentDetails = matchedStudents.map((id: string) => studentMap.get(id)).filter(Boolean);
+            const studentDues = studentDetails.map(student => ({
+              student,
+              due: student.current_amount_due || student.fixed_monthly_amount || 0
+            }));
+            
+            const totalDue = studentDues.reduce((sum, s) => sum + s.due, 0);
+            
+            const allocations = studentDues.map(s => {
+              let allocated = 0;
+              if (totalDue === 0) {
+                allocated = item.amount / matchedStudents.length;
+              } else {
+                allocated = s.due;
+              }
+              return { student: s.student, due: s.due, allocated };
+            });
+
+            const totalAllocated = allocations.reduce((sum, a) => sum + a.allocated, 0);
+            const difference = item.amount - totalAllocated;
+
+            if (difference !== 0 && totalDue !== 0 && matchedStudents.length > 0) {
+              const differencePerStudent = difference / matchedStudents.length;
+              allocations.forEach(a => {
+                a.allocated += differencePerStudent;
+              });
+            }
+            
+            newAllocations[item.id] = allocations;
+          });
+          
+          setAllocationsPreview(newAllocations);
+        }
+      }
     }
     setLoading(false);
   };
@@ -68,9 +120,9 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
     }
   };
 
-  // For partial_match, only allow confirming items with exactly 1 matched student
+  // Allow confirming items with matched students (including multiple for bulk payments)
   const confirmableItems = matchStatus === 'partial_match'
-    ? items.filter(item => (item.matched_student_ids || []).length === 1)
+    ? items.filter(item => (item.matched_student_ids || []).length > 0)
     : items;
 
   const handleConfirmAll = async () => {
@@ -91,90 +143,12 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
 
       const studentMap = new Map(students?.map(s => [s.id, s]) || []);
 
-      // Create payment transactions for all matched items
-      const transactions = confirmableItems.flatMap(item => {
-        const matchedStudents = item.matched_student_ids || [];
-        const splitAmount = item.amount / matchedStudents.length;
-        
-        const paymentDate = new Date(item.txn_date);
-        const paymentMonth = paymentDate.toISOString().slice(0, 7) + '-01';
-
-        return matchedStudents.map((studentId: string) => {
-          const student = studentMap.get(studentId);
-          const fixedAmount = student?.fixed_monthly_amount || 0;
-          const balanceBefore = student?.payment_balance || 0;
-          const amountDue = student?.current_amount_due || fixedAmount;
-          const difference = splitAmount - amountDue;
-          const balanceAfter = balanceBefore + splitAmount;
-
-          return {
-            student_id: studentId,
-            payment_date: item.txn_date,
-            payment_month: paymentMonth,
-            amount_paid: splitAmount,
-            fixed_amount: fixedAmount,
-            difference: difference,
-            payment_balance_before: balanceBefore,
-            payment_balance_after: balanceAfter,
-            payment_method: 'Bank Transfer',
-            reference_no: `IMPORT-${importId.slice(0, 8)}`,
-            notes: `Auto-imported from bank statement: ${item.description}`,
-          };
-        });
-      });
-
-      const { data: insertedPayments, error } = await supabase
-        .from('school_payment_transactions')
-        .insert(transactions)
-        .select();
-
-      if (error) throw error;
-
-      // Post each payment to GL (async, non-blocking per payment)
-      if (insertedPayments) {
-        for (const txn of insertedPayments) {
-          const student = studentMap.get(txn.student_id);
-          // Get branch_id for the student
-          const { data: studentData } = await supabase
-            .from('school_students')
-            .select('branch_id, student_name')
-            .eq('id', txn.student_id)
-            .single();
-
-          if (studentData?.branch_id) {
-            try {
-              await postPaymentToGL.mutateAsync({
-                paymentId: txn.id,
-                amount: txn.amount_paid,
-                branchId: studentData.branch_id,
-                studentName: studentData.student_name || 'Student',
-                paymentMethod: 'Bank Transfer',
-                referenceNo: txn.reference_no || undefined,
-                fixedAmount: student?.fixed_monthly_amount || 0,
-                overpaymentAmount: txn.difference > 0 ? txn.difference : undefined,
-                previousBalance: student?.payment_balance || 0,
-              });
-            } catch (glError) {
-              console.error("GL posting failed for bank import payment:", glError);
-            }
-          }
-        }
-      }
-
-      // Update student balances (trigger handles this, but ensure)
-      for (const txn of transactions) {
-        await supabase
-          .from('school_students')
-          .update({ payment_balance: txn.payment_balance_after })
-          .eq('id', txn.student_id);
-      }
-
-      // Update import items as processed
+      // Update import items as processed (ready for finance)
       const itemIds = confirmableItems.map(i => i.id);
       await supabase
         .from('school_payment_import_items')
         .update({
-          match_status: 'manual_matched',
+          match_status: 'ready_for_finance', // New status indicating Ops confirmed it
           processed_at: new Date().toISOString(),
         })
         .in('id', itemIds);
@@ -187,19 +161,30 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
         .single();
 
       if (importData) {
+        let newManual = importData.manual_matched_count;
+        let newUnmatched = importData.unmatched_count;
+        
+        if (matchStatus === 'partial_match') {
+          newManual += confirmableItems.length;
+          newUnmatched = Math.max(0, newUnmatched - confirmableItems.length);
+        } else if (matchStatus === 'auto_matched') {
+          // Confirming auto-matched items doesn't change the unmatched count
+          // We can optionally shift them to manual, but it's better to keep the original categorization
+        }
+
         await supabase
           .from('school_payment_imports')
           .update({
-            manual_matched_count: importData.manual_matched_count + confirmableItems.length,
-            unmatched_count: importData.unmatched_count - confirmableItems.length,
+            manual_matched_count: newManual,
+            unmatched_count: newUnmatched,
           })
           .eq('id', importId);
 
         onStatsUpdate({
           total: importData.auto_matched_count + importData.manual_matched_count + importData.unmatched_count,
           autoMatched: importData.auto_matched_count,
-          needsReview: 0,
-          unmatched: importData.unmatched_count - confirmableItems.length,
+          needsReview: matchStatus === 'partial_match' ? 0 : undefined, // Let it naturally clear
+          unmatched: newUnmatched,
         });
       }
 
@@ -255,17 +240,49 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
     },
     {
       accessorKey: "suggested_students",
-      header: "Matched Student(s)",
+      header: "Matched Student(s) & Allocation",
       cell: ({ row }) => {
         const students = row.original.suggested_students || [];
+        const allocations = allocationsPreview[row.original.id] || [];
+        
         return (
-          <div className="space-y-1">
-            {students.map((student: any, idx: number) => (
-              <div key={idx} className="flex items-center gap-2">
-                <Badge variant="default">{student.admission_no}</Badge>
-                <span className="text-sm">{student.student_name}</span>
-              </div>
-            ))}
+          <div className="space-y-2 min-w-[300px]">
+            {students.map((student: any, idx: number) => {
+              const alloc = allocations.find((a: any) => a.student.id === student.id);
+              
+              return (
+                <div key={idx} className="flex flex-col gap-1 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-md border text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="default" className="text-[10px]">{student.admission_no}</Badge>
+                      <span className="font-medium">{student.student_name}</span>
+                    </div>
+                  </div>
+                  {alloc && (
+                    <div className="grid grid-cols-3 gap-2 mt-1 text-muted-foreground pt-1 border-t">
+                      <div>
+                        <span className="block text-[10px] uppercase">AR Due</span>
+                        <span className="font-semibold text-foreground">
+                          {alloc.due.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase">Allocated</span>
+                        <span className="font-semibold text-primary">
+                          {alloc.allocated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase">Bal Diff</span>
+                        <span className={`font-semibold ${alloc.allocated - alloc.due > 0 ? 'text-green-600' : alloc.allocated - alloc.due < 0 ? 'text-red-500' : ''}`}>
+                          {alloc.allocated - alloc.due > 0 ? '+' : ''}{(alloc.allocated - alloc.due).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         );
       },

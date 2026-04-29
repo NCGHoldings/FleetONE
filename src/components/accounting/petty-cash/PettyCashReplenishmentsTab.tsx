@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { 
   usePettyCashFunds, useAllPettyCashTransactions, useCreatePettyCashTransaction 
 } from "@/hooks/usePettyCash";
+import { useAllProfiles } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "../shared/CurrencyDisplay";
 import { useBankAccounts } from "@/hooks/useAccountingData";
 import { PettyCashReimbursementDialog } from "./PettyCashReimbursementDialog";
@@ -23,13 +24,24 @@ export const PettyCashReplenishmentsTab = () => {
   const { data: transactions, isLoading } = useAllPettyCashTransactions({ transactionType: "replenishment" });
   const { data: allTransactions } = useAllPettyCashTransactions();
   const { data: bankAccounts } = useBankAccounts();
+  const { data: profiles } = useAllProfiles();
+
+  const getCreatorName = (userId: string | null) => {
+    if (!userId) return "System";
+    const profile = profiles?.find((p: any) => p.user_id === userId || p.id === userId);
+    if (profile) return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown User";
+    return userId.substring(0, 8);
+  };
 
 
-  // Extract AP Ref from description (format: "... [AP: PC-REPL-xxxx]")
+  // Extract AP Ref from description
   const extractAPRef = (description: string | null) => {
     if (!description) return null;
-    const match = description.match(/\[AP:\s*(PC-REPL-\d+)\]/);
-    return match ? match[1] : null;
+    const match1 = description.match(/\[AP:\s*(PC-REPL-\d+)\]/);
+    if (match1) return match1[1];
+    const match2 = description.match(/AP Payment:\s*(PAY-\d+|PC-REPL-\d+)/);
+    if (match2) return match2[1];
+    return null;
   };
 
   return (
@@ -52,6 +64,7 @@ export const PettyCashReplenishmentsTab = () => {
               <TableHead>Method</TableHead>
               <TableHead>Reference</TableHead>
               <TableHead>AP Ref</TableHead>
+              <TableHead>Created By</TableHead>
               <TableHead>Description</TableHead>
             </TableRow>
           </TableHeader>
@@ -82,8 +95,13 @@ export const PettyCashReplenishmentsTab = () => {
                         <Badge variant="secondary" className="text-xs font-mono">{apRef}</Badge>
                       ) : "-"}
                     </TableCell>
-                    <TableCell className="text-sm max-w-[200px] truncate">
-                      {txn.description?.replace(/\s*\[AP:.*?\]/, "") || "-"}
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground">
+                        {getCreatorName(txn.created_by)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm max-w-[200px] truncate" title={txn.description || ""}>
+                      {txn.description?.replace(/\s*\[AP:.*?\]/, "")?.replace(/from AP Payment:.*?$/, "") || "-"}
                     </TableCell>
                   </TableRow>
                 );

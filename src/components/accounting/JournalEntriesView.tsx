@@ -13,10 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { JournalEntryForm } from "./JournalEntryForm";
 import { JournalEntryDetailDialog } from "./JournalEntryDetailDialog";
-import { useJournalEntries } from "@/hooks/useAccountingData";
+import { useJournalEntries, useAllProfiles } from "@/hooks/useAccountingData";
 import { usePostJournalEntry, useRejectJournalEntry, useReverseJournalEntry, useDeleteJournalEntry } from "@/hooks/useAccountingMutations";
 import { useCompany } from "@/contexts/CompanyContext";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { DateRangeFilter, type DateRange } from "@/components/ui/DateRangeFilter";
 import { Filter } from "lucide-react";
 import { toast } from "sonner";
 import { GLExportModal } from "./GLExportModal";
@@ -40,7 +40,7 @@ export const JournalEntriesView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   
   // Advanced filters
-  const [dateRange, setDateRange] = useState<{from?: Date, to?: Date} | undefined>();
+  const [dateRange, setDateRange] = useState<DateRange>({ startDate: null, endDate: null });
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [minAmount, setMinAmount] = useState<string>("");
   const [maxAmount, setMaxAmount] = useState<string>("");
@@ -54,12 +54,20 @@ export const JournalEntriesView = () => {
     : [];
 
   const { data: entries, isLoading } = useJournalEntries(undefined, filterBusinessUnit);
+  const { data: profiles } = useAllProfiles();
   const postEntry = usePostJournalEntry();
   const rejectEntry = useRejectJournalEntry();
   const reverseEntry = useReverseJournalEntry();
   const deleteEntry = useDeleteJournalEntry();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [reverseConfirmEntry, setReverseConfirmEntry] = useState<any>(null);
+
+  const getCreatorName = (userId: string | null) => {
+    if (!userId) return "System";
+    const profile = profiles?.find((p: any) => p.user_id === userId || p.id === userId);
+    if (profile) return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown User";
+    return userId.substring(0, 8);
+  };
 
   // Filter entries based on multiple criteria
   const filteredEntries = useMemo(() => {
@@ -90,18 +98,18 @@ export const JournalEntriesView = () => {
       if (filterStatus !== "all" && entry.status !== filterStatus) return false;
 
       // 3. Date Range
-      if (dateRange?.from || dateRange?.to) {
+      if (dateRange?.startDate || dateRange?.endDate) {
         const entryDate = new Date(entry.entry_date);
         entryDate.setHours(0, 0, 0, 0);
         
-        if (dateRange.from) {
-          const fromDate = new Date(dateRange.from);
+        if (dateRange.startDate) {
+          const fromDate = new Date(dateRange.startDate);
           fromDate.setHours(0, 0, 0, 0);
           if (entryDate < fromDate) return false;
         }
         
-        if (dateRange.to) {
-          const toDate = new Date(dateRange.to);
+        if (dateRange.endDate) {
+          const toDate = new Date(dateRange.endDate);
           toDate.setHours(23, 59, 59, 999);
           if (entryDate > toDate) return false;
         }
@@ -119,7 +127,7 @@ export const JournalEntriesView = () => {
   const handleClearFilters = () => {
     setSearchQuery("");
     setFilterStatus("all");
-    setDateRange(undefined);
+    setDateRange({ startDate: null, endDate: null });
     setMinAmount("");
     setMaxAmount("");
     setFilterBusinessUnit("all");
@@ -128,7 +136,7 @@ export const JournalEntriesView = () => {
 
   const activeFilterCount = 
     (filterStatus !== "all" ? 1 : 0) + 
-    (dateRange?.from || dateRange?.to ? 1 : 0) + 
+    (dateRange?.startDate || dateRange?.endDate ? 1 : 0) + 
     (minAmount ? 1 : 0) + 
     (maxAmount ? 1 : 0) +
     (filterBusinessUnit !== "all" ? 1 : 0);
@@ -209,6 +217,15 @@ export const JournalEntriesView = () => {
       accessorKey: "total_credit",
       header: "Credit",
       cell: ({ row }: any) => <CurrencyDisplay amount={row.original.total_credit} />,
+    },
+    {
+      accessorKey: "created_by",
+      header: "Created By",
+      cell: ({ row }: any) => (
+        <span className="text-sm text-muted-foreground">
+          {getCreatorName(row.original.created_by)}
+        </span>
+      ),
     },
     {
       accessorKey: "status",
@@ -343,10 +360,10 @@ export const JournalEntriesView = () => {
             />
           </div>
 
-          {/* Date Range Filter */}
-          <DateRangePicker 
+          <DateRangeFilter 
             key={resetKey}
-            onDateRangeChange={setDateRange} 
+            value={dateRange}
+            onChange={setDateRange} 
           />
 
           {/* Status Filter */}
@@ -403,6 +420,7 @@ export const JournalEntriesView = () => {
       <DataTable
         columns={columns}
         data={filteredEntries}
+        enableColumnFilters
       />
 
       {/* Entry Detail Dialog */}
@@ -421,8 +439,8 @@ export const JournalEntriesView = () => {
           searchQuery,
           filterStatus,
           filterBusinessUnit,
-          dateFrom: dateRange?.from,
-          dateTo: dateRange?.to,
+          dateFrom: dateRange?.startDate ? new Date(dateRange.startDate) : undefined,
+          dateTo: dateRange?.endDate ? new Date(dateRange.endDate) : undefined,
           minAmount,
           maxAmount,
         }}

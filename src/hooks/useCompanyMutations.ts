@@ -792,6 +792,12 @@ export const useCompanyUpdateAccount = () => {
       is_header?: boolean;
       is_active?: boolean;
       description?: string;
+      level1?: string | null;
+      level2?: string | null;
+      level3?: string | null;
+      level4?: string | null;
+      level5?: string | null;
+      account_level?: number | null;
     }) => {
       if (!effectiveCompanyId) {
         throw new Error("No company selected");
@@ -816,6 +822,46 @@ export const useCompanyUpdateAccount = () => {
     },
     onError: (error) => {
       toast.error(`Failed to update account: ${error.message}`);
+    },
+  });
+};
+
+// ============ Delete Chart of Accounts ============
+export const useCompanyDeleteAccount = () => {
+  const queryClient = useQueryClient();
+  const companyContext = useCompanyOptional();
+  const companyId = companyContext?.selectedCompanyId;
+  const effectiveCompanyId = companyContext?.getEffectiveCompanyId?.() || companyId;
+  
+  return useMutation({
+    mutationFn: async (accountId: string) => {
+      if (!effectiveCompanyId) {
+        throw new Error("No company selected");
+      }
+
+      // Check if account has transactions (this is usually enforced by foreign key constraints,
+      // but good to have a clear error message if possible). We will just rely on DB error for now.
+      const { error } = await supabase
+        .from("chart_of_accounts")
+        .delete()
+        .eq("id", accountId)
+        .eq("company_id", effectiveCompanyId);
+      
+      if (error) {
+        if (error.code === '23503') { // Foreign key violation
+          throw new Error("Cannot delete account because it is being used in transactions.");
+        }
+        throw error;
+      }
+      return accountId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", effectiveCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts-all", effectiveCompanyId] });
+      toast.success("Account deleted successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete account: ${error.message}`);
     },
   });
 };

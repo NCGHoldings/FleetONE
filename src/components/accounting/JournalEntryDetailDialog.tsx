@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
-import { useJournalEntryLines } from "@/hooks/useAccountingData";
+import { useJournalEntryLines, useAllProfiles } from "@/hooks/useAccountingData";
 import { useReverseJournalEntry } from "@/hooks/useAccountingMutations";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -71,6 +71,15 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
   const { selectedCompanyId } = useCompany();
   const [showConfirm, setShowConfirm] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<RelatedDocument | null>(null);
+  
+  const { data: profiles } = useAllProfiles();
+  
+  const getCreatorName = (userId: string | null) => {
+    if (!userId) return "System / Auto";
+    const profile = profiles?.find((p: any) => p.user_id === userId || p.id === userId);
+    if (profile) return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown User";
+    return userId.substring(0, 8);
+  };
 
   // States for Fix Bank Account dialog
   const [showFixBankDialog, setShowFixBankDialog] = useState(false);
@@ -513,7 +522,8 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
 
             {/* Audit Info */}
             <div className="text-xs text-muted-foreground border-t pt-4">
-              <div className="flex gap-6">
+              <div className="flex flex-wrap gap-x-6 gap-y-2">
+                <span>Created By: <strong>{getCreatorName(entry.created_by)}</strong></span>
                 <span>Created: {new Date(entry.created_at).toLocaleString()}</span>
                 {entry.posted_at && <span>Posted: {new Date(entry.posted_at).toLocaleString()}</span>}
                 {entry.source_module && <span>Module: {entry.source_module}</span>}

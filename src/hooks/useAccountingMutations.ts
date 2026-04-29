@@ -4394,7 +4394,7 @@ export const useCreateARDebitNote = () => {
 // ============ Bank Accounts ============
 export const useCreateBankAccount = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (account: {
@@ -4408,17 +4408,23 @@ export const useCreateBankAccount = () => {
       opening_balance?: number;
       current_balance?: number;
       gl_account_id?: string;
+      business_unit_code?: string | null;
       is_active?: boolean;
       is_default?: boolean;
       notes?: string;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const autoBusinessUnitCode = getBusinessUnitCode();
+      const finalBusinessUnitCode = account.business_unit_code !== undefined ? account.business_unit_code : autoBusinessUnitCode;
+      
       const { data, error } = await supabase
         .from("bank_accounts")
         .insert([{
           ...account,
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId,
+          business_unit_code: finalBusinessUnitCode,
         }])
         .select()
         .single();

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateDisplay } from "@/lib/utils";
 import { DataTable } from "@/components/ui/data-table";
@@ -9,9 +10,10 @@ import { FileText, CheckCircle, Clock, XCircle } from "lucide-react";
 
 interface ImportHistoryTableProps {
   branchId: string;
+  onContinue?: (importRecord: any) => void;
 }
 
-export function ImportHistoryTable({ branchId }: ImportHistoryTableProps) {
+export function ImportHistoryTable({ branchId, onContinue }: ImportHistoryTableProps) {
   const [imports, setImports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,9 +38,10 @@ export function ImportHistoryTable({ branchId }: ImportHistoryTableProps) {
   const getStatusBadge = (status: string) => {
     const variants = {
       completed: { variant: "default" as const, icon: CheckCircle, text: "Completed" },
+      pending_finance: { variant: "secondary" as const, icon: Clock, text: "Pending Finance" },
       processing: { variant: "secondary" as const, icon: Clock, text: "Processing" },
       failed: { variant: "destructive" as const, icon: XCircle, text: "Failed" },
-      pending: { variant: "outline" as const, icon: Clock, text: "Pending" },
+      pending: { variant: "outline" as const, icon: Clock, text: "Pending Matching" },
     };
 
     const config = variants[status as keyof typeof variants] || variants.pending;
@@ -109,6 +112,39 @@ export function ImportHistoryTable({ branchId }: ImportHistoryTableProps) {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => getStatusBadge(row.original.status),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        return (
+          <div className="flex items-center gap-2">
+            {row.original.status === 'pending_finance' && (
+              <Button 
+                size="sm" 
+                variant="default"
+                onClick={() => {
+                  // Dispatch event to open Finance Approval Dialog
+                  window.dispatchEvent(new CustomEvent('openFinanceApproval', { detail: { importId: row.original.id } }));
+                }}
+              >
+                Review & Approve
+              </Button>
+            )}
+            {(row.original.unmatched_count > 0) && onContinue && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => onContinue(row.original)}
+              >
+                {row.original.status === 'completed' || row.original.status === 'pending_finance' 
+                  ? "Resolve Unmatched" 
+                  : "Continue Matching"}
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 

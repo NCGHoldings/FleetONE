@@ -26,6 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BusDetailsModal } from "@/components/fleet/BusDetailsModal";
 import { EditBusModal } from "@/components/fleet/EditBusModal";
+import { AddBusModal } from "@/components/fleet/AddBusModal";
 import { ServiceHistoryModal } from "@/components/fleet/ServiceHistoryModal";
 import { ScheduleMaintenanceModal } from "@/components/fleet/ScheduleMaintenanceModal";
 import { BusLoanModal } from "@/components/fleet/BusLoanModal";
@@ -99,7 +100,10 @@ const FleetManagementComponent = () => {
   const [masterDataSheetOpen, setMasterDataSheetOpen] = useState(false);
   const [docPreviewModalOpen, setDocPreviewModalOpen] = useState(false);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
+  const [addModalOpen, setAddModalOpen] = useState(false);
   const [vehicleImportOpen, setVehicleImportOpen] = useState(false);
+  
+  // Modals state
   const [filters, setFilters] = useState<FleetFilters>({ ...defaultFilters });
   const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([]);
   const [subCategoryOptions, setSubCategoryOptions] = useState<{ id: string; name: string }[]>([]);
@@ -653,8 +657,7 @@ const FleetManagementComponent = () => {
   };
 
   const handleAddBus = () => {
-    console.log("Adding new bus...");
-    // Add bus logic will be implemented here
+    setAddModalOpen(true);
   };
 
   // Filtering logic
@@ -885,6 +888,12 @@ const FleetManagementComponent = () => {
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
         bus={selectedBus}
+        onSuccess={fetchFleet}
+      />
+
+      <AddBusModal
+        open={addModalOpen}
+        onOpenChange={setAddModalOpen}
         onSuccess={fetchFleet}
       />
 

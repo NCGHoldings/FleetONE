@@ -17,6 +17,11 @@ import { useCompanyUpdateAccount } from "@/hooks/useCompanyMutations";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 const accountSchema = z.object({
   account_code: z.string().min(1, "Account code is required"),
@@ -54,9 +59,71 @@ interface AccountEditFormProps {
   onSuccess: () => void;
 }
 
+interface ParentAccount {
+  id: string;
+  account_code: string;
+  account_name: string;
+  account_type: string | null;
+  level1: string | null;
+  level2: string | null;
+  level3: string | null;
+  level4: string | null;
+  level5: string | null;
+  account_level: number | null;
+}
+
+// Derive level fields based on parent account
+const deriveLevelFields = (
+  accountName: string,
+  parentAccount: ParentAccount | null
+): {
+  level1: string | null;
+  level2: string | null;
+  level3: string | null;
+  level4: string | null;
+  level5: string | null;
+  accountLevel: number;
+} => {
+  if (!parentAccount) {
+    // No parent - this is a top-level (level 1) account
+    return {
+      level1: accountName,
+      level2: null,
+      level3: null,
+      level4: null,
+      level5: null,
+      accountLevel: 1,
+    };
+  }
+
+  // Determine parent's current level and place new account in next level
+  const parentLevel = parentAccount.account_level || 1;
+  const nextLevel = Math.min(parentLevel + 1, 5);
+
+  const result = {
+    level1: parentAccount.level1,
+    level2: parentAccount.level2,
+    level3: parentAccount.level3,
+    level4: parentAccount.level4,
+    level5: parentAccount.level5,
+    accountLevel: nextLevel,
+  };
+
+  // Place the new account name in the appropriate level
+  switch (nextLevel) {
+    case 2: result.level2 = accountName; result.level3 = null; result.level4 = null; result.level5 = null; break;
+    case 3: result.level3 = accountName; result.level4 = null; result.level5 = null; break;
+    case 4: result.level4 = accountName; result.level5 = null; break;
+    case 5: result.level5 = accountName; break;
+  }
+
+  return result;
+};
+
 export const AccountEditForm = ({ account, onSuccess }: AccountEditFormProps) => {
   const { selectedCompanyId } = useCompany();
   const updateAccount = useCompanyUpdateAccount();
+  const [openCombobox, setOpenCombobox] = useState(false);
 
   const form = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
@@ -77,7 +144,7 @@ export const AccountEditForm = ({ account, onSuccess }: AccountEditFormProps) =>
       if (!selectedCompanyId) return [];
       const { data, error } = await supabase
         .from("chart_of_accounts")
-        .select("id, account_code, account_name, level1, level2, level3, level4, level5, account_level")
+        .select("id, account_code, account_name, account_type, level1, level2, level3, level4, level5, account_level")
         .eq("company_id", selectedCompanyId)
         .neq("id", account.id)
         .order("account_code");
@@ -92,6 +159,13 @@ export const AccountEditForm = ({ account, onSuccess }: AccountEditFormProps) =>
       ? null
       : data.parent_account_id;
 
+    const selectedParent = parentId 
+      ? (parentAccounts as ParentAccount[] | undefined)?.find(acc => acc.id === parentId) || null
+      : null;
+      
+    // Derive level fields based on parent
+    const derivedLevels = deriveLevelFields(data.account_name, selectedParent);
+
     updateAccount.mutate(
       {
         id: account.id,
@@ -102,6 +176,12 @@ export const AccountEditForm = ({ account, onSuccess }: AccountEditFormProps) =>
         is_header: data.is_header,
         is_active: data.is_active,
         description: data.description,
+        level1: derivedLevels.level1,
+        level2: derivedLevels.level2,
+        level3: derivedLevels.level3,
+        level4: derivedLevels.level4,
+        level5: derivedLevels.level5,
+        account_level: derivedLevels.accountLevel,
       },
       { onSuccess: () => { form.reset(); onSuccess(); } }
     );
@@ -142,21 +222,81 @@ export const AccountEditForm = ({ account, onSuccess }: AccountEditFormProps) =>
           </FormItem>
         )} />
 
-        <FormField control={form.control} name="parent_account_id" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Parent Account (Optional)</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value ?? "_none"}>
-              <FormControl><SelectTrigger><SelectValue placeholder="Select parent account" /></SelectTrigger></FormControl>
-              <SelectContent>
-                <SelectItem value="_none">No Parent (Top Level)</SelectItem>
-                {parentAccounts?.filter(a => a.id && a.id.trim() !== '').map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.account_code} - {a.account_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )} />
+        <FormField control={form.control} name="parent_account_id" render={({ field }) => {
+          const selectedValue = field.value && field.value !== "_none" ? field.value : null;
+          const selectedAccount = parentAccounts?.find(a => a.id === selectedValue);
+          const displayValue = selectedAccount 
+            ? `${selectedAccount.account_code} - ${selectedAccount.account_name}`
+            : "No Parent (Top Level)";
+
+          return (
+            <FormItem className="flex flex-col">
+              <FormLabel>Parent Account (Optional)</FormLabel>
+              <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openCombobox}
+                      className={cn(
+                        "w-full justify-between font-normal",
+                        !selectedValue && "text-muted-foreground"
+                      )}
+                    >
+                      {displayValue}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0 z-[100]" align="start">
+                  <Command shouldFilter={true}>
+                    <CommandInput placeholder="Search parent account..." />
+                    <CommandList className="max-h-[300px] overflow-y-auto">
+                      <CommandEmpty>No account found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="no parent top level"
+                          onSelect={() => {
+                            field.onChange("_none");
+                            setOpenCombobox(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              !selectedValue ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          No Parent (Top Level)
+                        </CommandItem>
+                        {parentAccounts?.filter(a => a.id && a.id.trim() !== '').map((a) => (
+                          <CommandItem
+                            key={a.id}
+                            value={`${a.account_code} ${a.account_name}`}
+                            onSelect={() => {
+                              field.onChange(a.id);
+                              setOpenCombobox(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedValue === a.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {a.account_code} - {a.account_name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <FormMessage />
+            </FormItem>
+          );
+        }} />
 
         <FormField control={form.control} name="is_header" render={({ field }) => (
           <FormItem className="flex flex-row items-start space-x-3 space-y-0">

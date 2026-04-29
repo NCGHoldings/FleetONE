@@ -1,20 +1,17 @@
 const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
-
-const envContent = fs.readFileSync('.env', 'utf8');
-const supabaseUrl = envContent.match(/VITE_SUPABASE_URL="(.*)"/)[1];
-const supabaseKey = envContent.match(/VITE_SUPABASE_PUBLISHABLE_KEY="(.*)"/)[1];
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
 
 async function run() {
-  const { data, error } = await supabase
-    .from('school_students')
-    .select('id, student_name, current_amount_due, payment_balance, fixed_monthly_amount')
-    .eq('branch_id', 'dd387300-dc45-4c1e-ae24-933750c78a8e')
-    .limit(20);
-    
-  console.log(JSON.stringify(data, null, 2));
+  const { data: branches } = await supabase.from('school_branches').select('id, branch_name');
+  console.log("Branches:", branches);
+  
+  const branchId = 'dd387300-dc45-4c1e-ae24-933750c78a8e';
+  const { data: students } = await supabase.from('school_students').select('is_active, payment_status, current_amount_due, payment_balance').eq('branch_id', branchId);
+  
+  if (students) {
+     console.log(`Branch ${branchId} total students:`, students.length);
+     console.log(`Active:`, students.filter(s => s.is_active === true).length);
+     console.log(`Paid Status:`, students.filter(s => s.payment_status === 'paid').length);
+  }
 }
-
 run();
