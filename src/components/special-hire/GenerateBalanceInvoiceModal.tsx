@@ -5,7 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Mail, Download, FileText, CheckCircle, Clock, Send, Info } from 'lucide-react';
+import { 
+  CheckCircle, Clock, XCircle, DollarSign, FileText, 
+  AlertTriangle, Receipt, Database, Building2, RefreshCw, Undo2,
+  BookOpen, Mail, Download, Send, Info
+} from 'lucide-react';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -803,6 +807,105 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             </CardContent>
           </Card>
 
+          {/* General Ledger & AR Impact Preview (Simulation) */}
+          <Card className="border-blue-200 bg-blue-50/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center text-blue-800">
+                <Database className="w-4 h-4 mr-2" />
+                Database Impact Preview (Simulation)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-xs text-slate-600 mb-2">
+                The following operations will be executed when you click "Email to Customer & Post to GL".
+              </div>
+              
+              <div className="space-y-3">
+                {/* Simulated AR Invoice */}
+                <div className="border rounded-md p-3 bg-white shadow-sm border-slate-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline" className="bg-slate-100 text-[10px]">school_ar_invoices</Badge>
+                    <span className="text-sm font-semibold text-slate-800">AR Invoice Generation</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs mt-3">
+                    <div>
+                      <div className="text-muted-foreground">Invoice Amount</div>
+                      <div className="font-medium text-slate-800">LKR {(computedTotalAmount() + (effectiveAdjustment.extra_km_total_charge || 0) + (effectiveAdjustment.total_additional_expenses || 0)).toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Advance Applied</div>
+                      <div className="font-medium text-blue-600">LKR {getActualTotalPaid().toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Balance Due</div>
+                      <div className="font-medium text-amber-600">LKR {finalBalance.toLocaleString()}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Simulated GL Entries */}
+                <div className="border rounded-md p-3 bg-white shadow-sm border-slate-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline" className="bg-slate-100 text-[10px]">journal_entries</Badge>
+                    <span className="text-sm font-semibold text-slate-800">Revenue Recognition (GL)</span>
+                  </div>
+                  <table className="w-full text-xs mt-3">
+                    <thead className="bg-slate-50 text-slate-500 text-left">
+                      <tr>
+                        <th className="py-1.5 px-2 font-medium border-b">Account</th>
+                        <th className="py-1.5 px-2 font-medium text-right border-b">Debit</th>
+                        <th className="py-1.5 px-2 font-medium text-right border-b">Credit</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      <tr>
+                        <td className="py-2 px-2 text-slate-800">Trade Receivables</td>
+                        <td className="py-2 px-2 text-right font-medium text-slate-800">{(computedTotalAmount() + (effectiveAdjustment.extra_km_total_charge || 0) + (effectiveAdjustment.total_additional_expenses || 0)).toLocaleString()}</td>
+                        <td className="py-2 px-2 text-right text-slate-400">-</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 px-2 pl-6 text-slate-600">Special Hire Revenue</td>
+                        <td className="py-2 px-2 text-right text-slate-400">-</td>
+                        <td className="py-2 px-2 text-right font-medium text-slate-800">{(computedTotalAmount() + (effectiveAdjustment.extra_km_total_charge || 0) + (effectiveAdjustment.total_additional_expenses || 0)).toLocaleString()}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Simulated Advance Allocation GL */}
+                {getActualTotalPaid() > 0 && (
+                  <div className="border rounded-md p-3 bg-white shadow-sm border-slate-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline" className="bg-slate-100 text-[10px]">journal_entries</Badge>
+                      <span className="text-sm font-semibold text-slate-800">Advance Allocation (GL)</span>
+                    </div>
+                    <table className="w-full text-xs mt-3">
+                      <thead className="bg-slate-50 text-slate-500 text-left">
+                        <tr>
+                          <th className="py-1.5 px-2 font-medium border-b">Account</th>
+                          <th className="py-1.5 px-2 font-medium text-right border-b">Debit</th>
+                          <th className="py-1.5 px-2 font-medium text-right border-b">Credit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <tr>
+                          <td className="py-2 px-2 text-slate-800">Customer Advance Liability</td>
+                          <td className="py-2 px-2 text-right font-medium text-slate-800">{getActualTotalPaid().toLocaleString()}</td>
+                          <td className="py-2 px-2 text-right text-slate-400">-</td>
+                        </tr>
+                        <tr>
+                          <td className="py-2 px-2 pl-6 text-slate-600">Trade Receivables</td>
+                          <td className="py-2 px-2 text-right text-slate-400">-</td>
+                          <td className="py-2 px-2 text-right font-medium text-slate-800">{getActualTotalPaid().toLocaleString()}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Invoice HTML Preview */}
           <Card>
             <CardContent className="p-6 bg-muted/30">
@@ -841,9 +944,10 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             <Button
               onClick={handleEmailToCustomer}
               disabled={isLoading || isAutoSaving || !quotationData.customer_email}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Mail className="w-4 h-4 mr-2" />
-              Email to Customer
+              Email to Customer & Post to GL
             </Button>
           </div>
         </div>

@@ -34,6 +34,9 @@ export const useCreateJournalEntry = () => {
       const businessUnitCode = getBusinessUnitCode();
       const businessUnitId = isSubCompany(selectedCompanyId) ? selectedCompanyId : null;
       
+      // Get current user to track who created it
+      const { data: { user } } = await supabase.auth.getUser();
+
       const { data: journalEntry, error: entryError } = await supabase
         .from("journal_entries")
         .insert([{
@@ -48,6 +51,7 @@ export const useCreateJournalEntry = () => {
           company_id: effectiveCompanyId, // Posts to parent company for consolidated GL
           business_unit_id: businessUnitId, // Tags with originating sub-company
           business_unit_code: businessUnitCode, // Short code for filtering (SBO, YUT, etc.)
+          created_by: user?.id || null,
         }])
         .select()
         .single();
@@ -126,11 +130,17 @@ export const usePostJournalEntry = () => {
         }
       }
       
+      // Get current user to track who posted it
+      const { data: { user } } = await supabase.auth.getUser();
+
       const { error: statusError } = await supabase
         .from("journal_entries")
         .update({ 
           status: "posted" as const,
           posted_at: new Date().toISOString(),
+          posted_by: user?.id || null,
+          approved_at: new Date().toISOString(),
+          approved_by: user?.id || null,
         })
         .eq("id", entryId);
       

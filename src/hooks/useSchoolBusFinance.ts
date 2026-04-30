@@ -1072,6 +1072,7 @@ export function usePostPaymentToGL() {
       previousBalance?: number;    // Student's credit balance from previous months (positive = credit)
       customArAccountId?: string;  // Override Trade Receivables account (e.g. for Suspense)
       customBankAccountId?: string; // Override Bank account (e.g. for Suspense -> AR reversals)
+      studentId?: string;          // Added: Student ID to update operational record
     }) => {
       // Get finance settings for this branch
       const { data: settings } = await supabase
@@ -1289,6 +1290,19 @@ export function usePostPaymentToGL() {
         })
         .eq("id", paymentId);
 
+      // Find the actual bank_account_id by linking it to the GL account used
+      let physicalBankAccountId = effectiveSettings.bank_account_id;
+      if (!physicalBankAccountId && bankGLAccountId) {
+        const { data: linkedBank } = await supabase
+          .from("bank_accounts")
+          .select("id")
+          .eq("gl_account_id", bankGLAccountId)
+          .maybeSingle();
+        if (linkedBank) {
+          physicalBankAccountId = linkedBank.id;
+        }
+      }
+
       // Create AR Receipt record in Finance module
       try {
         const receiptNumber = `SBS-REC-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -1331,7 +1345,7 @@ export function usePostPaymentToGL() {
             reference: referenceNo || paymentId,
             status: 'posted',
             journal_entry_id: journalEntry.id,
-            bank_account_id: effectiveSettings.bank_account_id || null,
+            bank_account_id: physicalBankAccountId || null,
             notes: `School Bus Payment - ${studentName}`,
             is_advance: (overpaymentAmount && overpaymentAmount > 0) ? true : false,
           } as any)
@@ -1357,9 +1371,9 @@ export function usePostPaymentToGL() {
           }
 
           // If a bank account is configured, record the bank transaction and update balance
-          if (effectiveSettings.bank_account_id && amount > 0) {
+          if (physicalBankAccountId && amount > 0) {
             await supabase.from("bank_transactions").insert([{
-              bank_account_id: effectiveSettings.bank_account_id,
+              bank_account_id: physicalBankAccountId,
               transaction_date: format(new Date(), "yyyy-MM-dd"),
               transaction_type: "receipt",
               description: `School Bus Payment from ${studentName} - ${receiptNumber}`,
@@ -1375,14 +1389,14 @@ export function usePostPaymentToGL() {
             const { data: bankAccount } = await supabase
               .from("bank_accounts")
               .select("current_balance")
-              .eq("id", effectiveSettings.bank_account_id)
+              .eq("id", physicalBankAccountId)
               .single();
 
             if (bankAccount) {
               await supabase
                 .from("bank_accounts")
                 .update({ current_balance: (bankAccount.current_balance || 0) + amount })
-                .eq("id", effectiveSettings.bank_account_id);
+                .eq("id", physicalBankAccountId);
             }
           }
         }
@@ -1608,6 +1622,19 @@ export function usePostGroupedPaymentToGL() {
 
       await updateAccountBalancesFromJournalEntry(journalEntry.id);
 
+      // Find the actual bank_account_id by linking it to the GL account used
+      let physicalBankAccountId = effectiveSettings.bank_account_id;
+      if (!physicalBankAccountId && bankGLAccountId) {
+        const { data: linkedBank } = await supabase
+          .from("bank_accounts")
+          .select("id")
+          .eq("gl_account_id", bankGLAccountId)
+          .maybeSingle();
+        if (linkedBank) {
+          physicalBankAccountId = linkedBank.id;
+        }
+      }
+
       let receiptCustomerId: string | null = null;
       const { data: existingCust } = await supabase
         .from("customers")
@@ -1656,7 +1683,7 @@ export function usePostGroupedPaymentToGL() {
               reference: referenceNo || alloc.paymentId,
               status: 'posted',
               journal_entry_id: journalEntry.id,
-              bank_account_id: effectiveSettings.bank_account_id || null,
+              bank_account_id: physicalBankAccountId || null,
               notes: `School Bus Payment - ${alloc.studentName}`,
               is_advance: (alloc.overpaymentAmount && alloc.overpaymentAmount > 0) ? true : false,
             } as any)
@@ -1685,9 +1712,9 @@ export function usePostGroupedPaymentToGL() {
         }
       }
 
-      if (effectiveSettings.bank_account_id && totalAmount > 0) {
+      if (physicalBankAccountId && totalAmount > 0) {
         await supabase.from("bank_transactions").insert([{
-          bank_account_id: effectiveSettings.bank_account_id,
+          bank_account_id: physicalBankAccountId,
           transaction_date: format(new Date(), "yyyy-MM-dd"),
           transaction_type: "receipt",
           description: description || `Grouped School Bus Payment - ${referenceNo || ''}`,
@@ -1702,14 +1729,14 @@ export function usePostGroupedPaymentToGL() {
         const { data: bankAccount } = await supabase
           .from("bank_accounts")
           .select("current_balance")
-          .eq("id", effectiveSettings.bank_account_id)
+          .eq("id", physicalBankAccountId)
           .single();
 
         if (bankAccount) {
           await supabase
             .from("bank_accounts")
             .update({ current_balance: (bankAccount.current_balance || 0) + totalAmount })
-            .eq("id", effectiveSettings.bank_account_id);
+            .eq("id", physicalBankAccountId);
         }
       }
 

@@ -116,27 +116,70 @@ export default function SchoolBusService() {
 
   const fetchBranchStats = async (branchId: string) => {
     try {
-      const { data: students, error: studentsError } = await supabase
-        .from("school_students")
-        .select("payment_status, payment_amount")
-        .eq("branch_id", branchId)
-        .eq("is_active", true);
+      let allBranchStudents: any[] = [];
+      let hasMore = true;
+      let page = 0;
+      const pageSize = 1000;
+      
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("school_students")
+          .select("is_active, payment_status, payment_amount, current_amount_due, payment_balance")
+          .eq("branch_id", branchId)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+          
+        if (error) throw error;
+        allBranchStudents = [...allBranchStudents, ...(data || [])];
+        hasMore = data && data.length === pageSize;
+        page++;
+      }
 
-      if (studentsError) throw studentsError;
+      const activeStudents = allBranchStudents.filter(s => s.is_active !== false);
+
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
 
       const { data: payments, error: paymentsError } = await supabase
-        .from("school_payments")
-        .select("amount, status")
-        .eq("branch_id", branchId)
-        .eq("status", "paid");
+        .from("school_payment_transactions")
+        .select("amount_paid, payment_date, school_students!inner(branch_id)")
+        .eq("school_students.branch_id", branchId);
 
       if (paymentsError) throw paymentsError;
 
-      const totalStudents = students?.length || 0;
-      const paidStudents = students?.filter(s => s.payment_status === "paid").length || 0;
-      const pendingStudents = students?.filter(s => s.payment_status === "pending").length || 0;
-      const overduePayments = students?.filter(s => s.payment_status === "overdue").length || 0;
-      const totalRevenue = payments?.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) || 0;
+      const currentMonthTx = (payments || []).filter((tx: any) => {
+        if (!tx.payment_date) return false;
+        return new Date(tx.payment_date) >= startOfMonth;
+      });
+
+      const totalStudents = activeStudents.length;
+      
+      let paidStudentsCount = 0;
+      let pendingStudentsCount = 0;
+      let overduePaymentsCount = 0;
+
+      activeStudents.forEach(s => {
+        const due = s.current_amount_due || 0;
+        const balance = s.payment_balance || 0;
+        const hasPaymentHistory = Number(s.payment_amount) > 0 || balance > 0;
+        const isMathematicallyPaid = due <= 0 && balance >= 0 && hasPaymentHistory;
+        
+        const isStatusPaid = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'paid';
+        const isStatusOverdue = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'overdue';
+
+        if (isMathematicallyPaid || isStatusPaid) {
+          paidStudentsCount++;
+        } else if (due > 0 && balance < 0) {
+          overduePaymentsCount++;
+        } else {
+          pendingStudentsCount++;
+        }
+      });
+
+      const paidStudents = paidStudentsCount;
+      const pendingStudents = pendingStudentsCount;
+      const overduePayments = overduePaymentsCount;
+      const totalRevenue = currentMonthTx.reduce((sum, p) => sum + (Number(p.amount_paid) || 0), 0) || 0;
 
       setBranchStats(prev => ({
         ...prev,
