@@ -125,6 +125,49 @@ export function useCustomerData() {
         return name.trim();
       };
 
+      // Process Yutong master customers first
+      yutongCustomers.data?.forEach(customer => {
+        const normalizedPhone = normalizePhone(customer.phone);
+        const normalizedEmail = customer.email?.toLowerCase().trim() || '';
+        const key = normalizedPhone || normalizedEmail || customer.id;
+        
+        customerMap.set(key, {
+          id: customer.id,
+          name: customer.contact_person || customer.company_name,
+          company_name: customer.company_name,
+          phone: customer.phone,
+          email: customer.email,
+          address: customer.address,
+          city: customer.city,
+          source: 'yutong',
+          customer_type: customer.customer_type === 'business' || customer.customer_type === 'government' ? 'corporate' : 'individual',
+          created_at: customer.created_at,
+          analytics: {
+            total_lifetime_value: 0,
+            yutong_revenue: 0,
+            sinotruck_revenue: 0,
+            special_hire_revenue: 0,
+            maintenance_revenue: 0,
+            outstanding_balance: 0,
+            total_transactions: 0,
+            yutong_purchases: 0,
+            sinotruck_purchases: 0,
+            special_hire_bookings: 0,
+            owned_buses: 0,
+            avg_booking_value: 0,
+            first_interaction: customer.created_at,
+            last_interaction: customer.updated_at || customer.created_at,
+            months_active: 0,
+            booking_frequency: 0,
+            preferred_bus_types: [],
+            common_routes: [],
+            payment_methods: [],
+            recent_transactions: [],
+            monthly_revenue_trend: []
+          }
+        });
+      });
+
       // Process Yutong quotations as primary source for Yutong customers
       yutongQuotations.data?.forEach(quotation => {
         const normalizedPhone = normalizePhone(quotation.customer_phone);
@@ -143,7 +186,7 @@ export function useCustomerData() {
             address: quotation.customer_address,
             city: '',
             source: 'yutong',
-            customer_type: quotation.company_name ? 'corporate' : 'individual',
+            customer_type: normalizeCompanyName(quotation.company_name) ? 'corporate' : 'individual',
             created_at: quotation.created_at,
             analytics: {
               total_lifetime_value: 0,
@@ -175,8 +218,9 @@ export function useCustomerData() {
           if (!existing.email && quotation.customer_email) {
             existing.email = quotation.customer_email;
           }
-          if (!existing.company_name && quotation.company_name) {
+          if (!existing.company_name && normalizeCompanyName(quotation.company_name)) {
             existing.company_name = normalizeCompanyName(quotation.company_name);
+            existing.customer_type = 'corporate';
           }
           if (!existing.address && quotation.customer_address) {
             existing.address = quotation.customer_address;
@@ -206,7 +250,7 @@ export function useCustomerData() {
             address: quotation.customer_address,
             city: '',
             source: 'sinotruck',
-            customer_type: quotation.company_name ? 'corporate' : 'individual',
+            customer_type: normalizeCompanyName(quotation.company_name) ? 'corporate' : 'individual',
             created_at: quotation.created_at,
             analytics: {
               total_lifetime_value: 0,
@@ -238,8 +282,9 @@ export function useCustomerData() {
           if (!existing.email && quotation.customer_email) {
             existing.email = quotation.customer_email;
           }
-          if (!existing.company_name && quotation.company_name) {
+          if (!existing.company_name && normalizeCompanyName(quotation.company_name)) {
             existing.company_name = normalizeCompanyName(quotation.company_name);
+            existing.customer_type = 'corporate';
           }
           if (!existing.address && quotation.customer_address) {
             existing.address = quotation.customer_address;
@@ -268,7 +313,7 @@ export function useCustomerData() {
             address: quotation.pickup_location, // Using pickup as address fallback
             city: '',
             source: 'special_hire',
-            customer_type: quotation.company_name ? 'corporate' : 'individual',
+            customer_type: normalizeCompanyName(quotation.company_name) ? 'corporate' : 'individual',
             created_at: quotation.created_at,
             analytics: {
               total_lifetime_value: 0,
@@ -295,6 +340,21 @@ export function useCustomerData() {
             }
           };
           customerMap.set(key, customer);
+        } else {
+          // Merge data if key exists
+          if (!customer.email && quotation.customer_email) {
+            customer.email = quotation.customer_email;
+          }
+          if (!customer.company_name && normalizeCompanyName(quotation.company_name)) {
+            customer.company_name = normalizeCompanyName(quotation.company_name);
+            customer.customer_type = 'corporate';
+          }
+          if (!customer.address && quotation.pickup_location) {
+            customer.address = quotation.pickup_location;
+          }
+          if (new Date(quotation.created_at) > new Date(customer.analytics.last_interaction)) {
+            customer.analytics.last_interaction = quotation.created_at;
+          }
         }
       });
 

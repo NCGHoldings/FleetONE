@@ -114,7 +114,11 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
 
       // Filter by specific business unit if provided (auto or override)
       if (businessUnitCode && businessUnitCode !== "all") {
-        query = query.eq("business_unit_code", businessUnitCode);
+        if (businessUnitCode === "SBO") {
+          query = query.or(`business_unit_code.eq.SBO,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%`);
+        } else {
+          query = query.or(`business_unit_code.eq.${businessUnitCode},entry_number.ilike.${businessUnitCode}-%`);
+        }
       } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
         // Parent companies drop filter
       } else if (selectedCompany) {
@@ -364,7 +368,11 @@ export const useARInvoices = (status?: string) => {
 
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
-        query = query.eq("business_unit_code", autoBusinessUnitCode);
+        if (autoBusinessUnitCode === "SBO") {
+          query = query.or(`business_unit_code.eq.SBO,invoice_number.ilike.SBS-%`);
+        } else {
+          query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},invoice_number.ilike.${autoBusinessUnitCode}-%`);
+        }
       } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
         // Parent companies drop filter
       } else if (selectedCompany) {
@@ -445,7 +453,11 @@ export const useAPInvoices = (status?: string) => {
 
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
-        query = query.eq("business_unit_code", autoBusinessUnitCode);
+        if (autoBusinessUnitCode === "SBO") {
+          query = query.or(`business_unit_code.eq.SBO,invoice_number.ilike.SBS-%`);
+        } else {
+          query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},invoice_number.ilike.${autoBusinessUnitCode}-%`);
+        }
       } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
         // Parent companies drop filter
       } else if (selectedCompany) {
@@ -505,7 +517,11 @@ export const useARReceipts = () => {
 
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
-        query = query.eq("business_unit_code", autoBusinessUnitCode);
+        if (autoBusinessUnitCode === "SBO") {
+          query = query.or(`business_unit_code.eq.SBO,receipt_number.ilike.SBS-%`);
+        } else {
+          query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},receipt_number.ilike.${autoBusinessUnitCode}-%`);
+        }
       } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
         // Parent companies drop filter
       } else if (selectedCompany) {
@@ -586,7 +602,11 @@ export const useAPPayments = () => {
 
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
-        query = query.eq("business_unit_code", autoBusinessUnitCode);
+        if (autoBusinessUnitCode === "SBO") {
+          query = query.or(`business_unit_code.eq.SBO,payment_number.ilike.SBS-%`);
+        } else {
+          query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},payment_number.ilike.${autoBusinessUnitCode}-%`);
+        }
       } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
         // Parent companies drop filter
       } else if (selectedCompany) {
@@ -1060,18 +1080,19 @@ export const useAuditLogs = (tableName?: string, recordId?: string) => {
 
 // ============ Dashboard Summaries ============
 export const useAccountingSummary = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["accounting-summary", selectedCompanyId],
+    queryKey: ["accounting-summary", selectedCompanyId, effectiveCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("chart_of_accounts")
         .select("account_type, current_balance")
         .eq("is_active", true);
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       const { data: accounts, error } = await query;
