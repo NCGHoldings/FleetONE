@@ -1,0 +1,500 @@
+src/utils/bus-category-seeder.ts:      const { data } = await supabase.from("yutong_bus_models").select("*").eq("is_active", true);
+src/utils/bus-category-seeder.ts-      allModels = (data || []).map(m => ({ ...m, prefix: 'YUT' }));
+src/utils/bus-category-seeder.ts-      // Cleanup SNT/LV from Yutong
+--
+src/utils/bus-category-seeder.ts:      const { data } = await supabase.from("sinotruck_truck_models").select("*").eq("is_active", true);
+src/utils/bus-category-seeder.ts-      allModels = (data || []).map(m => ({ ...m, prefix: 'SNT' }));
+src/utils/bus-category-seeder.ts-      // Cleanup YUT/LV from Sinotruk
+--
+src/utils/bus-category-seeder.ts:      const { data } = await supabase.from("lightvehicle_models").select("*").eq("is_active", true);
+src/utils/bus-category-seeder.ts-      allModels = (data || []).map(m => ({ ...m, prefix: 'LV' }));
+src/utils/bus-category-seeder.ts:      await supabase.from("items").delete().eq("company_id", companyId).like("item_code", "YUT-%");
+--
+src/utils/bus-category-seeder.ts:      const yutongPromise = supabase.from("yutong_bus_models").select("*").eq("is_active", true);
+src/utils/bus-category-seeder.ts:      const sinotrukPromise = supabase.from("sinotruck_truck_models").select("*").eq("is_active", true);
+src/utils/bus-category-seeder.ts:      const lightVehiclePromise = supabase.from("lightvehicle_models").select("*").eq("is_active", true);
+src/utils/bus-category-seeder.ts-      const [yutongRes, sinotrukRes, lvRes] = await Promise.all([yutongPromise, sinotrukPromise, lightVehiclePromise]);
+src/utils/bus-category-seeder.ts-      allModels = [
+--
+src/components/lightvehicle/LightVehicleDeliveryOrderManagement.tsx:    const { data: ordersData } = await supabase.from('lightvehicle_orders').select('id, order_no, bus_model, quantity').order('created_at', { ascending: false });
+src/components/lightvehicle/LightVehicleDeliveryOrderManagement.tsx-    setOrders(ordersData || []);
+src/components/lightvehicle/LightVehicleDeliveryOrderManagement.tsx-    setLoading(false);
+--
+src/components/lightvehicle/LightVehicleLCManagement.tsx:    const { data: ordersData } = await supabase.from('lightvehicle_orders').select('id, order_no, bus_model, quantity, total_amount').order('created_at', { ascending: false });
+src/components/lightvehicle/LightVehicleLCManagement.tsx-    setOrders(ordersData || []);
+src/components/lightvehicle/LightVehicleLCManagement.tsx-    setLoading(false);
+--
+src/components/accounting/DrillDownModal.tsx:      let query = supabase.from(table as any).select("*");
+src/components/accounting/DrillDownModal.tsx-      
+src/components/accounting/DrillDownModal.tsx-      if (matchColumn && reference) {
+--
+src/components/accounting/settings/BalanceReconciliationTool.tsx:        supabase.from("ar_invoices").select("journal_entry_id").in("journal_entry_id", jeIds),
+src/components/accounting/settings/BalanceReconciliationTool.tsx:        supabase.from("ar_receipts").select("journal_entry_id").in("journal_entry_id", jeIds),
+src/components/accounting/settings/BalanceReconciliationTool.tsx:        supabase.from("ap_invoices").select("journal_entry_id").in("journal_entry_id", jeIds),
+src/components/accounting/settings/BalanceReconciliationTool.tsx:        supabase.from("ap_payments").select("journal_entry_id").in("journal_entry_id", jeIds),
+src/components/accounting/settings/BalanceReconciliationTool.tsx-      ]);
+src/components/accounting/settings/BalanceReconciliationTool.tsx-
+--
+src/components/accounting/AccountsReceivableView.tsx:        const { data: students } = await supabase.from('school_students').select('id, student_name, bus_reg_no');
+src/components/accounting/AccountsReceivableView.tsx:        const { data: buses } = await supabase.from('buses').select('id, bus_no, category_id');
+src/components/accounting/AccountsReceivableView.tsx-        
+src/components/accounting/AccountsReceivableView.tsx-        const busMap = new Map();
+--
+src/components/accounting/expenses/ExpenseMappingGrid.tsx:    const { data: bData } = await supabase.from("buses").select("id, bus_no");
+src/components/accounting/expenses/ExpenseMappingGrid.tsx-    if (bData) setVehicles(bData);
+src/components/accounting/expenses/ExpenseMappingGrid.tsx-    
+--
+src/components/accounting/PettyCashReconciliationWorksheet.tsx:      const { data } = await supabase.from("petty_cash_funds").select("*").eq("company_id", selectedCompanyId!).order("fund_name");
+src/components/accounting/PettyCashReconciliationWorksheet.tsx-      return data || [];
+src/components/accounting/PettyCashReconciliationWorksheet.tsx-    },
+--
+src/components/accounting/PettyCashReconciliationWorksheet.tsx:      const { data } = await supabase.from("petty_cash_transactions").select("*").eq("petty_cash_fund_id", selectedFundId!).order("created_at", { ascending: true });
+src/components/accounting/PettyCashReconciliationWorksheet.tsx-      return data || [];
+src/components/accounting/PettyCashReconciliationWorksheet.tsx-    },
+--
+src/components/accounting/DataImportWizard.tsx-         .select('id, account_code')
+src/components/accounting/DataImportWizard.tsx-         .eq('company_id', selectedCompanyId)
+--
+--
+src/components/accounting/DataImportWizard.tsx-          .select('id')
+src/components/accounting/DataImportWizard.tsx-          .eq('company_id', selectedCompanyId)
+--
+--
+src/components/accounting/DataImportWizard.tsx-                 
+src/components/accounting/DataImportWizard.tsx-                 if (arAccounts?.[0] && equityAccountId && periodId) {
+--
+src/components/accounting/DataImportWizard.tsx-                 
+src/components/accounting/DataImportWizard.tsx-                 if (apAccounts?.[0] && equityAccountId && periodId) {
+--
+src/components/accounting/inventory/LandedCostVoucherForm.tsx:        supabase.from('companies').select('id, name').order('name'),
+src/components/accounting/inventory/LandedCostVoucherForm.tsx:        (supabase.from as any)('suppliers').select('id, supplier_name').order('supplier_name'),
+src/components/accounting/inventory/LandedCostVoucherForm.tsx:        supabase.from('chart_of_accounts').select('id, account_code, account_name').eq('account_type', 'liability' as any).order('account_code')
+src/components/accounting/inventory/LandedCostVoucherForm.tsx-      ]);
+src/components/accounting/inventory/LandedCostVoucherForm.tsx-      setCompanies(cData || []);
+--
+src/components/accounting/inventory/LandedCostVoucherForm.tsx:        supabase.from('projects').select('id, project_name').order('project_name'),
+src/components/accounting/inventory/LandedCostVoucherForm.tsx:        supabase.from('goods_receipt_notes').select('id, grn_number').eq('company_id', companyId).eq('status', 'Received').order('grn_number', { ascending: false })
+src/components/accounting/inventory/LandedCostVoucherForm.tsx-      ]);
+src/components/accounting/inventory/LandedCostVoucherForm.tsx-      setProjects(pData || []);
+--
+src/components/accounting/inventory/LandedCostVoucherForm.tsx-        .select(`
+src/components/accounting/inventory/LandedCostVoucherForm.tsx-          id, quantity, unit_price,
+--
+--
+src/components/accounting/JournalEntryDetailDialog.tsx-          .select('bank_account_id, cash_account_id, sbs_collection_account_id, trade_receivable_account_id')
+src/components/accounting/JournalEntryDetailDialog.tsx-          .eq('company_id', selectedCompanyId || entry?.company_id);
+--
+--
+src/components/accounting/JournalEntryDetailDialog.tsx-          .select('id, account_code, account_name, account_type')
+src/components/accounting/JournalEntryDetailDialog.tsx-          .eq('company_id', selectedCompanyId || entry?.company_id)
+--
+--
+src/components/accounting/JournalEntryDetailDialog.tsx-        .select('id, account_code, account_name, account_type')
+src/components/accounting/JournalEntryDetailDialog.tsx-        .in('id', Array.from(validIds))
+--
+--
+src/components/accounting/JournalEntryDetailDialog.tsx-
+src/components/accounting/JournalEntryDetailDialog.tsx-      // 1. Revert old account balance
+--
+src/components/accounting/JournalEntryDetailDialog.tsx:        supabase.from("ar_invoices").select("*, customers(customer_name)").eq("journal_entry_id", entryId),
+src/components/accounting/JournalEntryDetailDialog.tsx:        supabase.from("ap_invoices").select("*, vendors(vendor_name)").eq("journal_entry_id", entryId),
+src/components/accounting/JournalEntryDetailDialog.tsx:        supabase.from("ar_receipts").select("*, customers(customer_name)").eq("journal_entry_id", entryId),
+src/components/accounting/JournalEntryDetailDialog.tsx:        supabase.from("ap_payments").select("*, vendors(vendor_name)").eq("journal_entry_id", entryId),
+src/components/accounting/JournalEntryDetailDialog.tsx:        supabase.from("special_hire_payments").select("*").eq("journal_entry_id", entryId),
+src/components/accounting/JournalEntryDetailDialog.tsx:        supabase.from("bank_transactions").select("*, bank_accounts(account_name)").eq("journal_entry_id", entryId),
+src/components/accounting/JournalEntryDetailDialog.tsx-      ]);
+src/components/accounting/JournalEntryDetailDialog.tsx-
+--
+src/components/accounting/petty-cash/PettyCashReportsTab.tsx:      const { data, error } = await supabase.from("school_branches").select("id, branch_name").eq("is_active", true).order("branch_name");
+src/components/accounting/petty-cash/PettyCashReportsTab.tsx-      if (error) throw error;
+src/components/accounting/petty-cash/PettyCashReportsTab.tsx-      return data;
+--
+src/components/accounting/petty-cash/PettyCashFundsTab.tsx:      const { data, error } = await supabase.from("school_branches").select("id, branch_name").eq("is_active", true).order("branch_name");
+src/components/accounting/petty-cash/PettyCashFundsTab.tsx-      if (error) throw error;
+src/components/accounting/petty-cash/PettyCashFundsTab.tsx-      return data;
+--
+src/components/accounting/APInvoiceForm.tsx-          const effectiveCompanyId = getEffectiveCompanyId?.() || undefined;
+src/components/accounting/APInvoiceForm.tsx-          if (effectiveCompanyId) query = query.eq("company_id", effectiveCompanyId);
+--
+src/components/accounting/FinancialStatementsView.tsx:      const q = supabase.from("chart_of_accounts").select("*").eq("is_active", true).order("account_code");
+src/components/accounting/FinancialStatementsView.tsx-      if (effectiveCompanyId) q.eq("company_id", effectiveCompanyId);
+src/components/accounting/FinancialStatementsView.tsx-      const { data, error } = await q;
+--
+src/components/accounting/IntercompanyReconciliationView.tsx:      const { data } = await supabase.from("companies").select("id, name, short_code").order("name");
+src/components/accounting/IntercompanyReconciliationView.tsx-      return data || [];
+src/components/accounting/IntercompanyReconciliationView.tsx-    },
+--
+src/components/special-hire/ReferralAgentsManagement.tsx-          .select('referral_agent_id, commission_amount, payment_status'),
+src/components/special-hire/ReferralAgentsManagement.tsx:        supabase.from('yutong_referral_commission_payments')
+src/components/special-hire/ReferralAgentsManagement.tsx-          .select('referral_agent_id, commission_amount, payment_status'),
+src/components/special-hire/ReferralAgentsManagement.tsx:        supabase.from('lightvehicle_referral_commission_payments')
+src/components/special-hire/ReferralAgentsManagement.tsx-          .select('agent_id, commission_amount, status'),
+src/components/special-hire/ReferralAgentsManagement.tsx:        supabase.from('sinotruck_referral_commission_payments')
+src/components/special-hire/ReferralAgentsManagement.tsx-          .select('referral_agent_id, commission_amount, payment_status')
+src/components/special-hire/ReferralAgentsManagement.tsx-      ]);
+--
+--
+src/components/special-hire/spreadsheet/ImportExcelButton.tsx-        if (existing) continue;
+src/components/special-hire/spreadsheet/ImportExcelButton.tsx-
+--
+src/components/special-hire/LoadSavedRouteDialog.tsx-        .select("*")
+src/components/special-hire/LoadSavedRouteDialog.tsx-        .order("created_at", { ascending: false });
+--
+--
+src/components/layout/AppSidebar.tsx-      if (error) {
+src/components/layout/AppSidebar.tsx-        console.error('Error loading logo:', error);
+--
+src/components/sinotruck/SinotrukLCManagement.tsx:    const { data: ordersData } = await supabase.from('sinotruck_orders').select('id, order_no, bus_model, quantity, total_amount').order('created_at', { ascending: false });
+src/components/sinotruck/SinotrukLCManagement.tsx-    setOrders(ordersData || []);
+src/components/sinotruck/SinotrukLCManagement.tsx-    setLoading(false);
+--
+src/components/system-health/RealDataSummary.tsx:        supabase.from('buses').select('id, status', { count: 'exact' }),
+src/components/system-health/RealDataSummary.tsx:        supabase.from('profiles').select('id, status', { count: 'exact' }),
+src/components/system-health/RealDataSummary.tsx:        supabase.from('special_hire_quotations').select('id, trip_status, balance_due', { count: 'exact' }),
+src/components/system-health/RealDataSummary.tsx:        supabase.from('yutong_quotations').select('id, status', { count: 'exact' }),
+src/components/system-health/RealDataSummary.tsx:        supabase.from('school_students').select('id, is_active, payment_status', { count: 'exact' }),
+src/components/system-health/RealDataSummary.tsx:        supabase.from('maintenance_records').select('id, status', { count: 'exact' }),
+src/components/system-health/RealDataSummary.tsx:        supabase.from('journal_entries').select('id, status', { count: 'exact' }),
+src/components/system-health/RealDataSummary.tsx:        supabase.from('daily_trips').select('id, status', { count: 'exact' }),
+src/components/system-health/RealDataSummary.tsx:        supabase.from('routes').select('id, is_active', { count: 'exact' }),
+src/components/system-health/RealDataSummary.tsx:        supabase.from('accident_records').select('id, status', { count: 'exact' }),
+src/components/system-health/RealDataSummary.tsx:        supabase.from('feedback_complaints').select('id, status', { count: 'exact' }),
+src/components/system-health/RealDataSummary.tsx-      ]);
+src/components/system-health/RealDataSummary.tsx-
+--
+src/components/driver-allocation/BulkImportModal.tsx:        supabase.from('buses').select('id, bus_no'),
+src/components/driver-allocation/BulkImportModal.tsx:        supabase.from('routes').select('id, route_no, route_name'),
+src/components/driver-allocation/BulkImportModal.tsx:        supabase.from('profiles').select('user_id, first_name, last_name')
+src/components/driver-allocation/BulkImportModal.tsx-      ]);
+src/components/driver-allocation/BulkImportModal.tsx-
+--
+src/components/budgeting/BudgetDashboard.tsx:      const q = supabase.from("budgets").select("*").order("created_at", { ascending: false });
+src/components/budgeting/BudgetDashboard.tsx-      if (effectiveCompanyId) q.eq("company_id", effectiveCompanyId);
+src/components/budgeting/BudgetDashboard.tsx-      const { data, error } = await q;
+--
+src/components/budgeting/BudgetAnalytics.tsx:      const q = supabase.from("budgets").select("*").order("created_at", { ascending: false });
+src/components/budgeting/BudgetAnalytics.tsx-      if (effectiveCompanyId) q.eq("company_id", effectiveCompanyId);
+src/components/budgeting/BudgetAnalytics.tsx-      const { data, error } = await q;
+--
+src/components/fleet/FleetVehicleDataImport.tsx:      const { data: existingBuses } = await supabase.from("buses").select("id, bus_no");
+src/components/fleet/FleetVehicleDataImport.tsx-      const busMap = new Map<string, { id: string; bus_no: string }>();
+src/components/fleet/FleetVehicleDataImport.tsx-      (existingBuses || []).forEach(b => busMap.set(normalizeBusNo(b.bus_no), b));
+--
+src/components/fleet/FleetVehicleDataImport.tsx:      supabase.from("bus_categories").select("id, name"),
+src/components/fleet/FleetVehicleDataImport.tsx:      supabase.from("bus_sub_categories").select("id, name, category_id"),
+src/components/fleet/FleetVehicleDataImport.tsx-    ]);
+src/components/fleet/FleetVehicleDataImport.tsx-
+--
+src/components/fleet/FleetExcelImport.tsx:    const { data: allBuses } = await supabase.from('buses').select('id, bus_no');
+src/components/fleet/FleetExcelImport.tsx-    const busMap = new Map((allBuses || []).map(b => [normalizeBusNo(b.bus_no), b.id]));
+src/components/fleet/FleetExcelImport.tsx-
+--
+src/components/fleet/FleetExcelImport.tsx:    const { data: existingRoster } = await supabase.from('fleet_master_roster').select('id, bus_id');
+src/components/fleet/FleetExcelImport.tsx-    const rosterMap = new Map((existingRoster || []).map(r => [r.bus_id, r.id]));
+src/components/fleet/FleetExcelImport.tsx-
+--
+src/components/fleet/FleetExcelImport.tsx:      const { data: currentRoster } = await supabase.from('fleet_master_roster').select('id, bus_id');
+src/components/fleet/FleetExcelImport.tsx-      const rosterMap = new Map((currentRoster || []).map(r => [r.bus_id, r.id]));
+src/components/fleet/FleetExcelImport.tsx-
+--
+src/components/yutong/YutongLandedCostView.tsx:      supabase.from('landed_cost_charges').select('*').eq('voucher_id', voucherId),
+src/components/yutong/YutongLandedCostView.tsx:      supabase.from('landed_cost_items').select('*').eq('voucher_id', voucherId),
+src/components/yutong/YutongLandedCostView.tsx-    ]);
+src/components/yutong/YutongLandedCostView.tsx-    setChargesMap(prev => ({ ...prev, [voucherId]: charges || [] }));
+--
+src/components/trips/ImportFromAllocationModal.tsx:        supabase.from('buses').select('id, bus_no'),
+src/components/trips/ImportFromAllocationModal.tsx:        supabase.from('routes').select('id, route_no, route_name')
+src/components/trips/ImportFromAllocationModal.tsx-      ]);
+src/components/trips/ImportFromAllocationModal.tsx-      setBuses(busesRes.data || []);
+--
+src/components/trips/EditTripForm.tsx:        supabase.from('buses').select('id, bus_no, model, expected_km_per_liter').eq('status', 'active'),
+src/components/trips/EditTripForm.tsx:        supabase.from('profiles').select('user_id, first_name, last_name, employee_id').eq('status', 'active')
+src/components/trips/EditTripForm.tsx-      ]);
+src/components/trips/EditTripForm.tsx-
+--
+src/components/trips/AddTripForm.tsx:        supabase.from('buses').select('id, bus_no, model, capacity, expected_km_per_liter').eq('status', 'active'),
+src/components/trips/AddTripForm.tsx:        supabase.from('routes').select('id, route_no, route_name, distance_km').eq('is_active', true),
+src/components/trips/AddTripForm.tsx:        supabase.from('driver_allocations').select('notes')
+src/components/trips/AddTripForm.tsx-      ]);
+src/components/trips/AddTripForm.tsx-
+--
+src/components/trips/AddTripForm.tsx-
+src/components/trips/AddTripForm.tsx-      if (error) throw error;
+--
+src/hooks/useCashReconciliation.ts-        if (error) throw error;
+src/hooks/useCashReconciliation.ts-        row.settlement_id = data.id;
+--
+src/hooks/useCashFlowData.ts:      const q = supabase.from("chart_of_accounts").select("*").order("account_code");
+src/hooks/useCashFlowData.ts-      if (effectiveCompanyId) q.eq("company_id", effectiveCompanyId);
+src/hooks/useCashFlowData.ts-      const { data, error } = await q;
+--
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_quotations').select('id, status, total_price, quantity, created_at, bus_model, customer_name, is_active_version'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_orders').select('id, status, total_amount, quantity, unit_price, payment_mode, current_phase, total_paid, balance_due, bus_model, customer_id, order_date, actual_delivery_date, created_at, expected_delivery_date'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_payment_schedules').select('id, amount, status, due_date, payment_date'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_letter_of_credits').select('id, status, lc_amount'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_shipment_groups').select('id, status, shipment_name, created_at'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_shipments').select('id, status'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_customs_declarations').select('id, customs_status'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_vehicle_processing').select('id, current_stage'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_rmv_registrations').select('id, registration_status'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_delivery_inspections').select('id, status'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_delivery_confirmations').select('id'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_customer_handovers').select('id, status'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_warranties').select('id, status'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_support_tickets').select('id, status, priority'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_service_reminders').select('id, service_completed, due_date'),
+src/hooks/useLightVehicleExecutiveReport.ts:    supabase.from('lightvehicle_customer_feedback').select('id, overall_rating'),
+src/hooks/useLightVehicleExecutiveReport.ts-  ]);
+src/hooks/useLightVehicleExecutiveReport.ts-
+--
+src/hooks/useLightVehicleExecutiveReport.ts:    const { data } = await supabase.from('lightvehicle_customers').select('id, company_name, contact_person').in('id', customerIds);
+src/hooks/useLightVehicleExecutiveReport.ts-    customersData = data || [];
+src/hooks/useLightVehicleExecutiveReport.ts-  }
+--
+src/hooks/useCustomerData.ts:        supabase.from('yutong_customers').select('*'),
+src/hooks/useCustomerData.ts:        supabase.from('yutong_quotations').select('*'),
+src/hooks/useCustomerData.ts:        supabase.from('sinotruck_quotations').select('*'),
+src/hooks/useCustomerData.ts:        supabase.from('special_hire_quotations').select('*'),
+src/hooks/useCustomerData.ts:        supabase.from('buses').select('*')
+src/hooks/useCustomerData.ts-      ]);
+src/hooks/useCustomerData.ts-      const sinotruckQuotations = { ...sinotruckQuotationsRaw, data: (sinotruckQuotationsRaw.data || []) as any[] };
+--
+src/hooks/useCustomerData.ts:          let query = supabase.from('yutong_customers').select('*');
+src/hooks/useCustomerData.ts-          
+src/hooks/useCustomerData.ts-          if (selectedCustomer.phone) {
+--
+src/hooks/useFeedbackModule.ts:        supabase.from('feedback_items').select('*'),
+src/hooks/useFeedbackModule.ts:        supabase.from('feedback_meetings').select('*')
+src/hooks/useFeedbackModule.ts-      ]);
+src/hooks/useFeedbackModule.ts-      
+--
+src/hooks/useYutongVehicleDataManagement.ts:        supabase.from('yutong_vehicle_data_sheets').select('id, status'),
+src/hooks/useYutongVehicleDataManagement.ts:        supabase.from('yutong_vehicle_records').select('id, is_matched, match_status')
+src/hooks/useYutongVehicleDataManagement.ts-      ]);
+src/hooks/useYutongVehicleDataManagement.ts-
+--
+src/hooks/useLeaveRequests.ts-      .select(`
+src/hooks/useLeaveRequests.ts-        *,
+--
+--
+src/hooks/useSpecialHireSpreadsheetData.ts:    let query = supabase.from(table).select(columns).in('quotation_id', chunk);
+src/hooks/useSpecialHireSpreadsheetData.ts-    
+src/hooks/useSpecialHireSpreadsheetData.ts-    if (filter) {
+--
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_quotations').select('id, status, total_price, quantity, created_at, bus_model, customer_name, is_active_version'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_orders').select('id, status, total_amount, quantity, unit_price, payment_mode, current_phase, total_paid, balance_due, bus_model, customer_id, order_date, actual_delivery_date, created_at, expected_delivery_date'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_payment_schedules').select('id, amount, status, due_date, payment_date'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_letter_of_credits').select('id, status, lc_amount'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_shipment_groups').select('id, status, shipment_name, created_at'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_shipments').select('id, status'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_customs_declarations').select('id, customs_status'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_vehicle_processing').select('id, current_stage'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_rmv_registrations').select('id, registration_status'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_delivery_inspections').select('id, status'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_delivery_confirmations').select('id'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_customer_handovers').select('id, status'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_warranties').select('id, status'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_support_tickets').select('id, status, priority'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_service_reminders').select('id, service_completed, due_date'),
+src/hooks/useSinotrukExecutiveReport.ts:    supabase.from('sinotruck_customer_feedback').select('id, overall_rating'),
+src/hooks/useSinotrukExecutiveReport.ts-  ]);
+src/hooks/useSinotrukExecutiveReport.ts-
+--
+src/hooks/useSinotrukExecutiveReport.ts:    const { data } = await supabase.from('sinotruck_customers').select('id, company_name, contact_person').in('id', customerIds);
+src/hooks/useSinotrukExecutiveReport.ts-    customersData = data || [];
+src/hooks/useSinotrukExecutiveReport.ts-  }
+--
+src/hooks/useSinotrukVehicleDataManagement.ts:        supabase.from('sinotruck_vehicle_data_sheets').select('id, status'),
+src/hooks/useSinotrukVehicleDataManagement.ts:        supabase.from('sinotruck_vehicle_records').select('id, is_matched, match_status')
+src/hooks/useSinotrukVehicleDataManagement.ts-      ]);
+src/hooks/useSinotrukVehicleDataManagement.ts-
+--
+src/hooks/useAccountingMutations.ts-              if (acc) {
+src/hooks/useAccountingMutations.ts:                await supabase.from("chart_of_accounts").update({ current_balance: (acc.current_balance || 0) + l.debit }).eq("id", l.account_id);
+--
+src/hooks/useAccountingMutations.ts-              if (acc) {
+src/hooks/useAccountingMutations.ts:                await supabase.from("chart_of_accounts").update({ current_balance: (acc.current_balance || 0) - l.credit }).eq("id", l.account_id);
+--
+src/hooks/useAccountingMutations.ts-            const { postAPPaymentToGL } = await import("@/lib/gl-posting-utils");
+src/hooks/useAccountingMutations.ts-            const glResult = await postAPPaymentToGL({
+--
+src/hooks/useAccountingMutations.ts-              if (jeData) {
+src/hooks/useAccountingMutations.ts:                await supabase.from("journal_entries").update({
+--
+src/hooks/useAccountingMutations.ts-              if (chargesAcc) {
+src/hooks/useAccountingMutations.ts-                const isDebitNormal = ["asset", "expense"].includes(chargesAcc.account_type);
+--
+src/hooks/useAccountingMutations.ts-              if (bankGLAcc) {
+src/hooks/useAccountingMutations.ts-                const isDebitNormal = ["asset", "expense"].includes(bankGLAcc.account_type);
+--
+src/hooks/useAccountingMutations.ts-              vendorName = vd?.vendor_name || "";
+src/hooks/useAccountingMutations.ts-            }
+--
+src/hooks/useAccountingMutations.ts-                if (acc && netAmount !== 0) {
+src/hooks/useAccountingMutations.ts-                  const isDebitNormal = ["asset", "expense"].includes(acc.account_type);
+--
+src/hooks/useAccountingMutations.ts-            const { postAPPaymentToGL } = await import("@/lib/gl-posting-utils");
+src/hooks/useAccountingMutations.ts-            const glResult = await postAPPaymentToGL({
+--
+src/hooks/useAccountingMutations.ts-              if (jeData) {
+src/hooks/useAccountingMutations.ts:                await supabase.from("journal_entries").update({
+--
+src/hooks/useAccountingMutations.ts-              if (chargesAcc) {
+src/hooks/useAccountingMutations.ts-                const isDebitNormal = ["asset", "expense"].includes(chargesAcc.account_type);
+--
+src/hooks/useAccountingMutations.ts-              if (bankGLAcc) {
+src/hooks/useAccountingMutations.ts-                const isDebitNormal = ["asset", "expense"].includes(bankGLAcc.account_type);
+--
+src/hooks/useAccountingMutations.ts-      if (error) throw error;
+src/hooks/useAccountingMutations.ts-      return result;
+--
+src/hooks/useAccountingMutations.ts-      if (error) throw error;
+src/hooks/useAccountingMutations.ts-      return result;
+--
+src/hooks/useAccountingMutations.ts-      if (prError) throw prError;
+src/hooks/useAccountingMutations.ts-      
+--
+src/hooks/useAccountingMutations.ts-
+src/hooks/useAccountingMutations.ts-        const fromName = fromAccount ? `${fromAccount.account_code} - ${fromAccount.account_name}` : 'Source Account';
+--
+src/hooks/useAccountingMutations.ts-      if (assetError) throw assetError;
+src/hooks/useAccountingMutations.ts-      
+--
+src/hooks/useLightVehicleVehicleDataManagement.ts:        supabase.from('lightvehicle_vehicle_data_sheets').select('id, status'),
+src/hooks/useLightVehicleVehicleDataManagement.ts:        supabase.from('lightvehicle_vehicle_records').select('id, is_matched, match_status')
+src/hooks/useLightVehicleVehicleDataManagement.ts-      ]);
+src/hooks/useLightVehicleVehicleDataManagement.ts-
+--
+src/hooks/useBusCategories.ts:    const { data: buses } = await supabase.from('buses').select('id, bus_no');
+src/hooks/useBusCategories.ts-    
+src/hooks/useBusCategories.ts-    // Get school routes to identify school buses
+src/hooks/useBusCategories.ts:    const { data: schoolRoutes } = await supabase.from('school_routes').select('bus_reg_no');
+src/hooks/useBusCategories.ts-    const schoolBusNos = new Set(schoolRoutes?.map(sr => sr.bus_reg_no?.toUpperCase().replace(/\s+/g, '')) || []);
+src/hooks/useBusCategories.ts-    
+--
+src/hooks/useFleetMasterSpreadsheet.ts-      
+src/hooks/useFleetMasterSpreadsheet.ts:      const { error } = await supabase.from("fleet_master_roster").insert({
+--
+src/hooks/useFleetMasterSpreadsheet.ts:      const { data: allBuses } = await supabase.from("buses").select("id, bus_no, route, category_id").eq("category_id", "8ba0dd7b-c503-4c3e-86e0-ac68480f3f8c").order("bus_no");
+src/hooks/useFleetMasterSpreadsheet.ts-      if (!allBuses || allBuses.length === 0) {
+src/hooks/useFleetMasterSpreadsheet.ts-        toast({ title: "No buses", description: "No buses found in the system", variant: "destructive" });
+--
+src/hooks/useAccountingData.ts:        supabase.from("journal_entries").select("id, status").eq("period_id", periodId).neq("status", "posted"),
+src/hooks/useAccountingData.ts:        supabase.from("ar_invoices").select("id, status").eq("period_id", periodId).eq("status", "unpaid"),
+src/hooks/useAccountingData.ts:        supabase.from("ap_invoices").select("id, status").eq("period_id", periodId).eq("status", "unpaid"),
+src/hooks/useAccountingData.ts:        supabase.from("bank_reconciliations").select("id, status").neq("status", "completed"),
+src/hooks/useAccountingData.ts-      ]);
+src/hooks/useAccountingData.ts-
+--
+src/hooks/useEditAccountingMutations.ts-              vendorName = vd?.vendor_name || "";
+src/hooks/useEditAccountingMutations.ts-            }
+--
+src/hooks/useEditAccountingMutations.ts-                if (acc && netAmount !== 0) {
+src/hooks/useEditAccountingMutations.ts-                  const isDebitNormal = ["asset", "expense"].includes(acc.account_type);
+--
+src/hooks/useEditAccountingMutations.ts-            const { postAPPaymentToGL } = await import("@/lib/gl-posting-utils");
+src/hooks/useEditAccountingMutations.ts-            const glResult = await postAPPaymentToGL({
+--
+src/hooks/useEditAccountingMutations.ts-              if (jeData) {
+src/hooks/useEditAccountingMutations.ts:                await supabase.from("journal_entries").update({
+--
+src/hooks/useEditAccountingMutations.ts-              if (chargesAcc) {
+src/hooks/useEditAccountingMutations.ts-                const isDebitNormal = ["asset", "expense"].includes(chargesAcc.account_type);
+--
+src/hooks/useEditAccountingMutations.ts-              if (bankGLAcc) {
+src/hooks/useEditAccountingMutations.ts-                const isDebitNormal = ["asset", "expense"].includes(bankGLAcc.account_type);
+--
+src/hooks/useEditAccountingMutations.ts-          partyName = custData?.customer_name || "";
+src/hooks/useEditAccountingMutations.ts-        }
+--
+src/hooks/useEditAccountingMutations.ts-              if (jeData) {
+src/hooks/useEditAccountingMutations.ts:                await supabase.from("journal_entries").update({
+--
+src/hooks/useEditAccountingMutations.ts-              if (chargesAcc) {
+src/hooks/useEditAccountingMutations.ts-                const isDebitNormal = ["asset", "expense"].includes(chargesAcc.account_type);
+--
+src/hooks/useEditAccountingMutations.ts-              if (bankGLAcc) {
+src/hooks/useEditAccountingMutations.ts-                const isDebitNormal = ["asset", "expense"].includes(bankGLAcc.account_type);
+--
+src/hooks/useEditAccountingMutations.ts-            const glResult = await postAPInvoiceToGL({
+src/hooks/useEditAccountingMutations.ts-              invoiceNumber: existing.invoice_number,
+--
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_quotations').select('id, status, total_price, quantity, created_at, bus_model, customer_name, is_active_version'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_orders').select('id, status, total_amount, quantity, unit_price, payment_mode, current_phase, total_paid, balance_due, bus_model, customer_id, order_date, actual_delivery_date, created_at, expected_delivery_date'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_payment_schedules').select('id, amount, status, due_date, payment_date'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_letter_of_credits').select('id, status, lc_amount'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_shipment_groups').select('id, status, shipment_name, created_at'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_shipments').select('id, status'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_customs_declarations').select('id, customs_status'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_vehicle_processing').select('id, current_stage'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_rmv_registrations').select('id, registration_status'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_delivery_inspections').select('id, status'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_delivery_confirmations').select('id'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_customer_handovers').select('id, status'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_warranties').select('id, status'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_support_tickets').select('id, status, priority'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_service_reminders').select('id, service_completed, due_date'),
+src/hooks/useYutongExecutiveReport.ts:    supabase.from('yutong_customer_feedback').select('id, overall_rating'),
+src/hooks/useYutongExecutiveReport.ts-  ]);
+src/hooks/useYutongExecutiveReport.ts-
+--
+src/hooks/useYutongExecutiveReport.ts:    const { data } = await supabase.from('yutong_customers').select('id, company_name, contact_person').in('id', customerIds);
+src/hooks/useYutongExecutiveReport.ts-    customersData = data || [];
+src/hooks/useYutongExecutiveReport.ts-  }
+--
+src/hooks/useSchoolBusFinance.ts:      const { data: buses } = await supabase.from("buses").select("id, bus_no, category_id");
+src/hooks/useSchoolBusFinance.ts-      const busMap = new Map();
+src/hooks/useSchoolBusFinance.ts-      buses?.forEach(b => {
+--
+src/hooks/useSpecialHireReports.ts:      const { data } = await supabase.from("bus_types").select("id, name");
+src/hooks/useSpecialHireReports.ts-      return data || [];
+src/hooks/useSpecialHireReports.ts-    },
+--
+src/hooks/useSpecialHireReports.ts:      const { data } = await supabase.from("referral_agents").select("id, name");
+src/hooks/useSpecialHireReports.ts-      return data || [];
+src/hooks/useSpecialHireReports.ts-    },
+--
+src/pages/SpecialHire.tsx:        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true),
+src/pages/SpecialHire.tsx:        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'pending'),
+src/pages/SpecialHire.tsx:        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'confirmed'),
+src/pages/SpecialHire.tsx:        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('approval_status', 'pending'),
+src/pages/SpecialHire.tsx-        // Comparison counts
+src/pages/SpecialHire.tsx:        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).lte('created_at', comparisonISO),
+src/pages/SpecialHire.tsx:        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'pending').lte('created_at', comparisonISO),
+src/pages/SpecialHire.tsx:        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'confirmed').lte('created_at', comparisonISO),
+src/pages/SpecialHire.tsx:        supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('approval_status', 'pending').lte('created_at', comparisonISO),
+src/pages/SpecialHire.tsx-        // Payment counts
+src/pages/SpecialHire.tsx:        supabase.from('special_hire_payments').select('*', { count: 'exact', head: true }).eq('status', 'pending_finance'),
+src/pages/SpecialHire.tsx:        supabase.from('special_hire_payments').select('*', { count: 'exact', head: true }).eq('status', 'pending_finance').lte('created_at', comparisonISO),
+src/pages/SpecialHire.tsx-        // Revenue (need actual amounts)
+src/pages/SpecialHire.tsx:        supabase.from('special_hire_payments').select('amount').eq('status', 'approved'),
+src/pages/SpecialHire.tsx:        supabase.from('special_hire_payments').select('amount').eq('status', 'approved').lte('created_at', comparisonISO),
+src/pages/SpecialHire.tsx-      ]);
+src/pages/SpecialHire.tsx-
+--
+src/pages/Marketing.tsx:        supabase.from('marketing_tasks').select('status', { count: 'exact' }),
+src/pages/Marketing.tsx:        supabase.from('marketing_job_requests').select('status', { count: 'exact' }),
+src/pages/Marketing.tsx:        supabase.from('marketing_projects').select('status', { count: 'exact' }),
+src/pages/Marketing.tsx:        supabase.from('marketing_team_members').select('id', { count: 'exact' }).eq('is_active', true),
+src/pages/Marketing.tsx-      ]);
+src/pages/Marketing.tsx-
+--
+src/pages/DriverAllocation.tsx:        supabase.from('buses').select('id, bus_no'),
+src/pages/DriverAllocation.tsx:        supabase.from('routes').select('id, route_no, route_name'),
+src/pages/DriverAllocation.tsx-        // Get staff from profiles joined with user_roles to get active staff members
+src/pages/DriverAllocation.tsx-        supabase
+--
+src/pages/SchoolPayments.tsx:                      const { data: branchStudents } = await supabase.from('school_students').select('id').eq('branch_id', branchId);
+src/pages/SchoolPayments.tsx-                      if (!branchStudents) return;
+src/pages/SchoolPayments.tsx-
+--
+src/pages/SchoolPayments.tsx-                          .select('*').in('student_id', chunk);
+src/pages/SchoolPayments.tsx-                        if (pChunk) allPayments = [...allPayments, ...pChunk];
+src/pages/SchoolPayments.tsx-                        
+--
+src/pages/SchoolPayments.tsx-                          .select('*').in('student_id', chunk).neq('status', 'void');
+src/pages/SchoolPayments.tsx-                        if (iChunk) allInvoices = [...allInvoices, ...iChunk];
+--
+--
+src/pages/DocumentManager.tsx:      let query = supabase.from('v_all_system_documents').select('*').order('uploaded_at', { ascending: false });
+src/pages/DocumentManager.tsx-
