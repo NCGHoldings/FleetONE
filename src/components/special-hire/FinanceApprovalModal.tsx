@@ -87,6 +87,10 @@ export const FinanceApprovalModal = ({
     settings?.default_bank_account_id && 
     (settings?.revenue_internal_account_id || settings?.revenue_external_account_id);
 
+  // Settings are required for GL auto-posting but not for the approval action itself.
+  // The hook validates settings before GL posting and shows a specific error toast.
+  const isApproveBlocked = loading || action === 'reject';
+
   useEffect(() => {
     if (settings && !isSettingsComplete) {
       setLocalSettings({
@@ -333,12 +337,12 @@ export const FinanceApprovalModal = ({
                   </div>
                 ) : !isSettingsComplete ? (
                   <div className="space-y-6">
-                    <Alert variant="destructive" className="bg-red-50 text-red-900 border-red-200">
+                    <Alert variant="destructive" className="bg-amber-50 text-amber-900 border-amber-200">
                       <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Configuration Required</AlertTitle>
+                      <AlertTitle>GL Auto-Posting Not Configured</AlertTitle>
                       <AlertDescription>
-                        You must map the core General Ledger accounts before approving any Special Hire payments. 
-                        This ensures accurate automatic posting.
+                        GL accounts are not fully mapped — automatic journal entries will be <strong>skipped</strong> on approval. 
+                        You can still approve the payment. Configure the accounts below and save to enable auto-posting going forward.
                       </AlertDescription>
                     </Alert>
 
@@ -771,8 +775,9 @@ export const FinanceApprovalModal = ({
           )}
           <Button 
             onClick={handleApprove} 
-            disabled={loading || action === 'reject' || !isSettingsComplete}
+            disabled={isApproveBlocked}
             className="bg-green-600 hover:bg-green-700"
+            title={!isSettingsComplete ? 'GL accounts not fully configured — payment will be approved but GL entry will be skipped. Configure accounts in Settings > Special Hire Finance.' : undefined}
           >
             {loading && action === 'approve' ? (isSyncMode ? 'Syncing...' : 'Approving...') : (isSyncMode ? 'Confirm GL Sync' : 'Approve Payment')}
           </Button>

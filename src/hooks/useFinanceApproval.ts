@@ -148,7 +148,7 @@ export const useFinanceApproval = () => {
         customerName: paymentData.quotation.customer_name,
         customerPhone: paymentData.quotation.customer_phone,
         customerEmail: paymentData.quotation.customer_email,
-companyId: effectiveCompanyId,
+        companyId,
       });
 
       if (!customerId) {
@@ -177,7 +177,7 @@ companyId: effectiveCompanyId,
         customerName: paymentData.quotation.customer_name,
         amount: paymentData.amount,
         settings,
-effectiveCompanyId: effectiveCompanyId,
+        effectiveCompanyId: companyId,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Advance GL posted:', journalEntry.entry_number);
@@ -189,7 +189,7 @@ effectiveCompanyId: effectiveCompanyId,
         customerName: paymentData.quotation.customer_name,
         amount: paymentData.amount,
         settings,
-effectiveCompanyId: effectiveCompanyId,
+        effectiveCompanyId: companyId,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Full payment GL posted:', journalEntry.entry_number);
@@ -201,7 +201,7 @@ effectiveCompanyId: effectiveCompanyId,
         customerName: paymentData.quotation.customer_name,
         balanceAmount: paymentData.amount,
         settings,
-effectiveCompanyId: effectiveCompanyId,
+        effectiveCompanyId: companyId,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Balance GL posted:', journalEntry.entry_number);
@@ -229,7 +229,7 @@ effectiveCompanyId: effectiveCompanyId,
             customerName: paymentData.quotation.customer_name,
             advanceAmount: totalAdvance,
             settings,
-effectiveCompanyId: effectiveCompanyId,
+            effectiveCompanyId: companyId,
           });
           if (applyResult) {
             console.log('[SPH Finance] ✅ Advance applied to invoice:', applyResult.entry_number);
@@ -731,7 +731,7 @@ effectiveCompanyId: effectiveCompanyId,
         throw new Error('AR Invoices are deferred until the trip is completed (Final Invoice generation). Cannot create AR Invoice for upfront payments.');
       }
 
-const settings = await fetchSpecialHireFinanceSettings(effectiveCompanyId);
+      const settings = await fetchSpecialHireFinanceSettings(companyId);
       if (!settings) {
         throw new Error('Special Hire Finance settings not configured');
       }
@@ -746,7 +746,7 @@ const settings = await fetchSpecialHireFinanceSettings(effectiveCompanyId);
           customerName: paymentData.quotation.customer_name,
           customerPhone: paymentData.quotation.customer_phone,
           customerEmail: paymentData.quotation.customer_email,
-companyId: effectiveCompanyId,
+          companyId,
         });
 
         if (!customerId) {
@@ -784,7 +784,7 @@ companyId: effectiveCompanyId,
           totalAmount,
           advanceAmount: paymentData.amount,
           dueDate,
-companyId: effectiveCompanyId,
+          companyId,
           journalEntryId: paymentData.journal_entry_id,
         });
 

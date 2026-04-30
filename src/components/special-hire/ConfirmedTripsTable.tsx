@@ -905,8 +905,8 @@ export function ConfirmedTripsTable() {
   };
 
   // Handle finance approval with document approval
-  const handleFinanceApproval = async (paymentId: string, notes?: string) => {
-    const result = await approvePayment(paymentId, notes, undefined, getEffectiveCompanyId());
+  const handleFinanceApproval = async (paymentId: string, notes?: string, signatures?: any) => {
+    const result = await approvePayment(paymentId, notes, signatures, getEffectiveCompanyId());
     if (result.success) {
       setFinanceApprovalModalOpen(false);
       setSelectedFinancePayment(null);
@@ -1843,7 +1843,7 @@ export function ConfirmedTripsTable() {
             setFinanceApprovalModalOpen(false);
             setSelectedFinancePayment(null);
           }}
-          onApprove={(notes) => handleFinanceApproval(selectedFinancePayment.id, notes)}
+          onApprove={(notes, signatures) => handleFinanceApproval(selectedFinancePayment.id, notes, signatures)}
           onReject={(reason) => handleFinanceRejection(selectedFinancePayment.id, reason)}
           paymentData={selectedFinancePayment}
           loading={financeLoading}
