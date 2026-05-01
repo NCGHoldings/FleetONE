@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { ChevronRight, ChevronDown, Folder, FileText, Eye, Plus, Check, X, Edit, Trash2 } from "lucide-react";
+import { ChevronRight, ChevronDown, Folder, FileText, Eye, Plus, Check, X, Edit, Trash2, Landmark } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,9 @@ import { DrillDownModal } from "./DrillDownModal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AccountEditForm } from "./AccountEditForm";
 import { useCompanyCreateAccount, useCompanyDeleteAccount } from "@/hooks/useCompanyMutations";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface Account {
   id: string;
@@ -175,6 +178,58 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
 
   const createAccount = useCompanyCreateAccount();
   const deleteAccount = useCompanyDeleteAccount();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+
+  const handleSyncToBanking = async (account: Account, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const effectiveId = getEffectiveCompanyId() || selectedCompanyId;
+      if (!effectiveId) {
+        toast({ title: "Error", description: "No company selected", variant: "destructive" });
+        return;
+      }
+
+      // Try to ensure column exists before inserting (if permissions allow)
+      try {
+        await supabase.rpc('execute_sql_query', {
+          sql: `ALTER TABLE public.bank_accounts ADD COLUMN IF NOT EXISTS shared_business_units TEXT[] DEFAULT '{}';`
+        });
+      } catch (e) {
+        // Ignore, might fail if rpc missing, will provide SQL to user
+      }
+
+      // Check if already synced
+      const { data: existing } = await supabase
+        .from('bank_accounts')
+        .select('id')
+        .eq('gl_account_id', account.id)
+        .maybeSingle();
+
+      if (existing) {
+        toast({ title: "Info", description: "Account is already synced to Banking." });
+        return;
+      }
+
+      // Insert the bank account
+      const { error } = await supabase.from('bank_accounts').insert({
+        account_name: account.account_name,
+        bank_name: account.account_name, // Default to account name
+        account_number: 'PENDING-UPDATE', // Require user to update
+        company_id: effectiveId,
+        gl_account_id: account.id,
+        account_type: 'checking',
+        currency: 'LKR',
+        is_active: true,
+        current_balance: account.current_balance || 0,
+      });
+
+      if (error) throw error;
+      toast({ title: "Success", description: "Account synced to Banking module!" });
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Sync failed", description: err.message, variant: "destructive" });
+    }
+  };
 
   const filteredAccounts = useMemo(() => {
     if (!searchTerm) return accounts;
@@ -574,6 +629,17 @@ export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", on
                 >
                   <Plus className="h-3 w-3" />
                 </Button>
+                {account.account_type === "asset" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                    onClick={(e) => handleSyncToBanking(account, e)}
+                    title={`Sync ${account.account_code} to Banking Module`}
+                  >
+                    <Landmark className="h-3 w-3" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"

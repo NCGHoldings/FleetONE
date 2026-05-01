@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { useVendorBankAccounts, useSaveVendorBankAccounts } from "@/hooks/useVendorBankAccounts";
 import { useActiveVendorCategories } from "@/hooks/useVendorCategories";
+import { DataExportMenu } from "@/components/ui/DataExportMenu";
 
 interface Vendor {
   id: string;
@@ -593,16 +594,32 @@ export function VendorMasterView() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="mb-4">
-          <div className="relative">
+        <div className="mb-4 flex items-center gap-4">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search vendors..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 max-w-sm"
             />
           </div>
+          <DataExportMenu 
+            data={filteredVendors || []}
+            title="Vendor Master"
+            filename="vendors"
+            headers={["Vendor Code", "Vendor Name", "Category", "Contact", "Email", "Tax ID", "Terms (Days)", "Status"]}
+            transformData={(data) => data.map(v => [
+              v.vendor_code || 'N/A',
+              v.vendor_name || 'N/A',
+              (v as any).vendor_categories?.category_name || 'N/A',
+              v.contact_person || 'N/A',
+              v.email || 'N/A',
+              v.tax_id || 'N/A',
+              v.payment_terms?.toString() || '30',
+              v.is_active ? "Active" : "Inactive"
+            ])}
+          />
         </div>
 
         {!selectedCompanyId ? (

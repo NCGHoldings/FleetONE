@@ -26,6 +26,7 @@ import {
   useTrialBalanceData,
 } from "@/hooks/useAccountingData";
 import { format } from "date-fns";
+import { DataExportMenu } from "@/components/ui/DataExportMenu";
 
 interface TrialBalanceRow {
   accountCode: string;
@@ -189,41 +190,6 @@ export const TrialBalanceView = () => {
     return num.toLocaleString("en-US", { minimumFractionDigits: 2 });
   };
 
-  const handleExport = () => {
-    const headers = [
-      "Account Code",
-      "Account Name",
-      "Type",
-      "Opening Dr",
-      "Opening Cr",
-      "Period Dr",
-      "Period Cr",
-      "Closing Dr",
-      "Closing Cr",
-    ];
-    const rows = trialBalance.map((row) => [
-      row.accountCode,
-      row.accountName,
-      row.accountType,
-      row.openingDebit.toFixed(2),
-      row.openingCredit.toFixed(2),
-      row.periodDebit.toFixed(2),
-      row.periodCredit.toFixed(2),
-      row.closingDebit.toFixed(2),
-      row.closingCredit.toFixed(2),
-    ]);
-
-    const csvContent = [headers, ...rows]
-      .map((row) => row.join(","))
-      .join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `trial-balance-${selectedPeriod?.period_name || "report"}.csv`;
-    a.click();
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -238,10 +204,33 @@ export const TrialBalanceView = () => {
             <Printer className="h-4 w-4 mr-2" />
             Print
           </Button>
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
+          <DataExportMenu 
+            data={trialBalance}
+            title={`Trial Balance - ${selectedPeriod?.period_name || "Report"}`}
+            filename={`trial_balance_${selectedPeriod?.period_name || "report"}`}
+            headers={[
+              "Account Code",
+              "Account Name",
+              "Type",
+              "Opening Dr",
+              "Opening Cr",
+              "Period Dr",
+              "Period Cr",
+              "Closing Dr",
+              "Closing Cr"
+            ]}
+            transformData={(data) => data.map(row => [
+              row.accountCode,
+              row.accountName,
+              row.accountType,
+              formatNumber(row.openingDebit),
+              formatNumber(row.openingCredit),
+              formatNumber(row.periodDebit),
+              formatNumber(row.periodCredit),
+              formatNumber(row.closingDebit),
+              formatNumber(row.closingCredit),
+            ])}
+          />
         </div>
       </div>
 

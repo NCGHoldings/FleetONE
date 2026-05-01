@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, Download, Receipt, History, FileSpreadsheet, Settings, FilterX } from "lucide-react";
+import { ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, Download, Receipt, History, FileSpreadsheet, Settings, FilterX, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -64,11 +65,12 @@ export default function SchoolPayments() {
   });
 
   const [currentMonthTransactions, setCurrentMonthTransactions] = useState<any[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Filters
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterGrade, setFilterGrade] = useState<string>("all");
-  const [filterActive, setFilterActive] = useState<string>("active");
+  const [filterActive, setFilterActive] = useState<string>("all");
   const [minAmount, setMinAmount] = useState<string>("");
   const [maxAmount, setMaxAmount] = useState<string>("");
 
@@ -86,10 +88,20 @@ export default function SchoolPayments() {
       // Status
       const due = s.current_amount_due || 0;
       const balance = s.payment_balance || 0;
+      const hasPaymentHistory = Number(s.payment_amount) > 0 || balance > 0;
+      const isMathematicallyPaid = due <= 0 && balance >= 0 && hasPaymentHistory;
+      
       let effectiveStatus = s.payment_status ? String(s.payment_status).toLowerCase().trim() : 'pending';
       
-      if (due <= 0 && balance >= 0) {
+      if (s.is_active === false) {
+        effectiveStatus = 'missing';
+      } else if (isMathematicallyPaid || effectiveStatus === 'paid') {
+        // If DB says paid OR math says paid, it's paid (matches KPI & Badges)
         effectiveStatus = 'paid';
+      } else if (balance < 0) {
+        effectiveStatus = 'overdue';
+      } else {
+        effectiveStatus = 'pending';
       }
 
       if (filterStatus !== "all") {
@@ -144,19 +156,33 @@ export default function SchoolPayments() {
 
   const fetchStudents = async () => {
     setLoading(true);
+    setErrorMsg(null);
     try {
-      const { data, error } = await supabase
-        .from('school_students')
-        .select('*')
-        .eq('branch_id', branchId)
-        .limit(10000);
-
-      if (error) throw error;
+      // Fetch all students using pagination to avoid 400 Bad Request (max-rows limit)
+      let allBranchStudents: any[] = [];
+      let hasMore = true;
+      let page = 0;
+      const pageSize = 1000;
+      
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('school_students')
+          .select('*')
+          .eq('branch_id', branchId)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+          
+        if (error) throw error;
+        allBranchStudents = [...allBranchStudents, ...(data || [])];
+        hasMore = data && data.length === pageSize;
+        page++;
+      }
+      
+      const data = allBranchStudents;
 
       // Fetch all transactions for this branch to compute Last Paid and current month revenue
       const { data: txData } = await supabase
         .from('school_payment_transactions')
-        .select('id, amount_paid, student_id, payment_date, school_students!inner(branch_id)')
+        .select('id, amount_paid, student_id, payment_date, school_students!inner(branch_id, student_name, is_active)')
         .eq('school_students.branch_id', branchId);
 
       // Filter for current month revenue
@@ -190,18 +216,14 @@ export default function SchoolPayments() {
         };
       });
 
-      // Filter to only show Active students OR Inactive students who have recent activity/balance
-      const relevantStudents = studentsWithComputedStatus.filter(s => 
-        s.is_active !== false || 
-        currentMonthTx.some((tx: any) => tx.student_id === s.id) ||
-        (s.payment_balance && s.payment_balance !== 0) ||
-        (s.current_amount_due && s.current_amount_due > 0)
-      );
-
-      setStudents(relevantStudents);
-      calculateStats(relevantStudents, actualRevenue);
-    } catch (error) {
+      // Pass ALL students to state so they can be filtered by the UI dropdown
+      console.log("FETCH STUDENTS SUCCESS, COUNT:", studentsWithComputedStatus.length);
+      setStudents(studentsWithComputedStatus);
+      // calculateStats internally filters out inactive students for KPI accuracy
+      calculateStats(studentsWithComputedStatus, actualRevenue);
+    } catch (error: any) {
       console.error('Error fetching students:', error);
+      setErrorMsg(error.message || "Failed to load student payment data");
       toast({
         title: "Error",
         description: "Failed to load student payment data",
@@ -220,13 +242,22 @@ export default function SchoolPayments() {
     
     // Derive status from balance OR database payment_status to match dashboard
     const paidStudents = activeStudents.filter(s => {
-      const isMathematicallyPaid = (s.current_amount_due || 0) <= 0 && (s.payment_balance || 0) >= 0;
+      const due = s.current_amount_due || 0;
+      const balance = s.payment_balance || 0;
+      const hasPaymentHistory = Number(s.payment_amount) > 0 || balance > 0;
+      const isMathematicallyPaid = due <= 0 && balance >= 0 && hasPaymentHistory;
+      
       const isStatusPaid = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'paid';
       return isMathematicallyPaid || isStatusPaid;
     }).length;
     
     const pendingPayments = activeStudents.filter(s => {
-      const isMathematicallyPending = (s.current_amount_due || 0) > 0 || (s.payment_balance || 0) < 0;
+      const due = s.current_amount_due || 0;
+      const balance = s.payment_balance || 0;
+      const hasPaymentHistory = Number(s.payment_amount) > 0 || balance > 0;
+      const isMathematicallyPaid = due <= 0 && balance >= 0 && hasPaymentHistory;
+      
+      const isMathematicallyPending = due > 0 || balance < 0 || !isMathematicallyPaid;
       const isStatusPaid = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'paid';
       const isStatusPending = s.payment_status && String(s.payment_status).toLowerCase().trim() === 'pending';
       return (isMathematicallyPending && !isStatusPaid) || isStatusPending;
@@ -299,26 +330,36 @@ export default function SchoolPayments() {
       accessorKey: "payment_status",
       header: "Status",
       cell: ({ row }) => {
-        let status = row.getValue("payment_status") as string;
+        let status = row.getValue("payment_status") as string || 'pending';
         const due = row.original.current_amount_due || 0;
         const balance = row.original.payment_balance || 0;
+        const isActive = row.original.is_active !== false;
+        const hasPaymentHistory = Number(row.original.payment_amount) > 0 || balance > 0;
+        const isMathematicallyPaid = due <= 0 && balance >= 0 && hasPaymentHistory;
 
-        // Dynamically override status based on actual calculated due
-        if (due <= 0 && balance >= 0) {
+        // Missing/Inactive students should be marked as missing to draw attention
+        if (!isActive) {
+          status = 'missing';
+        } else if (isMathematicallyPaid) {
+          // Dynamically override status based on actual calculated due
           status = 'paid';
+        } else if (status !== 'paid') {
+          status = 'pending';
         }
 
         return (
           <Badge variant={
             status === 'paid' ? 'default' : 
+            status === 'missing' ? 'destructive' :
             status === 'overdue' ? 'destructive' : 'secondary'
           }>
             {status === 'paid' ? <CheckCircle className="w-3 h-3 mr-1" /> :
+             status === 'missing' ? <AlertCircle className="w-3 h-3 mr-1" /> :
              status === 'overdue' ? <AlertCircle className="w-3 h-3 mr-1" /> :
              <Clock className="w-3 h-3 mr-1" />}
-            {status.charAt(0).toUpperCase() + status.slice(1)}
+            {status === 'missing' ? 'Missing/Inactive' : status.charAt(0).toUpperCase() + status.slice(1)}
           </Badge>
-        );
+        )
       },
     },
     {
@@ -395,6 +436,31 @@ export default function SchoolPayments() {
               <History className="h-4 w-4 mr-1" />
               History
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200"
+              onClick={async () => {
+                if (window.confirm(`Are you sure you want to permanently delete ${student.student_name} and all their payment records? This cannot be undone.`)) {
+                  try {
+                    // First delete their transactions to satisfy foreign key constraints
+                    await supabase.from('school_payment_transactions').delete().eq('student_id', student.id);
+                    await supabase.from('school_ar_invoices').delete().eq('student_id', student.id);
+                    
+                    // Then delete the student
+                    const { error } = await supabase.from('school_students').delete().eq('id', student.id);
+                    if (error) throw error;
+                    
+                    toast({ title: "Success", description: "Student and records permanently deleted." });
+                    fetchStudents();
+                  } catch (err: any) {
+                    toast({ title: "Error", description: err.message, variant: "destructive" });
+                  }
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
         );
       },
@@ -405,8 +471,77 @@ export default function SchoolPayments() {
     return <div className="flex items-center justify-center h-64">Loading payment data...</div>;
   }
 
+  const activeStudents = students.filter(s => s.is_active === true);
+  const unknownTxs = currentMonthTransactions.filter(tx => !activeStudents.find(s => s.id === tx.student_id));
+
   return (
     <div className="space-y-6">
+      {errorMsg && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Critical Error Loading Data</AlertTitle>
+          <AlertDescription>{errorMsg}</AlertDescription>
+        </Alert>
+      )}
+
+      {unknownTxs.length > 0 && (
+        <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-900">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertTitle className="text-red-800">Missing or Inactive Students Detected</AlertTitle>
+          <AlertDescription>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                We detected <strong>{unknownTxs.length} payment(s)</strong> (Total: LKR {unknownTxs.reduce((sum, tx) => sum + Number(tx.amount_paid), 0).toLocaleString()}) 
+                linked to students who are inactive or missing from the database. 
+                This causes discrepancies in the total revenue calculation.
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button 
+                  variant="default" 
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={async () => {
+                    try {
+                      const inactiveStudentIds = unknownTxs.map(tx => tx.student_id).filter(Boolean);
+                      if (inactiveStudentIds.length > 0) {
+                        await supabase.from('school_students').update({ is_active: true }).in('id', inactiveStudentIds);
+                        toast({ title: "Success", description: "Students restored to active status!" });
+                        fetchStudents();
+                      }
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }}
+                >
+                  Restore Students to Active
+                </Button>
+                <Button variant="outline" size="sm" className="bg-white" onClick={() => navigate(`/school-bus/branch/${branchId}`)}>
+                  Manage Students
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const ids = unknownTxs.map(tx => tx.id);
+                      if (ids.length > 0) {
+                        await supabase.from('school_payment_transactions').delete().in('id', ids);
+                        toast({ title: "Success", description: "Unknown payments removed!" });
+                        fetchStudents();
+                      }
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }}
+                >
+                  Purge Orphaned Revenue
+                </Button>
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -493,6 +628,9 @@ export default function SchoolPayments() {
                       for (let i = 0; i < studentIds.length; i += chunkSize) {
                         const chunk = studentIds.slice(i, i + chunkSize);
                         
+                        // Auto-activate all students in this chunk just in case they were hidden
+                        await supabase.from('school_students').update({ is_active: true }).in('id', chunk).eq('is_active', false);
+
                         const { data: pChunk } = await supabase.from('school_payment_transactions')
                           .select('*').in('student_id', chunk);
                         if (pChunk) allPayments = [...allPayments, ...pChunk];
@@ -631,17 +769,16 @@ export default function SchoolPayments() {
                 >
                   Repair Balances
                 </Button>
-                {currentMonthTransactions.length > 0 && currentMonthTransactions.some(tx => !students.find(s => s.id === tx.student_id)) && (
+                {currentMonthTransactions.length > 0 && currentMonthTransactions.some(tx => !activeStudents.find(s => s.id === tx.student_id)) && (
                   <Button 
                     variant="destructive" 
                     size="sm" 
                     className="h-6 text-[10px] px-2"
                     onClick={async () => {
                       try {
-                        const unknownTxs = currentMonthTransactions.filter(tx => !students.find(s => s.id === tx.student_id));
-                        const ids = unknownTxs.map(tx => tx.id);
-                        if (ids.length > 0) {
-                          await supabase.from('school_payment_transactions').delete().in('id', ids);
+                        const unknownTxIds = currentMonthTransactions.filter(tx => !activeStudents.find(s => s.id === tx.student_id)).map(tx => tx.id);
+                        if (unknownTxIds.length > 0) {
+                          await supabase.from('school_payment_transactions').delete().in('id', unknownTxIds);
                           toast({ title: "Success", description: "Unknown payments removed!" });
                           fetchStudents();
                         }
@@ -660,15 +797,41 @@ export default function SchoolPayments() {
                       <AlertCircle className="h-4 w-4" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-80 p-3">
+                  <PopoverContent className="w-[380px] p-3">
                     <h4 className="font-semibold text-sm mb-2">This Month's Transactions</h4>
                     <div className="space-y-2 max-h-[200px] overflow-y-auto">
                       {currentMonthTransactions.map((tx, idx) => {
-                        const student = students.find(s => s.id === tx.student_id);
+                        const student = activeStudents.find(s => s.id === tx.student_id);
+                        const isActuallyInactive = !student && tx.school_students?.is_active !== true;
+                        const studentName = student?.student_name || tx.school_students?.student_name || 'Unknown';
+                        
                         return (
-                          <div key={idx} className="flex justify-between text-xs border-b pb-1">
-                            <span className="truncate pr-2">{student?.student_name || 'Unknown'}</span>
-                            <div className="text-right flex-shrink-0">
+                          <div key={idx} className="flex justify-between items-center text-xs border-b pb-1">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span className="truncate max-w-[120px] font-medium">{studentName}</span>
+                              {isActuallyInactive && <span className="text-red-500 text-[10px] flex-shrink-0">(Inactive)</span>}
+                              {!student && !isActuallyInactive && <span className="text-red-500 text-[10px] flex-shrink-0">(Missing)</span>}
+                              {(!student || isActuallyInactive) && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  className="h-5 px-1.5 py-0 text-[9px] border-green-200 text-green-700 hover:bg-green-50 flex-shrink-0"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      await supabase.from('school_students').update({ is_active: true }).eq('id', tx.student_id);
+                                      toast({ title: "Success", description: "Database student immediately created and payment allocated!" });
+                                      fetchStudents();
+                                    } catch (err) {
+                                      console.error(err);
+                                    }
+                                  }}
+                                >
+                                  Quick Create Student
+                                </Button>
+                              )}
+                            </div>
+                            <div className="text-right flex-shrink-0 ml-2">
                               <div className="font-medium text-green-600">LKR {Number(tx.amount_paid).toLocaleString()}</div>
                               <div className="text-muted-foreground text-[10px]">{new Date(tx.payment_date).toLocaleDateString()}</div>
                             </div>
@@ -819,7 +982,7 @@ export default function SchoolPayments() {
 
         <TabsContent value="outstanding" className="space-y-0">
           <OutstandingStudentsView
-            students={students}
+            students={filteredStudents}
             onRecordPayment={handleRecordPayment}
             onViewHistory={handleViewHistory}
           />

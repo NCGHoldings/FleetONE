@@ -75,6 +75,22 @@ export const BankingView = () => {
       ),
     },
     {
+      accessorKey: "gl_account_id",
+      header: "GL Sync",
+      cell: ({ row }: any) => (
+        row.original.gl_account_id ? (
+          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Synced
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+            Unlinked
+          </Badge>
+        )
+      ),
+    },
+    {
       id: "actions",
       header: "Actions",
       cell: ({ row }: any) => (

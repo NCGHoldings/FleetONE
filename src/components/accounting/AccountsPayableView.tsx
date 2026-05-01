@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { useAPInvoices, useAllProfiles } from "@/hooks/useAccountingData";
 import { useApproveAPInvoice, useDeleteAPInvoice } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { DataExportMenu } from "@/components/ui/DataExportMenu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { APInvoiceForm } from "./APInvoiceForm";
 import { APPaymentForm } from "./APPaymentForm";
@@ -357,6 +358,24 @@ export const AccountsPayableView = () => {
             </p>
           </div>
           <div className="flex gap-2">
+            <DataExportMenu 
+              data={filteredInvoices || []}
+              title="Accounts Payable"
+              filename="ap_invoices"
+              headers={["Invoice #", "Vendor", "Bill #", "Date", "Due Date", "Amount", "Paid", "Balance", "Approval", "Status"]}
+              transformData={(data) => data.map(inv => [
+                inv.invoice_number || 'N/A',
+                inv.vendors?.vendor_name || 'N/A',
+                inv.vendor_bill_number || 'N/A',
+                inv.invoice_date ? format(new Date(inv.invoice_date), "MMM dd, yyyy") : 'N/A',
+                inv.due_date ? format(new Date(inv.due_date), "MMM dd, yyyy") : 'N/A',
+                inv.total_amount?.toString() || '0',
+                inv.paid_amount?.toString() || '0',
+                inv.balance?.toString() || '0',
+                inv.approval_status || 'N/A',
+                inv.status || 'N/A'
+              ])}
+            />
             <Button variant="outline" onClick={() => setAgeingReportOpen(true)}>
               <FileText className="h-4 w-4 mr-2" />
               AP Ageing Report

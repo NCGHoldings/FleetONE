@@ -12,6 +12,7 @@ import { ItemForm } from "./ItemForm";
 import { StockAdjustmentForm } from "./StockAdjustmentForm";
 import { ItemCategoryForm } from "./ItemCategoryForm";
 import { Input } from "@/components/ui/input";
+import { DataExportMenu } from "@/components/ui/DataExportMenu";
 import { RefreshCw } from "lucide-react";
 import { syncBusCategoriesToItems } from "@/utils/bus-category-seeder";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -253,6 +254,22 @@ export const InventoryView = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          <DataExportMenu 
+            data={filteredItems || []}
+            title="Inventory Items"
+            filename="inventory_items"
+            headers={["Item Code", "Item Name", "Category", "UOM", "Unit Cost", "Selling Price", "Reorder Level", "Status"]}
+            transformData={(data) => data.map(item => [
+              item.item_code || 'N/A',
+              item.item_name || 'N/A',
+              item.item_categories?.category_name || 'Uncategorized',
+              item.unit_of_measure || 'EA',
+              item.last_purchase_price?.toString() || '0',
+              item.selling_price?.toString() || '0',
+              item.reorder_level?.toString() || '0',
+              item.is_active ? "Active" : "Inactive"
+            ])}
+          />
           <Button variant="outline" onClick={() => setShowAdjustmentForm(true)}>
             <BarChart3 className="h-4 w-4 mr-2" />
             Stock Adjustment

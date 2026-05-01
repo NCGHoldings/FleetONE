@@ -136,16 +136,23 @@ export default function SchoolStudentDatabase() {
     }
   };
 
+  const [showInactive, setShowInactive] = useState(false);
+
   const fetchStudents = async () => {
     if (!branchId) return;
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("school_students")
         .select("*")
         .eq("branch_id", branchId)
-        .eq("is_active", true)
         .order("student_name");
+
+      if (!showInactive) {
+        query = query.eq("is_active", true);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setStudents(data || []);
@@ -160,6 +167,10 @@ export default function SchoolStudentDatabase() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchStudents();
+  }, [showInactive, branchId]);
 
   const filterStudents = () => {
     let filtered = students;
@@ -373,27 +384,52 @@ export default function SchoolStudentDatabase() {
     {
       id: "actions",
       header: "Actions",
-      cell: ({ row }: any) => (
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSelectedStudent(row.original);
-              setIsEditModalOpen(true);
-            }}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDeleteStudent(row.original.id)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
+      cell: ({ row }: any) => {
+        const student = row.original;
+        
+        return (
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedStudent(student);
+                setIsEditModalOpen(true);
+              }}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            
+            {student.is_active === false ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
+                onClick={async () => {
+                  try {
+                    await supabase.from("school_students").update({ is_active: true }).eq("id", student.id);
+                    toast({ title: "Success", description: "Student restored to active status!" });
+                    fetchStudents();
+                  } catch (err) {
+                    console.error(err);
+                    toast({ title: "Error", description: "Failed to restore student", variant: "destructive" });
+                  }
+                }}
+              >
+                Restore
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteStudent(student.id)}
+              >
+                <Trash2 className="h-4 w-4 text-red-500" />
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -556,6 +592,45 @@ export default function SchoolStudentDatabase() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex gap-2">
+              <Button
+                variant={showInactive ? "default" : "outline"}
+                onClick={() => setShowInactive(!showInactive)}
+                className={showInactive ? "bg-amber-600 hover:bg-amber-700" : ""}
+              >
+                {showInactive ? "Viewing Inactive Students" : "Show Inactive/Archived Students"}
+              </Button>
+              {showInactive && filteredStudents.length > 0 && (
+                <Button 
+                  variant="default"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={async () => {
+                    if (!confirm(`Are you sure you want to restore all ${filteredStudents.length} currently filtered inactive students?`)) return;
+                    try {
+                      setLoading(true);
+                      const ids = filteredStudents.map(s => s.id);
+                      
+                      // Process in batches of 100 to avoid Supabase limits
+                      for (let i = 0; i < ids.length; i += 100) {
+                        const batch = ids.slice(i, i + 100);
+                        await supabase.from("school_students").update({ is_active: true }).in("id", batch);
+                      }
+                      
+                      toast({ title: "Success", description: `Restored ${ids.length} students to active status.` });
+                      fetchStudents();
+                    } catch (err: any) {
+                      console.error(err);
+                      toast({ title: "Error", description: err.message, variant: "destructive" });
+                      setLoading(false);
+                    }
+                  }}
+                >
+                  Restore All Filtered ({filteredStudents.length})
+                </Button>
+              )}
+            </div>
+          </div>
           <div className="grid gap-4 md:grid-cols-4">
             <div>
               <Label htmlFor="search">Search Students</Label>

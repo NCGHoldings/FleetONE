@@ -8,6 +8,7 @@ import { EnhancedSearch } from "@/components/ui/enhanced-search";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { CustomerProfile } from "@/components/customer/CustomerProfile";
 import { useCustomerData, CustomerListFilters } from "@/hooks/useCustomerData";
+import { DataExportMenu } from "@/components/ui/DataExportMenu";
 import { 
   Users, 
   TrendingUp, 
@@ -245,6 +246,21 @@ export default function CustomerManagement() {
                     Filtered: {customers.length} of {stats.total_customers}
                   </Badge>
                 ) : null}
+                <DataExportMenu 
+                  data={customers}
+                  title="Customer Master Data"
+                  filename="Customers"
+                  headers={["Name", "Company", "Type", "Source", "Phone", "Email", "Active"]}
+                  transformData={(data) => data.map(c => [
+                    c.name || 'N/A',
+                    c.company || 'N/A',
+                    c.customer_type || 'N/A',
+                    c.source || 'N/A',
+                    c.phone || 'N/A',
+                    c.email || 'N/A',
+                    c.is_active ? 'Yes' : 'No'
+                  ])}
+                />
               </div>
             </CardHeader>
             <CardContent>

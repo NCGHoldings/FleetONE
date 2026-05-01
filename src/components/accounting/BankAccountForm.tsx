@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCreateBankAccount, useUpdateBankAccount } from "@/hooks/useAccountingMutations";
 import { useChartOfAccounts, useCurrencies } from "@/hooks/useAccountingData";
 import { Loader2 } from "lucide-react";
@@ -26,6 +27,7 @@ const bankAccountSchema = z.object({
   opening_balance: z.number().optional(),
   gl_account_id: z.string().optional(),
   business_unit_code: z.string().optional().nullable(),
+  shared_business_units: z.array(z.string()).optional(),
   is_active: z.boolean().optional(),
   is_default: z.boolean().optional(),
   notes: z.string().optional(),
@@ -53,20 +55,22 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
   const { data: currencies = [] } = useCurrencies();
   const createBankAccount = useCreateBankAccount();
   const updateBankAccount = useUpdateBankAccount();
-  const { selectedCompanyId, getSubCompaniesFor } = useCompany();
+  const { selectedCompanyId, allCompanies, getSubCompaniesFor } = useCompany();
   const isEditing = !!bankAccount;
 
-  // If the current selected company has sub-companies, it's a holding/parent company
+  // Always allow holding companies to see all other companies to share with
   const availableBusinessUnits = useMemo(() => {
-    if (!selectedCompanyId) return [];
-    return getSubCompaniesFor(selectedCompanyId);
-  }, [selectedCompanyId, getSubCompaniesFor]);
+    if (!selectedCompanyId || !allCompanies) return [];
+    return allCompanies.filter(c => c.id !== selectedCompanyId && c.business_unit_type !== 'test');
+  }, [selectedCompanyId, allCompanies]);
 
-  const isHoldingCompany = availableBusinessUnits.length > 0;
+  const isHoldingCompany = true; // Always allow sharing for now, or check if they have subcompanies. user requested "should have all"
 
   const bankAccounts = accounts?.filter(a => 
     a.account_type === "asset" && 
-    (a.account_name?.toLowerCase().includes("bank") || a.account_name?.toLowerCase().includes("cash"))
+    (a.account_name?.toLowerCase().includes("bank") || 
+     a.account_name?.toLowerCase().includes("cash") ||
+     a.account_name?.toLowerCase().includes("float"))
   );
 
   const form = useForm<BankAccountFormData>({
@@ -81,6 +85,7 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
       currency: "LKR",
       opening_balance: 0,
       business_unit_code: null,
+      shared_business_units: [],
       is_active: true,
       is_default: false,
       notes: "",
@@ -101,6 +106,7 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
         opening_balance: bankAccount.opening_balance || 0,
         gl_account_id: bankAccount.gl_account_id || undefined,
         business_unit_code: bankAccount.business_unit_code || null,
+        shared_business_units: bankAccount.shared_business_units || [],
         is_active: bankAccount.is_active ?? true,
         is_default: bankAccount.is_default ?? false,
         notes: bankAccount.notes || "",
@@ -126,6 +132,7 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
         opening_balance: data.opening_balance || 0,
         gl_account_id: data.gl_account_id,
         business_unit_code: data.business_unit_code,
+        shared_business_units: data.shared_business_units || [],
         is_active: data.is_active ?? true,
         is_default: data.is_default ?? false,
         notes: data.notes,
@@ -298,29 +305,90 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
           </div>
 
           {isHoldingCompany && (
-            <div className="space-y-2">
-              <Label htmlFor="business_unit_code">Business Unit (Optional)</Label>
-              <Select 
-                value={form.watch("business_unit_code") || "none"} 
-                onValueChange={(v) => form.setValue("business_unit_code", v === "none" ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Assign to Business Unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Shared / None</SelectItem>
-                  {availableBusinessUnits.map((bu) => (
-                    bu.short_code ? (
-                      <SelectItem key={bu.id} value={bu.short_code}>
-                        {bu.name}
-                      </SelectItem>
-                    ) : null
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                If assigned, this bank account will only be visible when accessing that specific business unit.
-              </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="business_unit_code">Primary Business Unit (Optional)</Label>
+                <Select 
+                  value={form.watch("business_unit_code") || "none"} 
+                  onValueChange={(v) => form.setValue("business_unit_code", v === "none" ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Assign to Business Unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None (Main Company Only)</SelectItem>
+                    {availableBusinessUnits.map((bu) => {
+                      const getBUCode = (name: string) => {
+                        const n = name.toLowerCase();
+                        if (n.includes("school bus")) return "SBO";
+                        if (n.includes("special hire")) return "SPH";
+                        if (n.includes("yutong")) return "YUT";
+                        if (n.includes("sinotruck") || n.includes("sinotruk")) return "SNT";
+                        if (n.includes("light vehicle")) return "LTV";
+                        if (n.includes("stores")) return "STO";
+                        return null;
+                      };
+                      const code = bu.short_code || getBUCode(bu.name);
+                      return code ? (
+                        <SelectItem key={bu.id} value={code}>
+                          {bu.name}
+                        </SelectItem>
+                      ) : null;
+                    })}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  The primary business unit that owns this bank account.
+                </p>
+              </div>
+
+              <div className="space-y-2 border p-3 rounded-md bg-secondary/20">
+                <Label>Share with Other Business Units</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Select other business units that should be able to see and use this bank account.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {availableBusinessUnits.map((bu) => {
+                    const getBUCode = (name: string) => {
+                      const n = name.toLowerCase();
+                      if (n.includes("school bus")) return "SBO";
+                      if (n.includes("special hire")) return "SPH";
+                      if (n.includes("yutong")) return "YUT";
+                      if (n.includes("sinotruck") || n.includes("sinotruk")) return "SNT";
+                      if (n.includes("light vehicle")) return "LTV";
+                      if (n.includes("stores")) return "STO";
+                      return null;
+                    };
+                    const code = bu.short_code || getBUCode(bu.name);
+                    
+                    if (!code) return null;
+                    // Don't show the primary BU in the shared list to avoid confusion
+                    if (code === form.watch("business_unit_code")) return null;
+                    
+                    const isShared = form.watch("shared_business_units")?.includes(code) || false;
+                    
+                    return (
+                      <div key={bu.id} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`share-${code}`} 
+                          checked={isShared}
+                          onCheckedChange={(checked) => {
+                            const current = form.watch("shared_business_units") || [];
+                            if (checked) {
+                              form.setValue("shared_business_units", [...current, code]);
+                            } else {
+                              form.setValue("shared_business_units", current.filter(c => c !== code));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`share-${code}`} className="text-sm font-normal cursor-pointer">
+                          {bu.name}
+                        </Label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 

@@ -40,6 +40,7 @@ import busDocsManifest from "@/data/bus_documents.json";
 import { FleetFilterPanel, FleetFilters, defaultFilters } from "@/components/fleet/FleetFilterPanel";
 import { FleetVehicleDataImport } from "@/components/fleet/FleetVehicleDataImport";
 import { Upload } from "lucide-react";
+import { DataExportMenu } from "@/components/ui/DataExportMenu";
 
 interface Fleet {
   id: string;
@@ -752,12 +753,29 @@ const FleetManagementComponent = () => {
             </div>
           </div>
           <div className="flex gap-2 animate-scale-in" style={{ animationDelay: '0.2s' }}>
+            <DataExportMenu 
+              data={filteredData || []}
+              title="Fleet Directory"
+              filename="fleet_directory"
+              headers={["Bus No.", "Type", "Route", "Model", "Year", "Capacity", "Status", "Mileage", "Next Service"]}
+              transformData={(data) => data.map(bus => [
+                bus.bus_no || 'N/A',
+                bus.type || 'N/A',
+                bus.route || 'N/A',
+                bus.model || 'N/A',
+                bus.year?.toString() || 'N/A',
+                bus.capacity?.toString() || '0',
+                bus.status || 'N/A',
+                bus.current_mileage?.toString() || '0',
+                bus.next_service_date ? new Date(bus.next_service_date).toLocaleDateString() : 'N/A'
+              ])}
+            />
             <Button 
               onClick={() => setVehicleImportOpen(true)} 
               className="gap-2 bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300"
             >
               <Upload className="w-4 h-4" />
-              Import Vehicle Data
+              Import
             </Button>
             <Button 
               onClick={handleAddBus} 

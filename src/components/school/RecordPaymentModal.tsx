@@ -111,6 +111,7 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
             fixedAmount: fixedAmount,
             overpaymentAmount: receivedAmount > amountDue ? (receivedAmount - amountDue) : undefined,
             previousBalance: previousBalance,
+            studentId: student.id,
           });
         } catch (glError) {
           console.error("GL posting failed:", glError);

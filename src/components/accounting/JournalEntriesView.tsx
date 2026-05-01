@@ -262,18 +262,6 @@ export const JournalEntriesView = () => {
               </Button>
             </>
           )}
-          {row.original.status === "posted" && !row.original.is_reversal && !row.original.entry_number?.startsWith('REV-') && (
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="text-amber-600 hover:text-amber-700"
-              onClick={() => setReverseConfirmEntry(row.original)}
-              disabled={reverseEntry.isPending}
-              title="Reverse this entry"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-          )}
           <Button 
             size="sm" 
             variant="outline" 

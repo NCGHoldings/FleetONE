@@ -34,6 +34,9 @@ export const useCreateJournalEntry = () => {
       const businessUnitCode = getBusinessUnitCode();
       const businessUnitId = isSubCompany(selectedCompanyId) ? selectedCompanyId : null;
       
+      // Get current user to track who created it
+      const { data: { user } } = await supabase.auth.getUser();
+
       const { data: journalEntry, error: entryError } = await supabase
         .from("journal_entries")
         .insert([{
@@ -48,6 +51,7 @@ export const useCreateJournalEntry = () => {
           company_id: effectiveCompanyId, // Posts to parent company for consolidated GL
           business_unit_id: businessUnitId, // Tags with originating sub-company
           business_unit_code: businessUnitCode, // Short code for filtering (SBO, YUT, etc.)
+          created_by: user?.id || null,
         }])
         .select()
         .single();
@@ -126,11 +130,17 @@ export const usePostJournalEntry = () => {
         }
       }
       
+      // Get current user to track who posted it
+      const { data: { user } } = await supabase.auth.getUser();
+
       const { error: statusError } = await supabase
         .from("journal_entries")
         .update({ 
           status: "posted" as const,
           posted_at: new Date().toISOString(),
+          posted_by: user?.id || null,
+          approved_at: new Date().toISOString(),
+          approved_by: user?.id || null,
         })
         .eq("id", entryId);
       
@@ -1259,77 +1269,43 @@ export const useCreateAPPayment = () => {
 
       // For direct payments: GL post per line (debit each line's account, credit bank)
       if (payment.is_direct_payment && payment.direct_lines?.length && bankGLAccountId && payment.amount > 0) {
-        // Build journal entry lines: debit each expense account, credit bank
-        const jeLines: Array<{ account_id: string; description: string; debit_amount: number; credit_amount: number }> = [];
+        const { createAndPostJournalEntry } = await import("@/lib/gl-posting-utils");
+        
+        const lines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
         
         for (const line of payment.direct_lines) {
           if (line.account_id && line.line_total > 0) {
-            jeLines.push({
+            lines.push({
               account_id: line.account_id,
               description: line.description || `Direct payment line`,
-              debit_amount: line.line_total,
-              credit_amount: 0,
+              debit: line.line_total,
+              credit: 0,
             });
           }
         }
+        
         // Credit bank for total
-        jeLines.push({
+        lines.push({
           account_id: bankGLAccountId,
           description: `Direct Payment ${payment.payment_number} to ${vendorName}`,
-          debit_amount: 0,
-          credit_amount: payment.amount,
+          debit: 0,
+          credit: payment.amount,
         });
 
-        const totalDebit = jeLines.reduce((s, l) => s + l.debit_amount, 0);
-        const totalCredit = jeLines.reduce((s, l) => s + l.credit_amount, 0);
+        const glResult = await createAndPostJournalEntry({
+          entry_date: payment.payment_date,
+          description: `Direct Payment ${payment.payment_number} to ${vendorName}`,
+          reference: payment.reference || payment.payment_number,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
+          source_module: 'ap_payment',
+          lines,
+        });
 
-        // Create journal entry
-        const { data: je, error: jeError } = await supabase
-          .from("journal_entries")
-          .insert([{
-            entry_number: `JE-DP-${payment.payment_number}`,
-            entry_date: payment.payment_date,
-            description: `Direct Payment ${payment.payment_number} to ${vendorName}`,
-            reference: payment.reference || payment.payment_number,
-            total_debit: totalDebit,
-            total_credit: totalCredit,
-            status: "posted",
-            company_id: effectiveCompanyId,
-            business_unit_code: businessUnitCode,
-          }])
-          .select()
-          .single();
-
-        if (!jeError && je) {
-          const jelLines = jeLines.map((l) => ({
-            journal_entry_id: je.id,
-            account_id: l.account_id,
-            description: l.description,
-            debit: l.debit_amount,
-            credit: l.credit_amount,
-            company_id: effectiveCompanyId,
-            business_unit_code: businessUnitCode,
-          }));
-          await supabase.from("journal_entry_lines").insert(jelLines);
-
-          // Update COA balances
-          for (const l of jelLines) {
-            if (l.debit > 0) {
-              const { data: acc } = await supabase.from("chart_of_accounts").select("current_balance").eq("id", l.account_id).single();
-              if (acc) {
-                await supabase.from("chart_of_accounts").update({ current_balance: (acc.current_balance || 0) + l.debit }).eq("id", l.account_id);
-              }
-            }
-            if (l.credit > 0) {
-              const { data: acc } = await supabase.from("chart_of_accounts").select("current_balance").eq("id", l.account_id).single();
-              if (acc) {
-                await supabase.from("chart_of_accounts").update({ current_balance: (acc.current_balance || 0) - l.credit }).eq("id", l.account_id);
-              }
-            }
-          }
-
-          // Link journal entry to payment
-          await supabase.from("ap_payments").update({ journal_entry_id: je.id }).eq("id", data.id);
+        if (glResult.success && glResult.journalEntryId) {
+          await supabase.from("ap_payments").update({ journal_entry_id: glResult.journalEntryId }).eq("id", data.id);
+        } else if (!glResult.success) {
+          console.error("Direct Payment GL Posting failed:", glResult.error);
         }
       } else if (!payment.is_direct_payment && payeeType === "vendor") {
         // Normal / Advance payment GL posting — resolve via vendor category mappings

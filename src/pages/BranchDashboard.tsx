@@ -16,7 +16,8 @@ import {
   Download,
   Plus,
   Receipt,
-  FileText
+  FileText,
+  Trash
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -60,6 +61,7 @@ export default function BranchDashboard() {
     totalRevenue: 0,
     pendingRevenue: 0,
   });
+  const [purging, setPurging] = useState(false);
 
   useEffect(() => {
     if (branchId) {
@@ -134,6 +136,36 @@ export default function BranchDashboard() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const purgeInactiveStudents = async () => {
+    if (!confirm("Are you sure you want to permanently delete all inactive students for this branch? This action cannot be undone.")) return;
+    
+    setPurging(true);
+    try {
+      const { error } = await supabase
+        .from("school_students")
+        .delete()
+        .eq("branch_id", branchId)
+        .eq("is_active", false);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Inactive students have been permanently deleted from the database.",
+      });
+      fetchStudents();
+    } catch (error: any) {
+      console.error("Error purging inactive students:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to purge inactive students",
+        variant: "destructive",
+      });
+    } finally {
+      setPurging(false);
     }
   };
 
@@ -240,6 +272,18 @@ export default function BranchDashboard() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button 
+            variant="destructive" 
+            onClick={purgeInactiveStudents}
+            disabled={purging}
+          >
+            {purging ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+            ) : (
+              <Trash className="h-4 w-4 mr-2" />
+            )}
+            Purge Inactive
+          </Button>
           <Button 
             variant="outline" 
             onClick={() => navigate(`/school-bus/branch/${branchId}/import`)}

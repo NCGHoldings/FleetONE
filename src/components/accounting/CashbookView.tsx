@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import * as XLSX from "xlsx";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Printer, Search, ArrowUpCircle, ArrowDownCircle, Wallet } from "lucide-react";
+import { Printer, Search, ArrowUpCircle, ArrowDownCircle, Wallet } from "lucide-react";
+import { DataExportMenu } from "@/components/ui/DataExportMenu";
 import { useBankTransactions, useBankAccounts } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
@@ -76,48 +76,6 @@ export const CashbookView = () => {
     window.print();
   };
 
-  const handleExport = () => {
-    if (!transactionsWithBalance.length) {
-      toast({
-        title: "No Data",
-        description: "No transactions to export for the selected period.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const exportData = transactionsWithBalance.map(t => ({
-      "Date": format(new Date(t.transaction_date), "dd/MM/yyyy"),
-      "Reference": t.reference || "",
-      "Description": t.description || "",
-      "Receipts": t.credit_amount || 0,
-      "Payments": t.debit_amount || 0,
-      "Balance": t.runningBalance,
-    }));
-
-    // Add totals row
-    exportData.push({
-      "Date": "",
-      "Reference": "",
-      "Description": "TOTALS",
-      "Receipts": summary.totalReceipts,
-      "Payments": summary.totalPayments,
-      "Balance": summary.netMovement,
-    });
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Cashbook");
-    
-    const accountName = bankAccounts?.find(b => b.id === selectedAccount)?.account_name || "All_Accounts";
-    XLSX.writeFile(wb, `Cashbook_${accountName}_${selectedMonth}.xlsx`);
-
-    toast({
-      title: "Exported",
-      description: "Cashbook has been exported to Excel.",
-    });
-  };
-
   if (isLoading) {
     return <div className="flex items-center justify-center h-32"><p className="text-muted-foreground">Loading cashbook...</p></div>;
   }
@@ -135,9 +93,31 @@ export const CashbookView = () => {
           <Button variant="outline" size="sm" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-2" />Print
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />Export
-          </Button>
+          <DataExportMenu 
+            data={transactionsWithBalance || []}
+            title={`Cashbook - ${bankAccounts?.find(b => b.id === selectedAccount)?.account_name || "All Accounts"}`}
+            filename="cashbook"
+            headers={["Date", "Description", "Reference", "Receipts (Cr)", "Payments (Dr)", "Balance"]}
+            transformData={(data) => {
+              const rows = data.map(t => [
+                format(new Date(t.transaction_date), "dd/MM/yyyy"),
+                t.description || "-",
+                t.reference || "-",
+                t.credit_amount ? t.credit_amount.toString() : "0",
+                t.debit_amount ? t.debit_amount.toString() : "0",
+                t.runningBalance.toString()
+              ]);
+              rows.push([
+                "",
+                "TOTALS",
+                "",
+                summary.totalReceipts.toString(),
+                summary.totalPayments.toString(),
+                summary.netMovement.toString()
+              ]);
+              return rows;
+            }}
+          />
         </div>
       </div>
 

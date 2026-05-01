@@ -72,13 +72,45 @@ const SchoolBusBranchPLReport = ({ branchId, branchName, branchCode, onBack }: P
   const { data: buses = [] } = useQuery({
     queryKey: ["branch-buses-pl", branchId],
     queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from("fleet_buses")
-        .select("id, bus_number, route_name, lease_monthly_amount")
-        .eq("branch_id", branchId)
+      // 1. Get all unique routes for this branch from school_students
+      const { data: studentsData } = await supabase
+        .from("school_students")
+        .select("route")
+        .eq("branch_id", branchId);
+      
+      const branchRoutes = [...new Set((studentsData || []).map(s => s.route).filter(Boolean))];
+
+      if (branchRoutes.length === 0) return [];
+
+      // 2. Fetch buses that run on these routes
+      const { data } = await supabase
+        .from("buses")
+        .select("id, bus_no, route")
+        .in("route", branchRoutes)
         .eq("status", "active")
-        .order("bus_number");
-      return data || [];
+        .order("bus_no");
+      
+      // Also fetch their active lease installments
+      const busIds = data?.map(b => b.id) || [];
+      let loans: any[] = [];
+      if (busIds.length > 0) {
+        const { data: loanData } = await supabase
+          .from("bus_loans")
+          .select("bus_id, monthly_installment")
+          .in("bus_id", busIds)
+          .eq("status", "active");
+        loans = loanData || [];
+      }
+
+      return (data || []).map(bus => {
+        const loan = loans.find(l => l.bus_id === bus.id);
+        return {
+          id: bus.id,
+          bus_number: bus.bus_no,
+          route_name: bus.route,
+          lease_monthly_amount: loan ? loan.monthly_installment : 0
+        };
+      });
     },
   });
 
@@ -86,13 +118,12 @@ const SchoolBusBranchPLReport = ({ branchId, branchName, branchCode, onBack }: P
   const { data: incomeData = [] } = useQuery({
     queryKey: ["sbs-income-pl", branchId, monthStart, monthEnd],
     queryFn: async () => {
-      // Get income per bus: join students → route → bus
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from("school_payment_transactions")
-        .select("amount_paid, student:school_bus_students(bus_id)")
+        .select("amount_paid, school_students!inner(branch_id, route)")
         .gte("payment_date", monthStart)
         .lte("payment_date", monthEnd)
-        .eq("student.branch_id", branchId);
+        .eq("school_students.branch_id", branchId);
       return data || [];
     },
   });
@@ -103,7 +134,7 @@ const SchoolBusBranchPLReport = ({ branchId, branchName, branchCode, onBack }: P
     queryFn: async () => {
       const busIds = buses.map((b: any) => b.id);
       if (busIds.length === 0) return [];
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from("daily_bus_expenses")
         .select("bus_id, fuel_cost, salary, food, parking, body_wash, police, repair, tyre_tube, highway_charges, short_misc, runner, other, emission_fitness, permits_renewal, staff_accommodation, accident_compensation, log_sheet, vehicle_hire, ntc, temporary_permit, legal_court")
         .in("bus_id", busIds)
@@ -117,30 +148,30 @@ const SchoolBusBranchPLReport = ({ branchId, branchName, branchCode, onBack }: P
   // ===== COMPUTE P&L PER BUS =====
   const busPLData: BusPL[] = useMemo(() => {
     return buses.map((bus: any) => {
-      // Compute income for this bus
+      // Compute income for this bus by matching the route
       const busIncome = incomeData
-        .filter((p: any) => p.student?.bus_id === bus.id)
-        .reduce((sum: number, p: any) => sum + (p.amount_paid || 0), 0);
+        .filter((p: any) => p.school_students?.route === bus.route_name)
+        .reduce((sum: number, p: any) => sum + (Number(p.amount_paid) || 0), 0);
 
       // Compute expenses for this bus
       const busExpenses = expenseData.filter((e: any) => e.bus_id === bus.id);
       
-      const fuelExpenses = busExpenses.reduce((s: number, e: any) => s + (e.fuel_cost || 0), 0);
+      const fuelExpenses = busExpenses.reduce((s: number, e: any) => s + (Number(e.fuel_cost) || 0), 0);
       const maintenanceExpenses = busExpenses.reduce((s: number, e: any) => 
-        s + (e.repair || 0) + (e.tyre_tube || 0) + (e.body_wash || 0) + (e.emission_fitness || 0), 0);
-      const driverSalary = busExpenses.reduce((s: number, e: any) => s + (e.salary || 0), 0);
-      const caretakerSalary = busExpenses.reduce((s: number, e: any) => s + (e.food || 0), 0); // caretaker payments often in food category
-      const parkingFee = busExpenses.reduce((s: number, e: any) => s + (e.parking || 0), 0);
+        s + (Number(e.repair) || 0) + (Number(e.tyre_tube) || 0) + (Number(e.body_wash) || 0) + (Number(e.emission_fitness) || 0), 0);
+      const driverSalary = busExpenses.reduce((s: number, e: any) => s + (Number(e.salary) || 0), 0);
+      const caretakerSalary = busExpenses.reduce((s: number, e: any) => s + (Number(e.food) || 0), 0); // caretaker payments often in food category
+      const parkingFee = busExpenses.reduce((s: number, e: any) => s + (Number(e.parking) || 0), 0);
       const otherExpenses = busExpenses.reduce((s: number, e: any) => 
-        s + (e.police || 0) + (e.highway_charges || 0) + (e.short_misc || 0) + 
-        (e.runner || 0) + (e.other || 0) + (e.permits_renewal || 0) + 
-        (e.staff_accommodation || 0) + (e.accident_compensation || 0) + 
-        (e.log_sheet || 0) + (e.vehicle_hire || 0) + (e.ntc || 0) + 
-        (e.temporary_permit || 0) + (e.legal_court || 0), 0);
+        s + (Number(e.police) || 0) + (Number(e.highway_charges) || 0) + (Number(e.short_misc) || 0) + 
+        (Number(e.runner) || 0) + (Number(e.other) || 0) + (Number(e.permits_renewal) || 0) + 
+        (Number(e.staff_accommodation) || 0) + (Number(e.accident_compensation) || 0) + 
+        (Number(e.log_sheet) || 0) + (Number(e.vehicle_hire) || 0) + (Number(e.ntc) || 0) + 
+        (Number(e.temporary_permit) || 0) + (Number(e.legal_court) || 0), 0);
 
       const totalDirectExpenses = fuelExpenses + maintenanceExpenses + driverSalary + caretakerSalary + parkingFee + otherExpenses;
       const directProfit = busIncome - totalDirectExpenses;
-      const leaseInstallment = bus.lease_monthly_amount || 0;
+      const leaseInstallment = Number(bus.lease_monthly_amount) || 0;
       const totalNetProfit = directProfit - leaseInstallment;
 
       return {
