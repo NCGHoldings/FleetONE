@@ -22,6 +22,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { toast } from "@/hooks/use-toast";
 
 const accountSchema = z.object({
   account_code: z.string().min(1, "Account code is required"),
@@ -159,6 +160,11 @@ export const AccountEditForm = ({ account, onSuccess }: AccountEditFormProps) =>
       ? null
       : data.parent_account_id;
 
+    if (!parentId && account.parent_account_id !== null) {
+      toast({ title: "Validation Error", description: "Child accounts must have a parent account.", variant: "destructive" });
+      return;
+    }
+
     const selectedParent = parentId 
       ? (parentAccounts as ParentAccount[] | undefined)?.find(acc => acc.id === parentId) || null
       : null;
@@ -255,21 +261,23 @@ export const AccountEditForm = ({ account, onSuccess }: AccountEditFormProps) =>
                     <CommandList className="max-h-[300px] overflow-y-auto">
                       <CommandEmpty>No account found.</CommandEmpty>
                       <CommandGroup>
-                        <CommandItem
-                          value="no parent top level"
-                          onSelect={() => {
-                            field.onChange("_none");
-                            setOpenCombobox(false);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              !selectedValue ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          No Parent (Top Level)
-                        </CommandItem>
+                        {account.parent_account_id === null && (
+                          <CommandItem
+                            value="no parent top level"
+                            onSelect={() => {
+                              field.onChange("_none");
+                              setOpenCombobox(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                !selectedValue ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            No Parent (Top Level)
+                          </CommandItem>
+                        )}
                         {parentAccounts?.filter(a => a.id && a.id.trim() !== '').map((a) => (
                           <CommandItem
                             key={a.id}

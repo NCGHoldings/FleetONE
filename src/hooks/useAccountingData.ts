@@ -39,6 +39,7 @@ export const useChartOfAccounts = () => {
   return useQuery({
     queryKey: ["chart-of-accounts", effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("chart_of_accounts")
         .select("*")
@@ -63,6 +64,7 @@ export const useAccountsByType = (accountType: "asset" | "liability" | "equity" 
   return useQuery({
     queryKey: ["accounts-by-type", accountType, effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("chart_of_accounts")
         .select("*")
@@ -99,6 +101,7 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
   return useQuery({
     queryKey: ["journal-entries", selectedCompanyId, status, effectiveCompanyId, businessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("journal_entries")
         .select("*, business_unit_code")
@@ -175,6 +178,7 @@ export const useFinancialPeriods = () => {
   return useQuery({
     queryKey: ["financial-periods", effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("financial_periods")
         .select("*")
@@ -198,6 +202,7 @@ export const useCurrentPeriod = () => {
   return useQuery({
     queryKey: ["current-period", selectedCompanyId],
     queryFn: async () => {
+      if (!selectedCompanyId) return null;
       const today = new Date().toISOString().split("T")[0];
       let query = supabase
         .from("financial_periods")
@@ -228,6 +233,7 @@ export const useCustomers = () => {
   return useQuery({
     queryKey: ["customers", selectedCompanyId, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("customers")
         .select("*, customer_categories(category_name)")
@@ -255,6 +261,7 @@ export const useCustomerBalance = (customerId: string) => {
   return useQuery({
     queryKey: ["customer-balance", customerId, selectedCompanyId],
     queryFn: async () => {
+      if (!selectedCompanyId) return null;
       let query = supabase
         .from("ar_invoices")
         .select("balance")
@@ -282,6 +289,7 @@ export const useVendors = () => {
   return useQuery({
     queryKey: ["vendors", selectedCompanyId, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("vendors")
         .select("*, vendor_categories(category_name)")
@@ -309,6 +317,7 @@ export const useVendorBalance = (vendorId: string) => {
   return useQuery({
     queryKey: ["vendor-balance", vendorId, selectedCompanyId],
     queryFn: async () => {
+      if (!selectedCompanyId) return null;
       let query = supabase
         .from("ap_invoices")
         .select("balance")
@@ -336,6 +345,7 @@ export const useARInvoices = (status?: string) => {
   return useQuery({
     queryKey: ["ar-invoices", selectedCompanyId, status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query: any = supabase
         .from("ar_invoices")
         .select(`
@@ -412,6 +422,7 @@ export const useAPInvoices = (status?: string) => {
   return useQuery({
     queryKey: ["ap-invoices", selectedCompanyId, status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query: any = supabase
         .from("ap_invoices")
         .select(`
@@ -497,6 +508,7 @@ export const useARReceipts = () => {
   return useQuery({
     queryKey: ["ar-receipts", selectedCompanyId, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ar_receipts")
         .select(`
@@ -557,6 +569,7 @@ export const useAPPayments = () => {
   return useQuery({
     queryKey: ["ap-payments", selectedCompanyId, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ap_payments")
         .select(`
@@ -655,7 +668,6 @@ export const useAPPayments = () => {
         const fallbackData = await fetchAllRows(fallbackQuery);
         return fallbackData;
       }
-      return data;
     },
     enabled: !!selectedCompanyId,
   });
@@ -671,6 +683,7 @@ export const useBankAccounts = () => {
   return useQuery({
     queryKey: ["bank-accounts", effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       // Use explicit column selection to avoid PostgREST errors from non-existent columns (e.g. 'status')
       let query = supabase
         .from("bank_accounts")
@@ -748,6 +761,7 @@ export const useBankTransactions = (bankAccountId?: string) => {
   return useQuery({
     queryKey: ["bank-transactions", bankAccountId, effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("bank_transactions")
         .select("*")
@@ -782,6 +796,7 @@ export const useBankTransactionsForRecon = (
   return useQuery({
     queryKey: ["bank-transactions-recon", bankAccountId, effectiveCompanyId, fromDate, toDate],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       // Fetch all unreconciled transactions (no limit)
       let unreconciledQuery = supabase
         .from("bank_transactions")
@@ -851,6 +866,7 @@ export const useBankReconciliations = (bankAccountId?: string) => {
   return useQuery({
     queryKey: ["bank-reconciliations", bankAccountId, effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("bank_reconciliations")
         .select("*")
@@ -880,6 +896,7 @@ export const useLastReconciliation = (bankAccountId: string | null) => {
   return useQuery({
     queryKey: ["last-reconciliation", bankAccountId, effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       const { data, error } = await supabase
         .from("bank_reconciliations")
         .select("*")
@@ -1052,7 +1069,9 @@ export const useAuditLogs = (tableName?: string, recordId?: string) => {
 
   return useQuery({
     queryKey: ["audit-logs", tableName, recordId, selectedCompanyId],
+    enabled: !!selectedCompanyId,
     queryFn: async () => {
+      if (!selectedCompanyId) return null;
       let query = supabase
         .from("accounting_audit_log")
         .select("*")
@@ -1073,8 +1092,7 @@ export const useAuditLogs = (tableName?: string, recordId?: string) => {
       const { data, error } = await query;
       if (error) throw error;
       return data;
-    },
-    enabled: !!selectedCompanyId,
+    }
   });
 };
 
@@ -1086,6 +1104,7 @@ export const useAccountingSummary = () => {
   return useQuery({
     queryKey: ["accounting-summary", selectedCompanyId, effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("chart_of_accounts")
         .select("account_type, current_balance")
@@ -1817,6 +1836,7 @@ export const useTrialBalanceData = (
   const openingQuery = useQuery({
     queryKey: ["trial-balance-opening", periodStartDate, effectiveCompanyId, autoBusinessUnitCode, costCenterId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       if (!periodStartDate) return [];
 
       // Get all posted journal entry IDs before period start
@@ -1881,6 +1901,7 @@ export const useTrialBalanceData = (
   const periodQuery = useQuery({
     queryKey: ["trial-balance-period", periodStartDate, periodEndDate, effectiveCompanyId, autoBusinessUnitCode, costCenterId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       if (!periodStartDate || !periodEndDate) return [];
 
       let jeQuery = supabase

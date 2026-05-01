@@ -1713,6 +1713,7 @@ export async function createSPHARReceipt({
   paymentId: string;
   companyId: string;
   journalEntryId?: string;
+  physicalBankAccountId?: string | null;
 }): Promise<{ receiptId: string; receiptNumber: string } | null> {
   try {
     console.log('[SPH AR] Creating AR Receipt for payment:', paymentId);
@@ -1742,6 +1743,7 @@ export async function createSPHARReceipt({
         company_id: companyId,
         business_unit_code: 'SPH',
         journal_entry_id: journalEntryId || null,
+        bank_account_id: physicalBankAccountId || null,
       })
       .select()
       .single();
@@ -1775,6 +1777,38 @@ export async function createSPHARReceipt({
 
     if (linkError) {
       console.error('[SPH AR] Error linking receipt to payment:', linkError);
+    }
+
+    if (physicalBankAccountId && paymentAmount > 0) {
+      const { error: btErr } = await supabase.from('bank_transactions').insert({
+        bank_account_id: physicalBankAccountId,
+        transaction_date: format(new Date(), 'yyyy-MM-dd'),
+        transaction_type: 'receipt',
+        description: `Special Hire Payment - ${receiptNumber}`,
+        debit_amount: paymentAmount,
+        credit_amount: 0,
+        reference: reference || paymentId,
+        company_id: companyId,
+        source_type: 'ar_receipt',
+        source_id: receipt.id,
+      });
+
+      if (btErr) console.error('[SPH AR] Error inserting bank transaction:', btErr);
+      else {
+        // Update bank account balance
+        const { data: bankAccount } = await supabase
+          .from('bank_accounts')
+          .select('current_balance')
+          .eq('id', physicalBankAccountId)
+          .single();
+          
+        if (bankAccount) {
+          await supabase
+            .from('bank_accounts')
+            .update({ current_balance: (bankAccount.current_balance || 0) + paymentAmount })
+            .eq('id', physicalBankAccountId);
+        }
+      }
     }
 
     console.log('[SPH AR] ✅ AR Receipt created:', receiptNumber);

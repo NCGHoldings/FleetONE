@@ -1297,6 +1297,7 @@ export function usePostPaymentToGL() {
           .from("bank_accounts")
           .select("id")
           .eq("gl_account_id", bankGLAccountId)
+          .limit(1)
           .maybeSingle();
         if (linkedBank) {
           physicalBankAccountId = linkedBank.id;
@@ -1372,7 +1373,7 @@ export function usePostPaymentToGL() {
 
           // If a bank account is configured, record the bank transaction and update balance
           if (physicalBankAccountId && amount > 0) {
-            await supabase.from("bank_transactions").insert([{
+            const { error: btErr } = await supabase.from("bank_transactions").insert([{
               bank_account_id: physicalBankAccountId,
               transaction_date: format(new Date(), "yyyy-MM-dd"),
               transaction_type: "receipt",
@@ -1384,6 +1385,8 @@ export function usePostPaymentToGL() {
               source_type: "ar_receipt",
               source_id: arReceipt.id,
             }]);
+            
+            if (btErr) console.error("Bank transaction insert failed:", btErr);
 
             // Update running balance on the bank account
             const { data: bankAccount } = await supabase
@@ -1440,6 +1443,7 @@ export function usePostGroupedPaymentToGL() {
       paymentMethod: string;
       referenceNo?: string;
       description?: string;
+      customBankAccountId?: string;
       allocations: Array<{
         paymentId: string;
         amount: number;
@@ -1506,9 +1510,9 @@ export function usePostGroupedPaymentToGL() {
         throw new Error(`Cannot post payment: GL accounts (${codes}) belong to a different company.`);
       }
 
-      const bankGLAccountId = effectiveSettings.branch_gl_account_id || effectiveSettings.cash_account_id;
+      const bankGLAccountId = customBankAccountId || effectiveSettings.branch_gl_account_id || effectiveSettings.cash_account_id;
       if (!bankGLAccountId) {
-        throw new Error("Bank/Cash GL account not configured for this branch.");
+        throw new Error("Bank/Cash GL account not configured for this branch and no override was provided.");
       }
 
       let liabilityAccountId: string | null = null;
@@ -1629,6 +1633,7 @@ export function usePostGroupedPaymentToGL() {
           .from("bank_accounts")
           .select("id")
           .eq("gl_account_id", bankGLAccountId)
+          .limit(1)
           .maybeSingle();
         if (linkedBank) {
           physicalBankAccountId = linkedBank.id;
@@ -1713,7 +1718,7 @@ export function usePostGroupedPaymentToGL() {
       }
 
       if (physicalBankAccountId && totalAmount > 0) {
-        await supabase.from("bank_transactions").insert([{
+        const { error: btErr } = await supabase.from("bank_transactions").insert([{
           bank_account_id: physicalBankAccountId,
           transaction_date: format(new Date(), "yyyy-MM-dd"),
           transaction_type: "receipt",
@@ -1725,6 +1730,8 @@ export function usePostGroupedPaymentToGL() {
           source_type: "journal_entry",
           source_id: journalEntry.id,
         }]);
+        
+        if (btErr) console.error("Grouped bank transaction insert failed:", btErr);
 
         const { data: bankAccount } = await supabase
           .from("bank_accounts")

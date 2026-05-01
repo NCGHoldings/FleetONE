@@ -19,6 +19,8 @@ interface BranchStats {
   totalRevenue: number;
   pendingAmount: number;
   overdueAmount: number;
+  unidentifiedCount: number;
+  unidentifiedAmount: number;
 }
 
 interface MonthlyData {
@@ -40,7 +42,9 @@ export default function SchoolReports() {
     totalStudents: 0,
     totalRevenue: 0,
     totalPending: 0,
-    totalOverdue: 0
+    totalOverdue: 0,
+    totalUnidentifiedCount: 0,
+    totalUnidentifiedAmount: 0
   });
 
   useEffect(() => {
@@ -58,6 +62,27 @@ export default function SchoolReports() {
         .eq('is_active', true);
 
       if (branchesError) throw branchesError;
+
+      // Fetch all unmatched items for counting across branches
+      const { data: unmatchedData, error: unmatchedError } = await supabase
+        .from('school_payment_import_items')
+        .select(`
+          amount,
+          school_payment_imports!inner(branch_id)
+        `)
+        .in('match_status', ['unmatched', 'posted_unmatched']);
+
+      const unmatchedByBranch = (unmatchedData || []).reduce((acc: any, item: any) => {
+        const branchId = item.school_payment_imports?.branch_id;
+        if (branchId) {
+          if (!acc[branchId]) {
+            acc[branchId] = { count: 0, amount: 0 };
+          }
+          acc[branchId].count += 1;
+          acc[branchId].amount += Number(item.amount) || 0;
+        }
+        return acc;
+      }, {});
 
       // Fetch statistics for each branch
       const statsPromises = (branches || []).map(async (branch) => {
@@ -86,6 +111,8 @@ export default function SchoolReports() {
           ?.filter(s => s.payment_status === 'overdue')
           ?.reduce((sum, s) => sum + (s.update_new || 0), 0) || 0;
 
+        const branchUnmatched = unmatchedByBranch[branch.id] || { count: 0, amount: 0 };
+
         return {
           branchId: branch.id,
           branchName: branch.branch_name,
@@ -96,7 +123,9 @@ export default function SchoolReports() {
           overdueStudents,
           totalRevenue,
           pendingAmount,
-          overdueAmount
+          overdueAmount,
+          unidentifiedCount: branchUnmatched.count,
+          unidentifiedAmount: branchUnmatched.amount
         };
       });
 
@@ -108,8 +137,10 @@ export default function SchoolReports() {
         totalStudents: acc.totalStudents + branch.totalStudents,
         totalRevenue: acc.totalRevenue + branch.totalRevenue,
         totalPending: acc.totalPending + branch.pendingAmount,
-        totalOverdue: acc.totalOverdue + branch.overdueAmount
-      }), { totalStudents: 0, totalRevenue: 0, totalPending: 0, totalOverdue: 0 });
+        totalOverdue: acc.totalOverdue + branch.overdueAmount,
+        totalUnidentifiedCount: acc.totalUnidentifiedCount + branch.unidentifiedCount,
+        totalUnidentifiedAmount: acc.totalUnidentifiedAmount + branch.unidentifiedAmount
+      }), { totalStudents: 0, totalRevenue: 0, totalPending: 0, totalOverdue: 0, totalUnidentifiedCount: 0, totalUnidentifiedAmount: 0 });
 
       setTotalStats(totals);
 
@@ -200,7 +231,7 @@ export default function SchoolReports() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Students</CardTitle>
@@ -249,6 +280,19 @@ export default function SchoolReports() {
             <div className="text-2xl font-bold text-destructive">LKR {totalStats.totalOverdue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
               Past due payments
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unidentified Funds</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">LKR {totalStats.totalUnidentifiedAmount.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalStats.totalUnidentifiedCount} unmatched payments
             </p>
           </CardContent>
         </Card>
@@ -366,6 +410,7 @@ export default function SchoolReports() {
                   <th className="text-right p-2">Paid</th>
                   <th className="text-right p-2">Pending</th>
                   <th className="text-right p-2">Overdue</th>
+                  <th className="text-right p-2 text-amber-600">Unidentified</th>
                   <th className="text-right p-2">Revenue</th>
                   <th className="text-right p-2">Collection Rate</th>
                 </tr>
@@ -383,6 +428,10 @@ export default function SchoolReports() {
                     <td className="text-right p-2 text-success">{branch.paidStudents}</td>
                     <td className="text-right p-2 text-warning">{branch.pendingStudents}</td>
                     <td className="text-right p-2 text-destructive">{branch.overdueStudents}</td>
+                    <td className="text-right p-2 text-amber-600">
+                      <div>{branch.unidentifiedCount}</div>
+                      <div className="text-xs font-semibold">LKR {branch.unidentifiedAmount.toLocaleString()}</div>
+                    </td>
                     <td className="text-right p-2">LKR {branch.totalRevenue.toLocaleString()}</td>
                     <td className="text-right p-2">
                       {branch.totalStudents > 0 

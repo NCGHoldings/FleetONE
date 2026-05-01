@@ -130,8 +130,8 @@ const BankReconciliationWorksheet = () => {
     let clearedPaymentTotal = 0, clearedDepositTotal = 0;
 
     transactions.forEach((t) => {
-      const payment = t.debit_amount || 0;
-      const deposit = t.credit_amount || 0;
+      const deposit = t.debit_amount || 0;
+      const payment = t.credit_amount || 0;
 
       if (payment > 0) { paymentCount++; paymentTotal += payment; }
       if (deposit > 0) { depositCount++; depositTotal += deposit; }
@@ -456,8 +456,8 @@ const BankReconciliationWorksheet = () => {
             </thead>
             <tbody>
               {filteredTransactions.map((t, idx) => {
-                const payment = t.debit_amount || 0;
-                const deposit = t.credit_amount || 0;
+                const deposit = t.debit_amount || 0;
+                const payment = t.credit_amount || 0;
                 const cs = clearedState[t.id];
                 const isCleared = cs?.cleared || t.is_reconciled;
                 const isAlreadyReconciled = !!t.is_reconciled;

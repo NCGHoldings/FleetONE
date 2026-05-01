@@ -252,6 +252,20 @@ export const useFinanceApproval = () => {
         });
       }
 
+      // Get physical bank account ID from the GL account setting
+      let physicalBankAccountId = null;
+      if (settings.default_bank_account_id) {
+        const { data: linkedBank } = await supabase
+          .from("bank_accounts")
+          .select("id")
+          .eq("gl_account_id", settings.default_bank_account_id)
+          .limit(1)
+          .maybeSingle();
+        if (linkedBank) {
+          physicalBankAccountId = linkedBank.id;
+        }
+      }
+
       const receiptResult = await createSPHARReceipt({
         customerId,
         arInvoiceId,
@@ -261,6 +275,7 @@ export const useFinanceApproval = () => {
         paymentId,
         companyId: effectiveCompanyId,
         journalEntryId: journalEntry?.id,
+        physicalBankAccountId,
       });
 
       if (receiptResult) {

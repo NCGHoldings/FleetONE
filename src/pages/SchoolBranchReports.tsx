@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Download, FileText, BarChart3, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowLeft, Download, FileText, BarChart3, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
@@ -56,6 +56,7 @@ export default function SchoolBranchReports() {
   const [loading, setLoading] = useState(true);
   const [busData, setBusData] = useState<BusFinancial[]>([]);
   const [branchName, setBranchName] = useState("");
+  const [unmatchedStats, setUnmatchedStats] = useState({ count: 0, amount: 0 });
 
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
@@ -97,7 +98,7 @@ export default function SchoolBranchReports() {
       const toStr = format(periodEnd, "yyyy-MM-dd");
 
       // Fetch all data in parallel using robust GL and Transaction tables
-      const [transactionsRes, expensesRes, staffRes, busesRes] = await Promise.all([
+      const [transactionsRes, expensesRes, staffRes, busesRes, importsRes] = await Promise.all([
         supabase
           .from("school_payment_transactions")
           .select(`
@@ -129,13 +130,35 @@ export default function SchoolBranchReports() {
           .eq("is_active", true),
         supabase
           .from("buses")
-          .select("id, bus_no")
+          .select("id, bus_no"),
+        supabase
+          .from("school_payment_imports")
+          .select(`
+            id,
+            school_payment_import_items ( amount, match_status )
+          `)
+          .eq("branch_id", branchId!)
       ]);
 
       const transactions = transactionsRes.data || [];
       const expenses = expensesRes.data || [];
       const staff = staffRes.data || [];
       const busesList = busesRes.data || [];
+      const importsList = importsRes.data || [];
+
+      let branchUnmatchedAmount = 0;
+      let branchUnmatchedCount = 0;
+      importsList.forEach(imp => {
+        if (imp.school_payment_import_items) {
+          imp.school_payment_import_items.forEach((item: any) => {
+            if (item.match_status === 'unmatched' || item.match_status === 'posted_unmatched') {
+              branchUnmatchedCount += 1;
+              branchUnmatchedAmount += Number(item.amount) || 0;
+            }
+          });
+        }
+      });
+      setUnmatchedStats({ count: branchUnmatchedCount, amount: branchUnmatchedAmount });
 
       // Helper to find bus_no from bus_id
       const getBusNo = (busId: string | null) => {
@@ -461,7 +484,7 @@ export default function SchoolBranchReports() {
       </Card>
 
       {/* KPI Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -497,6 +520,23 @@ export default function SchoolBranchReports() {
             <div className="text-xs text-muted-foreground">Net Profit</div>
             <div className={`text-lg font-bold ${totals.netProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
               {fmtCurrency(totals.netProfit)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3 text-amber-500" />
+                  Unidentified Funds
+                </div>
+                <div className="text-lg font-bold text-amber-600">{fmtCurrency(unmatchedStats.amount)}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-muted-foreground">Count</div>
+                <div className="text-sm font-bold text-amber-700">{unmatchedStats.count}</div>
+              </div>
             </div>
           </CardContent>
         </Card>

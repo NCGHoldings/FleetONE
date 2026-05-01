@@ -23,6 +23,7 @@ export function FinanceImportApprovalDialog() {
   
   const [suspenseAccounts, setSuspenseAccounts] = useState<any[]>([]);
   const [selectedSuspenseAccountId, setSelectedSuspenseAccountId] = useState<string>("");
+  const [selectedOverrideBankAccountId, setSelectedOverrideBankAccountId] = useState<string>("");
   const [bankAccountName, setBankAccountName] = useState<string>("Bank GL");
 
   const { toast } = useToast();
@@ -51,6 +52,7 @@ export function FinanceImportApprovalDialog() {
       .from('chart_of_accounts')
       .select('id, account_code, account_name, account_type')
       .in('account_type', ['asset', 'liability', 'equity'])
+      .eq('company_id', getEffectiveCompanyId())
       .order('account_name');
       
     if (data) {
@@ -71,7 +73,7 @@ export function FinanceImportApprovalDialog() {
         setImportData(imp);
         
         // Fetch branch's bank account mapping
-        const { data: settings } = await supabase
+        const { data: settings, error: settingsError } = await supabase
           .from("school_bus_finance_settings")
           .select(`
             branch_gl_account_id,
@@ -80,14 +82,36 @@ export function FinanceImportApprovalDialog() {
             cash_gl:chart_of_accounts!school_bus_finance_settings_cash_account_id_fkey(account_name)
           `)
           .eq("branch_id", imp.branch_id)
+          .not("branch_gl_account_id", "is", null)
+          .limit(1)
           .maybeSingle();
+
+        if (settingsError) {
+          console.warn("Error fetching branch finance settings:", settingsError);
+        }
 
         if (settings?.branch_gl?.account_name) {
           setBankAccountName(settings.branch_gl.account_name);
         } else if (settings?.cash_gl?.account_name) {
           setBankAccountName(settings.cash_gl.account_name);
         } else {
-          setBankAccountName("Bank GL");
+          // Fallback if no specific branch_gl_account_id is found, try fetching any setting for this branch
+          const { data: fallbackSettings } = await supabase
+            .from("school_bus_finance_settings")
+            .select(`
+              cash_account_id,
+              cash_gl:chart_of_accounts!school_bus_finance_settings_cash_account_id_fkey(account_name)
+            `)
+            .eq("branch_id", imp.branch_id)
+            .not("cash_account_id", "is", null)
+            .limit(1)
+            .maybeSingle();
+            
+          if (fallbackSettings?.cash_gl?.account_name) {
+            setBankAccountName(fallbackSettings.cash_gl.account_name);
+          } else {
+            setBankAccountName("Bank GL");
+          }
         }
       }
 
@@ -217,6 +241,7 @@ export function FinanceImportApprovalDialog() {
                 referenceNo: `IMPORT-${importId?.slice(0, 8)}`,
                 description: item.description,
                 allocations: glAllocations,
+                customBankAccountId: selectedOverrideBankAccountId || undefined,
               });
             } catch (glError) {
               console.error("Grouped GL posting failed for item", item.id, glError);
@@ -258,7 +283,8 @@ export function FinanceImportApprovalDialog() {
               paymentMethod: 'Bank Transfer',
               referenceNo: item.description,
               fixedAmount: item.amount,
-              customArAccountId: selectedSuspenseAccountId // Divert from standard AR to Suspense
+              customArAccountId: selectedSuspenseAccountId, // Divert from standard AR to Suspense
+              customBankAccountId: selectedOverrideBankAccountId || undefined // Override bank if selected
             });
             
             await supabase
@@ -335,12 +361,72 @@ export function FinanceImportApprovalDialog() {
 
             {matchedItems.length > 0 && (
               <div className="space-y-3 p-4 border rounded-lg">
-                <div className="flex justify-between items-center">
-                  <Label className="text-base font-semibold">Summary of Matched Payments</Label>
-                  <div className="text-xs bg-muted px-2 py-1 rounded">
-                    <strong>DR:</strong> {bankAccountName} &nbsp;|&nbsp; <strong>CR:</strong> Accounts Receivable (AR)
+                <div className="flex flex-col gap-3 mb-2">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-base font-semibold">Summary of Matched Payments</Label>
+                    <div className="text-xs bg-muted px-2 py-1 rounded">
+                      <strong>DR:</strong> {selectedOverrideBankAccountId ? suspenseAccounts.find(a => a.id === selectedOverrideBankAccountId)?.account_name : bankAccountName} &nbsp;|&nbsp; <strong>CR:</strong> Accounts Receivable (AR)
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-1.5 p-3 bg-blue-50/50 border border-blue-100 rounded-md">
+                    <Label className="text-sm font-medium text-blue-900">Override Receiving Bank (Optional)</Label>
+                    <p className="text-xs text-blue-700">Select an account here if this statement belongs to an old/different bank account rather than the default branch account.</p>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="w-full justify-between mt-1 bg-white"
+                        >
+                          {selectedOverrideBankAccountId
+                            ? suspenseAccounts.find((acc) => acc.id === selectedOverrideBankAccountId)?.account_name
+                            : `Default (${bankAccountName})`}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[600px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search Asset Account..." />
+                          <CommandList>
+                            <CommandEmpty>No accounts found.</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                onSelect={() => setSelectedOverrideBankAccountId("")}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    !selectedOverrideBankAccountId ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                Use Default Branch Account
+                              </CommandItem>
+                              {suspenseAccounts.filter(a => a.account_type === 'asset').map((acc) => (
+                                <CommandItem
+                                  key={acc.id}
+                                  value={`${acc.account_code} ${acc.account_name}`}
+                                  onSelect={() => {
+                                    setSelectedOverrideBankAccountId(acc.id);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedOverrideBankAccountId === acc.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {acc.account_code} - {acc.account_name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
+
                 <div className="max-h-[200px] overflow-y-auto border rounded divide-y bg-background">
                   {matchedItems.map(item => (
                     <div key={item.id} className="p-3 flex justify-between text-sm hover:bg-muted/50 transition-colors">
@@ -363,7 +449,7 @@ export function FinanceImportApprovalDialog() {
                 <div className="flex justify-between items-center">
                   <Label className="text-base font-semibold">Suspense GL Account (For Unmatched Funds)</Label>
                   <div className="text-xs bg-muted px-2 py-1 rounded">
-                    <strong>DR:</strong> {bankAccountName} &nbsp;|&nbsp; <strong>CR:</strong> Suspense Account
+                    <strong>DR:</strong> {selectedOverrideBankAccountId ? suspenseAccounts.find(a => a.id === selectedOverrideBankAccountId)?.account_name : bankAccountName} &nbsp;|&nbsp; <strong>CR:</strong> Suspense Account
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground mb-2">
