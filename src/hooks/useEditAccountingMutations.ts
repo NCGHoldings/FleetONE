@@ -301,6 +301,8 @@ export const useEditAPPayment = () => {
             if (glResult.success && glResult.journalEntryId) {
               newJeId = glResult.journalEntryId;
               await supabase.from("ap_payments").update({ journal_entry_id: newJeId }).eq("id", id);
+            } else {
+              throw new Error("Transaction Aborted: Journal Entry generation failed. Please verify Bank/GL mappings.");
             }
           }
         }
@@ -572,6 +574,8 @@ export const useEditARReceipt = () => {
           if (glResult.success && glResult.journalEntryId) {
             newJeId = glResult.journalEntryId;
             await supabase.from("ar_receipts").update({ journal_entry_id: newJeId }).eq("id", id);
+          } else {
+            throw new Error("Transaction Aborted: Journal Entry generation failed. Please verify Bank/GL mappings.");
           }
         } else if (tradeReceivableId) {
           const { postARReceiptToGL } = await import("@/lib/gl-posting-utils");
@@ -588,6 +592,8 @@ export const useEditARReceipt = () => {
           if (glResult.success && glResult.journalEntryId) {
             newJeId = glResult.journalEntryId;
             await supabase.from("ar_receipts").update({ journal_entry_id: newJeId }).eq("id", id);
+          } else {
+            throw new Error("Transaction Aborted: Journal Entry generation failed. Please verify Bank/GL mappings.");
           }
         }
 
@@ -807,6 +813,8 @@ export const useEditAPInvoice = () => {
             if (glResult.success && glResult.journalEntryId) {
               newJeId = glResult.journalEntryId;
               await (supabase as any).from("ap_invoices").update({ journal_entry_id: newJeId }).eq("id", id);
+            } else {
+              throw new Error("Transaction Aborted: Journal Entry generation failed. Please verify Bank/GL mappings.");
             }
           }
         } catch (e) {
@@ -903,6 +911,8 @@ export const useEditARInvoice = () => {
             if (glResult.success && glResult.journalEntryId) {
               newJeId = glResult.journalEntryId;
               await (supabase as any).from("ar_invoices").update({ journal_entry_id: newJeId }).eq("id", id);
+            } else {
+              throw new Error("Transaction Aborted: Journal Entry generation failed. Please verify Bank/GL mappings.");
             }
           }
         } catch (e) {

@@ -268,6 +268,11 @@ const financeItems = [{
   url: "/api-usage",
   icon: Activity
 }, {
+  id: "verify_hub",
+  title: "Verify Hub",
+  url: "/verify-hub",
+  icon: Shield
+}, {
   id: "system_health",
   title: "System Health",
   url: "/system-health",

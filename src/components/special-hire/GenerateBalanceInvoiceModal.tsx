@@ -420,11 +420,6 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   };
 
   const handleEmailToCustomer = async () => {
-    if (!quotationData.customer_email) {
-      toast.error('Customer email is not available');
-      return;
-    }
-
     try {
       setIsLoading(true);
       
@@ -452,39 +447,11 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       
       const pdfBase64 = await base64Promise;
 
-      // Call edge function to send email
-      const { error } = await supabase.functions.invoke('send-balance-invoice-email', {
-        body: {
-          quotationNo: quotationData.quotation_no,
-          customerEmail: quotationData.customer_email,
-          customerName: quotationData.customer_name,
-          balanceDue: calculateFinalBalance(),
-          invoiceNo: invoiceData.invoiceNo,
-          pdfBase64,
-        },
-      });
-
-      if (error) throw error;
-
-      // Update invoice status
-      if (documentId) {
-        await supabase
-          .from('document_storage')
-          .update({ 
-            invoice_status: 'sent_to_customer',
-            email_status: 'sent',
-            email_sent_at: new Date().toISOString(),
-            email_sent_by: user?.id,
-          })
-          .eq('id', documentId);
-
-        setInvoiceStatus('sent_to_customer');
-      }
-
       // ========================
-      // GL & AR POSTING INTEGRATION - Post invoice to General Ledger and update AR
-      // Guard: Check if GL was already posted for this quotation's final invoice
+      // 1. GL & AR POSTING INTEGRATION - Post invoice to General Ledger and update AR
+      // Do this BEFORE the email so network issues don't abort the finance pipeline
       // ========================
+      let glPostedSuccessfully = false;
       try {
         console.log('[SPH GL] Invoice sent - checking if GL already posted...');
         
@@ -500,183 +467,228 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
         if (existingJE) {
           console.log('[SPH GL] ⚠️ GL already posted for this invoice:', existingJE.entry_number, '— skipping to prevent double-posting');
           toast.info(`GL already posted: ${existingJE.entry_number}`);
+          glPostedSuccessfully = true;
         } else {
           console.log('[SPH GL] No existing GL found — proceeding with GL & AR posting...');
-        }
-
-        const settings = await fetchSpecialHireFinanceSettings(companyIdToUse);
-        
-        if (settings?.auto_post_invoices && !existingJE) {
-          // Post GROSS invoice amount (before discount) — discount is posted separately
-          const fullInvoiceAmount = computedTotalAmount() + 
-            (effectiveAdjustment.extra_km_total_charge || 0) + 
-            (effectiveAdjustment.total_additional_expenses || 0);
-          const discountAmount = quotationData.discount_amount_lkr || 0;
           
-          const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
-          const isInternal = quotationData.company_name?.toLowerCase().includes('internal') || false;
+          const settings = await fetchSpecialHireFinanceSettings(companyIdToUse);
           
-          console.log('[SPH GL] Posting invoice to GL:', {
-            invoiceNo,
-            amount: fullInvoiceAmount,
-            isInternal,
-          });
-
-          // 1. Post invoice (Revenue recognition)
-          // DR Trade Receivable | CR Special Hire Revenue
-          const invoiceGLResult = await postInvoiceToGLStandalone({
-            invoiceNo,
-            quotationNo: quotationData.quotation_no,
-            customerName: quotationData.customer_name,
-            totalAmount: fullInvoiceAmount,
-            isInternal,
-            settings,
-            effectiveCompanyId: companyIdToUse,
-          });
-          
-          if (invoiceGLResult) {
-            console.log('[SPH GL] ✅ Invoice posted:', invoiceGLResult.entry_number);
-            toast.success(`Invoice GL Entry: ${invoiceGLResult.entry_number}`);
-
-            // Update or Create AR Invoice with full invoice amount
-            const { data: quotationRecord } = await supabase
-              .from('special_hire_quotations')
-              .select('ar_invoice_id, finance_customer_id')
-              .eq('id', quotationData.id)
-              .single();
-
-            let arInvoiceId = quotationRecord?.ar_invoice_id;
-            const financeCustomerId = quotationRecord?.finance_customer_id;
-
-            if (arInvoiceId) {
-              await updateSPHARInvoiceOnInvoiceSent({
-                arInvoiceId: arInvoiceId,
-                quotationId: quotationData.id,
-                totalAmount: fullInvoiceAmount,
-                journalEntryId: invoiceGLResult.id,
-              });
-              console.log('[SPH AR] ✅ AR Invoice updated with invoice amount');
-            } else {
-              // Create the missing AR Invoice
-              console.log('[SPH AR] Creating missing AR Invoice for Sent Invoice');
-              const { createSPHARInvoice, createOrGetSPHCustomer } = await import('@/hooks/useSpecialHireFinance');
-              
-              let customerId = financeCustomerId;
-              if (!customerId) {
-                customerId = await createOrGetSPHCustomer({
-                  customerName: quotationData.customer_name,
-                  customerPhone: quotationData.customer_phone,
-                  customerEmail: quotationData.customer_email,
-                  companyId: companyIdToUse,
-                });
-              }
-
-              if (customerId) {
-                const dueDate = format(new Date(), 'yyyy-MM-dd');
-                const arResult = await createSPHARInvoice({
-                  quotationId: quotationData.id,
-                  quotationNo: quotationData.quotation_no,
-                  customerId,
-                  customerName: quotationData.customer_name,
-                  totalAmount: fullInvoiceAmount,
-                  advanceAmount: quotationData.advance_paid,
-                  dueDate,
-                  companyId: companyIdToUse,
-                  journalEntryId: invoiceGLResult.id, // Pass journalEntryId to skip double GL posting
-                });
-                
-                if (arResult) {
-                  console.log('[SPH AR] ✅ AR Invoice created:', arResult.invoiceNumber);
-                }
-              }
-            }
-          }
-          
-          // 2. Apply advance if customer paid advance (with double-posting guard)
-          // DR Customer Advance (Liability) | CR Trade Receivable
-          // Query ONLY advance payments (not balance) to get correct advance-only amount
-          let advanceAmount = quotationData.advance_paid || 0;
-          try {
-            const { data: advPmts } = await supabase
-              .from('special_hire_payments')
-              .select('amount')
-              .eq('quotation_id', quotationData.id)
-              .eq('payment_type', 'advance')
-              .eq('status', 'approved');
-            if (advPmts && advPmts.length > 0) {
-              advanceAmount = advPmts.reduce((s, p) => s + (p.amount || 0), 0);
-            }
-          } catch (err) {
-            console.warn('[SPH GL] Could not fetch advance payments, using fallback:', err);
-          }
-          if (advanceAmount > 0) {
-            // Check if advance was already applied by useFinanceApproval
-            const { data: existingApplyJE } = await supabase
-              .from('journal_entries')
-              .select('id')
-              .ilike('entry_number', `SPH-ADJ-APPLY-${quotationData.quotation_no}%`)
-              .limit(1)
-              .maybeSingle();
-
-            if (!existingApplyJE) {
-              console.log('[SPH GL] Applying advance to invoice:', advanceAmount);
-              
-              const advanceGLResult = await applyAdvanceToInvoiceStandalone({
-                invoiceNo,
-                quotationNo: quotationData.quotation_no,
-                customerName: quotationData.customer_name,
-                advanceAmount,
-                settings,
-                effectiveCompanyId: companyIdToUse,
-              });
-              
-              if (advanceGLResult) {
-                console.log('[SPH GL] ✅ Advance applied:', advanceGLResult.entry_number);
-                toast.success(`Advance Applied: ${advanceGLResult.entry_number}`);
-              }
-            } else {
-              console.log('[SPH GL] ⏭️ Advance already applied, skipping duplicate');
-            }
-          }
-
-          // 3. Post discount if applicable
-          // DR Discount Expense | CR Trade Receivable
-          if (discountAmount > 0) {
-            console.log('[SPH GL] Posting discount to GL:', discountAmount);
+          if (settings?.auto_post_invoices) {
+            // Post GROSS invoice amount (before discount) — discount is posted separately
+            const fullInvoiceAmount = computedTotalAmount() + 
+              (effectiveAdjustment.extra_km_total_charge || 0) + 
+              (effectiveAdjustment.total_additional_expenses || 0);
+            const discountAmount = quotationData.discount_amount_lkr || 0;
+            
             const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
+            const isInternal = quotationData.company_name?.toLowerCase().includes('internal') || false;
+            
+            console.log('[SPH GL] Posting invoice to GL:', {
+              invoiceNo,
+              amount: fullInvoiceAmount,
+              isInternal,
+            });
 
-            const discountGLResult = await postDiscountToGLStandalone({
+            // 1. Post invoice (Revenue recognition)
+            // DR Trade Receivable | CR Special Hire Revenue
+            const invoiceGLResult = await postInvoiceToGLStandalone({
               invoiceNo,
               quotationNo: quotationData.quotation_no,
               customerName: quotationData.customer_name,
-              discountAmount,
+              totalAmount: fullInvoiceAmount,
+              isInternal,
               settings,
               effectiveCompanyId: companyIdToUse,
             });
+            
+            if (invoiceGLResult) {
+              console.log('[SPH GL] ✅ Invoice posted:', invoiceGLResult.entry_number);
+              toast.success(`Invoice GL Entry: ${invoiceGLResult.entry_number}`);
 
-            if (discountGLResult) {
-              console.log('[SPH GL] ✅ Discount posted:', discountGLResult.entry_number);
-              toast.success(`Discount GL Entry: ${discountGLResult.entry_number}`);
+              // Update or Create AR Invoice with full invoice amount
+              const { data: quotationRecord } = await supabase
+                .from('special_hire_quotations')
+                .select('ar_invoice_id, finance_customer_id')
+                .eq('id', quotationData.id)
+                .single();
+
+              let arInvoiceId = quotationRecord?.ar_invoice_id;
+              const financeCustomerId = quotationRecord?.finance_customer_id;
+
+              if (arInvoiceId) {
+                await updateSPHARInvoiceOnInvoiceSent({
+                  arInvoiceId: arInvoiceId,
+                  quotationId: quotationData.id,
+                  totalAmount: fullInvoiceAmount,
+                  journalEntryId: invoiceGLResult.id,
+                });
+                console.log('[SPH AR] ✅ AR Invoice updated with invoice amount');
+              } else {
+                // Create the missing AR Invoice
+                console.log('[SPH AR] Creating missing AR Invoice for Sent Invoice');
+                const { createSPHARInvoice, createOrGetSPHCustomer } = await import('@/hooks/useSpecialHireFinance');
+                
+                let customerId = financeCustomerId;
+                if (!customerId) {
+                  customerId = await createOrGetSPHCustomer({
+                    customerName: quotationData.customer_name,
+                    customerPhone: quotationData.customer_phone,
+                    customerEmail: quotationData.customer_email,
+                    companyId: companyIdToUse,
+                  });
+                }
+
+                if (customerId) {
+                  const dueDate = format(new Date(), 'yyyy-MM-dd');
+                  const arResult = await createSPHARInvoice({
+                    quotationId: quotationData.id,
+                    quotationNo: quotationData.quotation_no,
+                    customerId,
+                    customerName: quotationData.customer_name,
+                    totalAmount: fullInvoiceAmount,
+                    advanceAmount: quotationData.advance_paid,
+                    dueDate,
+                    companyId: companyIdToUse,
+                    journalEntryId: invoiceGLResult.id, // Pass journalEntryId to skip double GL posting
+                  });
+                  
+                  if (arResult) {
+                    console.log('[SPH AR] ✅ AR Invoice created:', arResult.invoiceNumber);
+                  }
+                }
+              }
             }
+            
+            // 2. Apply advance if customer paid advance (with double-posting guard)
+            // DR Customer Advance (Liability) | CR Trade Receivable
+            // Query ONLY advance payments (not balance) to get correct advance-only amount
+            let advanceAmount = quotationData.advance_paid || 0;
+            try {
+              const { data: advPmts } = await supabase
+                .from('special_hire_payments')
+                .select('amount')
+                .eq('quotation_id', quotationData.id)
+                .eq('payment_type', 'advance')
+                .eq('status', 'approved');
+              if (advPmts && advPmts.length > 0) {
+                advanceAmount = advPmts.reduce((s, p) => s + (p.amount || 0), 0);
+              }
+            } catch (err) {
+              console.warn('[SPH GL] Could not fetch advance payments, using fallback:', err);
+            }
+            if (advanceAmount > 0) {
+              // Check if advance was already applied by useFinanceApproval
+              const { data: existingApplyJE } = await supabase
+                .from('journal_entries')
+                .select('id')
+                .ilike('entry_number', `SPH-ADJ-APPLY-${quotationData.quotation_no}%`)
+                .limit(1)
+                .maybeSingle();
+
+              if (!existingApplyJE) {
+                console.log('[SPH GL] Applying advance to invoice:', advanceAmount);
+                
+                const advanceGLResult = await applyAdvanceToInvoiceStandalone({
+                  invoiceNo,
+                  quotationNo: quotationData.quotation_no,
+                  customerName: quotationData.customer_name,
+                  advanceAmount,
+                  settings,
+                  effectiveCompanyId: companyIdToUse,
+                });
+                
+                if (advanceGLResult) {
+                  console.log('[SPH GL] ✅ Advance applied:', advanceGLResult.entry_number);
+                  toast.success(`Advance Applied: ${advanceGLResult.entry_number}`);
+                }
+              } else {
+                console.log('[SPH GL] ⏭️ Advance already applied, skipping duplicate');
+              }
+            }
+
+            // 3. Post discount if applicable
+            // DR Discount Expense | CR Trade Receivable
+            if (discountAmount > 0) {
+              console.log('[SPH GL] Posting discount to GL:', discountAmount);
+              const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
+
+              const discountGLResult = await postDiscountToGLStandalone({
+                invoiceNo,
+                quotationNo: quotationData.quotation_no,
+                customerName: quotationData.customer_name,
+                discountAmount,
+                settings,
+                effectiveCompanyId: companyIdToUse,
+              });
+
+              if (discountGLResult) {
+                console.log('[SPH GL] ✅ Discount posted:', discountGLResult.entry_number);
+                toast.success(`Discount GL Entry: ${discountGLResult.entry_number}`);
+              }
+            }
+          } else {
+            console.log('[SPH GL] Auto-post invoices disabled or settings not found');
           }
-        } else {
-          console.log('[SPH GL] Auto-post invoices disabled or settings not found');
+          
+          glPostedSuccessfully = true;
         }
       } catch (glError: any) {
         console.error('[SPH GL] ❌ Invoice GL/AR update failed:', glError?.message || glError);
-        toast.warning(`Invoice sent but GL/AR update failed: ${glError?.message || 'Unknown error'}`);
+        toast.warning(`GL/AR update failed: ${glError?.message || 'Unknown error'}. Please try again.`);
+        throw new Error("Finance generation pipeline aborted due to database error.");
       }
-      // ========================
-      // END GL & AR POSTING
-      // ========================
 
-      toast.success(`Invoice emailed successfully to ${quotationData.customer_email}`);
+      // ========================
+      // 2. SEND EMAIL (If email exists)
+      // Done after GL & AR posting to ensure we don't skip finance
+      // ========================
+      let emailSent = false;
+      if (quotationData.customer_email) {
+        try {
+          // Call edge function to send email
+          const { error } = await supabase.functions.invoke('send-balance-invoice-email', {
+            body: {
+              quotationNo: quotationData.quotation_no,
+              customerEmail: quotationData.customer_email,
+              customerName: quotationData.customer_name,
+              balanceDue: calculateFinalBalance(),
+              invoiceNo: invoiceData.invoiceNo,
+              pdfBase64,
+            },
+          });
+
+          if (error) throw error;
+          emailSent = true;
+        } catch (emailError: any) {
+          console.error('Error sending email:', emailError);
+          toast.warning('Finance generated successfully, but the email failed to send due to a network issue.');
+        }
+      }
+
+      // Update document status
+      if (documentId) {
+        await supabase
+          .from('document_storage')
+          .update({ 
+            invoice_status: emailSent ? 'sent_to_customer' : 'approved',
+            email_status: emailSent ? 'sent' : (quotationData.customer_email ? 'failed' : 'n/a'),
+            ...(emailSent ? { email_sent_at: new Date().toISOString(), email_sent_by: user?.id } : {})
+          })
+          .eq('id', documentId);
+
+        setInvoiceStatus(emailSent ? 'sent_to_customer' : 'approved');
+      }
+
+      if (emailSent) {
+        toast.success(`Invoice emailed successfully to ${quotationData.customer_email}`);
+      } else if (!quotationData.customer_email) {
+        toast.success(`Invoice generated and posted to Finance successfully.`);
+      }
       
-      // Database write is already awaited above, call refresh directly
       onInvoiceGenerated?.();
-    } catch (error) {
-      console.error('Error sending email:', error);
-      toast.error('Failed to send invoice email');
+    } catch (error: any) {
+      console.error('Error generating invoice:', error);
+      toast.error(error.message || 'An error occurred during invoice generation.');
     } finally {
       setIsLoading(false);
     }
@@ -943,11 +955,20 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             </Button>
             <Button
               onClick={handleEmailToCustomer}
-              disabled={isLoading || isAutoSaving || !quotationData.customer_email}
+              disabled={isLoading || isAutoSaving}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
-              <Mail className="w-4 h-4 mr-2" />
-              Email to Customer & Post to GL
+              {quotationData.customer_email ? (
+                <>
+                  <Mail className="w-4 h-4 mr-2" />
+                  Email & Post to GL
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Post to GL (No Email)
+                </>
+              )}
             </Button>
           </div>
         </div>

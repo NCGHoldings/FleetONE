@@ -12,6 +12,7 @@ import { useARInvoices, useAllProfiles } from "@/hooks/useAccountingData";
 import { useDeleteARInvoice } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DataExportMenu } from "@/components/ui/DataExportMenu";
+import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -200,7 +201,8 @@ export const AccountsReceivableView = () => {
       },
     },
     {
-      accessorKey: "bus_categories.name",
+      id: "bus_category",
+      accessorFn: (row: any) => row.bus_categories?.name,
       header: "Category",
       cell: ({ row }: any) => {
         const cat = row.original.bus_categories;

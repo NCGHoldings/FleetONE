@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { useSpecialHireFinanceSettings, useUpdateSpecialHireFinanceSettings } from "@/hooks/useSpecialHireFinance";
 import { useChartOfAccounts } from "@/hooks/useAccountingData";
 import { SearchableFinanceAccountSelector } from "@/components/settings/SearchableFinanceAccountSelector";
+import { SettingsLock } from "@/components/settings/SettingsLock";
 
 interface SettingsState {
   // Revenue
@@ -207,8 +208,7 @@ export function SpecialHireFinanceSettings() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>Special Hire Revenue - Internal (Credit on Invoice)</Label>
+            <SettingsLock label="Special Hire Revenue - Internal (Credit on Invoice)" valueExists={!!settings.revenue_internal_account_id}>
               <SearchableFinanceAccountSelector
                 value={settings.revenue_internal_account_id || null}
                 onValueChange={(value) => 
@@ -217,11 +217,10 @@ export function SpecialHireFinanceSettings() {
                 accounts={chartOfAccounts || []}
                 placeholder="Select internal revenue account..."
               />
-              <p className="text-xs text-muted-foreground">Used for internal/inter-company special hire bookings</p>
-            </div>
+              <p className="text-xs text-muted-foreground mt-1">Used for internal/inter-company special hire bookings</p>
+            </SettingsLock>
             
-            <div className="space-y-2">
-              <Label>Special Hire Revenue - External (Credit on Invoice)</Label>
+            <SettingsLock label="Special Hire Revenue - External (Credit on Invoice)" valueExists={!!settings.revenue_external_account_id}>
               <SearchableFinanceAccountSelector
                 value={settings.revenue_external_account_id || null}
                 onValueChange={(value) => 
@@ -230,11 +229,10 @@ export function SpecialHireFinanceSettings() {
                 accounts={chartOfAccounts || []}
                 placeholder="Select external revenue account..."
               />
-              <p className="text-xs text-muted-foreground">Used for external customer special hire bookings</p>
-            </div>
+              <p className="text-xs text-muted-foreground mt-1">Used for external customer special hire bookings</p>
+            </SettingsLock>
 
-            <div className="space-y-2">
-              <Label>Trade Receivable Account (Debit on Invoice)</Label>
+            <SettingsLock label="Trade Receivable Account (Debit on Invoice)" valueExists={!!settings.trade_receivable_account_id}>
               <SearchableFinanceAccountSelector
                 value={settings.trade_receivable_account_id || null}
                 onValueChange={(value) => 
@@ -243,11 +241,10 @@ export function SpecialHireFinanceSettings() {
                 accounts={chartOfAccounts || []}
                 placeholder="Select receivable account..."
               />
-              <p className="text-xs text-muted-foreground">Debited when invoice is generated, credited when payment received</p>
-            </div>
+              <p className="text-xs text-muted-foreground mt-1">Debited when invoice is generated, credited when payment received</p>
+            </SettingsLock>
 
-            <div className="space-y-2">
-              <Label>Customer Advance Receipt Account (Credit on Advance)</Label>
+            <SettingsLock label="Customer Advance Receipt Account (Credit on Advance)" valueExists={!!settings.customer_advance_account_id}>
               <SearchableFinanceAccountSelector
                 value={settings.customer_advance_account_id || null}
                 onValueChange={(value) => 
@@ -256,8 +253,8 @@ export function SpecialHireFinanceSettings() {
                 accounts={chartOfAccounts || []}
                 placeholder="Select advance account..."
               />
-              <p className="text-xs text-muted-foreground">Liability account - Credited when advance received, debited when applied to invoice</p>
-            </div>
+              <p className="text-xs text-muted-foreground mt-1">Liability account - Credited when advance received, debited when applied to invoice</p>
+            </SettingsLock>
           </div>
         </CardContent>
       </Card>
@@ -271,8 +268,7 @@ export function SpecialHireFinanceSettings() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>Default Bank/Cash Account (Debit on Payment Received)</Label>
+            <SettingsLock label="Default Bank/Cash Account (Debit on Payment Received)" valueExists={!!settings.default_bank_account_id}>
               <SearchableFinanceAccountSelector
                 value={settings.default_bank_account_id || null}
                 onValueChange={(value) => 
@@ -281,8 +277,8 @@ export function SpecialHireFinanceSettings() {
                 accounts={chartOfAccounts || []}
                 placeholder="Select bank/cash account..."
               />
-              <p className="text-xs text-muted-foreground">This account is debited when advance or balance payments are received</p>
-            </div>
+              <p className="text-xs text-muted-foreground mt-1">This account is debited when advance or balance payments are received</p>
+            </SettingsLock>
           </div>
         </CardContent>
       </Card>

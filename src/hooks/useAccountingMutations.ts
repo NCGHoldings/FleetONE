@@ -751,8 +751,6 @@ export const useCreateARReceipt = () => {
           });
         } else {
           glResult = { success: false, error: "Trade Receivable account not found in COA" };
-          console.warn("[AR Receipt GL] Trade Receivable account not found, skipping GL posting");
-          toast.warning("GL posting skipped: 'Trade Receivable' account not found in Chart of Accounts.");
         }
 
         // Link journal entry to receipt if GL posting succeeded
@@ -761,10 +759,11 @@ export const useCreateARReceipt = () => {
             .from("ar_receipts")
             .update({ journal_entry_id: glResult.journalEntryId })
             .eq("id", data.id);
+        } else if (!glResult.success) {
+          throw new Error(`Transaction Aborted: GL posting failed. ${glResult.error}`);
         }
       } else if (receipt.amount > 0 && !bankGLAccountId) {
-        console.warn("[AR Receipt GL] Bank account has no linked GL account, skipping GL posting");
-        toast.warning("GL posting skipped: Bank account has no linked GL account. Configure it in Banking → Edit Account → GL Account.");
+        throw new Error("Transaction Aborted: Bank account has no linked GL account. Configure it in Banking → Edit Account → GL Account.");
       }
 
       // ========== BANK TRANSACTION ==========
@@ -1359,15 +1358,15 @@ export const useCreateAPPayment = () => {
               .from("ap_payments")
               .update({ journal_entry_id: glResult.journalEntryId })
               .eq("id", data.id);
+          } else if (!glResult.success) {
+            throw new Error(`Transaction Aborted: Journal Entry generation failed. ${glResult.error}`);
           }
         } else if (payment.amount > 0) {
           if (!bankGLAccountId) {
-            console.warn("[AP Payment GL] Bank account has no linked GL account, skipping GL posting");
-            toast.warning("GL posting skipped: Bank account has no linked GL account. Configure it in Banking → Edit Account → GL Account.");
+            throw new Error("Transaction Aborted: Bank account has no linked GL account. Configure it in Banking → Edit Account → GL Account.");
           }
           if (!tradePayableId) {
-            console.warn("[AP Payment GL] Trade Payable account not found in COA");
-            toast.warning("GL posting skipped: 'Trade Payable' account not found in Chart of Accounts.");
+            throw new Error("Transaction Aborted: 'Trade Payable' account not found in Chart of Accounts.");
           }
         }
       }

@@ -81,6 +81,7 @@ import FleetAnalytics from "./pages/FleetAnalytics";
 import VehicleInquiryHub from "./pages/VehicleInquiryHub";
 import ScheduledTasks from "./pages/ScheduledTasks";
 import ApiUsageMonitoring from "./pages/ApiUsageMonitoring";
+import { VerifyHubView } from "./components/system-monitor/VerifyHubView";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import SystemHealthDashboard from "./pages/SystemHealthDashboard";
 import Marketing from "./pages/Marketing";
@@ -839,6 +840,16 @@ const App = () => (
                 <ProtectedRoute requiredRoles={['super_admin', 'admin']}>
                   <AppLayout>
                     <ApiUsageMonitoring />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/verify-hub" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin']}>
+                  <AppLayout>
+                    <VerifyHubView />
                   </AppLayout>
                 </ProtectedRoute>
               } 

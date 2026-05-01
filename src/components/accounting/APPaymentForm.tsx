@@ -27,6 +27,7 @@ import { Wallet, CheckCircle, AlertCircle, AlertTriangle, BookOpen, Landmark, Fi
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 import { VehicleSelector } from "./shared/VehicleSelector";
 import { SearchableVendorSelector } from "./shared/SearchableVendorSelector";
+import { GLImpactPreviewModal, GLImpactLine } from "./pre-flight/GLImpactPreviewModal";
 
 const paymentSchema = z.object({
   payment_number: z.string().optional(),
@@ -125,6 +126,11 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const [selectedBusId, setSelectedBusId] = useState("");
   const [selectedBusNo, setSelectedBusNo] = useState("");
   const [selectedVehicleType, setSelectedVehicleType] = useState<"fleet" | "external" | "">("");
+
+  // Pre-Flight Preview State
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewData, setPreviewData] = useState<{debits: GLImpactLine[], credits: GLImpactLine[]}>({ debits: [], credits: [] });
+  const [pendingFormData, setPendingFormData] = useState<PaymentFormData | null>(null);
 
   // Only fetch vendor bank accounts when payee is a vendor (customers don't have vendor_bank_accounts)
   const { data: vendorBankAccounts } = useVendorBankAccounts(
@@ -355,7 +361,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const effectiveBankFee = includeBankFee ? bankFeeAmount : 0;
   const totalWithFees = totalPayment + effectiveBankFee;
 
-  const onSubmit = async (data: PaymentFormData) => {
+  const executeFinalSubmit = async (data: PaymentFormData) => {
     if (submitLock.current) return;
     submitLock.current = true;
 
@@ -469,6 +475,43 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     }
   };
 
+  const calculatePreview = (data: PaymentFormData) => {
+    const bankName = bankAccounts?.find(b => b.id === data.bank_account_id)?.account_name || "Bank/Cash Account";
+    const debits: GLImpactLine[] = [];
+    const credits: GLImpactLine[] = [];
+
+    if (isDirectPayment) {
+      directLines.filter(l => l.account_id && l.line_total > 0).forEach(l => {
+        debits.push({ accountName: l.description || "Direct Expense Account", amount: l.line_total });
+      });
+      credits.push({ accountName: bankName, amount: directLinesTotal + effectiveBankFee });
+    } else {
+      debits.push({ accountName: isAdvance ? "Vendor Advance (Asset)" : "Trade Payable (Liability)", amount: totalPayment + totalWhtDeducted });
+      credits.push({ accountName: bankName, amount: totalPayment + effectiveBankFee });
+      
+      if (totalWhtDeducted > 0) {
+        credits.push({ accountName: "WHT Payable", amount: totalWhtDeducted });
+      }
+      const writeOffTotal = allocations.reduce((sum, a) => sum + a.write_off_amount, 0);
+      if (writeOffTotal > 0) {
+        credits.push({ accountName: "Write Off / Discount", amount: writeOffTotal });
+      }
+    }
+    
+    if (effectiveBankFee > 0) {
+      debits.push({ accountName: "Bank Charges", amount: effectiveBankFee });
+    }
+
+    return { debits, credits };
+  };
+
+  const handleInitialSubmit = (data: PaymentFormData) => {
+    const preview = calculatePreview(data);
+    setPreviewData(preview);
+    setPendingFormData(data);
+    setIsPreviewOpen(true);
+  };
+
   const canSubmit = isDirectPayment
     ? directLinesTotal > 0 && selectedVendorId && directLines.some((l) => l.account_id)
     : isAdvance 
@@ -497,7 +540,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleInitialSubmit)} className="space-y-6">
             {/* Mode Toggles */}
             <div className="space-y-3">
               <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
@@ -1167,6 +1210,21 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
           </form>
         </Form>
       </DialogContent>
+      
+      {isPreviewOpen && (
+        <GLImpactPreviewModal
+          isOpen={isPreviewOpen}
+          onOpenChange={setIsPreviewOpen}
+          debits={previewData.debits}
+          credits={previewData.credits}
+          onConfirm={() => {
+            if (pendingFormData) {
+              executeFinalSubmit(pendingFormData);
+            }
+          }}
+          isExecuting={createPayment.isPending}
+        />
+      )}
     </Dialog>
   );
 };

@@ -14,6 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Eye, Edit, FileCheck, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { GLImpactPreviewModal, GLImpactLine } from '@/components/accounting/pre-flight/GLImpactPreviewModal';
 
 interface PaymentConfirmationModalProps {
   isOpen: boolean;
@@ -80,6 +81,10 @@ export const PaymentConfirmationModal = ({
   // Progress tracking state
   const [processingStep, setProcessingStep] = useState<ProcessingStep>('idle');
   const [progressPercent, setProgressPercent] = useState(0);
+
+  // Pre-Flight Preview State
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewData, setPreviewData] = useState<{debits: GLImpactLine[], credits: GLImpactLine[]}>({ debits: [], credits: [] });
   
   // Calculate final total to match quotation preview
   const calculateFinalTotal = () => {
@@ -278,8 +283,37 @@ export const PaymentConfirmationModal = ({
     }
 
     // All validations passed - document will be auto-generated
-    console.log('[SPH Payment] Confirming payment - document will be auto-generated');
+    console.log('[SPH Payment] Validations passed. Generating Pre-Flight Preview');
+
+    // Generate Pre-Flight Preview
+    const debits: GLImpactLine[] = [];
+    const credits: GLImpactLine[] = [];
     
+    // Debit Bank/Cash Account
+    debits.push({
+      accountName: "Bank/Cash Account",
+      amount: amount
+    });
+
+    // Credit logic
+    if (paymentType === 'advance') {
+      credits.push({
+        accountName: "Special Hire Advance (Liability)",
+        amount: amount
+      });
+    } else {
+      credits.push({
+        accountName: "Special Hire Trade Receivable (Asset)",
+        amount: amount
+      });
+    }
+
+    setPreviewData({ debits, credits });
+    setIsPreviewOpen(true);
+  };
+
+  const executeFinalConfirm = () => {
+    setIsPreviewOpen(false);
     onConfirm({
       amount,
       paymentType,
@@ -681,6 +715,17 @@ export const PaymentConfirmationModal = ({
           )}
         </div>
       </DialogContent>
+
+      {isPreviewOpen && (
+        <GLImpactPreviewModal
+          isOpen={isPreviewOpen}
+          onOpenChange={setIsPreviewOpen}
+          debits={previewData.debits}
+          credits={previewData.credits}
+          onConfirm={executeFinalConfirm}
+          isExecuting={isProcessing}
+        />
+      )}
     </Dialog>
   );
 };
