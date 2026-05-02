@@ -14,6 +14,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { BusDailySummary } from "@/hooks/useDailyBusGroupedTrips";
 import { format } from "date-fns";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ExpenseBreakdownPreview, DailyExpenseData } from "./ExpenseBreakdownPreview";
 import { InlineExpenseEditor } from "./InlineExpenseEditor";
 import { InlineRevenueEditor } from "./InlineRevenueEditor";
@@ -334,7 +335,23 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
                                 <div className="font-semibold flex items-center gap-2">
                                   <span className="text-primary text-sm">Trip #{idx + 1}</span>
                                   <span className="text-muted-foreground">•</span>
-                                  <span>{trip.route_name}</span>
+                                  <span className="flex items-center gap-1.5">
+                                    {trip.route_name}
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          {trip.route_id ? (
+                                            <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                                          ) : (
+                                            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                                          )}
+                                        </TooltipTrigger>
+                                        <TooltipContent side="right">
+                                          {trip.route_id ? "Official Route (Dictionary Match)" : "Unverified Route. Please map to an official route."}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </span>
                                 </div>
                                 <div className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap mt-1">
                                   <span>

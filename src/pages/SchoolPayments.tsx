@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, Download, Receipt, History, FileSpreadsheet, Settings, FilterX, Trash2 } from "lucide-react";
+import { ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, Download, Receipt, History, FileSpreadsheet, Settings, FilterX, Trash2, Database, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,8 @@ import { PaymentHistoryModal } from "@/components/school/PaymentHistoryModal";
 import { OutstandingStudentsView } from "@/components/school/OutstandingStudentsView";
 import { BulkARInvoiceDialog } from "@/components/school/BulkARInvoiceDialog";
 import { SchoolBusBranchPLReport } from "@/components/school/SchoolBusBranchPLReport";
+import { SchoolBusFinanceSettlement } from "@/components/school/SchoolBusFinanceSettlement";
+import { useAuth } from "@/hooks/useAuth";
 import React from "react";
 
 interface Student {
@@ -54,6 +56,10 @@ export default function SchoolPayments() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showBulkARDialog, setShowBulkARDialog] = useState(false);
+  const [showFinanceHub, setShowFinanceHub] = useState(false);
+  const { userRoles } = useAuth();
+  
+  const hasFinanceAccess = userRoles.includes('super_admin') || userRoles.includes('admin') || userRoles.includes('finance');
   const [stats, setStats] = useState({
     totalStudents: 0,
     paidStudents: 0,
@@ -71,6 +77,7 @@ export default function SchoolPayments() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterGrade, setFilterGrade] = useState<string>("all");
   const [filterActive, setFilterActive] = useState<string>("all");
+  const [filterFinance, setFilterFinance] = useState<string>("all");
   const [minAmount, setMinAmount] = useState<string>("");
   const [maxAmount, setMaxAmount] = useState<string>("");
 
@@ -114,15 +121,26 @@ export default function SchoolPayments() {
       // Amount Due
       if (minAmount && due < parseFloat(minAmount)) return false;
       if (maxAmount && due > parseFloat(maxAmount)) return false;
+
+      // Finance Integration
+      if (filterFinance !== "all") {
+        const issues = (s as any).finance_issues;
+        if (filterFinance === "synced" && (issues?.hasAny)) return false;
+        if (filterFinance === "pending_gl" && !issues?.missingGL) return false;
+        if (filterFinance === "pending_allocation" && !issues?.missingAllocation) return false;
+        if (filterFinance === "missing_ar" && !issues?.missingARSight) return false;
+        if (filterFinance === "any_issue" && (!issues || !issues.hasAny)) return false;
+      }
       
       return true;
     });
-  }, [students, filterStatus, filterGrade, filterActive, minAmount, maxAmount]);
+  }, [students, filterStatus, filterGrade, filterActive, filterFinance, minAmount, maxAmount]);
 
   const clearFilters = () => {
     setFilterStatus("all");
     setFilterGrade("all");
     setFilterActive("active");
+    setFilterFinance("all");
     setMinAmount("");
     setMaxAmount("");
   };
@@ -179,10 +197,17 @@ export default function SchoolPayments() {
       
       const data = allBranchStudents;
 
-      // Fetch all transactions for this branch to compute Last Paid and current month revenue
+      // Fetch all transactions for this branch
       const { data: txData } = await supabase
         .from('school_payment_transactions')
-        .select('id, amount_paid, student_id, payment_date, school_students!inner(branch_id, student_name, is_active)')
+        .select('id, amount_paid, student_id, payment_date, gl_posted, school_students!inner(branch_id, student_name, is_active)')
+        .eq('school_students.branch_id', branchId);
+
+      // Fetch all invoices for this branch to check for AR discrepancies
+      const { data: invData } = await supabase
+        .from('school_ar_invoices')
+        .select('id, student_id, payment_id, status, ar_invoice_id, amount, paid_amount, school_students!inner(branch_id)')
+        .neq('status', 'void')
         .eq('school_students.branch_id', branchId);
 
       // Filter for current month revenue
@@ -209,10 +234,25 @@ export default function SchoolPayments() {
           new Date(b.payment_date || 0).getTime() - new Date(a.payment_date || 0).getTime()
         )[0];
 
+        const studentInv = (invData || []).filter((inv: any) => inv.student_id === s.id);
+
+        // Calculate finance issues
+        const hasMissingGL = studentTx.some(tx => tx.gl_posted !== true);
+        const hasUnallocatedPayment = studentTx.some(tx => tx.gl_posted === true && !studentInv.some(inv => inv.payment_id === tx.id));
+        const hasUnpaidInvoice = studentInv.some(inv => inv.status === 'unpaid' || inv.status === 'posted');
+        const hasMissingAllocation = hasUnallocatedPayment && hasUnpaidInvoice;
+        const hasMissingARSight = studentInv.some(inv => (inv.status === 'paid' || inv.status === 'partial') && !inv.ar_invoice_id);
+
         return {
           ...s,
           payment_amount: latestTx ? latestTx.amount_paid : s.payment_amount,
-          last_payment_date: latestTx ? latestTx.payment_date : s.last_payment_date
+          last_payment_date: latestTx ? latestTx.payment_date : s.last_payment_date,
+          finance_issues: {
+             missingGL: hasMissingGL,
+             missingAllocation: hasMissingAllocation,
+             missingARSight: hasMissingARSight,
+             hasAny: hasMissingGL || hasMissingAllocation || hasMissingARSight
+          }
         };
       });
 
@@ -415,6 +455,50 @@ export default function SchoolPayments() {
       header: "Contact",
     },
     {
+      id: "integration",
+      header: "Finance Integration",
+      accessorFn: (row: any) => {
+        const issues = row.finance_issues;
+        if (!issues || !issues.hasAny) return "Synced";
+        let status = [];
+        if (issues.missingGL) status.push("Pending GL");
+        if (issues.missingAllocation) status.push("Pending Allocation");
+        if (issues.missingARSight) status.push("Missing AR Sync");
+        return status.join(", ");
+      },
+      cell: ({ row }) => {
+        const issues = (row.original as any).finance_issues;
+        if (!issues || !issues.hasAny) {
+          return (
+             <Badge variant="outline" className="text-[10px] h-5 py-0 border-green-200 text-green-700 bg-green-50">
+               <CheckCircle className="w-3 h-3 mr-1" />
+               Synced
+             </Badge>
+          );
+        }
+
+        return (
+          <div className="flex flex-col gap-1">
+            {issues.missingGL && (
+              <Badge variant="outline" className="text-[9px] h-4 py-0 border-amber-200 text-amber-700 bg-amber-50 leading-tight">
+                <Clock className="w-3 h-3 mr-1 shrink-0" /> Pending GL
+              </Badge>
+            )}
+            {issues.missingAllocation && (
+              <Badge variant="outline" className="text-[9px] h-4 py-0 border-blue-200 text-blue-700 bg-blue-50 leading-tight">
+                <Database className="w-3 h-3 mr-1 shrink-0" /> Pending Allocation
+              </Badge>
+            )}
+            {issues.missingARSight && (
+              <Badge variant="outline" className="text-[9px] h-4 py-0 border-red-200 text-red-700 bg-red-50 leading-tight">
+                <XCircle className="w-3 h-3 mr-1 shrink-0" /> Missing AR Sync
+              </Badge>
+            )}
+          </div>
+        );
+      }
+    },
+    {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => {
@@ -436,6 +520,20 @@ export default function SchoolPayments() {
               <History className="h-4 w-4 mr-1" />
               History
             </Button>
+            {hasFinanceAccess && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                onClick={() => {
+                  setSelectedStudent(student);
+                  setShowFinanceHub(true);
+                }}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-1" />
+                Finance Hub
+              </Button>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -938,6 +1036,22 @@ export default function SchoolPayments() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1 min-w-[150px]">
+                <label className="text-xs font-medium text-muted-foreground">Finance Status</label>
+                <Select value={filterFinance} onValueChange={setFilterFinance}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="All Integration Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="synced">Synced (Clear)</SelectItem>
+                    <SelectItem value="any_issue">Any Issues</SelectItem>
+                    <SelectItem value="pending_gl">Pending GL</SelectItem>
+                    <SelectItem value="pending_allocation">Pending Allocation</SelectItem>
+                    <SelectItem value="missing_ar">Missing AR Sync</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Min Amount Due (LKR)</label>
                 <Input 
@@ -958,7 +1072,7 @@ export default function SchoolPayments() {
                   className="h-8 w-[150px]"
                 />
               </div>
-              {(filterStatus !== "all" || filterGrade !== "all" || minAmount || maxAmount) && (
+              {(filterStatus !== "all" || filterGrade !== "all" || filterFinance !== "all" || minAmount || maxAmount) && (
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-muted-foreground">
                   <FilterX className="w-4 h-4 mr-2" />
                   Clear Filters
@@ -1028,6 +1142,17 @@ export default function SchoolPayments() {
           onOpenChange={setShowBulkARDialog}
           branchId={branchId}
           branchName={branch.branch_name}
+        />
+      )}
+
+      {selectedStudent && (
+        <SchoolBusFinanceSettlement
+          studentId={selectedStudent.id}
+          isOpen={showFinanceHub}
+          onClose={() => {
+            setShowFinanceHub(false);
+            fetchStudents(); // Refresh to reflect any GL syncs or reversals
+          }}
         />
       )}
     </div>

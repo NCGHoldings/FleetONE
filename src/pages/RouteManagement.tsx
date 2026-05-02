@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit, Trash2, Map, MapPin, GitMerge, Bus, ChevronDown, ChevronRight, ArrowLeftRight } from "lucide-react";
+import { Plus, Edit, Trash2, Map, MapPin, GitMerge, Bus, ChevronDown, ChevronRight, ArrowLeftRight, Settings, Target, Wallet, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -63,6 +63,22 @@ export default function RouteManagement() {
     is_active: true,
     category: "Public Bus",
     route_group: "",
+    
+    // Gamification & Targets
+    revenue_target: "100000",
+    fuel_allocation_liters: "150",
+    driver_commission_pct: "5",
+    conductor_commission_pct: "5",
+    
+    // Standard Costs
+    meal_allowance: "1500",
+    highway_fee: "2000",
+    runner_fee: "500",
+    
+    // Crew Allocations
+    default_bus: "",
+    default_driver: "",
+    default_conductor: ""
   });
 
   const fetchRoutes = async () => {
@@ -191,9 +207,20 @@ export default function RouteManagement() {
       end_location: routeItem.end_location || "",
       distance_km: routeItem.distance_km ? String(routeItem.distance_km) : "",
       fare_amount: routeItem.fare_amount ? String(routeItem.fare_amount) : "",
-      is_active: routeItem.is_active !== false,
       category: routeItem.category || "Public Bus",
       route_group: routeItem.route_group || "",
+      
+      // Extract from master_config JSONB
+      revenue_target: (routeItem as any).master_config?.revenue_target || "100000",
+      fuel_allocation_liters: (routeItem as any).master_config?.fuel_allocation_liters || "150",
+      driver_commission_pct: (routeItem as any).master_config?.driver_commission_pct || "5",
+      conductor_commission_pct: (routeItem as any).master_config?.conductor_commission_pct || "5",
+      meal_allowance: (routeItem as any).master_config?.meal_allowance || "1500",
+      highway_fee: (routeItem as any).master_config?.highway_fee || "2000",
+      runner_fee: (routeItem as any).master_config?.runner_fee || "500",
+      default_bus: (routeItem as any).master_config?.default_bus || "",
+      default_driver: (routeItem as any).master_config?.default_driver || "",
+      default_conductor: (routeItem as any).master_config?.default_conductor || ""
     });
     setEditingRoute(routeItem);
     setIsDialogOpen(true);
@@ -205,11 +232,19 @@ export default function RouteManagement() {
       route_name: "",
       start_location: "",
       end_location: "",
-      distance_km: "",
-      fare_amount: "",
       is_active: true,
       category: "Public Bus",
       route_group: "",
+      revenue_target: "100000",
+      fuel_allocation_liters: "150",
+      driver_commission_pct: "5",
+      conductor_commission_pct: "5",
+      meal_allowance: "1500",
+      highway_fee: "2000",
+      runner_fee: "500",
+      default_bus: "",
+      default_driver: "",
+      default_conductor: ""
     });
     setEditingRoute(null);
     setIsDialogOpen(true);
@@ -232,6 +267,18 @@ export default function RouteManagement() {
         is_active: formData.is_active,
         category: formData.category,
         route_group: formData.route_group || null,
+        master_config: {
+          revenue_target: formData.revenue_target,
+          fuel_allocation_liters: formData.fuel_allocation_liters,
+          driver_commission_pct: formData.driver_commission_pct,
+          conductor_commission_pct: formData.conductor_commission_pct,
+          meal_allowance: formData.meal_allowance,
+          highway_fee: formData.highway_fee,
+          runner_fee: formData.runner_fee,
+          default_bus: formData.default_bus,
+          default_driver: formData.default_driver,
+          default_conductor: formData.default_conductor
+        }
       };
 
       if (editingRoute) {
@@ -447,84 +494,183 @@ export default function RouteManagement() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editingRoute ? "Edit Route" : "Add New Route"}</DialogTitle>
+            <DialogTitle>{editingRoute ? "Edit Route Master Profile" : "Create New Route"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-4 gap-4 items-center">
-              <Label htmlFor="route_no" className="text-right">Route No *</Label>
-              <Input id="route_no" placeholder="e.g. 99" value={formData.route_no}
-                onChange={(e) => setFormData({ ...formData, route_no: e.target.value })} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 gap-4 items-center">
-              <Label htmlFor="route_name" className="text-right">Route Name *</Label>
-              <Input id="route_name" placeholder="e.g. Colombo - Badulla" value={formData.route_name}
-                onChange={(e) => setFormData({ ...formData, route_name: e.target.value })} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 gap-4 items-center">
-              <Label htmlFor="category" className="text-right">Category</Label>
-              <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
-                <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Public Bus">Public Bus</SelectItem>
-                  <SelectItem value="School Bus">School Bus</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 gap-4 items-center">
-              <Label htmlFor="start_location" className="text-right">Start Loc</Label>
-              <Input id="start_location" placeholder="Colombo" value={formData.start_location}
-                onChange={(e) => setFormData({ ...formData, start_location: e.target.value })} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 gap-4 items-center">
-              <Label htmlFor="end_location" className="text-right">End Loc</Label>
-              <Input id="end_location" placeholder="Badulla" value={formData.end_location}
-                onChange={(e) => setFormData({ ...formData, end_location: e.target.value })} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 gap-4 items-center">
-              <Label htmlFor="route_group" className="text-right">Corridor</Label>
-              <div className="col-span-3 space-y-1">
-                <Select value={formData.route_group || "__none__"} onValueChange={(val) => setFormData({ ...formData, route_group: val === "__none__" ? "" : val })}>
-                  <SelectTrigger><SelectValue placeholder="Select corridor group..." /></SelectTrigger>
+          
+          <Tabs defaultValue="basic" className="w-full mt-4">
+            <TabsList className="grid w-full grid-cols-4 mb-4">
+              <TabsTrigger value="basic" className="flex items-center gap-2"><MapPin className="w-4 h-4"/> Basic Info</TabsTrigger>
+              <TabsTrigger value="targets" className="flex items-center gap-2"><Target className="w-4 h-4"/> Targets</TabsTrigger>
+              <TabsTrigger value="costs" className="flex items-center gap-2"><Wallet className="w-4 h-4"/> Costs</TabsTrigger>
+              <TabsTrigger value="crew" className="flex items-center gap-2"><Users className="w-4 h-4"/> Crew Maps</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="basic" className="space-y-4">
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="route_no" className="text-right font-medium">Route No *</Label>
+                <Input id="route_no" placeholder="e.g. 99" value={formData.route_no}
+                  onChange={(e) => setFormData({ ...formData, route_no: e.target.value })} className="col-span-3 bg-slate-50" />
+              </div>
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="route_name" className="text-right font-medium">Route Name *</Label>
+                <Input id="route_name" placeholder="e.g. Colombo - Badulla" value={formData.route_name}
+                  onChange={(e) => setFormData({ ...formData, route_name: e.target.value })} className="col-span-3 bg-slate-50" />
+              </div>
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="category" className="text-right font-medium">Category</Label>
+                <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
+                  <SelectTrigger className="col-span-3 bg-slate-50"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">No corridor (standalone)</SelectItem>
-                    {existingGroups.map(g => (
-                      <SelectItem key={g} value={g}>{g}</SelectItem>
-                    ))}
+                    <SelectItem value="Public Bus">Public Bus</SelectItem>
+                    <SelectItem value="School Bus">School Bus</SelectItem>
                   </SelectContent>
                 </Select>
-                {suggestedGroup && (
-                  <button
-                    type="button"
-                    className="text-xs text-primary hover:underline flex items-center gap-1"
-                    onClick={() => setFormData({ ...formData, route_group: suggestedGroup })}
-                  >
-                    <ArrowLeftRight className="w-3 h-3" />
-                    Auto-detected reverse route — link to "{suggestedGroup}"?
-                  </button>
-                )}
               </div>
-            </div>
-            <div className="grid grid-cols-4 gap-4 items-center">
-              <Label htmlFor="distance_km" className="text-right">Distance (km)</Label>
-              <Input id="distance_km" type="number" placeholder="210" value={formData.distance_km}
-                onChange={(e) => setFormData({ ...formData, distance_km: e.target.value })} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 gap-4 items-center">
-              <Label htmlFor="fare_amount" className="text-right">Fare (Rs)</Label>
-              <Input id="fare_amount" type="number" placeholder="1500" value={formData.fare_amount}
-                onChange={(e) => setFormData({ ...formData, fare_amount: e.target.value })} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 gap-4 items-center">
-              <Label htmlFor="is_active" className="text-right">Active?</Label>
-              <div className="col-span-3 flex items-center">
-                <Switch id="is_active" checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="start_location" className="text-right font-medium">Start Loc</Label>
+                <Input id="start_location" placeholder="Colombo" value={formData.start_location}
+                  onChange={(e) => setFormData({ ...formData, start_location: e.target.value })} className="col-span-3 bg-slate-50" />
               </div>
-            </div>
-            <Button className="w-full mt-4" onClick={handleSubmit}>
-              {editingRoute ? "Save Changes" : "Create Route"}
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="end_location" className="text-right font-medium">End Loc</Label>
+                <Input id="end_location" placeholder="Badulla" value={formData.end_location}
+                  onChange={(e) => setFormData({ ...formData, end_location: e.target.value })} className="col-span-3 bg-slate-50" />
+              </div>
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="route_group" className="text-right font-medium">Corridor</Label>
+                <div className="col-span-3 space-y-1">
+                  <Select value={formData.route_group || "__none__"} onValueChange={(val) => setFormData({ ...formData, route_group: val === "__none__" ? "" : val })}>
+                    <SelectTrigger className="bg-slate-50"><SelectValue placeholder="Select corridor group..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">No corridor (standalone)</SelectItem>
+                      {existingGroups.map(g => (
+                        <SelectItem key={g} value={g}>{g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {suggestedGroup && (
+                    <button
+                      type="button"
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                      onClick={() => setFormData({ ...formData, route_group: suggestedGroup })}
+                    >
+                      <ArrowLeftRight className="w-3 h-3" />
+                      Auto-detected reverse route — link to "{suggestedGroup}"?
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="distance_km" className="text-right font-medium">Distance (km)</Label>
+                <Input id="distance_km" type="number" placeholder="210" value={formData.distance_km}
+                  onChange={(e) => setFormData({ ...formData, distance_km: e.target.value })} className="col-span-3 bg-slate-50" />
+              </div>
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="fare_amount" className="text-right font-medium">Fare (Rs)</Label>
+                <Input id="fare_amount" type="number" placeholder="1500" value={formData.fare_amount}
+                  onChange={(e) => setFormData({ ...formData, fare_amount: e.target.value })} className="col-span-3 bg-slate-50" />
+              </div>
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="is_active" className="text-right font-medium">Active?</Label>
+                <div className="col-span-3 flex items-center">
+                  <Switch id="is_active" checked={formData.is_active}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="targets" className="space-y-4">
+              <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100 mb-4">
+                <h4 className="font-semibold text-blue-800 mb-1 flex items-center gap-2"><Target className="w-4 h-4" /> Gamification & Targets</h4>
+                <p className="text-sm text-blue-600/80">These values power the 'Mental Game' banners in the Crew App.</p>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="revenue_target" className="text-right font-medium">Daily Revenue Target (Rs)</Label>
+                <Input id="revenue_target" type="number" value={formData.revenue_target}
+                  onChange={(e) => setFormData({ ...formData, revenue_target: e.target.value })} className="col-span-3 font-semibold text-emerald-600 bg-emerald-50" />
+              </div>
+              
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="fuel_target" className="text-right font-medium">Daily Fuel Target (Liters)</Label>
+                <Input id="fuel_target" type="number" value={formData.fuel_allocation_liters}
+                  onChange={(e) => setFormData({ ...formData, fuel_allocation_liters: e.target.value })} className="col-span-3 font-semibold text-amber-600 bg-amber-50" />
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 items-center mt-6">
+                <Label className="text-right font-medium">Commission if Target Beaten</Label>
+                <div className="col-span-3 grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Driver (%)</Label>
+                    <Input type="number" value={formData.driver_commission_pct}
+                      onChange={(e) => setFormData({ ...formData, driver_commission_pct: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Conductor (%)</Label>
+                    <Input type="number" value={formData.conductor_commission_pct}
+                      onChange={(e) => setFormData({ ...formData, conductor_commission_pct: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="costs" className="space-y-4">
+              <div className="bg-slate-100 p-4 rounded-lg border border-slate-200 mb-4">
+                <h4 className="font-semibold text-slate-800 mb-1 flex items-center gap-2"><Wallet className="w-4 h-4" /> Standard Operating Costs</h4>
+                <p className="text-sm text-slate-500">These will automatically pre-fill the expenses section in the Daily Trips app.</p>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="meal_allowance" className="text-right font-medium">Meal Allowance (Rs)</Label>
+                <Input id="meal_allowance" type="number" value={formData.meal_allowance}
+                  onChange={(e) => setFormData({ ...formData, meal_allowance: e.target.value })} className="col-span-3 bg-slate-50" />
+              </div>
+              
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="highway_fee" className="text-right font-medium">Highway Tolls (Rs)</Label>
+                <Input id="highway_fee" type="number" value={formData.highway_fee}
+                  onChange={(e) => setFormData({ ...formData, highway_fee: e.target.value })} className="col-span-3 bg-slate-50" />
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="runner_fee" className="text-right font-medium">Runner Fee (Rs)</Label>
+                <Input id="runner_fee" type="number" value={formData.runner_fee}
+                  onChange={(e) => setFormData({ ...formData, runner_fee: e.target.value })} className="col-span-3 bg-slate-50" />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="crew" className="space-y-4">
+              <div className="bg-purple-50/50 p-4 rounded-lg border border-purple-100 mb-4">
+                <h4 className="font-semibold text-purple-800 mb-1 flex items-center gap-2"><Users className="w-4 h-4" /> Default Bus Allocations</h4>
+                <p className="text-sm text-purple-600/80">Map a bus to this route, and assign its default Driver and Conductor for automated data entry.</p>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="default_bus" className="text-right font-medium">Bus Number</Label>
+                <Input id="default_bus" placeholder="e.g. NCG-1234" value={formData.default_bus}
+                  onChange={(e) => setFormData({ ...formData, default_bus: e.target.value })} className="col-span-3" />
+              </div>
+              
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="default_driver" className="text-right font-medium">Default Driver</Label>
+                <Input id="default_driver" placeholder="Search staff..." value={formData.default_driver}
+                  onChange={(e) => setFormData({ ...formData, default_driver: e.target.value })} className="col-span-3" />
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <Label htmlFor="default_conductor" className="text-right font-medium">Default Conductor</Label>
+                <Input id="default_conductor" placeholder="Search staff..." value={formData.default_conductor}
+                  onChange={(e) => setFormData({ ...formData, default_conductor: e.target.value })} className="col-span-3" />
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-slate-100">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSubmit} className="bg-primary hover:bg-primary/90 min-w-[120px]">
+              {editingRoute ? "Save Route Master" : "Create Master Profile"}
             </Button>
           </div>
         </DialogContent>

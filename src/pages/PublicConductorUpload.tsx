@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Check, Loader2, Send, Languages, Calculator, Plus, Trash2, ChevronDown, ChevronUp, Upload, CreditCard, Banknote, Camera } from 'lucide-react';
 import { createAnonymousClient } from '@/integrations/supabase/public-client';
+import { GamificationBanner } from '@/components/trips/GamificationBanner';
 
 type Language = 'en' | 'si' | 'ta';
 
@@ -272,6 +273,10 @@ export default function PublicConductorUpload() {
   const [submitted, setSubmitted] = useState(false);
   const [submissionCode, setSubmissionCode] = useState('');
   
+  // Gamification & Route Master State
+  const [routeTarget, setRouteTarget] = useState<number>(0);
+  const [fetchingMaster, setFetchingMaster] = useState(false);
+  
   // Autocomplete Memory
   const [history, setHistory] = useState(() => loadState('history', { buses: [], drivers: [], conductors: [] }));
   
@@ -319,6 +324,61 @@ export default function PublicConductorUpload() {
       localStorage.setItem('conductor_form_bankDeposit', JSON.stringify(bankDeposit));
     }
   }, [formData, trips, expenses, fuelDetails, bankDeposit, submitted]);
+
+  // Route Master Auto-Fill Hook
+  useEffect(() => {
+    const fetchMasterConfig = async () => {
+      const bus = formData.busNumber?.trim().toUpperCase();
+      if (!bus || bus.length < 4) return;
+      
+      setFetchingMaster(true);
+      try {
+        const supabase = createAnonymousClient();
+        // Look for any route that has this bus assigned as default
+        const { data, error } = await supabase
+          .from('routes')
+          .select('master_config')
+          .eq('is_active', true);
+
+        if (!error && data) {
+          // Find the route matching this bus
+          const routeMatch = data.find(r => r.master_config && r.master_config.default_bus === bus);
+          
+          if (routeMatch && routeMatch.master_config) {
+            const config = routeMatch.master_config;
+            
+            // Auto-fill Gamification Targets
+            if (config.revenue_target) {
+              setRouteTarget(Number(config.revenue_target));
+            }
+            
+            // Auto-fill standard expenses (only if they aren't already set)
+            setExpenses(prev => ({
+              ...prev,
+              ...(config.meal_allowance && !prev['food'] ? { food: config.meal_allowance } : {}),
+              ...(config.highway_fee && !prev['highway_charges'] ? { highway_charges: config.highway_fee } : {}),
+              ...(config.runner_fee && !prev['runner'] ? { runner: config.runner_fee } : {}),
+            }));
+
+            // Auto-fill Crew if they are empty
+            setFormData((prev: any) => ({
+              ...prev,
+              driverName: prev.driverName || config.default_driver || '',
+              conductorName: prev.conductorName || config.default_conductor || ''
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch route master config:', err);
+      } finally {
+        setFetchingMaster(false);
+      }
+    };
+
+    // Debounce the fetch slightly
+    const timeoutId = setTimeout(fetchMasterConfig, 800);
+    return () => clearTimeout(timeoutId);
+  }, [formData.busNumber]);
 
   // Derived calculations
   const calculateTripTotal = (incomeObj?: Record<string, string>) => {
@@ -596,8 +656,17 @@ export default function PublicConductorUpload() {
 
             {/* STEP 1: Global Details & Trips */}
             <div className={currentStep === 1 ? 'space-y-6 animate-in fade-in duration-300' : 'hidden'}>
+              
+              {/* Gamification Banner */}
+              <GamificationBanner totalIncome={totalIncome} totalExpenses={totalExpenses} routeTarget={routeTarget} />
+
               {/* Global Details */}
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4 relative">
+                {fetchingMaster && (
+                  <div className="absolute top-2 right-2 flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full animate-pulse">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Auto-filling...
+                  </div>
+                )}
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-1.5 h-5 bg-blue-500 rounded-full" />
                 <h3 className="font-bold text-slate-800">{t.globalDetails}</h3>

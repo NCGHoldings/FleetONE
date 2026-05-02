@@ -27,6 +27,8 @@ import { format } from "date-fns";
 import { ArrowRight, CheckCircle, Wallet, Check, ChevronsUpDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 interface AdvanceAllocationFormProps {
@@ -43,6 +45,7 @@ export const AdvanceAllocationForm = ({ type }: AdvanceAllocationFormProps) => {
   const [selectedParty, setSelectedParty] = useState<string>("");
   const [partyOpen, setPartyOpen] = useState(false);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
+  const [activeModule, setActiveModule] = useState<string>("all");
 
   const isAR = type === "ar";
   const partyLabel = isAR ? "Customer" : "Vendor";
@@ -80,14 +83,24 @@ export const AdvanceAllocationForm = ({ type }: AdvanceAllocationFormProps) => {
 
   // Fetch advance receipts for AR
   const { data: arAdvances } = useQuery({
-    queryKey: ["ar-advances", selectedParty],
+    queryKey: ["ar-advances", selectedParty, activeModule],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ar_receipts")
         .select("*")
         .eq("customer_id", selectedParty)
         .eq("is_advance", true)
         .eq("status", "posted");
+        
+      if (activeModule !== "all") {
+        if (activeModule === "GEN") {
+          query = query.is("business_unit_code", null);
+        } else {
+          query = query.eq("business_unit_code", activeModule);
+        }
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -96,14 +109,24 @@ export const AdvanceAllocationForm = ({ type }: AdvanceAllocationFormProps) => {
 
   // Fetch advance payments for AP
   const { data: apAdvances } = useQuery({
-    queryKey: ["ap-advances", selectedParty],
+    queryKey: ["ap-advances", selectedParty, activeModule],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ap_payments")
         .select("*")
         .eq("vendor_id", selectedParty)
         .eq("is_advance", true)
         .eq("status", "posted");
+        
+      if (activeModule !== "all") {
+        if (activeModule === "GEN") {
+          query = query.is("business_unit_code", null);
+        } else {
+          query = query.eq("business_unit_code", activeModule);
+        }
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -114,14 +137,24 @@ export const AdvanceAllocationForm = ({ type }: AdvanceAllocationFormProps) => {
 
   // Fetch outstanding invoices
   const { data: arInvoices } = useQuery({
-    queryKey: ["ar-invoices-outstanding", selectedParty],
+    queryKey: ["ar-invoices-outstanding", selectedParty, activeModule],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ar_invoices")
         .select("*")
         .eq("customer_id", selectedParty)
         .gt("balance", 0)
         .order("due_date");
+        
+      if (activeModule !== "all") {
+        if (activeModule === "GEN") {
+          query = query.is("business_unit_code", null);
+        } else {
+          query = query.eq("business_unit_code", activeModule);
+        }
+      }
+        
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -129,14 +162,24 @@ export const AdvanceAllocationForm = ({ type }: AdvanceAllocationFormProps) => {
   });
 
   const { data: apInvoices } = useQuery({
-    queryKey: ["ap-invoices-outstanding", selectedParty],
+    queryKey: ["ap-invoices-outstanding", selectedParty, activeModule],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ap_invoices")
         .select("*")
         .eq("vendor_id", selectedParty)
         .gt("balance", 0)
         .order("due_date");
+        
+      if (activeModule !== "all") {
+        if (activeModule === "GEN") {
+          query = query.is("business_unit_code", null);
+        } else {
+          query = query.eq("business_unit_code", activeModule);
+        }
+      }
+        
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -198,6 +241,19 @@ export const AdvanceAllocationForm = ({ type }: AdvanceAllocationFormProps) => {
             </p>
           </div>
         </div>
+
+        <Tabs value={activeModule} onValueChange={setActiveModule} className="mb-6">
+          <ScrollArea className="w-full whitespace-nowrap">
+            <TabsList className="inline-flex w-max">
+              <TabsTrigger value="all">All Modules</TabsTrigger>
+              <TabsTrigger value="GEN">General</TabsTrigger>
+              <TabsTrigger value="SPH">Special Hire</TabsTrigger>
+              <TabsTrigger value="SCH">School Bus</TabsTrigger>
+              <TabsTrigger value="YUT">Yutong</TabsTrigger>
+            </TabsList>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </Tabs>
 
         <div className="grid gap-6 md:grid-cols-2 mb-6">
           <div className="space-y-2 flex flex-col">
@@ -278,8 +334,11 @@ export const AdvanceAllocationForm = ({ type }: AdvanceAllocationFormProps) => {
                   <Card key={adv.id} className="p-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="font-medium">
+                        <p className="font-medium flex items-center gap-2">
                           {isAR ? (adv as any).receipt_number : (adv as any).payment_number}
+                          {adv.business_unit_code && activeModule === 'all' && (
+                            <Badge variant="outline" className="text-xs">{adv.business_unit_code}</Badge>
+                          )}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {format(new Date(isAR ? (adv as any).receipt_date : (adv as any).payment_date), "MMM dd, yyyy")}
@@ -312,7 +371,14 @@ export const AdvanceAllocationForm = ({ type }: AdvanceAllocationFormProps) => {
                       
                       return (
                         <TableRow key={invoice.id}>
-                          <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {invoice.invoice_number}
+                              {invoice.business_unit_code && activeModule === 'all' && (
+                                <Badge variant="outline" className="text-xs">{invoice.business_unit_code}</Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             {format(new Date(invoice.invoice_date), "MMM dd, yyyy")}
                           </TableCell>

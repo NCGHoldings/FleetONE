@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { Bus, Users, DollarSign, Activity, FileText, ChevronDown, ChevronUp, ExternalLink, Calendar, MapPin } from 'lucide-react';
-import React, { useState } from 'react';
+import { FileText, ChevronDown, ChevronUp, ExternalLink, Calendar, MapPin, Smartphone } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 
 // Passenger detail table shown when row is expanded
 const PassengerDetail = ({ report }: { report: any }) => {
@@ -210,6 +211,72 @@ const MagiyaReports = () => {
     setExpandedRow(expandedRow === id ? null : id);
   };
 
+  // --- AUTOMATED WHATSAPP SWEEP ---
+  useEffect(() => {
+    const sweepPendingWhatsApp = async () => {
+      if (!reports) return;
+      const pending = reports.filter(r => r.status === 'pending_whatsapp');
+      if (pending.length === 0) return;
+
+      const WA_SERVER = localStorage.getItem('wa_server_url') || 'http://localhost:3000';
+
+      for (const report of pending) {
+        try {
+          console.log(`Sweeping report ${report.route_name} for WhatsApp...`);
+          // 1. Find Conductor WhatsApp
+          // Look up driver allocations for this date
+          const { data: allocations, error: allocErr } = await supabase
+            .from('driver_allocations')
+            .select('*, conductor:conductor_id(whatsapp, phone)')
+            .eq('allocation_date', report.report_date)
+            .limit(1);
+
+          let conductorPhone = null;
+          if (allocations && allocations.length > 0) {
+            const alloc = allocations[0];
+            // @ts-ignore
+            conductorPhone = alloc.conductor?.whatsapp || alloc.conductor?.phone || null;
+            // Fallback to notes if parsed from excel
+            if (!conductorPhone && alloc.notes) {
+               try { const n = JSON.parse(alloc.notes); conductorPhone = n.whatsapp || n.phone; } catch(e){}
+            }
+          }
+
+          // If we couldn't find a conductor phone, we still mark it completed so it doesn't loop forever
+          if (!conductorPhone) {
+             console.warn(`No conductor phone found for ${report.route_name}`);
+             await supabase.from('magiya_daily_reports').update({ status: 'completed' }).eq('id', report.id);
+             continue;
+          }
+
+          // Format number
+          const formattedPhone = conductorPhone.startsWith('0') ? '94' + conductorPhone.substring(1) : conductorPhone;
+
+          // 2. Send Message via WhatsApp Server
+          const message = `*🚌 Manifest Ready*\nRoute: ${report.route_name}\nDate: ${report.report_date}\nPassengers: ${report.total_passengers}\n\n📎 PDF: ${report.pdf_url || 'N/A'}`;
+
+          const res = await fetch(`${WA_SERVER}/api/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: formattedPhone, message }),
+          });
+
+          if (res.ok) {
+            toast.success(`Sent manifest to conductor for ${report.route_name}`);
+            await supabase.from('magiya_daily_reports').update({ status: 'completed' }).eq('id', report.id);
+          } else {
+            console.error('WhatsApp server rejected the message');
+            // Don't mark completed, maybe WA server is down, try again later
+          }
+        } catch (err) {
+          console.error('WhatsApp Sweep Error:', err);
+        }
+      }
+    };
+
+    sweepPendingWhatsApp();
+  }, [reports]);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
@@ -378,10 +445,16 @@ const MagiyaReports = () => {
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                           report.status === 'completed'
                             ? 'bg-[#10b981]/10 text-[#10b981] ring-1 ring-[#10b981]/30'
+                            : report.status === 'pending_whatsapp'
+                            ? 'bg-[#8b5cf6]/10 text-[#8b5cf6] ring-1 ring-[#8b5cf6]/30'
                             : 'bg-yellow-500/10 text-yellow-400 ring-1 ring-yellow-500/30'
                         }`}>
-                          <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${report.status === 'completed' ? 'bg-[#10b981]' : 'bg-yellow-400'}`} />
-                          {report.status || 'pending'}
+                          {report.status === 'pending_whatsapp' ? (
+                            <Smartphone className="h-3 w-3 mr-1.5 animate-pulse" />
+                          ) : (
+                            <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${report.status === 'completed' ? 'bg-[#10b981]' : 'bg-yellow-400'}`} />
+                          )}
+                          {report.status === 'pending_whatsapp' ? 'dispatching wa...' : (report.status || 'pending')}
                         </span>
                       </TableCell>
                     </TableRow>

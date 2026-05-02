@@ -201,6 +201,8 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
 
       setProgress(20);
 
+      const totalAmount = parseResult.transactions.reduce((sum, txn) => sum + (txn.credit > 0 ? txn.credit : txn.debit), 0);
+
       // Create import record
       const { data: importRecord, error: importError } = await supabase
         .from('school_payment_imports')
@@ -208,6 +210,7 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           branch_id: branchId,
           file_name: file?.name || "bank_statement",
           total_transactions: parseResult.transactions.length,
+          total_amount_imported: totalAmount,
           status: 'processing',
         }])
         .select()

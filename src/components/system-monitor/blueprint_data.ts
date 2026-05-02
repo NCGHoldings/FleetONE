@@ -498,5 +498,47 @@ export const BLUEPRINTS: Record<string, { code: BlueprintGenerator, filename: st
         
         FAIL --> ALERT[Send Slack/Email Alert to Admins]
     end`
+  },
+  magiya: {
+    filename: "magiya_scraper_pipeline.mermaid",
+    code: `graph TD
+    %% Trigger Phase
+    subgraph Phase 1: Cloud Execution
+        GH[GitHub Actions Nightly Cron] -->|Trigger| NODE[Node.js Puppeteer Scraper]
+    end
+
+    %% Extraction & Resiliency Phase
+    subgraph Phase 2: 3-Strike Resiliency Engine
+        NODE -->|Attempt Extraction| MAGIYA[Magiya Partner Portal]
+        MAGIYA -->|Success| EXT[Extract Passengers & PDF]
+        MAGIYA -.->|Timeout / DOM Change| FAIL_1[Attempt Failed]
+        
+        FAIL_1 -->|Retry 1, 2, 3| NODE
+        FAIL_1 -->|Exceeds 3 Retries| ALERT[(vh_system_alerts Table)]
+        ALERT -->|Critical Alert| DASH[Verify Hub Dashboard]
+    end
+
+    %% Storage Phase
+    subgraph Phase 3: Zero-Trust Database Persistence
+        EXT -->|Save Passenger Rows| DB_PASS[(magiya_passenger_bookings)]
+        EXT -->|Upload PDF| STORAGE[(Supabase Storage)]
+        EXT -->|Save Report Meta| DB_REP[(magiya_daily_reports)]
+        
+        DB_REP -->|Set Status| PEND[status = 'pending_whatsapp']
+    end
+
+    %% Local Automation Phase
+    subgraph Phase 4: Local Hub Automation
+        PEND -->|Detected by Verify Hub| SWEEP[Verify Hub / MagiyaReports.tsx]
+        
+        SWEEP -->|Query for Conductor| DB_ALLOC[(driver_allocations)]
+        DB_ALLOC -->|Return Conductor Phone| SWEEP
+        
+        SWEEP -->|API Call| WA_SERVER[Local WhatsApp Server:3000]
+        WA_SERVER -->|Send Message & PDF| PHONE((Conductor WhatsApp))
+        
+        SWEEP -->|Update Status| COMP[status = 'completed']
+        COMP --> DB_REP
+    end`
   }
 };

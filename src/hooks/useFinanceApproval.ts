@@ -276,6 +276,7 @@ export const useFinanceApproval = () => {
         companyId: effectiveCompanyId,
         journalEntryId: journalEntry?.id,
         physicalBankAccountId,
+        isAdvance: isAdvance || isFullPayment,
       });
 
       if (receiptResult) {

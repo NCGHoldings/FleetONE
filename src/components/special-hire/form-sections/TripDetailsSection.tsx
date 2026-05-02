@@ -207,29 +207,6 @@ export function TripDetailsSection({
 
           <FormField
             control={form.control}
-            name="hireType"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Hire Type *</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="Outside">Outside</SelectItem>
-                    <SelectItem value="Lyceum">Lyceum</SelectItem>
-                    <SelectItem value="Internal">Internal</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
             name="parkingLocationId"
             render={({ field }) => (
               <FormItem className={(useMultiParking || usePickupAsParking) ? "opacity-50 pointer-events-none" : ""}>

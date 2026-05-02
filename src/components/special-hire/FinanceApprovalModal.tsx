@@ -16,7 +16,7 @@ import { SignatureCaptureModal } from './SignatureCaptureModal';
 import { SearchableFinanceAccountSelector } from '@/components/settings/SearchableFinanceAccountSelector';
 import { useSpecialHireFinanceSettings, useUpdateSpecialHireFinanceSettings } from '@/hooks/useSpecialHireFinance';
 import { useChartOfAccounts } from '@/hooks/useAccountingData';
-import { useCompany } from '@/contexts/CompanyContext';
+import { useCompany, NCG_HOLDING_ID } from '@/contexts/CompanyContext';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -72,7 +72,7 @@ export const FinanceApprovalModal = ({
   
   const { getDocumentsByQuotation, approveDocument } = useDocumentManagement();
   const { saveApproval, getDocumentApprovals } = useSignatureManagement();
-  const { selectedCompany, isTestCompany } = useCompany();
+  const { selectedCompany, isTestCompany, setSelectedCompanyId, isNCGHoldingOrSubCompany } = useCompany();
 
   // GL Configuration State
   const { data: settings, isLoading: settingsLoading } = useSpecialHireFinanceSettings();
@@ -86,6 +86,8 @@ export const FinanceApprovalModal = ({
     settings?.customer_advance_account_id && 
     settings?.default_bank_account_id && 
     (settings?.revenue_internal_account_id || settings?.revenue_external_account_id);
+
+  const isCorrectWorkspace = selectedCompany && isNCGHoldingOrSubCompany(selectedCompany.id) && !isTestCompany;
 
   // Settings are required for GL auto-posting but not for the approval action itself.
   // The hook validates settings before GL posting and shows a specific error toast.
@@ -337,21 +339,44 @@ export const FinanceApprovalModal = ({
                   </div>
                 ) : !isSettingsComplete ? (
                   <div className="space-y-6">
-                    <Alert variant="destructive" className="bg-amber-50 text-amber-900 border-amber-200">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>GL Auto-Posting Not Configured</AlertTitle>
-                      <AlertDescription>
-                        GL accounts are not fully mapped — automatic journal entries will be <strong>skipped</strong> on approval. 
-                        You can still approve the payment. Configure the accounts below and save to enable auto-posting going forward.
-                      </AlertDescription>
-                    </Alert>
+                    {!isCorrectWorkspace ? (
+                      <div className="space-y-4">
+                        <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-900">
+                          <AlertTriangle className="h-5 w-5" />
+                          <AlertTitle className="text-lg">Workspace Configuration Locked</AlertTitle>
+                          <AlertDescription className="mt-2 text-sm leading-relaxed">
+                            You are currently in the <strong>{selectedCompany?.name || 'Unknown'}</strong> workspace, which does not have Special Hire Finance settings configured.
+                            <br/><br/>
+                            To prevent cross-tenant data contamination, configuration of Live Special Hire settings is restricted to the primary NCG Holding workspace.
+                          </AlertDescription>
+                        </Alert>
+                        <div className="flex justify-center pt-4">
+                          <Button 
+                            size="lg" 
+                            className="bg-primary text-primary-foreground font-semibold"
+                            onClick={() => setSelectedCompanyId(NCG_HOLDING_ID)}
+                          >
+                            Switch to NCG Holding Workspace
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <Alert variant="destructive" className="bg-amber-50 text-amber-900 border-amber-200">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertTitle>GL Auto-Posting Not Configured</AlertTitle>
+                          <AlertDescription>
+                            GL accounts are not fully mapped — automatic journal entries will be <strong>skipped</strong> on approval. 
+                            You can still approve the payment. Configure the accounts below and save to enable auto-posting going forward.
+                          </AlertDescription>
+                        </Alert>
 
-                    <div className="flex justify-end">
-                      <Button variant="outline" size="sm" onClick={handleAutoFill}>
-                        <Wand2 className="h-4 w-4 mr-2" />
-                        Auto-Fill Defaults
-                      </Button>
-                    </div>
+                        <div className="flex justify-end">
+                          <Button variant="outline" size="sm" onClick={handleAutoFill}>
+                            <Wand2 className="h-4 w-4 mr-2" />
+                            Auto-Fill Defaults
+                          </Button>
+                        </div>
 
                     <div className="grid gap-4">
                       <div className="space-y-2">
@@ -398,6 +423,8 @@ export const FinanceApprovalModal = ({
                         Save Settings
                       </Button>
                     </div>
+                  </>
+                )}
                   </div>
                 ) : (
                   <div className="space-y-6">

@@ -1,2 +1,9 @@
-const { createClient } = require('@supabase/supabase-js');
-// Need to find Supabase URL and Key. We can extract it from .env
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env' });
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
+async function run() {
+  const { data, error } = await supabase.from('vh_system_alerts').select('*').order('created_at', { ascending: false }).limit(5);
+  if (error) console.error(error); else console.log(JSON.stringify(data, null, 2));
+}
+run();

@@ -1060,6 +1060,7 @@ export function usePostPaymentToGL() {
       previousBalance,
       customArAccountId,
       customBankAccountId,
+      studentId,
     }: {
       paymentId: string;
       amount: number;
@@ -1276,7 +1277,11 @@ export function usePostPaymentToGL() {
         .from("journal_entry_lines")
         .insert(jeLines);
 
-      if (linesError) throw linesError;
+      if (linesError) {
+        // CLEANUP: If lines fail, delete the orphaned Journal Entry header
+        await supabase.from("journal_entries").delete().eq("id", journalEntry.id);
+        throw linesError;
+      }
 
       // UPDATE COA BALANCES - Critical for proper accounting
       await updateAccountBalancesFromJournalEntry(journalEntry.id);
@@ -1405,6 +1410,64 @@ export function usePostPaymentToGL() {
         }
       } catch (receiptError) {
         console.error("AR Receipt creation failed (non-critical):", receiptError);
+      }
+
+      // ------------------------------------------------------------------------------------------------
+      // CRITICAL FIX: Synchronize with Finance AR Invoices
+      // The database trigger 'update_student_balance_on_payment_trigger' has already run
+      // and marked school_ar_invoices as 'paid' or 'partial'. Now we must push that to ar_invoices.
+      // ------------------------------------------------------------------------------------------------
+      try {
+        if (studentId) {
+          const { data: updatedInvoices } = await supabase
+            .from("school_ar_invoices")
+            .select("id, amount, paid_amount, status, ar_invoice_id")
+            .eq("student_id", studentId)
+            .in("status", ["paid", "partial"]);
+
+          if (updatedInvoices && updatedInvoices.length > 0) {
+            // Get or create SBS customer
+            let customerId: string | null = null;
+            const { data: existingCustomer } = await supabase
+              .from("customers")
+              .select("id")
+              .eq("company_id", effectiveCompanyId || '')
+              .eq("customer_code", "SBS-DEFAULT")
+              .maybeSingle();
+
+            if (existingCustomer) {
+              customerId = existingCustomer.id;
+            } else {
+              const { data: newCustomer } = await supabase
+                .from("customers")
+                .insert({
+                  company_id: effectiveCompanyId,
+                  business_unit_code: 'SBO',
+                  customer_code: "SBS-DEFAULT",
+                  customer_name: "School Bus Students",
+                  is_active: true,
+                } as any)
+                .select()
+                .single();
+              customerId = newCustomer?.id || null;
+            }
+
+            if (customerId) {
+              for (const inv of updatedInvoices) {
+                await syncPaymentToFinanceAR(
+                  inv.id,
+                  inv.paid_amount || 0,
+                  inv.amount || 0,
+                  effectiveCompanyId || '',
+                  businessUnitCode || 'SBO',
+                  customerId
+                );
+              }
+            }
+          }
+        }
+      } catch (arSyncErr) {
+        console.error("Finance AR Sync failed (non-critical):", arSyncErr);
       }
 
       return journalEntry;
@@ -1714,6 +1777,36 @@ export function usePostGroupedPaymentToGL() {
           }
         } catch (receiptError) {
           console.error("AR Receipt creation failed:", receiptError);
+        }
+
+        // ------------------------------------------------------------------------------------------------
+        // CRITICAL FIX: Synchronize with Finance AR Invoices for Grouped Payments
+        // The database trigger 'update_student_balance_on_payment_trigger' has already run
+        // and marked school_ar_invoices as 'paid' or 'partial'. Now we must push that to ar_invoices.
+        // ------------------------------------------------------------------------------------------------
+        try {
+          if (alloc.studentId) {
+            const { data: updatedInvoices } = await supabase
+              .from("school_ar_invoices")
+              .select("id, amount, paid_amount, status, ar_invoice_id")
+              .eq("student_id", alloc.studentId)
+              .in("status", ["paid", "partial"]);
+
+            if (updatedInvoices && updatedInvoices.length > 0 && receiptCustomerId) {
+              for (const inv of updatedInvoices) {
+                await syncPaymentToFinanceAR(
+                  inv.id,
+                  inv.paid_amount || 0,
+                  inv.amount || 0,
+                  effectiveCompanyId || '',
+                  businessUnitCode || 'SBO',
+                  receiptCustomerId
+                );
+              }
+            }
+          }
+        } catch (arSyncErr) {
+          console.error("Finance AR Sync failed in grouped payment:", arSyncErr);
         }
       }
 

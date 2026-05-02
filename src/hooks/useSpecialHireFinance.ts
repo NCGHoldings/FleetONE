@@ -1704,6 +1704,8 @@ export async function createSPHARReceipt({
   paymentId,
   companyId,
   journalEntryId,
+  physicalBankAccountId,
+  isAdvance,
 }: {
   customerId: string;
   arInvoiceId?: string | null;
@@ -1714,6 +1716,7 @@ export async function createSPHARReceipt({
   companyId: string;
   journalEntryId?: string;
   physicalBankAccountId?: string | null;
+  isAdvance?: boolean;
 }): Promise<{ receiptId: string; receiptNumber: string } | null> {
   try {
     console.log('[SPH AR] Creating AR Receipt for payment:', paymentId);
@@ -1742,6 +1745,7 @@ export async function createSPHARReceipt({
         status: 'posted',
         company_id: companyId,
         business_unit_code: 'SPH',
+        is_advance: isAdvance || false,
         journal_entry_id: journalEntryId || null,
         bank_account_id: physicalBankAccountId || null,
       })

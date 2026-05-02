@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Network, Workflow, DatabaseZap, FileWarning, Briefcase, FileSignature, Receipt, GraduationCap, Truck } from "lucide-react";
+import { Network, Workflow, DatabaseZap, FileWarning, Briefcase, FileSignature, Receipt, GraduationCap, Truck, Bot } from "lucide-react";
 import { PipelineBlueprintViewer } from "./PipelineBlueprintViewer";
 import { BLUEPRINTS } from "./blueprint_data";
 
@@ -178,6 +178,7 @@ export const VerifyHubView = () => {
             { id: "pc", name: "Petty Cash Replenishment", icon: <Receipt className="h-5 w-5 text-emerald-500" />, desc: "Disbursements & AP Top-ups", status: "Active Guard" },
             { id: "iou", name: "IOU & Expense Pipeline", icon: <FileSignature className="h-5 w-5 text-purple-500" />, desc: "Staff Advances to COA Recognition", status: "Active Guard" },
             { id: "ap", name: "Procurement & GRN (AP)", icon: <Workflow className="h-5 w-5 text-cyan-500" />, desc: "Purchase Orders to Final Payments", status: "Active Guard" },
+            { id: "magiya", name: "Magiya Scraper Pipeline", icon: <Bot className="h-5 w-5 text-pink-500" />, desc: "Automated Resilient Extraction & Dispatch", status: "Active Guard" },
           ].map((pipeline) => {
             const cardContent = (
               <Card className="relative overflow-hidden group hover:border-slate-300 transition-colors cursor-pointer h-full">

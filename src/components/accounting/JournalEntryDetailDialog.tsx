@@ -295,15 +295,16 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              Journal Entry: {entry.entry_number}
-              <Badge variant={getStatusVariant(entry.status)}>
-                {entry.status?.toUpperCase()}
-              </Badge>
-            </DialogTitle>
-            {entry.status === "posted" && !isReversal && (
-              <div className="absolute right-12 top-4 flex gap-2">
+          <DialogHeader className="p-6 pb-4 border-b">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pr-6">
+              <DialogTitle className="flex items-center gap-3 text-xl">
+                Journal Entry: {entry.entry_number}
+                <Badge variant={getStatusVariant(entry.status)}>
+                  {entry.status?.toUpperCase()}
+                </Badge>
+              </DialogTitle>
+              {entry.status === "posted" && !isReversal && (
+                <div className="flex items-center gap-2">
                   <Button 
                     variant="destructive" 
                     size="sm"
@@ -319,20 +320,21 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
                     <AlertTriangle className="h-4 w-4 mr-1" />
                     Fix Bank Account
                   </Button>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => setShowConfirm(true)}
-                  disabled={reverseEntry.isPending}
-                >
-                  <ArrowLeftRight className="h-4 w-4 mr-1" />
-                  {reverseEntry.isPending ? "Reversing..." : "Reverse Entry"}
-                </Button>
-              </div>
-            )}
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => setShowConfirm(true)}
+                    disabled={reverseEntry.isPending}
+                  >
+                    <ArrowLeftRight className="h-4 w-4 mr-1" />
+                    {reverseEntry.isPending ? "Reversing..." : "Reverse Entry"}
+                  </Button>
+                </div>
+              )}
+            </div>
           </DialogHeader>
 
-          <div className="space-y-6">
+          <div className="space-y-6 p-6 overflow-y-auto">
             {/* Reversal Info Banners */}
             {isReversed && entry.reversed_entry_id && (
               <div className="flex items-center gap-2 p-3 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg text-sm">

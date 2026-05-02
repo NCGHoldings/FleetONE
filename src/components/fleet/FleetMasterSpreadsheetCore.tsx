@@ -6,11 +6,12 @@ import { ExpandedFleetRow } from '@/hooks/useFleetMasterSpreadsheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Loader2, Check, ChevronsUpDown, MapPin, Settings, Activity, Users, Clock, Gauge, Wallet, Layers } from "lucide-react";
+import { Loader2, Check, ChevronsUpDown, MapPin, Settings, Activity, Users, Clock, Gauge, Wallet, Layers, BadgeCheck, AlertCircle } from "lucide-react";
 import { formatLKR } from "@/lib/accounting-utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
   rows: ExpandedFleetRow[];
@@ -368,14 +369,34 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
 
   const renderRouteCell = (row: ExpandedFleetRow) => {
     // Route is always editable in master mode, and editable per-trip in daily mode
+    const isOfficial = availableRoutes.some(r => r.route_name === row.route_label || r.id === row.route_id);
+    
     if (!isEditable('route_label')) {
       return (
-        <span
-          className="px-3 py-2.5 rounded block text-sm min-h-[40px] flex items-center text-muted-foreground bg-muted/10 cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap"
-          title={String(row.route_label ?? '') + " (Master Edit Only)"}
-        >
-          {row.route_label || '-'}
-        </span>
+        <div className="flex items-center justify-between px-3 py-2.5 rounded text-sm min-h-[40px] text-muted-foreground bg-muted/10 cursor-not-allowed overflow-hidden">
+          <span
+            className="text-ellipsis whitespace-nowrap truncate pr-2"
+            title={String(row.route_label ?? '') + " (Master Edit Only)"}
+          >
+            {row.route_label || '-'}
+          </span>
+          {row.route_label && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {isOfficial ? (
+                    <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                  )}
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  {isOfficial ? "Official Route (Dictionary Match)" : "Unverified Route. Please map to an official route."}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
       );
     }
 
@@ -396,10 +417,17 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
               if (isOpen) setOpenRouteComboboxFor(null);
             }}
           >
-            <span className="truncate pr-2">
+            <span className="truncate pr-2 flex items-center gap-1.5 flex-1 text-left">
               {row.route_label || "Select route..."}
+              {row.route_label && (
+                 isOfficial ? (
+                   <BadgeCheck className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 ml-auto" title="Verified Route" />
+                 ) : (
+                   <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 ml-auto" title="Unverified Route" />
+                 )
+              )}
             </span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-[300px] p-0" align="start">

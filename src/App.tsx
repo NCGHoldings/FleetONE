@@ -57,6 +57,12 @@ import PublicReceiptUpload from "./pages/PublicReceiptUpload";
 import PublicConductorUpload from "./pages/PublicConductorUpload";
 import { ConductorSubmissionsReview } from "./components/trips/ConductorSubmissionsReview";
 import { LateEntryApprovalInterface } from "./components/trips/LateEntryApprovalInterface";
+import CrewLogin from "./pages/CrewLogin";
+import CrewAppLayout from "./components/layouts/CrewAppLayout";
+import { CrewAuthProvider } from "./contexts/CrewAuthContext";
+import CrewHistory from "./pages/CrewHistory";
+import CrewSchedule from "./pages/CrewSchedule";
+import CrewProfile from "./pages/CrewProfile";
 import SchoolImportPage from "./pages/SchoolImportPage";
 import SchoolBusExpenseImport from "./pages/SchoolBusExpenseImport";
 import CustomerManagement from "./pages/CustomerManagement";
@@ -141,6 +147,24 @@ const App = () => (
             <Route path="/public/yutong-report" element={<PublicYutongReport />} />
             <Route path="/public/yutong-spreadsheet" element={<PublicYutongSpreadsheet />} />
             
+            {/* Crew App Routes */}
+            <Route path="/public/crew-login" element={
+              <CrewAuthProvider>
+                <CrewLogin />
+              </CrewAuthProvider>
+            } />
+            <Route path="/public/crew" element={
+              <CrewAuthProvider>
+                <CrewAppLayout />
+              </CrewAuthProvider>
+            }>
+              <Route index element={<PublicConductorUpload />} />
+              <Route path="upload" element={<PublicConductorUpload />} />
+              <Route path="history" element={<CrewHistory />} />
+              <Route path="schedule" element={<CrewSchedule />} />
+              <Route path="profile" element={<CrewProfile />} />
+            </Route>
+
             {/* Protected routes wrapped in AppLayout */}
             <Route 
               path="/" 

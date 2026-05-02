@@ -245,6 +245,7 @@ export function FinanceImportApprovalDialog() {
               });
             } catch (glError) {
               console.error("Grouped GL posting failed for item", item.id, glError);
+              throw glError;
             }
           }
 
@@ -296,6 +297,7 @@ export function FinanceImportApprovalDialog() {
               .eq('id', item.id);
           } catch (e) {
             console.error("Failed to post suspense entry", e);
+            throw e;
           }
         }
       }
@@ -311,6 +313,13 @@ export function FinanceImportApprovalDialog() {
       window.dispatchEvent(new Event("schoolPaymentImportUpdated"));
       
     } catch (error: any) {
+      await supabase
+        .from('school_payment_imports')
+        .update({ status: 'failed' })
+        .eq('id', importId);
+        
+      window.dispatchEvent(new Event("schoolPaymentImportUpdated"));
+
       toast({
         title: "Error",
         description: error.message || "Failed to approve import batch.",
