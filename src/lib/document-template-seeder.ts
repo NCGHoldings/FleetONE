@@ -1574,6 +1574,182 @@ export const generateIOUVoucherTemplate = (): string => `
 </div>
 `;
 
+// ==================== SPH AR Invoice (Special Hire) ====================
+// Pixel-perfect replica of BalanceInvoicePreview.tsx from operations
+export const generateSPHARInvoiceTemplate = (): string => `
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 0; color: #000; }
+  .pg { max-width: 210mm; margin: 0 auto; padding: 15px; background: #fff; }
+  .hd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .hd .lo img { height: 70px !important; width: auto !important; object-fit: contain !important; }
+  .hd .co { text-align: right; font-size: 14px; }
+  .tt { text-align: center; font-size: 20px; font-weight: bold; text-decoration: underline; margin-bottom: 12px; }
+  .it { width: 100%; margin-bottom: 12px; font-size: 14px; }
+  .it td { padding: 4px 6px; }
+  .it .lb { font-weight: bold; width: 18%; }
+  .it .vl { width: 32%; }
+  .li { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  .li th { border: 1px solid #d1d5db; padding: 8px; text-align: center; background: #f3f4f6; font-weight: bold; }
+  .li td { border: 1px solid #d1d5db; padding: 8px; text-align: center; font-size: 12px; }
+  .sm { display: flex; justify-content: flex-end; margin-top: 12px; }
+  .sm table { border-collapse: collapse; font-size: 14px; max-width: 300px; }
+  .sm td { border: 1px solid #d1d5db; padding: 8px; }
+  .sm .sl { font-weight: bold; }
+  .sm .sr { text-align: right; }
+  .sm .dc { color: #dc2626; }
+  .sm .ar { background: #fefce8; }
+  .sm .aa { color: #15803d; font-weight: bold; text-align: right; }
+  .sm .br { background: #eff6ff; }
+  .sm .bl { font-weight: bold; color: #1e40af; }
+  .sm .ba { font-weight: bold; color: #1e40af; font-size: 16px; text-align: right; }
+  .nt { margin-top: 16px; padding: 10px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 13px; }
+  .sg { width: 100%; border-collapse: collapse; margin-top: 30px; font-size: 12px; }
+  .sg th { border: 1px solid #000; padding: 8px; text-align: center; background: #f3f4f6; }
+  .sg td { border: 1px solid #000; padding: 12px; vertical-align: top; }
+  .sgl { height: 40px; border-bottom: 1px solid #000; margin: 5px 0; }
+  .ft { margin-top: 30px; text-align: center; font-size: 10px; color: #666; }
+  @media print { body { background: #fff; } .pg { margin: 0; padding: 10px; max-width: 100%; } }
+</style>
+<div class="pg">
+  <div class="hd">
+    <div class="lo">{{company_logo}}</div>
+    <div class="co">
+      <strong>{{company_name}}</strong><br>
+      {{company_address}}<br>
+      {{company_phone}}
+    </div>
+  </div>
+  <div class="tt">INVOICE</div>
+  <table class="it">
+    <tr><td class="lb">Customer Code</td><td class="vl">{{customer_code}}</td><td class="lb">Invoice No</td><td class="vl">{{invoice_number}}</td></tr>
+    <tr><td class="lb">Customer Name</td><td class="vl">{{customer_name}}</td><td class="lb">Invoice Date</td><td class="vl">{{invoice_date}}</td></tr>
+    <tr><td class="lb">Branch</td><td class="vl">SHS</td><td class="lb">Ref No</td><td class="vl">{{reference}}</td></tr>
+    <tr><td class="lb">Contact Person</td><td class="vl">{{customer_name}}</td><td class="lb">Dates of Hire</td><td class="vl">{{due_date}}</td></tr>
+    <tr><td class="lb">Contact Number</td><td class="vl">{{customer_phone}}</td><td class="lb">Quote No</td><td class="vl">{{reference}}</td></tr>
+    <tr><td class="lb">Address</td><td class="vl">{{customer_address}}</td><td class="lb">Bus Type</td><td class="vl"></td></tr>
+  </table>
+  <table class="li">
+    <thead>
+      <tr>
+        <th style="width:25%">Description</th>
+        <th style="width:40%">Item Detail</th>
+        <th style="width:15%">Vehicle No</th>
+        <th style="width:20%">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Special Hire</td>
+        <td>{{notes}}</td>
+        <td>TBA</td>
+        <td><strong>{{total_amount}}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="sm">
+    <table>
+      <tr><td class="sl">Sub Total</td><td class="sr">{{total_amount}}</td></tr>
+      <tr><td class="sl">Discount</td><td class="sr dc">{{discount_amount}}</td></tr>
+      <tr class="ar"><td class="sl">Advance Paid</td><td class="aa">{{paid_amount}}</td></tr>
+      <tr class="br"><td class="bl">BALANCE DUE</td><td class="ba">{{balance}}</td></tr>
+    </table>
+  </div>
+  <div class="nt"><strong>Notes:</strong> {{notes}}</div>
+  <table class="sg">
+    <thead><tr><th>Prepared By</th><th>Checked By</th><th>Approved By</th></tr></thead>
+    <tbody><tr>
+      <td><strong>Name:</strong> {{prepared_by}}<br><strong>Signature:</strong><div class="sgl">{{prepared_by_signature}}</div><strong>Date:</strong> {{print_date}}</td>
+      <td><strong>Name:</strong> {{verified_by}}<br><strong>Signature:</strong><div class="sgl">{{verified_by_signature}}</div><strong>Date:</strong> .........................</td>
+      <td><strong>Name:</strong> {{approved_by}}<br><strong>Signature:</strong><div class="sgl">{{approved_by_signature}}</div><strong>Date:</strong> .........................</td>
+    </tr></tbody>
+  </table>
+  <div class="ft">Page 1 of 1<br>NCG Express Transport Management System</div>
+</div>
+`;
+
+// ==================== SPH AR Receipt (Special Hire) ====================
+// Pixel-perfect replica of AdvanceReceiptPreview.tsx from operations
+export const generateSPHARReceiptTemplate = (): string => `
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 0; color: #000; }
+  .rpg { max-width: 210mm; margin: 0 auto; padding: 20px; background: #fff; }
+  .rhd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+  .rhd .rlo img { width: 150px !important; height: auto !important; object-fit: contain !important; }
+  .rhd .rco { text-align: right; font-size: 14px; }
+  .rtt { text-align: center; font-size: 20px; font-weight: bold; text-decoration: underline; margin-bottom: 20px; }
+  .rinf { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  .rinf td { border: 1px solid #000; padding: 8px; font-size: 13px; width: 50%; }
+  .rinf strong { display: block; margin-bottom: 2px; }
+  .rpt { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  .rpt th { border: 1px solid #000; padding: 8px; text-align: left; background: #f3f4f6; font-size: 13px; }
+  .rpt td { border: 1px solid #000; padding: 8px; font-size: 13px; }
+  .rtot { text-align: right; margin-bottom: 16px; font-size: 14px; line-height: 1.8; }
+  .rtot .rbd { color: #b91c1c; font-weight: bold; }
+  .rtrip { font-style: italic; font-size: 12px; margin-bottom: 8px; }
+  .rnote { font-size: 11px; margin-bottom: 24px; }
+  .rsg { width: 100%; border-collapse: collapse; margin-top: 30px; font-size: 14px; }
+  .rsg th { border: 1px solid #000; padding: 8px; text-align: center; background: #f3f4f6; }
+  .rsg td { border: 1px solid #000; padding: 12px; vertical-align: top; }
+  .rsgl { height: 50px; border-bottom: 1px solid #000; margin: 5px 0; }
+  .rft { margin-top: 40px; text-align: center; font-size: 10px; color: #666; }
+  @media print { body { background: #fff; } .rpg { margin: 0; padding: 10px; max-width: 100%; } }
+</style>
+<div class="rpg">
+  <div class="rhd">
+    <div class="rlo">{{company_logo}}</div>
+    <div class="rco">
+      <strong>{{company_name}}</strong><br>
+      {{company_address}}<br>
+      {{company_phone}}
+    </div>
+  </div>
+  <div class="rtt">SALES RECEIPT</div>
+  <table class="rinf">
+    <tr>
+      <td><strong>Receipt No.</strong>{{receipt_number}}</td>
+      <td><strong>Date</strong>{{receipt_date}}</td>
+    </tr>
+    <tr>
+      <td><strong>Payment Ref</strong>{{customer_name}}, {{reference}}</td>
+      <td><strong>Transaction No.</strong>{{cheque_number}}</td>
+    </tr>
+    <tr>
+      <td><strong>Customer</strong>{{customer_name}}</td>
+      <td><strong>Payment Method</strong>{{payment_method}}</td>
+    </tr>
+  </table>
+  <table class="rpt">
+    <thead><tr><th>Account Name</th><th>Transfer Date</th><th>Reference</th><th style="text-align:right;">Amount</th></tr></thead>
+    <tbody><tr>
+      <td>BALANCE PAYMENT</td>
+      <td>{{receipt_date}}</td>
+      <td>{{reference}}</td>
+      <td style="text-align:right;font-weight:bold;">{{amount}}</td>
+    </tr></tbody>
+  </table>
+  {{allocations}}
+  <div class="rtot">
+    <p><strong>This Payment:</strong> {{amount}}</p>
+    <p><strong>Total Paid to Date:</strong> {{total_amount}}</p>
+    <p class="rbd"><strong>Balance Due:</strong> {{currency}} 0.00</p>
+  </div>
+  <div class="rtrip">
+    <strong>Notes:</strong> {{notes}}
+  </div>
+  <div class="rnote">*Note: Please make sure to place the name, signature and date in the given space accordingly.</div>
+  <table class="rsg">
+    <thead><tr><th>Prepared By</th><th>Checked By</th><th>Approved By</th></tr></thead>
+    <tbody><tr>
+      <td><strong>Name:</strong> {{prepared_by}}<br><strong>Signature:</strong><div class="rsgl">{{prepared_by_signature}}</div><strong>Date:</strong> {{print_date}}</td>
+      <td><strong>Name:</strong> {{verified_by}}<br><strong>Signature:</strong><div class="rsgl">{{verified_by_signature}}</div><strong>Date:</strong> .........................</td>
+      <td><strong>Name:</strong> {{approved_by}}<br><strong>Signature:</strong><div class="rsgl">{{approved_by_signature}}</div><strong>Date:</strong> .........................</td>
+    </tr></tbody>
+  </table>
+  <div class="rft">Page 1 of 1<br>NCG Express Transport Management System</div>
+</div>
+`;
+
+// Export all templates as a map
 // Export all templates as a map
 export const defaultTemplates: Record<string, () => string> = {
   ar_invoice: generateARInvoiceTemplate,
@@ -1592,6 +1768,14 @@ export const defaultTemplates: Record<string, () => string> = {
   petty_cash_voucher: generatePettyCashVoucherTemplate,
   iou_voucher: generateIOUVoucherTemplate,
   purchase_order: generatePurchaseOrderTemplate,
+  sph_ar_invoice: generateSPHARInvoiceTemplate,
+  sph_ar_receipt: generateSPHARReceiptTemplate,
+};
+
+// SPH-specific template overrides: when company short_code is SPH, use these for AR docs
+export const sphTemplateOverrides: Record<string, () => string> = {
+  ar_invoice: generateSPHARInvoiceTemplate,
+  ar_receipt: generateSPHARReceiptTemplate,
 };
 
 // Template display names

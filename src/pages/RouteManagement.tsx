@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit, Trash2, Map, MapPin, GitMerge, Bus, ChevronDown, ChevronRight, ArrowLeftRight, Settings, Target, Wallet, Users } from "lucide-react";
+import { Plus, Edit, Trash2, Map, MapPin, GitMerge, Bus, ChevronDown, ChevronRight, ArrowLeftRight, Settings, Target, Wallet, Users, ShieldCheck, AlertTriangle, RefreshCw, CheckCircle2, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,9 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { useRouteAudit } from "@/hooks/useRouteAudit";
+import { Progress } from "@/components/ui/progress";
+import { RouteSyncAuditDashboard } from "@/components/fleet/RouteSyncAuditDashboard";
 
 interface FleetRoute {
   id: string;
@@ -46,6 +49,9 @@ export default function RouteManagement() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [busCountMap, setBusCountMap] = useState<Record<string, number>>({});
   const [collapsedCorridors, setCollapsedCorridors] = useState<string[]>([]);
+
+  // Audit engine
+  const { summary: auditSummary } = useRouteAudit();
 
   // Merge state
   const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
@@ -424,6 +430,91 @@ export default function RouteManagement() {
     );
   };
 
+  const renderRouteTable = () => (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Route No</TableHead>
+              <TableHead>Route Name</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Locations</TableHead>
+              <TableHead>Distance</TableHead>
+              <TableHead className="text-center">Buses</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8">Loading routes...</TableCell>
+              </TableRow>
+            ) : filteredRoutes.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  No routes found for this category.
+                </TableCell>
+              </TableRow>
+            ) : (
+              <>
+                {groupedRoutes.corridors.map(corridor => {
+                  const isCollapsed = collapsedCorridors.includes(corridor.name);
+                  const totalBuses = corridor.routes.reduce((sum, r) => sum + getBusCount(r.route_name), 0);
+                  const totalDistance = corridor.routes.reduce((sum, r) => sum + (r.distance_km || 0), 0);
+                  return (
+                    <React.Fragment key={corridor.name}>
+                      <TableRow 
+                        className="bg-muted/50 hover:bg-muted/70 cursor-pointer border-t-2 border-border"
+                        onClick={() => toggleCorridor(corridor.name)}
+                      >
+                        <TableCell colSpan={2}>
+                          <div className="flex items-center gap-2 font-semibold text-foreground">
+                            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            <ArrowLeftRight className="w-4 h-4 text-primary" />
+                            <span>{corridor.name}</span>
+                            <Badge variant="outline" className="ml-2 text-xs font-normal">
+                              {corridor.routes.length} routes
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell />
+                        <TableCell className="text-sm text-muted-foreground">Round-trip corridor</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {totalDistance > 0 ? `${totalDistance} km total` : "-"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {totalBuses > 0 && (
+                            <span className="inline-flex items-center gap-1 text-sm font-medium">
+                              <Bus className="w-3.5 h-3.5 text-muted-foreground" />
+                              {totalBuses}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell />
+                        <TableCell />
+                      </TableRow>
+                      {!isCollapsed && corridor.routes.map(route => renderRouteRow(route, true))}
+                    </React.Fragment>
+                  );
+                })}
+                {groupedRoutes.ungrouped.length > 0 && groupedRoutes.corridors.length > 0 && (
+                  <TableRow className="bg-muted/30 border-t-2 border-border">
+                    <TableCell colSpan={8} className="font-semibold text-muted-foreground text-sm py-2">
+                      Standalone Routes
+                    </TableCell>
+                  </TableRow>
+                )}
+                {groupedRoutes.ungrouped.map(route => renderRouteRow(route))}
+              </>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-6 animate-fade-in p-6">
       <div className="flex items-center justify-between">
@@ -682,96 +773,21 @@ export default function RouteManagement() {
           <TabsTrigger value="all">All Routes ({routes.length})</TabsTrigger>
           <TabsTrigger value="public">Public Bus ({publicCount})</TabsTrigger>
           <TabsTrigger value="school">School Bus ({schoolCount})</TabsTrigger>
+          <TabsTrigger value="sync-audit" className="gap-1.5">
+            <ShieldCheck className="w-4 h-4" />
+            Sync Audit
+            {auditSummary && auditSummary.totalOrphans > 0 && (
+              <Badge variant="destructive" className="ml-1 text-[10px] h-5 px-1.5">{auditSummary.totalOrphans}</Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value={categoryFilter}>
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Route No</TableHead>
-                    <TableHead>Route Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Locations</TableHead>
-                    <TableHead>Distance</TableHead>
-                    <TableHead className="text-center">Buses</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8">Loading routes...</TableCell>
-                    </TableRow>
-                  ) : filteredRoutes.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        No routes found for this category.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    <>
-                      {/* Corridor Groups */}
-                      {groupedRoutes.corridors.map(corridor => {
-                        const isCollapsed = collapsedCorridors.includes(corridor.name);
-                        const totalBuses = corridor.routes.reduce((sum, r) => sum + getBusCount(r.route_name), 0);
-                        const totalDistance = corridor.routes.reduce((sum, r) => sum + (r.distance_km || 0), 0);
-                        return (
-                          <React.Fragment key={corridor.name}>
-                            <TableRow 
-                              className="bg-muted/50 hover:bg-muted/70 cursor-pointer border-t-2 border-border"
-                              onClick={() => toggleCorridor(corridor.name)}
-                            >
-                              <TableCell colSpan={2}>
-                                <div className="flex items-center gap-2 font-semibold text-foreground">
-                                  {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                  <ArrowLeftRight className="w-4 h-4 text-primary" />
-                                  <span>{corridor.name}</span>
-                                  <Badge variant="outline" className="ml-2 text-xs font-normal">
-                                    {corridor.routes.length} routes
-                                  </Badge>
-                                </div>
-                              </TableCell>
-                              <TableCell />
-                              <TableCell className="text-sm text-muted-foreground">
-                                Round-trip corridor
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {totalDistance > 0 ? `${totalDistance} km total` : "-"}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                {totalBuses > 0 && (
-                                  <span className="inline-flex items-center gap-1 text-sm font-medium">
-                                    <Bus className="w-3.5 h-3.5 text-muted-foreground" />
-                                    {totalBuses}
-                                  </span>
-                                )}
-                              </TableCell>
-                              <TableCell />
-                              <TableCell />
-                            </TableRow>
-                            {!isCollapsed && corridor.routes.map(route => renderRouteRow(route, true))}
-                          </React.Fragment>
-                        );
-                      })}
+        <TabsContent value="all">{renderRouteTable()}</TabsContent>
+        <TabsContent value="public">{renderRouteTable()}</TabsContent>
+        <TabsContent value="school">{renderRouteTable()}</TabsContent>
 
-                      {/* Ungrouped Routes */}
-                      {groupedRoutes.ungrouped.length > 0 && groupedRoutes.corridors.length > 0 && (
-                        <TableRow className="bg-muted/30 border-t-2 border-border">
-                          <TableCell colSpan={8} className="font-semibold text-muted-foreground text-sm py-2">
-                            Standalone Routes
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      {groupedRoutes.ungrouped.map(route => renderRouteRow(route))}
-                    </>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        <TabsContent value="sync-audit">
+          <RouteSyncAuditDashboard />
         </TabsContent>
       </Tabs>
     </div>

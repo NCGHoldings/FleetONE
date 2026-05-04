@@ -12,9 +12,16 @@ export default function CrewLogin() {
   const [nic, setNic] = useState('');
   const [phone, setPhone] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const { login } = useCrewAuth();
+  const { login, isAuthenticated, isLoading } = useCrewAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    localStorage.setItem('app_mode', 'crew');
+    if (isAuthenticated && !isLoading) {
+      navigate('/public/crew', { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +46,7 @@ export default function CrewLogin() {
         title: "Welcome Back",
         description: "Successfully logged in to Crew App.",
       });
-      navigate('/public/conductor-upload');
+      navigate('/public/crew');
     } else {
       toast({
         title: "Login Failed",
@@ -56,11 +63,20 @@ export default function CrewLogin() {
           <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm">
             <Bus className="w-8 h-8 text-white" />
           </div>
-          <CardTitle className="text-2xl font-black text-white text-center">AIV Crew Portal</CardTitle>
+          <CardTitle className="text-2xl font-black text-white text-center">NCG Speed Crew</CardTitle>
           <CardDescription className="text-blue-100 text-center mt-2">
             Enter your details to access your daily targets, history, and schedule.
           </CardDescription>
         </div>
+        
+        {!window.matchMedia('(display-mode: standalone)').matches && (
+          <div className="bg-amber-50 p-3 flex items-center justify-between border-b border-amber-100">
+            <div className="text-sm text-amber-800 font-medium">For the best experience, install our app!</div>
+            <Button size="sm" variant="outline" className="bg-white hover:bg-amber-100 text-amber-700 border-amber-200" onClick={() => navigate('/install?app=crew')}>
+              Install App
+            </Button>
+          </div>
+        )}
         
         <CardContent className="p-6 sm:p-8 bg-white">
           <form onSubmit={handleLogin} className="space-y-5">

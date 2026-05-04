@@ -47,8 +47,7 @@ async function runMagiyaScraper() {
 
   const chromePath = findChromePath();
   const launchOptions = {
-    headless: true,
-    userDataDir: '/tmp/puppeteer_dev_chrome_profile_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
+    headless: "new",
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
     protocolTimeout: 0
   };
@@ -75,14 +74,9 @@ async function runMagiyaScraper() {
     await sleep(5000);
 
     // ---- Target date ----
-    let dateStr;
-    if (process.env.TARGET_DATE) {
-      dateStr = process.env.TARGET_DATE;
-    } else {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      dateStr = yesterday.toISOString().split('T')[0];
-    }
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dateStr = yesterday.toISOString().split('T')[0];
     console.log(`📅 Target date: ${dateStr}`);
 
     // ---- Navigate to Reports ----
@@ -118,47 +112,16 @@ async function runMagiyaScraper() {
     });
     await sleep(2000);
 
-    const allRoutes = await page.evaluate(async () => {
-      const routes = new Set();
-      
-      const extract = () => {
-        const options = document.querySelectorAll('ui-option');
-        for (const opt of options) {
-          const text = opt.innerText.trim();
-          if (text !== 'All Trips' && text !== '' && !text.includes('Bookings') && !text.includes('Cancellation')) {
-            routes.add(text);
-          }
-        }
-      };
-
-      // Extract initially visible
-      extract();
-
-      // Find the scrollable container (often a parent of the options, or a global cdk overlay)
-      const container = document.querySelector('ui-option')?.closest('[style*="overflow"]') 
-                     || document.querySelector('.cdk-virtual-scroll-viewport') 
-                     || document.querySelector('.scrollable-content')
-                     || document.querySelector('.ng-dropdown-panel-items')
-                     || document.querySelector('[role="listbox"]');
-
-      if (container) {
-        // Scroll down multiple times to force virtual rows to render
-        for (let i = 0; i < 15; i++) {
-          container.scrollTop += 200;
-          await new Promise(r => setTimeout(r, 150));
-          extract();
-        }
-      } else {
-        // Fallback: try scrolling options into view
-        const opts = document.querySelectorAll('ui-option');
-        if (opts.length > 0) {
-          opts[opts.length - 1].scrollIntoView();
-          await new Promise(r => setTimeout(r, 200));
-          extract();
+    const allRoutes = await page.evaluate(() => {
+      const options = document.querySelectorAll('ui-option');
+      const routes = [];
+      for (const opt of options) {
+        const text = opt.innerText.trim();
+        if (text !== 'All Trips' && text !== '' && !text.includes('Bookings') && !text.includes('Cancellation')) {
+          routes.push(text);
         }
       }
-
-      return Array.from(routes);
+      return routes;
     });
 
     // Close the dropdown so the next loop sequence works properly
@@ -175,11 +138,7 @@ async function runMagiyaScraper() {
     const savedReports = [];
 
     // Process all routes (Loop through each route sequentially)
-    let routesToProcess = allRoutes.length > 0 ? allRoutes : ['Default'];
-    if (process.env.TEST_SINGLE_ROUTE) {
-      routesToProcess = routesToProcess.slice(0, 1);
-      console.log(`🧪 TEST MODE: Only running 1 route: ${routesToProcess[0]}`);
-    }
+    const routesToProcess = allRoutes.length > 0 ? allRoutes : ['Default'];
 
     for (const routeName of routesToProcess) {
       console.log(`\n📍 Processing route: ${routeName}`);
@@ -421,14 +380,13 @@ async function runMagiyaScraper() {
           if (attempt === 3) {
             console.log(`   ❌ Route ${routeName} failed completely after 3 attempts.`);
             // Log Alert to the Database!
-            const { error: alertErr } = await supabase.from('vh_system_alerts').insert({
+            await supabase.from('vh_system_alerts').insert({
               module: 'magiya_scraper',
               issue_type: 'Scraper Pipeline Timeout/Crash',
               reference: routeName,
               severity: 'high',
               company_id: '00000000-0000-0000-0000-000000000000' // General company
-            });
-            if (alertErr) console.log('Failed to log alert:', alertErr);
+            }).catch(e => console.log('Failed to log alert:', e));
           }
         }
       }

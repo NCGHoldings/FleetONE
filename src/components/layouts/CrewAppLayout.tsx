@@ -1,28 +1,21 @@
 import React from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Home, Clock, CalendarDays, User } from 'lucide-react';
+import { Home, TrendingUp, Banknote, User } from 'lucide-react';
 import { useCrewAuth } from '@/contexts/CrewAuthContext';
 
 export default function CrewAppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, isLoading } = useCrewAuth();
+  const { isLoading } = useCrewAuth();
 
-  // If not authenticated, redirect to the crew login page
-  React.useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate('/public/crew-login');
-    }
-  }, [isAuthenticated, isLoading, navigate]);
-
-  if (isLoading || !isAuthenticated) {
+  if (isLoading) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">Loading...</div>;
   }
 
   const tabs = [
     { name: 'Upload', path: '/public/crew/upload', icon: Home },
-    { name: 'History', path: '/public/crew/history', icon: Clock },
-    { name: 'Schedule', path: '/public/crew/schedule', icon: CalendarDays },
+    { name: 'Performance', path: '/public/crew/performance', icon: TrendingUp },
+    { name: 'Finance', path: '/public/crew/finance', icon: Banknote },
     { name: 'Profile', path: '/public/crew/profile', icon: User },
   ];
 

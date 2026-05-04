@@ -63,6 +63,8 @@ import { CrewAuthProvider } from "./contexts/CrewAuthContext";
 import CrewHistory from "./pages/CrewHistory";
 import CrewSchedule from "./pages/CrewSchedule";
 import CrewProfile from "./pages/CrewProfile";
+import CrewPerformance from "./pages/CrewPerformance";
+import CrewFinance from "./pages/CrewFinance";
 import SchoolImportPage from "./pages/SchoolImportPage";
 import SchoolBusExpenseImport from "./pages/SchoolBusExpenseImport";
 import CustomerManagement from "./pages/CustomerManagement";
@@ -100,6 +102,7 @@ import PublicYutongSpreadsheet from "./pages/PublicYutongSpreadsheet";
 import RouteManagement from "./pages/RouteManagement";
 import MagiyaReports from "./pages/MagiyaReports";
 import PersonalDiary from "./pages/PersonalDiary";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -160,6 +163,8 @@ const App = () => (
             }>
               <Route index element={<PublicConductorUpload />} />
               <Route path="upload" element={<PublicConductorUpload />} />
+              <Route path="performance" element={<CrewPerformance />} />
+              <Route path="finance" element={<CrewFinance />} />
               <Route path="history" element={<CrewHistory />} />
               <Route path="schedule" element={<CrewSchedule />} />
               <Route path="profile" element={<CrewProfile />} />

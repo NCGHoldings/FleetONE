@@ -353,6 +353,7 @@ export async function postVehiclePaymentToGL({
   paymentMethod,
   settings,
   effectiveCompanyId,
+  customBankAccountId,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -362,6 +363,7 @@ export async function postVehiclePaymentToGL({
   paymentMethod?: string;
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
+  customBankAccountId?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
@@ -379,7 +381,8 @@ export async function postVehiclePaymentToGL({
       return null;
     }
 
-    if (!settings.default_bank_account_id) {
+    const bankAccountId = customBankAccountId || settings.default_bank_account_id;
+    if (!bankAccountId) {
       console.error(`[${module.toUpperCase()} Finance] Missing bank account`);
       toast.error('Missing GL account configuration for bank');
       return null;
@@ -421,7 +424,7 @@ export async function postVehiclePaymentToGL({
     // DEBIT: Bank/Cash Account
     lines.push({
       journal_entry_id: journalEntry.id,
-      account_id: settings.default_bank_account_id,
+      account_id: bankAccountId,
       description: `${businessUnitCode} ${paymentMethod || 'Payment'} received - ${orderNo}`,
       debit: amount,
       credit: 0,

@@ -34,35 +34,7 @@ export default defineConfig(({ mode }) => ({
         enabled: false
       },
       includeAssets: ['favicon.ico', 'robots.txt'],
-      manifest: {
-        name: 'NCG Speed Transport Management System',
-        short_name: 'NCG Speed',
-        description: 'Enterprise-grade transport management system for NCG Speed',
-        theme_color: '#1e40af',
-        background_color: '#ffffff',
-        display: 'standalone',
-        orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
-        icons: [
-          {
-            src: '/pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable'
-          }
-        ]
-      },
+      manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024, // 30 MB limit for large ERP bundle

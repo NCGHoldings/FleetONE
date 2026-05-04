@@ -90,15 +90,16 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   const loadBankAccounts = async () => {
     try {
       const { data, error } = await supabase
-        .from('bank_accounts')
-        .select('id, account_name, bank_name, account_number')
-        .in('company_id', [NCG_HOLDING_ID, 'a0000000-0000-0000-0000-000000000003'])
+        .from('chart_of_accounts')
+        .select('id, account_code, account_name')
+        .eq('company_id', NCG_HOLDING_ID)
+        .eq('account_type', 'asset')
         .eq('is_active', true)
-        .order('bank_name');
+        .order('account_code');
       if (error) throw error;
       setBankAccounts(data || []);
     } catch (error) {
-      console.error('Error loading bank accounts:', error);
+      console.error('Error loading asset accounts:', error);
     }
   };
 
@@ -249,7 +250,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           payment_method: paymentForm.payment_method,
           payment_reference: paymentForm.reference_no || null,
           bank_account_id: paymentForm.bank_account_id,
-          bank_name: selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_name}` : null,
+          bank_name: selectedBank ? `${selectedBank.account_code} - ${selectedBank.account_name}` : null,
           payment_slip_url: paymentSlipUrl,
           notes: paymentForm.notes || null,
           status: 'pending',
@@ -377,6 +378,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           paymentMethod: payment.payment_method,
           settings,
           effectiveCompanyId: NCG_HOLDING_ID,
+          customBankAccountId: payment.bank_account_id,
         });
 
         if (glResult) {
@@ -875,7 +877,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                     <SelectItem key={bank.id} value={bank.id}>
                       <div className="flex items-center gap-2">
                         <Landmark className="h-3 w-3 text-muted-foreground" />
-                        {bank.bank_name} - {bank.account_name} ({bank.account_number})
+                        {bank.account_code} - {bank.account_name}
                       </div>
                     </SelectItem>
                   ))}

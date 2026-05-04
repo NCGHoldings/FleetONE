@@ -1,3 +1,11 @@
+## 2026-05-03
+
+### ✅ SPH AR Templates Line Items & Signature Fix
+
+**Files Modified:**
+- `src/lib/document-template-seeder.ts` — Updated the `generateSPHARInvoiceTemplate` and `generateSPHARReceiptTemplate` functions. Replaced the generic `{{line_items}}` table (which rendered "No line items" because `ar_invoice_lines` aren't created for SPH) with a hardcoded SPH-specific layout matching the operations side (Description: Special Hire, Item Detail: `{{notes}}`, Amount: `{{total_amount}}`). Also updated `{{subtotal}}` to fallback to `{{total_amount}}` so it no longer shows `0.00`. Fixed logo sizing issue by switching `{{company_logo_url}}` to `{{company_logo}}` with `!important` CSS overrides.
+- `src/lib/document-template-utils.ts` — Added missing signature placeholders (`{{prepared_by}}`, `{{verified_by}}`, `{{approved_by}}` and their corresponding image signature tags) inside the `ar_invoice` and `ar_receipt` mapping logic. Previously, these were completely missing from these document types.
+
 # 🚀 Antigravity External Development Changelog
 
 > **Purpose:** This file documents all changes made by **Antigravity** (external AI development tool).

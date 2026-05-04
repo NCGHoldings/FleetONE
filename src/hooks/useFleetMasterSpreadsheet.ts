@@ -500,16 +500,41 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
       const numericFields = ['trips_per_day', 'day_target', 'sort_order'];
       const finalValue = numericFields.includes(field) ? Number(value) || 0 : value;
 
+      let updatePayload: Record<string, any> = { [field]: finalValue };
+
+      // Phase 2: If we are assigning a Route in Master mode, auto-pull the master_config
+      if (field === 'route_label') {
+        try {
+          const { data: routeData } = await supabase
+            .from('routes')
+            .select('id, master_config')
+            .eq('route_name', finalValue)
+            .single();
+            
+          if (routeData) {
+            updatePayload['route_id'] = routeData.id;
+            if (routeData.master_config) {
+              const cfg = routeData.master_config;
+              if (cfg.revenue_target) updatePayload['day_target'] = Number(cfg.revenue_target) || 0;
+              if (cfg.default_driver) updatePayload['default_driver'] = cfg.default_driver;
+              if (cfg.default_conductor) updatePayload['default_conductor'] = cfg.default_conductor;
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to auto-sync route defaults", e);
+        }
+      }
+
       const { error } = await supabase
         .from("fleet_master_roster")
-        .update({ [field]: finalValue })
+        .update(updatePayload)
         .eq("id", rosterId);
 
       if (error) throw error;
 
       // Optimistic local update
       setExpandedRows(prev => prev.map(r =>
-        r.id === rosterId ? { ...r, [field]: finalValue } : r
+        r.id === rosterId ? { ...r, ...updatePayload } : r
       ));
 
       if (field === 'trips_per_day') {

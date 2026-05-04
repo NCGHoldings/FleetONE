@@ -13,7 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { CalendarIcon, CheckCircle2, AlertCircle, Loader2, Check, ChevronsUpDown, Landmark } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Label } from '@/components/ui/label';
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,6 +48,11 @@ export function BulkGLPostingDialog({
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<PostingResult | null>(null);
   
+  // Custom GL Override
+  const [customBankAccountId, setCustomBankAccountId] = useState<string>('');
+  const [assetAccounts, setAssetAccounts] = useState<any[]>([]);
+  const [openCombobox, setOpenCombobox] = useState(false);
+  
   // Counts
   const [unpostedTripsCount, setUnpostedTripsCount] = useState(0);
   const [unpostedExpensesCount, setUnpostedExpensesCount] = useState(0);
@@ -54,16 +61,40 @@ export function BulkGLPostingDialog({
 
   // Fetch unposted counts when date range changes
   useEffect(() => {
-    if (dateRange?.from && dateRange?.to) {
+    if (dateRange?.from) {
       fetchUnpostedCounts();
+    } else {
+      setUnpostedTripsCount(0);
+      setUnpostedExpensesCount(0);
     }
   }, [dateRange?.from, dateRange?.to]);
 
+  useEffect(() => {
+    fetchAssetAccounts();
+  }, []);
+
+  const fetchAssetAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chart_of_accounts')
+        .select('id, account_code, account_name')
+        .eq('company_id', '7ece7595-8b7b-46de-8bfc-c1e8e0da7513') // NCG Express Company ID
+        .eq('account_type', 'asset')
+        .eq('is_active', true)
+        .order('account_code');
+        
+      if (error) throw error;
+      setAssetAccounts(data || []);
+    } catch (error) {
+      console.error('Error fetching asset accounts:', error);
+    }
+  };
+
   const fetchUnpostedCounts = async () => {
-    if (!dateRange?.from || !dateRange?.to) return;
+    if (!dateRange?.from) return;
     
     const fromStr = format(dateRange.from, 'yyyy-MM-dd');
-    const toStr = format(dateRange.to, 'yyyy-MM-dd');
+    const toStr = format(dateRange.to || dateRange.from, 'yyyy-MM-dd');
 
     // Count unposted trips
     const { count: tripsCount } = await supabase
@@ -86,7 +117,7 @@ export function BulkGLPostingDialog({
   };
 
   const handlePost = async () => {
-    if (!dateRange?.from || !dateRange?.to || !settings) {
+    if (!dateRange?.from || !settings) {
       toast({
         title: "Error",
         description: "Please select a date range and ensure settings are configured",
@@ -100,7 +131,7 @@ export function BulkGLPostingDialog({
     setResult(null);
 
     const fromStr = format(dateRange.from, 'yyyy-MM-dd');
-    const toStr = format(dateRange.to, 'yyyy-MM-dd');
+    const toStr = format(dateRange.to || dateRange.from, 'yyyy-MM-dd');
     
     let successCount = 0;
     let failedCount = 0;
@@ -138,7 +169,8 @@ export function BulkGLPostingDialog({
                 route_name: trip.routes?.route_name || 'Unknown',
                 income: trip.income || 0,
               },
-              settings
+              settings,
+              customBankAccountId || undefined
             );
             
             if (result.success) {
@@ -174,7 +206,7 @@ export function BulkGLPostingDialog({
         for (let i = 0; i < totalExpenses; i++) {
           const expense = expenses![i];
           try {
-            const result = await postExpensesToGL(expense, settings);
+            const result = await postExpensesToGL(expense, settings, customBankAccountId || undefined);
             
             if (result.success) {
               successCount++;
@@ -285,8 +317,63 @@ export function BulkGLPostingDialog({
             </Popover>
           </div>
 
+          {/* GL Override Combobox */}
+          <div className="space-y-2 mt-4 bg-muted/50 p-3 rounded-lg border border-border/50">
+            <Label className="text-sm font-semibold flex items-center gap-2">
+              <Landmark className="h-4 w-4 text-blue-500" />
+              Override Receiving GL Account (Optional)
+            </Label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Select an account here if you want to route these transactions to a specific Inter-Company or non-default GL account.
+            </p>
+            <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openCombobox}
+                  className="w-full justify-between"
+                  disabled={isPosting}
+                >
+                  {customBankAccountId
+                    ? assetAccounts.find((account) => account.id === customBankAccountId)?.account_name || "Select receiving account..."
+                    : "Select receiving account..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[400px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search accounts..." />
+                  <CommandList>
+                    <CommandEmpty>No account found.</CommandEmpty>
+                    <CommandGroup>
+                      {assetAccounts.map((account) => (
+                        <CommandItem
+                          key={account.id}
+                          value={account.account_name}
+                          onSelect={() => {
+                            setCustomBankAccountId(account.id === customBankAccountId ? "" : account.id);
+                            setOpenCombobox(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              customBankAccountId === account.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {account.account_code} - {account.account_name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
           {/* Unposted Counts */}
-          {dateRange?.from && dateRange?.to && (
+          {dateRange?.from && (
             <div className="bg-muted rounded-lg p-4 space-y-2">
               <h4 className="text-sm font-medium">Unposted Records</h4>
               <div className="flex gap-4">
@@ -364,7 +451,8 @@ export function BulkGLPostingDialog({
           {!result && (
             <Button 
               onClick={handlePost} 
-              disabled={isPosting || !dateRange?.from || !dateRange?.to || totalUnposted === 0 || !settings?.cash_account_id}
+              disabled={!dateRange?.from || isPosting || totalUnposted === 0 || !settings?.cash_account_id}
+              className="w-full sm:w-auto"
             >
               {isPosting ? (
                 <>

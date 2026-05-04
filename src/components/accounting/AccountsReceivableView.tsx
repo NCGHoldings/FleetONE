@@ -165,6 +165,7 @@ export const AccountsReceivableView = () => {
     if (deleteConfirmId) {
       deleteInvoice.mutate(deleteConfirmId);
       setDeleteConfirmId(null);
+      setViewInvoice(null);
     }
   };
 
@@ -621,7 +622,6 @@ export const AccountsReceivableView = () => {
                     variant="outline"
                     className="text-destructive border-destructive hover:bg-destructive/10"
                     onClick={() => {
-                      setViewInvoice(null);
                       setDeleteConfirmId(viewInvoice.id);
                     }}
                   >

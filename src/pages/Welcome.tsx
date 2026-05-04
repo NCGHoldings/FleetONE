@@ -1,3 +1,5 @@
+import React, { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +8,13 @@ import luxuryBusHero from "@/assets/luxury-bus-hero.jpg";
 
 export default function Welcome() {
   const { userProfile } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (window.location.search.includes('source=pwa_crew')) {
+      navigate('/public/crew', { replace: true });
+    }
+  }, [navigate]);
 
   return (
     <AppLayout>

@@ -426,6 +426,22 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
       const arInvLogo = companyData?.logo_url || headerImageUrl || '';
       if (arInvLogo) placeholders['{{company_logo}}'] = `<img src="${arInvLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
+      placeholders['{{company_logo_url}}'] = arInvLogo;
+      // Signature placeholders
+      placeholders['{{prepared_by}}'] = documentData?.prepared_by || '';
+      placeholders['{{prepared_by_signature}}'] = documentData?.prepared_by_signature 
+        ? `<img src="${documentData.prepared_by_signature}" style="max-height: 60px; max-width: 150px;" alt="Signature" />`
+        : '';
+      placeholders['{{verified_by}}'] = documentData?.verified_by || '';
+      placeholders['{{verified_by_signature}}'] = documentData?.verified_by_signature 
+        ? `<img src="${documentData.verified_by_signature}" style="max-height: 60px; max-width: 150px;" alt="Signature" />`
+        : '';
+      placeholders['{{approved_by}}'] = documentData?.approved_by || '';
+      placeholders['{{approved_by_signature}}'] = documentData?.approved_by_signature 
+        ? `<img src="${documentData.approved_by_signature}" style="max-height: 60px; max-width: 150px;" alt="Signature" />`
+        : '';
+      placeholders['{{received_by}}'] = documentData?.received_by || '';
+      placeholders['{{finance_controller}}'] = documentData?.finance_controller || '';
       break;
     }
 
@@ -454,6 +470,22 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
       const arRcptLogo = companyData?.logo_url || headerImageUrl || '';
       if (arRcptLogo) placeholders['{{company_logo}}'] = `<img src="${arRcptLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
+      placeholders['{{company_logo_url}}'] = arRcptLogo;
+      // Signature placeholders
+      placeholders['{{prepared_by}}'] = documentData?.prepared_by || '';
+      placeholders['{{prepared_by_signature}}'] = documentData?.prepared_by_signature 
+        ? `<img src="${documentData.prepared_by_signature}" style="max-height: 60px; max-width: 150px;" alt="Signature" />`
+        : '';
+      placeholders['{{verified_by}}'] = documentData?.verified_by || '';
+      placeholders['{{verified_by_signature}}'] = documentData?.verified_by_signature 
+        ? `<img src="${documentData.verified_by_signature}" style="max-height: 60px; max-width: 150px;" alt="Signature" />`
+        : '';
+      placeholders['{{approved_by}}'] = documentData?.approved_by || '';
+      placeholders['{{approved_by_signature}}'] = documentData?.approved_by_signature 
+        ? `<img src="${documentData.approved_by_signature}" style="max-height: 60px; max-width: 150px;" alt="Signature" />`
+        : '';
+      placeholders['{{received_by}}'] = documentData?.received_by || '';
+      placeholders['{{finance_controller}}'] = documentData?.finance_controller || '';
       break;
     }
 

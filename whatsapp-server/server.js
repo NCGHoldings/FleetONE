@@ -14,6 +14,14 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
+// Load AI Agent
+let aiAgent;
+try {
+  aiAgent = require('./ai_agent');
+} catch (e) {
+  console.log('AI Agent not loaded:', e.message);
+}
+
 /* ─── State ─── */
 let qrCodeDataUrl = null;
 let connectionStatus = 'disconnected'; // disconnected | qr_ready | connected
@@ -112,6 +120,19 @@ waClient.on('message', async (msg) => {
   messageLog.unshift(messageData);
   if (messageLog.length > 500) messageLog.pop();
   broadcast({ type: 'message', data: messageData });
+
+  // AI Integration
+  if (aiAgent && !msg.fromMe && msg.type === 'chat' && !msg.from.includes('@g.us')) {
+    try {
+      console.log(`🤖 Processing AI response for ${msg.from}...`);
+      const aiResponse = await aiAgent.processWhatsAppMessage(msg.from, msg.body);
+      if (aiResponse) {
+        await msg.reply(aiResponse);
+      }
+    } catch (err) {
+      console.error('AI Processing Error:', err);
+    }
+  }
 });
 
 // ─── Outgoing Message (sent by us) ───

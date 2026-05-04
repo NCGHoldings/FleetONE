@@ -175,11 +175,13 @@ async function updateAccountBalance(accountId: string, amount: number, isDebit: 
  */
 export async function postTripRevenueToGL(
   trip: DailyTripForGL,
-  settings: NCGExpressFinanceSettings
+  settings: NCGExpressFinanceSettings,
+  customBankAccountId?: string
 ): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
   try {
     // Validate settings
-    if (!settings.cash_account_id || !settings.ticket_revenue_account_id) {
+    const cashAccountId = customBankAccountId || settings.cash_account_id;
+    if (!cashAccountId || !settings.ticket_revenue_account_id) {
       return { success: false, error: 'Revenue account mappings not configured' };
     }
 
@@ -218,7 +220,7 @@ export async function postTripRevenueToGL(
     const lines = [
       {
         journal_entry_id: journalEntry.id,
-        account_id: settings.cash_account_id,
+        account_id: cashAccountId,
         debit: trip.income,
         credit: 0,
         description: `Cash from trip - ${routeName}`,
@@ -247,7 +249,7 @@ export async function postTripRevenueToGL(
     if (linesError) throw linesError;
 
     // Update COA balances
-    await updateAccountBalance(settings.cash_account_id, trip.income, true);
+    await updateAccountBalance(cashAccountId, trip.income, true);
     await updateAccountBalance(settings.ticket_revenue_account_id, trip.income, false);
 
     // Link trip to journal entry
@@ -274,11 +276,13 @@ export async function postTripRevenueToGL(
  */
 export async function postExpensesToGL(
   expense: DailyExpenseForGL,
-  settings: NCGExpressFinanceSettings
+  settings: NCGExpressFinanceSettings,
+  customBankAccountId?: string
 ): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
   try {
     // Validate settings
-    if (!settings.expense_cash_account_id) {
+    const cashAccountId = customBankAccountId || settings.expense_cash_account_id;
+    if (!cashAccountId) {
       return { success: false, error: 'Expense cash account not configured' };
     }
 
@@ -376,7 +380,7 @@ export async function postExpensesToGL(
     if (totalCashExpenses > 0) {
       jeLines.push({
         journal_entry_id: journalEntry.id,
-        account_id: settings.expense_cash_account_id,
+        account_id: cashAccountId,
         debit: 0,
         credit: totalCashExpenses,
         description: `Cash paid for expenses - Bus ${busNo}`,
@@ -409,7 +413,7 @@ export async function postExpensesToGL(
       await updateAccountBalance(line.accountId, line.amount, true);
     }
     if (totalCashExpenses > 0) {
-      await updateAccountBalance(settings.expense_cash_account_id, totalCashExpenses, false);
+      await updateAccountBalance(cashAccountId, totalCashExpenses, false);
     }
     if (totalCardExpenses > 0 && settings.fuel_card_payable_account_id) {
       await updateAccountBalance(settings.fuel_card_payable_account_id, totalCardExpenses, false);
@@ -522,14 +526,15 @@ export function useUnpostedExpenses(date?: Date) {
  */
 export async function bulkPostTripsToGL(
   trips: DailyTripForGL[],
-  settings: NCGExpressFinanceSettings
+  settings: NCGExpressFinanceSettings,
+  customBankAccountId?: string
 ): Promise<{ success: number; failed: number; errors: string[] }> {
   let success = 0;
   let failed = 0;
   const errors: string[] = [];
 
   for (const trip of trips) {
-    const result = await postTripRevenueToGL(trip, settings);
+    const result = await postTripRevenueToGL(trip, settings, customBankAccountId);
     if (result.success) {
       success++;
     } else {
@@ -546,14 +551,15 @@ export async function bulkPostTripsToGL(
  */
 export async function bulkPostExpensesToGL(
   expenses: DailyExpenseForGL[],
-  settings: NCGExpressFinanceSettings
+  settings: NCGExpressFinanceSettings,
+  customBankAccountId?: string
 ): Promise<{ success: number; failed: number; errors: string[] }> {
   let success = 0;
   let failed = 0;
   const errors: string[] = [];
 
   for (const expense of expenses) {
-    const result = await postExpensesToGL(expense, settings);
+    const result = await postExpensesToGL(expense, settings, customBankAccountId);
     if (result.success) {
       success++;
     } else {

@@ -11,6 +11,18 @@
     <meta name="author" content="NCG Holdings" />
     <meta http-equiv="Content-Security-Policy" content="frame-src 'self' blob: data: https://www.google.com https://maps.google.com;">
 
+    <!-- Dynamic PWA Manifest Injection -->
+    <script>
+      var link = document.createElement('link');
+      link.rel = 'manifest';
+      if (window.location.pathname.startsWith('/public/crew') || window.location.search.includes('app=crew')) {
+        link.href = '/crew-manifest.json';
+      } else {
+        link.href = '/manifest.webmanifest';
+      }
+      document.head.appendChild(link);
+    </script>
+
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#f59e0b">
     <meta name="mobile-web-app-capable" content="yes">

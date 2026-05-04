@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { FileText, ChevronDown, ChevronUp, ExternalLink, Calendar, MapPin, Smartphone } from 'lucide-react';
+import { FileText, ChevronDown, ChevronUp, ExternalLink, Calendar, MapPin, Smartphone, DollarSign, Users, Bus, Activity } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 

@@ -37,11 +37,15 @@ export default function Auth() {
 
   useEffect(() => {
     const checkUser = async () => {
+      if (localStorage.getItem('app_mode') === 'crew' && !location.pathname.includes('/public/crew')) {
+        navigate("/public/crew", { replace: true });
+        return;
+      }
       const { data: { session } } = await supabase.auth.getSession();
       if (session) navigate("/");
     };
     checkUser();
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   useEffect(() => {
     const timer = setInterval(() => {

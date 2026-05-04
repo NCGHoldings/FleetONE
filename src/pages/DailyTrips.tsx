@@ -241,6 +241,14 @@ export default function DailyTrips() {
 
               <Button 
                 variant="outline"
+                onClick={() => navigate('/routes')}
+              >
+                <Route className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Route Master</span>
+              </Button>
+
+              <Button 
+                variant="outline"
                 onClick={() => setShowBulkGLPostingDialog(true)}
                 className="border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950"
               >

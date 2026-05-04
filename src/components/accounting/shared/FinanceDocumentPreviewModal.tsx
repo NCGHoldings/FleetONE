@@ -10,7 +10,7 @@ import { useCompanies } from "@/hooks/useAccountingData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { mapDocumentToPlaceholders, replacePlaceholders, generatePrintableDocument, HeaderMode } from "@/lib/document-template-utils";
-import { defaultTemplates } from "@/lib/document-template-seeder";
+import { defaultTemplates, sphTemplateOverrides } from "@/lib/document-template-seeder";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { canvasToMultiPagePDF } from "@/lib/pdf-multi-page";
@@ -45,7 +45,9 @@ export const FinanceDocumentPreviewModal = ({
       return;
     }
 
-    const defaultGenerator = defaultTemplates[documentType];
+    // Use SPH-specific template for SPH business unit (ar_invoice / ar_receipt)
+    const isSPH = businessUnitCode === 'SPH' || resolvedCompany?.short_code === 'SPH';
+    const defaultGenerator = (isSPH && sphTemplateOverrides[documentType]) || defaultTemplates[documentType];
     if (!defaultGenerator) {
       toast.error("No default layout available for this document type.");
       return;
@@ -322,7 +324,9 @@ export const FinanceDocumentPreviewModal = ({
 
   // Generate fallback HTML using default template
   const generateFallbackHtml = (docData: any): string => {
-    const templateGenerator = defaultTemplates[documentType];
+    // Use SPH-specific template when company is SPH (Special Hire business unit)
+    const isSPH = businessUnitCode === 'SPH' || resolvedCompany?.short_code === 'SPH';
+    const templateGenerator = (isSPH && sphTemplateOverrides[documentType]) || defaultTemplates[documentType];
     if (!templateGenerator) {
       return `
         <div style="text-align: center; padding: 40px; font-family: sans-serif;">

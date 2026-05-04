@@ -1563,3 +1563,208 @@ export const useCreatePettyCashReimbursement = () => {
     },
   });
 };
+
+export const useCreatePettyCashTopUp = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+
+  return useMutation({
+    mutationFn: async (data: {
+      petty_cash_fund_id: string;
+      bank_account_id: string;
+      amount: number;
+      top_up_date: string;
+      reference: string;
+      description: string;
+    }) => {
+      if (data.amount <= 0) throw new Error("Amount must be greater than zero.");
+      if (!data.petty_cash_fund_id) throw new Error("Fund is required.");
+      if (!data.bank_account_id) throw new Error("Bank Account is required.");
+
+      // 1. Generate AP Payment Voucher Number
+      const { data: paymentNum } = await supabase.rpc("generate_entity_number", {
+        p_entity_type: "payment",
+        p_company_id: selectedCompanyId,
+      });
+      const paymentNumber = paymentNum || `PAY-${Date.now()}`;
+
+      // 2. Fetch Fund Details
+      const { data: fund } = await supabase
+        .from("petty_cash_funds")
+        .select("current_balance, fund_name, gl_account_id, business_unit_code")
+        .eq("id", data.petty_cash_fund_id)
+        .single();
+      
+      if (!fund) throw new Error("Petty Cash Fund not found");
+
+      // 3. Create the AP Payment Voucher
+      const { data: apPayment, error: apError } = await supabase
+        .from("ap_payments")
+        .insert({
+          payment_number: paymentNumber,
+          payment_date: data.top_up_date,
+          amount: data.amount,
+          payment_method: "transfer",
+          bank_account_id: data.bank_account_id,
+          payee_type: "direct",
+          notes: `Petty Cash Direct Top-Up: ${fund.fund_name}`,
+          reference: data.reference,
+          is_direct_payment: true,
+          status: "posted",
+          company_id: selectedCompanyId,
+          business_unit_code: fund.business_unit_code,
+        })
+        .select()
+        .single();
+
+      if (apError) throw apError;
+
+      // 4. Create Bank Transaction
+      await supabase.from("bank_transactions").insert({
+        bank_account_id: data.bank_account_id,
+        transaction_date: data.top_up_date,
+        transaction_type: "payment",
+        description: `Direct Petty Cash Top-Up: ${fund.fund_name}`,
+        credit_amount: data.amount,
+        debit_amount: 0,
+        reference: paymentNumber,
+        company_id: selectedCompanyId,
+        source_type: "ap_payment",
+        source_id: apPayment.id,
+      });
+
+      // 5. Update Bank Balance
+      const { data: bankAccount } = await supabase
+        .from("bank_accounts")
+        .select("current_balance, gl_account_id")
+        .eq("id", data.bank_account_id)
+        .single();
+        
+      if (bankAccount) {
+        await supabase
+          .from("bank_accounts")
+          .update({ current_balance: (bankAccount.current_balance || 0) - data.amount, updated_at: new Date().toISOString() })
+          .eq("id", data.bank_account_id);
+      }
+
+      // 6. Update the Petty Cash Fund Balance
+      const newBalance = (fund.current_balance || 0) + data.amount;
+      await supabase
+        .from("petty_cash_funds")
+        .update({ current_balance: newBalance, updated_at: new Date().toISOString(), last_replenished_at: new Date().toISOString() })
+        .eq("id", data.petty_cash_fund_id);
+
+      // 7. Log Petty Cash Transaction
+      const { data: pcTx } = await supabase.from("petty_cash_transactions").insert({
+        petty_cash_fund_id: data.petty_cash_fund_id,
+        transaction_type: "replenishment",
+        amount: data.amount,
+        balance_after: newBalance,
+        description: data.description || `Direct Top-Up from Bank`,
+        reference_number: paymentNumber,
+        payment_method: "transfer",
+        status: "approved",
+        company_id: selectedCompanyId,
+        expense_category: "Direct Top-Up",
+      }).select().single();
+
+      // 8. GL Automation
+      const debitGL = fund.gl_account_id;
+      let creditGL = bankAccount?.gl_account_id;
+      
+      if (!creditGL) {
+         const { data: glSettings2 } = await supabase
+            .from("gl_settings" as any)
+            .select("bank_account_id")
+            .eq("company_id", selectedCompanyId)
+            .maybeSingle();
+         creditGL = (glSettings2 as any)?.bank_account_id || "";
+      }
+      
+      if (debitGL && creditGL) {
+          const entryNumber = `PC-TOPUP-${Date.now()}`;
+          const { data: je, error: jeError } = await supabase
+            .from("journal_entries")
+            .insert({
+              entry_number: entryNumber,
+              entry_date: data.top_up_date,
+              description: `Direct Top-Up: ${fund.fund_name}`,
+              reference: paymentNumber,
+              total_debit: data.amount,
+              total_credit: data.amount,
+              status: "posted",
+              company_id: selectedCompanyId,
+              posted_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          if (!jeError && je) {
+             await supabase.from("journal_entry_lines").insert([
+              {
+                journal_entry_id: je.id,
+                account_id: debitGL,
+                description: `Float Direct Top-Up: ${fund.fund_name}`,
+                debit: data.amount,
+                credit: 0,
+                company_id: selectedCompanyId,
+              },
+              {
+                journal_entry_id: je.id,
+                account_id: creditGL,
+                description: `Bank Transfer for Float Top-Up`,
+                debit: 0,
+                credit: data.amount,
+                company_id: selectedCompanyId,
+              },
+            ]);
+
+            // Update COA balances
+            for (const acctId of [debitGL, creditGL]) {
+              const { data: acct } = await supabase
+                .from("chart_of_accounts")
+                .select("current_balance, account_type")
+                .eq("id", acctId)
+                .single();
+              if (acct) {
+                const isDebit = acctId === debitGL;
+                const isDebitNormal = ["asset", "expense"].includes(acct.account_type || "");
+                const adjustment = isDebit
+                  ? (isDebitNormal ? data.amount : -data.amount)
+                  : (isDebitNormal ? -data.amount : data.amount);
+                await supabase
+                  .from("chart_of_accounts")
+                  .update({ current_balance: (acct.current_balance || 0) + adjustment, updated_at: new Date().toISOString() })
+                  .eq("id", acctId);
+              }
+            }
+
+            // Link JE
+            if (pcTx) {
+               await supabase.from("petty_cash_transactions").update({ journal_entry_id: je.id }).eq("id", pcTx.id);
+            }
+          }
+      }
+
+      return apPayment;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      toast({
+        title: "Top-Up Successful",
+        description: `Fund topped up with LKR ${variables.amount.toLocaleString()}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Top-Up Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+};

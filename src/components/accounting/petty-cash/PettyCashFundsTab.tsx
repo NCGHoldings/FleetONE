@@ -22,6 +22,8 @@ import { SearchableAccountSelector } from "../shared/SearchableAccountSelector";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { PettyCashTopUpDialog } from "./PettyCashTopUpDialog";
+import { ArrowUpCircle } from "lucide-react";
 
 const FUND_TYPES = [
   { value: "main", label: "Main Fund" },
@@ -31,6 +33,7 @@ const FUND_TYPES = [
 
 export const PettyCashFundsTab = () => {
   const [showForm, setShowForm] = useState(false);
+  const [showTopUpForm, setShowTopUpForm] = useState(false);
   const [editingFund, setEditingFund] = useState<PettyCashFund | null>(null);
   const [filterBranch, setFilterBranch] = useState("all");
   const [filterUnit, setFilterUnit] = useState("all");
@@ -141,9 +144,14 @@ export const PettyCashFundsTab = () => {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" /> New Fund
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowTopUpForm(true)}>
+            <ArrowUpCircle className="h-4 w-4 mr-2" /> Direct Top-Up
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-2" /> New Fund
+          </Button>
+        </div>
       </div>
 
       {/* Table */}
@@ -311,6 +319,12 @@ export const PettyCashFundsTab = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Direct Top-Up Dialog */}
+      <PettyCashTopUpDialog 
+        open={showTopUpForm} 
+        onOpenChange={setShowTopUpForm} 
+      />
     </div>
   );
 };

@@ -16,9 +16,11 @@ import { useAllProfiles } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "../shared/CurrencyDisplay";
 import { useBankAccounts } from "@/hooks/useAccountingData";
 import { PettyCashReimbursementDialog } from "./PettyCashReimbursementDialog";
+import { PettyCashTopUpDialog } from "./PettyCashTopUpDialog";
 
 export const PettyCashReplenishmentsTab = () => {
-  const [showForm, setShowForm] = useState(false);
+  const [showReimburseForm, setShowReimburseForm] = useState(false);
+  const [showTopUpForm, setShowTopUpForm] = useState(false);
 
   const { data: funds } = usePettyCashFunds();
   const { data: transactions, isLoading } = useAllPettyCashTransactions({ transactionType: "replenishment" });
@@ -48,9 +50,14 @@ export const PettyCashReplenishmentsTab = () => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold">Reimbursement History</h3>
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="h-4 w-4 mr-2" /> Reimburse Fund
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowTopUpForm(true)}>
+            <ArrowUpCircle className="h-4 w-4 mr-2" /> Direct Top-Up
+          </Button>
+          <Button onClick={() => setShowReimburseForm(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Reimburse Fund
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -113,8 +120,14 @@ export const PettyCashReplenishmentsTab = () => {
 
       {/* Reimbursement Dialog */}
       <PettyCashReimbursementDialog 
-        open={showForm} 
-        onOpenChange={setShowForm} 
+        open={showReimburseForm} 
+        onOpenChange={setShowReimburseForm} 
+      />
+      
+      {/* Direct Top-Up Dialog */}
+      <PettyCashTopUpDialog 
+        open={showTopUpForm} 
+        onOpenChange={setShowTopUpForm} 
       />
     </div>
   );

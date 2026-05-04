@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Check, Loader2, Send, Languages, Calculator, Plus, Trash2, ChevronDown, ChevronUp, Upload, CreditCard, Banknote, Camera } from 'lucide-react';
+import { Check, Loader2, Send, Languages, Calculator, Plus, Trash2, ChevronDown, ChevronUp, Upload, CreditCard, Banknote, Camera, Route } from 'lucide-react';
 import { createAnonymousClient } from '@/integrations/supabase/public-client';
 import { GamificationBanner } from '@/components/trips/GamificationBanner';
 
@@ -285,6 +285,7 @@ export default function PublicConductorUpload() {
     driverName: '',
     conductorName: '',
     busNumber: '',
+    routeName: '',
     tripDate: new Date().toISOString().split('T')[0],
   }));
 
@@ -331,24 +332,163 @@ export default function PublicConductorUpload() {
       const bus = formData.busNumber?.trim().toUpperCase();
       if (!bus || bus.length < 4) return;
       
+      console.log('🔄 Fetching config for Bus:', bus, 'Date:', formData.tripDate);
       setFetchingMaster(true);
       try {
         const supabase = createAnonymousClient();
-        // Look for any route that has this bus assigned as default
-        const { data, error } = await supabase
-          .from('routes')
-          .select('master_config')
-          .eq('is_active', true);
+        const busVariations = [
+          bus, 
+          bus.replace('-', ' '), 
+          bus.replace('-', '')
+        ];
 
-        if (!error && data) {
-          // Find the route matching this bus
-          const routeMatch = data.find(r => r.master_config && r.master_config.default_bus === bus);
+        console.log('🔍 Searching bus variations:', busVariations);
+
+        // Fetch the bus ID first to check daily_trips
+        const { data: busData, error: busError } = await supabase
+          .from('buses')
+          .select('id, expected_km_per_liter, fleet_master_roster(day_target, default_driver, default_conductor)')
+          .in('bus_no', busVariations)
+          .limit(1)
+          .single();
+
+        if (busError) {
+          console.error('❌ Error fetching bus:', busError);
+        } else if (busData) {
+          console.log('✅ Bus found in DB:', busData.id);
+
+          // Check daily_trips for an allocation for today
+          console.log('🔍 Searching daily_trips for bus_id:', busData.id, 'trip_date:', formData.tripDate);
+          const { data: dailyTripsData, error: tripsError } = await supabase
+            .from('daily_trips')
+            .select('id, trip_no, notes, route_id, routes(route_name, master_config)')
+            .eq('bus_id', busData.id)
+            .eq('trip_date', formData.tripDate)
+            .order('trip_no', { ascending: true });
+
+          if (tripsError) {
+            console.error('❌ Error fetching daily_trips:', tripsError);
+          } else {
+            console.log('📋 daily_trips results:', dailyTripsData);
+          }
+
+          let allocatedDriver = '';
+          let allocatedConductor = '';
+          let allocatedRoute = '';
+          let allocatedConfig: any = null;
+
+          if (dailyTripsData && dailyTripsData.length > 0) {
+            console.log(`✅ Found ${dailyTripsData.length} trips allocated today!`);
+            
+            // Auto-fill trips array to match allocated count (if form is still mostly empty)
+            if (trips.length === 1 && !trips[0].income.busCollection && !trips[0].endOdo) {
+              const newTrips = dailyTripsData.map((t, index) => ({
+                id: t.id || Date.now().toString() + index,
+                startOdo: '',
+                endOdo: '',
+                expanded: index === 0,
+                income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' }
+              }));
+              console.log('🔄 Spawning', newTrips.length, 'trip forms automatically');
+              setTrips(newTrips);
+            }
+
+            // Scan through all trips to find the first available names and config
+            for (const trip of dailyTripsData) {
+              try {
+                const notes = typeof trip.notes === 'string' 
+                  ? JSON.parse(trip.notes) 
+                  : (trip.notes || {});
+                
+                if (!allocatedDriver && notes?.driver && notes.driver !== 'N/A') allocatedDriver = notes.driver;
+                if (!allocatedConductor && notes?.conductor && notes.conductor !== 'N/A') allocatedConductor = notes.conductor;
+                
+                if (trip.routes) {
+                  if (!allocatedRoute && (trip.routes as any).route_name) {
+                    allocatedRoute = (trip.routes as any).route_name;
+                  }
+                  if (!allocatedConfig && (trip.routes as any).master_config) {
+                    allocatedConfig = (trip.routes as any).master_config;
+                  }
+                }
+                
+                // Fallback to notes if route ID wasn't properly linked in the DB
+                if (!allocatedRoute && notes) {
+                  if (notes.route && notes.route !== 'null') allocatedRoute = notes.route;
+                  else if (notes.excel_route_name && notes.excel_route_name !== 'null') allocatedRoute = notes.excel_route_name;
+                  else if (notes.route_no && notes.route_no !== 'null') allocatedRoute = notes.route_no;
+                  else if (notes.excel_route_no && notes.excel_route_no !== 'null') allocatedRoute = notes.excel_route_no;
+                }
+
+                // If we found all needed details, we can stop scanning
+                if (allocatedDriver && allocatedConductor && allocatedRoute && allocatedConfig) break;
+              } catch (e) {
+                console.error('Failed to parse trip notes for trip:', trip.id, e);
+              }
+            }
+            
+            console.log('🎯 Final extracted crew details:', { allocatedDriver, allocatedConductor, allocatedRoute, hasConfig: !!allocatedConfig });
+          } else {
+            console.log('⚠️ No daily_trips found for this date & bus combination');
+          }
+
+          if (allocatedDriver || allocatedConductor || allocatedRoute) {
+            setFormData(prev => ({
+              ...prev,
+              ...(allocatedDriver ? { driverName: allocatedDriver } : {}),
+              ...(allocatedConductor ? { conductorName: allocatedConductor } : {}),
+              ...(allocatedRoute ? { routeName: allocatedRoute } : {}),
+            }));
+            
+            // Apply expenses from the allocated route immediately
+            if (allocatedConfig) {
+              if (allocatedConfig.revenue_target && !routeTarget) {
+                setRouteTarget(Number(allocatedConfig.revenue_target));
+              }
+              setExpenses(prev => ({
+                ...prev,
+                ...(allocatedConfig.meal_allowance && !prev['food'] ? { food: allocatedConfig.meal_allowance } : {}),
+                ...(allocatedConfig.highway_fee && !prev['highway_charges'] ? { highway_charges: allocatedConfig.highway_fee } : {}),
+                ...(allocatedConfig.runner_fee && !prev['runner'] ? { runner: allocatedConfig.runner_fee } : {}),
+              }));
+            }
+
+            toast({
+              title: "Allocations Found",
+              description: `Auto-filled ${dailyTripsData?.length || 1} trip(s)${allocatedConfig ? ' & standard expenses' : ''} for ${allocatedRoute || 'today'}.`,
+            });
+          }
+
+          // Roster Fallback Logic
+          const activeRoster = Array.isArray(busData.fleet_master_roster) ? busData.fleet_master_roster[0] : busData.fleet_master_roster;
           
+          if (activeRoster) {
+            // Auto-fill Gamification Targets from Roster
+            if (activeRoster.day_target) {
+              setRouteTarget(Number(activeRoster.day_target));
+            }
+            
+            // Auto-fill Scheduled Crew from Roster if form is empty AND no allocation found
+            if (!allocatedDriver && activeRoster.default_driver && !formData.driverName) {
+              setFormData(prev => ({ ...prev, driverName: activeRoster.default_driver }));
+            }
+            if (!allocatedConductor && activeRoster.default_conductor && !formData.conductorName) {
+              setFormData(prev => ({ ...prev, conductorName: activeRoster.default_conductor }));
+            }
+          }
+
+          // Fetch the route config fallback for standard costs (meal, highway)
+          const { data: routeData } = await supabase
+            .from('routes')
+            .select('master_config, route_name, id')
+            .eq('is_active', true);
+
+          const routeMatch = routeData?.find(r => r.master_config && busVariations.includes(r.master_config.default_bus));
           if (routeMatch && routeMatch.master_config) {
             const config = routeMatch.master_config;
             
             // Auto-fill Gamification Targets
-            if (config.revenue_target) {
+            if (config.revenue_target && !routeTarget) {
               setRouteTarget(Number(config.revenue_target));
             }
             
@@ -363,8 +503,9 @@ export default function PublicConductorUpload() {
             // Auto-fill Crew if they are empty
             setFormData((prev: any) => ({
               ...prev,
-              driverName: prev.driverName || config.default_driver || '',
-              conductorName: prev.conductorName || config.default_conductor || ''
+              driverName: prev.driverName || (!allocatedDriver && config.default_driver) || '',
+              conductorName: prev.conductorName || (!allocatedConductor && config.default_conductor) || '',
+              routeName: prev.routeName || (!allocatedRoute && routeMatch.route_name) || ''
             }));
           }
         }
@@ -378,7 +519,7 @@ export default function PublicConductorUpload() {
     // Debounce the fetch slightly
     const timeoutId = setTimeout(fetchMasterConfig, 800);
     return () => clearTimeout(timeoutId);
-  }, [formData.busNumber]);
+  }, [formData.busNumber, formData.tripDate]);
 
   // Derived calculations
   const calculateTripTotal = (incomeObj?: Record<string, string>) => {
@@ -629,6 +770,15 @@ export default function PublicConductorUpload() {
           </div>
         </div>
 
+        {!window.matchMedia('(display-mode: standalone)').matches && (
+          <div className="bg-amber-50 p-3 flex items-center justify-between border-b border-amber-100">
+            <div className="text-xs text-amber-800 font-medium">For the best experience, install our app!</div>
+            <Button size="sm" variant="outline" className="h-7 text-xs bg-white hover:bg-amber-100 text-amber-700 border-amber-200" onClick={() => window.location.href = '/install?app=crew'}>
+              Install App
+            </Button>
+          </div>
+        )}
+
         <CardHeader className="text-center bg-white border-b pb-4">
           <CardTitle className="text-2xl font-black text-slate-800">{t.title}</CardTitle>
           <CardDescription className="text-sm font-medium text-slate-500">{t.subtitle}</CardDescription>
@@ -687,7 +837,7 @@ export default function PublicConductorUpload() {
                     autoFormat="bus"
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 col-span-2 sm:col-span-1">
                   <Label className="text-xs font-bold text-slate-600">{t.driverName}</Label>
                   <AutocompleteInput 
                     value={formData.driverName} 
@@ -695,7 +845,7 @@ export default function PublicConductorUpload() {
                     options={history.drivers || []} 
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 col-span-2 sm:col-span-1">
                   <Label className="text-xs font-bold text-slate-600">{t.conductorName}</Label>
                   <AutocompleteInput 
                     value={formData.conductorName} 
@@ -703,6 +853,15 @@ export default function PublicConductorUpload() {
                     options={history.conductors || []} 
                   />
                 </div>
+                {formData.routeName && (
+                  <div className="space-y-1.5 col-span-2">
+                    <Label className="text-xs font-bold text-slate-600">Route</Label>
+                    <div className="bg-emerald-50 border border-emerald-100 px-3 py-2.5 rounded-md text-sm font-medium text-emerald-800 flex items-center gap-2">
+                      <Route className="w-4 h-4" />
+                      {formData.routeName}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

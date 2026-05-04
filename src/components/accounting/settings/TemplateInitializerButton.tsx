@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Wand2, Check, AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { defaultTemplates, templateDisplayNames } from "@/lib/document-template-seeder";
+import { defaultTemplates, sphTemplateOverrides, templateDisplayNames } from "@/lib/document-template-seeder";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -75,8 +75,9 @@ export const TemplateInitializerButton = ({
           const key = `${company.id}-${templateType.id}`;
           const existingId = existingMap.get(key);
 
-          // Get template generator (guaranteed to exist after filtering)
-          const templateGenerator = defaultTemplates[templateType.type_code];
+          // Get template generator — use SPH override for SPH companies
+          const isSPH = company.short_code === 'SPH';
+          const templateGenerator = (isSPH && sphTemplateOverrides[templateType.type_code]) || defaultTemplates[templateType.type_code];
 
           const htmlContent = templateGenerator();
           const templateName = `${templateDisplayNames[templateType.type_code] || templateType.type_name}`;
@@ -285,6 +286,83 @@ export const TemplateInitializerButton = ({
         >
           <Wand2 className="h-4 w-4 mr-2 text-green-600" />
           Update Only AP Vouchers (Safe)
+        </Button>
+
+        {/* SPH-Only Update Button — ONLY updates AR Invoice + AR Receipt for the SPH company */}
+        <Button 
+          variant="outline" 
+          className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 font-medium"
+          disabled={isInitializing} 
+          onClick={async () => {
+            setIsInitializing(true);
+            setProgress(0);
+            
+            // Find the SPH company
+            const sphCompany = companies.find(c => c.short_code === 'SPH');
+            if (!sphCompany) {
+              toast.error("SPH (Special Hire) company not found. Please check company settings.");
+              setIsInitializing(false);
+              return;
+            }
+            
+            // Target only ar_invoice and ar_receipt
+            const sphTypeCodes = ['ar_invoice', 'ar_receipt'];
+            const sphTypes = templateTypes.filter(t => sphTypeCodes.includes(t.type_code));
+            
+            if (sphTypes.length === 0) {
+              toast.error("AR Invoice / AR Receipt template types not found.");
+              setIsInitializing(false);
+              return;
+            }
+            
+            let completed = 0;
+            const totalOps = sphTypes.length;
+            
+            for (const templateType of sphTypes) {
+              const templateGenerator = sphTemplateOverrides[templateType.type_code];
+              if (!templateGenerator) continue;
+              
+              const htmlContent = templateGenerator();
+              const templateName = `SPH — ${templateDisplayNames[templateType.type_code] || templateType.type_name}`;
+              
+              const { data: existing } = await supabase
+                .from('document_templates')
+                .select('id')
+                .eq('company_id', sphCompany.id)
+                .eq('template_type_id', templateType.id)
+                .single();
+              
+              if (existing) {
+                await supabase.from('document_templates').update({ 
+                  html_content: htmlContent,
+                  template_name: templateName,
+                }).eq('id', existing.id);
+              } else {
+                await supabase.from('document_templates').insert({
+                  company_id: sphCompany.id,
+                  template_type_id: templateType.id,
+                  template_name: templateName,
+                  template_code: `sph_${templateType.type_code}`,
+                  html_content: htmlContent,
+                  css_styles: "",
+                  is_default: true,
+                  is_active: true,
+                  paper_size: "A4",
+                  orientation: "portrait",
+                  version: 1,
+                });
+              }
+              completed++;
+              setProgress((completed / totalOps) * 100);
+            }
+            
+            setIsInitializing(false);
+            toast.success(`Updated SPH templates: AR Invoice + AR Receipt for ${sphCompany.name}`);
+            onComplete?.();
+          }}
+        >
+          <Wand2 className="h-4 w-4 mr-2 text-blue-600" />
+          Update SPH Templates Only (Safe)
         </Button>
       </div>
 

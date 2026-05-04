@@ -19,6 +19,7 @@ import { YutongLCManagement } from './YutongLCManagement';
 import { YutongPaymentTracking } from './YutongPaymentTracking';
 import { YutongDeliveryOrderManagement } from './YutongDeliveryOrderManagement';
 import { YutongLandedCostView } from './YutongLandedCostView';
+import { YutongFinanceSettlementHub } from './YutongFinanceSettlementHub';
 import { format } from 'date-fns';
 
 interface FinancialSummary {
@@ -184,8 +185,9 @@ export function YutongFinanceDashboard() {
 
       {/* Main Finance Management Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="settlement-hub">Settlement Hub</TabsTrigger>
           <TabsTrigger value="lc-management">Letter of Credits</TabsTrigger>
           <TabsTrigger value="payments">Payment Tracking</TabsTrigger>
           <TabsTrigger value="delivery-orders">Delivery Orders</TabsTrigger>
@@ -237,6 +239,10 @@ export function YutongFinanceDashboard() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="settlement-hub">
+          <YutongFinanceSettlementHub />
         </TabsContent>
 
         <TabsContent value="lc-management">

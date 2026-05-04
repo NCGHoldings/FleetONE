@@ -7,14 +7,19 @@ import { useCrewAuth } from '@/contexts/CrewAuthContext';
 import { UserCircle, LogOut, Wallet, Medal, CalendarOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createAnonymousClient } from '@/integrations/supabase/public-client';
+import CrewLogin from './CrewLogin';
 
 export default function CrewProfile() {
-  const { crewMember, logout } = useCrewAuth();
+  const { crewMember, logout, isAuthenticated } = useCrewAuth();
   const { toast } = useToast();
   
   const [leaveDate, setLeaveDate] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isAuthenticated) {
+    return <CrewLogin />;
+  }
 
   const handleLeaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
