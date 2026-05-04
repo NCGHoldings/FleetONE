@@ -1,28 +1,47 @@
-name: Daily Database Backup (Supabase to DO Spaces)
+name: Daily Database Backup (Supabase → DO Spaces)
+# Runs daily at 2:00 AM UTC. Can also be triggered manually.
+# Secrets required: SUPABASE_DB_URL, DO_SPACES_KEY, DO_SPACES_SECRET, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 on:
   schedule:
-    - cron: '0 2 * * *' # Run daily at 2:00 AM UTC
-  workflow_dispatch: # Allow manual triggering from GitHub UI
+    - cron: '0 2 * * *'
+  workflow_dispatch:
 
 jobs:
   backup:
     runs-on: ubuntu-latest
+
     steps:
       - name: Install PostgreSQL Client
         run: |
-          sudo apt-get update
+          sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
 
+      # ── 1. Dump ─────────────────────────────────────────────────────────────
       - name: Dump Supabase Database
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          echo "Starting pg_dump..."
-          # Dump the database in custom format (-Fc) which is compressed and suitable for pg_restore
+          echo "🗄️  Starting pg_dump..."
           pg_dump "$DATABASE_URL" -Fc -Z 9 -f supabase-backup.dump
-          echo "Backup created successfully."
+          DUMP_SIZE=$(du -sh supabase-backup.dump | cut -f1)
+          echo "✅ Dump complete. Size: $DUMP_SIZE"
+          echo "DUMP_SIZE=$DUMP_SIZE" >> $GITHUB_ENV
 
+      # ── 2. Integrity Check ───────────────────────────────────────────────────
+      - name: Verify Dump Integrity
+        run: |
+          echo "🔍 Verifying dump integrity with pg_restore --list..."
+          pg_restore --list supabase-backup.dump > /tmp/restore-toc.txt
+          TOC_LINES=$(wc -l < /tmp/restore-toc.txt)
+          echo "   Table of Contents: $TOC_LINES entries"
+          if [ "$TOC_LINES" -lt 10 ]; then
+            echo "❌ Integrity check failed — TOC suspiciously small ($TOC_LINES lines)."
+            exit 1
+          fi
+          echo "✅ Integrity check passed."
+
+      # ── 3. Upload to DO Spaces ───────────────────────────────────────────────
       - name: Upload to DigitalOcean Spaces
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_KEY }}
@@ -31,12 +50,61 @@ jobs:
           DO_SPACE_BUCKET: ncg-db-backup
         run: |
           TIMESTAMP=$(date +%Y-%m-%d_%H-%M)
-          FILE_NAME="supabase-backup-$TIMESTAMP.dump"
-          
-          echo "Uploading $FILE_NAME to DigitalOcean Spaces..."
-          # AWS CLI comes pre-installed on ubuntu-latest GitHub runners
-          aws s3 cp supabase-backup.dump s3://$DO_SPACE_BUCKET/$FILE_NAME \
-            --endpoint-url $DO_SPACE_ENDPOINT \
+          FILE_NAME="fleetone/supabase-backup-$TIMESTAMP.dump"
+          echo "📤 Uploading $FILE_NAME to DigitalOcean Spaces..."
+          aws s3 cp supabase-backup.dump "s3://$DO_SPACE_BUCKET/$FILE_NAME" \
+            --endpoint-url "$DO_SPACE_ENDPOINT" \
             --acl private
-            
-          echo "Upload complete!"
+          echo "✅ Upload complete: $FILE_NAME"
+          echo "BACKUP_FILE=$FILE_NAME" >> $GITHUB_ENV
+
+      # ── 4. Retention Purge (keep last 30 days) ───────────────────────────────
+      - name: Purge Backups Older Than 30 Days
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET }}
+          DO_SPACE_ENDPOINT: https://sgp1.digitaloceanspaces.com
+          DO_SPACE_BUCKET: ncg-db-backup
+        run: |
+          echo "🧹 Purging backups older than 30 days..."
+          CUTOFF=$(date -d '30 days ago' +%Y-%m-%d)
+
+          aws s3 ls "s3://$DO_SPACE_BUCKET/fleetone/" \
+            --endpoint-url "$DO_SPACE_ENDPOINT" | while read -r line; do
+            FILE_DATE=$(echo "$line" | awk '{print $1}')
+            FILE_NAME=$(echo "$line" | awk '{print $4}')
+            if [[ "$FILE_DATE" < "$CUTOFF" ]] && [[ -n "$FILE_NAME" ]]; then
+              echo "   Deleting old backup: $FILE_NAME (date: $FILE_DATE)"
+              aws s3 rm "s3://$DO_SPACE_BUCKET/fleetone/$FILE_NAME" \
+                --endpoint-url "$DO_SPACE_ENDPOINT"
+            fi
+          done
+          echo "✅ Retention purge complete."
+
+      # ── 5. Telegram — Success ────────────────────────────────────────────────
+      - name: Notify Telegram (Success)
+        if: success()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MESSAGE="✅ *FleetONE DB Backup — Success*%0A%0A📦 File: \`$BACKUP_FILE\`%0A📏 Size: $DUMP_SIZE%0A🕐 Time: $(date -u '+%Y-%m-%d %H:%M UTC')%0A%0A🔗 [View Run]($RUN_URL)"
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d chat_id="$TELEGRAM_CHAT_ID" \
+            -d parse_mode="Markdown" \
+            -d text="$MESSAGE" > /dev/null
+
+      # ── 6. Telegram — Failure ────────────────────────────────────────────────
+      - name: Notify Telegram (Failure)
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MESSAGE="🚨 *FleetONE DB Backup — FAILED*%0A%0A❗ The nightly database backup did not complete successfully.%0A🕐 Time: $(date -u '+%Y-%m-%d %H:%M UTC')%0A%0A🔗 [Investigate Run]($RUN_URL)"
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d chat_id="$TELEGRAM_CHAT_ID" \
+            -d parse_mode="Markdown" \
+            -d text="$MESSAGE" > /dev/null
