@@ -367,9 +367,9 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
                             <p className="font-semibold text-primary">
                               LKR {invoiceAmount.toLocaleString()}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               {billingPercentage}% of {(student.fixed_monthly_amount || 0).toLocaleString()}
-                              {outstandingBal > 0 && ` + ${outstandingBal.toLocaleString()} outstanding`}
+                              {outstandingBal > 0 && <span className="block mt-0.5 font-medium text-amber-600">Total Due After Invoice: LKR {(invoiceAmount + outstandingBal).toLocaleString()}</span>}
                             </p>
                           </div>
                         </div>

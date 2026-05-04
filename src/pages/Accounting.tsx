@@ -31,6 +31,7 @@ import { FinancialPeriodsView } from "@/components/accounting/FinancialPeriodsVi
 import { PurchaseRequisitionView } from "@/components/accounting/PurchaseRequisitionView";
 import { GoodsReceiptNoteView } from "@/components/accounting/GoodsReceiptNoteView";
 import { InvoiceMatchingView } from "@/components/accounting/InvoiceMatchingView";
+import { DayBookView } from "@/components/accounting/reports/DayBookView";
 import { BankReconciliationWorksheet } from "@/components/accounting/BankReconciliationWorksheet";
 import { TrialBalanceView } from "@/components/accounting/TrialBalanceView";
 // Phase 2 Components
@@ -846,6 +847,7 @@ const Accounting = () => {
                 <TabsList className="inline-flex w-max">
                   <TabsTrigger value="fleet-costs">Fleet Operating Costs</TabsTrigger>
                   <TabsTrigger value="receipts-payments">Receipts & Payments</TabsTrigger>
+                  <TabsTrigger value="day-book">Day Book</TabsTrigger>
                   <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
                   <TabsTrigger value="statements">Financial Statements</TabsTrigger>
                   <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
@@ -867,6 +869,10 @@ const Accounting = () => {
 
               <TabsContent value="receipts-payments">
                 <ReceiptsAndPaymentsView />
+              </TabsContent>
+
+              <TabsContent value="day-book">
+                <DayBookView />
               </TabsContent>
 
               <TabsContent value="trial-balance">

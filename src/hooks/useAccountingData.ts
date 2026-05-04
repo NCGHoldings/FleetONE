@@ -1308,7 +1308,7 @@ export const usePurchaseOrders = (status?: string) => {
     queryFn: async () => {
       let query = supabase
         .from("purchase_orders")
-        .select(`*, vendors (vendor_code, vendor_name)`)
+        .select(`*, vendors (vendor_code, vendor_name, address, contact_person, phone, email, tax_id)`)
         .order("order_date", { ascending: false });
 
       if (selectedCompanyId) {

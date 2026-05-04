@@ -4,9 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Check, Loader2, Send, Languages, Calculator, Plus, Trash2, ChevronDown, ChevronUp, Upload, CreditCard, Banknote, Camera, Route } from 'lucide-react';
+import { Check, Loader2, Send, Languages, Calculator, Plus, Trash2, ChevronDown, ChevronUp, Upload, CreditCard, Banknote, Camera, Route, Sun, Moon, Sparkles, Navigation, Bus, User, BadgeCent, Receipt, ArrowRight } from 'lucide-react';
 import { createAnonymousClient } from '@/integrations/supabase/public-client';
 import { GamificationBanner } from '@/components/trips/GamificationBanner';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type Language = 'en' | 'si' | 'ta';
 
@@ -190,7 +191,8 @@ const AutocompleteInput = ({
   options = [], 
   placeholder, 
   uppercase = false,
-  autoFormat
+  autoFormat,
+  icon
 }: { 
   value: string; 
   onChange: (v: string) => void; 
@@ -198,6 +200,7 @@ const AutocompleteInput = ({
   placeholder?: string;
   uppercase?: boolean;
   autoFormat?: 'bus';
+  icon?: React.ReactNode;
 }) => {
   const [show, setShow] = useState(false);
   
@@ -212,9 +215,7 @@ const AutocompleteInput = ({
     let val = uppercase ? e.target.value.toUpperCase() : e.target.value;
     
     if (autoFormat === 'bus') {
-      // Remove all spaces and hyphens, force uppercase
       val = val.replace(/[\s-]/g, '').toUpperCase();
-      // If it ends with 4 numbers and has letters/numbers before it, insert a hyphen
       const match = val.match(/^([A-Z0-9]+?)(\d{4})$/);
       if (match) {
         val = `${match[1]}-${match[2]}`;
@@ -225,6 +226,11 @@ const AutocompleteInput = ({
 
   return (
     <div className="relative">
+      {icon && (
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          {icon}
+        </div>
+      )}
       <Input 
         value={safeValue} 
         onChange={handleChange} 
@@ -232,7 +238,7 @@ const AutocompleteInput = ({
         onBlur={() => setTimeout(() => setShow(false), 200)}
         placeholder={placeholder}
         required
-        className="bg-slate-50 border-slate-200"
+        className={`bg-slate-50 border-slate-200 focus-visible:ring-blue-500 transition-all ${icon ? 'pl-9' : ''}`}
       />
       {show && filtered.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 shadow-xl rounded-md max-h-48 overflow-y-auto">
@@ -361,7 +367,7 @@ export default function PublicConductorUpload() {
           console.log('🔍 Searching daily_trips for bus_id:', busData.id, 'trip_date:', formData.tripDate);
           const { data: dailyTripsData, error: tripsError } = await supabase
             .from('daily_trips')
-            .select('id, trip_no, notes, route_id, routes(route_name, master_config)')
+            .select('id, trip_no, notes, route_id, route_label, routes(route_name, master_config)')
             .eq('bus_id', busData.id)
             .eq('trip_date', formData.tripDate)
             .order('trip_no', { ascending: true });
@@ -395,10 +401,13 @@ export default function PublicConductorUpload() {
 
             // Scan through all trips to find the first available names and config
             for (const trip of dailyTripsData) {
+              console.log(`🔎 Inspecting Trip ${trip.trip_no || trip.id}:`, trip);
               try {
                 const notes = typeof trip.notes === 'string' 
                   ? JSON.parse(trip.notes) 
                   : (trip.notes || {});
+                
+                console.log(`📝 Parsed Notes for ${trip.trip_no || trip.id}:`, notes);
                 
                 if (!allocatedDriver && notes?.driver && notes.driver !== 'N/A') allocatedDriver = notes.driver;
                 if (!allocatedConductor && notes?.conductor && notes.conductor !== 'N/A') allocatedConductor = notes.conductor;
@@ -412,7 +421,12 @@ export default function PublicConductorUpload() {
                   }
                 }
                 
-                // Fallback to notes if route ID wasn't properly linked in the DB
+                // Fallback 1: route_label column directly on daily_trips
+                if (!allocatedRoute && trip.route_label) {
+                  allocatedRoute = trip.route_label;
+                }
+                
+                // Fallback 2: notes if route ID wasn't properly linked in the DB
                 if (!allocatedRoute && notes) {
                   if (notes.route && notes.route !== 'null') allocatedRoute = notes.route;
                   else if (notes.excel_route_name && notes.excel_route_name !== 'null') allocatedRoute = notes.excel_route_name;
@@ -749,85 +763,129 @@ export default function PublicConductorUpload() {
     );
   }
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
+  const displayGreeting = formData.driverName ? `${greeting}, ${formData.driverName.split(' ')[0]}!` : formData.conductorName ? `${greeting}, ${formData.conductorName.split(' ')[0]}!` : `${greeting}, Crew!`;
+
   return (
-    <div className="min-h-screen bg-slate-50 flex items-start justify-center p-0 sm:p-4 pb-20">
-      <Card className="w-full max-w-lg shadow-2xl border-0 sm:border rounded-none sm:rounded-xl overflow-hidden">
-        {/* Language Switcher */}
-        <div className="bg-slate-900 text-slate-50 p-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Languages className="w-5 h-5 text-slate-300" />
-            <span className="font-semibold text-sm">Language</span>
-          </div>
-          <div className="flex bg-slate-800 rounded-md p-1 gap-1">
-            {(['en', 'si', 'ta'] as const).map(l => (
-              <button 
-                key={l} type="button" onClick={() => setLang(l)}
-                className={`px-3 py-1 text-xs font-bold rounded ${lang === l ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+    <div className="min-h-screen bg-slate-50 flex items-start justify-center sm:p-4 pb-24">
+      <Card className="w-full max-w-lg shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] border-0 sm:border rounded-none sm:rounded-[2rem] overflow-hidden bg-white">
+        
+        {/* Dynamic Premium Hero Header */}
+        <div className="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white overflow-hidden">
+          {/* Abstract background blobs */}
+          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-blue-500/20 blur-3xl" />
+          <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-64 h-64 rounded-full bg-emerald-500/20 blur-3xl" />
+          
+          <div className="relative p-6 pt-8 pb-10 z-10">
+            <div className="flex justify-between items-start mb-6">
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col gap-1"
               >
-                {l === 'en' ? 'EN' : l === 'si' ? 'සිංහල' : 'தமிழ்'}
-              </button>
-            ))}
+                <span className="flex items-center gap-2 text-blue-200 text-sm font-medium">
+                  {hour < 12 ? <Sun className="w-4 h-4" /> : hour < 18 ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  NCG Speed Crew
+                </span>
+                <h1 className="text-2xl font-black tracking-tight text-white drop-shadow-sm">
+                  {displayGreeting}
+                </h1>
+              </motion.div>
+              
+              {/* Sleek Glass Language Switcher */}
+              <div className="flex bg-white/10 backdrop-blur-md rounded-full p-1 border border-white/10">
+                {(['en', 'si', 'ta'] as const).map(l => (
+                  <button 
+                    key={l} type="button" onClick={() => setLang(l)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all ${lang === l ? 'bg-white text-blue-900 shadow-sm' : 'text-blue-100 hover:text-white hover:bg-white/10'}`}
+                  >
+                    {l === 'en' ? 'EN' : l === 'si' ? 'සිං' : 'த'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="text-blue-100 text-sm max-w-[250px] leading-relaxed"
+            >
+              {t.subtitle}
+            </motion.p>
           </div>
         </div>
 
         {!window.matchMedia('(display-mode: standalone)').matches && (
-          <div className="bg-amber-50 p-3 flex items-center justify-between border-b border-amber-100">
-            <div className="text-xs text-amber-800 font-medium">For the best experience, install our app!</div>
-            <Button size="sm" variant="outline" className="h-7 text-xs bg-white hover:bg-amber-100 text-amber-700 border-amber-200" onClick={() => window.location.href = '/install?app=crew'}>
-              Install App
+          <div className="bg-amber-50 p-3 flex items-center justify-between border-b border-amber-100 px-5">
+            <div className="text-xs text-amber-800 font-medium flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5" /> For the best experience, install our app!
+            </div>
+            <Button size="sm" variant="outline" className="h-7 text-xs bg-white hover:bg-amber-100 text-amber-700 border-amber-200 rounded-full" onClick={() => window.location.href = '/install?app=crew'}>
+              Install
             </Button>
           </div>
         )}
 
-        <CardHeader className="text-center bg-white border-b pb-4">
-          <CardTitle className="text-2xl font-black text-slate-800">{t.title}</CardTitle>
-          <CardDescription className="text-sm font-medium text-slate-500">{t.subtitle}</CardDescription>
-        </CardHeader>
-
-        <CardContent className="p-4 sm:p-6 bg-slate-50/50">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Step Navigation */}
-            <div className="flex bg-slate-200/50 p-1 rounded-lg mb-6 shadow-inner">
-              <button 
-                type="button" 
-                onClick={() => setCurrentStep(1)} 
-                className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${currentStep === 1 ? 'bg-white shadow text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                1. Trips & Details
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setCurrentStep(2)} 
-                className={`flex-1 py-2.5 text-sm font-bold rounded-md transition-all ${currentStep === 2 ? 'bg-white shadow text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                2. {t.expenses} & Deposit
-              </button>
+        <CardContent className="p-0 sm:p-2 bg-slate-50/50">
+          <form onSubmit={handleSubmit} className="relative pb-6">
+            
+            {/* Elegant Step Indicator */}
+            <div className="px-5 pt-6 pb-2">
+              <div className="flex bg-slate-100/80 backdrop-blur-sm p-1.5 rounded-2xl mb-4 border border-slate-200">
+                <button 
+                  type="button" 
+                  onClick={() => setCurrentStep(1)} 
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition-all duration-300 ${currentStep === 1 ? 'bg-white shadow-[0_2px_10px_rgba(0,0,0,0.06)] text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <Navigation className={`w-4 h-4 ${currentStep === 1 ? 'text-blue-500' : 'text-slate-400'}`} />
+                  1. Details
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setCurrentStep(2)} 
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition-all duration-300 ${currentStep === 2 ? 'bg-white shadow-[0_2px_10px_rgba(0,0,0,0.06)] text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <Receipt className={`w-4 h-4 ${currentStep === 2 ? 'text-blue-500' : 'text-slate-400'}`} />
+                  2. {t.expenses}
+                </button>
+              </div>
             </div>
 
-            {/* STEP 1: Global Details & Trips */}
-            <div className={currentStep === 1 ? 'space-y-6 animate-in fade-in duration-300' : 'hidden'}>
+            <div className="px-4 sm:px-5">
+              <AnimatePresence mode="wait">
+                {currentStep === 1 && (
+                  <motion.div 
+                    key="step1"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="space-y-6"
+                  >
               
               {/* Gamification Banner */}
               <GamificationBanner totalIncome={totalIncome} totalExpenses={totalExpenses} routeTarget={routeTarget} />
 
               {/* Global Details */}
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4 relative">
+              <div className="bg-white p-5 rounded-[1.5rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-5 relative">
                 {fetchingMaster && (
-                  <div className="absolute top-2 right-2 flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full animate-pulse">
-                    <Loader2 className="w-3 h-3 animate-spin" /> Auto-filling...
+                  <div className="absolute top-4 right-4 flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full animate-pulse border border-blue-100">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Auto-filling...
                   </div>
                 )}
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-1">
                 <div className="w-1.5 h-5 bg-blue-500 rounded-full" />
-                <h3 className="font-bold text-slate-800">{t.globalDetails}</h3>
+                <h3 className="font-extrabold text-slate-800 text-lg tracking-tight">{t.globalDetails}</h3>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-600">{t.tripDate}</Label>
-                  <Input type="date" value={formData.tripDate} onChange={(e) => setFormData({ ...formData, tripDate: e.target.value })} required className="bg-slate-50 border-slate-200" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.tripDate}</Label>
+                  <Input type="date" value={formData.tripDate} onChange={(e) => setFormData({ ...formData, tripDate: e.target.value })} required className="bg-slate-50 border-slate-200 focus-visible:ring-blue-500 transition-all" />
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-600">{t.busNumber}</Label>
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.busNumber}</Label>
                   <AutocompleteInput 
                     value={formData.busNumber} 
                     onChange={(v) => setFormData({ ...formData, busNumber: v })} 
@@ -835,33 +893,51 @@ export default function PublicConductorUpload() {
                     placeholder="NA-1234" 
                     uppercase={true} 
                     autoFormat="bus"
+                    icon={<Bus className="w-4 h-4" />}
                   />
                 </div>
-                <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                  <Label className="text-xs font-bold text-slate-600">{t.driverName}</Label>
+                <div className="space-y-2 col-span-2 sm:col-span-1">
+                  <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.driverName}</Label>
                   <AutocompleteInput 
                     value={formData.driverName} 
                     onChange={(v) => setFormData({ ...formData, driverName: v })} 
                     options={history.drivers || []} 
+                    placeholder="Driver Name"
+                    icon={<User className="w-4 h-4" />}
                   />
                 </div>
-                <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                  <Label className="text-xs font-bold text-slate-600">{t.conductorName}</Label>
+                <div className="space-y-2 col-span-2 sm:col-span-1">
+                  <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.conductorName}</Label>
                   <AutocompleteInput 
                     value={formData.conductorName} 
                     onChange={(v) => setFormData({ ...formData, conductorName: v })} 
                     options={history.conductors || []} 
+                    placeholder="Conductor Name"
+                    icon={<User className="w-4 h-4 text-emerald-500" />}
                   />
                 </div>
-                {formData.routeName && (
-                  <div className="space-y-1.5 col-span-2">
-                    <Label className="text-xs font-bold text-slate-600">Route</Label>
-                    <div className="bg-emerald-50 border border-emerald-100 px-3 py-2.5 rounded-md text-sm font-medium text-emerald-800 flex items-center gap-2">
-                      <Route className="w-4 h-4" />
-                      {formData.routeName}
+                <div className="space-y-2 col-span-2">
+                  <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">Route</Label>
+                  {formData.routeName ? (
+                    <div className="bg-emerald-50/50 border border-emerald-200 px-4 py-3 rounded-xl text-sm font-bold text-emerald-800 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-2.5">
+                        <Route className="w-4 h-4 text-emerald-600" />
+                        {formData.routeName}
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" className="h-7 px-3 text-xs bg-white border border-emerald-100 shadow-sm text-emerald-700 hover:text-emerald-900 rounded-lg hover:bg-emerald-100/50" onClick={() => setFormData({ ...formData, routeName: '' })}>
+                        Edit
+                      </Button>
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <AutocompleteInput 
+                      value={formData.routeName || ''}
+                      onChange={(e) => setFormData({ ...formData, routeName: e })}
+                      options={[]}
+                      placeholder="Enter Route Name manually..."
+                      icon={<Route className="w-4 h-4 text-amber-500" />}
+                    />
+                  )}
+                </div>
               </div>
             </div>
 
@@ -993,10 +1069,19 @@ export default function PublicConductorUpload() {
                 {showAllExpenses ? t.hideExpenses : t.showAllExpenses}
               </Button>
             </div>
-          </div>
+                  </motion.div>
+                )}
 
+                {currentStep === 2 && (
+                  <motion.div 
+                    key="step2"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="space-y-6 pb-6"
+                  >
             {/* STEP 2: Expenses & Fuel & Bank */}
-            <div className={currentStep === 2 ? 'space-y-6 animate-in fade-in duration-300' : 'hidden'}>
 
             {/* Fuel Details Section */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
@@ -1159,6 +1244,9 @@ export default function PublicConductorUpload() {
                 </div>
               </div>
             </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             {/* End Step 2 */}
 

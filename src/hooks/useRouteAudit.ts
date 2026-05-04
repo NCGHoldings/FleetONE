@@ -33,7 +33,7 @@ export interface AuditSummary {
   syncPercentage: number;
 }
 
-export function useRouteAudit() {
+export function useRouteAudit(onSyncComplete?: () => void) {
   const [officialRoutes, setOfficialRoutes] = useState<OfficialRoute[]>([]);
   const [orphans, setOrphans] = useState<OrphanRoute[]>([]);
   const [summary, setSummary] = useState<AuditSummary | null>(null);
@@ -220,6 +220,9 @@ export function useRouteAudit() {
 
       // Re-run audit to refresh
       await runAudit();
+      
+      // Notify parent to refresh its own data
+      onSyncComplete?.();
     } catch (err: any) {
       console.error("Fix orphan error:", err);
       toast({
@@ -232,6 +235,64 @@ export function useRouteAudit() {
     }
   };
 
+  /**
+   * Promotes an orphan to an official route and syncs all records.
+   */
+  const addAsOfficialRoute = async (orphan: OrphanRoute) => {
+    try {
+      setFixing(true);
+
+      // 1. Generate a temporary route number
+      const tempRouteNo = `TEMP-${Math.floor(Math.random() * 1000)}`;
+
+      // 1.5 Extract start and end locations if possible
+      let startLoc = "TBD";
+      let endLoc = "TBD";
+      
+      if (orphan.label.includes("-")) {
+        const parts = orphan.label.split("-");
+        startLoc = parts[0].trim() || "TBD";
+        endLoc = parts[parts.length - 1].trim() || "TBD";
+      } else if (orphan.label.toLowerCase().includes(" to ")) {
+        const parts = orphan.label.toLowerCase().split(" to ");
+        startLoc = parts[0].trim() || "TBD";
+        endLoc = parts[parts.length - 1].trim() || "TBD";
+      } else {
+        startLoc = orphan.label;
+        endLoc = "TBD";
+      }
+
+      // 2. Insert into routes
+      const { data: newRoute, error: insertError } = await supabase
+        .from("routes")
+        .insert([{
+          route_name: orphan.label,
+          route_no: tempRouteNo,
+          start_location: startLoc,
+          end_location: endLoc,
+          is_active: true,
+          category: "Public Bus"
+        }])
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // 3. Sync all records to this new ID
+      setFixing(false); // Let fixOrphan handle the loading state
+      await fixOrphan(orphan, newRoute.id, newRoute.route_name);
+
+    } catch (err: any) {
+      console.error("Add as official error:", err);
+      toast({
+        title: "Failed to Add Route",
+        description: err.message || "Could not add route to dictionary",
+        variant: "destructive",
+      });
+      setFixing(false);
+    }
+  };
+
   return {
     officialRoutes,
     orphans,
@@ -240,5 +301,6 @@ export function useRouteAudit() {
     fixing,
     runAudit,
     fixOrphan,
+    addAsOfficialRoute,
   };
 }

@@ -13,11 +13,14 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // Required for Twilio webhooks
 
 // Load AI Agent
 let aiAgent;
 try {
-  aiAgent = require('./ai_agent');
+  // Toggle this to './ai_agent' if you want to switch back to Gemini API
+  // Toggle this to './local_ai_connector' if you want to use Local AI (Ollama/LM Studio)
+  aiAgent = require('./rule_based_agent');
 } catch (e) {
   console.log('AI Agent not loaded:', e.message);
 }
@@ -122,7 +125,7 @@ waClient.on('message', async (msg) => {
   broadcast({ type: 'message', data: messageData });
 
   // AI Integration
-  if (aiAgent && !msg.fromMe && msg.type === 'chat' && !msg.from.includes('@g.us')) {
+  if (aiAgent && !msg.fromMe && msg.type === 'chat' && !msg.from.includes('@g.us') && msg.from !== 'status@broadcast') {
     try {
       console.log(`🤖 Processing AI response for ${msg.from}...`);
       const aiResponse = await aiAgent.processWhatsAppMessage(msg.from, msg.body);
@@ -176,6 +179,20 @@ wss.on('connection', (ws) => {
 });
 
 /* ─── REST API Endpoints ─── */
+
+// Twilio Voice Webhook Endpoint
+app.post('/api/voice/incoming', (req, res) => {
+  console.log('📞 Incoming voice call from Twilio:', req.body.From);
+  const twiml = `
+    <Response>
+      <Connect>
+        <Stream url="wss://${req.headers.host}/ws/voice" />
+      </Connect>
+    </Response>
+  `;
+  res.type('text/xml');
+  res.send(twiml);
+});
 
 // Get connection status
 app.get('/api/status', (req, res) => {

@@ -200,24 +200,39 @@ export function useSchoolBusBulkExpenses() {
           throw new Error("Direct Payment requires a 'Pay From Account' to be selected.");
         }
         
-        const { data: bankAccount, error: bankErr } = await supabase
+        // Try bank_accounts first
+        let { data: bankAccount } = await supabase
           .from("bank_accounts")
           .select("id, account_name, company_id, gl_account_id")
           .eq("id", payload.directPaymentAccountId)
           .maybeSingle();
 
-        if (bankErr || !bankAccount) {
-          throw new Error("Selected Bank/Float account not found.");
+        if (bankAccount) {
+          if (bankAccount.company_id !== effectiveCompanyId) {
+            throw new Error("Selected account belongs to a different company. Pick an account from the current company's Bank Accounts.");
+          }
+          if (!bankAccount.gl_account_id) {
+            throw new Error("Selected Bank Account is missing a mapped GL Account. Please map it in the Banking module first.");
+          }
+          creditAccountId = bankAccount.gl_account_id;
+          creditAccountName = bankAccount.account_name;
+        } else {
+          // If not in bank_accounts, check chart_of_accounts directly (e.g. for Fuel Floats)
+          let { data: floatAccount } = await supabase
+            .from("chart_of_accounts")
+            .select("id, account_name, company_id")
+            .eq("id", payload.directPaymentAccountId)
+            .maybeSingle();
+            
+          if (!floatAccount) {
+            throw new Error("Selected Bank/Float account not found.");
+          }
+          if (floatAccount.company_id !== effectiveCompanyId) {
+            throw new Error("Selected account belongs to a different company.");
+          }
+          creditAccountId = floatAccount.id;
+          creditAccountName = floatAccount.account_name;
         }
-        if (bankAccount.company_id !== effectiveCompanyId) {
-          throw new Error("Selected account belongs to a different company. Pick an account from the current company's Bank Accounts.");
-        }
-        if (!bankAccount.gl_account_id) {
-          throw new Error("Selected Bank Account is missing a mapped GL Account. Please map it in the Banking module first.");
-        }
-        
-        creditAccountId = bankAccount.gl_account_id;
-        creditAccountName = bankAccount.account_name;
       } else {
         // AP - Trade Payable
         const { data: payableAccount } = await supabase

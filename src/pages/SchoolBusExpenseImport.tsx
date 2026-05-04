@@ -58,7 +58,7 @@ export default function SchoolBusExpenseImport() {
   const [buses, setBuses] = useState<{id: string, bus_no: string}[]>([]);
   const [vendors, setVendors] = useState<{id: string, vendor_name: string}[]>([]);
   const [pettyCashFunds, setPettyCashFunds] = useState<{id: string, fund_name: string}[]>([]);
-  const [directAccounts, setDirectAccounts] = useState<{id: string, account_name: string, bank_name: string, account_number: string, current_balance: number}[]>([]);
+  const [directAccounts, setDirectAccounts] = useState<{id: string, account_name: string, bank_name?: string, account_number?: string, current_balance: number, type: 'bank' | 'float'}[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<{id: string, account_code: string, account_name: string}[]>([]);
   
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
@@ -127,11 +127,34 @@ export default function SchoolBusExpenseImport() {
         .eq("company_id", effectiveCompanyId)
         .eq("is_active", true)
         .order("account_name");
+        
+      // Fetch cash floats from chart of accounts
+      const { data: floatData } = await supabase
+        .from("chart_of_accounts")
+        .select("id, account_name, current_balance")
+        .eq("company_id", effectiveCompanyId)
+        .eq("is_active", true)
+        .ilike("account_name", "%FLOAT%")
+        .order("account_name");
+
+      const combined: any[] = [];
       if (acctData) {
-        setDirectAccounts(acctData as any);
-        if (acctData.length > 0) setDirectPaymentAccountId(acctData[0].id);
-        else setDirectPaymentAccountId("");
+        combined.push(...acctData.map((a: any) => ({ ...a, type: 'bank' })));
       }
+      if (floatData) {
+        combined.push(...floatData.map((a: any) => ({ 
+            id: a.id, 
+            account_name: a.account_name, 
+            bank_name: 'Cash Float', 
+            account_number: '', 
+            current_balance: a.current_balance || 0,
+            type: 'float'
+        })));
+      }
+
+      setDirectAccounts(combined);
+      if (combined.length > 0) setDirectPaymentAccountId(combined[0].id);
+      else setDirectPaymentAccountId("");
     };
     initData();
   }, [effectiveCompanyId]);

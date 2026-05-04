@@ -12,11 +12,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ShieldCheck, AlertTriangle, RefreshCw, CheckCircle2, Loader2, LayoutList, FileSpreadsheet, Bus } from "lucide-react";
+import { ShieldCheck, AlertTriangle, RefreshCw, CheckCircle2, Loader2, LayoutList, FileSpreadsheet, Bus, Plus } from "lucide-react";
 import { useRouteAudit, OrphanRoute } from "@/hooks/useRouteAudit";
 
-export function RouteSyncAuditDashboard() {
-  const { officialRoutes, orphans, summary, loading, fixing, runAudit, fixOrphan } = useRouteAudit();
+interface RouteSyncAuditDashboardProps {
+  onSyncComplete?: () => void;
+}
+
+export function RouteSyncAuditDashboard({ onSyncComplete }: RouteSyncAuditDashboardProps) {
+  const { officialRoutes, orphans, summary, loading, fixing, runAudit, fixOrphan, addAsOfficialRoute } = useRouteAudit(onSyncComplete);
   const [selectedTargets, setSelectedTargets] = useState<Record<string, string>>({});
 
   if (loading) {
@@ -186,20 +190,33 @@ export function RouteSyncAuditDashboard() {
                         </Select>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          disabled={!selectedTarget || fixing}
-                          onClick={() => {
-                            const target = officialRoutes.find(r => r.id === selectedTarget);
-                            if (target) {
-                              fixOrphan(orphan, target.id, target.route_name);
-                            }
-                          }}
-                          className="gap-1.5 text-xs"
-                        >
-                          {fixing ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-                          Fix & Sync
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={fixing}
+                            onClick={() => addAsOfficialRoute(orphan)}
+                            className="gap-1.5 text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                            title="Add this route to the official dictionary and sync all records"
+                          >
+                            {fixing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                            Make Official
+                          </Button>
+                          <Button
+                            size="sm"
+                            disabled={!selectedTarget || fixing}
+                            onClick={() => {
+                              const target = officialRoutes.find(r => r.id === selectedTarget);
+                              if (target) {
+                                fixOrphan(orphan, target.id, target.route_name);
+                              }
+                            }}
+                            className="gap-1.5 text-xs min-w-[100px]"
+                          >
+                            {fixing ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                            Fix & Sync
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit, Trash2, Map, MapPin, GitMerge, Bus, ChevronDown, ChevronRight, ArrowLeftRight, Settings, Target, Wallet, Users, ShieldCheck, AlertTriangle, RefreshCw, CheckCircle2, Loader2 } from "lucide-react";
+import { Plus, Edit, Trash2, Map, MapPin, GitMerge, Bus, ChevronDown, ChevronRight, ArrowLeftRight, Settings, Target, Wallet, Users, ShieldCheck, AlertTriangle, RefreshCw, CheckCircle2, Loader2, Search } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -138,15 +138,31 @@ export default function RouteManagement() {
     return count;
   };
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   useEffect(() => {
     fetchRoutes();
     fetchBusCounts();
   }, []);
 
   const filteredRoutes = routes.filter((r) => {
-    if (categoryFilter === "all") return true;
-    if (categoryFilter === "public") return r.category === "Public Bus";
-    if (categoryFilter === "school") return r.category === "School Bus";
+    // Tab filter
+    if (categoryFilter === "public" && r.category !== "Public Bus") return false;
+    if (categoryFilter === "school" && r.category !== "School Bus") return false;
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const match = 
+        (r.route_no && r.route_no.toLowerCase().includes(q)) ||
+        (r.route_name && r.route_name.toLowerCase().includes(q)) ||
+        (r.start_location && r.start_location.toLowerCase().includes(q)) ||
+        (r.end_location && r.end_location.toLowerCase().includes(q)) ||
+        (r.route_group && r.route_group.toLowerCase().includes(q));
+      
+      if (!match) return false;
+    }
+
     return true;
   });
 
@@ -767,27 +783,42 @@ export default function RouteManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Category Tabs */}
+      {/* Category Tabs & Search */}
       <Tabs value={categoryFilter} onValueChange={setCategoryFilter}>
-        <TabsList>
-          <TabsTrigger value="all">All Routes ({routes.length})</TabsTrigger>
-          <TabsTrigger value="public">Public Bus ({publicCount})</TabsTrigger>
-          <TabsTrigger value="school">School Bus ({schoolCount})</TabsTrigger>
-          <TabsTrigger value="sync-audit" className="gap-1.5">
-            <ShieldCheck className="w-4 h-4" />
-            Sync Audit
-            {auditSummary && auditSummary.totalOrphans > 0 && (
-              <Badge variant="destructive" className="ml-1 text-[10px] h-5 px-1.5">{auditSummary.totalOrphans}</Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+          <TabsList>
+            <TabsTrigger value="all">All Routes ({routes.length})</TabsTrigger>
+            <TabsTrigger value="public">Public Bus ({publicCount})</TabsTrigger>
+            <TabsTrigger value="school">School Bus ({schoolCount})</TabsTrigger>
+            <TabsTrigger value="sync-audit" className="gap-1.5">
+              <ShieldCheck className="w-4 h-4" />
+              Sync Audit
+              {auditSummary && auditSummary.totalOrphans > 0 && (
+                <Badge variant="destructive" className="ml-1 text-[10px] h-5 px-1.5">{auditSummary.totalOrphans}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+          
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search by route, location..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 bg-white"
+            />
+          </div>
+        </div>
 
         <TabsContent value="all">{renderRouteTable()}</TabsContent>
         <TabsContent value="public">{renderRouteTable()}</TabsContent>
         <TabsContent value="school">{renderRouteTable()}</TabsContent>
 
         <TabsContent value="sync-audit">
-          <RouteSyncAuditDashboard />
+          <RouteSyncAuditDashboard onSyncComplete={() => {
+            fetchRoutes();
+            fetchBusCounts();
+          }} />
         </TabsContent>
       </Tabs>
     </div>

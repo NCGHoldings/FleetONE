@@ -12,20 +12,20 @@ interface Quotation {
 
 interface Props {
   quotations: Quotation[];
+  dateFrom: Date;
   dateTo: Date;
 }
 
-export default function SpecialHiresIncomeReport({ quotations, dateTo }: Props) {
-  const currentMonthDate = dateTo;
-  const previousMonthDate = subMonths(currentMonthDate, 1);
-  const currentMonthName = format(currentMonthDate, "MMMM");
-  const currentYear = format(currentMonthDate, "yyyy");
-  const previousMonthName = format(previousMonthDate, "MMMM");
+export default function SpecialHiresIncomeReport({ quotations, dateFrom, dateTo }: Props) {
+  const isSameMonthPeriod = isSameMonth(dateFrom, dateTo);
+  const periodString = isSameMonthPeriod 
+    ? format(dateFrom, "MMMM (yyyy)")
+    : `${format(dateFrom, "MMM yyyy")} - ${format(dateTo, "MMM yyyy")}`;
 
   const reportData = useMemo(() => {
     const data: Record<string, any> = {
-      Inside: { type: "Inside", completed: 0, confirmed: 0, upcoming: 0, cancelled: 0, postPrev: 0, postCurr: 0 },
-      Outside: { type: "Outside", completed: 0, confirmed: 0, upcoming: 0, cancelled: 0, postPrev: 0, postCurr: 0 },
+      Inside: { type: "Inside", completed: 0, confirmed: 0, upcoming: 0, cancelled: 0, postponed: 0 },
+      Outside: { type: "Outside", completed: 0, confirmed: 0, upcoming: 0, cancelled: 0, postponed: 0 },
     };
 
     quotations.forEach((q) => {
@@ -42,34 +42,29 @@ export default function SpecialHiresIncomeReport({ quotations, dateTo }: Props) 
 
       // Postponed
       if (status.includes("postpone")) {
-        if (isSameMonth(pickupDate, previousMonthDate)) {
-          data[type].postPrev += rev;
-        } else if (isSameMonth(pickupDate, currentMonthDate)) {
-          data[type].postCurr += rev;
-        }
+        data[type].postponed += rev;
         return;
       }
 
-      // Completed in Current Month
-      if (status.includes("complete") && isSameMonth(pickupDate, currentMonthDate)) {
+      // Completed
+      if (status.includes("complete")) {
         data[type].completed += rev;
         return;
       }
 
-      // Confirmed in Current Month
-      if ((status.includes("confirm") || status === "approved") && isSameMonth(pickupDate, currentMonthDate)) {
-        data[type].confirmed += rev;
+      // Confirmed & Upcoming
+      if (status.includes("confirm") || status === "approved") {
+        if (isAfter(pickupDate, startOfDay(new Date()))) {
+          data[type].upcoming += rev;
+        } else {
+          data[type].confirmed += rev;
+        }
         return;
-      }
-
-      // Upcoming Hires (After today or approved future trips)
-      if ((status.includes("confirm") || status === "approved") && isAfter(pickupDate, startOfDay(currentMonthDate))) {
-        data[type].upcoming += rev;
       }
     });
 
     return Object.values(data);
-  }, [quotations, currentMonthDate, previousMonthDate]);
+  }, [quotations]);
 
   const totals = reportData.reduce(
     (acc, row) => ({
@@ -78,10 +73,9 @@ export default function SpecialHiresIncomeReport({ quotations, dateTo }: Props) 
       totalCurr: acc.totalCurr + (row.completed + row.confirmed),
       upcoming: acc.upcoming + row.upcoming,
       cancelled: acc.cancelled + row.cancelled,
-      postPrev: acc.postPrev + row.postPrev,
-      postCurr: acc.postCurr + row.postCurr,
+      postponed: acc.postponed + row.postponed,
     }),
-    { completed: 0, confirmed: 0, totalCurr: 0, upcoming: 0, cancelled: 0, postPrev: 0, postCurr: 0 }
+    { completed: 0, confirmed: 0, totalCurr: 0, upcoming: 0, cancelled: 0, postponed: 0 }
   );
 
   const formatCurrency = (val: number) => (val === 0 ? "-" : val.toLocaleString("en-US", { minimumFractionDigits: 2 }));
@@ -90,7 +84,7 @@ export default function SpecialHiresIncomeReport({ quotations, dateTo }: Props) 
     <div className="rounded-md border overflow-x-auto">
       <div className="bg-white px-4 py-3 border-b text-center">
         <h2 className="text-lg font-bold text-gray-800">
-          Special Hires Income Report - Upto {format(new Date(), "do MMMM yyyy")}
+          Special Hires Income Report - {periodString}
         </h2>
       </div>
       <Table className="text-sm border-collapse">
@@ -98,17 +92,15 @@ export default function SpecialHiresIncomeReport({ quotations, dateTo }: Props) 
           <TableRow className="bg-muted/50 hover:bg-muted/50">
             <TableHead rowSpan={2} className="border text-center font-bold w-12 border-gray-300">#</TableHead>
             <TableHead rowSpan={2} className="border text-center font-bold min-w-[100px] border-gray-300">Hire Type</TableHead>
-            <TableHead colSpan={2} className="border text-center font-bold border-gray-300 bg-muted/30">{currentMonthName} ({currentYear})</TableHead>
-            <TableHead rowSpan={2} className="border text-center font-bold bg-muted/80 border-gray-300">Total {currentMonthName}</TableHead>
+            <TableHead colSpan={2} className="border text-center font-bold border-gray-300 bg-muted/30">{periodString}</TableHead>
+            <TableHead rowSpan={2} className="border text-center font-bold bg-muted/80 border-gray-300">Total Selected</TableHead>
             <TableHead rowSpan={2} className="border text-center font-bold border-gray-300">Upcoming Hires</TableHead>
             <TableHead rowSpan={2} className="border text-center font-bold border-gray-300">Cancelled</TableHead>
-            <TableHead colSpan={2} className="border text-center font-bold border-gray-300 bg-muted/30">Postponed</TableHead>
+            <TableHead rowSpan={2} className="border text-center font-bold border-gray-300">Postponed</TableHead>
           </TableRow>
           <TableRow className="bg-muted/50 hover:bg-muted/50">
             <TableHead className="border text-center font-bold border-gray-300 bg-white">Completed</TableHead>
             <TableHead className="border text-center font-bold border-gray-300 bg-white">Confirmed</TableHead>
-            <TableHead className="border text-center font-bold border-gray-300 bg-white">{previousMonthName}</TableHead>
-            <TableHead className="border text-center font-bold border-gray-300 bg-white">{currentMonthName}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -123,8 +115,7 @@ export default function SpecialHiresIncomeReport({ quotations, dateTo }: Props) 
               </TableCell>
               <TableCell className="border text-right border-gray-300">{formatCurrency(row.upcoming)}</TableCell>
               <TableCell className="border text-right border-gray-300">{formatCurrency(row.cancelled)}</TableCell>
-              <TableCell className="border text-right border-gray-300">{formatCurrency(row.postPrev)}</TableCell>
-              <TableCell className="border text-right border-gray-300">{formatCurrency(row.postCurr)}</TableCell>
+              <TableCell className="border text-right border-gray-300">{formatCurrency(row.postponed)}</TableCell>
             </TableRow>
           ))}
           <TableRow className="font-bold bg-muted/50 hover:bg-muted/50">
@@ -134,8 +125,7 @@ export default function SpecialHiresIncomeReport({ quotations, dateTo }: Props) 
             <TableCell className="border text-right bg-white border-gray-300">{formatCurrency(totals.totalCurr)}</TableCell>
             <TableCell className="border text-right border-gray-300">{formatCurrency(totals.upcoming)}</TableCell>
             <TableCell className="border text-right border-gray-300">{formatCurrency(totals.cancelled)}</TableCell>
-            <TableCell className="border text-right border-gray-300">{formatCurrency(totals.postPrev)}</TableCell>
-            <TableCell className="border text-right border-gray-300">{formatCurrency(totals.postCurr)}</TableCell>
+            <TableCell className="border text-right border-gray-300">{formatCurrency(totals.postponed)}</TableCell>
           </TableRow>
         </TableBody>
       </Table>

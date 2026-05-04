@@ -466,9 +466,7 @@ export function useGenerateBulkARInvoices() {
       const totalAmount = students.reduce((sum, s) => {
         const fixedAmount = s.fixed_monthly_amount || 0;
         const chargeAmount = fixedAmount * (effectivePercentage / 100);
-        const outstanding = Math.abs(Math.min(s.payment_balance || 0, 0));
-        const credit = s.payment_balance > 0 ? s.payment_balance : 0;
-        return sum + Math.max(0, chargeAmount + outstanding - credit);
+        return sum + Math.max(0, chargeAmount);
       }, 0);
 
       // Create batch record for tracking

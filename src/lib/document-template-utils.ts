@@ -242,14 +242,13 @@ export const mapDocumentToPlaceholders = (
 ): Record<string, string> => {
   const placeholders: Record<string, string> = {};
 
-  // Company placeholders (always available) - with fallback guidance for empty fields
-  placeholders['{{company_name}}'] = companyData?.name || '';
-  placeholders['{{company_address}}'] = companyData?.address || '';
-  
   // Override old contact details with the new requested values
   const phone = companyData?.phone === '+94 77 766 5501' || !companyData?.phone ? '0763682859' : companyData.phone;
   const email = companyData?.email === 'info@ncgholdings.lk' || !companyData?.email ? 'info_ncgholdings@ncg.lk' : companyData.email;
+  const address = (!companyData?.address || companyData?.address.trim() === '') ? 'No. 157Y, Kebellaovita, Weniwelkola, Polgasovita' : companyData.address;
   
+  placeholders['{{company_name}}'] = companyData?.name || '';
+  placeholders['{{company_address}}'] = address;
   placeholders['{{company_phone}}'] = phone;
   placeholders['{{company_email}}'] = email;
   placeholders['{{company_tax_id}}'] = companyData?.tax_number || companyData?.registration_number || companyData?.tax_registration_number || '';

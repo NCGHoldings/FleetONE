@@ -20,8 +20,8 @@ export interface MonthlyData {
 
 export function useSpecialHireReports() {
   const [filters, setFilters] = useState<ReportFilters>({
-    dateFrom: subMonths(startOfMonth(new Date()), 11),
-    dateTo: endOfMonth(new Date()),
+    dateFrom: startOfMonth(new Date()),
+    dateTo: new Date(),
   });
 
   const { data: quotations = [], isLoading } = useQuery({

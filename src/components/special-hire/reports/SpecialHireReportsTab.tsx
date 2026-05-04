@@ -76,7 +76,7 @@ export default function SpecialHireReportsTab() {
   };
 
   const sections = [
-    { key: "income", title: "💰 Special Hires Income Report", component: <SpecialHiresIncomeReport quotations={quotations} dateTo={filters.dateTo} /> },
+    { key: "income", title: "💰 Special Hires Income Report", component: <SpecialHiresIncomeReport quotations={quotations} dateFrom={filters.dateFrom} dateTo={filters.dateTo} /> },
     { key: "revenue", title: "📊 Revenue & Profit Overview", component: <RevenueOverview stats={stats} monthlyData={monthlyData} /> },
     { key: "trips", title: "🚌 Trip Performance Analytics", component: <TripPerformance statusBreakdown={statusBreakdown} monthlyData={monthlyData} tripCount={stats.tripCount} /> },
     { key: "financial", title: "💰 Financial Summary", component: <FinancialSummary revenueBreakdown={revenueBreakdown} expenseBreakdown={expenseBreakdown} monthlyData={monthlyData} costPerKm={stats.costPerKm} /> },
