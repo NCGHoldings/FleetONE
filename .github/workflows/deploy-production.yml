@@ -71,16 +71,6 @@ jobs:
             -e "ssh -o StrictHostKeyChecking=no" \
             ./ root@${{ env.PRIMARY_IP }}:$TARGET_PATH/
 
-          echo "📝 Creating .env file..."
-          ssh -o StrictHostKeyChecking=no root@${{ env.PRIMARY_IP }} "cat > $TARGET_PATH/.env << 'EOF'
-          VITE_APP_ENV=production
-          VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-          VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          VITE_GEMINI_API_KEY=${{ secrets.VITE_GEMINI_API_KEY }}
-          EOF
-          chmod 600 $TARGET_PATH/.env"
 
           # ATOMIC SYMLINK PIVOT — zero downtime 🚀
           echo "🔄 Pivoting production traffic to new release..."
@@ -88,9 +78,9 @@ jobs:
             "rsync -a --delete $TARGET_PATH/dist/ $SYMLINK_PATH/dist/ && sudo systemctl reload nginx"
           echo "✅ Traffic is now live on release: $RELEASE_DIR"
 
-          # Housekeeping: Keep last 5 releases
-          echo "🧹 Cleaning up old releases (Keeping last 5)..."
-          ssh -o StrictHostKeyChecking=no root@${{ env.PRIMARY_IP }} "cd ${{ env.APP_DIR }}/releases/production && ls -1t | tail -n +6 | xargs -I {} rm -rf {}"
+          # Housekeeping: Keep last 3 releases
+          echo "🧹 Cleaning up old releases (Keeping last 3)..."
+          ssh -o StrictHostKeyChecking=no root@${{ env.PRIMARY_IP }} "cd ${{ env.APP_DIR }}/releases/production && ls -1t | tail -n +4 | xargs -I {} rm -rf {}"
 
       - name: Smoke Test & Health Check
         env:
