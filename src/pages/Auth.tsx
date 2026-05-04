@@ -318,6 +318,8 @@ export default function Auth() {
                 <button
                   key={i}
                   onClick={() => setSlide(i)}
+                  aria-label={`Go to slide ${i + 1}`}
+                  aria-current={i === slide ? "true" : undefined}
                   className="h-1.5 rounded-full transition-all duration-300"
                   style={{
                     width: i === slide ? "2rem" : "0.75rem",
