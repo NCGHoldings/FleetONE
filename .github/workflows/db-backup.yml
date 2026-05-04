@@ -23,7 +23,12 @@ jobs:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           echo "🗄️  Starting pg_dump..."
-          pg_dump "$DATABASE_URL" -Fc -Z 9 -f supabase-backup.dump
+          
+          # pg_dump requires a direct connection (5432), not the connection pooler (6543)
+          # We dynamically replace the port so we don't have to change the GitHub Secret
+          DIRECT_URL=$(echo "$DATABASE_URL" | sed 's/:6543/:5432/g' | sed 's/[?&]pgbouncer=true//g')
+          
+          pg_dump "$DIRECT_URL" -Fc -Z 9 -f supabase-backup.dump
           DUMP_SIZE=$(du -sh supabase-backup.dump | cut -f1)
           echo "✅ Dump complete. Size: $DUMP_SIZE"
           echo "DUMP_SIZE=$DUMP_SIZE" >> $GITHUB_ENV
