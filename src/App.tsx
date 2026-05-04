@@ -24,7 +24,7 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Dashboard from "./pages/Dashboard";
 import DailyTrips from "./pages/DailyTrips";
-import TripsAnalytics from "./pages/TripsAnalytics";
+const TripsAnalytics = React.lazy(() => import("./pages/TripsAnalytics"));
 import FleetManagement from "./pages/FleetManagement";
 import NotFound from "./pages/NotFound";
 import StaffManagement from "./pages/StaffManagement";
@@ -45,9 +45,9 @@ import SchoolPaymentImport from "./pages/SchoolPaymentImport";
 import SchoolPaymentSettings from "./pages/SchoolPaymentSettings";
 import ReceiptUpload from "./pages/ReceiptUpload";
 import SchoolReports from "./pages/SchoolReports";
-import YutongQuotations from "./pages/YutongQuotations";
-import SinotruckQuotations from "./pages/SinotruckQuotations";
-import LightVehicleQuotations from "./pages/LightVehicleQuotations";
+const YutongQuotations = React.lazy(() => import("./pages/YutongQuotations"));
+const SinotruckQuotations = React.lazy(() => import("./pages/SinotruckQuotations"));
+const LightVehicleQuotations = React.lazy(() => import("./pages/LightVehicleQuotations"));
 import Complaints from "./pages/Complaints";
 import FeedbackModule from "./pages/FeedbackModule";
 import StaffPerformance from "./pages/StaffPerformance";
@@ -71,7 +71,7 @@ import CustomerManagement from "./pages/CustomerManagement";
 import AddStudentForm from "./pages/AddStudentForm";
 import SchoolRouteManagement from "./pages/SchoolRouteManagement";
 import SchoolReceiptManagement from "./pages/SchoolReceiptManagement";
-import SchoolBranchReports from "./pages/SchoolBranchReports";
+const SchoolBranchReports = React.lazy(() => import("./pages/SchoolBranchReports"));
 import GlobalSchoolImport from "./pages/GlobalSchoolImport";
 import GlobalSchoolPayments from "./pages/GlobalSchoolPayments";
 import TotalDashboard from "./pages/TotalDashboard";
@@ -84,13 +84,13 @@ import SeasonalThemes from "./pages/SeasonalThemes";
 import DailyBusExpenses from "./pages/DailyBusExpenses";
 import Accounting from "./pages/Accounting";
 import Budgeting from "./pages/Budgeting";
-import TyreManagement from "./pages/TyreManagement";
-import FleetAnalytics from "./pages/FleetAnalytics";
+const TyreManagement = React.lazy(() => import("./pages/TyreManagement"));
+const FleetAnalytics = React.lazy(() => import("./pages/FleetAnalytics"));
 import VehicleInquiryHub from "./pages/VehicleInquiryHub";
 import ScheduledTasks from "./pages/ScheduledTasks";
 import ApiUsageMonitoring from "./pages/ApiUsageMonitoring";
 import { VerifyHubView } from "./components/system-monitor/VerifyHubView";
-import ExecutiveDashboard from "./pages/ExecutiveDashboard";
+const ExecutiveDashboard = React.lazy(() => import("./pages/ExecutiveDashboard"));
 import SystemHealthDashboard from "./pages/SystemHealthDashboard";
 import Marketing from "./pages/Marketing";
 import CustomerPortal from "./pages/CustomerPortal";
@@ -135,9 +135,10 @@ const App = () => (
             <SeasonalThemeProvider>
               <SystemErrorBoundary>
                 <BrowserRouter>
-                  <Routes>
-                    {/* Public routes */}
-            <Route path="/auth" element={<Auth />} />
+                  <React.Suspense fallback={<div className="flex h-screen w-full items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>}>
+                    <Routes>
+                      {/* Public routes */}
+              <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/accept-invite" element={<AcceptInvite />} />
             <Route path="/install" element={<InstallApp />} />
@@ -933,6 +934,7 @@ const App = () => (
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+                  </React.Suspense>
                 </BrowserRouter>
               </SystemErrorBoundary>
             </SeasonalThemeProvider>

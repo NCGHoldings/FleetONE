@@ -19,6 +19,20 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     target: "esnext",
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': ['lucide-react', 'framer-motion', 'embla-carousel-react'],
+          'vendor-charts': ['recharts', '@nivo/core', '@nivo/radar', '@nivo/sankey'],
+          'vendor-3d': ['three', '@react-three/fiber', '@react-three/drei'],
+          'vendor-pdf': ['jspdf', 'jspdf-autotable', 'html2canvas'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-utils': ['date-fns', 'zod', 'react-hook-form', '@tanstack/react-query'],
+        }
+      }
+    }
   },
   define: {
     __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
