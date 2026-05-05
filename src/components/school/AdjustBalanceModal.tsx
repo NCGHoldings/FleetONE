@@ -216,7 +216,7 @@ export function AdjustBalanceModal({ isOpen, onClose, student, onSuccess }: Adju
                 <SelectValue placeholder="Select Expense or Income Account..." />
               </SelectTrigger>
               <SelectContent>
-                {accounts?.filter(a => a.account_type === 'Expense' || a.account_type === 'Income' || a.account_type === 'Equity').map(acc => (
+                {accounts?.filter(a => ['expense', 'revenue', 'equity'].includes((a.account_type || '').toLowerCase())).map(acc => (
                   <SelectItem key={acc.id} value={acc.id}>
                     {acc.account_code} - {acc.account_name} ({acc.account_type})
                   </SelectItem>

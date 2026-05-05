@@ -961,10 +961,10 @@ export const useCreateAPInvoice = () => {
       }>;
       cost_allocations?: Array<{ unit_code: string; amount: number }>;
     }) => {
-      if (!selectedCompanyId) throw new Error("No company selected");
+      const effectiveCompanyId = getEffectiveCompanyId();
+      if (!effectiveCompanyId) throw new Error("No company selected");
       
       // For consolidated GL: post to parent company, tag with business unit
-      const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = getBusinessUnitCode();
       
       const { lines, cost_allocations, ...headerData } = invoice;

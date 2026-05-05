@@ -284,10 +284,9 @@ export const useCustomerBalance = (customerId: string) => {
 export const useVendors = () => {
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
-  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["vendors", selectedCompanyId, effectiveCompanyId, autoBusinessUnitCode],
+    queryKey: ["vendors", selectedCompanyId, effectiveCompanyId],
     queryFn: async () => {
       if (!effectiveCompanyId) return null;
       let query = supabase
@@ -297,11 +296,6 @@ export const useVendors = () => {
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
-      }
-
-      // Filter by business unit for sub-company views
-      if (autoBusinessUnitCode) {
-        (query as any) = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const data = await fetchAllRows(query);

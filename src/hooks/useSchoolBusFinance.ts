@@ -2280,6 +2280,7 @@ export function useSchoolPaymentDeletionBreakdown(paymentId: string | null) {
 // Reallocate Advance Credit
 export function useReallocateAdvancePayment() {
   const queryClient = useQueryClient();
+  const { getEffectiveCompanyId } = useCompany();
 
   return useMutation({
     mutationFn: async ({
@@ -2292,23 +2293,191 @@ export function useReallocateAdvancePayment() {
       amount: number;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
+      const effectiveCompanyId = getEffectiveCompanyId();
 
-      const { data, error } = await supabase.rpc('reallocate_school_payment_advance', {
-        p_payment_id: paymentId,
-        p_target_student_id: targetStudentId,
-        p_amount: amount,
-        p_user_id: user?.id,
-      });
+      if (!effectiveCompanyId) throw new Error("Company context missing");
 
-      if (error) {
-        console.error('Reallocation failed:', error);
-        throw error;
+      // 1. Fetch Source Payment
+      const { data: sourcePayment, error: sourceError } = await supabase
+        .from('school_payment_transactions')
+        .select('*')
+        .eq('id', paymentId)
+        .single();
+      if (sourceError || !sourcePayment) throw new Error('Source payment not found');
+
+      if (amount <= 0 || amount > sourcePayment.amount_paid) {
+        throw new Error('Cannot reallocate more than the original payment amount');
       }
 
-      return data;
+      // 2. Fetch Students
+      const { data: sourceStudent, error: sourceStudentError } = await supabase
+        .from('school_students')
+        .select('*')
+        .eq('id', sourcePayment.student_id)
+        .single();
+      if (sourceStudentError) throw new Error('Source student not found');
+
+      const { data: targetStudent, error: targetStudentError } = await supabase
+        .from('school_students')
+        .select('*')
+        .eq('id', targetStudentId)
+        .single();
+      if (targetStudentError) throw new Error('Target student not found');
+
+      if (sourceStudent.branch_id !== targetStudent.branch_id) {
+        throw new Error('Target student must be in the same branch to maintain GL integrity');
+      }
+
+      // 3. Fetch Settings
+      const { data: settings, error: settingsError } = await supabase
+        .from('school_bus_finance_settings')
+        .select('*')
+        .eq('company_id', effectiveCompanyId)
+        .or(`branch_id.eq.${sourceStudent.branch_id},branch_id.is.null`)
+        .order('branch_id', { ascending: false, nullsFirst: false })
+        .limit(1)
+        .single();
+      
+      if (settingsError || !settings) throw new Error('Finance settings not found for this branch');
+      
+      const arAccount = settings.trade_receivable_account_id;
+      if (!arAccount) throw new Error('AR Account not configured for this branch');
+
+      // 4. Create GL Journal Entry for Transfer
+      const randSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const jeNum = `SBS-XFR-${new Date().toISOString().replace(/[-:T.]/g, '').substring(0, 6)}-${randSuffix}`;
+      
+      const { data: je, error: jeError } = await supabase
+        .from('journal_entries')
+        .insert({
+          entry_number: jeNum,
+          entry_date: new Date().toISOString().split('T')[0],
+          description: `Advance Reallocation: ${sourceStudent.student_name} -> ${targetStudent.student_name}`,
+          reference: `PAY-${paymentId.substring(0, 8)}`,
+          total_debit: amount,
+          total_credit: amount,
+          status: 'posted',
+          company_id: effectiveCompanyId,
+          business_unit_code: 'SBO',
+          business_unit_id: sourceStudent.branch_id,
+          posted_at: new Date().toISOString(),
+          created_by: user?.id,
+        })
+        .select()
+        .single();
+      
+      if (jeError) throw new Error(`JE Error: ${jeError.message}`);
+
+      // 5. Create JE Lines
+      const { error: lineError } = await supabase
+        .from('journal_entry_lines')
+        .insert([
+          {
+            journal_entry_id: je.id,
+            account_id: arAccount,
+            description: `XFR Out - ${sourceStudent.student_name}`,
+            debit: amount,
+            credit: 0,
+            company_id: effectiveCompanyId
+          },
+          {
+            journal_entry_id: je.id,
+            account_id: arAccount,
+            description: `XFR In - ${targetStudent.student_name}`,
+            debit: 0,
+            credit: amount,
+            company_id: effectiveCompanyId
+          }
+        ]);
+        
+      if (lineError) throw new Error(`JE Line Error: ${lineError.message}`);
+
+      // Update COA Balance (Net 0)
+      // Since it's net 0 on the exact same account, current_balance remains identical, but included for completeness in other hooks
+      
+      // 6. Create Negative Payment for Source
+      const { error: outError } = await supabase
+        .from('school_payment_transactions')
+        .insert({
+          student_id: sourceStudent.id,
+          payment_month: sourcePayment.payment_month,
+          fixed_amount: 0,
+          amount_paid: -amount,
+          difference: -amount,
+          payment_balance_before: sourceStudent.payment_balance,
+          payment_balance_after: sourceStudent.payment_balance - amount,
+          payment_method: 'Transfer Out',
+          reference_no: `XFR-TO-${targetStudent.id.substring(0, 8)}`,
+          notes: `Reallocated to ${targetStudent.student_name}`,
+          created_by: user?.id,
+          journal_entry_id: je.id,
+          gl_posted: true,
+          payment_date: new Date().toISOString().split('T')[0]
+        });
+        
+      if (outError) throw new Error(`Out Payment Error: ${outError.message}`);
+
+      // 7. Create Positive Payment for Target
+      const { data: targetPayment, error: inError } = await supabase
+        .from('school_payment_transactions')
+        .insert({
+          student_id: targetStudent.id,
+          payment_month: sourcePayment.payment_month,
+          fixed_amount: 0,
+          amount_paid: amount,
+          difference: amount,
+          payment_balance_before: targetStudent.payment_balance,
+          payment_balance_after: targetStudent.payment_balance + amount,
+          payment_method: 'Transfer In',
+          reference_no: `XFR-FROM-${sourceStudent.id.substring(0, 8)}`,
+          notes: `Reallocated from ${sourceStudent.student_name}`,
+          created_by: user?.id,
+          journal_entry_id: je.id,
+          gl_posted: true,
+          payment_date: new Date().toISOString().split('T')[0]
+        })
+        .select()
+        .single();
+        
+      if (inError) throw new Error(`In Payment Error: ${inError.message}`);
+
+      // 8. Auto-Allocate Target Student Invoices (FIFO)
+      let remainingAmount = amount;
+      const { data: pendingInvoices } = await supabase
+        .from('school_ar_invoices')
+        .select('*')
+        .eq('student_id', targetStudentId)
+        .in('status', ['pending', 'partial'])
+        .order('created_at', { ascending: true });
+
+      if (pendingInvoices) {
+        for (const inv of pendingInvoices) {
+          if (remainingAmount <= 0) break;
+          const outstanding = inv.invoice_amount - (inv.paid_amount || 0);
+          if (outstanding > 0) {
+            const applied = Math.min(remainingAmount, outstanding);
+            const newPaid = (inv.paid_amount || 0) + applied;
+            
+            await supabase
+              .from('school_ar_invoices')
+              .update({
+                paid_amount: newPaid,
+                status: newPaid >= inv.invoice_amount ? 'paid' : 'partial',
+                payment_id: targetPayment.id,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', inv.id);
+            
+            remainingAmount -= applied;
+          }
+        }
+      }
+
+      // Trigger syncs will automatically update school_students.payment_balance for both
+
+      return { success: true, message: `Successfully reallocated LKR ${amount} to ${targetStudent.student_name}` };
     },
     onSuccess: () => {
-      // Invalidate both student balance queries
       queryClient.invalidateQueries({ queryKey: ["student-payment-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["school-students"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });

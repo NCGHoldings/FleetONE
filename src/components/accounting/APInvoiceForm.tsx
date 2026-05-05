@@ -15,7 +15,7 @@ import { useCreateAPInvoice, useUpdateAPInvoice, useCreateAPPayment } from "@/ho
 import { useCompany } from "@/contexts/CompanyContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays } from "date-fns";
-import { Plus, Trash2, Check, ChevronsUpDown, Bus, Route, Banknote, CreditCard, Split } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Bus, Route, Banknote, CreditCard, Split, Lock, Unlock } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -70,10 +70,11 @@ interface SingleAPInvoiceFormProps {
   initialData?: SingleInvoiceData;
   editingInvoice?: any;
   isActive: boolean;
+  open: boolean;
   onDataChange?: (data: SingleInvoiceData) => void;
 }
 
-const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive, onDataChange }: SingleAPInvoiceFormProps, ref) => {
+const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive, open, onDataChange }: SingleAPInvoiceFormProps, ref) => {
   const { data: vendors } = useVendors();
   const { data: taxCodes } = useTaxCodes();
   const { data: bankAccounts } = useBankAccounts();
@@ -1069,6 +1070,7 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
 
 export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceFormProps) => {
   const [numCopies, setNumCopies] = useState(1);
+  const [isLocked, setIsLocked] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
   const [copiesData, setCopiesData] = useState<SingleInvoiceData[]>([]);
   const formRefs = useRef<any[]>([]);
@@ -1087,6 +1089,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
         setCopiesData([]);
       } else {
         setNumCopies(1);
+        setIsLocked(true);
         setActiveTab(0);
         setCopiesData([
           {
@@ -1149,17 +1152,27 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     try {
       // 1. Validate all forms
       const validatedData = [];
-      for (let i = 0; i < numCopies; i++) {
+      const validationCount = isLocked && numCopies > 1 ? 1 : numCopies;
+      
+      for (let i = 0; i < validationCount; i++) {
         const ref = formRefs.current[i];
         if (ref) {
           const data = await ref.validateAndGetData();
           if (!data) {
-            toast.error(`Please fix the errors in Copy ${i + 1}`);
+            toast.error(isLocked ? "Please fix the errors before saving copies" : `Please fix the errors in Copy ${i + 1}`);
             setActiveTab(i);
             setIsSubmitting(false);
             return;
           }
           validatedData.push(data);
+        }
+      }
+
+      // If locked, duplicate the validated data to cover all copies
+      if (isLocked && numCopies > 1 && validatedData.length === 1) {
+        const template = validatedData[0];
+        while (validatedData.length < numCopies) {
+          validatedData.push(JSON.parse(JSON.stringify(template)));
         }
       }
 
@@ -1204,18 +1217,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
           // New Invoice creation
           let finalInvoiceNumber = data.formValues.invoice_number;
           if (!finalInvoiceNumber) {
-            const year = new Date().getFullYear();
-            const prefix = `AP-INV-${year}-`;
-            let query = supabase.from("ap_invoices").select("invoice_number").ilike("invoice_number", `${prefix}%`).order("invoice_number", { ascending: false }).limit(1);
-            const effectiveCompanyId = getEffectiveCompanyId?.() || undefined;
-            if (effectiveCompanyId) query = query.eq("company_id", effectiveCompanyId);
-            const { data: latestInvoice } = await query.maybeSingle();
-            let nextSeq = 1;
-            if (latestInvoice?.invoice_number) {
-               const match = latestInvoice.invoice_number.match(/(\d+)$/);
-               if (match) nextSeq = parseInt(match[1], 10) + 1;
-            }
-            finalInvoiceNumber = `${prefix}${String(nextSeq).padStart(4, "0")}`;
+            finalInvoiceNumber = await generatePayNum("ap_invoice");
           }
 
           const validAllocations = data.allocations.filter((a: any) => a.unit_code && a.amount > 0).map((a: any) => ({ unit_code: a.unit_code, amount: a.amount }));
@@ -1258,23 +1260,54 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
             <DialogTitle>{editingInvoice ? "Edit AP Invoice" : "Record AP Invoice (Vendor Bill)"}</DialogTitle>
             
             {!editingInvoice && (
-              <div className="flex items-center gap-2 pr-6">
-                <span className="text-sm text-muted-foreground whitespace-nowrap">Number of Copies:</span>
-                <Input 
-                  type="number" 
-                  min={1} 
-                  max={20} 
-                  value={numCopies} 
-                  onChange={handleNumCopiesChange}
-                  className="w-20 h-8"
-                />
+              <div className="flex items-center gap-6 pr-6">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                    {isLocked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+                    Identical Copies:
+                  </span>
+                  <Switch 
+                    checked={isLocked}
+                    onCheckedChange={(checked) => {
+                      setIsLocked(checked);
+                      if (!checked && copiesData.length > 1 && formRefs.current[0]) {
+                        // When unlocking, ensure copies have the latest data from Copy 1
+                        formRefs.current[0].validateAndGetData().then((latestData: any) => {
+                          if (latestData) {
+                            setCopiesData(prev => {
+                              const newData = [...prev];
+                              for (let i = 1; i < newData.length; i++) {
+                                newData[i] = JSON.parse(JSON.stringify(latestData));
+                              }
+                              return newData;
+                            });
+                          }
+                        });
+                      } else if (checked) {
+                        // When locking, immediately switch to the first tab
+                        setActiveTab(0);
+                      }
+                    }}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">Number of Copies:</span>
+                  <Input 
+                    type="number" 
+                    min={1} 
+                    max={20} 
+                    value={numCopies} 
+                    onChange={handleNumCopiesChange}
+                    className="w-20 h-8"
+                  />
+                </div>
               </div>
             )}
           </div>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto bg-muted/10 p-6">
-          {!editingInvoice && numCopies > 1 && (
+          {!editingInvoice && numCopies > 1 && !isLocked && (
             <div className="flex gap-1 mb-4 overflow-x-auto pb-2 border-b">
               {Array.from({ length: numCopies }).map((_, i) => (
                 <button
@@ -1299,14 +1332,16 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
                ref={el => formRefs.current[0] = el}
                editingInvoice={editingInvoice}
                isActive={true}
+               open={open}
              />
           ) : (
-            copiesData.map((data, i) => (
+            copiesData.slice(0, isLocked ? 1 : copiesData.length).map((data, i) => (
               <SingleAPInvoiceForm 
                 key={i}
                 ref={el => formRefs.current[i] = el}
                 initialData={data}
-                isActive={activeTab === i}
+                isActive={isLocked ? true : activeTab === i}
+                open={open}
                 onDataChange={(newData) => handleDataChange(i, newData)}
               />
             ))
