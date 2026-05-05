@@ -16,6 +16,11 @@ DECLARE
     v_je_num text;
     v_ar_account uuid;
     v_rand_suffix text;
+    v_target_new_payment_id uuid;
+    v_remaining_amount numeric;
+    v_inv RECORD;
+    v_outstanding numeric;
+    v_applied numeric;
 BEGIN
     -- 1. Fetch Source Data and Lock
     SELECT * INTO v_source_payment FROM school_payment_transactions WHERE id = p_payment_id FOR UPDATE;
@@ -108,9 +113,38 @@ BEGIN
         'XFR-FROM-' || substring(v_source_student.id::text from 1 for 8), 
         'Reallocated from ' || v_source_student.student_name, 
         p_user_id, v_je_id, true, CURRENT_DATE
-    );
+    ) RETURNING id INTO v_target_new_payment_id;
 
-    -- 6. Trigger syncs will automatically update school_students.payment_balance for both
+    -- 6. Auto-Allocate Target Student Invoices (FIFO)
+    v_remaining_amount := p_amount;
+    FOR v_inv IN 
+        SELECT id, invoice_amount, paid_amount 
+        FROM school_ar_invoices 
+        WHERE student_id = p_target_student_id 
+          AND status IN ('pending', 'partial')
+        ORDER BY created_at ASC
+    LOOP
+        IF v_remaining_amount <= 0 THEN
+            EXIT;
+        END IF;
+
+        v_outstanding := v_inv.invoice_amount - COALESCE(v_inv.paid_amount, 0);
+        
+        IF v_outstanding > 0 THEN
+            v_applied := LEAST(v_remaining_amount, v_outstanding);
+            
+            UPDATE school_ar_invoices
+            SET paid_amount = COALESCE(paid_amount, 0) + v_applied,
+                status = CASE WHEN (COALESCE(paid_amount, 0) + v_applied) >= invoice_amount THEN 'paid' ELSE 'partial' END,
+                payment_id = v_target_new_payment_id,
+                updated_at = now()
+            WHERE id = v_inv.id;
+
+            v_remaining_amount := v_remaining_amount - v_applied;
+        END IF;
+    END LOOP;
+
+    -- 7. Trigger syncs will automatically update school_students.payment_balance for both
 
     RETURN json_build_object(
         'success', true, 

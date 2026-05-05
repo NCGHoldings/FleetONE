@@ -220,19 +220,32 @@ export function SchoolBusFinanceSettlement({
 
     setActionLoading(true);
     try {
+      const amountPaid = Number(payment.amount_paid);
+      
+      // Calculate TRUE AR debt for this exact payment instance
+      // 1. Current outstanding debt that hasn't been allocated yet
+      const unallocatedOwed = Number(student?.current_amount_due || 0);
+      // 2. Any amount from this payment that was ALREADY allocated to invoices (in case they allocated before syncing GL)
+      const allocatedToThisPayment = invoices
+        .filter((inv: any) => inv.payment_id === payment.id)
+        .reduce((sum: number, inv: any) => sum + Number(inv.paid_amount || 0), 0);
+      
+      const trueArDebt = unallocatedOwed + allocatedToThisPayment;
+      
+      // The AR credit cannot exceed what the payment actually was
+      const arCredit = Math.min(amountPaid, trueArDebt);
+      const calculatedOverpayment = amountPaid > arCredit ? amountPaid - arCredit : undefined;
+
       await postPaymentToGL.mutateAsync({
         paymentId: payment.id,
-        amount: Number(payment.amount_paid),
+        amount: amountPaid,
         branchId: student.branch_id,
         studentName: student.student_name,
         paymentMethod: payment.payment_method || 'Cash',
         referenceNo: payment.reference_no,
         customBankAccountId: overrideBankAccountId || undefined,
-        fixedAmount: Number(payment.fixed_amount || student.fixed_monthly_amount),
-        // If they paid more than due, send overpayment amount
-        overpaymentAmount: Number(payment.amount_paid) > Number(payment.fixed_amount) 
-          ? Number(payment.amount_paid) - Number(payment.fixed_amount) 
-          : undefined,
+        fixedAmount: arCredit,
+        overpaymentAmount: calculatedOverpayment,
         previousBalance: Number(payment.payment_balance_before || 0),
         studentId: student.id,
       });
@@ -988,8 +1001,17 @@ export function SchoolBusFinanceSettlement({
                                     reallocateDialog.targetStudentId === s.id ? "opacity-100" : "opacity-0"
                                   )}
                                 />
-                                <div className="flex flex-col">
-                                  <span>{s.student_name}</span>
+                                <div className="flex flex-col w-full">
+                                  <div className="flex justify-between items-center w-full">
+                                    <span className="font-medium">{s.student_name}</span>
+                                    {Number(s.current_amount_due) > 0 ? (
+                                      <span className="text-xs font-semibold text-red-600">Owes LKR {Number(s.current_amount_due).toLocaleString()}</span>
+                                    ) : Number(s.payment_balance) > 0 ? (
+                                      <span className="text-xs font-semibold text-emerald-600">Credit LKR {Number(s.payment_balance).toLocaleString()}</span>
+                                    ) : (
+                                      <span className="text-xs text-slate-400">Settled (0)</span>
+                                    )}
+                                  </div>
                                   <span className="text-xs text-slate-500">{s.admission_number || 'No ADM'}</span>
                                 </div>
                               </CommandItem>
@@ -999,6 +1021,42 @@ export function SchoolBusFinanceSettlement({
                       </Command>
                     </PopoverContent>
                   </Popover>
+                  
+                  {/* Selected Target Student Breakdown */}
+                  {reallocateDialog.targetStudentId && (
+                    <div className="mt-3 p-3 bg-white border border-slate-200 rounded-md shadow-sm">
+                      <p className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">Target Student Status</p>
+                      {activeStudents.find((s: any) => s.id === reallocateDialog.targetStudentId) && (
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-sm font-medium text-slate-800">
+                              {activeStudents.find((s: any) => s.id === reallocateDialog.targetStudentId)?.student_name}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              Monthly Fee: LKR {Number(activeStudents.find((s: any) => s.id === reallocateDialog.targetStudentId)?.fixed_monthly_amount || 0).toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            {Number(activeStudents.find((s: any) => s.id === reallocateDialog.targetStudentId)?.current_amount_due) > 0 ? (
+                              <div>
+                                <p className="text-sm font-bold text-red-600">
+                                  Owes LKR {Number(activeStudents.find((s: any) => s.id === reallocateDialog.targetStudentId)?.current_amount_due).toLocaleString()}
+                                </p>
+                                <p className="text-xs text-slate-500">Pending Invoices</p>
+                              </div>
+                            ) : (
+                              <div>
+                                <p className="text-sm font-bold text-emerald-600">
+                                  Credit LKR {Number(activeStudents.find((s: any) => s.id === reallocateDialog.targetStudentId)?.payment_balance || 0).toLocaleString()}
+                                </p>
+                                <p className="text-xs text-slate-500">Advance Balance</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

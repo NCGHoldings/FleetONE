@@ -37,8 +37,8 @@ BEGIN
     ORDER BY branch_id NULLS LAST
     LIMIT 1;
 
-    -- 2. Fetch the global suspense account (changed from finance_settings to gl_settings)
-    SELECT suspense_account_id
+    -- 2. Fetch the global suspense/expense account (mapped to expense_account_id in gl_settings)
+    SELECT expense_account_id
     INTO v_suspense_account
     FROM gl_settings
     WHERE company_id = v_company_id

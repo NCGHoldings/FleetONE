@@ -1167,7 +1167,7 @@ export function usePostPaymentToGL() {
       // Scenario 2: Credit Consumption (has existing credit, paid < fixedAmount) → DR Advance Liability
       // Scenario 3: Exact payment → No liability entry
       const existingCredit = (previousBalance && previousBalance > 0) ? previousBalance : 0;
-      const amountDue = fixedAmount || amount;
+      const amountDue = fixedAmount ?? amount;
       const shortfall = amountDue - amount; // How much less than due was paid
       const creditToConsume = Math.min(existingCredit, Math.max(0, shortfall)); // Draw from credit
 

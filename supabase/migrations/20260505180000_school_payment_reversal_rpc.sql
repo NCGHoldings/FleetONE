@@ -107,6 +107,11 @@ BEGIN
         RAISE EXCEPTION 'School payment transaction not found';
     END IF;
 
+    -- IMMEDIATELY unlink foreign keys from the payment to prevent FK violations during deletions
+    UPDATE school_payment_transactions 
+    SET ar_receipt_id = NULL, journal_entry_id = NULL 
+    WHERE id = p_payment_id;
+
     -- 1. Revert Student Balance
     v_balance_impact := v_payment.payment_balance_after - v_payment.payment_balance_before;
     v_student_id := v_payment.student_id;
@@ -131,9 +136,6 @@ BEGIN
         IF FOUND THEN
             v_je_id := v_ar_receipt.journal_entry_id;
             v_ar_receipt_id := v_ar_receipt.id;
-
-            -- A. Un-link the AR receipt from the payment to avoid foreign key violations
-            UPDATE school_payment_transactions SET ar_receipt_id = NULL WHERE id = p_payment_id;
 
             -- B. Delete Bank Transactions (this triggers bank_accounts balance update via existing triggers)
             DELETE FROM bank_transactions WHERE source_type = 'ar_receipt' AND source_id = v_ar_receipt_id;
