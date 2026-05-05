@@ -11,12 +11,13 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { usePostPaymentToGL, syncPaymentToFinanceAR } from '@/hooks/useSchoolBusFinance';
+import { usePostPaymentToGL, syncPaymentToFinanceAR, useReallocateAdvancePayment, useStudentsForBulkAR } from '@/hooks/useSchoolBusFinance';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { DeleteSchoolPaymentDialog } from './DeleteSchoolPaymentDialog';
 
 interface SchoolBusFinanceSettlementProps {
@@ -34,6 +35,7 @@ export function SchoolBusFinanceSettlement({
   const effectiveCompanyId = getEffectiveCompanyId();
   
   const postPaymentToGL = usePostPaymentToGL();
+  const reallocatePayment = useReallocateAdvancePayment();
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -60,7 +62,16 @@ export function SchoolBusFinanceSettlement({
     payment: any;
   } | null>(null);
 
+  const [reallocateDialog, setReallocateDialog] = useState<{
+    isOpen: boolean;
+    payment: any;
+    targetStudentId: string;
+    amount: string;
+  } | null>(null);
+
   const [transactionToDelete, setTransactionToDelete] = useState<any>(null);
+
+  const { data: activeStudents = [] } = useStudentsForBulkAR(student?.branch_id || null);
 
   useEffect(() => {
     if (isOpen && studentId) {
@@ -307,6 +318,46 @@ export function SchoolBusFinanceSettlement({
     }
   };
 
+  const handleReallocatePayment = async () => {
+    if (!reallocateDialog) return;
+    
+    const { payment, targetStudentId, amount } = reallocateDialog;
+    const transferAmount = Number(amount);
+
+    if (!targetStudentId) {
+      toast.error("Please select a target student");
+      return;
+    }
+    
+    if (isNaN(transferAmount) || transferAmount <= 0) {
+      toast.error("Please enter a valid amount greater than 0");
+      return;
+    }
+    
+    if (transferAmount > Number(payment.amount_paid)) {
+      toast.error(`Amount cannot exceed the original payment of LKR ${Number(payment.amount_paid).toLocaleString()}`);
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await reallocatePayment.mutateAsync({
+        paymentId: payment.id,
+        targetStudentId,
+        amount: transferAmount
+      });
+
+      toast.success("Advance credit successfully reallocated");
+      setReallocateDialog(null);
+      await fetchFinanceData();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to reallocate advance credit");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   // Calculate stats
@@ -423,26 +474,42 @@ export function SchoolBusFinanceSettlement({
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 md:max-w-[200px]">
                                 {!payment.gl_posted && (
                                   <Button 
                                     variant="outline" 
-                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 w-full md:w-auto text-xs h-8"
                                     onClick={() => setGlSyncDialog({ isOpen: true, payment })}
                                     disabled={actionLoading}
                                   >
-                                    <RefreshCw className="w-4 h-4 mr-2" />
-                                    Sync to GL
+                                    <RefreshCw className="w-3 h-3 mr-1" />
+                                    Sync GL
+                                  </Button>
+                                )}
+                                {payment.gl_posted && Number(payment.amount_paid) > 0 && !payment.payment_method.includes('Transfer Out') && (
+                                  <Button 
+                                    variant="outline" 
+                                    className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 w-full md:w-auto text-xs h-8"
+                                    onClick={() => setReallocateDialog({ 
+                                      isOpen: true, 
+                                      payment, 
+                                      targetStudentId: '', 
+                                      amount: Number(payment.amount_paid).toString() 
+                                    })}
+                                    disabled={actionLoading}
+                                  >
+                                    <ArrowRight className="w-3 h-3 mr-1" />
+                                    Reallocate
                                   </Button>
                                 )}
                                 <Button 
                                   variant="outline" 
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 w-full md:w-auto text-xs h-8"
                                   onClick={() => setTransactionToDelete(payment)}
                                   disabled={actionLoading}
                                 >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete / Reverse
+                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  Reverse
                                 </Button>
                             </div>
                           </div>
@@ -842,6 +909,125 @@ export function SchoolBusFinanceSettlement({
               <Button onClick={handleSyncToGL} disabled={actionLoading} className="bg-blue-600 hover:bg-blue-700 text-white">
                 {actionLoading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
                 Post to General Ledger
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Reallocate Advance Dialog */}
+      {reallocateDialog && (
+        <Dialog open={reallocateDialog.isOpen} onOpenChange={(open) => !open && setReallocateDialog(null)}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle className="text-xl flex items-center gap-2">
+                <ArrowRight className="w-5 h-5 text-emerald-600" />
+                Reallocate Advance Credit
+              </DialogTitle>
+              <DialogDescription>
+                Transfer a portion of this payment's balance to another student in the same branch.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 my-2">
+              <Card className="bg-slate-50 border-slate-200 shadow-none">
+                <CardContent className="p-4 flex flex-col items-center text-center">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Original Payment Amount</p>
+                  <p className="text-2xl font-bold text-slate-700">LKR {Number(reallocateDialog.payment.amount_paid).toLocaleString()}</p>
+                  <p className="text-sm text-slate-600 mt-1">{reallocateDialog.payment.payment_method}</p>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Transfer Amount (LKR)</Label>
+                  <Input 
+                    type="number" 
+                    value={reallocateDialog.amount}
+                    onChange={(e) => setReallocateDialog({...reallocateDialog, amount: e.target.value})}
+                    placeholder="Enter amount to transfer"
+                    max={Number(reallocateDialog.payment.amount_paid)}
+                  />
+                  <p className="text-xs text-slate-500">Maximum allowed: LKR {Number(reallocateDialog.payment.amount_paid).toLocaleString()}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Target Student (Same Branch)</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between mt-1 bg-white"
+                      >
+                        {reallocateDialog.targetStudentId
+                          ? activeStudents.find((s: any) => s.id === reallocateDialog.targetStudentId)?.student_name
+                          : "Select a student to receive funds..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[500px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search by name or admission no..." />
+                        <CommandList>
+                          <CommandEmpty>No students found.</CommandEmpty>
+                          <CommandGroup>
+                            {activeStudents
+                              .filter((s: any) => s.id !== student.id)
+                              .map((s: any) => (
+                              <CommandItem
+                                key={s.id}
+                                value={`${s.student_name} ${s.admission_number || ''}`}
+                                onSelect={() => {
+                                  setReallocateDialog({...reallocateDialog, targetStudentId: s.id});
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    reallocateDialog.targetStudentId === s.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span>{s.student_name}</span>
+                                  <span className="text-xs text-slate-500">{s.admission_number || 'No ADM'}</span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              <div className="bg-emerald-50/50 rounded-lg p-4 border border-emerald-100 text-sm">
+                <p className="font-semibold text-emerald-800 mb-2">What will happen?</p>
+                <ul className="space-y-2 text-slate-700">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span><strong>1. Balance Updated:</strong> {student.student_name}'s advance drops, and the new student's balance is credited.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span><strong>2. Audit Trail:</strong> A negative payment is logged here, and a positive payment is logged on the new student.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span><strong>3. GL Balanced:</strong> A Journal Entry moves AR (Accounts Receivable) from this student to the new student without affecting the Bank.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-4">
+              <Button variant="outline" onClick={() => setReallocateDialog(null)} disabled={actionLoading}>
+                Cancel
+              </Button>
+              <Button onClick={handleReallocatePayment} disabled={actionLoading || !reallocateDialog.targetStudentId} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                {actionLoading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                Confirm Transfer
               </Button>
             </div>
           </DialogContent>

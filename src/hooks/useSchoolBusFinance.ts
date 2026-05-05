@@ -1498,6 +1498,7 @@ export function usePostGroupedPaymentToGL() {
       referenceNo,
       description,
       allocations,
+      customBankAccountId,
     }: {
       totalAmount: number;
       branchId: string;
@@ -2273,6 +2274,46 @@ export function useSchoolPaymentDeletionBreakdown(paymentId: string | null) {
       return data;
     },
     enabled: !!paymentId,
+  });
+}
+
+// Reallocate Advance Credit
+export function useReallocateAdvancePayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      paymentId,
+      targetStudentId,
+      amount,
+    }: {
+      paymentId: string;
+      targetStudentId: string;
+      amount: number;
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { data, error } = await supabase.rpc('reallocate_school_payment_advance', {
+        p_payment_id: paymentId,
+        p_target_student_id: targetStudentId,
+        p_amount: amount,
+        p_user_id: user?.id,
+      });
+
+      if (error) {
+        console.error('Reallocation failed:', error);
+        throw error;
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      // Invalidate both student balance queries
+      queryClient.invalidateQueries({ queryKey: ["student-payment-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["school-students"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-ar-stats"] });
+    },
   });
 }
 
