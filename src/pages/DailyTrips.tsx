@@ -26,6 +26,7 @@ import { RouteProfitabilityReport } from "@/components/ncg-express/RouteProfitab
 import { CashierSettlementDashboard } from "@/components/ncg-express/CashierSettlementDashboard";
 import { BankDepositDashboard } from "@/components/ncg-express/BankDepositDashboard";
 import { FleetMasterSpreadsheet } from "@/components/fleet/FleetMasterSpreadsheet";
+import { LogSheetUploadModal } from "@/components/trips/LogSheetUploadModal";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 
@@ -41,6 +42,7 @@ export default function DailyTrips() {
   const [showGLExportModal, setShowGLExportModal] = useState(false);
   const [showRouteGLAdmin, setShowRouteGLAdmin] = useState(false);
   const [showBulkGLPostingDialog, setShowBulkGLPostingDialog] = useState(false);
+  const [showLogSheetModal, setShowLogSheetModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   
   // Validate and prepare date range for hook
@@ -228,6 +230,14 @@ export default function DailyTrips() {
               >
                 <Upload className="mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Import</span>
+              </Button>
+
+              <Button 
+                variant="outline"
+                onClick={() => setShowLogSheetModal(true)}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Upload Log Sheet</span>
               </Button>
 
               <Button 
@@ -443,6 +453,15 @@ export default function DailyTrips() {
         onComplete={() => {
           handleRefetch();
           toast.success('GL posting complete!');
+        }}
+      />
+
+      <LogSheetUploadModal
+        open={showLogSheetModal}
+        onOpenChange={setShowLogSheetModal}
+        selectedDate={selectedDate}
+        onSuccess={() => {
+          handleRefetch();
         }}
       />
     </div>

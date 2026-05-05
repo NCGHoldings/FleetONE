@@ -416,16 +416,16 @@ export const AccountsPayableView = () => {
           </TabsList>
 
           <TabsContent value="all" className="mt-4">
-            <DataTable columns={columns} data={filteredInvoices} />
+            <DataTable enableColumnFilters columns={columns} data={filteredInvoices} />
           </TabsContent>
           <TabsContent value="unpaid">
-            <DataTable columns={columns} data={filteredInvoices} />
+            <DataTable enableColumnFilters columns={columns} data={filteredInvoices} />
           </TabsContent>
           <TabsContent value="partial">
-            <DataTable columns={columns} data={filteredInvoices} />
+            <DataTable enableColumnFilters columns={columns} data={filteredInvoices} />
           </TabsContent>
           <TabsContent value="paid">
-            <DataTable columns={columns} data={filteredInvoices} />
+            <DataTable enableColumnFilters columns={columns} data={filteredInvoices} />
           </TabsContent>
         </Tabs>
       </Card>

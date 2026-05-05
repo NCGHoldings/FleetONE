@@ -1768,3 +1768,40 @@ export const useCreatePettyCashTopUp = () => {
     },
   });
 };
+
+export const useIOUDeletionBreakdown = (iouId: string | null) => {
+  return useQuery({
+    queryKey: ["iou-deletion-breakdown", iouId],
+    queryFn: async () => {
+      if (!iouId) return null;
+      const { data, error } = await supabase.rpc("get_iou_deletion_breakdown", { p_iou_id: iouId });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!iouId,
+  });
+};
+
+export const useDeleteIOU = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (iouId: string) => {
+      const { data, error } = await supabase.rpc("delete_and_reverse_iou", { p_iou_id: iouId });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["iou-records"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      toast({ title: "IOU Deleted", description: "IOU and all related financial entries have been successfully reversed." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+};

@@ -463,7 +463,7 @@ export const VehicleOperatingCostView = () => {
             <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <DataTable 
+          <DataTable enableColumnFilters 
             columns={vehicleColumns} 
             data={vehicleCosts} 
             searchKey="busNo"

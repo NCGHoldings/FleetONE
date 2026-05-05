@@ -344,6 +344,18 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
     }));
   };
 
+  const handleTripCrewChange = (tripIndex: number, field: 'driverName' | 'conductorName', value: string) => {
+    setHasEdits(true);
+    setEditedData(prev => ({
+      ...prev,
+      trips: prev.trips.map((trip, idx) =>
+        idx === tripIndex
+          ? { ...trip, [field]: value }
+          : trip
+      )
+    }));
+  };
+
   const handleAllocateUnmapped = (unmappedKey: string, targetCategory: keyof DBExpenseFields) => {
     const amount = unmappedItems[unmappedKey];
     if (amount) {
@@ -844,6 +856,49 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                         </div>
                         
                         <div className="space-y-1 text-xs">
+                          {/* Driver and Conductor Names */}
+                          {(trip.driverName || isEditing) && (
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-muted-foreground flex items-center gap-1">
+                                <span className="text-xs">👨‍✈️</span> Driver:
+                              </span>
+                              {isEditing ? (
+                                <Input
+                                  type="text"
+                                  value={trip.driverName || ''}
+                                  onChange={(e) => handleTripCrewChange(tripIdx, 'driverName', e.target.value)}
+                                  className="h-6 w-32 text-xs"
+                                  placeholder="Driver Name"
+                                />
+                              ) : (
+                                <span className="font-medium text-blue-700 dark:text-blue-300">
+                                  {trip.driverName}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          
+                          {(trip.conductorName || isEditing) && (
+                            <div className="flex justify-between items-center mb-2 pb-2 border-b border-muted/50">
+                              <span className="text-muted-foreground flex items-center gap-1">
+                                <span className="text-xs">🎫</span> Conductor:
+                              </span>
+                              {isEditing ? (
+                                <Input
+                                  type="text"
+                                  value={trip.conductorName || ''}
+                                  onChange={(e) => handleTripCrewChange(tripIdx, 'conductorName', e.target.value)}
+                                  className="h-6 w-32 text-xs"
+                                  placeholder="Conductor Name"
+                                />
+                              ) : (
+                                <span className="font-medium text-blue-700 dark:text-blue-300">
+                                  {trip.conductorName}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
                           {Object.entries(trip.income).map(([key, value]) => (
                             value > 0 || isEditing ? (
                               <div key={key} className="flex justify-between items-center">

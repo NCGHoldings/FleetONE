@@ -156,7 +156,7 @@ export const ChequeBookManagement = () => {
         </div>
       </div>
 
-      <DataTable columns={columns} data={chequeBooks || []} searchKey="prefix" />
+      <DataTable enableColumnFilters columns={columns} data={chequeBooks || []} searchKey="prefix" />
 
       {/* Add Cheque Book Dialog */}
       <Dialog open={showAddForm} onOpenChange={setShowAddForm}>

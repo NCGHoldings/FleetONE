@@ -11,16 +11,64 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64 } = await req.json();
+    const { imageBase64, sheetType = 'daily_trip' } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    console.log('Starting OCR extraction with Lovable AI');
+    console.log(`Starting OCR extraction with Lovable AI (Type: ${sheetType})`);
 
-    const prompt = `Analyze this Sri Lankan bus trip sheet. This sheet contains MULTIPLE trips for ONE bus on ONE day.
+    let prompt = "";
+    
+    if (sheetType === 'monthly_log') {
+      prompt = `Analyze this Sri Lankan bus monthly log sheet. This sheet contains MULTIPLE DAYS of data for ONE bus.
+
+CRITICAL: Extract the data from the table exactly as written.
+
+1. BUS NUMBER: Extract from the top right (e.g. වාහන අංකය: NC 8226 -> "NC-8226").
+
+2. LOG SHEET ROWS:
+   For EACH ROW in the table, extract:
+   - "date": Date (e.g., "04/22", "04/23")
+   - "start_location": Start Location (ගමන් ආරම්භක ස්ථානය, e.g. "KB")
+   - "start_odo": Start Odometer (ආරම්භක මාපක කියවීම, e.g. 77500)
+   - "start_time": Start Time (e.g. "07:30")
+   - "end_location": End Location (අවසන් කළ ස්ථානය, e.g. "KB")
+   - "end_odo": End Odometer (අවසන් මාපක කියවීම, e.g. 77815)
+   - "end_time": End Time (e.g. "22:00")
+   - "distance": Total Distance (සමස්ත දුර, e.g. 315)
+   - "fuel_liters": Fuel Pumped (පිරවූ ඉන්ධන, e.g. 120 or 121. Extract only the number, strip 'l' or 'L')
+   - "driver_name": Driver Name (රියදුරුගේ නම, e.g. "Amila")
+   - "conductor_name": Conductor/Helper Name (රිය සහයකගේ නම, e.g. "Geetha")
+
+CRITICAL RULES:
+- Ignore empty rows.
+- If a value is missing or illegible, use null.
+- Convert fuel to numbers (e.g. "120 L" -> 120).
+
+Return JSON EXACTLY in this format:
+{
+  "busNumber": "NC-8226",
+  "logs": [
+    {
+      "date": "04/22",
+      "start_location": "KB",
+      "start_odo": 77500,
+      "start_time": "07:30",
+      "end_location": "KB",
+      "end_odo": 77815,
+      "end_time": "22:00",
+      "distance": 315,
+      "fuel_liters": 120,
+      "driver_name": "Amila",
+      "conductor_name": "Geetha"
+    }
+  ]
+}`;
+    } else {
+      prompt = `Analyze this Sri Lankan bus trip sheet. This sheet contains MULTIPLE trips for ONE bus on ONE day.
 
 CRITICAL: Look for a TABLE with numbered rows (usually 1, 2, 3, 4) showing different trips.
 
@@ -35,15 +83,17 @@ Extract:
 2. DATE: Format DD/MM/YYYY or දිනය
    - Look for the date field at the top of the sheet
 
-3. CREW INFORMATION (IMPORTANT - extract if visible):
-   - DRIVER NAME (රියදුරු / ඩ්‍රයිවර් / Driver): Look for driver name near the top of the sheet
-   - CONDUCTOR NAME (කොන්දොස්තර / Conductor / Helper): Look for conductor/helper name
-   - These are usually written near the bus number or at the top of the sheet
-   - If you see a signature or name field, extract the readable name
+3. CREW INFORMATION (IMPORTANT - PER TRIP IF POSSIBLE):
+   - Look for Driver (රියදුරු / ඩ්‍රයිවර්) and Conductor (කොන්දොස්තර) names.
+   - Sometimes the crew changes between trips. If names are written next to specific trips, assign them to those trips.
+   - If only one set of names is written at the top of the sheet, apply those names to ALL trips.
+   - Extract the readable names from signatures or written text.
 
 4. TRIP TABLE (rows labeled 1, 2, 3, 4):
    For EACH ROW that has data, extract:
    - Trip number (1, 2, 3, or 4)
+   - Driver Name for this trip (driverName) - use the global one if not specified per trip
+   - Conductor Name for this trip (conductorName) - use the global one if not specified per trip
    - Revenue fields for that specific trip:
      * බස්රථ / බස් රථ / bus collection (Regular passenger income)
      * ඇවිලා / ඇමතුම් / call booking (Phone bookings)
@@ -124,11 +174,11 @@ Return JSON in this exact format:
 {
   "busNumber": "0746",
   "date": "01/10/2025",
-  "driverName": "Kamal Perera",
-  "conductorName": "Sunil Fernando",
   "trips": [
     {
       "trip_no": 1,
+      "driverName": "Kamal Perera",
+      "conductorName": "Sunil Fernando",
       "income": {
         "bus_collection": 106520,
         "call_booking": 8312,
@@ -141,6 +191,8 @@ Return JSON in this exact format:
     },
     {
       "trip_no": 2,
+      "driverName": "Nimal Silva",
+      "conductorName": "Ruwan Kumara",
       "income": {
         "bus_collection": 85140,
         "call_booking": 8486,
@@ -177,6 +229,7 @@ Return JSON in this exact format:
 }
 
 NOTE: If driver or conductor name is not visible, return null for those fields.`;
+    }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -306,6 +359,13 @@ NOTE: If driver or conductor name is not visible, return null for those fields.`
       }
       
       console.log('First trip bus_collection:', extractedData.trips?.[0]?.income?.bus_collection);
+      
+      // Return the raw extracted data directly if it's a monthly log
+      if (sheetType === 'monthly_log') {
+        return new Response(JSON.stringify(extractedData), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     } catch (e) {
       console.error('Failed to parse AI response:', content);
       console.error('Parse error:', e);

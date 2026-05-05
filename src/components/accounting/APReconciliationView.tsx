@@ -412,7 +412,7 @@ export const APReconciliationView = () => {
               </TabsList>
               
               <TabsContent value="invoices" className="mt-4">
-                <DataTable
+                <DataTable enableColumnFilters
                   columns={invoiceColumns}
                   data={apInvoices || []}
                   searchKey="invoice_number"
@@ -420,7 +420,7 @@ export const APReconciliationView = () => {
               </TabsContent>
               
               <TabsContent value="payments" className="mt-4">
-                <DataTable
+                <DataTable enableColumnFilters
                   columns={paymentColumns}
                   data={apPayments || []}
                   searchKey="payment_number"
@@ -443,7 +443,7 @@ export const APReconciliationView = () => {
               <p className="text-muted-foreground">Loading...</p>
             </div>
           ) : (
-            <DataTable
+            <DataTable enableColumnFilters
               columns={reconciliationColumns}
               data={reconciliations || []}
               searchKey="vendors.vendor_name"

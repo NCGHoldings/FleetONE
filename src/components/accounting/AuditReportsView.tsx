@@ -105,7 +105,7 @@ export const AuditReportsView = () => {
               </div>
             </div>
 
-            <DataTable columns={auditColumns} data={auditLogs || []} searchKey="table_name" />
+            <DataTable enableColumnFilters columns={auditColumns} data={auditLogs || []} searchKey="table_name" />
           </Card>
         </TabsContent>
 

@@ -453,7 +453,7 @@ export const ApprovalConfigView = () => {
               <p className="text-muted-foreground">Loading...</p>
             </div>
           ) : (
-            <DataTable
+            <DataTable enableColumnFilters
               columns={configColumns}
               data={configs || []}
               searchKey="module"

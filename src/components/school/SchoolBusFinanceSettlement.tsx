@@ -17,6 +17,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
+import { DeleteSchoolPaymentDialog } from './DeleteSchoolPaymentDialog';
 
 interface SchoolBusFinanceSettlementProps {
   studentId: string;
@@ -58,6 +59,8 @@ export function SchoolBusFinanceSettlement({
     isOpen: boolean;
     payment: any;
   } | null>(null);
+
+  const [transactionToDelete, setTransactionToDelete] = useState<any>(null);
 
   useEffect(() => {
     if (isOpen && studentId) {
@@ -234,36 +237,7 @@ export function SchoolBusFinanceSettlement({
     }
   };
 
-  const handleReversePayment = async (payment: any) => {
-    if (!confirm('Are you sure you want to completely DELETE and REVERSE this payment? This will alter the student balance and unlink AR Invoices. DO THIS ONLY IF IT WAS A MISTAKE!')) {
-      return;
-    }
 
-    setActionLoading(true);
-    try {
-      // If it's linked to an AR invoice, first unlink it
-      await supabase.from('school_ar_invoices').update({ payment_id: null }).eq('payment_id', payment.id);
-
-      // If it has a Journal Entry, we technically should reverse it, but for a true delete:
-      if (payment.journal_entry_id) {
-         // Delete JE (lines will cascade if FK setup, or we manually delete them)
-         await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', payment.journal_entry_id);
-         await supabase.from('journal_entries').delete().eq('id', payment.journal_entry_id);
-      }
-      
-      // Delete the payment transaction (Trigger will handle the student balance recalculation and invoice FIFO re-application!)
-      const { error } = await supabase.from('school_payment_transactions').delete().eq('id', payment.id);
-      if (error) throw error;
-
-      toast.success("Payment completely reversed and deleted.");
-      await fetchFinanceData();
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to reverse payment.");
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const initiateAllocation = (invoiceId: string, invoiceNumber: string, invoiceAmount: number) => {
     const unallocatedPayment = payments.find(p => p.gl_posted && !invoices.some(inv => inv.payment_id === p.id));
@@ -464,7 +438,7 @@ export function SchoolBusFinanceSettlement({
                                 <Button 
                                   variant="outline" 
                                   className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                                  onClick={() => handleReversePayment(payment)}
+                                  onClick={() => setTransactionToDelete(payment)}
                                   disabled={actionLoading}
                                 >
                                   <Trash2 className="w-4 h-4 mr-2" />
@@ -873,6 +847,17 @@ export function SchoolBusFinanceSettlement({
           </DialogContent>
         </Dialog>
       )}
+
+      <DeleteSchoolPaymentDialog
+        paymentId={transactionToDelete?.id || null}
+        paymentAmount={transactionToDelete?.amount_paid || 0}
+        open={!!transactionToDelete}
+        onOpenChange={(open) => !open && setTransactionToDelete(null)}
+        onSuccess={() => {
+          fetchFinanceData();
+          setTransactionToDelete(null);
+        }}
+      />
     </Dialog>
   );
 }

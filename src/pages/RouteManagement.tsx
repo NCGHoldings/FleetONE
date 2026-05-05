@@ -139,6 +139,15 @@ export default function RouteManagement() {
   };
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [colFilters, setColFilters] = useState({
+    routeNo: "",
+    routeName: "",
+    category: "",
+    locations: "",
+    distance: "",
+    buses: "",
+    status: ""
+  });
 
   useEffect(() => {
     fetchRoutes();
@@ -150,7 +159,25 @@ export default function RouteManagement() {
     if (categoryFilter === "public" && r.category !== "Public Bus") return false;
     if (categoryFilter === "school" && r.category !== "School Bus") return false;
 
-    // Search filter
+    // Column Filters
+    if (colFilters.routeNo && !(r.route_no || "").toLowerCase().includes(colFilters.routeNo.toLowerCase())) return false;
+    if (colFilters.routeName && !(r.route_name || "").toLowerCase().includes(colFilters.routeName.toLowerCase())) return false;
+    if (colFilters.category && !(r.category || "").toLowerCase().includes(colFilters.category.toLowerCase())) return false;
+    if (colFilters.locations) {
+      const locString = `${r.start_location || ""} ${r.end_location || ""}`.toLowerCase();
+      if (!locString.includes(colFilters.locations.toLowerCase())) return false;
+    }
+    if (colFilters.distance && r.distance_km !== null && !String(r.distance_km).includes(colFilters.distance)) return false;
+    if (colFilters.buses) {
+      const bCount = getBusCount(r.route_name || "");
+      if (!String(bCount).includes(colFilters.buses)) return false;
+    }
+    if (colFilters.status) {
+      const st = r.is_active ? "active" : "inactive";
+      if (!st.includes(colFilters.status.toLowerCase())) return false;
+    }
+
+    // Global Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       const match = 
@@ -452,14 +479,74 @@ export default function RouteManagement() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Route No</TableHead>
-              <TableHead>Route Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Locations</TableHead>
-              <TableHead>Distance</TableHead>
-              <TableHead className="text-center">Buses</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="w-[120px]">
+                <div className="mb-2">Route No</div>
+                <Input 
+                  placeholder="Filter..." 
+                  value={colFilters.routeNo}
+                  onChange={e => setColFilters(p => ({ ...p, routeNo: e.target.value }))}
+                  className="h-7 text-xs font-normal"
+                />
+              </TableHead>
+              <TableHead className="w-[200px]">
+                <div className="mb-2">Route Name</div>
+                <Input 
+                  placeholder="Filter..." 
+                  value={colFilters.routeName}
+                  onChange={e => setColFilters(p => ({ ...p, routeName: e.target.value }))}
+                  className="h-7 text-xs font-normal"
+                />
+              </TableHead>
+              <TableHead className="w-[140px]">
+                <div className="mb-2">Category</div>
+                <Input 
+                  placeholder="Filter..." 
+                  value={colFilters.category}
+                  onChange={e => setColFilters(p => ({ ...p, category: e.target.value }))}
+                  className="h-7 text-xs font-normal"
+                />
+              </TableHead>
+              <TableHead className="min-w-[200px]">
+                <div className="mb-2">Locations</div>
+                <Input 
+                  placeholder="Filter..." 
+                  value={colFilters.locations}
+                  onChange={e => setColFilters(p => ({ ...p, locations: e.target.value }))}
+                  className="h-7 text-xs font-normal"
+                />
+              </TableHead>
+              <TableHead className="w-[120px]">
+                <div className="mb-2">Distance</div>
+                <Input 
+                  placeholder="Filter..." 
+                  value={colFilters.distance}
+                  onChange={e => setColFilters(p => ({ ...p, distance: e.target.value }))}
+                  className="h-7 text-xs font-normal"
+                />
+              </TableHead>
+              <TableHead className="w-[100px] text-center">
+                <div className="mb-2">Buses</div>
+                <Input 
+                  placeholder="Filter..." 
+                  value={colFilters.buses}
+                  onChange={e => setColFilters(p => ({ ...p, buses: e.target.value }))}
+                  className="h-7 text-xs font-normal mx-auto"
+                />
+              </TableHead>
+              <TableHead className="w-[120px]">
+                <div className="mb-2">Status</div>
+                <Input 
+                  placeholder="Filter..." 
+                  value={colFilters.status}
+                  onChange={e => setColFilters(p => ({ ...p, status: e.target.value }))}
+                  className="h-7 text-xs font-normal"
+                />
+              </TableHead>
+              <TableHead className="w-[100px] text-right">
+                <div className="mb-2">Actions</div>
+                {/* Spacer for actions column */}
+                <div className="h-7"></div>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

@@ -264,7 +264,7 @@ export const TaxManagementView = () => {
               </Button>
             </div>
 
-            <DataTable 
+            <DataTable enableColumnFilters 
               columns={taxCodeColumns} 
               data={taxCodes || []} 
               searchKey="tax_name" 
@@ -289,7 +289,7 @@ export const TaxManagementView = () => {
               </div>
             </div>
 
-            <DataTable columns={vatColumns} data={vatTransactions} searchKey="customer_vendor" />
+            <DataTable enableColumnFilters columns={vatColumns} data={vatTransactions} searchKey="customer_vendor" />
           </Card>
         </TabsContent>
 
@@ -310,7 +310,7 @@ export const TaxManagementView = () => {
               </div>
             </div>
 
-            <DataTable columns={whtColumns} data={whtTransactions} searchKey="vendor" />
+            <DataTable enableColumnFilters columns={whtColumns} data={whtTransactions} searchKey="vendor" />
           </Card>
         </TabsContent>
 

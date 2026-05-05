@@ -20,7 +20,7 @@ export default function CrewAppLayout() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="h-[100dvh] bg-slate-50 flex flex-col overflow-hidden">
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto pb-20">
         <Outlet />

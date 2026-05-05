@@ -83,7 +83,7 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange }: PettyCashRe
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Reimburse Petty Cash Float</DialogTitle>
           <DialogDescription>
@@ -91,7 +91,7 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange }: PettyCashRe
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 flex-1 overflow-y-auto pr-2">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Select Fund</label>
@@ -99,7 +99,7 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange }: PettyCashRe
                 <SelectTrigger>
                   <SelectValue placeholder="Select petty cash fund..." />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[300px]">
                   {funds?.map(f => (
                     <SelectItem key={f.id} value={f.id}>
                       {f.fund_name} (Bal: <CurrencyDisplay amount={f.current_balance} />)
@@ -115,7 +115,7 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange }: PettyCashRe
                 <SelectTrigger>
                   <SelectValue placeholder="Select bank account..." />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[300px]">
                   {bankAccounts?.filter(b => b.is_active).map(bank => (
                     <SelectItem key={bank.id} value={bank.id}>
                       {bank.bank_name} - {bank.account_number}

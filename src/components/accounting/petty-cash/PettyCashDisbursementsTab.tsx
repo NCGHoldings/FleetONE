@@ -282,7 +282,7 @@ export const PettyCashDisbursementsTab = () => {
               <Label>Select Fund *</Label>
               <Select value={form.petty_cash_fund_id} onValueChange={(v) => setForm({ ...form, petty_cash_fund_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select fund" /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[300px]">
                   {funds?.map((f) => (
                     <SelectItem key={f.id} value={f.id}>
                       {f.fund_name} — Balance: Rs {f.current_balance.toLocaleString()}
@@ -342,7 +342,7 @@ export const PettyCashDisbursementsTab = () => {
                       setLines(newLines);
                     }}>
                       <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[300px]">
                         <SelectItem value="none">No Category</SelectItem>
                         {filteredCategories.map((c) => (
                           <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
@@ -361,7 +361,7 @@ export const PettyCashDisbursementsTab = () => {
                           }}
                         >
                           <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select Vehicle (Optional)" /></SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="max-h-[300px]">
                             <SelectItem value="none">No Vehicle</SelectItem>
                             {buses?.map((bus) => (
                               <SelectItem key={bus.id} value={bus.bus_no}>

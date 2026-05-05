@@ -87,14 +87,18 @@ export default function SchoolBusExpenseImport() {
   const effectiveCompanyId = getEffectiveCompanyId();
 
   useEffect(() => {
+    let isMounted = true;
+    
     // Fetch branches and buses for mapping
     const initData = async () => {
       if (!effectiveCompanyId) return;
 
       const { data: bData } = await supabase.from("school_branches").select("id, branch_name").eq("is_active", true);
+      if (!isMounted) return;
       if (bData) setBranches(bData);
 
       const { data: busData } = await supabase.from("buses").select("id, bus_no");
+      if (!isMounted) return;
       if (busData) setBuses(busData);
 
       const { data: vData } = await supabase
@@ -102,12 +106,14 @@ export default function SchoolBusExpenseImport() {
         .select("id, vendor_name")
         .eq("is_active", true)
         .eq("company_id", effectiveCompanyId);
+      if (!isMounted) return;
       if (vData) setVendors(vData);
 
       const { data: pcData } = await supabase
         .from("petty_cash_funds")
         .select("id, fund_name")
         .eq("company_id", effectiveCompanyId);
+      if (!isMounted) return;
       if (pcData) setPettyCashFunds(pcData);
 
       // Fetch expense accounts for explicit mapping
@@ -118,6 +124,7 @@ export default function SchoolBusExpenseImport() {
         .eq("account_type", "expense")
         .eq("is_active", true)
         .order("account_name");
+      if (!isMounted) return;
       if (expData) setExpenseAccounts(expData as any);
 
       // Fetch bank accounts for Direct Payment — scoped to active company
@@ -136,6 +143,8 @@ export default function SchoolBusExpenseImport() {
         .eq("is_active", true)
         .ilike("account_name", "%FLOAT%")
         .order("account_name");
+
+      if (!isMounted) return;
 
       const combined: any[] = [];
       if (acctData) {
@@ -156,7 +165,12 @@ export default function SchoolBusExpenseImport() {
       if (combined.length > 0) setDirectPaymentAccountId(combined[0].id);
       else setDirectPaymentAccountId("");
     };
+    
     initData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [effectiveCompanyId]);
 
   // Auto-suggest the expense account based on type
@@ -214,11 +228,11 @@ export default function SchoolBusExpenseImport() {
         // Convert to JSON (un-normalized keys)
         const rawData = utils.sheet_to_json<any>(ws);
         
-        // Normalize the keys to strip any leading/trailing spaces padding the headers
+        // Normalize the keys to strip spaces and convert to lowercase for robust matching
         const data = rawData.map(r => {
           const nr: any = {};
           for (const k in r) {
-            nr[k.trim()] = r[k];
+            nr[k.trim().toLowerCase()] = r[k];
           }
           return nr;
         });
@@ -226,7 +240,8 @@ export default function SchoolBusExpenseImport() {
         // Map to our structure
         const mapped: MappedExpense[] = data.map((row) => {
           if (globalExpenseType === 'fuel') {
-            const vehicleNo = row["Vehicle number"] ? String(row["Vehicle number"]).trim() : "Unknown";
+            const vNo = row["vehicle number"] || row["vehicle no"] || row["bus no"] || row["bus number"] || row["vehicle"];
+            const vehicleNo = vNo ? String(vNo).trim() : "Unknown";
             
             // Try to exact match Bus NO ignoring spaces
             const matchedBus = buses.find(b => 
@@ -234,20 +249,26 @@ export default function SchoolBusExpenseImport() {
             );
 
             // We'll capture route loosely if provided
-            const route = String(row["Bus Route"] || row["Route Code"] || "-");
+            const routeRaw = row["bus route"] || row["route code"] || row["route"] || row["route name"];
+            const route = routeRaw ? String(routeRaw).trim() : "-";
 
-            const fuelCost = Number(row["Fuel Cost"]) || 0;
-            const liters = Number(row["Liters"]) || 0;
-            const mileage = Number(row["Mileage"]) || undefined;
+            const costRaw = row["fuel cost"] || row["amount"] || row["total cost"] || row["cost"];
+            const fuelCost = Number(costRaw) || 0;
+            
+            const litersRaw = row["liters"] || row["litres"] || row["qty"] || row["quantity"] || row["volume"];
+            const liters = Number(litersRaw) || 0;
+            
+            const mileageRaw = row["mileage"] || row["odometer"] || row["meter"] || row["km"];
+            const mileage = Number(mileageRaw) || undefined;
 
             return {
-              expenseDate: parseExcelDate(row["Date"]!),
+              expenseDate: parseExcelDate(row["date"] || row["expense date"]),
               busId: matchedBus?.id || "",
               amount: fuelCost,
               fuelLiters: liters,
               odometerEnd: mileage,
               routeTitle: route,
-              notes: row["Ref."] ? String(row["Ref."]) : undefined,
+              notes: row["ref."] || row["ref"] || row["reference"] ? String(row["ref."] || row["ref"] || row["reference"]) : undefined,
               expenseType: 'fuel',
               originalVehicleNumber: vehicleNo,
               matchedBusNo: matchedBus?.bus_no,
@@ -256,27 +277,35 @@ export default function SchoolBusExpenseImport() {
           } else {
             // Parking / Highway / Other mapping
             // Expected format: No | Bus No | Route Name | Account Name | Bank Name | Bank Acc No | Bank Branch | Amount
-            const vehicleNo = row["Bus No"] ? String(row["Bus No"]).trim() : "Unknown";
+            const vNo = row["bus no"] || row["vehicle number"] || row["vehicle no"] || row["bus number"] || row["vehicle"];
+            const vehicleNo = vNo ? String(vNo).trim() : "Unknown";
+            
             const matchedBus = buses.find(b => 
               b.bus_no.toLowerCase().replace(/\s/g, '') === vehicleNo.toLowerCase().replace(/\s/g, '')
             );
-            const route = String(row["Route Name"] || "-");
-            const amount = Number(row["Amount"]) || 0;
+            
+            const routeRaw = row["route name"] || row["route"] || row["bus route"] || row["route code"];
+            const route = routeRaw ? String(routeRaw).trim() : "-";
+            
+            const amountRaw = row["amount"] || row["cost"] || row["total"];
+            const amount = Number(amountRaw) || 0;
+
+            const noRaw = row["no"] || row["ref"] || row["ref."];
 
             return {
-              expenseDate: format(new Date(), "yyyy-MM-dd"), // Assuming "Today" since there's no date column
+              expenseDate: parseExcelDate(row["date"] || row["expense date"]), // Attempt to parse Date if present, else fallback in parseExcelDate
               busId: matchedBus?.id || "",
               amount: amount,
               routeTitle: route,
-              notes: row["No"] ? `Ref/No: ${row["No"]}` : undefined,
+              notes: noRaw ? `Ref/No: ${noRaw}` : undefined,
               expenseType: globalExpenseType,
               originalVehicleNumber: vehicleNo,
               matchedBusNo: matchedBus?.bus_no,
               isValid: !!matchedBus?.id && (amount > 0),
-              accountName: row["Account Name"] ? String(row["Account Name"]) : undefined,
-              bankName: row["Bank Name"] ? String(row["Bank Name"]) : undefined,
-              bankAccNo: row["Bank Acc No"] ? String(row["Bank Acc No"]) : undefined,
-              bankBranch: row["Bank Branch"] ? String(row["Bank Branch"]) : undefined,
+              accountName: row["account name"] ? String(row["account name"]) : undefined,
+              bankName: row["bank name"] ? String(row["bank name"]) : undefined,
+              bankAccNo: row["bank acc no"] || row["account number"] ? String(row["bank acc no"] || row["account number"]) : undefined,
+              bankBranch: row["bank branch"] || row["branch"] ? String(row["bank branch"] || row["branch"]) : undefined,
             };
           }
         });

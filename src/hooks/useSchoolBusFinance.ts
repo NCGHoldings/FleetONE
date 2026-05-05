@@ -2262,3 +2262,39 @@ export function useExistingBatch(branchId: string | null, invoiceMonth: Date | n
     enabled: !!branchId && !!invoiceMonth && enabled,
   });
 }
+
+export function useSchoolPaymentDeletionBreakdown(paymentId: string | null) {
+  return useQuery({
+    queryKey: ["school-payment-deletion-breakdown", paymentId],
+    queryFn: async () => {
+      if (!paymentId) return null;
+      const { data, error } = await supabase.rpc("get_school_payment_deletion_breakdown", { p_payment_id: paymentId });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!paymentId,
+  });
+}
+
+export function useDeleteSchoolPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (paymentId: string) => {
+      const { data, error } = await supabase.rpc("delete_and_reverse_school_payment", { p_payment_id: paymentId });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["school-payment-history"] });
+      queryClient.invalidateQueries({ queryKey: ["school-students"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-receipts"] });
+      toast.success("Payment and all related financial entries successfully reversed.");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to delete payment: ${error.message}`);
+    },
+  });
+}

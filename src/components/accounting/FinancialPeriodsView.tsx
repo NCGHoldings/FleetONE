@@ -448,7 +448,7 @@ export const FinancialPeriodsView = () => {
         </Dialog>
       </div>
 
-      <DataTable
+      <DataTable enableColumnFilters
         columns={columns}
         data={periods || []}
         searchKey="period_name"

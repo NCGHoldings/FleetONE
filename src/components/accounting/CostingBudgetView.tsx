@@ -184,7 +184,7 @@ export const CostingBudgetView = () => {
               </Button>
             </div>
 
-            <DataTable columns={costCenterColumns} data={costCenters || []} searchKey="center_name" />
+            <DataTable enableColumnFilters columns={costCenterColumns} data={costCenters || []} searchKey="center_name" />
           </Card>
         </TabsContent>
 
@@ -203,7 +203,7 @@ export const CostingBudgetView = () => {
               </Button>
             </div>
 
-            <DataTable columns={budgetColumns} data={budgets || []} searchKey="budget_name" />
+            <DataTable enableColumnFilters columns={budgetColumns} data={budgets || []} searchKey="budget_name" />
           </Card>
         </TabsContent>
 

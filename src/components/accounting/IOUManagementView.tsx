@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { 
   FileText, Plus, RefreshCw, User, Calendar, 
-  AlertTriangle, CheckCircle, Clock, Loader2, Printer
+  AlertTriangle, CheckCircle, Clock, Loader2, Printer, Trash2
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { useIOURecords, useCreateIOU, useUpdateIOU, IOURecord, usePettyCashFunds } from "@/hooks/usePettyCash";
@@ -21,6 +21,7 @@ import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModa
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useChartOfAccounts, useBankAccounts } from "@/hooks/useAccountingData";
+import { DeleteIOUDialog } from "./petty-cash/DeleteIOUDialog";
 
 const statusConfig = {
   pending: { label: "Pending", color: "bg-yellow-500", icon: Clock },
@@ -34,6 +35,8 @@ export const IOUManagementView = () => {
   const [showCreateIOU, setShowCreateIOU] = useState(false);
   const [selectedIOU, setSelectedIOU] = useState<IOURecord | null>(null);
   const [showSettleDialog, setShowSettleDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [iouToDelete, setIouToDelete] = useState<IOURecord | null>(null);
   const [settleAmount, setSettleAmount] = useState(0);
   const [expenseAmount, setExpenseAmount] = useState(0);
   const [previewData, setPreviewData] = useState<any>(null);
@@ -334,6 +337,18 @@ export const IOUManagementView = () => {
                             Settle
                           </Button>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => {
+                            setIouToDelete(iou);
+                            setShowDeleteDialog(true);
+                          }}
+                          title="Reverse & Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -673,6 +688,16 @@ export const IOUManagementView = () => {
         onOpenChange={(op) => !op && setPreviewData(null)}
         documentType="iou_voucher"
         documentData={previewData}
+      />
+
+      {/* Delete / Reverse IOU Dialog */}
+      <DeleteIOUDialog
+        iou={iouToDelete}
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          setShowDeleteDialog(open);
+          if (!open) setIouToDelete(null);
+        }}
       />
     </div>
   );

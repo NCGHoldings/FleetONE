@@ -264,7 +264,7 @@ export const RecurringEntriesView = () => {
 
       {/* Templates Table */}
       <Card className="p-6">
-        <DataTable
+        <DataTable enableColumnFilters
           columns={columns}
           data={entries || []}
           searchKey="entry_name"

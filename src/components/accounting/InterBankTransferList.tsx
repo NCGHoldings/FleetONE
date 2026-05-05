@@ -120,7 +120,7 @@ export function InterBankTransferList() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <DataTable 
+        <DataTable enableColumnFilters 
           columns={columns} 
           data={transfers || []} 
           searchKey="transfer_number"

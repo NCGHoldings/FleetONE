@@ -258,22 +258,22 @@ export const PurchaseOrderView = () => {
               </TabsList>
 
               <TabsContent value="all">
-                <DataTable columns={poColumns} data={purchaseOrders || []} searchKey="po_number" />
+                <DataTable enableColumnFilters columns={poColumns} data={purchaseOrders || []} searchKey="po_number" />
               </TabsContent>
               <TabsContent value="draft">
-                <DataTable columns={poColumns} data={purchaseOrders || []} searchKey="po_number" />
+                <DataTable enableColumnFilters columns={poColumns} data={purchaseOrders || []} searchKey="po_number" />
               </TabsContent>
               <TabsContent value="pending">
-                <DataTable columns={poColumns} data={purchaseOrders || []} searchKey="po_number" />
+                <DataTable enableColumnFilters columns={poColumns} data={purchaseOrders || []} searchKey="po_number" />
               </TabsContent>
               <TabsContent value="approved">
-                <DataTable columns={poColumns} data={purchaseOrders || []} searchKey="po_number" />
+                <DataTable enableColumnFilters columns={poColumns} data={purchaseOrders || []} searchKey="po_number" />
               </TabsContent>
             </Tabs>
           </TabsContent>
 
           <TabsContent value="grn" className="mt-4">
-            <DataTable columns={grnColumns} data={grns || []} searchKey="grn_number" />
+            <DataTable enableColumnFilters columns={grnColumns} data={grns || []} searchKey="grn_number" />
           </TabsContent>
 
           <TabsContent value="matching" className="mt-4">

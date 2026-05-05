@@ -379,7 +379,7 @@ export const ChequeRegisterView = () => {
               </TabsList>
               {["all", "draft", "issued", "post_dated", "cleared", "bounced"].map((tab) => (
                 <TabsContent key={tab} value={tab}>
-                  <DataTable columns={columns} data={filteredCheques} searchKey="cheque_number" />
+                  <DataTable enableColumnFilters columns={columns} data={filteredCheques} searchKey="cheque_number" />
                 </TabsContent>
               ))}
             </Tabs>

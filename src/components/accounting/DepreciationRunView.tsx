@@ -213,7 +213,7 @@ export const DepreciationRunView = () => {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Depreciable Assets</h3>
-          <DataTable
+          <DataTable enableColumnFilters
             columns={assetColumns}
             data={activeAssets}
             searchKey="asset_name"
@@ -222,7 +222,7 @@ export const DepreciationRunView = () => {
 
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Recent Depreciation Schedule</h3>
-          <DataTable
+          <DataTable enableColumnFilters
             columns={scheduleColumns}
             data={schedule?.slice(0, 20) || []}
             searchKey="depreciation_date"

@@ -206,7 +206,7 @@ export const ChartOfAccountsView = () => {
       {viewMode === "tree" ? (
         <ChartOfAccountsTree accounts={accounts || []} allAccounts={accounts || []} searchTerm={searchTerm} onAccountCreated={refetch} />
       ) : (
-        <DataTable columns={columns} data={filteredAccounts} />
+        <DataTable enableColumnFilters columns={columns} data={filteredAccounts} />
       )}
 
       {/* Edit Account Dialog */}

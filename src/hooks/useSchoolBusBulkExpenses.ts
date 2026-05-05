@@ -157,6 +157,7 @@ export function useSchoolBusBulkExpenses() {
       // 2. Resolve Credit Account based on Payment Method
       let creditAccountId: string;
       let creditAccountName: string;
+      let isBankAccount = false;
 
       if (payload.paymentMethod === 'petty_cash') {
         let cashAccountId = financeSettings?.expense_cash_account_id;
@@ -208,6 +209,7 @@ export function useSchoolBusBulkExpenses() {
           .maybeSingle();
 
         if (bankAccount) {
+          isBankAccount = true;
           if (bankAccount.company_id !== effectiveCompanyId) {
             throw new Error("Selected account belongs to a different company. Pick an account from the current company's Bank Accounts.");
           }
@@ -408,7 +410,7 @@ export function useSchoolBusBulkExpenses() {
                payment_method: 'direct',
                payee_type: 'direct',
                vendor_id: null,
-               bank_account_id: payload.directPaymentAccountId || null,
+               bank_account_id: isBankAccount ? payload.directPaymentAccountId : null,
                amount: totalAmount,
                is_direct_payment: true,
                status: 'paid',

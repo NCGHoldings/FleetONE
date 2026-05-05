@@ -391,7 +391,7 @@ export const ARReconciliationView = () => {
               </TabsList>
               
               <TabsContent value="invoices" className="mt-4">
-                <DataTable
+                <DataTable enableColumnFilters
                   columns={invoiceColumns}
                   data={arInvoices || []}
                   searchKey="invoice_number"
@@ -399,7 +399,7 @@ export const ARReconciliationView = () => {
               </TabsContent>
               
               <TabsContent value="receipts" className="mt-4">
-                <DataTable
+                <DataTable enableColumnFilters
                   columns={receiptColumns}
                   data={arReceipts || []}
                   searchKey="receipt_number"
@@ -422,7 +422,7 @@ export const ARReconciliationView = () => {
               <p className="text-muted-foreground">Loading...</p>
             </div>
           ) : (
-            <DataTable
+            <DataTable enableColumnFilters
               columns={reconciliationColumns}
               data={reconciliations || []}
               searchKey="customers.customer_name"

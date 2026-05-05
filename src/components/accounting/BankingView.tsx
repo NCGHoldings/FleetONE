@@ -265,7 +265,7 @@ export const BankingView = () => {
               </Button>
             </div>
 
-            <DataTable columns={bankColumns} data={bankAccounts || []} searchKey="account_name" />
+            <DataTable enableColumnFilters columns={bankColumns} data={bankAccounts || []} searchKey="account_name" />
           </Card>
         </TabsContent>
 
@@ -299,7 +299,7 @@ export const BankingView = () => {
               </div>
             </div>
 
-            <DataTable columns={transactionColumns} data={transactions || []} searchKey="description" />
+            <DataTable enableColumnFilters columns={transactionColumns} data={transactions || []} searchKey="description" />
           </Card>
         </TabsContent>
 
@@ -375,7 +375,7 @@ export const BankingView = () => {
               </div>
             </div>
 
-            <DataTable columns={reconciliationColumns} data={reconciliations || []} searchKey="status" />
+            <DataTable enableColumnFilters columns={reconciliationColumns} data={reconciliations || []} searchKey="status" />
           </Card>
         </TabsContent>
       </Tabs>

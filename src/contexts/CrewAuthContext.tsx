@@ -66,6 +66,7 @@ export const CrewAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const logout = () => {
     setCrewMember(null);
     localStorage.removeItem('crew_session');
+    localStorage.removeItem('app_mode');
   };
 
   return (

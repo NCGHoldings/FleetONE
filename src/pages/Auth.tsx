@@ -37,9 +37,9 @@ export default function Auth() {
 
   useEffect(() => {
     const checkUser = async () => {
-      if (localStorage.getItem('app_mode') === 'crew' && !location.pathname.includes('/public/crew')) {
-        navigate("/public/crew", { replace: true });
-        return;
+      // If someone explicitly navigates to the admin login, clear crew mode
+      if (localStorage.getItem('app_mode') === 'crew') {
+        localStorage.removeItem('app_mode');
       }
       const { data: { session } } = await supabase.auth.getSession();
       if (session) navigate("/");

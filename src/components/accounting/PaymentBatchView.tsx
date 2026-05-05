@@ -437,7 +437,7 @@ export const PaymentBatchView = () => {
               <p className="text-muted-foreground">Loading...</p>
             </div>
           ) : (
-            <DataTable
+            <DataTable enableColumnFilters
               columns={batchColumns}
               data={batches || []}
               searchKey="batch_number"

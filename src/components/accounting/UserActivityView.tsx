@@ -346,7 +346,7 @@ export const UserActivityView = () => {
               <p className="text-muted-foreground">Loading...</p>
             </div>
           ) : (
-            <DataTable
+            <DataTable enableColumnFilters
               columns={activityColumns}
               data={activityLogs || []}
               searchKey="description"

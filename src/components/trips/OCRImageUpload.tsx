@@ -18,6 +18,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { TelegramImageGallery } from './TelegramImageGallery';
 
 // Note: parseOcrDate function removed - using manual date selection instead
 
@@ -54,6 +55,10 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  const handleTelegramImageSelect = (file: File) => {
+    setImages(prev => [...prev, file]);
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -329,9 +334,16 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           
           const incomeDetails = { ...trip.income };
           
+          const notesData = {
+            driver: trip.driverName || null,
+            conductor: trip.conductorName || null,
+            notes: null
+          };
+          
           const updatePayload = {
             income: tripRevenue,
             income_details: incomeDetails as any,
+            notes: JSON.stringify(notesData),
             updated_at: new Date().toISOString()
           };
           
@@ -364,6 +376,12 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           
           const incomeDetails = { ...trip.income };
           
+          const notesData = {
+            driver: trip.driverName || null,
+            conductor: trip.conductorName || null,
+            notes: null
+          };
+          
           const { error: insertError } = await supabase
             .from('daily_trips')
             .insert({
@@ -372,7 +390,8 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
               trip_no: newTripNo,
               income: tripRevenue,
               income_details: incomeDetails as any,
-              data_source: 'ocr' as any
+              data_source: 'ocr' as any,
+              notes: JSON.stringify(notesData)
             });
           
           if (insertError) {
@@ -671,6 +690,11 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        
+        {/* Telegram Integration */}
+        {images.length === 0 && (
+          <TelegramImageGallery onImageSelect={handleTelegramImageSelect} className="mb-6" />
+        )}
 
         {/* Upload Area */}
         {images.length === 0 ? (
