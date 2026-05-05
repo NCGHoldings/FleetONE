@@ -1345,7 +1345,7 @@ export function usePostPaymentToGL() {
             receipt_number: receiptNumber,
             receipt_date: format(new Date(), "yyyy-MM-dd"),
             amount: amount,
-            payment_method: paymentMethod === 'Bank Transfer' ? 'bank_transfer' : paymentMethod.toLowerCase(),
+            payment_method: paymentMethod === 'Adjustment' ? 'other' : paymentMethod === 'Bank Transfer' ? 'bank_transfer' : paymentMethod.toLowerCase(),
             reference: referenceNo || paymentId,
             status: 'posted',
             journal_entry_id: journalEntry.id,

@@ -138,8 +138,8 @@ export default function QuickTripsEntry() {
   };
 
   const getCompletionStatus = (trip: TripData) => {
-    if (!trip.income_details && !trip.other_expenses_details) return 'empty';
-    if (trip.income > 0 && trip.other_expenses > 0) return 'complete';
+    if (!trip.income_details && !trip.income) return 'empty';
+    if (trip.income > 0) return 'complete';
     return 'partial';
   };
 

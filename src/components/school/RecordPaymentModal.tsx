@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
@@ -273,7 +274,21 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="notes">Notes</Label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {["Full Payment", "Advance Payment", "Late Fee", "Bank Charge", "Sibling Discount"].map((remark) => (
+                    <Badge
+                      key={remark}
+                      variant="outline"
+                      className="cursor-pointer text-[10px] hover:bg-primary/10 transition-colors py-0 h-5"
+                      onClick={() => setNotes(prev => prev ? `${prev}, ${remark}` : remark)}
+                    >
+                      {remark}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
               <Textarea
                 id="notes"
                 placeholder="Optional notes"

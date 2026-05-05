@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { TelegramImageGallery } from './TelegramImageGallery';
+import { saveOCRDraft, loadOCRDraft, clearOCRDraft } from '@/lib/ocrDraftStorage';
 
 // Note: parseOcrDate function removed - using manual date selection instead
 
@@ -56,8 +57,25 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
+  // Load draft on mount
+  React.useEffect(() => {
+    const loadDraft = async () => {
+      const draft = await loadOCRDraft();
+      if (draft && draft.extractedData.length > 0) {
+        setImages(draft.images);
+        setExtractedData(draft.extractedData);
+        toast.info("Restored unapplied OCR scans from draft.");
+      }
+    };
+    loadDraft();
+  }, []);
+
   const handleTelegramImageSelect = (file: File) => {
-    setImages(prev => [...prev, file]);
+    setImages(prev => {
+      const newImages = [...prev, file];
+      // Note: We don't save draft here yet, wait until extracted data is generated
+      return newImages;
+    });
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,6 +154,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       }
 
       setExtractedData(results);
+      await saveOCRDraft(images, results);
       toast.success(`🎉 Successfully processed ${results.length} sheet(s) with ${results.reduce((sum, r) => sum + r.trips.length, 0)} total trips`);
     } catch (error) {
       console.error('OCR processing error:', error);
@@ -147,10 +166,11 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
     }
   };
 
-  const clearAll = () => {
+  const clearAll = async () => {
     setImages([]);
     setExtractedData([]);
     setProgress(0);
+    await clearOCRDraft();
   };
 
   const applyMultiTripData = async (data: ExtractedMultiTripData & { mapped_expenses: import('@/lib/ocr-expense-mapper').DBExpenseFields }) => {
@@ -611,6 +631,17 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         extractedDate: tripDate,
         count: data.trips.length,
       });
+
+      // Remove the applied item from state
+      const newExtractedData = extractedData.filter(d => d.id !== data.id);
+      setExtractedData(newExtractedData);
+      
+      if (newExtractedData.length === 0) {
+        await clearOCRDraft();
+      } else {
+        await saveOCRDraft(images, newExtractedData);
+      }
+      
     } catch (error) {
       console.error('Apply error:', error);
       toast.error('Failed to apply data');
@@ -642,10 +673,22 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       count: readyData.length,
       extractedDate: lastExtractedDate,
     });
+    
+    // Remove the applied items from state
+    const remainingData = extractedData.filter(d => d.confidence < 0.6);
+    setExtractedData(remainingData);
+    
+    if (remainingData.length === 0) {
+      await clearOCRDraft();
+    } else {
+      await saveOCRDraft(images, remainingData);
+    }
   };
 
-  const handleDiscard = (index: number) => {
-    setExtractedData(prev => prev.filter((_, i) => i !== index));
+  const handleDiscard = async (index: number) => {
+    const newExtractedData = extractedData.filter((_, i) => i !== index);
+    setExtractedData(newExtractedData);
+    await saveOCRDraft(images, newExtractedData);
     toast.success("Sheet discarded");
   };
 
@@ -872,8 +915,10 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
               data={data}
               actualSaveDate={format(manualDate, 'yyyy-MM-dd')}
               onApply={applyMultiTripData}
-              onChange={(updatedData) => {
-                setExtractedData(prev => prev.map((item, i) => i === index ? updatedData : item));
+              onChange={async (updatedData) => {
+                const newData = extractedData.map((item, i) => i === index ? updatedData : item);
+                setExtractedData(newData);
+                await saveOCRDraft(images, newData);
               }}
               onDiscard={() => handleDiscard(index)}
               onView={handleView}

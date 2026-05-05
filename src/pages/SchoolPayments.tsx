@@ -15,12 +15,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { ColumnDef } from "@tanstack/react-table";
 import { RecordPaymentModal } from "@/components/school/RecordPaymentModal";
 import { PaymentHistoryModal } from "@/components/school/PaymentHistoryModal";
+import { AdjustBalanceModal } from "@/components/school/AdjustBalanceModal";
 import { OutstandingStudentsView } from "@/components/school/OutstandingStudentsView";
 import { BulkARInvoiceDialog } from "@/components/school/BulkARInvoiceDialog";
 import { SchoolBusBranchPLReport } from "@/components/school/SchoolBusBranchPLReport";
 import { SchoolBusFinanceSettlement } from "@/components/school/SchoolBusFinanceSettlement";
 import { useAuth } from "@/hooks/useAuth";
 import React from "react";
+import * as XLSX from "xlsx";
 
 interface Student {
   id: string;
@@ -37,6 +39,7 @@ interface Student {
   fixed_monthly_amount: number;
   payment_balance: number;
   current_amount_due: number;
+  last_payment_notes?: string;
 }
 
 interface Branch {
@@ -55,6 +58,7 @@ export default function SchoolPayments() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [showBulkARDialog, setShowBulkARDialog] = useState(false);
   const [showFinanceHub, setShowFinanceHub] = useState(false);
   const { userRoles } = useAuth();
@@ -80,6 +84,7 @@ export default function SchoolPayments() {
   const [filterFinance, setFilterFinance] = useState<string>("all");
   const [minAmount, setMinAmount] = useState<string>("");
   const [maxAmount, setMaxAmount] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const uniqueGrades = React.useMemo(() => {
     const grades = new Set(students.map(s => s.grade).filter(Boolean));
@@ -132,9 +137,18 @@ export default function SchoolPayments() {
         if (filterFinance === "any_issue" && (!issues || !issues.hasAny)) return false;
       }
       
+      // Global Search
+      if (searchQuery.trim() !== "") {
+        const query = searchQuery.toLowerCase();
+        const matchesName = s.student_name?.toLowerCase().includes(query);
+        const matchesAdmission = s.admission_no?.toLowerCase().includes(query);
+        const matchesNotes = s.last_payment_notes?.toLowerCase().includes(query);
+        if (!matchesName && !matchesAdmission && !matchesNotes) return false;
+      }
+
       return true;
     });
-  }, [students, filterStatus, filterGrade, filterActive, filterFinance, minAmount, maxAmount]);
+  }, [students, filterStatus, filterGrade, filterActive, filterFinance, minAmount, maxAmount, searchQuery]);
 
   const clearFilters = () => {
     setFilterStatus("all");
@@ -143,6 +157,7 @@ export default function SchoolPayments() {
     setFilterFinance("all");
     setMinAmount("");
     setMaxAmount("");
+    setSearchQuery("");
   };
 
   useEffect(() => {
@@ -200,7 +215,7 @@ export default function SchoolPayments() {
       // Fetch all transactions for this branch
       const { data: txData } = await supabase
         .from('school_payment_transactions')
-        .select('id, amount_paid, student_id, payment_date, gl_posted, school_students!inner(branch_id, student_name, is_active)')
+        .select('id, amount_paid, student_id, payment_date, gl_posted, notes, school_students!inner(branch_id, student_name, is_active)')
         .eq('school_students.branch_id', branchId);
 
       // Fetch all invoices for this branch to check for AR discrepancies
@@ -247,6 +262,7 @@ export default function SchoolPayments() {
           ...s,
           payment_amount: latestTx ? latestTx.amount_paid : s.payment_amount,
           last_payment_date: latestTx ? latestTx.payment_date : s.last_payment_date,
+          last_payment_notes: latestTx ? latestTx.notes : undefined,
           finance_issues: {
              missingGL: hasMissingGL,
              missingAllocation: hasMissingAllocation,
@@ -339,10 +355,76 @@ export default function SchoolPayments() {
   };
 
   const handleExport = () => {
-    toast({
-      title: "Export Feature",
-      description: "Export functionality coming soon",
-    });
+    try {
+      const exportData = filteredStudents.map(student => {
+        let status = student.payment_status ? String(student.payment_status).toLowerCase().trim() : 'pending';
+        const due = student.current_amount_due || 0;
+        const balance = student.payment_balance || 0;
+        const isActive = student.is_active !== false;
+        const hasPaymentHistory = Number(student.payment_amount) > 0 || balance > 0;
+        const isMathematicallyPaid = due <= 0 && balance >= 0 && hasPaymentHistory;
+
+        if (!isActive) {
+          status = 'Missing/Inactive';
+        } else if (isMathematicallyPaid) {
+          status = 'Paid';
+        } else {
+          status = status.charAt(0).toUpperCase() + status.slice(1);
+        }
+
+        const issues = (student as any).finance_issues;
+        let financeStatus = "Synced";
+        if (issues?.hasAny) {
+          const statusList = [];
+          if (issues.missingGL) statusList.push("Pending GL");
+          if (issues.missingAllocation) statusList.push("Pending Allocation");
+          if (issues.missingARSight) statusList.push("Missing AR Sync");
+          financeStatus = statusList.join(", ");
+        }
+
+        return {
+          "Student Name": student.student_name || "-",
+          "Admission No": student.admission_no || "-",
+          "Grade": student.grade || "-",
+          "Status": status,
+          "Fixed Amount (LKR)": student.fixed_monthly_amount || 0,
+          "Balance (LKR)": student.payment_balance || 0,
+          "Amount Due (LKR)": student.current_amount_due || 0,
+          "Last Paid Amount (LKR)": student.payment_amount || 0,
+          "Last Payment Date": student.last_payment_date ? new Date(student.last_payment_date).toLocaleDateString() : "-",
+          "Contact No": student.father_contact_no || "-",
+          "Finance Integration": financeStatus
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      
+      // Auto-size columns slightly
+      const colWidths = [
+        { wch: 30 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, 
+        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 },
+        { wch: 15 }, { wch: 15 }, { wch: 25 }
+      ];
+      worksheet['!cols'] = colWidths;
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+      
+      const fileName = `Student_Payments_${branch?.branch_code || 'Branch'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export Successful",
+        description: `Exported ${filteredStudents.length} records to Excel.`,
+      });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast({
+        title: "Export Failed",
+        description: "An error occurred while generating the Excel file.",
+        variant: "destructive"
+      });
+    }
   };
 
   const columns: ColumnDef<Student>[] = [
@@ -512,6 +594,19 @@ export default function SchoolPayments() {
               <Receipt className="h-4 w-4 mr-1" />
               Record Payment
             </Button>
+            {hasFinanceAccess && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 border-amber-200"
+                onClick={() => {
+                  setSelectedStudent(student);
+                  setShowAdjustModal(true);
+                }}
+              >
+                Adjust
+              </Button>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -994,7 +1089,16 @@ export default function SchoolPayments() {
         <TabsContent value="all" className="space-y-4">
           {/* Advanced Filters */}
           <Card>
-            <CardContent className="p-4 flex flex-wrap items-end gap-4">
+            <CardContent className="flex flex-wrap items-end gap-4 p-4 border-b">
+              <div className="space-y-1 min-w-[200px] flex-grow">
+                <label className="text-xs font-medium text-muted-foreground">Global Search</label>
+                <Input 
+                  placeholder="Search Name, Admission No, or Remarks..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-8"
+                />
+              </div>
               <div className="space-y-1 min-w-[150px]">
                 <label className="text-xs font-medium text-muted-foreground">Student Status</label>
                 <Select value={filterActive} onValueChange={setFilterActive}>
@@ -1118,6 +1222,18 @@ export default function SchoolPayments() {
         isOpen={showPaymentModal}
         onClose={() => {
           setShowPaymentModal(false);
+          setSelectedStudent(null);
+        }}
+        student={selectedStudent}
+        onSuccess={() => {
+          fetchStudents();
+        }}
+      />
+
+      <AdjustBalanceModal
+        isOpen={showAdjustModal}
+        onClose={() => {
+          setShowAdjustModal(false);
           setSelectedStudent(null);
         }}
         student={selectedStudent}

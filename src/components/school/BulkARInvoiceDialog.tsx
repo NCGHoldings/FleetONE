@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { CalendarIcon, FileSpreadsheet, Users, DollarSign, AlertCircle, CheckCircle, Loader2, AlertTriangle, Trash2, Percent } from "lucide-react";
+import { CalendarIcon, FileSpreadsheet, Users, DollarSign, AlertCircle, CheckCircle, Loader2, AlertTriangle, Trash2, Percent, Search } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useStudentsForBulkAR, useGenerateBulkARInvoices, useBranchFinanceSettings, useExistingBatch, useDeleteARBatch, useOrphanARCount, useRepairOrphanARs } from "@/hooks/useSchoolBusFinance";
@@ -27,7 +27,8 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
   const [invoiceMonth, setInvoiceMonth] = useState<Date>(new Date());
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [step, setStep] = useState<"select" | "confirm" | "processing" | "complete">("select");
-  const [billingPercentage, setBillingPercentage] = useState<number>(80);
+  const [billingPercentage, setBillingPercentage] = useState<number>(100);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: students, isLoading: studentsLoading } = useStudentsForBulkAR(branchId);
   const { data: settings, isLoading: settingsLoading } = useBranchFinanceSettings(branchId);
@@ -64,12 +65,27 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
     setSelectedStudents(newSelected);
   };
 
+  const filteredStudents = students?.filter((s) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      s.student_name?.toLowerCase().includes(query) ||
+      s.admission_no?.toLowerCase().includes(query) ||
+      s.grade?.toLowerCase().includes(query)
+    );
+  }) || [];
+
   const toggleAll = () => {
-    if (selectedStudents.size === students?.length) {
-      setSelectedStudents(new Set());
+    const filteredIds = filteredStudents.map(s => s.id);
+    const allFilteredSelected = filteredIds.length > 0 && filteredIds.every(id => selectedStudents.has(id));
+    
+    const newSelected = new Set(selectedStudents);
+    if (allFilteredSelected) {
+      filteredIds.forEach(id => newSelected.delete(id));
     } else {
-      setSelectedStudents(new Set(students?.map((s) => s.id) || []));
+      filteredIds.forEach(id => newSelected.add(id));
     }
+    setSelectedStudents(newSelected);
   };
 
   const selectedStudentsList = students?.filter((s) => selectedStudents.has(s.id)) || [];
@@ -315,31 +331,42 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
             </div>
 
             {/* Student List */}
-            <div className="flex-1 overflow-hidden border rounded-lg">
-              <div className="p-3 bg-muted border-b flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={students?.length > 0 && selectedStudents.size === students.length}
-                    onCheckedChange={toggleAll}
+            <div className="flex-1 overflow-hidden border rounded-lg flex flex-col">
+              <div className="p-3 bg-muted border-b flex flex-col gap-3">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by student name, admission no, or grade..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 h-9"
                   />
-                  <span className="text-sm font-medium">Select All</span>
                 </div>
-                <span className="text-sm text-muted-foreground">
-                  {selectedStudents.size} of {students?.length || 0} selected
-                </span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={filteredStudents.length > 0 && filteredStudents.every(s => selectedStudents.has(s.id))}
+                      onCheckedChange={toggleAll}
+                    />
+                    <span className="text-sm font-medium">Select All Filtered</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {selectedStudents.size} selected (showing {filteredStudents.length})
+                  </span>
+                </div>
               </div>
               <ScrollArea className="h-[250px]">
                 {studentsLoading ? (
                   <div className="flex items-center justify-center h-32">
                     <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
-                ) : students?.length === 0 ? (
+                ) : filteredStudents.length === 0 ? (
                   <div className="flex items-center justify-center h-32 text-muted-foreground">
-                    No active students with amount due
+                    No students match your search
                   </div>
                 ) : (
                   <div className="divide-y">
-                    {students?.map((student) => {
+                    {filteredStudents.map((student) => {
                       const invoiceAmount = calculateStudentAmount(student);
                       const outstandingBal = Math.abs(Math.min(student.payment_balance || 0, 0));
                       return (
