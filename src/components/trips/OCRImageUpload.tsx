@@ -872,6 +872,9 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
               data={data}
               actualSaveDate={format(manualDate, 'yyyy-MM-dd')}
               onApply={applyMultiTripData}
+              onChange={(updatedData) => {
+                setExtractedData(prev => prev.map((item, i) => i === index ? updatedData : item));
+              }}
               onDiscard={() => handleDiscard(index)}
               onView={handleView}
               savedExpensesTotal={data.savedExpensesTotal}

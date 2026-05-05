@@ -31,16 +31,24 @@ interface OCRExtractedDataCardProps {
   data: ExtractedMultiTripData;
   actualSaveDate: string; // The date that will be used for saving (YYYY-MM-DD)
   onApply: (data: ExtractedMultiTripData & { mapped_expenses: DBExpenseFields }) => void;
+  onChange: (data: ExtractedMultiTripData) => void;
   onDiscard: () => void;
   onView: () => void;
   savedExpensesTotal?: number;
 }
 
-export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard, onView, savedExpensesTotal }: OCRExtractedDataCardProps) => {
+export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, onDiscard, onView, savedExpensesTotal }: OCRExtractedDataCardProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState(data);
   const [hasEdits, setHasEdits] = useState(false);
+
+  // Sync editedData up to parent whenever it changes
+  useEffect(() => {
+    if (hasEdits) {
+      onChange(editedData);
+    }
+  }, [editedData, hasEdits, onChange]);
   
   // Multi-day route detection
   const [isMultiDayRoute, setIsMultiDayRoute] = useState(false);

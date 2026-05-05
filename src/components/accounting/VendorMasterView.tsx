@@ -52,6 +52,7 @@ interface Vendor {
   is_active: boolean | null;
   vendor_category_id: string | null;
   created_at: string | null;
+  is_global: boolean;
 }
 
 interface BankAccountRow {
@@ -108,6 +109,7 @@ export function VendorMasterView() {
     wht_applicable: "false",
     wht_rate: "",
     vendor_category_id: "",
+    is_global: false,
   });
 
   // Bank account helpers
@@ -154,7 +156,7 @@ export function VendorMasterView() {
       
       // Filter by business unit for sub-company views
       if (businessUnitCode) {
-        query = query.eq("business_unit_code", businessUnitCode);
+        query = query.or(`business_unit_code.eq.${businessUnitCode},is_global.eq.true`);
       }
       
       const { data, error } = await query;
@@ -183,6 +185,7 @@ export function VendorMasterView() {
         is_active: true,
         company_id: effectiveCompanyId,
         business_unit_code: businessUnitCode,
+        is_global: data.is_global,
       }]).select().single();
       if (error) throw error;
       return inserted;
@@ -228,6 +231,7 @@ export function VendorMasterView() {
           wht_applicable: data.wht_applicable === "true",
           wht_rate: data.wht_rate ? parseFloat(data.wht_rate) : null,
           vendor_category_id: data.vendor_category_id || null,
+          is_global: data.is_global,
         })
         .eq("id", id);
       if (error) throw error;
@@ -284,6 +288,7 @@ export function VendorMasterView() {
       wht_applicable: "false",
       wht_rate: "",
       vendor_category_id: "",
+      is_global: false,
     });
     setBankAccounts([]);
   };
@@ -302,6 +307,7 @@ export function VendorMasterView() {
       wht_applicable: vendor.wht_applicable ? "true" : "false",
       wht_rate: vendor.wht_rate?.toString() || "",
       vendor_category_id: vendor.vendor_category_id || "",
+      is_global: vendor.is_global || false,
     });
     setIsDialogOpen(true);
   };
@@ -492,6 +498,19 @@ export function VendorMasterView() {
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   />
                 </div>
+                
+                <div className="flex flex-row items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <Label>Global Vendor</Label>
+                    <p className="text-[10px] text-muted-foreground">
+                      Share this vendor across all branches and sub-units.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.is_global}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_global: checked })}
+                  />
+                </div>
 
                 {/* Banking Details Section */}
                 <div className="space-y-3 border-t pt-4">
@@ -661,7 +680,14 @@ export function VendorMasterView() {
                         <div className="text-[10px] text-muted-foreground/60 mt-0.5">was: {(vendor as any).legacy_number}</div>
                       )}
                     </TableCell>
-                    <TableCell className="font-medium">{vendor.vendor_name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {vendor.vendor_name}
+                        {vendor.is_global && (
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200">Global</Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       {(vendor as any).vendor_categories?.category_code 
                         ? <Badge variant="outline">{(vendor as any).vendor_categories.category_code}</Badge>

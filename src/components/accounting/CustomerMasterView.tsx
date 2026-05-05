@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useActiveCustomerCategories } from "@/hooks/useCustomerCategories";
 import {
@@ -47,8 +48,8 @@ interface Customer {
   credit_limit: number | null;
   payment_terms: number | null;
   is_active: boolean | null;
-  created_at: string | null;
   customer_category_id: string | null;
+  is_global: boolean;
 }
 
 export function CustomerMasterView() {
@@ -75,6 +76,7 @@ export function CustomerMasterView() {
     credit_limit: "",
     payment_terms: "30",
     customer_category_id: "",
+    is_global: false,
   });
 
   const { data: customers, isLoading } = useQuery({
@@ -91,22 +93,22 @@ export function CustomerMasterView() {
       
       // Filter by business unit for sub-company views
       if (businessUnitCode) {
-        query = query.eq("business_unit_code", businessUnitCode);
+        query = query.or(`business_unit_code.eq.${businessUnitCode},is_global.eq.true`);
       } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
         // Parent companies skip module filtering
       } else if (selectedCompany) {
         // Fallback to source_module mapping since legacy bridged records use source_module instead of business_unit_code
         const cName = selectedCompany.name.toLowerCase();
         if (cName.includes("yutong")) {
-          query = query.eq("source_module", "yutong");
+          query = query.or(`source_module.eq.yutong,is_global.eq.true`);
         } else if (cName.includes("sinotruck")) {
-          query = query.eq("source_module", "sinotruck");
+          query = query.or(`source_module.eq.sinotruck,is_global.eq.true`);
         } else if (cName.includes("special hire")) {
-          query = query.eq("source_module", "special_hire");
+          query = query.or(`source_module.eq.special_hire,is_global.eq.true`);
         } else if (cName.includes("school bus")) {
-          query = query.eq("source_module", "school_bus");
+          query = query.or(`source_module.eq.school_bus,is_global.eq.true`);
         } else if (cName.includes("light vehicle")) {
-          query = query.eq("source_module", "light_vehicle");
+          query = query.or(`source_module.eq.light_vehicle,is_global.eq.true`);
         }
       }
       
@@ -134,6 +136,7 @@ export function CustomerMasterView() {
         company_id: effectiveCompanyId,
         business_unit_code: businessUnitCode,
         customer_category_id: data.customer_category_id || null,
+        is_global: data.is_global,
       }]);
       if (error) throw error;
     },
@@ -162,6 +165,7 @@ export function CustomerMasterView() {
           credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : null,
           payment_terms: parseInt(data.payment_terms) || 30,
           customer_category_id: data.customer_category_id || null,
+          is_global: data.is_global,
         })
         .eq("id", id);
       if (error) throw error;
@@ -203,6 +207,7 @@ export function CustomerMasterView() {
       credit_limit: "",
       payment_terms: "30",
       customer_category_id: "",
+      is_global: false,
     });
   };
 
@@ -218,6 +223,7 @@ export function CustomerMasterView() {
       credit_limit: customer.credit_limit?.toString() || "",
       payment_terms: customer.payment_terms?.toString() || "30",
       customer_category_id: customer.customer_category_id || "",
+      is_global: customer.is_global || false,
     });
     setIsDialogOpen(true);
   };
@@ -377,6 +383,18 @@ export function CustomerMasterView() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex flex-row items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <Label>Global Customer</Label>
+                    <p className="text-[10px] text-muted-foreground">
+                      Share this customer across all branches and sub-units.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.is_global}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_global: checked })}
+                  />
+                </div>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
@@ -441,7 +459,14 @@ export function CustomerMasterView() {
                         <div className="text-[10px] text-muted-foreground/60 mt-0.5">was: {(customer as any).legacy_number}</div>
                       )}
                     </TableCell>
-                    <TableCell className="font-medium">{customer.customer_name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {customer.customer_name}
+                        {customer.is_global && (
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200">Global</Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       {(customer as any).customer_categories?.category_code 
                         ? <Badge variant="outline">{(customer as any).customer_categories.category_code}</Badge>

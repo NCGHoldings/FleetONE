@@ -89,13 +89,28 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
     setCreating(false);
   };
 
-  // Calculate eligible trip count from roster (matching creation logic exactly)
-  const tripsCreatedCount = expandedRows.filter(r => r.trip_id).length;
-  const tripsTotalCount = roster
-    .filter(r => r.is_active && r.bus_id && r.remark === 'Running')
-    .reduce((sum, r) => sum + (r.trips_per_day || 1), 0);
-  const isAllTripsCreated = tripsTotalCount > 0 && tripsCreatedCount >= tripsTotalCount;
-  const isPartialTripsCreated = tripsTotalCount > 0 && tripsCreatedCount > 0 && tripsCreatedCount < tripsTotalCount;
+  // Calculate eligible trip count per bus to handle cases where some buses have extra trips
+  let tripsPending = 0;
+  let totalTarget = 0;
+  let totalExisting = 0;
+
+  roster.forEach(r => {
+    if (r.is_active && r.bus_id && r.remark === 'Running') {
+       const busTarget = r.trips_per_day || 1;
+       totalTarget += busTarget;
+       
+       // Count existing trips for this specific bus
+       const busExistingTrips = expandedRows.filter(er => er.bus_id === r.bus_id && er.trip_id).length;
+       totalExisting += busExistingTrips;
+       
+       if (busExistingTrips < busTarget) {
+         tripsPending += (busTarget - busExistingTrips);
+       }
+    }
+  });
+
+  const isAllTripsCreated = totalTarget > 0 && tripsPending === 0;
+  const isPartialTripsCreated = tripsPending > 0 && totalExisting > 0;
 
   const exportToExcel = () => {
     const data = expandedRows.map((r, i) => ({
@@ -255,9 +270,9 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
             )}
           >
             {isAllTripsCreated ? (
-              <><CheckCircle2 className="h-4 w-4 mr-1" /> Generated ({tripsCreatedCount}/{tripsTotalCount})</>
+              <><CheckCircle2 className="h-4 w-4 mr-1" /> Generated ({totalExisting}/{totalTarget})</>
             ) : isPartialTripsCreated ? (
-              <><Rocket className="h-4 w-4 mr-1" /> {creating ? 'Creating...' : `Create Remaining (${tripsTotalCount - tripsCreatedCount})`}</>
+              <><Rocket className="h-4 w-4 mr-1" /> {creating ? 'Creating...' : `Create Remaining (${tripsPending})`}</>
             ) : (
               <><Rocket className="h-4 w-4 mr-1" /> {creating ? 'Creating...' : 'Create Trips'}</>
             )}
@@ -266,7 +281,7 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
       </div>
 
       {/* No Trips Banner */}
-      {editMode === 'daily' && tripsTotalCount > 0 && tripsCreatedCount === 0 && (
+      {editMode === 'daily' && totalTarget > 0 && totalExisting === 0 && (
         <div className="bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-800 rounded-lg p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />

@@ -5,7 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, Loader2, Save, Camera, Search, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Upload, Loader2, Save, Camera, Search, AlertCircle, CheckCircle2, CalendarIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { extractLogSheetData, OCRLogSheetResult, LogSheetRow } from '@/lib/ocr-log-sheet-processor';
@@ -217,7 +220,18 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
 
   const handleEditLog = (index: number, field: keyof LogSheetRow, value: any) => {
     const newLogs = [...editedLogs];
-    newLogs[index] = { ...newLogs[index], [field]: value };
+    const currentRow = { ...newLogs[index], [field]: value };
+    
+    // Auto-calculate distance if odometer changes
+    if (field === 'start_odo' || field === 'end_odo') {
+       const start = field === 'start_odo' ? value : currentRow.start_odo;
+       const end = field === 'end_odo' ? value : currentRow.end_odo;
+       if (start && end && end > start) {
+          currentRow.distance = end - start;
+       }
+    }
+    
+    newLogs[index] = currentRow;
     setEditedLogs(newLogs);
   };
 
@@ -336,7 +350,7 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] md:max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] md:max-w-7xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Monthly Log Sheet Verification</DialogTitle>
           <DialogDescription>
@@ -479,12 +493,32 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                     return (
                       <TableRow key={index} className={hasConflict ? "bg-amber-50 dark:bg-amber-950/20" : ""}>
                         <TableCell className="font-medium p-1">
-                          <Input 
-                            type="date"
-                            value={fullDate || ''}
-                            onChange={e => handleDateChange(index, e.target.value)}
-                            className="h-7 text-xs w-[115px]"
-                          />
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "h-7 w-[120px] justify-start text-left font-normal text-xs px-2",
+                                  !fullDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-1 h-3 w-3 shrink-0" />
+                                {fullDate ? format(parse(fullDate, 'yyyy-MM-dd', new Date()), "MMM dd, yyyy") : <span>Pick date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0 z-[100]" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={fullDate ? parse(fullDate, 'yyyy-MM-dd', new Date()) : undefined}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    handleDateChange(index, format(date, 'yyyy-MM-dd'));
+                                  }
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
                         </TableCell>
                         <TableCell className="p-1">
                           <Input 
@@ -522,6 +556,9 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                             onChange={e => handleEditLog(index, 'distance', e.target.value ? Number(e.target.value) : null)}
                             className="h-7 text-xs w-16"
                           />
+                          {dbRow && dbRow.distance_km && (
+                            <div className="text-[10px] text-muted-foreground mt-1">DB: {dbRow.distance_km}</div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Input 
@@ -540,6 +577,11 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                             onChange={e => handleEditLog(index, 'driver_name', e.target.value)}
                             className="h-7 text-xs w-24"
                           />
+                          {dbRow && dbRow.notes && typeof dbRow.notes === 'string' && dbRow.notes.includes('driver') && (
+                            <div className="text-[10px] text-muted-foreground mt-1 truncate max-w-[100px]" title={JSON.parse(dbRow.notes).driver}>
+                              DB: {JSON.parse(dbRow.notes).driver || 'N/A'}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           {dbRow ? (

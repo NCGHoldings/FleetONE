@@ -406,14 +406,17 @@ export const ChequePrintPreview = ({ open, onOpenChange, cheque }: ChequePrintPr
           @media print {
             /* Hide everything except cheque */
             body * {
-              visibility: hidden !important;
+              visibility: hidden;
+            }
+            #root {
+              display: none !important;
             }
             #cheque-print-area,
             #cheque-print-area * {
               visibility: visible !important;
             }
             #cheque-print-area {
-              position: fixed !important;
+              position: absolute !important;
               top: 0 !important;
               left: 0 !important;
               width: 175mm !important;
