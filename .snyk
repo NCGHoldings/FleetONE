@@ -1,0 +1,7 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+version: v1.25.0
+ignore:
+  'SNYK-JS-XLSX-6252523':
+    - '*':
+        reason: 'SheetJS stopped updating NPM registry at 0.18.5. This vulnerability is a ReDoS which is not exploitable in our controlled browser environment where we only parse trusted internal log sheets.'
+        expires: '2029-01-01T00:00:00.000Z'
