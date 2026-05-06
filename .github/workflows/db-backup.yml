@@ -17,25 +17,13 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
           
-      - name: Setup Cloudflare WARP (Provides IPv6)
-        uses: fscarmen/warp-on-actions@v1.4
-
-      - name: Fix WARP MTU and MSS
-        run: |
-          # Aggressive MTU to prevent fragmentation over IPv6/WARP
-          sudo ip link set dev CloudflareWARP mtu 1200 || true
-          # Clamp MSS to PMTU for all TCP traffic to stabilize pg_dump
-          sudo iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu || true
-
       - name: Whitelist Runner IP in Supabase
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: wwjpdszkmtnzshbulkon
         run: |
           export RUNNER_IPV4=$(curl -s -4 https://api.ipify.org || echo "")
-          export RUNNER_IPV6=$(curl -s -6 https://api64.ipify.org || echo "")
-          echo "Runner IPv4: $RUNNER_IPV4"
-          echo "Runner IPv6: $RUNNER_IPV6"
+          echo "Runner IPv4 is $RUNNER_IPV4"
           
           node -e '
             (async () => {
@@ -52,8 +40,8 @@ jobs:
               
               require("fs").writeFileSync("original_cidrs.json", JSON.stringify(existing));
               
-              // Temporarily allow all traffic to ensure WARP egress IPs are not blocked
-              const newIps = ["0.0.0.0/0", "::/0"];
+              // Whitelist all IPv4 traffic temporarily
+              const newIps = ["0.0.0.0/0"];
               
               for (const ip of newIps) {
                 if (!existing.includes(ip)) {
@@ -61,7 +49,7 @@ jobs:
                 }
               }
               
-              console.log("Temporarily opening firewall for backup runner...");
+              console.log("Temporarily allowing 0.0.0.0/0 for backup runner...");
               const postRes = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply`, {
                 method: "POST",
                 headers: { 
@@ -78,34 +66,45 @@ jobs:
             })();
           '
           
-          # Wait 120 seconds for firewall rules to propagate globally
-          echo "Waiting 120 seconds for firewall rules to propagate..."
-          sleep 120
+          # Wait 60 seconds for firewall rules to propagate
+          echo "Waiting 60 seconds for firewall rules to propagate..."
+          sleep 60
 
       # ── 1. Dump ─────────────────────────────────────────────────────────────
       - name: Dump Supabase Database
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          echo "🗄️  Starting db dump via Direct IPv6 Connection..."
+          echo "🗄️  Starting db dump via Pooler (Port 6543)..."
           
-          # Format Direct Connection URL
+          # Use Node.js to format the connection string for port 6543
           DB_URL=$(node -e '
             const url = new URL(process.env.DATABASE_URL);
-            url.hostname = "db.wwjpdszkmtnzshbulkon.supabase.co";
-            url.port = "5432";
-            url.username = "postgres";
+            
+            // Use port 6543 as specified in the original secret
+            url.port = "6543";
+            
+            // Ensure username is in the correct tenant format (postgres.ref)
+            if (!url.username.includes(".")) {
+              url.username = `postgres.wwjpdszkmtnzshbulkon`;
+            }
+            
             url.searchParams.delete("pgbouncer");
             console.log(url.toString());
           ')
           
-          # Diagnostic: Check port connectivity
-          echo "🔍 Checking port 5432 connectivity..."
-          nc -zv -w 10 db.wwjpdszkmtnzshbulkon.supabase.co 5432 || echo "⚠️ Port 5432 seems closed (may be ICMP blocked)"
+          # Diagnostic: Test connection first
+          echo "🔍 Testing connection to pooler (Port 6543)..."
+          if ! psql "$DB_URL" -c "SELECT 1" > /dev/null 2>&1; then
+            echo "❌ Connection failed. Trying to get error message..."
+            psql "$DB_URL" -c "SELECT 1" 2>&1 | sed "s/://g" | grep -v "password" || true
+            exit 1
+          fi
+          echo "✅ Connection successful."
           
-          # Perform the dump with a long timeout
-          echo "⏳ Dumping database (this may take several minutes)..."
-          timeout 15m pg_dump "$DB_URL" -Fc -Z 9 -f supabase-backup.dump
+          # Perform the dump
+          # Note: We use --no-owner and --no-privileges to avoid session issues in transaction mode
+          pg_dump "$DB_URL" -Fc -Z 9 --no-owner --no-privileges -f supabase-backup.dump
           
           DUMP_SIZE=$(du -sh supabase-backup.dump | cut -f1)
           echo "✅ Dump complete. Size: $DUMP_SIZE"
