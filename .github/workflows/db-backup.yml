@@ -17,26 +17,13 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
           
-      - name: Setup Cloudflare WARP (Provides IPv6)
-        uses: fscarmen/warp-on-actions@v1.4
-
-      - name: Fix WARP MTU
-        run: |
-          # Lower the MTU of the WARP interface to prevent packet fragmentation hangs
-          sudo ip link set dev CloudflareWARP mtu 1280 || true
-          # Clamp MSS to PMTU for all TCP connections to fix the pg_dump hang
-          sudo iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu || true
-          sudo iptables -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu || true
-
       - name: Whitelist Runner IP in Supabase
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: wwjpdszkmtnzshbulkon
         run: |
-          export RUNNER_IPV4=$(curl -s -4 https://api.ipify.org)
-          export RUNNER_IPV6=$(curl -s -6 https://api64.ipify.org || echo "")
+          export RUNNER_IPV4=$(curl -s -4 https://api.ipify.org || echo "")
           echo "Runner IPv4 is $RUNNER_IPV4"
-          echo "Runner IPv6 is $RUNNER_IPV6"
           
           node -e '
             (async () => {
@@ -53,18 +40,16 @@ jobs:
               
               require("fs").writeFileSync("original_cidrs.json", JSON.stringify(existing));
               
-              // Whitelist all IPs temporarily to ensure WARP dynamic egress IPs are not blocked
-              const newIps = ["0.0.0.0/0", "::/0"];
+              // Whitelist all IPv4 traffic temporarily for the runner
+              const newIps = ["0.0.0.0/0"];
               
-              let modified = false;
               for (const ip of newIps) {
                 if (!existing.includes(ip)) {
                   existing.push(ip);
-                  modified = true;
                 }
               }
               
-              console.log("Updating allowlist to include all IPs (0.0.0.0/0, ::/0) temporarily...");
+              console.log("Temporarily allowing 0.0.0.0/0 for backup runner...");
               const postRes = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply`, {
                 method: "POST",
                 headers: { 
@@ -81,39 +66,46 @@ jobs:
             })();
           '
           
-          # Wait 120 seconds for firewall rules to propagate globally
-          echo "Waiting 120 seconds for firewall rules to propagate..."
-          sleep 120
+          # Wait 60 seconds for firewall rules to propagate to the Supavisor Pooler
+          echo "Waiting 60 seconds for firewall rules to propagate..."
+          sleep 60
 
       # ── 1. Dump ─────────────────────────────────────────────────────────────
       - name: Dump Supabase Database
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          echo "🗄️  Starting db dump via direct IPv6 connection..."
+          echo "🗄️  Starting db dump via Supavisor Pooler (IPv4)..."
           
-          # Use Node.js to reliably parse and manipulate the connection string
-          DIRECT_URL=$(node -e '
+          # Use Node.js to format the connection string for Session Mode (Port 5432)
+          # We use the standard postgres.[ref] username format.
+          DB_URL=$(node -e '
             const url = new URL(process.env.DATABASE_URL);
             
-            // Bypass the connection pooler entirely and use the direct database connection (IPv6)
-            url.hostname = "db.wwjpdszkmtnzshbulkon.supabase.co";
+            // Force Session Mode port (5432) for pg_dump compatibility
             url.port = "5432";
             
-            // The direct connection does not require the project ref in the username
-            url.username = "postgres"; 
+            // Ensure username is in the correct tenant format (postgres.ref)
+            if (!url.username.includes(".")) {
+              url.username = `postgres.wwjpdszkmtnzshbulkon`;
+            }
+            
             url.searchParams.delete("pgbouncer");
-            
-            // Debug logging (password hidden)
-            console.error(`[DEBUG] Host: ${url.hostname}`);
-            console.error(`[DEBUG] Username: ${url.username}`);
-            console.error(`[DEBUG] Port: ${url.port}`);
-            
             console.log(url.toString());
           ')
           
-          # Use native pg_dump with timeout
-          timeout 5m pg_dump "$DIRECT_URL" -Fc -Z 9 -f supabase-backup.dump
+          # Diagnostic: Test connection first
+          echo "🔍 Testing connection to pooler..."
+          if ! psql "$DB_URL" -c "SELECT 1" > /dev/null 2>&1; then
+            echo "❌ Connection failed. Diagnosing..."
+            # Try to print a more helpful error message (without leaking password)
+            psql "$DB_URL" -c "SELECT 1" 2>&1 | sed "s/://g" | grep -v "password" || true
+            exit 1
+          fi
+          echo "✅ Connection successful."
+          
+          # Perform the dump
+          pg_dump "$DB_URL" -Fc -Z 9 -f supabase-backup.dump
           
           DUMP_SIZE=$(du -sh supabase-backup.dump | cut -f1)
           echo "✅ Dump complete. Size: $DUMP_SIZE"
