@@ -21,14 +21,13 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: wwjpdszkmtnzshbulkon
         run: |
-          RUNNER_IP=$(curl -s https://api.ipify.org)
+          export RUNNER_IP=$(curl -s https://api.ipify.org)
           echo "Runner IP is $RUNNER_IP"
-          echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
           
-          node -e "
+          node -e '
             (async () => {
-              const getRes = await fetch('https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions', {
-                headers: { 'Authorization': 'Bearer ' + process.env.SUPABASE_ACCESS_TOKEN }
+              const getRes = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions`, {
+                headers: { "Authorization": `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}` }
               });
               const data = await getRes.json();
               
@@ -38,19 +37,19 @@ jobs:
               else if (data.db_allowed_cidrs) existing = data.db_allowed_cidrs;
               else if (Array.isArray(data)) existing = data;
               
-              require('fs').writeFileSync('original_cidrs.json', JSON.stringify(existing));
+              require("fs").writeFileSync("original_cidrs.json", JSON.stringify(existing));
               
-              const newIp = '${RUNNER_IP}/32';
+              const newIp = `${process.env.RUNNER_IP}/32`;
               if (!existing.includes(newIp)) {
                 existing.push(newIp);
               }
               
-              console.log('Updating allowlist...');
-              const postRes = await fetch('https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply', {
-                method: 'POST',
+              console.log("Updating allowlist...");
+              const postRes = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply`, {
+                method: "POST",
                 headers: { 
-                  'Authorization': 'Bearer ' + process.env.SUPABASE_ACCESS_TOKEN,
-                  'Content-Type': 'application/json'
+                  "Authorization": `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`,
+                  "Content-Type": "application/json"
                 },
                 body: JSON.stringify({ db_allowed_cidrs: existing })
               });
@@ -60,7 +59,7 @@ jobs:
                 process.exit(1);
               }
             })();
-          "
+          '
           
           # Wait 15 seconds for firewall rules to propagate
           echo "Waiting for firewall rules to propagate..."
@@ -184,29 +183,29 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: wwjpdszkmtnzshbulkon
         run: |
-          node -e "
-            const fs = require('fs');
-            if (!fs.existsSync('original_cidrs.json')) {
-              console.log('No original CIDRs found. Skipping revert.');
+          node -e '
+            const fs = require("fs");
+            if (!fs.existsSync("original_cidrs.json")) {
+              console.log("No original CIDRs found. Skipping revert.");
               process.exit(0);
             }
-            const original = JSON.parse(fs.readFileSync('original_cidrs.json', 'utf8'));
+            const original = JSON.parse(fs.readFileSync("original_cidrs.json", "utf8"));
             
             (async () => {
-              console.log('Reverting allowlist to:', original);
-              const postRes = await fetch('https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply', {
-                method: 'POST',
+              console.log("Reverting allowlist to:", original);
+              const postRes = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply`, {
+                method: "POST",
                 headers: { 
-                  'Authorization': 'Bearer ' + process.env.SUPABASE_ACCESS_TOKEN,
-                  'Content-Type': 'application/json'
+                  "Authorization": `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`,
+                  "Content-Type": "application/json"
                 },
                 body: JSON.stringify({ db_allowed_cidrs: original })
               });
               
               if (!postRes.ok) {
-                console.error('Failed to revert restrictions:', await postRes.text());
+                console.error("Failed to revert restrictions:", await postRes.text());
                 process.exit(1);
               }
-              console.log('Revert successful.');
+              console.log("Revert successful.");
             })();
-          "
+          '
