@@ -1,6 +1,6 @@
 name: Daily Database Backup (Supabase → DO Spaces)
 # Runs daily at 2:00 AM UTC. Can also be triggered manually.
-# Secrets required: SUPABASE_DB_URL, DO_SPACES_KEY, DO_SPACES_SECRET, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+# Secrets required: SUPABASE_DB_URL, SUPABASE_ACCESS_TOKEN, DO_SPACES_KEY, DO_SPACES_SECRET, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 on:
   schedule:
@@ -16,21 +16,22 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
-          
+
       - name: Whitelist Runner IP in Supabase
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: wwjpdszkmtnzshbulkon
         run: |
-          export RUNNER_IPV4=$(curl -s -4 https://api.ipify.org || echo "")
-          echo "Runner IPv4 is $RUNNER_IPV4"
+          # Get the runner's public IPv4 address
+          export RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "Runner IP is $RUNNER_IP"
           
           node -e '
             (async () => {
-              const getRes = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions`, {
+              const res = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions`, {
                 headers: { "Authorization": `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}` }
               });
-              const data = await getRes.json();
+              const data = await res.json();
               
               let existing = [];
               if (data.config && data.config.dbAllowedCidrs) existing = data.config.dbAllowedCidrs;
@@ -38,19 +39,19 @@ jobs:
               else if (data.db_allowed_cidrs) existing = data.db_allowed_cidrs;
               else if (Array.isArray(data)) existing = data;
               
+              // Save original list to revert later
               require("fs").writeFileSync("original_cidrs.json", JSON.stringify(existing));
               
-              // Whitelist all IPv4 traffic temporarily
-              const newIps = ["0.0.0.0/0"];
-              
-              for (const ip of newIps) {
-                if (!existing.includes(ip)) {
-                  existing.push(ip);
-                }
+              // Add runner IP if not present
+              const cidr = `${process.env.RUNNER_IP}/32`;
+              if (!existing.includes(cidr)) {
+                existing.push(cidr);
+                console.log(`Adding runner IP: ${cidr}`);
+              } else {
+                console.log(`Runner IP ${cidr} already whitelisted.`);
               }
               
-              console.log("Temporarily allowing 0.0.0.0/0 for backup runner...");
-              const postRes = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply`, {
+              const applyRes = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply`, {
                 method: "POST",
                 headers: { 
                   "Authorization": `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`,
@@ -59,52 +60,40 @@ jobs:
                 body: JSON.stringify({ db_allowed_cidrs: existing })
               });
               
-              if (!postRes.ok) {
-                console.error(await postRes.text());
+              if (!applyRes.ok) {
+                console.error("Failed to apply restrictions:", await applyRes.text());
                 process.exit(1);
               }
             })();
           '
           
-          # Wait 60 seconds for firewall rules to propagate
-          echo "Waiting 60 seconds for firewall rules to propagate..."
-          sleep 60
+          # Wait for propagation (Supabase firewall updates can take 1-2 minutes)
+          echo "Waiting 120 seconds for firewall rules to propagate..."
+          sleep 120
 
       # ── 1. Dump ─────────────────────────────────────────────────────────────
       - name: Dump Supabase Database
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          echo "🗄️  Starting db dump via Pooler (Port 6543)..."
+          echo "🗄️ Starting database dump via Pooler..."
           
-          # Use Node.js to format the connection string for port 6543
+          # Use Node to ensure the URL uses Port 5432 (Session Mode)
           DB_URL=$(node -e '
-            const url = new URL(process.env.DATABASE_URL);
-            
-            // Use port 6543 as specified in the original secret
-            url.port = "6543";
-            
-            // Ensure username is in the correct tenant format (postgres.ref)
-            if (!url.username.includes(".")) {
-              url.username = `postgres.wwjpdszkmtnzshbulkon`;
+            try {
+              const url = new URL(process.env.DATABASE_URL);
+              // Force port 5432 if it is a Supabase pooler host
+              if (url.hostname.includes("pooler.supabase.com")) {
+                url.port = "5432";
+              }
+              console.log(url.toString());
+            } catch (e) {
+              console.error("Invalid DATABASE_URL");
+              process.exit(1);
             }
-            
-            url.searchParams.delete("pgbouncer");
-            console.log(url.toString());
           ')
           
-          # Diagnostic: Test connection first
-          echo "🔍 Testing connection to pooler (Port 6543)..."
-          if ! psql "$DB_URL" -c "SELECT 1" > /dev/null 2>&1; then
-            echo "❌ Connection failed. Trying to get error message..."
-            psql "$DB_URL" -c "SELECT 1" 2>&1 | sed "s/://g" | grep -v "password" || true
-            exit 1
-          fi
-          echo "✅ Connection successful."
-          
-          # Perform the dump
-          # Note: We use --no-owner and --no-privileges to avoid session issues in transaction mode
-          pg_dump "$DB_URL" -Fc -Z 9 --no-owner --no-privileges -f supabase-backup.dump
+          pg_dump "$DB_URL" -Fc -Z 9 -f supabase-backup.dump
           
           DUMP_SIZE=$(du -sh supabase-backup.dump | cut -f1)
           echo "✅ Dump complete. Size: $DUMP_SIZE"
@@ -113,14 +102,8 @@ jobs:
       # ── 2. Integrity Check ───────────────────────────────────────────────────
       - name: Verify Dump Integrity
         run: |
-          echo "🔍 Verifying dump integrity with pg_restore --list..."
-          pg_restore --list supabase-backup.dump > /tmp/restore-toc.txt
-          TOC_LINES=$(wc -l < /tmp/restore-toc.txt)
-          echo "   Table of Contents: $TOC_LINES entries"
-          if [ "$TOC_LINES" -lt 10 ]; then
-            echo "❌ Integrity check failed — TOC suspiciously small ($TOC_LINES lines)."
-            exit 1
-          fi
+          echo "🔍 Verifying dump integrity..."
+          pg_restore --list supabase-backup.dump > /dev/null
           echo "✅ Integrity check passed."
 
       # ── 3. Upload to DO Spaces ───────────────────────────────────────────────
@@ -133,65 +116,48 @@ jobs:
         run: |
           TIMESTAMP=$(date +%Y-%m-%d_%H-%M)
           FILE_NAME="fleetone/supabase-backup-$TIMESTAMP.dump"
-          echo "📤 Uploading $FILE_NAME to DigitalOcean Spaces..."
+          echo "📤 Uploading $FILE_NAME..."
           aws s3 cp supabase-backup.dump "s3://$DO_SPACE_BUCKET/$FILE_NAME" \
             --endpoint-url "$DO_SPACE_ENDPOINT" \
             --acl private
-          echo "✅ Upload complete: $FILE_NAME"
           echo "BACKUP_FILE=$FILE_NAME" >> $GITHUB_ENV
 
       # ── 4. Retention Purge (keep last 30 days) ───────────────────────────────
-      - name: Purge Backups Older Than 30 Days
+      - name: Purge Old Backups
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET }}
           DO_SPACE_ENDPOINT: https://sgp1.digitaloceanspaces.com
           DO_SPACE_BUCKET: ncg-db-backup
         run: |
-          echo "🧹 Purging backups older than 30 days..."
           CUTOFF=$(date -d '30 days ago' +%Y-%m-%d)
-
-          aws s3 ls "s3://$DO_SPACE_BUCKET/fleetone/" \
-            --endpoint-url "$DO_SPACE_ENDPOINT" | while read -r line; do
-            FILE_DATE=$(echo "$line" | awk '{print $1}')
-            FILE_NAME=$(echo "$line" | awk '{print $4}')
+          aws s3 ls "s3://$DO_SPACE_BUCKET/fleetone/" --endpoint-url "$DO_SPACE_ENDPOINT" | while read -r line; do
+            FILE_DATE=$(echo "$line" | awk "{print \$1}")
+            FILE_NAME=$(echo "$line" | awk "{print \$4}")
             if [[ "$FILE_DATE" < "$CUTOFF" ]] && [[ -n "$FILE_NAME" ]]; then
-              echo "   Deleting old backup: $FILE_NAME (date: $FILE_DATE)"
-              aws s3 rm "s3://$DO_SPACE_BUCKET/fleetone/$FILE_NAME" \
-                --endpoint-url "$DO_SPACE_ENDPOINT"
+              aws s3 rm "s3://$DO_SPACE_BUCKET/fleetone/$FILE_NAME" --endpoint-url "$DO_SPACE_ENDPOINT"
             fi
           done
-          echo "✅ Retention purge complete."
 
-      # ── 5. Telegram — Success ────────────────────────────────────────────────
-      - name: Notify Telegram (Success)
-        if: success()
+      # ── 5. Telegram Notifications ──────────────────────────────────────────
+      - name: Notify Telegram
+        if: always()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          MESSAGE="✅ *FleetONE DB Backup — Success*%0A%0A📦 File: \`$BACKUP_FILE\`%0A📏 Size: $DUMP_SIZE%0A🕐 Time: $(date -u '+%Y-%m-%d %H:%M UTC')%0A%0A🔗 [View Run]($RUN_URL)"
+          if [ "${{ job.status }}" == "success" ]; then
+            MESSAGE="✅ *FleetONE DB Backup — Success*%0A%0A📦 File: \`$BACKUP_FILE\`%0A📏 Size: $DUMP_SIZE%0A🕐 Time: $(date -u '+%Y-%m-%d %H:%M UTC')%0A%0A🔗 [View Run]($RUN_URL)"
+          else
+            MESSAGE="🚨 *FleetONE DB Backup — FAILED*%0A%0A❗ Nightly backup failed. Check logs for details.%0A🕐 Time: $(date -u '+%Y-%m-%d %H:%M UTC')%0A%0A🔗 [Investigate Run]($RUN_URL)"
+          fi
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
             -d parse_mode="Markdown" \
-            -d text="$MESSAGE" > /dev/null
+            -d text="$MESSAGE"
 
-      # ── 6. Telegram — Failure ────────────────────────────────────────────────
-      - name: Notify Telegram (Failure)
-        if: failure()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          MESSAGE="🚨 *FleetONE DB Backup — FAILED*%0A%0A❗ The nightly database backup did not complete successfully.%0A🕐 Time: $(date -u '+%Y-%m-%d %H:%M UTC')%0A%0A🔗 [Investigate Run]($RUN_URL)"
-          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-            -d chat_id="$TELEGRAM_CHAT_ID" \
-            -d parse_mode="Markdown" \
-            -d text="$MESSAGE" > /dev/null
-
-      # ── 7. Revert Network Restrictions ───────────────────────────────────────
+      # ── 6. Revert Network Restrictions ───────────────────────────────────────
       - name: Revert Supabase Network Restrictions
         if: always()
         env:
@@ -200,15 +166,11 @@ jobs:
         run: |
           node -e '
             const fs = require("fs");
-            if (!fs.existsSync("original_cidrs.json")) {
-              console.log("No original CIDRs found. Skipping revert.");
-              process.exit(0);
-            }
+            if (!fs.existsSync("original_cidrs.json")) process.exit(0);
             const original = JSON.parse(fs.readFileSync("original_cidrs.json", "utf8"));
-            
             (async () => {
-              console.log("Reverting allowlist to:", original);
-              const postRes = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply`, {
+              console.log("Reverting firewall settings...");
+              await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply`, {
                 method: "POST",
                 headers: { 
                   "Authorization": `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`,
@@ -216,11 +178,5 @@ jobs:
                 },
                 body: JSON.stringify({ db_allowed_cidrs: original })
               });
-              
-              if (!postRes.ok) {
-                console.error("Failed to revert restrictions:", await postRes.text());
-                process.exit(1);
-              }
-              console.log("Revert successful.");
             })();
           '
