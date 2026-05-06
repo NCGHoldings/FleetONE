@@ -16,9 +16,10 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
-
-      - name: Setup IPv6
-        uses: vmactions/ipv6-network@v0
+      - name: Setup Cloudflare WARP (Provides IPv6)
+        uses: felipecrs/setup-warp@v1
+        with:
+          accepted-tos: true
 
       # ── 1. Dump ─────────────────────────────────────────────────────────────
       - name: Dump Supabase Database
