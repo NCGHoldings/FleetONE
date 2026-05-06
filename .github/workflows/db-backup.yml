@@ -73,39 +73,23 @@ jobs:
       # ── 1. Dump ─────────────────────────────────────────────────────────────
       - name: Dump Supabase Database
         env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          echo "🗄️  Starting db dump via Supavisor Pooler (IPv4)..."
+          echo "🗄️  Starting db dump via Supabase CLI..."
           
-          # Use Node.js to format the connection string for Session Mode (Port 5432)
-          # We use the standard postgres.[ref] username format.
-          DB_URL=$(node -e '
+          # Extract password from DATABASE_URL
+          DB_PASSWORD=$(node -e '
             const url = new URL(process.env.DATABASE_URL);
-            
-            // Force Session Mode port (5432) for pg_dump compatibility
-            url.port = "5432";
-            
-            // Ensure username is in the correct tenant format (postgres.ref)
-            if (!url.username.includes(".")) {
-              url.username = `postgres.wwjpdszkmtnzshbulkon`;
-            }
-            
-            url.searchParams.delete("pgbouncer");
-            console.log(url.toString());
+            console.log(url.password);
           ')
           
-          # Diagnostic: Test connection first
-          echo "🔍 Testing connection to pooler..."
-          if ! psql "$DB_URL" -c "SELECT 1" > /dev/null 2>&1; then
-            echo "❌ Connection failed. Diagnosing..."
-            # Try to print a more helpful error message (without leaking password)
-            psql "$DB_URL" -c "SELECT 1" 2>&1 | sed "s/://g" | grep -v "password" || true
-            exit 1
-          fi
-          echo "✅ Connection successful."
-          
-          # Perform the dump
-          pg_dump "$DB_URL" -Fc -Z 9 -f supabase-backup.dump
+          # Use Supabase CLI to perform the dump. 
+          # It uses the Management API and handles the connection automatically.
+          npx supabase db dump \
+            --project-ref wwjpdszkmtnzshbulkon \
+            --db-password "$DB_PASSWORD" \
+            -f supabase-backup.dump
           
           DUMP_SIZE=$(du -sh supabase-backup.dump | cut -f1)
           echo "✅ Dump complete. Size: $DUMP_SIZE"

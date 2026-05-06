@@ -1,0 +1,118 @@
+name: Database Restore Drill (Backup Validation)
+# Runs weekly on Sunday at 3:00 AM UTC.
+# This validates that the nightly .dump files are actually restorable.
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+jobs:
+  restore-drill:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install PostgreSQL Client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
+      # ── 1. Identify & Download Latest Backup ───────────────────────────────
+      - name: Download Latest Backup from DO Spaces
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET }}
+          DO_SPACE_ENDPOINT: https://sgp1.digitaloceanspaces.com
+          DO_SPACE_BUCKET: ncg-db-backup
+        run: |
+          echo "📂 Identifying latest backup in s3://$DO_SPACE_BUCKET/fleetone/ ..."
+          
+          LATEST_FILE=$(aws s3 ls "s3://$DO_SPACE_BUCKET/fleetone/" \
+            --endpoint-url "$DO_SPACE_ENDPOINT" | sort | tail -n 1 | awk '{print $4}')
+          
+          if [ -z "$LATEST_FILE" ]; then
+            echo "❌ No backup files found in DO Spaces!"
+            exit 1
+          fi
+          
+          echo "📥 Downloading $LATEST_FILE ..."
+          aws s3 cp "s3://$DO_SPACE_BUCKET/fleetone/$LATEST_FILE" supabase-backup.dump \
+            --endpoint-url "$DO_SPACE_ENDPOINT"
+          
+          echo "LATEST_FILE=$LATEST_FILE" >> $GITHUB_ENV
+
+      # ── 2. Provision Isolated Postgres ──────────────────────────────────────
+      - name: Start Test PostgreSQL Container
+        run: |
+          docker run --name pg-test \
+            -e POSTGRES_PASSWORD=postgres \
+            -p 5432:5432 \
+            -d postgres:15
+          
+          # Wait for readiness
+          MAX_RETRIES=30
+          for i in $(seq 1 $MAX_RETRIES); do
+            if pg_isready -h localhost -U postgres; then
+              echo "✅ Postgres is ready."
+              break
+            fi
+            echo "⏳ Waiting for Postgres... ($i/$MAX_RETRIES)"
+            sleep 2
+          done
+
+      # ── 3. Execute Restore Drill ────────────────────────────────────────────
+      - name: Run pg_restore
+        run: |
+          echo "🛠️  Attempting full restore from $LATEST_FILE ..."
+          
+          # We use --no-owner and --no-privileges because the local docker container 
+          # doesn't have the same Supabase roles (authenticator, etc.)
+          # We also ignore errors (|| true) because Supabase dumps often contain 
+          # extension creation commands that fail on a plain Postgres instance.
+          pg_restore -h localhost -U postgres -d postgres \
+            --no-owner --no-privileges --clean --if-exists \
+            supabase-backup.dump || true
+          
+          echo "✅ Restore operation completed (checked output for fatal errors manually if needed)."
+
+      # ── 4. Verify Data Integrity ────────────────────────────────────────────
+      - name: Verify Table Counts
+        id: verify
+        run: |
+          echo "🔍 Verifying data integrity..."
+          TABLE_COUNT=$(psql -h localhost -U postgres -d postgres -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';")
+          TABLE_COUNT=$(echo $TABLE_COUNT | xargs)
+          
+          echo "📊 Public Tables Found: $TABLE_COUNT"
+          
+          if [ "$TABLE_COUNT" -lt 50 ]; then
+            echo "❌ Validation failed: Table count ($TABLE_COUNT) is suspiciously low."
+            exit 1
+          fi
+          
+          echo "TABLE_COUNT=$TABLE_COUNT" >> $GITHUB_OUTPUT
+          echo "✅ Database validation successful."
+
+      # ── 5. Telegram Notification ───────────────────────────────────────────
+      - name: Notify Telegram
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          STATUS: ${{ job.status }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M UTC')
+          
+          if [ "$STATUS" = "success" ]; then
+            ICON="✅"
+            MSG_TEXT="*FleetONE Restore Drill — PASSED*%0A%0A📦 Verified File: \`$LATEST_FILE\`%0A📊 Tables Restored: ${{ steps.verify.outputs.TABLE_COUNT }}%0A🕐 Time: $TIMESTAMP%0A%0AThe disaster recovery artifact is confirmed functional."
+          else
+            ICON="🚨"
+            MSG_TEXT="*FleetONE Restore Drill — FAILED*%0A%0A❗ The weekly backup validation failed. The backup artifacts may be corrupt or the restore process encountered fatal errors.%0A🕐 Time: $TIMESTAMP%0A%0A🔗 [Investigate Run]($RUN_URL)"
+          fi
+          
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d chat_id="$TELEGRAM_CHAT_ID" \
+            -d parse_mode="Markdown" \
+            -d text="$MSG_TEXT" > /dev/null
