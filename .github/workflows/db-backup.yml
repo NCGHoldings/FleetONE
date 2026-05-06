@@ -17,6 +17,9 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
 
+      - name: Setup IPv6
+        uses: vmactions/ipv6-network@v0
+
       # ── 1. Dump ─────────────────────────────────────────────────────────────
       - name: Dump Supabase Database
         env:
@@ -28,10 +31,12 @@ jobs:
           DIRECT_URL=$(node -e '
             const url = new URL(process.env.DATABASE_URL);
             
-            // If using the connection pooler, force port 5432 (Session mode)
-            if (url.hostname.includes("pooler.supabase")) {
-              url.port = "5432";
-            }
+            // Bypass the connection pooler entirely and use the direct database connection (IPv6)
+            url.hostname = "db.wwjpdszkmtnzshbulkon.supabase.co";
+            url.port = "5432";
+            
+            // The direct connection does not require the project ref in the username
+            url.username = "postgres"; 
             url.searchParams.delete("pgbouncer");
             
             // Debug logging (password hidden)
