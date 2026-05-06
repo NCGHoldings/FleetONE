@@ -73,9 +73,9 @@ jobs:
             })();
           '
           
-          # Wait 20 seconds for firewall rules to propagate globally
-          echo "Waiting 20 seconds for firewall rules to propagate..."
-          sleep 20
+          # Wait 120 seconds for firewall rules to propagate globally to the Supavisor Pooler
+          echo "Waiting 120 seconds for firewall rules to propagate..."
+          sleep 120
 
       # ── 1. Dump ─────────────────────────────────────────────────────────────
       - name: Dump Supabase Database
