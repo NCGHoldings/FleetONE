@@ -1654,7 +1654,23 @@ export const generateSPHARInvoiceTemplate = (): string => `
       <tr class="br"><td class="bl">BALANCE DUE</td><td class="ba">{{balance}}</td></tr>
     </table>
   </div>
-  <div class="nt"><strong>Notes:</strong> {{notes}}</div>
+  <div class="nt">
+    <div style="margin-bottom: 12px;"><strong>Notes:</strong> {{notes}}</div>
+    <table style="width: 100%; border: none; font-size: 12px;">
+      <tr>
+        <td style="vertical-align: top; width: 50%; padding-right: 10px;">
+          <strong>Payment Info -</strong><br/>
+          Account No : 1001077213<br/>
+          Account Name : NCG Holdings Private Limited<br/>
+          Bank & Branch : Commercial Bank - Nugegoda
+        </td>
+        <td style="vertical-align: top; width: 50%;">
+          <strong>Terms & Conditions -</strong><br/>
+          1. Cheques are to be drawn in favour of NCG HOLDINGS PRIVATE LIMITED and A/C payee only.
+        </td>
+      </tr>
+    </table>
+  </div>
   <table class="sg">
     <thead><tr><th>Prepared By</th><th>Checked By</th><th>Approved By</th></tr></thead>
     <tbody><tr>

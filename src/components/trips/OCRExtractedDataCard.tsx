@@ -15,6 +15,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { APPaymentForm } from "../accounting/APPaymentForm";
+import { ARReceiptForm } from "../accounting/ARReceiptForm";
+import { Wallet, Landmark, DollarSign } from "lucide-react";
 
 interface ExtractedMultiTripData {
   id: string; // Add id to interface
@@ -74,6 +77,8 @@ export const OCRExtractedDataCard = ({ data, isOpen = false, onToggleOpen, actua
   const [manualMultiDayEnabled, setManualMultiDayEnabled] = useState(data.manualMultiDayEnabled || false);
   const [showBusNumberEdit, setShowBusNumberEdit] = useState(false);
   const [availableMultiDayRoutes, setAvailableMultiDayRoutes] = useState<any[]>([]);
+  const [apFormOpen, setApFormOpen] = useState(false);
+  const [arFormOpen, setArFormOpen] = useState(false);
   
   // Track unmapped OCR items
   const [unmappedItems, setUnmappedItems] = useState<Record<string, number>>(() => {
@@ -475,6 +480,9 @@ export const OCRExtractedDataCard = ({ data, isOpen = false, onToggleOpen, actua
     luggage_income: "Luggage (ගමන් මල්)",
     special_income: "Special (විශේෂ)",
   };
+
+  const handleOpenDirectPayment = () => setApFormOpen(true);
+  const handleOpenDirectReceipt = () => setArFormOpen(true);
 
   // Get bus data for route warning — re-check on edited bus number with debounce
   const [busData, setBusData] = useState<any>(null);
@@ -1143,6 +1151,82 @@ export const OCRExtractedDataCard = ({ data, isOpen = false, onToggleOpen, actua
                 </div>
               </div>
             </div>
+            
+            {/* Finance Actions Section */}
+            <div className="mt-6 p-4 border-t bg-muted/20 rounded-b-lg">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  Financial Reconciliation
+                </h4>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 dark:bg-orange-950/20 dark:border-orange-900"
+                    onClick={handleOpenDirectPayment}
+                    disabled={isApplied}
+                  >
+                    <Wallet className="h-4 w-4 mr-2" />
+                    Direct Payment
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/20 dark:border-blue-900"
+                    onClick={handleOpenDirectReceipt}
+                    disabled={isApplied}
+                  >
+                    <Landmark className="h-4 w-4 mr-2" />
+                    Direct Receipt
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Post expenses as direct payments or income as direct receipts directly to the GL.
+              </p>
+            </div>
+
+            {apFormOpen && (
+              <APPaymentForm 
+                open={apFormOpen} 
+                onOpenChange={setApFormOpen}
+                initialData={{
+                  amount: totalExpenses,
+                  reference: `Trip Sheet: ${editedData.busNumber} (${actualSaveDate})`,
+                  notes: `Automated posting from OCR Trip Sheet. Bus: ${editedData.busNumber}, Date: ${actualSaveDate}`,
+                  isDirectPayment: true,
+                  directLines: Object.entries(mappedExpenses)
+                    .filter(([_, amount]) => (amount as number) > 0)
+                    .map(([key, amount]) => ({
+                      account_id: "", 
+                      description: DB_EXPENSE_CATEGORIES.find(c => c.key === key)?.label || key,
+                      line_total: amount as number
+                    }))
+                }}
+              />
+            )}
+            {arFormOpen && (
+              <ARReceiptForm 
+                open={arFormOpen} 
+                onOpenChange={setArFormOpen}
+                initialData={{
+                  amount: totalRevenue,
+                  reference: `Trip Sheet: ${editedData.busNumber} (${actualSaveDate})`,
+                  notes: `Automated receipt from OCR Trip Sheet. Bus: ${editedData.busNumber}, Date: ${actualSaveDate}`,
+                  isDirectReceipt: true,
+                  directLines: editedData.trips.flatMap(trip => 
+                    Object.entries(trip.income)
+                      .filter(([_, amount]) => (amount as number) > 0)
+                      .map(([key, amount]) => ({
+                        account_id: "", 
+                        description: `Trip ${trip.trip_no} - ${fieldLabels[key] || key}`,
+                        amount: amount as number
+                      }))
+                  )
+                }}
+              />
+            )}
           </CardContent>
         </CollapsibleContent>
       </Collapsible>

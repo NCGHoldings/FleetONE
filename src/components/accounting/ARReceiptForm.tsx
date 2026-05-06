@@ -58,6 +58,17 @@ interface ARReceiptFormProps {
   onOpenChange: (open: boolean) => void;
   preselectedCustomerId?: string;
   isAdvanceMode?: boolean;
+  initialData?: {
+    amount?: number;
+    reference?: string;
+    notes?: string;
+    isDirectReceipt?: boolean;
+    directLines?: Array<{
+      account_id: string;
+      description: string;
+      amount: number;
+    }>;
+  };
 }
 
 interface PartyOption {
@@ -67,7 +78,7 @@ interface PartyOption {
   categoryName: string;
 }
 
-export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdvanceMode = false }: ARReceiptFormProps) => {
+export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdvanceMode = false, initialData }: ARReceiptFormProps) => {
   const { data: customers } = useCustomers();
   const { data: vendors } = useVendors();
   const { data: bankAccounts } = useBankAccounts();
@@ -103,6 +114,10 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const [selectedBusId, setSelectedBusId] = useState("");
   const [selectedBusNo, setSelectedBusNo] = useState("");
   const [selectedVehicleType, setSelectedVehicleType] = useState<"fleet" | "external" | "">("");
+  const [isDirectReceipt, setIsDirectReceipt] = useState(false);
+  const [directLines, setDirectLines] = useState<Array<{ account_id: string; description: string; amount: number }>>([
+    { account_id: "", description: "", amount: 0 }
+  ]);
   const [includeBankFee, setIncludeBankFee] = useState(false);
   const [bankFeeAmount, setBankFeeAmount] = useState(0);
   const [bankFeeType, setBankFeeType] = useState("bank_charge");
@@ -248,13 +263,23 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
 
   useEffect(() => {
     if (open) {
-      setIsAdvance(isAdvanceMode);
-      form.setValue("is_advance", isAdvanceMode);
-      if (!isAdvanceMode) {
+      setIsAdvance(isAdvanceMode || !!initialData?.is_advance);
+      setIsDirectReceipt(!!initialData?.isDirectReceipt);
+      if (initialData?.directLines) {
+        setDirectLines(initialData.directLines);
+      } else {
+        setDirectLines([{ account_id: "", description: "", amount: 0 }]);
+      }
+      form.setValue("is_advance", isAdvanceMode || !!initialData?.is_advance);
+      if (initialData?.amount) form.setValue("amount", initialData.amount);
+      if (initialData?.reference) form.setValue("reference", initialData.reference);
+      if (initialData?.notes) form.setValue("notes", initialData.notes);
+      
+      if (!isAdvanceMode && !initialData?.amount) {
         form.setValue("amount", 0);
       }
     }
-  }, [open, isAdvanceMode, form]);
+  }, [open, isAdvanceMode, form, initialData]);
 
   // Filter invoices for selected party
   useEffect(() => {
@@ -335,19 +360,48 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   };
 
   const totalAllocated = allocations.reduce((sum, a) => sum + a.allocated_amount, 0);
+  const totalDirect = directLines.reduce((sum, l) => sum + l.amount, 0);
 
   useEffect(() => {
-    if (!isAdvance) {
+    if (isDirectReceipt) {
+      form.setValue("amount", totalDirect);
+    } else if (!isAdvance) {
       form.setValue("amount", totalAllocated);
     }
-  }, [totalAllocated, form, isAdvance]);
+  }, [totalAllocated, totalDirect, form, isAdvance, isDirectReceipt]);
 
   const handleAdvanceToggle = (checked: boolean) => {
     setIsAdvance(checked);
     form.setValue("is_advance", checked);
     if (checked) {
       setAllocations([]);
+      setIsDirectReceipt(false);
     }
+  };
+
+  const handleDirectToggle = (checked: boolean) => {
+    setIsDirectReceipt(checked);
+    if (checked) {
+      setIsAdvance(false);
+      form.setValue("is_advance", false);
+      setAllocations([]);
+    }
+  };
+
+  const addDirectLine = () => {
+    setDirectLines([...directLines, { account_id: "", description: "", amount: 0 }]);
+  };
+
+  const removeDirectLine = (index: number) => {
+    const newLines = [...directLines];
+    newLines.splice(index, 1);
+    setDirectLines(newLines);
+  };
+
+  const updateDirectLine = (index: number, field: string, value: any) => {
+    const newLines = [...directLines];
+    newLines[index] = { ...newLines[index], [field]: value };
+    setDirectLines(newLines);
   };
 
   const effectiveBankFee = includeBankFee ? bankFeeAmount : 0;
@@ -386,11 +440,17 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
           write_off_amount: a.write_off_amount,
           write_off_account_id: globalWriteOffAccountId || undefined,
         })),
+        is_direct_receipt: isDirectReceipt,
+        direct_lines: isDirectReceipt ? directLines : undefined,
       });
       onOpenChange(false);
       form.reset();
       setAllocations([]);
       setIsAdvance(false);
+      setIsDirectReceipt(false);
+      setDirectLines([{ account_id: "", description: "", amount: 0 }]);
+      setIncludeBankFee(false);
+      setBankFeeAmount(0);
       setResolvedGL(null);
       setSelectedBusId("");
       setSelectedBusNo("");
@@ -405,11 +465,13 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
     }
   };
 
-  const canSubmit = isAdvance 
-    ? form.watch("amount") > 0 && selectedCustomerId 
-    : selectedPartyType === "vendor" 
-      ? form.watch("amount") > 0 && selectedCustomerId
-      : totalAllocated > 0 || (form.watch("amount") > 0 && selectedCustomerId);
+  const canSubmit = isDirectReceipt
+    ? form.watch("amount") > 0 && selectedCustomerId && directLines.every(l => l.account_id && l.amount > 0)
+    : isAdvance 
+      ? form.watch("amount") > 0 && selectedCustomerId 
+      : selectedPartyType === "vendor" 
+        ? form.watch("amount") > 0 && selectedCustomerId
+        : totalAllocated > 0 || (form.watch("amount") > 0 && selectedCustomerId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -430,20 +492,34 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Advance Toggle */}
-            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <Wallet className="h-5 w-5 text-orange-600" />
-                <div>
-                  <p className="font-medium">Advance Receipt</p>
-                  <p className="text-sm text-muted-foreground">
-                    Record payment without allocating to invoices
-                  </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Wallet className="h-5 w-5 text-orange-600" />
+                  <div>
+                    <p className="font-medium">Advance Receipt</p>
+                    <p className="text-sm text-muted-foreground">Record without allocation</p>
+                  </div>
                 </div>
+                <Switch
+                  checked={isAdvance}
+                  onCheckedChange={handleAdvanceToggle}
+                />
               </div>
-              <Switch
-                checked={isAdvance}
-                onCheckedChange={handleAdvanceToggle}
-              />
+
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Landmark className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="font-medium">Direct Receipt</p>
+                    <p className="text-sm text-muted-foreground">Post to income directly</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={isDirectReceipt}
+                  onCheckedChange={handleDirectToggle}
+                />
+              </div>
             </div>
 
             {/* Header Fields */}
@@ -717,7 +793,70 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
               </div>
             )}
 
-            {/* Invoice Allocation (only when not advance mode) */}
+            {/* Direct Receipt Lines */}
+            {isDirectReceipt && (
+              <div className="space-y-4 p-4 border rounded-lg bg-blue-50/30 dark:bg-blue-900/10">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Landmark className="h-4 w-4 text-blue-600" />
+                    Income Distribution
+                  </h3>
+                  <Button type="button" variant="outline" size="sm" onClick={addDirectLine}>
+                    Add Line
+                  </Button>
+                </div>
+                
+                <div className="space-y-3">
+                  {directLines.map((line, index) => (
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-start border-b pb-3 last:border-0 last:pb-0">
+                      <div className="md:col-span-5">
+                        <Label className="text-[10px] uppercase text-muted-foreground mb-1 block">Account</Label>
+                        <SearchableAccountSelector
+                          value={line.account_id}
+                          onValueChange={(val) => updateDirectLine(index, "account_id", val)}
+                          placeholder="Select income account..."
+                        />
+                      </div>
+                      <div className="md:col-span-4">
+                        <Label className="text-[10px] uppercase text-muted-foreground mb-1 block">Description</Label>
+                        <Input
+                          value={line.description}
+                          onChange={(e) => updateDirectLine(index, "description", e.target.value)}
+                          placeholder="e.g. Sales income, Service fee..."
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label className="text-[10px] uppercase text-muted-foreground mb-1 block">Amount</Label>
+                        <Input
+                          type="number"
+                          value={line.amount}
+                          onChange={(e) => updateDirectLine(index, "amount", parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div className="md:col-span-1 pt-6">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={directLines.length === 1}
+                          onClick={() => removeDirectLine(index)}
+                        >
+                          <CheckCircle className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end pt-2 border-t font-semibold">
+                  <div className="flex items-center gap-4">
+                    <span>Total Income:</span>
+                    <CurrencyDisplay amount={totalDirect} className="text-blue-600" />
+                  </div>
+                </div>
+              </div>
+            )}
             {!isAdvance && selectedCustomerId && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">

@@ -106,7 +106,7 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
         .from('daily_trips')
         .select(`
           *,
-          buses(bus_no, registration_number, model, type, capacity),
+          buses(bus_no, registration_number, model, type, capacity, route),
           routes(route_no, route_name),
           profiles!driver_id(first_name, last_name)
         `)

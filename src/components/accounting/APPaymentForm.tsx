@@ -74,6 +74,17 @@ interface APPaymentFormProps {
   onOpenChange: (open: boolean) => void;
   preselectedVendorId?: string;
   isAdvanceMode?: boolean;
+  initialData?: {
+    amount?: number;
+    reference?: string;
+    notes?: string;
+    isDirectPayment?: boolean;
+    directLines?: Array<{
+      account_id: string;
+      description: string;
+      line_total: number;
+    }>;
+  };
 }
 
 const createEmptyLine = (): DirectPaymentLine => ({
@@ -95,7 +106,7 @@ const parsePayee = (value: string): { type: "vendor" | "customer"; id: string } 
   return { type: "vendor", id: value };
 };
 
-export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvanceMode = false }: APPaymentFormProps) => {
+export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvanceMode = false, initialData }: APPaymentFormProps) => {
   const { data: vendors } = useVendors();
   const { data: customers } = useCustomers();
   const { data: bankAccounts } = useBankAccounts();
@@ -187,11 +198,32 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   useEffect(() => {
     if (open) {
       if (!hasGeneratedNumber.current) {
-        setIsAdvance(isAdvanceMode);
-        setIsDirectPayment(false);
-        setDirectLines([createEmptyLine()]);
-        form.setValue("is_advance", isAdvanceMode);
-        setAdvanceAmount(0);
+        setIsAdvance(isAdvanceMode || !!initialData?.is_advance);
+        setIsDirectPayment(!!initialData?.isDirectPayment);
+        if (initialData?.directLines) {
+          setDirectLines(initialData.directLines.map(l => ({
+            id: crypto.randomUUID(),
+            account_id: l.account_id,
+            description: l.description,
+            quantity: 1,
+            unit_price: l.line_total,
+            tax_rate: 0,
+            tax_amount: 0,
+            line_total: l.line_total,
+          })));
+        } else {
+          setDirectLines([createEmptyLine()]);
+        }
+        form.setValue("is_advance", isAdvanceMode || !!initialData?.is_advance);
+        if (initialData?.amount) setAdvanceAmount(initialData.amount);
+        if (initialData?.reference) form.setValue("reference", initialData.reference);
+        if (initialData?.notes) form.setValue("notes", initialData.notes);
+        if (initialData?.amount && initialData.isDirectPayment) {
+          // Amount will be calculated from lines
+        } else if (initialData?.amount) {
+          form.setValue("amount", initialData.amount);
+        }
+        
         setSelectedBankAccountId("");
         setIncludeBankFee(false);
         setBankFeeAmount(0);

@@ -144,6 +144,7 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
             <TableHeader className="bg-blue-50/50 dark:bg-slate-800/50">
               <TableRow>
                 <TableHead className="font-semibold whitespace-nowrap">Route (Permit)</TableHead>
+                <TableHead className="font-semibold whitespace-nowrap">Bus Model</TableHead>
                 <TableHead className="font-semibold whitespace-nowrap">Bus Number</TableHead>
                 <TableHead className="text-center font-semibold whitespace-nowrap">No of Trips</TableHead>
                 <TableHead className="text-right font-semibold whitespace-nowrap">Start Meter</TableHead>
@@ -158,7 +159,7 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
             <TableBody>
               {processedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <p>No fuel records found for the selected date.</p>
                       <Button variant="outline" size="sm" asChild>
@@ -171,8 +172,9 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
                 </TableRow>
               ) : (
                 processedData.map((group) => {
+                  const busModel = group.buses?.model || '-';
                   const busNumber = group.buses?.bus_no || group.buses?.registration_number || '-';
-                  const routeName = group.routes ? `${group.routes.route_no} - ${group.routes.route_name}` : '-';
+                  const routeName = group.routes ? `${group.routes.route_no || ''} ${group.routes.route_name || ''}`.trim() : (group.buses?.route || '-');
                   
                   const startMeter = group.odo_start ?? 0;
                   const endMeter = group.odo_end ?? 0;
@@ -200,7 +202,8 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
 
                   return (
                     <TableRow key={group.id} className="hover:bg-muted/50 transition-colors">
-                      <TableCell className="max-w-[200px] truncate" title={routeName}>{routeName}</TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={routeName || '-'}>{routeName || '-'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">{busModel}</TableCell>
                       <TableCell className="whitespace-nowrap font-medium">{busNumber}</TableCell>
                       <TableCell className="text-center font-medium bg-slate-50 dark:bg-slate-800/50">{group.no_of_trips}</TableCell>
                       

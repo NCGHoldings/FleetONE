@@ -547,6 +547,12 @@ export const useCreateARReceipt = () => {
         write_off_amount?: number;
         write_off_account_id?: string;
       }>;
+      is_direct_receipt?: boolean;
+      direct_lines?: Array<{
+        account_id: string;
+        description: string;
+        amount: number;
+      }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
@@ -582,6 +588,7 @@ export const useCreateARReceipt = () => {
         vehicle_type: receipt.vehicle_type || null,
         payee_employee_id: employeeIdResolved,
         vendor_id: vendorIdResolved,
+        is_direct_receipt: receipt.is_direct_receipt || false,
       };
 
       const { data, error } = await supabase
@@ -624,6 +631,18 @@ export const useCreateARReceipt = () => {
               .eq("id", alloc.invoice_id);
           }
         }
+      }
+      
+      // ========== DIRECT RECEIPT LINES ==========
+      if (receipt.is_direct_receipt && receipt.direct_lines?.length) {
+        const linesToInsert = receipt.direct_lines.map((line) => ({
+          receipt_id: data.id,
+          account_id: line.account_id,
+          description: line.description,
+          amount: line.amount,
+          company_id: effectiveCompanyId,
+        }));
+        await supabase.from("ar_receipt_lines" as any).insert(linesToInsert);
       }
 
       // ========== GL POSTING ==========
@@ -748,6 +767,38 @@ export const useCreateARReceipt = () => {
             companyId: effectiveCompanyId,
             businessUnitCode: businessUnitCode || undefined,
             customerName: customerName,
+          });
+        } else if (receipt.is_direct_receipt && receipt.direct_lines?.length) {
+          // Direct Receipt GL Posting: DR Bank, CR each direct line account
+          const glLines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
+          
+          // DR Bank
+          glLines.push({
+            account_id: bankGLAccountId,
+            description: `Direct Receipt - ${receipt.receipt_number}`,
+            debit: receipt.amount,
+            credit: 0,
+          });
+          
+          // CR each income account
+          for (const line of receipt.direct_lines) {
+            glLines.push({
+              account_id: line.account_id,
+              description: line.description || `Income - ${receipt.receipt_number}`,
+              debit: 0,
+              credit: line.amount,
+            });
+          }
+          
+          const { createAndPostJournalEntry } = await import("@/lib/gl-posting-utils");
+          glResult = await createAndPostJournalEntry({
+            entry_date: receipt.receipt_date,
+            description: `Direct Receipt ${receipt.receipt_number}${customerName ? ` from ${customerName}` : ""}`,
+            reference: receipt.receipt_number,
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode,
+            source_module: 'ar_receipt',
+            lines: glLines,
           });
         } else {
           glResult = { success: false, error: "Trade Receivable account not found in COA" };
