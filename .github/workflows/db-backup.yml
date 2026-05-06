@@ -78,37 +78,26 @@ jobs:
           sleep 120
 
       # ── 1. Dump ─────────────────────────────────────────────────────────────
-      - name: Dump Supabase Database
+      - name: Debug Supabase Pooler Config
         env:
-          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: wwjpdszkmtnzshbulkon
         run: |
-          echo "🗄️  Starting pg_dump..."
-          
-          # Use Node.js to reliably parse and manipulate the connection string
-          DIRECT_URL=$(node -e '
-            const url = new URL(process.env.DATABASE_URL);
-            
-            // Bypass the connection pooler entirely and use the direct database connection (IPv6)
-            url.hostname = "db.wwjpdszkmtnzshbulkon.supabase.co";
-            url.port = "5432";
-            
-            // The direct connection does not require the project ref in the username
-            url.username = "postgres"; 
-            url.searchParams.delete("pgbouncer");
-            
-            // Debug logging (password hidden)
-            console.error(`[DEBUG] Host: ${url.hostname}`);
-            console.error(`[DEBUG] Username: ${url.username}`);
-            console.error(`[DEBUG] Port: ${url.port}`);
-            
-            console.log(url.toString());
-          ')
-          
-          # Use a timeout to prevent hanging forever if something goes wrong
-          timeout 5m pg_dump "$DIRECT_URL" -Fc -Z 9 -f supabase-backup.dump
-          DUMP_SIZE=$(du -sh supabase-backup.dump | cut -f1)
-          echo "✅ Dump complete. Size: $DUMP_SIZE"
-          echo "DUMP_SIZE=$DUMP_SIZE" >> $GITHUB_ENV
+          node -e '
+            (async () => {
+              try {
+                const res = await fetch(`https://api.supabase.com/v1/projects`, {
+                  headers: { "Authorization": `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}` }
+                });
+                const projects = await res.json();
+                const myProject = projects.find(p => p.id === process.env.PROJECT_REF);
+                console.log("Project Details:", JSON.stringify(myProject, null, 2));
+              } catch (e) {
+                console.error(e);
+              }
+            })();
+          '
+          exit 1
 
       # ── 2. Integrity Check ───────────────────────────────────────────────────
       - name: Verify Dump Integrity
