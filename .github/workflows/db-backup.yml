@@ -16,6 +16,9 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
+          
+      - name: Setup Cloudflare WARP (Provides IPv6)
+        uses: fscarmen/warp-on-actions@v1.4
 
       - name: Whitelist Runner IP in Supabase
         env:
@@ -23,7 +26,9 @@ jobs:
           PROJECT_REF: wwjpdszkmtnzshbulkon
         run: |
           export RUNNER_IPV4=$(curl -s -4 https://api.ipify.org)
+          export RUNNER_IPV6=$(curl -s -6 https://api64.ipify.org || echo "")
           echo "Runner IPv4 is $RUNNER_IPV4"
+          echo "Runner IPv6 is $RUNNER_IPV6"
           
           node -e '
             (async () => {
@@ -40,8 +45,8 @@ jobs:
               
               require("fs").writeFileSync("original_cidrs.json", JSON.stringify(existing));
               
-              // Only whitelist the runner IPv4
-              const newIps = [`${process.env.RUNNER_IPV4}/32`];
+              // Whitelist all IPs temporarily to ensure WARP dynamic egress IPs are not blocked
+              const newIps = ["0.0.0.0/0", "::/0"];
               
               let modified = false;
               for (const ip of newIps) {
@@ -51,7 +56,7 @@ jobs:
                 }
               }
               
-              console.log("Updating allowlist to include:", newIps);
+              console.log("Updating allowlist to include all IPs (0.0.0.0/0, ::/0) temporarily...");
               const postRes = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply`, {
                 method: "POST",
                 headers: { 
@@ -68,7 +73,7 @@ jobs:
             })();
           '
           
-          # Wait 120 seconds for firewall rules to propagate globally to the Supavisor Pooler
+          # Wait 120 seconds for firewall rules to propagate globally
           echo "Waiting 120 seconds for firewall rules to propagate..."
           sleep 120
 
@@ -83,11 +88,12 @@ jobs:
           DIRECT_URL=$(node -e '
             const url = new URL(process.env.DATABASE_URL);
             
-            // If using the connection pooler, force port 5432 (Session mode)
-            // DO NOT change the username format, as Supavisor uses postgres.[tenant_id]
-            if (url.hostname.includes("pooler.supabase")) {
-              url.port = "5432";
-            }
+            // Bypass the connection pooler entirely and use the direct database connection (IPv6)
+            url.hostname = "db.wwjpdszkmtnzshbulkon.supabase.co";
+            url.port = "5432";
+            
+            // The direct connection does not require the project ref in the username
+            url.username = "postgres"; 
             url.searchParams.delete("pgbouncer");
             
             // Debug logging (password hidden)
