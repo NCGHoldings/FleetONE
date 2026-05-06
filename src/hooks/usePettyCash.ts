@@ -1532,7 +1532,7 @@ export const useCreatePettyCashReimbursement = () => {
 
       // 7. Log reimbursement as a dummy transaction for the float?
       // Wait, a replenishment should just be a transaction of type 'replenishment'.
-      await supabase.from("petty_cash_transactions").insert({
+      const { data: pcTx } = await supabase.from("petty_cash_transactions").insert({
         petty_cash_fund_id: data.petty_cash_fund_id,
         transaction_type: "replenishment",
         amount: data.total_amount,
@@ -1541,9 +1541,9 @@ export const useCreatePettyCashReimbursement = () => {
         payment_method: "transfer",
         status: "approved",
         company_id: selectedCompanyId,
-      });
+      }).select().single();
 
-      return apPayment;
+      return { apPayment, pcTx };
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["petty-cash-funds"] });

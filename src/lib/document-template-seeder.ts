@@ -1240,7 +1240,7 @@ export const generatePettyCashVoucherTemplate = (): string => `
 <style>
   * { box-sizing: border-box; }
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; font-size: 13px; }
-  .page { margin: 20px auto; max-width: 800px; padding: 0; }
+  .page { margin: 20px auto; max-width: 800px; padding: 20px 40px; }
   .header-grid { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
   .logo-area { display: flex; align-items: center; }
   
@@ -1275,7 +1275,7 @@ export const generatePettyCashVoucherTemplate = (): string => `
   .main-table .col-amount { width: 20%; text-align: right; }
   
   /* Ensure fixed height for empty rows to fill space */
-  .empty-row td { height: 25px; }
+  .empty-row td { height: 35px; }
   
   table.total-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 13px; border-top: none; }
   table.total-table td { border: 1px solid #000; padding: 6px; }
@@ -1401,7 +1401,7 @@ export const generateIOUVoucherTemplate = (): string => `
 <style>
   * { box-sizing: border-box; }
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; font-size: 13px; }
-  .page { margin: 20px auto; max-width: 800px; padding: 0; }
+  .page { margin: 20px auto; max-width: 800px; padding: 20px 40px; }
   .header-grid { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
   .logo-area { display: flex; align-items: center; }
   

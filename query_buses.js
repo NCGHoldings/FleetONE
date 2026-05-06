@@ -1,10 +1,24 @@
-const { createClient } = require('@supabase/supabase-js');
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://vymcddtpmrnhkavudxku.supabase.co';
+import { createClient } from '@supabase/supabase-js';
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.log('No Supabase credentials found.');
+  process.exit(1);
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function run() {
-  const { data, error } = await supabase.from('buses').select('bus_no').ilike('bus_no', '%NE%2521%');
-  console.log('Buses:', data, error);
+async function main() {
+  const { data: buses, error } = await supabase.from('buses').select('*').limit(5);
+  if (error) {
+    console.error('Error fetching buses:', error);
+  } else {
+    console.log(`Found ${buses.length} buses.`);
+    console.log(buses);
+  }
 }
-run();
+main();

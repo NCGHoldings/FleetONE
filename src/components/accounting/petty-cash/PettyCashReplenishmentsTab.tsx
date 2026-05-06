@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowUpCircle, Plus, Loader2, Info } from "lucide-react";
+import { ArrowUpCircle, Plus, Loader2, Info, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { 
   usePettyCashFunds, useAllPettyCashTransactions, useCreatePettyCashTransaction 
@@ -17,10 +17,12 @@ import { CurrencyDisplay } from "../shared/CurrencyDisplay";
 import { useBankAccounts } from "@/hooks/useAccountingData";
 import { PettyCashReimbursementDialog } from "./PettyCashReimbursementDialog";
 import { PettyCashTopUpDialog } from "./PettyCashTopUpDialog";
+import { FinanceDocumentPreviewModal } from "../shared/FinanceDocumentPreviewModal";
 
 export const PettyCashReplenishmentsTab = () => {
   const [showReimburseForm, setShowReimburseForm] = useState(false);
   const [showTopUpForm, setShowTopUpForm] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
 
   const { data: funds } = usePettyCashFunds();
   const { data: transactions, isLoading } = useAllPettyCashTransactions({ transactionType: "replenishment" });
@@ -73,16 +75,17 @@ export const PettyCashReplenishmentsTab = () => {
               <TableHead>AP Ref</TableHead>
               <TableHead>Created By</TableHead>
               <TableHead>Description</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell>
+                <TableCell colSpan={9} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell>
               </TableRow>
             ) : transactions?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No reimbursements found</TableCell>
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No reimbursements found</TableCell>
               </TableRow>
             ) : (
               transactions?.map((txn) => {
@@ -110,6 +113,11 @@ export const PettyCashReplenishmentsTab = () => {
                     <TableCell className="text-sm max-w-[200px] truncate" title={txn.description || ""}>
                       {txn.description?.replace(/\s*\[AP:.*?\]/, "")?.replace(/from AP Payment:.*?$/, "") || "-"}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => setPreviewData(txn)}>
+                        <Printer className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })
@@ -121,13 +129,22 @@ export const PettyCashReplenishmentsTab = () => {
       {/* Reimbursement Dialog */}
       <PettyCashReimbursementDialog 
         open={showReimburseForm} 
-        onOpenChange={setShowReimburseForm} 
+        onOpenChange={setShowReimburseForm}
+        onSuccessPrint={setPreviewData}
       />
       
       {/* Direct Top-Up Dialog */}
       <PettyCashTopUpDialog 
         open={showTopUpForm} 
         onOpenChange={setShowTopUpForm} 
+      />
+
+      {/* Print Document Modal */}
+      <FinanceDocumentPreviewModal
+        open={!!previewData}
+        onOpenChange={(op) => !op && setPreviewData(null)}
+        documentType="petty_cash_voucher"
+        documentData={previewData}
       />
     </div>
   );

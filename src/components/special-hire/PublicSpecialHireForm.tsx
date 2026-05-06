@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { WheelTimePicker } from "@/components/ui/wheel-time-picker";
-import { CalendarIcon, CheckCircle, Send, Bus, Plus, X, MapPin } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { CalendarIcon, CheckCircle, Send, Bus, Plus, X, MapPin, Search, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { createAnonymousClient } from "@/integrations/supabase/public-client";
@@ -18,8 +19,47 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { publicSpecialHireSchema } from "@/lib/validation";
 import { z } from "zod";
 
+const INTERNAL_COMPANIES = [
+  { name: 'LYCEUM GLOBAL HOLDINGS (PRIVATE) LIMITED', group: 'Lyceum & Education Sector' },
+  { name: 'LYCEUM EDUCATION HOLDINGS (PRIVATE) LIMITED', group: 'Lyceum & Education Sector' },
+  { name: 'LYCEUM LEAF SCHOOL (PRIVATE) LIMITED', group: 'Lyceum & Education Sector' },
+  { name: 'LYCEUM INTERNATIONAL SCHOOL (PRIVATE) LIMITED', group: 'Lyceum & Education Sector' },
+  { name: 'LYCEUM DAY CARE (PRIVATE) LIMITED', group: 'Lyceum & Education Sector' },
+  { name: 'THE LYCEUM CAMPUS (PRIVATE) LIMITED', group: 'Lyceum & Education Sector' },
+  { name: 'LYCEUM PLACEMENTS (PRIVATE) LIMITED', group: 'Lyceum & Education Sector' },
+  { name: 'LYCEUM GUARDIAN (PRIVATE) LIMITED', group: 'Lyceum & Education Sector' },
+  { name: 'LYCEUM ASSESSMENTS (PRIVATE) LIMITED', group: 'Lyceum & Education Sector' },
+  { name: 'THE LYCEUM ACADEMY (PRIVATE) LIMITED', group: 'Lyceum & Education Sector' },
+  { name: 'LYCEUM COLLECTION (PRIVATE) LIMITED', group: 'Lyceum & Education Sector' },
+  { name: 'N C G HOLDINGS (PRIVATE) LIMITED', group: 'NCG Holdings & Core Operations' },
+  { name: 'N C G SPEED HOLDINGS (PRIVATE) LIMITED', group: 'NCG Holdings & Core Operations' },
+  { name: 'N C G AUTOMOTIVE SOLUTIONS (PRIVATE) LIMITED', group: 'NCG Holdings & Core Operations' },
+  { name: 'N C G EXPRESS (PRIVATE) LIMITED', group: 'NCG Holdings & Core Operations' },
+  { name: 'NCG FLEET MANAGEMENT (PRIVATE) LIMITED', group: 'NCG Holdings & Core Operations' },
+  { name: 'N C G SPARES (PRIVATE) LIMITED', group: 'NCG Holdings & Core Operations' },
+  { name: 'NCG Maxload (Private) Limited', group: 'NCG Holdings & Core Operations' },
+  { name: 'NCG READ HOLDINGS (PRIVATE) LIMITED', group: 'NCG Holdings & Core Operations' },
+  { name: 'NCG BUILD HOLDINGS (PRIVATE) LIMITED', group: 'NCG Holdings & Core Operations' },
+  { name: 'NCG SERENGETI PROPERTY MANAGEMENT (PRIVATE) LIMITED', group: 'NCG Holdings & Core Operations' },
+  { name: 'NCG WAREHOUSE SOLUTIONS (PRIVATE) LIMITED', group: 'NCG Holdings & Core Operations' },
+  { name: 'NCG TECH HOLDINGS (PRIVATE) LIMITED', group: 'NCG Holdings & Core Operations' },
+  { name: 'NCG KIT HOLDINGS (PRIVATE) LIMITED', group: 'NCG Holdings & Core Operations' },
+  { name: 'NEXTGEN HUMAN CAPITAL SOLUTIONS (PRIVATE) LIMITED', group: 'NextGen & Specialized Services' },
+  { name: 'NEXTGEN PUBLICATIONS (PRIVATE) LIMITED', group: 'NextGen & Specialized Services' }
+];
+
+const LYCEUM_BRANCHES = [
+  "Nugegoda", "Panadura", "Wattala", "Ratnapura", "Galle", "Kandy", 
+  "Kurunegala", "Anuradhapura", "Gampaha", "Nuwara Eliya", "Jaffna"
+];
+
+const NCG_BRANCHES = [
+  "Head Office", "Colombo", "Kandy", "Galle"
+];
+
 interface PublicSpecialHireFormData {
   companyName: string;
+  branch: string;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -47,6 +87,7 @@ type Language = 'en' | 'si' | 'ta';
 export default function PublicSpecialHireForm() {
   const [formData, setFormData] = useState<PublicSpecialHireFormData>({
     companyName: '',
+    branch: '',
     customerName: '',
     customerPhone: '',
     customerEmail: '',
@@ -61,6 +102,7 @@ export default function PublicSpecialHireForm() {
     pickupDateTime: null,
     dropDateTime: null
   });
+  const [openCompanyPopover, setOpenCompanyPopover] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submissionId, setSubmissionId] = useState('');
@@ -163,6 +205,7 @@ export default function PublicSpecialHireForm() {
             number_of_passengers: formData.numberOfPassengers,
             pickup_datetime: formData.pickupDateTime.toISOString(),
             drop_datetime: formData.dropDateTime.toISOString(),
+            branch: formData.branch || null,
           }),
         }
       );
@@ -222,6 +265,7 @@ export default function PublicSpecialHireForm() {
                 setSubmitted(false);
                 setFormData({
                   companyName: '',
+                  branch: '',
                   customerName: '',
                   customerPhone: '',
                   customerEmail: '',
@@ -288,17 +332,114 @@ export default function PublicSpecialHireForm() {
           <CardContent className="px-4 sm:px-6">
             <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
               {/* Customer Information */}
-              <div className="space-y-4">
-                <h3 className="text-base sm:text-lg font-semibold">Customer Information</h3>
+                <h3 className="text-base sm:text-lg font-semibold">Request Category</h3>
+                
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="hireType" className="text-sm">Hire Type *</Label>
+                    <Select value={formData.hireType} onValueChange={(value) => setFormData(prev => ({ ...prev, hireType: value, companyName: '', branch: '' }))}>
+                      <SelectTrigger className="h-11 sm:h-10 text-base sm:text-sm">
+                        <SelectValue placeholder="Select hire type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Outside">Outside Hire</SelectItem>
+                        <SelectItem value="Lyceum">Lyceum Hire</SelectItem>
+                        <SelectItem value="Internal">Internal Hire</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h3 className="text-base sm:text-lg font-semibold">Customer Information</h3>
+                </div>
                 
                 <div>
-                  <Label htmlFor="companyName" className="text-sm">Company Name (Optional)</Label>
+                  <Label htmlFor="companyName" className="text-sm">
+                    {formData.hireType === 'Outside' ? 'Company Name (Optional)' : 'Company Name *'}
+                  </Label>
+                  {formData.hireType === 'Outside' ? (
+                    <Input
+                      id="companyName"
+                      value={formData.companyName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                      placeholder="Your company name"
+                      className="h-11 sm:h-10 text-base sm:text-sm"
+                    />
+                  ) : (
+                    <Popover open={openCompanyPopover} onOpenChange={setOpenCompanyPopover}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={openCompanyPopover}
+                          className={cn(
+                            "w-full justify-between h-11 sm:h-10 text-base sm:text-sm font-normal",
+                            !formData.companyName && "text-muted-foreground"
+                          )}
+                        >
+                          <span className="truncate">
+                            {formData.companyName || "Select company..."}
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search company..." />
+                          <CommandList>
+                            <CommandEmpty>No company found.</CommandEmpty>
+                            {Object.entries(
+                              INTERNAL_COMPANIES
+                                .filter(c => {
+                                  if (formData.hireType === 'Lyceum') return c.group.includes('Lyceum');
+                                  if (formData.hireType === 'Internal') return c.group.includes('NCG') || c.group.includes('NextGen');
+                                  return true;
+                                })
+                                .reduce((acc, curr) => {
+                                  if (!acc[curr.group]) acc[curr.group] = [];
+                                  acc[curr.group].push(curr.name);
+                                  return acc;
+                                }, {} as Record<string, string[]>)
+                            ).map(([group, companies]) => (
+                              <CommandGroup key={group} heading={group}>
+                                {companies.map(company => (
+                                  <CommandItem
+                                    key={company}
+                                    value={company}
+                                    onSelect={(currentValue) => {
+                                      setFormData(prev => ({ ...prev, companyName: currentValue }));
+                                      setOpenCompanyPopover(false);
+                                    }}
+                                    className="text-sm"
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        formData.companyName === company ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {company}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            ))}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="branch" className="text-sm">Branch / Department {formData.hireType !== 'Outside' && '*'}</Label>
                   <Input
-                    id="companyName"
-                    value={formData.companyName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                    placeholder="Your company name"
+                    id="branch"
+                    value={formData.branch}
+                    onChange={(e) => setFormData(prev => ({ ...prev, branch: e.target.value }))}
+                    placeholder={formData.hireType === 'Lyceum' ? "e.g. Nugegoda, Panadura" : "e.g. Finance, Head Office"}
                     className="h-11 sm:h-10 text-base sm:text-sm"
+                    required={formData.hireType !== 'Outside'}
                   />
                 </div>
 
@@ -341,27 +482,12 @@ export default function PublicSpecialHireForm() {
                     className="h-11 sm:h-10 text-base sm:text-sm"
                   />
                 </div>
-              </div>
 
               {/* Trip Details */}
-              <div className="space-y-4">
+              <div className="space-y-4 pt-4 border-t">
                 <h3 className="text-base sm:text-lg font-semibold">Trip Details</h3>
                 
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="hireType" className="text-sm">Hire Type *</Label>
-                    <Select value={formData.hireType} onValueChange={(value) => setFormData(prev => ({ ...prev, hireType: value }))}>
-                      <SelectTrigger className="h-11 sm:h-10 text-base sm:text-sm">
-                        <SelectValue placeholder="Select hire type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Outside">Outside Hire</SelectItem>
-                        <SelectItem value="Lyceum">Lyceum Hire</SelectItem>
-                        <SelectItem value="Internal">Internal Hire</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
                   <div>
                     <Label htmlFor="busType" className="text-sm">Bus Type *</Label>
                     <Select value={formData.busTypeId} onValueChange={(value) => setFormData(prev => ({ ...prev, busTypeId: value }))}>
@@ -377,9 +503,7 @@ export default function PublicSpecialHireForm() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
 
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="numberOfBuses" className="text-sm">Number of Buses *</Label>
                     <Input

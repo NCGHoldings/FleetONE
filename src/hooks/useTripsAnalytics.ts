@@ -38,6 +38,8 @@ export interface TripData {
   buses?: { registration_number: string; bus_no?: string };
   routes?: { route_no: string; route_name: string };
   profiles?: { first_name: string; last_name: string };
+  fuel_liters?: number;
+  standard_fuel_rate?: number;
 }
 
 export interface DriverStats {
@@ -600,7 +602,20 @@ function processAnalyticsData(
       permitsPercentage: totalExpenses > 0 ? (totalPermitsLegal / totalExpenses) * 100 : 0,
       otherPercentage: totalExpenses > 0 ? (totalOtherExpenses / totalExpenses) * 100 : 0
     },
-    rawTrips: trips,
+    rawTrips: trips.map(t => {
+      const key = `${t.bus_id}_${t.trip_date}`;
+      const expenseData = expenseMap.get(key);
+      const busStat = busStats.find(b => b.busNo === t.buses?.bus_no || b.busNo === t.buses?.registration_number);
+      let fuelLiters = expenseData?.fuel_liters || 0;
+      if (fuelLiters === 0 && expenseData?.fuel_cost > 0 && expenseData?.diesel_price_per_liter > 0) {
+        fuelLiters = expenseData.fuel_cost / expenseData.diesel_price_per_liter;
+      }
+      return {
+        ...t,
+        fuel_liters: fuelLiters,
+        standard_fuel_rate: busStat?.stdFuelRate || 0
+      };
+    }),
     tripsWithExpenses
   };
 }

@@ -103,6 +103,10 @@ export const publicSpecialHireSchema = z.object({
     .int()
     .min(1, 'At least 1 passenger is required')
     .max(1000, 'Maximum 1000 passengers allowed'),
+  branch: z.string()
+    .trim()
+    .max(100, 'Branch must be less than 100 characters')
+    .optional(),
   pickupDateTime: z.date({
     required_error: 'Pickup date and time is required'
   }),

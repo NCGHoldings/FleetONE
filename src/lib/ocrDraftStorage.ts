@@ -18,7 +18,7 @@ function getDB(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveOCRDraft(images: File[], extractedData: any[]) {
+export async function saveOCRDraft(images: File[], extractedData: any[], metadata: any = {}) {
   try {
     const db = await getDB();
     return new Promise<void>((resolve, reject) => {
@@ -35,6 +35,7 @@ export async function saveOCRDraft(images: File[], extractedData: any[]) {
       const payload = {
         images, // Array of Files/Blobs which IndexedDB supports natively
         extractedData: safeData,
+        metadata,
         timestamp: Date.now()
       };
 
@@ -48,7 +49,7 @@ export async function saveOCRDraft(images: File[], extractedData: any[]) {
   }
 }
 
-export async function loadOCRDraft(): Promise<{ images: File[], extractedData: any[] } | null> {
+export async function loadOCRDraft(): Promise<{ images: File[], extractedData: any[], metadata?: any } | null> {
   try {
     const db = await getDB();
     return new Promise((resolve, reject) => {
@@ -75,7 +76,7 @@ export async function loadOCRDraft(): Promise<{ images: File[], extractedData: a
           };
         });
 
-        resolve({ images, extractedData: restoredData });
+        resolve({ images, extractedData: restoredData, metadata: result.metadata });
       };
       
       request.onerror = () => reject(request.error);

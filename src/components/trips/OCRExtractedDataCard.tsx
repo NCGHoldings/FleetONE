@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 interface ExtractedMultiTripData {
+  id: string; // Add id to interface
   fileName: string;
   imageUrl: string;
   busNumber: string;
@@ -25,44 +26,54 @@ interface ExtractedMultiTripData {
   trips: SingleTrip[];
   daily_expenses: DailyExpenses;
   mapped_expenses?: DBExpenseFields;
+  status?: 'pending' | 'applied';
+  savedExpensesTotal?: number; // Add this
+  // Multi-day fields
+  isMultiDayRoute?: boolean;
+  multiDayConfig?: any;
+  manualMultiDayEnabled?: boolean;
+  dateRangeStart?: string;
+  dateRangeEnd?: string;
 }
 
 interface OCRExtractedDataCardProps {
   data: ExtractedMultiTripData;
   actualSaveDate: string; // The date that will be used for saving (YYYY-MM-DD)
-  onApply: (data: ExtractedMultiTripData & { mapped_expenses: DBExpenseFields }) => void;
+  isOpen?: boolean;
+  onToggleOpen?: (open: boolean) => void;
+  onApply: (data: ExtractedMultiTripData & { mapped_expenses: DBExpenseFields }, autoNext: boolean) => void;
   onChange: (data: ExtractedMultiTripData) => void;
   onDiscard: () => void;
   onView: () => void;
   savedExpensesTotal?: number;
 }
 
-export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, onDiscard, onView, savedExpensesTotal }: OCRExtractedDataCardProps) => {
-  const [isOpen, setIsOpen] = useState(false);
+export const OCRExtractedDataCard = ({ data, isOpen = false, onToggleOpen, actualSaveDate, onApply, onChange, onDiscard, onView, savedExpensesTotal }: OCRExtractedDataCardProps) => {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isCardOpen = onToggleOpen ? isOpen : internalIsOpen;
+  
+  const handleOpenChange = (open: boolean) => {
+    if (onToggleOpen) {
+      onToggleOpen(open);
+    } else {
+      setInternalIsOpen(open);
+    }
+  };
+
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState(data);
-  const [hasEdits, setHasEdits] = useState(false);
 
   // Sync editedData up to parent whenever it changes
   useEffect(() => {
-    if (hasEdits) {
-      onChange(editedData);
-    }
-  }, [editedData, hasEdits, onChange]);
+    onChange(editedData);
+  }, [editedData, onChange]);
   
-  // Multi-day route detection
-  const [isMultiDayRoute, setIsMultiDayRoute] = useState(false);
-  const [multiDayConfig, setMultiDayConfig] = useState<any>(null);
-  
-  // Manual override for multi-day mode
-  const [manualMultiDayEnabled, setManualMultiDayEnabled] = useState(false);
+  // Initialize multi-day state from data
+  const [isMultiDayRoute, setIsMultiDayRoute] = useState(data.isMultiDayRoute || false);
+  const [multiDayConfig, setMultiDayConfig] = useState<any>(data.multiDayConfig || null);
+  const [manualMultiDayEnabled, setManualMultiDayEnabled] = useState(data.manualMultiDayEnabled || false);
   const [showBusNumberEdit, setShowBusNumberEdit] = useState(false);
   const [availableMultiDayRoutes, setAvailableMultiDayRoutes] = useState<any[]>([]);
-  
-  // Initialize mapped expenses from OCR data
-  const initialMappedExpenses = data.mapped_expenses || mapOCRExpensesToDB(data.daily_expenses);
-  const [mappedExpenses, setMappedExpenses] = useState<DBExpenseFields>(() => initialMappedExpenses);
-  const [originalMappedExpenses] = useState<DBExpenseFields>(initialMappedExpenses);
   
   // Track unmapped OCR items
   const [unmappedItems, setUnmappedItems] = useState<Record<string, number>>(() => {
@@ -76,8 +87,12 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
   });
 
   // Multi-day route: Date range state
-  const [dateRangeStart, setDateRangeStart] = useState<string>('');
-  const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
+  const [dateRangeStart, setDateRangeStart] = useState<string>(data.dateRangeStart || '');
+  const [dateRangeEnd, setDateRangeEnd] = useState<string>(data.dateRangeEnd || '');
+
+  // Initialize mapped expenses from OCR data
+  const initialMappedExpenses = data.mapped_expenses || mapOCRExpensesToDB(data.daily_expenses);
+  const [mappedExpenses, setMappedExpenses] = useState<DBExpenseFields>(initialMappedExpenses);
 
   // Normalize route name to handle different dash characters (en-dash, em-dash, etc.)
   const normalizeRouteName = (name: string | null) => {
@@ -129,7 +144,12 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
     
     setEditedData(prev => ({
       ...prev,
-      trips: updatedTrips
+      trips: updatedTrips,
+      isMultiDayRoute: true,
+      multiDayConfig: routeConfig,
+      manualMultiDayEnabled: true,
+      dateRangeStart: defaultStart,
+      dateRangeEnd: defaultEnd
     }));
 
     // Show success message
@@ -249,7 +269,11 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
           
           setEditedData(prev => ({
             ...prev,
-            trips: updatedTrips
+            trips: updatedTrips,
+            isMultiDayRoute: true,
+            multiDayConfig: multiDayData,
+            dateRangeStart: defaultStart,
+            dateRangeEnd: defaultEnd
           }));
         }
       } catch (error) {
@@ -279,7 +303,9 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
       
       setEditedData(prev => ({
         ...prev,
-        trips: updatedTrips
+        trips: updatedTrips,
+        dateRangeStart,
+        dateRangeEnd
       }));
     }
   }, [dateRangeStart, dateRangeEnd, isMultiDayRoute]);
@@ -307,15 +333,18 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
   const netProfit = totalRevenue - totalExpenses;
 
   const handleMappedExpenseChange = (field: keyof DBExpenseFields, value: number) => {
-    setHasEdits(true);
-    setMappedExpenses(prev => ({
-      ...prev,
+    const newMappedExpenses = {
+      ...mappedExpenses,
       [field]: value
+    };
+    setMappedExpenses(newMappedExpenses);
+    setEditedData(prev => ({
+      ...prev,
+      mapped_expenses: newMappedExpenses
     }));
   };
 
   const handleBusNumberChange = (value: string) => {
-    setHasEdits(true);
     const newBusNumber = value.toUpperCase();
     setEditedData(prev => ({
       ...prev,
@@ -329,7 +358,6 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
   };
 
   const handleTripIncomeChange = (tripIndex: number, field: keyof SingleTrip['income'], value: number) => {
-    setHasEdits(true);
     setEditedData(prev => ({
       ...prev,
       trips: prev.trips.map((trip, idx) =>
@@ -341,7 +369,6 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
   };
 
   const handleTripDateChange = (tripIndex: number, newDate: Date) => {
-    setHasEdits(true);
     setEditedData(prev => ({
       ...prev,
       trips: prev.trips.map((trip, idx) =>
@@ -353,7 +380,6 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
   };
 
   const handleTripCrewChange = (tripIndex: number, field: 'driverName' | 'conductorName', value: string) => {
-    setHasEdits(true);
     setEditedData(prev => ({
       ...prev,
       trips: prev.trips.map((trip, idx) =>
@@ -368,9 +394,16 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
     const amount = unmappedItems[unmappedKey];
     if (amount) {
       // Add to mapped category
-      setMappedExpenses(prev => ({
+      const newMappedExpenses = {
+        ...mappedExpenses,
+        [targetCategory]: (mappedExpenses[targetCategory] || 0) + amount
+      };
+      setMappedExpenses(newMappedExpenses);
+      
+      // Update editedData
+      setEditedData(prev => ({
         ...prev,
-        [targetCategory]: prev[targetCategory] + amount
+        mapped_expenses: newMappedExpenses
       }));
       
       // Remove from unmapped
@@ -410,8 +443,6 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
 
   const handleConfirmEdits = () => {
     console.log('✏️ EDITS CONFIRMED - Ready to Apply');
-    console.log('  Original mapped expenses:', originalMappedExpenses);
-    console.log('  Edited mapped expenses:', mappedExpenses);
     setIsEditing(false);
   };
 
@@ -419,19 +450,15 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
     console.log('↶ RESET TO OCR VALUES');
     setEditedData(data);
     setMappedExpenses(data.mapped_expenses || mapOCRExpensesToDB(data.daily_expenses));
-    setHasEdits(false);
     setIsEditing(false);
   };
 
   const handleApplyAll = () => {
-    console.log('🎯 APPLYING DATA TO DATABASE:');
-    console.log('  Bus:', editedData.busNumber, '| Date:', editedData.date);
-    console.log('  Original OCR expenses:', data.daily_expenses);
-    console.log('  Edited mapped expenses:', mappedExpenses);
-    console.log('  Edited trips:', editedData.trips);
-    console.log('  Has user edits:', hasEdits);
-    
-    onApply({ ...editedData, mapped_expenses: mappedExpenses });
+    onApply({ ...editedData, mapped_expenses: mappedExpenses }, false);
+  };
+
+  const handleApplyAndNext = () => {
+    onApply({ ...editedData, mapped_expenses: mappedExpenses }, true);
   };
 
   const formatAmount = (amount: number) => {
@@ -485,18 +512,28 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
     return () => { if (busLookupTimer.current) clearTimeout(busLookupTimer.current); };
   }, [editedData.busNumber]);
 
+  const isApplied = data.status === 'applied';
+
   return (
-    <Card className={`mb-4 border-2 ${getBorderColor(data.confidence)}`}>
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <Card className={`relative overflow-hidden mb-4 border-2 ${isApplied ? 'border-green-500/50 bg-green-50/10 dark:bg-green-950/10 opacity-75' : getBorderColor(data.confidence)}`}>
+      {isApplied && (
+        <div className="absolute top-0 right-0 left-0 bottom-0 pointer-events-none z-10 flex items-center justify-center bg-background/20 backdrop-blur-[1px] rounded-lg">
+          <Badge className="scale-150 bg-green-500 hover:bg-green-600 shadow-lg px-4 py-2 text-sm">
+            <CheckCircle className="w-5 h-5 mr-2" />
+            Applied
+          </Badge>
+        </div>
+      )}
+      <Collapsible open={isCardOpen} onOpenChange={handleOpenChange}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1">
               <img 
                 src={data.imageUrl} 
                 alt="Trip sheet preview" 
-                className="w-16 h-16 object-cover rounded border"
+                className={`w-16 h-16 object-cover rounded border ${isApplied ? 'opacity-50' : ''}`}
               />
-              <div className="flex-1">
+              <div className={`flex-1 ${isApplied ? 'opacity-70' : ''}`}>
                 <p className="text-sm font-medium text-muted-foreground">{data.fileName}</p>
                 <div className="flex items-center gap-2 mt-1">
                   {isEditing ? (
@@ -547,7 +584,7 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
                   )}
                   
                   {/* MULTI-DAY DATE RANGE PREVIEW - COLLAPSED STATE */}
-                  {!isOpen && isMultiDayRoute && multiDayConfig && editedData.trips.some(t => t.individualDate) && (
+                  {!isCardOpen && isMultiDayRoute && multiDayConfig && editedData.trips.some(t => t.individualDate) && (
                     <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
                       📅 {editedData.trips.map(t => 
                         t.individualDate ? format(parseISO(t.individualDate), 'MMM d') : '?'
@@ -622,7 +659,7 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
                           setManualMultiDayEnabled(true);
                           setShowBusNumberEdit(true);
                           setIsEditing(true);
-                          setIsOpen(true);
+                          handleOpenChange(true);
                         }}
                         className="ml-2 h-7 text-xs"
                       >
@@ -634,8 +671,8 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
               </div>
             </div>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+              <Button variant="ghost" size="sm" disabled={isApplied} className={isApplied ? 'pointer-events-auto opacity-100 relative z-20' : ''}>
+                <ChevronDown className={`h-4 w-4 transition-transform ${isCardOpen ? 'rotate-180' : ''}`} />
               </Button>
             </CollapsibleTrigger>
           </div>
@@ -1074,14 +1111,25 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onChange, 
                       <Button 
                         onClick={handleApplyAll} 
                         size="sm" 
-                        className="flex-1"
+                        variant="default"
                         disabled={Object.keys(unmappedItems).length > 0}
                         title={Object.keys(unmappedItems).length > 0 
                           ? "Please map all unmapped items before applying" 
                           : "Save trips and expenses to database"}
                       >
                         <CheckCircle className="h-4 w-4 mr-1" />
-                        Apply All (Trips + Expenses)
+                        Apply
+                      </Button>
+                      <Button 
+                        onClick={handleApplyAndNext} 
+                        size="sm" 
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                        disabled={Object.keys(unmappedItems).length > 0}
+                        title={Object.keys(unmappedItems).length > 0 
+                          ? "Please map all unmapped items before applying" 
+                          : "Save and automatically open the next sheet"}
+                      >
+                        Apply & Next →
                       </Button>
                       <Button onClick={onView} variant="outline" size="sm">
                         <Eye className="h-4 w-4 mr-1" />

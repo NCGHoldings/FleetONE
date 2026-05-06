@@ -20,9 +20,10 @@ import { usePettyCashFunds } from "@/hooks/usePettyCash";
 interface PettyCashReimbursementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccessPrint?: (data: any) => void;
 }
 
-export const PettyCashReimbursementDialog = ({ open, onOpenChange }: PettyCashReimbursementDialogProps) => {
+export const PettyCashReimbursementDialog = ({ open, onOpenChange, onSuccessPrint }: PettyCashReimbursementDialogProps) => {
   const [fundId, setFundId] = useState<string>("");
   const { data: funds } = usePettyCashFunds();
   const { data: transactions, isLoading } = usePettyCashTransactions(fundId);
@@ -68,7 +69,7 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange }: PettyCashRe
   const handleReimburse = async () => {
     if (selectedVoucherIds.length === 0 || !selectedBankAccountId) return;
 
-    await reimburseMutation.mutateAsync({
+    const result = await reimburseMutation.mutateAsync({
       voucher_ids: selectedVoucherIds,
       bank_account_id: selectedBankAccountId,
       total_amount: totalAmount,
@@ -79,6 +80,9 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange }: PettyCashRe
     onOpenChange(false);
     setSelectedVoucherIds([]);
     setSelectedBankAccountId("");
+    if (onSuccessPrint && result.pcTx) {
+      onSuccessPrint(result.pcTx);
+    }
   };
 
   return (
@@ -190,14 +194,16 @@ export const PettyCashReimbursementDialog = ({ open, onOpenChange }: PettyCashRe
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button 
-            onClick={handleReimburse} 
-            disabled={selectedVoucherIds.length === 0 || !selectedBankAccountId || reimburseMutation.isPending}
-          >
-            {reimburseMutation.isPending ? "Processing..." : "Generate AP Payment"}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleReimburse} 
+              disabled={selectedVoucherIds.length === 0 || !selectedBankAccountId || reimburseMutation.isPending}
+            >
+              {reimburseMutation.isPending ? "Processing..." : "Save Reimbursement"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

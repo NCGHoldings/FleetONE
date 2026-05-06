@@ -56,6 +56,7 @@ Deno.serve(async (req) => {
         number_of_passengers: formData.number_of_passengers,
         pickup_datetime: formData.pickup_datetime,
         drop_datetime: formData.drop_datetime,
+        branch: formData.branch || null,
         submission_status: 'pending',
       })
       .select('submission_no')

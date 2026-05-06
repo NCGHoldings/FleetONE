@@ -7,12 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Upload, Loader2, Save, Camera, Search, AlertCircle, CheckCircle2, CalendarIcon } from 'lucide-react';
+import { Upload, Loader2, Save, Camera, Search, AlertCircle, CheckCircle2, CalendarIcon, ChevronDown, ChevronRight, Route } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { extractLogSheetData, OCRLogSheetResult, LogSheetRow } from '@/lib/ocr-log-sheet-processor';
-import { format, parse, isValid, startOfMonth, endOfMonth, addDays } from 'date-fns';
+import { format, parse, isValid, startOfMonth, endOfMonth, addDays, subDays } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TelegramImageGallery } from './TelegramImageGallery';
 
@@ -25,12 +25,15 @@ interface LogSheetUploadModalProps {
 
 interface DBTripRow {
   id: string;
+  trip_no: string;
   trip_date: string;
   odometer_start: number | null;
   odometer_end: number | null;
   fuel_liters: number | null;
   distance_km: number | null;
   notes: any;
+  route_label?: string;
+  routes?: { route_name: string } | null;
 }
 
 export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSuccess }: LogSheetUploadModalProps) {
@@ -43,9 +46,17 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
   const [busNumber, setBusNumber] = useState('');
   const [busId, setBusId] = useState<string | null>(null);
   const [monthYear, setMonthYear] = useState(format(selectedDate, 'yyyy-MM'));
-  const [dbData, setDbData] = useState<Record<string, DBTripRow>>({});
+  const [dbData, setDbData] = useState<Record<string, DBTripRow[]>>({});
   const [editedLogs, setEditedLogs] = useState<LogSheetRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+
+  const toggleRow = (index: number) => {
+    const newSet = new Set(expandedRows);
+    if (newSet.has(index)) newSet.delete(index);
+    else newSet.add(index);
+    setExpandedRows(newSet);
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -147,6 +158,7 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
       .from('buses')
       .select('id, bus_no')
       .ilike('bus_no', `%${busNo.replace(/[^a-zA-Z0-9]/g, '%')}%`)
+      .order('created_at', { ascending: false })
       .limit(1)
       .single();
       
@@ -169,12 +181,16 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
     const year = parseInt(yearStr);
     const month = parseInt(monthStr) - 1; // 0-indexed
     
-    const startDate = format(new Date(year, month, 1), 'yyyy-MM-dd');
-    const endDate = format(endOfMonth(new Date(year, month, 1)), 'yyyy-MM-dd');
+    // Buffer the dates by 45 days on both sides to catch cross-month trips
+    const startDateObj = subDays(new Date(year, month, 1), 45);
+    const endDateObj = addDays(endOfMonth(new Date(year, month, 1)), 45);
+    
+    const startDate = format(startDateObj, 'yyyy-MM-dd');
+    const endDate = format(endDateObj, 'yyyy-MM-dd');
 
     const { data, error } = await supabase
       .from('daily_trips')
-      .select('id, trip_date, odometer_start, odometer_end, fuel_liters, distance_km, notes')
+      .select('id, trip_no, trip_date, odometer_start, odometer_end, fuel_liters, distance_km, notes, route_label, routes(route_name)')
       .eq('bus_id', bId)
       .gte('trip_date', startDate)
       .lte('trip_date', endDate)
@@ -187,19 +203,17 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
       return;
     }
 
-    // Group by date, taking the earliest start_odo and latest end_odo for the day
-    const dbMap: Record<string, DBTripRow> = {};
+    // Group by date, maintaining all trips for the day
+    const dbMap: Record<string, DBTripRow[]> = {};
     if (data) {
       data.forEach(trip => {
-        if (!dbMap[trip.trip_date]) {
-          dbMap[trip.trip_date] = trip;
-        } else {
-          // If multiple trips on the same day, update end_odo and add fuel
-          const existing = dbMap[trip.trip_date];
-          existing.odometer_end = trip.odometer_end || existing.odometer_end;
-          existing.fuel_liters = (existing.fuel_liters || 0) + (trip.fuel_liters || 0);
-          existing.distance_km = (existing.distance_km || 0) + (trip.distance_km || 0);
+        // Ensure trip_date is always YYYY-MM-DD even if it's a timestamp
+        const dateKey = trip.trip_date.substring(0, 10);
+        
+        if (!dbMap[dateKey]) {
+          dbMap[dateKey] = [];
         }
+        dbMap[dateKey].push(trip as any);
       });
     }
     
@@ -287,7 +301,7 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
           continue; // Skip invalid rows
         }
 
-        const dbRow = dbData[fullDate];
+        const dbRows = dbData[fullDate];
 
         // Prepare JSON notes
         const notesObj = {
@@ -296,20 +310,60 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
           source: 'monthly_log_ocr'
         };
 
-        if (dbRow) {
-          // Update existing DB row
-          const { error } = await supabase
-            .from('daily_trips')
-            .update({
-              odometer_start: log.start_odo || dbRow.odometer_start,
-              odometer_end: log.end_odo || dbRow.odometer_end,
-              fuel_liters: log.fuel_liters || dbRow.fuel_liters,
-              distance_km: log.distance || dbRow.distance_km,
-              notes: { ...(dbRow.notes || {}), ...notesObj },
-            })
-            .eq('id', dbRow.id);
+        if (dbRows && dbRows.length > 0) {
+          // If we have multiple trips for the day, we allocate:
+          // 1. Start Odo -> First Trip
+          // 2. End Odo -> Last Trip
+          // 3. Fuel -> First Trip (based on user plan)
+          // 4. Notes -> All trips
 
-          if (!error) successCount++;
+          if (dbRows.length === 1) {
+            // Single trip - standard update
+            const dbRow = dbRows[0];
+            const { error } = await supabase
+              .from('daily_trips')
+              .update({
+                odometer_start: log.start_odo || dbRow.odometer_start,
+                odometer_end: log.end_odo || dbRow.odometer_end,
+                fuel_liters: log.fuel_liters || dbRow.fuel_liters,
+                distance_km: log.distance || dbRow.distance_km,
+                notes: { ...(dbRow.notes || {}), ...notesObj },
+              })
+              .eq('id', dbRow.id);
+            if (!error) successCount++;
+          } else {
+            // Multiple trips
+            for (let i = 0; i < dbRows.length; i++) {
+              const dbRow = dbRows[i];
+              const isFirst = i === 0;
+              const isLast = i === dbRows.length - 1;
+
+              const updates: any = {
+                notes: { ...(dbRow.notes || {}), ...notesObj },
+              };
+
+              if (isFirst) {
+                updates.odometer_start = log.start_odo || dbRow.odometer_start;
+                updates.fuel_liters = log.fuel_liters || dbRow.fuel_liters;
+                // If it's the only one getting distance, we can put it here, or leave DB distance alone.
+              }
+              
+              if (isLast) {
+                updates.odometer_end = log.end_odo || dbRow.odometer_end;
+              }
+
+              const { error } = await supabase
+                .from('daily_trips')
+                .update(updates)
+                .eq('id', dbRow.id);
+              
+              if (!error) {
+                 // Only count the whole day as 1 success to match log rows, or we can count each. 
+                 // Let's only increment success count on the first one so the toast count matches rows.
+                 if (isFirst) successCount++;
+              }
+            }
+          }
         } else {
           // Generate a unique trip number
           const dateStr = fullDate.replace(/-/g, '');
@@ -487,13 +541,29 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                 <TableBody>
                   {editedLogs.map((log, index) => {
                     const fullDate = getFullDate(log.date);
-                    const dbRow = fullDate ? dbData[fullDate] : null;
-                    const hasConflict = dbRow && (dbRow.odometer_start !== log.start_odo && log.start_odo !== null);
+                    const dbRows = fullDate ? dbData[fullDate] : null;
+                    const exists = dbRows && dbRows.length > 0;
+                    const dbFirstRow = exists ? dbRows[0] : null;
+                    const dbLastRow = exists ? dbRows[dbRows.length - 1] : null;
+                    const hasConflict = dbFirstRow && (dbFirstRow.odometer_start !== log.start_odo && log.start_odo !== null);
+                    const isExpanded = expandedRows.has(index);
 
                     return (
-                      <TableRow key={index} className={hasConflict ? "bg-amber-50 dark:bg-amber-950/20" : ""}>
+                      <React.Fragment key={index}>
+                      <TableRow className={hasConflict ? "bg-amber-50 dark:bg-amber-950/20" : ""}>
                         <TableCell className="font-medium p-1">
-                          <Popover>
+                          <div className="flex items-center gap-1">
+                            {dbRows && dbRows.length > 1 && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-6 w-6 p-0 shrink-0" 
+                                onClick={() => toggleRow(index)}
+                              >
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              </Button>
+                            )}
+                            <Popover>
                             <PopoverTrigger asChild>
                               <Button
                                 variant={"outline"}
@@ -519,7 +589,8 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                               />
                             </PopoverContent>
                           </Popover>
-                        </TableCell>
+                        </div>
+                      </TableCell>
                         <TableCell className="p-1">
                           <Input 
                             value={log.start_location || ''} 
@@ -534,8 +605,8 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                             onChange={e => handleEditLog(index, 'start_odo', e.target.value ? Number(e.target.value) : null)}
                             className="h-7 text-xs w-24"
                           />
-                          {dbRow && dbRow.odometer_start && (
-                            <div className="text-[10px] text-muted-foreground mt-1">DB: {dbRow.odometer_start}</div>
+                          {dbFirstRow && dbFirstRow.odometer_start && (
+                            <div className="text-[10px] text-muted-foreground mt-1">DB: {dbFirstRow.odometer_start}</div>
                           )}
                         </TableCell>
                         <TableCell>
@@ -545,8 +616,8 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                             onChange={e => handleEditLog(index, 'end_odo', e.target.value ? Number(e.target.value) : null)}
                             className="h-7 text-xs w-24"
                           />
-                          {dbRow && dbRow.odometer_end && (
-                            <div className="text-[10px] text-muted-foreground mt-1">DB: {dbRow.odometer_end}</div>
+                          {dbLastRow && dbLastRow.odometer_end && (
+                            <div className="text-[10px] text-muted-foreground mt-1">DB: {dbLastRow.odometer_end}</div>
                           )}
                         </TableCell>
                         <TableCell>
@@ -556,8 +627,8 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                             onChange={e => handleEditLog(index, 'distance', e.target.value ? Number(e.target.value) : null)}
                             className="h-7 text-xs w-16"
                           />
-                          {dbRow && dbRow.distance_km && (
-                            <div className="text-[10px] text-muted-foreground mt-1">DB: {dbRow.distance_km}</div>
+                          {dbFirstRow && dbFirstRow.distance_km && (
+                            <div className="text-[10px] text-muted-foreground mt-1">DB: {dbFirstRow.distance_km}</div>
                           )}
                         </TableCell>
                         <TableCell>
@@ -567,8 +638,8 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                             onChange={e => handleEditLog(index, 'fuel_liters', e.target.value ? Number(e.target.value) : null)}
                             className="h-7 text-xs w-16"
                           />
-                           {dbRow && dbRow.fuel_liters && (
-                            <div className="text-[10px] text-muted-foreground mt-1">DB: {dbRow.fuel_liters}</div>
+                           {dbFirstRow && dbFirstRow.fuel_liters && (
+                            <div className="text-[10px] text-muted-foreground mt-1">DB: {dbFirstRow.fuel_liters}</div>
                           )}
                         </TableCell>
                         <TableCell>
@@ -577,20 +648,77 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                             onChange={e => handleEditLog(index, 'driver_name', e.target.value)}
                             className="h-7 text-xs w-24"
                           />
-                          {dbRow && dbRow.notes && typeof dbRow.notes === 'string' && dbRow.notes.includes('driver') && (
-                            <div className="text-[10px] text-muted-foreground mt-1 truncate max-w-[100px]" title={JSON.parse(dbRow.notes).driver}>
-                              DB: {JSON.parse(dbRow.notes).driver || 'N/A'}
+                          {dbFirstRow && dbFirstRow.notes && typeof dbFirstRow.notes === 'string' && dbFirstRow.notes.includes('driver') && (
+                            <div className="text-[10px] text-muted-foreground mt-1 truncate max-w-[100px]" title={JSON.parse(dbFirstRow.notes).driver}>
+                              DB: {JSON.parse(dbFirstRow.notes).driver || 'N/A'}
                             </div>
                           )}
                         </TableCell>
                         <TableCell>
-                          {dbRow ? (
+                          {dbRows && dbRows.length > 1 ? (
+                            <div className="flex flex-col items-start gap-1">
+                              <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50 cursor-pointer" onClick={() => toggleRow(index)}>
+                                {dbRows.length} Trips Found
+                              </Badge>
+                            </div>
+                          ) : dbRows && dbRows.length === 1 ? (
                             <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Trip Exists</Badge>
                           ) : (
                             <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">New Trip</Badge>
                           )}
                         </TableCell>
                       </TableRow>
+                      {isExpanded && dbRows && dbRows.length > 1 && (
+                        <TableRow className="bg-muted/10 border-b-2 border-primary/20">
+                          <TableCell colSpan={8} className="p-0">
+                            <div className="p-4 pl-12 bg-gradient-to-b from-muted/30 to-muted/10 shadow-inner">
+                              <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-3 tracking-wider flex items-center gap-2">
+                                <Route className="h-3 w-3" />
+                                Database Trip Breakdown
+                              </h4>
+                              <div className="grid grid-cols-6 gap-2 text-xs mb-2 font-medium text-muted-foreground px-3">
+                                <div>Trip No</div>
+                                <div className="col-span-2">Route</div>
+                                <div>Start Odo</div>
+                                <div>End Odo</div>
+                                <div>Driver</div>
+                              </div>
+                              <div className="space-y-1">
+                                {dbRows.map((trip, i) => (
+                                  <div key={trip.id} className="grid grid-cols-6 gap-2 text-xs bg-background p-2 px-3 rounded border items-center">
+                                    <div className="font-mono text-[10px] bg-muted/50 px-1 py-0.5 rounded truncate" title={trip.trip_no}>{trip.trip_no}</div>
+                                    <div className="col-span-2 font-medium truncate" title={trip.route_label || trip.routes?.route_name || 'N/A'}>
+                                      {trip.route_label || trip.routes?.route_name || 'N/A'}
+                                    </div>
+                                    <div>
+                                      {i === 0 ? (
+                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{trip.odometer_start || '-'}</Badge>
+                                      ) : (
+                                        <span className="text-muted-foreground">{trip.odometer_start || '-'}</span>
+                                      )}
+                                    </div>
+                                    <div>
+                                      {i === dbRows.length - 1 ? (
+                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{trip.odometer_end || '-'}</Badge>
+                                      ) : (
+                                        <span className="text-muted-foreground">{trip.odometer_end || '-'}</span>
+                                      )}
+                                    </div>
+                                    <div className="truncate">
+                                      {trip.notes && typeof trip.notes === 'string' && trip.notes.includes('driver') ? JSON.parse(trip.notes).driver : 'N/A'}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="mt-3 text-[10px] text-muted-foreground bg-blue-50/50 p-2 rounded border border-blue-100 flex items-start gap-2">
+                                <AlertCircle className="h-3 w-3 text-blue-500 mt-0.5 shrink-0" />
+                                <p><strong>Allocation Plan:</strong> When saved, the Start Odo (<span className="font-mono">{log.start_odo || '0'}</span>) will be applied to the <strong>first trip</strong>, and the End Odo (<span className="font-mono">{log.end_odo || '0'}</span>) will be applied to the <strong>last trip</strong>.</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      </React.Fragment>
                     );
                   })}
                 </TableBody>

@@ -43,6 +43,13 @@ export interface ExtractedMultiTripData {
   daily_expenses: DailyExpenses;
   mapped_expenses?: import('@/lib/ocr-expense-mapper').DBExpenseFields;
   savedExpensesTotal?: number;
+  status?: 'pending' | 'applied';
+  // Multi-day fields for persistence
+  isMultiDayRoute?: boolean;
+  multiDayConfig?: any;
+  manualMultiDayEnabled?: boolean;
+  dateRangeStart?: string;
+  dateRangeEnd?: string;
 }
 
 export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUploadProps) {
@@ -50,6 +57,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [extractedData, setExtractedData] = useState<ExtractedMultiTripData[]>([]);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [processingStep, setProcessingStep] = useState<string>("");
   const [manualDate, setManualDate] = useState<Date>(selectedDate); // Manual date selection
   const isMobile = useIsMobile();
@@ -64,6 +72,9 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       if (draft && draft.extractedData.length > 0) {
         setImages(draft.images);
         setExtractedData(draft.extractedData);
+        if (draft.metadata?.manualDate) {
+          setManualDate(new Date(draft.metadata.manualDate));
+        }
         toast.info("Restored unapplied OCR scans from draft.");
       }
     };
@@ -147,6 +158,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           confidence: ocrResult.confidence,
           trips: ocrResult.trips,
           daily_expenses: ocrResult.daily_expenses,
+          status: 'pending',
         });
         
         setProgress(((i + 1) / images.length) * 100);
@@ -154,7 +166,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       }
 
       setExtractedData(results);
-      await saveOCRDraft(images, results);
+      await saveOCRDraft(images, results, { manualDate: manualDate.toISOString() });
       toast.success(`🎉 Successfully processed ${results.length} sheet(s) with ${results.reduce((sum, r) => sum + r.trips.length, 0)} total trips`);
     } catch (error) {
       console.error('OCR processing error:', error);
@@ -169,11 +181,12 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
   const clearAll = async () => {
     setImages([]);
     setExtractedData([]);
+    setExpandedCardId(null);
     setProgress(0);
     await clearOCRDraft();
   };
 
-  const applyMultiTripData = async (data: ExtractedMultiTripData & { mapped_expenses: import('@/lib/ocr-expense-mapper').DBExpenseFields }) => {
+  const applyMultiTripData = async (data: ExtractedMultiTripData & { mapped_expenses: import('@/lib/ocr-expense-mapper').DBExpenseFields }, autoNext: boolean = false) => {
     try {
       // 1. Use manually selected date (ignore OCR date)
       const tripDate = format(manualDate, 'yyyy-MM-dd');
@@ -222,13 +235,29 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         }
         
         if (!busData) {
-          toast.error(`Bus not found. Tried: "${data.busNumber}" and alternatives.`);
-          console.error('Bus lookup failed for all formats');
+          toast.error(`Bus ${data.busNumber} not found. Please select a valid bus.`);
           return;
         }
       }
 
-      // Warn if bus has no route (but allow trip creation)
+      // 2.5. DUPLICATE CHECK
+      const { data: existingTrips } = await supabase
+        .from('daily_trips')
+        .select('id, income')
+        .eq('bus_id', busData.id)
+        .eq('trip_date', tripDate);
+
+      if (existingTrips && existingTrips.length > 0) {
+        const confirmOverwrite = window.confirm(
+          `A trip already exists for Bus ${busData.bus_no} on ${tripDate}.\n\nDo you want to overwrite it with this new scan?`
+        );
+        if (!confirmOverwrite) {
+          toast.info("Save cancelled by user.");
+          return;
+        }
+      }
+
+      // 3. Multi-day date distribution validationw trip creation)
       if (!busData.route) {
         console.warn(`⚠️ Bus ${busData.bus_no} has no route assigned`);
       }
@@ -250,7 +279,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       console.log(`📅 Date range: ${minDate} to ${maxDate} (${hasIndividualDates ? 'multi-day' : 'single-day'})`);
 
       // Pre-load all existing trips in date range
-      const { data: existingTrips, error: queryError } = await supabase
+      const { data: existingTripsInRange, error: queryError } = await supabase
         .from('daily_trips')
         .select('id, trip_no, trip_date, income')
         .eq('bus_id', busData.id)
@@ -265,12 +294,12 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         return;
       }
 
-      console.log(`📊 Found ${existingTrips?.length || 0} existing trips in range for ${busData.bus_no}`);
+      console.log(`📊 Found ${existingTripsInRange?.length || 0} existing trips in range for ${busData.bus_no}`);
 
       // 4. BUILD MAP OF EXISTING TRIPS BY DATE
       const existingTripsByDate = new Map<string, Array<{ id: string; trip_no: string; income: number | null; used: boolean }>>();
-      if (existingTrips) {
-        existingTrips.forEach(trip => {
+      if (existingTripsInRange) {
+        existingTripsInRange.forEach(trip => {
           if (!existingTripsByDate.has(trip.trip_date)) {
             existingTripsByDate.set(trip.trip_date, []);
           }
@@ -315,7 +344,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       console.log(`\n🔄 Processing ${data.trips.length} OCR trip(s)...`);
       console.log(`Multi-day detection: ${hasIndividualDates ? 'YES ✓' : 'NO'}`);
       console.log(`Date range: ${minDate} to ${maxDate}`);
-      console.log(`Existing trips found: ${existingTrips?.length || 0}`);
+      console.log(`Existing trips found: ${existingTripsInRange?.length || 0}`);
       
       for (let i = 0; i < data.trips.length; i++) {
         const trip = data.trips[i];
@@ -632,14 +661,34 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         count: data.trips.length,
       });
 
-      // Remove the applied item from state
-      const newExtractedData = extractedData.filter(d => d.id !== data.id);
+      // Mark the item as applied instead of removing it
+      const newExtractedData = extractedData.map(d => 
+        d.id === data.id ? { ...d, status: 'applied' as const } : d
+      );
       setExtractedData(newExtractedData);
       
-      if (newExtractedData.length === 0) {
+      // Check if all are applied
+      const allApplied = newExtractedData.every(d => d.status === 'applied');
+      if (allApplied) {
         await clearOCRDraft();
+        setExpandedCardId(null);
       } else {
-        await saveOCRDraft(images, newExtractedData);
+        await saveOCRDraft(images, newExtractedData, { manualDate: manualDate.toISOString() });
+        
+        if (autoNext) {
+          // Find the next unapplied card
+          const currentIndex = newExtractedData.findIndex(d => d.id === data.id);
+          const nextCard = newExtractedData.find((d, idx) => idx > currentIndex && d.status !== 'applied');
+          if (nextCard) {
+            setExpandedCardId(nextCard.id);
+          } else {
+            // Wrap around
+            const firstUnapplied = newExtractedData.find(d => d.status !== 'applied');
+            if (firstUnapplied) setExpandedCardId(firstUnapplied.id);
+          }
+        } else {
+          setExpandedCardId(null);
+        }
       }
       
     } catch (error) {
@@ -674,21 +723,24 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       extractedDate: lastExtractedDate,
     });
     
-    // Remove the applied items from state
-    const remainingData = extractedData.filter(d => d.confidence < 0.6);
-    setExtractedData(remainingData);
+    // Mark the items as applied
+    const newExtractedData = extractedData.map(d => 
+      d.confidence >= 0.6 ? { ...d, status: 'applied' as const } : d
+    );
+    setExtractedData(newExtractedData);
     
-    if (remainingData.length === 0) {
+    const allApplied = newExtractedData.every(d => d.status === 'applied');
+    if (allApplied) {
       await clearOCRDraft();
     } else {
-      await saveOCRDraft(images, remainingData);
+      await saveOCRDraft(images, newExtractedData, { manualDate: manualDate.toISOString() });
     }
   };
 
   const handleDiscard = async (index: number) => {
     const newExtractedData = extractedData.filter((_, i) => i !== index);
     setExtractedData(newExtractedData);
-    await saveOCRDraft(images, newExtractedData);
+    await saveOCRDraft(images, newExtractedData, { manualDate: manualDate.toISOString() });
     toast.success("Sheet discarded");
   };
 
@@ -913,12 +965,14 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
             <OCRExtractedDataCard
               key={data.id}
               data={data}
+              isOpen={expandedCardId === data.id}
+              onToggleOpen={(open) => setExpandedCardId(open ? data.id : null)}
               actualSaveDate={format(manualDate, 'yyyy-MM-dd')}
               onApply={applyMultiTripData}
               onChange={async (updatedData) => {
                 const newData = extractedData.map((item, i) => i === index ? updatedData : item);
                 setExtractedData(newData);
-                await saveOCRDraft(images, newData);
+                await saveOCRDraft(images, newData, { manualDate: manualDate.toISOString() });
               }}
               onDiscard={() => handleDiscard(index)}
               onView={handleView}

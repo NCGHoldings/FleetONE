@@ -27,6 +27,7 @@ import CircularRevenueChart from '@/components/trips-analytics/charts/CircularRe
 import DriverPerformanceSection from '@/components/trips-analytics/DriverPerformanceSection';
 import BusFleetSection from '@/components/trips-analytics/BusFleetSection';
 import ExpenseAnalyticsSection from '@/components/trips-analytics/ExpenseAnalyticsSection';
+import FuelAnalyticsSection from '@/components/trips-analytics/FuelAnalyticsSection';
 import AnalyticsErrorBoundary from '@/components/trips-analytics/AnalyticsErrorBoundary';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -403,7 +404,7 @@ const handleFilterChange = useCallback((filters: any) => {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-10">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="time">Time</TabsTrigger>
           <TabsTrigger value="comparison">Compare</TabsTrigger>
@@ -412,6 +413,7 @@ const handleFilterChange = useCallback((filters: any) => {
           <TabsTrigger value="drivers">Drivers</TabsTrigger>
           <TabsTrigger value="buses">Buses</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
+          <TabsTrigger value="fuel">Fuel</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
         </TabsList>
 
@@ -638,6 +640,11 @@ const handleFilterChange = useCallback((filters: any) => {
             overview={analytics.overview}
             dailyTrends={analytics.dailyTrends}
           />
+        </TabsContent>
+
+        {/* Fuel Tab */}
+        <TabsContent value="fuel" className="space-y-6">
+          <FuelAnalyticsSection rawTrips={analytics.rawTrips} />
         </TabsContent>
 
         {/* Trends Tab */}
