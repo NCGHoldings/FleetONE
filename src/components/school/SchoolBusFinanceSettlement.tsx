@@ -223,14 +223,14 @@ export function SchoolBusFinanceSettlement({
       const amountPaid = Number(payment.amount_paid);
       
       // Calculate TRUE AR debt for this exact payment instance
-      // 1. Current outstanding debt that hasn't been allocated yet
-      const unallocatedOwed = Number(student?.current_amount_due || 0);
-      // 2. Any amount from this payment that was ALREADY allocated to invoices (in case they allocated before syncing GL)
-      const allocatedToThisPayment = invoices
-        .filter((inv: any) => inv.payment_id === payment.id)
-        .reduce((sum: number, inv: any) => sum + Number(inv.paid_amount || 0), 0);
-      
-      const trueArDebt = unallocatedOwed + allocatedToThisPayment;
+      // We use payment_balance_before snapshot because student?.current_amount_due 
+      // reflects the LIVE balance which has already been reduced by the trigger 
+      // when this payment was recorded operationally.
+      const trueArDebt = payment.payment_balance_before !== undefined && payment.payment_balance_before !== null
+        ? Math.max(0, Number(payment.payment_balance_before))
+        : Number(student?.current_amount_due || 0) + (invoices
+            .filter((inv: any) => inv.payment_id === payment.id)
+            .reduce((sum: number, inv: any) => sum + Number(inv.paid_amount || 0), 0));
       
       // The AR credit cannot exceed what the payment actually was
       const arCredit = Math.min(amountPaid, trueArDebt);

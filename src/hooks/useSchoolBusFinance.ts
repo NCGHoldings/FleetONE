@@ -2491,6 +2491,16 @@ export function useDeleteSchoolPayment() {
 
   return useMutation({
     mutationFn: async (paymentId: string) => {
+      // 0. Manual unlink and reset to prevent FK violation and restore operational status
+      // The RPC doesn't currently handle school_ar_invoices status reversal
+      await supabase.from("school_ar_invoices")
+        .update({ 
+          payment_id: null,
+          paid_amount: 0,
+          status: 'posted'
+        })
+        .eq("payment_id", paymentId);
+
       const { data, error } = await supabase.rpc("delete_and_reverse_school_payment", { p_payment_id: paymentId });
       if (error) throw error;
       return data;
