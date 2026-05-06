@@ -16,8 +16,6 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client
-      - name: Setup Cloudflare WARP (Provides IPv6)
-        uses: fscarmen/warp-on-actions@v1.4
 
       - name: Whitelist Runner IP in Supabase
         env:
@@ -25,9 +23,7 @@ jobs:
           PROJECT_REF: wwjpdszkmtnzshbulkon
         run: |
           export RUNNER_IPV4=$(curl -s -4 https://api.ipify.org)
-          export RUNNER_IPV6=$(curl -s -6 https://api64.ipify.org || echo "")
           echo "Runner IPv4 is $RUNNER_IPV4"
-          echo "Runner IPv6 is $RUNNER_IPV6"
           
           node -e '
             (async () => {
@@ -44,7 +40,8 @@ jobs:
               
               require("fs").writeFileSync("original_cidrs.json", JSON.stringify(existing));
               
-              const newIps = ["0.0.0.0/0", "::/0"];
+              // Only whitelist the runner IPv4
+              const newIps = [`${process.env.RUNNER_IPV4}/32`];
               
               let modified = false;
               for (const ip of newIps) {
@@ -54,7 +51,7 @@ jobs:
                 }
               }
               
-              console.log("Updating allowlist to temporarily allow all IPs (0.0.0.0/0, ::/0) for the backup window...");
+              console.log("Updating allowlist to include:", newIps);
               const postRes = await fetch(`https://api.supabase.com/v1/projects/${process.env.PROJECT_REF}/network-restrictions/apply`, {
                 method: "POST",
                 headers: { 
@@ -71,9 +68,9 @@ jobs:
             })();
           '
           
-          # Wait 20 seconds for firewall rules to propagate
-          echo "Waiting 20 seconds for firewall rules to propagate..."
-          sleep 20
+          # Wait 120 seconds for firewall rules to propagate globally to the Supavisor Pooler
+          echo "Waiting 120 seconds for firewall rules to propagate..."
+          sleep 120
 
       # ── 1. Dump ─────────────────────────────────────────────────────────────
       - name: Dump Supabase Database
@@ -86,28 +83,17 @@ jobs:
           DIRECT_URL=$(node -e '
             const url = new URL(process.env.DATABASE_URL);
             
-            // Format connection for Supavisor pooler compatibility
+            // If using the connection pooler, force port 5432 (Session mode)
+            // DO NOT change the username format, as Supavisor uses postgres.[tenant_id]
             if (url.hostname.includes("pooler.supabase")) {
-              url.port = "5432"; // Session mode required for pg_dump
-              
-              // Extract tenant ID from username (postgres.tenant_id)
-              const usernameParts = url.username.split(".");
-              if (usernameParts.length > 1) {
-                const projectRef = usernameParts.pop();
-                url.username = usernameParts.join("."); // Reset to just "postgres"
-                
-                // Add reference as connection option (required by new Supavisor update)
-                url.searchParams.append("options", `reference=${projectRef}`);
-              }
+              url.port = "5432";
             }
-            
             url.searchParams.delete("pgbouncer");
             
             // Debug logging (password hidden)
             console.error(`[DEBUG] Host: ${url.hostname}`);
             console.error(`[DEBUG] Username: ${url.username}`);
             console.error(`[DEBUG] Port: ${url.port}`);
-            console.error(`[DEBUG] Options: ${url.searchParams.get("options")}`);
             
             console.log(url.toString());
           ')
