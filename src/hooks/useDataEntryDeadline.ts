@@ -40,7 +40,10 @@ export const useDataEntryDeadline = () => {
         const enforcementSetting = data.find(s => s.setting_key === 'deadline_enforcement_enabled');
         
         if (hoursSetting) setDeadlineHours(parseInt(String(hoursSetting.setting_value)));
-        if (enforcementSetting) setEnforcementEnabled(String(enforcementSetting.setting_value) === 'true');
+        
+        // TEMPORARILY DISABLED: Hardcoding to false to allow old list data entry without impact
+        setEnforcementEnabled(false);
+        // if (enforcementSetting) setEnforcementEnabled(String(enforcementSetting.setting_value) === 'true');
       }
     };
     loadSettings();

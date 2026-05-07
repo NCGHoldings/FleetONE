@@ -341,9 +341,6 @@ export async function createVehicleARInvoice({
   }
 }
 
-/**
- * Post a vehicle payment to GL (Journal Entry)
- */
 export async function postVehiclePaymentToGL({
   module,
   orderNo,
@@ -354,6 +351,7 @@ export async function postVehiclePaymentToGL({
   settings,
   effectiveCompanyId,
   customBankAccountId,
+  customCreditAccountId,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -364,6 +362,7 @@ export async function postVehiclePaymentToGL({
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
   customBankAccountId?: string;
+  customCreditAccountId?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
@@ -524,7 +523,7 @@ export async function resolveItemCategoryRevenueAccount(
 // Map module to default item category name
 const MODULE_CATEGORY_MAP: Record<VehicleModule, string> = {
   yutong: 'Yutong Sales',
-  sinotruck: 'Sinotruk Sales',
+  sinotruck: 'Sinotruck Sales',
   lightvehicle: 'Light Vehicle Sales',
 };
 
@@ -796,16 +795,18 @@ export async function createVehicleARReceipt({
   paymentDate,
   settings,
   effectiveCompanyId,
+  overrideGLAccountId,
 }: {
   module: VehicleModule;
   paymentId: string;
-  invoiceId?: string;
+  invoiceId: string;
   customerId: string;
   amount: number;
   paymentMethod: string;
   paymentDate: string;
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
+  overrideGLAccountId?: string;
 }): Promise<{ receiptId: string; receiptNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];

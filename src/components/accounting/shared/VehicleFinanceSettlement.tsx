@@ -156,6 +156,7 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
         settings,
         effectiveCompanyId: NCG_HOLDING_ID,
         customBankAccountId: payment.bank_account_id,
+        customCreditAccountId: payment.custom_credit_account_id,
       });
 
       if (glResult) {
