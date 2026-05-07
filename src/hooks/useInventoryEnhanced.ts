@@ -4,11 +4,13 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "@/hooks/use-toast";
 
 // ============ Pick Lists ============
+// ============ Pick Lists ============
 export const usePickLists = (status?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
   
   return useQuery({
-    queryKey: ["pick-lists", status, selectedCompanyId],
+    queryKey: ["pick-lists", status, effectiveCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("pick_lists")
@@ -24,8 +26,8 @@ export const usePickLists = (status?: string) => {
         `)
         .order("created_at", { ascending: false });
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
       
       if (status) {
@@ -36,7 +38,7 @@ export const usePickLists = (status?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
@@ -65,7 +67,7 @@ export const usePickListLines = (pickListId: string) => {
 
 export const useCreatePickList = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (pickList: {
@@ -80,13 +82,16 @@ export const useCreatePickList = () => {
         qty_to_pick: number;
       }[];
     }) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = getBusinessUnitCode();
       const { lines, ...pickListData } = pickList;
       
       const { data: newPickList, error: pickListError } = await supabase
         .from("pick_lists")
         .insert({
           ...pickListData,
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
           status: "draft",
         })
         .select()
@@ -161,10 +166,11 @@ export const useCompletePicking = () => {
 
 // ============ Landed Cost Vouchers ============
 export const useLandedCostVouchers = (status?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
   
   return useQuery({
-    queryKey: ["landed-cost-vouchers", status, selectedCompanyId],
+    queryKey: ["landed-cost-vouchers", status, effectiveCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("landed_cost_vouchers")
@@ -176,8 +182,8 @@ export const useLandedCostVouchers = (status?: string) => {
         `)
         .order("posting_date", { ascending: false });
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
       
       if (status) {
@@ -188,7 +194,7 @@ export const useLandedCostVouchers = (status?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
@@ -238,7 +244,7 @@ export const useLandedCostCharges = (voucherId: string) => {
 
 export const useCreateLandedCostVoucher = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (voucher: {
@@ -261,6 +267,8 @@ export const useCreateLandedCostVoucher = () => {
         expense_account_id?: string;
       }[];
     }) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = getBusinessUnitCode();
       const { items, charges, ...voucherData } = voucher;
       
       const totalCharges = charges.reduce((sum, c) => sum + c.amount, 0);
@@ -271,7 +279,8 @@ export const useCreateLandedCostVoucher = () => {
         .from("landed_cost_vouchers")
         .insert({
           ...voucherData,
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
           total_additional_cost: totalCharges,
           status: "draft",
         })
@@ -342,41 +351,43 @@ export const useCreateLandedCostVoucher = () => {
 
 // ============ Unit of Measures ============
 export const useUnitOfMeasures = () => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
   
   return useQuery({
-    queryKey: ["unit-of-measures", selectedCompanyId],
+    queryKey: ["unit-of-measures", effectiveCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("unit_of_measures")
         .select("*")
         .order("uom_name");
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
       
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useUoMConversions = (itemId?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
   
   return useQuery({
-    queryKey: ["uom-conversions", itemId, selectedCompanyId],
+    queryKey: ["uom-conversions", itemId, effectiveCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("uom_conversions")
         .select("*")
         .eq("is_active", true);
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
       
       if (itemId) {
@@ -387,19 +398,20 @@ export const useUoMConversions = (itemId?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useCreateUoM = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (uom: { uom_name: string; uom_symbol?: string }) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
       const { data, error } = await supabase
         .from("unit_of_measures")
-        .insert({ ...uom, company_id: selectedCompanyId })
+        .insert({ ...uom, company_id: effectiveCompanyId })
         .select()
         .single();
       
@@ -419,11 +431,12 @@ export const useCreateUoM = () => {
 // ============ Landed Cost GL Posting ============
 export const usePostLandedCostToGL = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId, selectedCompany } = useCompany();
+  const { getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
 
   return useMutation({
     mutationFn: async (voucherId: string) => {
       const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = getBusinessUnitCode();
       if (!effectiveCompanyId) throw new Error("No company selected");
 
       // 1. Fetch voucher
@@ -492,7 +505,7 @@ export const usePostLandedCostToGL = () => {
       const { createAndPostJournalEntry, generateEntryNumber } = await import("@/lib/gl-posting-utils");
       
       const totalCharges = charges.reduce((sum, c) => sum + (c.amount || 0), 0);
-      const businessUnitCode = (selectedCompany as any)?.business_unit_code || voucher.business_unit_code || undefined;
+      const voucherBUCode = voucher.business_unit_code || businessUnitCode || undefined;
 
       const jeLines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
 
@@ -523,7 +536,7 @@ export const usePostLandedCostToGL = () => {
         reference: voucher.voucher_number,
         lines: jeLines,
         company_id: effectiveCompanyId,
-        business_unit_code: businessUnitCode,
+        business_unit_code: voucherBUCode,
         source_module: "landed_cost",
       });
 
@@ -536,7 +549,7 @@ export const usePostLandedCostToGL = () => {
         .from("landed_cost_vouchers")
         .update({
           journal_entry_id: glResult.journalEntryId,
-          business_unit_code: businessUnitCode,
+          business_unit_code: voucherBUCode,
           status: "posted",
         } as any)
         .eq("id", voucherId);
@@ -569,7 +582,7 @@ export const usePostLandedCostToGL = () => {
 
 export const useCreateUoMConversion = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (conversion: {
@@ -578,9 +591,10 @@ export const useCreateUoMConversion = () => {
       to_uom: string;
       conversion_factor: number;
     }) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
       const { data, error } = await supabase
         .from("uom_conversions")
-        .insert({ ...conversion, company_id: selectedCompanyId })
+        .insert({ ...conversion, company_id: effectiveCompanyId })
         .select()
         .single();
       

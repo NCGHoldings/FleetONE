@@ -13,7 +13,9 @@ import "./ReconciliationWorksheet.css";
 const fmt = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const IntercompanyReconciliationView = () => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = getBusinessUnitCode();
   const queryClient = useQueryClient();
 
   const { data: companies = [] } = useQuery({
@@ -54,7 +56,8 @@ export const IntercompanyReconciliationView = () => {
         unit_b_balance: unitBBal,
         status: difference === 0 ? "completed" : "draft",
         notes,
-        company_id: selectedCompanyId,
+        company_id: effectiveCompanyId,
+        business_unit_code: businessUnitCode,
       }]);
       toast.success("Intercompany Reconciliation saved");
       queryClient.invalidateQueries({ queryKey: ["intercompany-reconciliations"] });

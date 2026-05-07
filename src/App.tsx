@@ -1,8 +1,10 @@
 import React from "react";
+console.log("[DEBUG] App.tsx module is executing");
+
 import { Toaster } from "@/components/ui/toaster"; 
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider } from "./hooks/useAuth";
@@ -112,13 +114,13 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
     },
   },
-  queryCache: new (await import("@tanstack/react-query")).QueryCache({
+  queryCache: new QueryCache({
     onError: (error) => {
       console.error("[Query System Error]:", error);
       toast.error("Network issue detected. We are recovering your connection.");
     },
   }),
-  mutationCache: new (await import("@tanstack/react-query")).MutationCache({
+  mutationCache: new MutationCache({
     onError: (error) => {
       console.error("[Mutation System Error]:", error);
       toast.error(error.message || "Failed to save records. Please try again.");

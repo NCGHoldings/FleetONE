@@ -48,7 +48,9 @@ export const DataImportWizard = () => {
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<{ success: number; errors: string[] } | null>(null);
   const [fullData, setFullData] = useState<any[][]>([]);
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = getBusinessUnitCode();
 
   const selectedType = IMPORT_TYPES.find(t => t.value === importType);
 
@@ -125,9 +127,9 @@ export const DataImportWizard = () => {
     let successCount = 0;
     const errors: string[] = [];
 
-    if (["bank_accounts", "accounts_receivable", "accounts_payable", "customers", "vendors", "items", "fleet_vehicles", "staff_directory"].includes(importType)) {
+    if (["bank_accounts", "accounts_receivable", "accounts_payable", "customers", "vendors", "items", "fleet_vehicles", "staff_directory", "bank_transactions"].includes(importType)) {
        const totalRows = fullData.length - 1;
-       if (!selectedCompanyId) {
+       if (!effectiveCompanyId) {
          setImportResult({ success: 0, errors: ["No company selected"]});
          return;
        }
@@ -135,14 +137,14 @@ export const DataImportWizard = () => {
        // Helper to find or create "Opening Balance Equity"
        const { data: equityAccounts } = await supabase.from('chart_of_accounts')
          .select('id, account_code')
-         .eq('company_id', selectedCompanyId)
+         .eq('company_id', effectiveCompanyId)
          .ilike('account_name', '%Opening Balance%')
          .eq('account_type', 'equity');
        
        let equityAccountId = equityAccounts?.[0]?.id;
        if (!equityAccountId) {
           const { data: newEquity } = await supabase.from('chart_of_accounts').insert({
-             company_id: selectedCompanyId,
+             company_id: effectiveCompanyId,
              account_name: 'Opening Balance Equity',
              account_code: '3999',
              account_type: 'equity',
@@ -156,7 +158,7 @@ export const DataImportWizard = () => {
        // Get Period ID
        const { data: periods } = await supabase.from('financial_periods')
           .select('id')
-          .eq('company_id', selectedCompanyId)
+          .eq('company_id', effectiveCompanyId)
           .eq('status', 'open')
           .order('start_date', { ascending: false })
           .limit(1);
@@ -181,7 +183,8 @@ export const DataImportWizard = () => {
               const ob = parseFloat(row[obIdx]) || 0;
               
               const { data: bankAcc, error: bankErr } = await supabase.from('bank_accounts').insert({
-                 company_id: selectedCompanyId,
+                 company_id: effectiveCompanyId,
+                 business_unit_code: businessUnitCode,
                  account_number: row[accNumIdx]?.toString() || `BANK-${Date.now()}`,
                  bank_name: row[bankNameIdx] || 'Unknown Bank',
                  account_name: row[accNameIdx] || 'Bank Account',
@@ -195,7 +198,8 @@ export const DataImportWizard = () => {
 
               if (ob !== 0 && periodId && bankAcc.gl_account_id && equityAccountId) {
                  const { data: je } = await supabase.from('journal_entries').insert({
-                    company_id: selectedCompanyId,
+                    company_id: effectiveCompanyId,
+                    business_unit_code: businessUnitCode,
                     period_id: periodId,
                     entry_date: new Date().toISOString().split('T')[0],
                     entry_number: `OB-BANK-${Date.now()}-${i}`,
@@ -207,8 +211,8 @@ export const DataImportWizard = () => {
 
                  if (je) {
                     await supabase.from('journal_entry_lines').insert([
-                       { journal_entry_id: je.id, account_id: bankAcc.gl_account_id, debit: ob > 0 ? ob : 0, credit: ob < 0 ? Math.abs(ob) : 0, company_id: selectedCompanyId },
-                       { journal_entry_id: je.id, account_id: equityAccountId, debit: ob < 0 ? Math.abs(ob) : 0, credit: ob > 0 ? ob : 0, company_id: selectedCompanyId }
+                       { journal_entry_id: je.id, account_id: bankAcc.gl_account_id, debit: ob > 0 ? ob : 0, credit: ob < 0 ? Math.abs(ob) : 0, company_id: effectiveCompanyId, business_unit_code: businessUnitCode },
+                       { journal_entry_id: je.id, account_id: equityAccountId, debit: ob < 0 ? Math.abs(ob) : 0, credit: ob > 0 ? ob : 0, company_id: effectiveCompanyId, business_unit_code: businessUnitCode }
                     ]);
                  }
               }
@@ -225,16 +229,17 @@ export const DataImportWizard = () => {
                // Look up the bank account ID by account number
                const { data: bankAcc } = await supabase.from('bank_accounts')
                   .select('id')
-                  .eq('company_id', selectedCompanyId)
+                  .eq('company_id', effectiveCompanyId)
                   .eq('account_number', accNum)
-                  .single();
+                  .maybeSingle();
                
                if (!bankAcc) throw new Error(`Bank account not found: ${accNum}`);
 
                const amt = parseFloat(row[amtIdx]) || 0;
                if (amt !== 0) {
                   const { error: txnErr } = await supabase.from('bank_transactions').insert({
-                     company_id: selectedCompanyId,
+                     company_id: effectiveCompanyId,
+                     business_unit_code: businessUnitCode,
                      bank_account_id: bankAcc.id,
                      transaction_date: row[dateIdx] || new Date().toISOString().split('T')[0],
                      transaction_type: amt > 0 ? 'deposit' : 'withdrawal',
@@ -259,7 +264,8 @@ export const DataImportWizard = () => {
               const amt = parseFloat(row[amtIdx]) || 0;
               if (amt > 0) {
                  const { data: ar, error: arErr } = await supabase.from('accounts_receivable').insert({
-                    company_id: selectedCompanyId,
+                    company_id: effectiveCompanyId,
+                    business_unit_code: businessUnitCode,
                     customer_name: row[cNameIdx] || 'Unknown Customer',
                     invoice_number: row[invNumIdx]?.toString() || `INV-${Date.now()}-${i}`,
                     invoice_date: row[invDateIdx] || new Date().toISOString().split('T')[0],
@@ -273,11 +279,13 @@ export const DataImportWizard = () => {
                  if (arErr) throw arErr;
 
                  const { data: arAccounts } = await supabase.from('chart_of_accounts')
-                    .select('id').eq('company_id', selectedCompanyId).ilike('account_name', '%Account%Receivable%').limit(1);
+                    .select('id').eq('company_id', effectiveCompanyId).ilike('account_name', '%Account%Receivable%').limit(1);
                  
                  if (arAccounts?.[0] && equityAccountId && periodId) {
                     const { data: je } = await supabase.from('journal_entries').insert({
-                       company_id: selectedCompanyId, period_id: periodId,
+                       company_id: effectiveCompanyId, 
+                       business_unit_code: businessUnitCode,
+                       period_id: periodId,
                        entry_date: ar.invoice_date, entry_number: `OB-AR-${Date.now()}-${i}`,
                        description: `Opening Balance AR - ${ar.invoice_number}`,
                        total_debit: amt, total_credit: amt, status: 'posted'
@@ -285,8 +293,8 @@ export const DataImportWizard = () => {
 
                     if (je) {
                        await supabase.from('journal_entry_lines').insert([
-                          { journal_entry_id: je.id, account_id: arAccounts[0].id, debit: amt, credit: 0, company_id: selectedCompanyId },
-                          { journal_entry_id: je.id, account_id: equityAccountId, debit: 0, credit: amt, company_id: selectedCompanyId }
+                          { journal_entry_id: je.id, account_id: arAccounts[0].id, debit: amt, credit: 0, company_id: effectiveCompanyId, business_unit_code: businessUnitCode },
+                          { journal_entry_id: je.id, account_id: equityAccountId, debit: 0, credit: amt, company_id: effectiveCompanyId, business_unit_code: businessUnitCode }
                        ]);
                     }
                  }
@@ -301,7 +309,8 @@ export const DataImportWizard = () => {
               const amt = parseFloat(row[amtIdx]) || 0;
               if (amt > 0) {
                  const { data: ap, error: apErr } = await supabase.from('accounts_payable').insert({
-                    company_id: selectedCompanyId,
+                    company_id: effectiveCompanyId,
+                    business_unit_code: businessUnitCode,
                     vendor_name: row[vNameIdx] || 'Unknown Vendor',
                     invoice_number: row[invNumIdx]?.toString() || `BILL-${Date.now()}-${i}`,
                     invoice_date: row[invDateIdx] || new Date().toISOString().split('T')[0],
@@ -315,11 +324,13 @@ export const DataImportWizard = () => {
                  if (apErr) throw apErr;
 
                  const { data: apAccounts } = await supabase.from('chart_of_accounts')
-                    .select('id').eq('company_id', selectedCompanyId).ilike('account_name', '%Account%Payable%').limit(1);
+                    .select('id').eq('company_id', effectiveCompanyId).ilike('account_name', '%Account%Payable%').limit(1);
                  
                  if (apAccounts?.[0] && equityAccountId && periodId) {
                     const { data: je } = await supabase.from('journal_entries').insert({
-                       company_id: selectedCompanyId, period_id: periodId,
+                       company_id: effectiveCompanyId, 
+                       business_unit_code: businessUnitCode,
+                       period_id: periodId,
                        entry_date: ap.invoice_date, entry_number: `OB-AP-${Date.now()}-${i}`,
                        description: `Opening Balance AP - ${ap.invoice_number}`,
                        total_debit: amt, total_credit: amt, status: 'posted'
@@ -327,8 +338,8 @@ export const DataImportWizard = () => {
 
                     if (je) {
                        await supabase.from('journal_entry_lines').insert([
-                          { journal_entry_id: je.id, account_id: equityAccountId, debit: amt, credit: 0, company_id: selectedCompanyId },
-                          { journal_entry_id: je.id, account_id: apAccounts[0].id, debit: 0, credit: amt, company_id: selectedCompanyId }
+                          { journal_entry_id: je.id, account_id: equityAccountId, debit: amt, credit: 0, company_id: effectiveCompanyId, business_unit_code: businessUnitCode },
+                          { journal_entry_id: je.id, account_id: apAccounts[0].id, debit: 0, credit: amt, company_id: effectiveCompanyId, business_unit_code: businessUnitCode }
                        ]);
                     }
                  }
@@ -343,7 +354,8 @@ export const DataImportWizard = () => {
               const termsIdx = mapIdx("payment_terms");
 
               const { error: custErr } = await supabase.from('customers').insert({
-                company_id: selectedCompanyId,
+                company_id: effectiveCompanyId,
+                business_unit_code: businessUnitCode,
                 customer_code: row[codeIdx]?.toString() || `CUST-${Date.now()}-${i}`,
                 customer_name: row[nameIdx] || 'Unknown Customer',
                 email: row[emailIdx] || null,
@@ -365,7 +377,8 @@ export const DataImportWizard = () => {
               const taxIdx = mapIdx("tax_id");
 
               const { error: vendErr } = await supabase.from('vendors').insert({
-                company_id: selectedCompanyId,
+                company_id: effectiveCompanyId,
+                business_unit_code: businessUnitCode,
                 vendor_code: row[codeIdx]?.toString() || `VEND-${Date.now()}-${i}`,
                 vendor_name: row[nameIdx] || 'Unknown Vendor',
                 email: row[emailIdx] || null,
@@ -386,7 +399,8 @@ export const DataImportWizard = () => {
               const reorderIdx = mapIdx("reorder_level");
 
               const { error: itemErr } = await supabase.from('inventory_items').insert({
-                company_id: selectedCompanyId,
+                company_id: effectiveCompanyId,
+                business_unit_code: businessUnitCode,
                 item_code: row[codeIdx]?.toString() || `ITEM-${Date.now()}-${i}`,
                 item_name: row[nameIdx] || 'Unknown Item',
                 unit_of_measure: row[uomIdx] || 'Nos',
@@ -408,7 +422,8 @@ export const DataImportWizard = () => {
               const capIdx = mapIdx("capacity");
 
               const { error: fleetErr } = await supabase.from('vehicles').insert({
-                company_id: selectedCompanyId,
+                company_id: effectiveCompanyId,
+                business_unit_code: businessUnitCode,
                 bus_no: row[busIdx]?.toString() || `BUS-${Date.now()}-${i}`,
                 chassis_no: row[chasIdx] || null,
                 engine_no: row[engIdx] || null,
@@ -430,7 +445,8 @@ export const DataImportWizard = () => {
               const joinIdx = mapIdx("join_date");
 
               const { error: staffErr } = await supabase.from('staff').insert({
-                company_id: selectedCompanyId,
+                company_id: effectiveCompanyId,
+                business_unit_code: businessUnitCode,
                 employee_id: row[empIdx]?.toString() || `EMP-${Date.now()}-${i}`,
                 first_name: row[fNameIdx] || 'Unknown',
                 last_name: row[lNameIdx] || 'Employee',

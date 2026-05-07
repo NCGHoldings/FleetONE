@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { AccountSelector } from "./shared/AccountSelector";
-import { Plus, Trash2, Calculator } from "lucide-react";
-import { useCreateJournalEntry } from "@/hooks/useAccountingMutations";
-import { formatLKR } from "@/lib/accounting-utils";
+import { useCompany } from "@/contexts/CompanyContext";
+import { BusinessUnitSelector } from "./shared/BusinessUnitSelector";
 import { cn } from "@/lib/utils";
+import { formatLKR } from "@/lib/accounting-utils";
+import { useCreateJournalEntry } from "@/hooks/useAccountingMutations";
 import { useGenerateNumber } from "@/hooks/useNumbering";
-import { Loader2 } from "lucide-react";
+import { Plus, Trash2, Calculator } from "lucide-react";
 
 const lineSchema = z.object({
   account_id: z.string().min(1, "Account is required"),
@@ -26,6 +27,7 @@ const formSchema = z.object({
   entry_date: z.string().min(1, "Date is required"),
   description: z.string().min(1, "Description is required"),
   reference: z.string().optional(),
+  business_unit_code: z.string().optional(),
   lines: z.array(lineSchema).min(2, "At least 2 lines required"),
 });
 
@@ -35,11 +37,17 @@ interface JournalEntryFormProps {
   onSuccess?: () => void;
 }
 
+
+
 export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
   const createEntry = useCreateJournalEntry();
   const generateNumber = useGenerateNumber();
+  const { getEffectiveCompanyId, getBusinessUnitCode, selectedCompany, isSubCompany } = useCompany();
   const [isGenerating, setIsGenerating] = useState(true);
   const submitLock = useRef(false);
+
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const defaultBusinessUnit = getBusinessUnitCode();
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -48,12 +56,15 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
       entry_date: new Date().toISOString().split("T")[0],
       description: "",
       reference: "",
+      business_unit_code: defaultBusinessUnit || "",
       lines: [
         { account_id: "", description: "", debit: 0, credit: 0 },
         { account_id: "", description: "", debit: 0, credit: 0 },
       ],
     },
   });
+
+  const isParentView = selectedCompany && !isSubCompany(selectedCompany.id);
 
   // Note: Auto-generate entry number exactly on save to prevent skipped sequences on cancel.
 
@@ -100,7 +111,9 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
         total_debit: totalDebit,
         total_credit: totalCredit,
         lines: validLines,
-      });
+        company_id: effectiveCompanyId,
+        business_unit_code: data.business_unit_code || defaultBusinessUnit,
+      } as any);
 
       onSuccess?.();
     } finally {
@@ -111,7 +124,7 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-3 gap-4">
+        <div className={cn("grid gap-4", isParentView ? "grid-cols-4" : "grid-cols-3")}>
           <FormField
             control={form.control}
             name="entry_number"
@@ -145,6 +158,25 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
               </FormItem>
             )}
           />
+
+          {isParentView && (
+            <FormField
+              control={form.control}
+              name="business_unit_code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Business Unit</FormLabel>
+                  <BusinessUnitSelector
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                    showAllOption={false}
+                  />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
           <FormField
             control={form.control}
             name="reference"

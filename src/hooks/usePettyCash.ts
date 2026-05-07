@@ -1498,7 +1498,7 @@ export const useCreatePettyCashReimbursement = () => {
       // 4. Update Bank Balance
       const { data: bankAccount } = await supabase
         .from("bank_accounts")
-        .select("current_balance")
+        .select("current_balance, gl_account_id")
         .eq("id", data.bank_account_id)
         .single();
       if (bankAccount) {
@@ -1511,7 +1511,7 @@ export const useCreatePettyCashReimbursement = () => {
       // 5. Update the Petty Cash Fund Balance (Add the replenished cash)
       const { data: fund } = await supabase
         .from("petty_cash_funds")
-        .select("current_balance")
+        .select("current_balance, gl_account_id, fund_name")
         .eq("id", data.petty_cash_fund_id)
         .single();
       if (fund) {
@@ -1530,8 +1530,7 @@ export const useCreatePettyCashReimbursement = () => {
           .eq("id", id);
       }
 
-      // 7. Log reimbursement as a dummy transaction for the float?
-      // Wait, a replenishment should just be a transaction of type 'replenishment'.
+      // 7. Log reimbursement as a transaction for the float
       const { data: pcTx } = await supabase.from("petty_cash_transactions").insert({
         petty_cash_fund_id: data.petty_cash_fund_id,
         transaction_type: "replenishment",
@@ -1542,6 +1541,87 @@ export const useCreatePettyCashReimbursement = () => {
         status: "approved",
         company_id: selectedCompanyId,
       }).select().single();
+
+      // 8. GL Automation for Reimbursement
+      const debitGL = fund?.gl_account_id;
+      let creditGL = bankAccount?.gl_account_id;
+      
+      if (!creditGL) {
+         const { data: glSettings } = await supabase
+            .from("gl_settings" as any)
+            .select("bank_account_id")
+            .eq("company_id", selectedCompanyId)
+            .maybeSingle();
+         creditGL = (glSettings as any)?.bank_account_id || "";
+      }
+      
+      if (debitGL && creditGL) {
+          const entryNumber = `PC-REIMB-${Date.now()}`;
+          const { data: je, error: jeError } = await supabase
+            .from("journal_entries")
+            .insert({
+              entry_number: entryNumber,
+              entry_date: data.reimbursement_date,
+              description: `Float Reimbursement: ${fund.fund_name}`,
+              reference: paymentNumber,
+              total_debit: data.total_amount,
+              total_credit: data.total_amount,
+              status: "posted",
+              company_id: selectedCompanyId,
+              posted_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          if (!jeError && je) {
+             await supabase.from("journal_entry_lines").insert([
+              {
+                journal_entry_id: je.id,
+                account_id: debitGL,
+                description: `Float Reimbursement: ${fund.fund_name}`,
+                debit: data.total_amount,
+                credit: 0,
+                company_id: selectedCompanyId,
+              },
+              {
+                journal_entry_id: je.id,
+                account_id: creditGL,
+                description: `Bank Transfer for Reimbursement`,
+                debit: 0,
+                credit: data.total_amount,
+                company_id: selectedCompanyId,
+              },
+            ]);
+
+            // Update COA balances
+            for (const acctId of [debitGL, creditGL]) {
+              const { data: acct } = await supabase
+                .from("chart_of_accounts")
+                .select("current_balance, account_type")
+                .eq("id", acctId)
+                .single();
+              if (acct) {
+                const isDebit = acctId === debitGL;
+                const isDebitNormal = ["asset", "expense"].includes(acct.account_type || "");
+                const adjustment = isDebit
+                  ? (isDebitNormal ? data.total_amount : -data.total_amount)
+                  : (isDebitNormal ? -data.total_amount : data.total_amount);
+                await supabase
+                  .from("chart_of_accounts")
+                  .update({ current_balance: (acct.current_balance || 0) + adjustment, updated_at: new Date().toISOString() })
+                  .eq("id", acctId);
+              }
+            }
+
+            // Link JE to AP Payment and Petty Cash Tx
+            if (pcTx) {
+               await supabase.from("petty_cash_transactions").update({ journal_entry_id: je.id }).eq("id", pcTx.id);
+            }
+            if (apPayment) {
+               await supabase.from("ap_payments").update({ journal_entry_id: je.id }).eq("id", apPayment.id);
+            }
+          }
+      }
 
       return { apPayment, pcTx };
     },

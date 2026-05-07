@@ -18,10 +18,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { format, parseISO, differenceInDays } from "date-fns";
+import { useDropzone } from "react-dropzone";
 import { RoutePermitImport } from "@/components/route-permits/RoutePermitImport";
 import { RoutePermitDetailsModal } from "@/components/route-permits/RoutePermitDetailsModal";
 import { useRoutePermitFinanceSettings, usePostPermitCostToGL } from "@/hooks/useRoutePermitFinance";
-import { useDropzone } from "react-dropzone";
+import { RoutePermitDocumentModal } from "@/components/route-permits/RoutePermitDocumentModal";
 
 interface RoutePermit {
   id: string;
@@ -71,9 +72,12 @@ export default function RoutePermits() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [uploadPermitId, setUploadPermitId] = useState<string>('');
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPermitId, setUploadPermitId] = useState<string>('');
+  const [docCounts, setDocCounts] = useState<Record<string, number>>({});
+  const [docModalOpen, setDocModalOpen] = useState(false);
+  const [selectedPermitForDocs, setSelectedPermitForDocs] = useState<RoutePermit | null>(null);
 
   // Finance integration
   const { data: permitFinanceSettings } = useRoutePermitFinanceSettings();
@@ -116,9 +120,32 @@ export default function RoutePermits() {
 
       if (error) throw error;
       setPermits(data || []);
+      if (data && data.length > 0) {
+        fetchDocumentCounts(data.map(p => p.id));
+      }
     } catch (error) {
       console.error('Error fetching permits:', error);
       toast.error('Failed to load route permits');
+    }
+  };
+
+  const fetchDocumentCounts = async (permitIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('linked_row_id')
+        .eq('linked_table', 'route_permits')
+        .in('linked_row_id', permitIds);
+
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      data?.forEach(doc => {
+        counts[doc.linked_row_id] = (counts[doc.linked_row_id] || 0) + 1;
+      });
+      setDocCounts(counts);
+    } catch (error) {
+      console.error('Error fetching document counts:', error);
     }
   };
 
@@ -267,6 +294,7 @@ export default function RoutePermits() {
       setShowUploadDialog(false);
       setUploadFile(null);
       setUploadPermitId('');
+      fetchDocumentCounts([uploadPermitId]);
     } catch (error: any) {
       console.error('Upload error:', error);
       toast.error(error.message || 'Failed to upload document');
@@ -480,6 +508,11 @@ export default function RoutePermits() {
     }
   };
 
+  const handleOpenDocumentManager = (permit: RoutePermit) => {
+    setSelectedPermitForDocs(permit);
+    setDocModalOpen(true);
+  };
+
   const columns: ColumnDef<RoutePermit>[] = [
     {
       accessorKey: "permit_no",
@@ -502,11 +535,30 @@ export default function RoutePermits() {
     {
       accessorKey: "allocated_bus_number",
       header: "Bus No",
-      cell: ({ row }) => (
-        <span className="font-mono text-sm">
-          {row.original.allocated_bus_number || row.original.buses?.bus_no || '-'}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const busNo = row.original.allocated_bus_number || row.original.buses?.bus_no || '-';
+        const docCount = docCounts[row.original.id] || 0;
+        
+        return (
+          <div className="flex flex-col gap-1 items-start">
+            <span className="font-mono text-sm font-semibold tracking-tighter">
+              {busNo}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-6 px-1.5 text-[10px] gap-1 hover:bg-primary/10 hover:text-primary transition-all duration-300 ${docCount > 0 ? 'text-primary bg-primary/5 border border-primary/20' : 'text-muted-foreground opacity-50'}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenDocumentManager(row.original);
+              }}
+            >
+              <FileText className={`h-3 w-3 ${docCount > 0 ? 'animate-pulse-subtle' : ''}`} />
+              {docCount > 0 ? `${docCount} Documents` : 'No Attachments'}
+            </Button>
+          </div>
+        );
+      },
     },
     {
       accessorKey: "owner_name",
@@ -578,10 +630,15 @@ export default function RoutePermits() {
               expiryStatus === 'expiring-soon' ? 'secondary' : 
               'default'
             }
+            className={`font-semibold tracking-tight shadow-sm px-2 py-0.5 rounded-full ${
+              expiryStatus === 'expired' ? 'bg-red-500/10 text-red-600 border-red-200' : 
+              expiryStatus === 'expiring-soon' ? 'bg-amber-500/10 text-amber-600 border-amber-200' : 
+              'bg-emerald-500/10 text-emerald-600 border-emerald-200'
+            }`}
           >
             {expiryStatus === 'expired' ? 'Expired' : 
              expiryStatus === 'expiring-soon' ? 'Expiring Soon' : 
-             status}
+             status.charAt(0).toUpperCase() + status.slice(1)}
           </Badge>
         );
       },
@@ -630,9 +687,10 @@ export default function RoutePermits() {
   ];
 
   const totalPermits = permits.length;
-  const activePermits = permits.filter(p => p.operation_status === 'active').length;
+  const activePermits = permits.filter(p => p.permit_status === 'active' || p.operation_status === 'active').length;
   const expiringSoon = permits.filter(p => getExpiryStatus(p.expiry_date) === 'expiring-soon').length;
   const expired = permits.filter(p => getExpiryStatus(p.expiry_date) === 'expired').length;
+  const totalDocs = Object.values(docCounts).reduce((sum, count) => sum + count, 0);
 
   return (
     <div className="space-y-8 animate-fade-in p-6">
@@ -645,11 +703,11 @@ export default function RoutePermits() {
               <FileText className="w-10 h-10 animate-bounce-subtle" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent animate-slide-in-right">
-                Route Permits
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent animate-slide-in-right tracking-tight">
+                Route Permits Registry
               </h1>
-              <p className="text-primary-foreground/80 text-lg animate-slide-in-right" style={{ animationDelay: '0.1s' }}>
-                Manage transport route permits and compliance
+              <p className="text-primary-foreground/80 text-lg animate-slide-in-right font-medium" style={{ animationDelay: '0.1s' }}>
+                Manage {totalPermits} active transport route permits and compliance documents
               </p>
             </div>
           </div>
@@ -901,40 +959,48 @@ export default function RoutePermits() {
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/20 rounded-full blur-2xl animate-bounce-subtle" />
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KPICard
-          title="Total Permits"
-          value={totalPermits.toString()}
-          icon={<FileText className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="all permits"
-        />
-        <KPICard
-          title="Active Operations"
-          value={activePermits.toString()}
-          icon={<Truck className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="currently operating"
-        />
-        <KPICard
-          title="Expiring Soon"
-          value={expiringSoon.toString()}
-          icon={<Clock className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description={`next ${expiryThreshold} days`}
-        />
-        <KPICard
-          title="Expired"
-          value={expired.toString()}
-          icon={<AlertTriangle className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="needs renewal"
-        />
+      {/* Enhanced KPI Cards with Animations */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 px-1">
+        <div className="animate-scale-in" style={{ animationDelay: '0.1s' }}>
+          <KPICard
+            title="Total Permits"
+            value={totalPermits.toString()}
+            icon={<FileText className="h-4 w-4" />}
+            description="All active permits"
+          />
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.15s' }}>
+          <KPICard
+            title="Active Operations"
+            value={activePermits.toString()}
+            icon={<Truck className="h-4 w-4" />}
+            description="Currently operating"
+          />
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.2s' }}>
+          <KPICard
+            title="Expiring Soon"
+            value={expiringSoon.toString()}
+            icon={<Clock className="h-4 w-4" />}
+            description="Next 30 days"
+          />
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.25s' }}>
+          <KPICard
+            title="Expired"
+            value={expired.toString()}
+            icon={<AlertTriangle className="h-4 w-4" />}
+            description="Needs renewal"
+          />
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.3s' }}>
+          <KPICard
+            title="Registry Documents"
+            value={totalDocs.toString()}
+            icon={<BookOpen className="h-4 w-4" />}
+            description="Total attachments"
+          />
+        </div>
       </div>
 
       {/* Route Permits Table */}
@@ -1053,6 +1119,13 @@ export default function RoutePermits() {
           </div>
         </DialogContent>
       </Dialog>
+      {selectedPermitForDocs && (
+        <RoutePermitDocumentModal 
+          permit={selectedPermitForDocs} 
+          open={docModalOpen} 
+          onOpenChange={setDocModalOpen} 
+        />
+      )}
     </div>
   );
 }

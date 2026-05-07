@@ -195,11 +195,20 @@ const KPICard = ({ title, value, icon, trend, color }: {
 // ────────── Main Component ──────────
 
 import React from "react";
+import { useAutoBusinessUnitFilter } from "@/hooks/useAccountingData";
+import { BusinessUnitSelector } from "./shared/BusinessUnitSelector";
 
 export const FinancialStatementsView = () => {
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId?.() || selectedCompanyId;
+  const autoBU = useAutoBusinessUnitFilter();
+  const [businessUnit, setBusinessUnit] = useState<string>(autoBU || "all");
+
+  // Sync with context if it changes (e.g. user switches company)
+  useMemo(() => {
+    if (autoBU) setBusinessUnit(autoBU);
+  }, [autoBU]);
 
   // ────────── Data Fetching ──────────
 
@@ -215,14 +224,24 @@ export const FinancialStatementsView = () => {
   });
 
   const { data: journalEntries = [], isLoading } = useQuery({
-    queryKey: ["fs-journal-entries", effectiveCompanyId],
+    queryKey: ["fs-journal-entries", effectiveCompanyId, businessUnit],
     queryFn: async () => {
-      const q = supabase
+      let q = supabase
         .from("journal_entries")
         .select("*, lines:journal_entry_lines(*)")
         .eq("status", "posted")
         .order("entry_date", { ascending: false });
-      if (effectiveCompanyId) q.eq("company_id", effectiveCompanyId);
+      
+      if (effectiveCompanyId) q = q.eq("company_id", effectiveCompanyId);
+      
+      if (businessUnit && businessUnit !== "all") {
+        if (businessUnit === "SBO") {
+          q = q.or(`business_unit_code.eq.SBO,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%`);
+        } else {
+          q = q.or(`business_unit_code.eq.${businessUnit},entry_number.ilike.${businessUnit}-%`);
+        }
+      }
+
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
@@ -549,6 +568,11 @@ export const FinancialStatementsView = () => {
             )}
           </div>
           <div className="flex gap-3 items-center">
+            <BusinessUnitSelector
+              value={businessUnit}
+              onChange={setBusinessUnit}
+              showAllOption
+            />
             <DateRangePicker
               onDateRangeChange={(range) => setDateRange(range || {})}
             />

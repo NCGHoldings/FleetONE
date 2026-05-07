@@ -554,7 +554,7 @@ export const APPaymentsView = () => {
 
       {/* Payment Detail Dialog */}
       <Dialog open={!!detailPayment} onOpenChange={(open) => { if (!open) { setDetailPayment(null); setPreviewUrl(null); } }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Payment Details</DialogTitle>
             <DialogDescription>

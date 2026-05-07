@@ -722,7 +722,8 @@ export async function postAPPaymentToGL(params: {
  * Use for audit/verification purposes
  */
 export async function recalculateCOABalances(
-  companyId: string
+  companyId: string,
+  businessUnitCode?: string
 ): Promise<{
   success: boolean;
   discrepancies: Array<{
@@ -737,27 +738,34 @@ export async function recalculateCOABalances(
 }> {
   try {
     // Get all accounts for the company
-    const { data: accounts, error: accountsError } = await supabase
+    let accountQuery = supabase
       .from("chart_of_accounts")
       .select("id, account_code, account_name, current_balance, account_type")
       .eq("company_id", companyId);
+    
+    // If filtering by BU, we might want to only look at accounts tagged for that BU
+    // or just filter the journal lines below. Usually, we audit the whole COA or a BU's slice.
+    
+    const { data: accounts, error: accountsError } = await accountQuery;
 
     if (accountsError) throw accountsError;
 
     // Get all posted journal entry lines for these accounts
-    // We join chart_of_accounts to ensure we get ALL lines hitting these accounts,
-    // regardless of which sub-company the journal entry was created under.
-    const query = supabase
+    let query = supabase
       .from("journal_entry_lines")
       .select(`
         account_id,
         debit,
         credit,
-        journal_entries!inner(status),
+        journal_entries!inner(status, business_unit_code),
         chart_of_accounts!inner(company_id)
       `)
       .eq("chart_of_accounts.company_id", companyId)
       .eq("journal_entries.status", "posted");
+
+    if (businessUnitCode) {
+      query = query.eq("business_unit_code", businessUnitCode);
+    }
 
     const journalLines = await fetchAllRows(query);
 

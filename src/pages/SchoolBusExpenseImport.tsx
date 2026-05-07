@@ -395,14 +395,14 @@ export default function SchoolBusExpenseImport() {
     try {
       toast.info("Cleaning up...", { description: "Removing corrupted imports for April 6th." });
       
-      // 1. Delete AP Payments for DP-FUEL on April 6
-      const { error: apError } = await supabase.from("ap_payments").delete().like("payment_number", "DP-FUEL-%").eq("payment_date", "2026-04-06");
-      if (apError) throw new Error("AP Payments: " + apError.message);
-
       // Get the IDs of the corrupted journal entries
       const { data: jes } = await supabase.from("journal_entries").select("id").eq("source_module", "school_bus_fuel_import").eq("entry_date", "2026-04-06");
       if (jes && jes.length > 0) {
          const jeIds = jes.map(je => je.id);
+
+         // 1. Delete AP Payments created from this import regardless of their payment_date
+         const { error: apError } = await supabase.from("ap_payments").delete().in("journal_entry_id", jeIds);
+         if (apError) throw new Error("AP Payments: " + apError.message);
 
          // 1.5 Delete AP Invoices created from this import
          const { error: invError } = await supabase.from("ap_invoices").delete().in("journal_entry_id", jeIds);

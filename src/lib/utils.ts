@@ -5,6 +5,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export { formatLKR } from "./accounting-utils";
+
 /**
  * Safely parse JSON with fallback - prevents "Unexpected end of JSON input" errors
  * Handles null, undefined, empty strings, already-parsed objects, and malformed JSON

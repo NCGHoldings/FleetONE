@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { SearchableVendorSelector } from "./shared/SearchableVendorSelector";
+import { BusinessUnitSelector } from "./shared/BusinessUnitSelector";
 
 const invoiceSchema = z.object({
   invoice_number: z.string().optional(),
@@ -36,6 +37,7 @@ const invoiceSchema = z.object({
   apply_wht: z.boolean().optional(),
   wht_rate: z.number().optional(),
   notes: z.string().optional(),
+  business_unit_code: z.string().optional(),
 });
 
 type InvoiceFormData = z.infer<typeof invoiceSchema>;
@@ -81,7 +83,10 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
   const createInvoice = useCreateAPInvoice();
   const updateInvoice = useUpdateAPInvoice();
   const createPayment = useCreateAPPayment();
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { getEffectiveCompanyId, getBusinessUnitCode, isSubCompany, selectedCompany } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = getBusinessUnitCode();
+  const isParentView = selectedCompany && !isSubCompany(selectedCompany.id);
   const queryClient = useQueryClient();
   const generatePayNum = useGenerateNumber();
   const submitLock = useRef(false);
@@ -100,13 +105,7 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
   const [allocationMode, setAllocationMode] = useState<"amount" | "percentage">("amount");
   const [costAllocations, setCostAllocations] = useState<Array<{id: string; unit_code: string; amount: number; percentage: number;}>>(initialData?.allocations || []);
 
-  const BUSINESS_UNITS = [
-    { code: "SBO", label: "School Bus Operations" },
-    { code: "YUT", label: "Yutong" },
-    { code: "SPH", label: "Special Hire" },
-    { code: "LTV", label: "Light Vehicle" },
-    { code: "SNT", label: "Sinotruck" },
-  ];
+
 
   const addAllocation = () => {
     setCostAllocations(prev => [...prev, {
@@ -161,12 +160,13 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
       const { data, error } = await supabase
         .from("routes")
         .select("id, route_name, route_no")
+        .eq("company_id", effectiveCompanyId!)
         .eq("is_active", true)
         .order("route_name");
       if (error) throw error;
       return data || [];
     },
-    enabled: open,
+    enabled: open && !!effectiveCompanyId,
   });
 
   // Fetch buses
@@ -176,11 +176,12 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
       const { data, error } = await supabase
         .from("buses")
         .select("id, bus_no")
+        .eq("company_id", effectiveCompanyId!)
         .order("bus_no");
       if (error) throw error;
       return data || [];
     },
-    enabled: open,
+    enabled: open && !!effectiveCompanyId,
   });
 
   // Fetch school routes
@@ -190,17 +191,17 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
       const { data, error } = await supabase
         .from("school_routes")
         .select("id, route_name, route_code")
+        .eq("company_id", effectiveCompanyId!)
         .order("route_name");
       if (error) throw error;
       return data || [];
     },
-    enabled: open,
+    enabled: open && !!effectiveCompanyId,
   });
 
   const form = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: initialData?.formValues || {
-
       invoice_number: "",
       vendor_bill_number: "",
       invoice_date: format(new Date(), "yyyy-MM-dd"),
@@ -208,11 +209,10 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
       apply_wht: false,
       wht_rate: 5,
       notes: "",
-    
+      business_unit_code: initialData?.formValues?.business_unit_code || businessUnitCode || "",
     },
   });
 
-  // Pre-fill form when editing
   useEffect(() => {
     if (editingInvoice) {
       form.reset({
@@ -226,41 +226,48 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
           ? Math.round((editingInvoice.wht_amount / editingInvoice.subtotal) * 100 * 100) / 100
           : 5,
         notes: editingInvoice.notes || "",
+        business_unit_code: editingInvoice.business_unit_code || "",
       });
       setSelectedRouteId(editingInvoice.route_id || "");
       setSelectedBusId(editingInvoice.bus_id || "");
       setSelectedSchoolRouteId(editingInvoice.school_route_id || "");
 
-      // Fetch existing lines
       const fetchLines = async () => {
         const { data: existingLines } = await supabase
           .from("ap_invoice_lines")
           .select("*")
           .eq("invoice_id", editingInvoice.id);
         if (existingLines && existingLines.length > 0) {
-          setLines(existingLines.map((l: any) => ({
-            id: l.id,
-            description: l.description || "",
-            quantity: l.quantity || 1,
-            unit_price: l.unit_price || 0,
-            tax_code: l.tax_code || undefined,
-            tax_rate: l.tax_rate || 0,
-            line_total: l.line_total || 0,
-            account_id: l.account_id || undefined,
-          })));
+          setLines(existingLines.map((l: any) => {
+            const taxCode = l.tax_code || undefined;
+            const currentTaxRate = taxCode && taxCodes 
+              ? taxCodes.find(t => t.tax_code === taxCode)?.rate || 0 
+              : (l.tax_rate || 0);
+            
+            const subtotal = (l.quantity || 1) * (l.unit_price || 0);
+            const calculatedTotal = subtotal + (subtotal * currentTaxRate / 100);
+
+            return {
+              id: l.id,
+              description: l.description || "",
+              quantity: l.quantity || 1,
+              unit_price: l.unit_price || 0,
+              tax_code: taxCode,
+              tax_rate: currentTaxRate,
+              line_total: l.line_total || calculatedTotal,
+              account_id: l.account_id || undefined,
+            };
+          }));
         }
       };
       fetchLines();
     } else {
-      // New invoice - reset
       setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
       setSelectedRouteId("");
       setSelectedBusId("");
       setSelectedSchoolRouteId("");
     }
   }, [open, editingInvoice]);
-
-  // Note: Auto-generate AP Invoice number exactly on save to prevent skipped sequences/collisions on cancel
 
   useImperativeHandle(ref, () => ({
     validateAndGetData: async () => {
@@ -282,7 +289,6 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
     }
   }));
 
-  // Auto-sync data to parent when active
   useEffect(() => {
     if (isActive && onDataChange) {
       const subscription = form.watch((value) => {
@@ -353,14 +359,20 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
     }
   };
 
-  // Add new route inline
   const handleAddRoute = async () => {
     if (!newRouteName.trim()) return;
     setAddingRoute(true);
     try {
       const { data, error } = await (supabase as any)
         .from("routes")
-        .insert([{ route_name: newRouteName.trim(), route_no: 'NEW', start_location: 'TBD', end_location: 'TBD', is_active: true }])
+        .insert([{ 
+          route_name: newRouteName.trim(), 
+          route_no: 'NEW', 
+          start_location: 'TBD', 
+          end_location: 'TBD', 
+          is_active: true,
+          company_id: effectiveCompanyId
+        }])
         .select("id")
         .single();
       if (error) throw error;
@@ -375,14 +387,18 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
     }
   };
 
-  // Add new bus inline
   const handleAddBus = async () => {
     if (!newBusNumber.trim()) return;
     setAddingBus(true);
     try {
       const { data, error } = await (supabase as any)
         .from("buses")
-        .insert([{ bus_no: newBusNumber.trim(), capacity: 0, year: new Date().getFullYear() }])
+        .insert([{ 
+          bus_no: newBusNumber.trim(), 
+          capacity: 0, 
+          year: new Date().getFullYear(),
+          company_id: effectiveCompanyId
+        }])
         .select("id")
         .single();
       if (error) throw error;
@@ -397,14 +413,17 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
     }
   };
 
-  // Add new school route inline
   const handleAddSchoolRoute = async () => {
     if (!newSchoolRouteName.trim()) return;
     setAddingSchoolRoute(true);
     try {
       const { data, error } = await (supabase as any)
         .from("school_routes")
-        .insert([{ route_name: newSchoolRouteName.trim(), route_code: 'NEW-' + Date.now().toString().slice(-4) }])
+        .insert([{ 
+          route_name: newSchoolRouteName.trim(), 
+          route_code: 'NEW-' + Date.now().toString().slice(-4),
+          company_id: effectiveCompanyId
+        }])
         .select("id")
         .single();
       if (error) throw error;
@@ -432,16 +451,12 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
   const selectedBus = buses?.find(b => b.id === selectedBusId);
   const selectedSchoolRoute = schoolRoutes?.find(r => r.id === selectedSchoolRouteId);
 
-  
-
   const isPending = isEditing ? updateInvoice.isPending : (createInvoice.isPending || createPayment.isPending);
 
   return (
     <div className={cn("space-y-6", !isActive && "hidden")}>
-
         <Form {...form}>
           <form className="space-y-6">
-            {/* Header Fields */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <FormField
                 control={form.control}
@@ -514,11 +529,27 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
                   </FormItem>
                 )}
               />
+
+              {isParentView && (
+                <FormField
+                  control={form.control}
+                  name="business_unit_code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Business Unit</FormLabel>
+                      <BusinessUnitSelector
+                        value={field.value || "HQ"}
+                        onChange={field.onChange}
+                        showAllOption={false}
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
-            {/* Route, Bus, School Route Selectors */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Route Selector */}
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-1">
                   <Route className="h-3.5 w-3.5" /> Route
@@ -579,7 +610,6 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
                 </Popover>
               </div>
 
-              {/* Bus Selector */}
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-1">
                   <Bus className="h-3.5 w-3.5" /> Bus
@@ -640,7 +670,6 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
                 </Popover>
               </div>
 
-              {/* School Route Selector */}
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-1">
                   <Route className="h-3.5 w-3.5" /> School Route
@@ -702,7 +731,6 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
               </div>
             </div>
 
-            {/* Invoice Lines */}
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold">Invoice Lines</h3>
@@ -815,7 +843,6 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
                 </table>
               </div>
 
-              {/* WHT Section */}
               <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
                 <FormField
                   control={form.control}
@@ -854,7 +881,6 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
                 )}
               </div>
 
-              {/* Totals */}
               <div className="flex justify-end">
                 <div className="w-72 space-y-2">
                   <div className="flex justify-between">
@@ -883,7 +909,6 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
               </div>
             </div>
 
-            {/* Cost Allocation by Business Unit (Optional) */}
             {!isEditing && (
               <div className="border rounded-lg p-4 space-y-4">
                 <div className="flex items-center justify-between">
@@ -995,7 +1020,6 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
               )}
             />
 
-            {/* Pay Now (Optional) - only for new invoices */}
             {!isEditing && (
               <div className="border rounded-lg p-4 space-y-4">
                 <div className="flex items-center justify-between">
@@ -1067,7 +1091,6 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
   );
 });
 
-
 export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceFormProps) => {
   const [numCopies, setNumCopies] = useState(1);
   const [isLocked, setIsLocked] = useState(true);
@@ -1079,7 +1102,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
   const updateInvoice = useUpdateAPInvoice();
   const createPayment = useCreateAPPayment();
   const generatePayNum = useGenerateNumber();
-  const { getEffectiveCompanyId } = useCompany();
+  const { getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -1102,6 +1125,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
               apply_wht: false,
               wht_rate: 5,
               notes: "",
+              business_unit_code: getBusinessUnitCode() || "",
             },
             lines: [{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }],
             allocations: [],
@@ -1120,14 +1144,10 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
       setNumCopies(val);
       setCopiesData(prev => {
         const newData = [...prev];
-        // If increasing copies, duplicate the currently active copy's data to the new ones
         const templateData = prev[activeTab] || prev[0];
-        
         while (newData.length < val) {
-          // Deep clone the template data
           newData.push(JSON.parse(JSON.stringify(templateData)));
         }
-        // If decreasing, truncate
         if (newData.length > val) {
           newData.length = val;
           if (activeTab >= val) setActiveTab(val - 1);
@@ -1150,7 +1170,6 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
     setIsSubmitting(true);
 
     try {
-      // 1. Validate all forms
       const validatedData = [];
       const validationCount = isLocked && numCopies > 1 ? 1 : numCopies;
       
@@ -1168,7 +1187,6 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
         }
       }
 
-      // If locked, duplicate the validated data to cover all copies
       if (isLocked && numCopies > 1 && validatedData.length === 1) {
         const template = validatedData[0];
         while (validatedData.length < numCopies) {
@@ -1176,7 +1194,6 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
         }
       }
 
-      // 2. Submit all sequentially
       let successCount = 0;
       for (let i = 0; i < validatedData.length; i++) {
         const data = validatedData[i];
@@ -1192,6 +1209,9 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
             line_total: l.line_total,
             account_id: l.account_id,
           }));
+
+        const effectiveCompanyId = getEffectiveCompanyId();
+        const businessUnitCode = getBusinessUnitCode();
 
         if (editingInvoice) {
           await updateInvoice.mutateAsync({
@@ -1210,11 +1230,12 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
               route_id: data.routeId || undefined,
               bus_id: data.busId || undefined,
               school_route_id: data.schoolRouteId || undefined,
+              company_id: effectiveCompanyId,
+              business_unit_code: data.formValues.business_unit_code || businessUnitCode,
             },
             lines: lineData,
           });
         } else {
-          // New Invoice creation
           let finalInvoiceNumber = data.formValues.invoice_number;
           if (!finalInvoiceNumber) {
             finalInvoiceNumber = await generatePayNum("ap_invoice");
@@ -1236,6 +1257,8 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
             route_id: data.routeId || undefined,
             bus_id: data.busId || undefined,
             school_route_id: data.schoolRouteId || undefined,
+            company_id: effectiveCompanyId,
+            business_unit_code: data.formValues.business_unit_code || businessUnitCode,
             lines: lineData,
             cost_allocations: validAllocations.length > 0 ? validAllocations : undefined,
           });

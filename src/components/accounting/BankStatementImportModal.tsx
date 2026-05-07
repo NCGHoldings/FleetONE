@@ -22,7 +22,9 @@ const fmt = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2,
 type Step = "upload" | "preview" | "importing" | "done";
 
 const BankStatementImportModal = ({ open, onOpenChange, bankAccountId, onImportComplete }: Props) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = getBusinessUnitCode();
   const [step, setStep] = useState<Step>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [bankId, setBankId] = useState<string>("auto");
@@ -97,7 +99,8 @@ const BankStatementImportModal = ({ open, onOpenChange, bankAccountId, onImportC
           cheque_number: t.chequeNumber || null,
           source_type: `statement_import_${parseResult.bankName.replace(/\s+/g, '_').toLowerCase()}`,
           is_reconciled: false,
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
         }));
 
         const { error } = await (supabase as any)
@@ -121,7 +124,7 @@ const BankStatementImportModal = ({ open, onOpenChange, bankAccountId, onImportC
     } finally {
       setImporting(false);
     }
-  }, [parseResult, bankAccountId, selectedCompanyId]);
+  }, [parseResult, bankAccountId, effectiveCompanyId, businessUnitCode]);
 
   const handleClose = useCallback(() => {
     if (step === "done" && onImportComplete) {

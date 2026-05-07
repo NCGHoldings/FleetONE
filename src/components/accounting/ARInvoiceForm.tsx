@@ -30,6 +30,7 @@ const invoiceSchema = z.object({
   due_date: z.string().min(1, "Due date is required"),
   billing_address: z.string().optional(),
   notes: z.string().optional(),
+  business_unit_code: z.string().optional(),
 });
 
 type InvoiceFormData = z.infer<typeof invoiceSchema>;
@@ -55,11 +56,22 @@ interface ARInvoiceFormProps {
 export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceFormProps) => {
   const { data: customers } = useCustomers();
   const { data: taxCodes } = useTaxCodes();
-  const { getEffectiveCompanyId } = useCompany();
+  const { getEffectiveCompanyId, getBusinessUnitCode, isSubCompany, selectedCompany } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
+  const defaultBusinessUnit = getBusinessUnitCode();
   const createInvoice = useCreateARInvoice();
   const updateInvoice = useUpdateARInvoice();
   const generateNumber = useGenerateNumber();
+
+  const isParentView = selectedCompany && !isSubCompany(selectedCompany.id);
+
+  const BUSINESS_UNITS = [
+    { code: "SBO", label: "School Bus Operations" },
+    { code: "YUT", label: "Yutong" },
+    { code: "SPH", label: "Special Hire" },
+    { code: "LTV", label: "Light Vehicle" },
+    { code: "SNT", label: "Sinotruck" },
+  ];
 
   // Fetch item categories with their sales_account_id for revenue mapping
   const { data: itemCategories } = useQuery({
@@ -104,6 +116,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
       due_date: format(addDays(new Date(), 30), "yyyy-MM-dd"),
       billing_address: "",
       notes: "",
+      business_unit_code: editingInvoice?.business_unit_code || defaultBusinessUnit || "HQ",
     },
   });
 
@@ -118,6 +131,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
         due_date: editingInvoice.due_date || format(addDays(new Date(), 30), "yyyy-MM-dd"),
         billing_address: editingInvoice.billing_address || "",
         notes: editingInvoice.notes || "",
+        business_unit_code: editingInvoice.business_unit_code || "",
       });
 
       // Pre-fill bus data
@@ -251,6 +265,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
             total_amount: grandTotal,
             tax_amount: totalTax,
             notes: data.billing_address ? `${data.billing_address ? `Billing: ${data.billing_address}\n` : ''}${data.notes || ''}`.trim() : data.notes,
+            business_unit_code: data.business_unit_code,
             ...busFields,
           },
           lines: lineData,
@@ -265,6 +280,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
           total_amount: grandTotal,
           tax_amount: totalTax,
           notes: data.billing_address ? `${data.billing_address ? `Billing: ${data.billing_address}\n` : ''}${data.notes || ''}`.trim() : data.notes,
+          business_unit_code: data.business_unit_code || defaultBusinessUnit,
           ...busFields,
           lines: lineData,
         });
@@ -359,6 +375,32 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                   </FormItem>
                 )}
               />
+
+              {isParentView && (
+                <FormField
+                  control={form.control}
+                  name="business_unit_code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Business Unit</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Unit" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="HQ">HQ / Central</SelectItem>
+                          {BUSINESS_UNITS.map(bu => (
+                            <SelectItem key={bu.code} value={bu.code}>{bu.code} — {bu.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
             {/* Bus Selection */}

@@ -160,7 +160,7 @@ export function YutongDeliveryOrderManagement({ onRefresh }: YutongDeliveryOrder
                   <Select value={createForm.lc_id} onValueChange={v => setCreateForm(f => ({ ...f, lc_id: v }))}>
                     <SelectTrigger><SelectValue placeholder="Select LC" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="_none">None</SelectItem>
                       {lcs.map(lc => (
                         <SelectItem key={lc.id} value={lc.id}>{lc.lc_no} ({lc.currency} {Number(lc.lc_amount).toLocaleString()})</SelectItem>
                       ))}

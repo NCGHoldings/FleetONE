@@ -63,7 +63,9 @@ export const CreateLandedCostVoucherModal = ({
   onOpenChange,
   onSuccess,
 }: CreateLandedCostVoucherModalProps) => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = getBusinessUnitCode();
   const createVoucher = useCreateLandedCostVoucher();
 
   const [step, setStep] = useState(0);
@@ -103,33 +105,33 @@ export const CreateLandedCostVoucherModal = ({
 
   // Fetch GRNs
   const { data: grns } = useQuery({
-    queryKey: ["grns-for-lcv", selectedCompanyId],
+    queryKey: ["grns-for-lcv", effectiveCompanyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("goods_receipt_notes")
         .select("id, grn_number, receipt_date, status")
-        .eq("company_id", selectedCompanyId!)
+        .eq("company_id", effectiveCompanyId!)
         .order("receipt_date", { ascending: false });
       if (error) throw error;
       return data || [];
     },
-    enabled: open && !!selectedCompanyId,
+    enabled: open && !!effectiveCompanyId,
   });
 
   // Fetch items catalog for manual mode
   const { data: catalogItems } = useQuery({
-    queryKey: ["items-catalog", selectedCompanyId],
+    queryKey: ["items-catalog", effectiveCompanyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("items")
         .select("id, item_code, item_name, standard_cost")
-        .eq("company_id", selectedCompanyId!)
+        .eq("company_id", effectiveCompanyId!)
         .eq("is_active", true)
         .order("item_code");
       if (error) throw error;
       return data || [];
     },
-    enabled: open && !!selectedCompanyId,
+    enabled: open && !!effectiveCompanyId,
   });
 
   // Fetch GRN lines when GRN selected
@@ -164,35 +166,35 @@ export const CreateLandedCostVoucherModal = ({
 
   // Fetch vendors
   const { data: vendors } = useQuery({
-    queryKey: ["vendors-for-lcv", selectedCompanyId],
+    queryKey: ["vendors-for-lcv", effectiveCompanyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vendors")
         .select("id, vendor_name")
-        .eq("company_id", selectedCompanyId!)
+        .eq("company_id", effectiveCompanyId!)
         .eq("is_active", true)
         .order("vendor_name");
       if (error) throw error;
       return data || [];
     },
-    enabled: open && !!selectedCompanyId,
+    enabled: open && !!effectiveCompanyId,
   });
 
   // Fetch expense accounts
   const { data: expenseAccounts } = useQuery({
-    queryKey: ["expense-accounts-for-lcv", selectedCompanyId],
+    queryKey: ["expense-accounts-for-lcv", effectiveCompanyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("chart_of_accounts")
         .select("id, account_code, account_name")
-        .eq("company_id", selectedCompanyId!)
+        .eq("company_id", effectiveCompanyId!)
         .eq("is_active", true)
         .in("account_type", ["expense", "asset"])
         .order("account_code");
       if (error) throw error;
       return data || [];
     },
-    enabled: open && !!selectedCompanyId,
+    enabled: open && !!effectiveCompanyId,
   });
 
   const selectedItems = items.filter((i) => i.selected);
@@ -291,6 +293,8 @@ export const CreateLandedCostVoucherModal = ({
         posting_date: postingDate,
         allocation_method: allocationMethod,
         notes: notes || undefined,
+        company_id: effectiveCompanyId,
+        business_unit_code: businessUnitCode,
         items: selectedItems.map((i) => ({
           grn_line_id: i.grn_line_id,
           item_id: i.item_id,
@@ -304,7 +308,7 @@ export const CreateLandedCostVoucherModal = ({
           amount: c.amount,
           expense_account_id: c.expense_account_id || undefined,
         })),
-      });
+      } as any);
       toast.success("Landed Cost Voucher created as Draft");
       onOpenChange(false);
       onSuccess?.();

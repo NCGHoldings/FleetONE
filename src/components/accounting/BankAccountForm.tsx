@@ -55,7 +55,9 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
   const { data: currencies = [] } = useCurrencies();
   const createBankAccount = useCreateBankAccount();
   const updateBankAccount = useUpdateBankAccount();
-  const { selectedCompanyId, allCompanies, getSubCompaniesFor } = useCompany();
+  const { selectedCompanyId, allCompanies, getSubCompaniesFor, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = getBusinessUnitCode();
   const isEditing = !!bankAccount;
 
   // Always allow holding companies to see all other companies to share with
@@ -112,9 +114,12 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
         notes: bankAccount.notes || "",
       });
     } else if (!bankAccount && open) {
-      form.reset();
+      form.reset({
+        ...form.getValues(),
+        business_unit_code: businessUnitCode,
+      });
     }
-  }, [bankAccount, open, form]);
+  }, [bankAccount, open, form, businessUnitCode]);
 
   const watchedAccountType = form.watch("account_type");
   const isPettyCash = watchedAccountType === "petty_cash";
@@ -131,11 +136,12 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
         currency: data.currency || "LKR",
         opening_balance: data.opening_balance || 0,
         gl_account_id: data.gl_account_id,
-        business_unit_code: data.business_unit_code,
+        business_unit_code: data.business_unit_code || businessUnitCode,
         shared_business_units: data.shared_business_units || [],
         is_active: data.is_active ?? true,
         is_default: data.is_default ?? false,
         notes: data.notes,
+        company_id: effectiveCompanyId,
       };
 
       if (isEditing) {

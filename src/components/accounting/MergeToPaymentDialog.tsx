@@ -58,7 +58,7 @@ export const MergeToPaymentDialog = ({ open, onOpenChange, invoice }: MergeToPay
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Merge Invoice into Payment</DialogTitle>
           <DialogDescription>

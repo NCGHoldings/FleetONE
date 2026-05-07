@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { useCashFlowData, CashFlowLineItem, CashFlowData } from "@/hooks/useCashFlowData";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { useAutoBusinessUnitFilter } from "@/hooks/useAccountingData";
+import { BusinessUnitSelector } from "./shared/BusinessUnitSelector";
 
 // ────────── Helpers ──────────
 
@@ -151,8 +153,14 @@ export const CashFlowView = () => {
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
   const [customDateRange, setCustomDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [method, setMethod] = useState<string>("indirect");
-  const [businessUnit, setBusinessUnit] = useState<string>("all");
+  const autoBU = useAutoBusinessUnitFilter();
+  const [businessUnit, setBusinessUnit] = useState<string>(autoBU || "all");
   const [showComparative, setShowComparative] = useState(false);
+
+  // Sync with context if it changes
+  useMemo(() => {
+    if (autoBU) setBusinessUnit(autoBU);
+  }, [autoBU]);
 
   // Compute effective dates
   const effectiveDates = useMemo(() => {
@@ -258,14 +266,6 @@ export const CashFlowView = () => {
   };
 
   const hasComparativeData = showComparative && comparativeData;
-  const businessUnits = [
-    { value: "all", label: "All (Consolidated)" },
-    { value: "SBO", label: "SBO — School Bus" },
-    { value: "YUT", label: "YUT — Yutong Sales" },
-    { value: "SNT", label: "SNT — Sinotruck" },
-    { value: "LTV", label: "LTV — Light Vehicle" },
-    { value: "SPH", label: "SPH — Spare Parts" },
-  ];
 
   return (
     <div className="space-y-6">
@@ -331,14 +331,11 @@ export const CashFlowView = () => {
             {/* Business Unit */}
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground">Business Unit</Label>
-              <Select value={businessUnit} onValueChange={setBusinessUnit}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {businessUnits.map((bu) => (
-                    <SelectItem key={bu.value} value={bu.value}>{bu.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <BusinessUnitSelector
+                value={businessUnit}
+                onChange={setBusinessUnit}
+                showAllOption
+              />
             </div>
 
             {/* Comparative Toggle */}

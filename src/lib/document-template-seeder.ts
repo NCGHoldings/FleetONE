@@ -215,18 +215,6 @@ const commonStyles = `
     .doc { box-shadow: none; border-radius: 0; border: none; }
     .header { border-top: 1px solid var(--line); }
   }
-  @media (max-width: 840px) {
-    .header { grid-template-columns: 1fr; }
-    .meta { justify-items: start; }
-    .title { text-align: left; }
-    .chips { justify-content: flex-start; }
-    .grid { grid-template-columns: 1fr; }
-    .sig-row { grid-template-columns: 1fr 1fr; }
-    .bottom-bar { flex-direction: column; align-items: flex-start; gap: 20px; }
-    .terms-column { max-width: 100%; }
-    .verification { text-align: left; }
-    .qr-placeholder { margin-left: 0; }
-  }
 `;
 
 // Helper to build the header block

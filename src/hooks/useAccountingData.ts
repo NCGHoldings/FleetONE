@@ -7,7 +7,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { fetchAllRows } from "@/lib/utils";
 
 // Helper hook to get auto business unit filtering for sub-companies
-const useAutoBusinessUnitFilter = () => {
+export const useAutoBusinessUnitFilter = () => {
   const { selectedCompanyId, getBusinessUnitCode } = useCompany();
 
   // Auto-filter by business unit when a sub-company is selected
@@ -33,7 +33,7 @@ export const useAllProfiles = () => {
 // ============ Chart of Accounts ============
 // For sub-companies, fetch parent company's COA (consolidated GL)
 export const useChartOfAccounts = () => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
@@ -53,12 +53,12 @@ export const useChartOfAccounts = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useAccountsByType = (accountType: "asset" | "liability" | "equity" | "revenue" | "expense") => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
@@ -80,7 +80,7 @@ export const useAccountsByType = (accountType: "asset" | "liability" | "equity" 
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
@@ -89,7 +89,7 @@ export const useAccountsByType = (accountType: "asset" | "liability" | "equity" 
 // Auto-filters by business_unit_code when a sub-company is selected
 // businessUnitCodeOverride: pass "all" to see all entries (consolidated view), or specific code
 export const useJournalEntries = (status?: "draft" | "posted" | "void", businessUnitCodeOverride?: string) => {
-  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
+  const { selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
@@ -99,7 +99,7 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
     : autoBusinessUnitCode;
 
   return useQuery({
-    queryKey: ["journal-entries", selectedCompanyId, status, effectiveCompanyId, businessUnitCode],
+    queryKey: ["journal-entries", status, effectiveCompanyId, businessUnitCode],
     queryFn: async () => {
       if (!effectiveCompanyId) return null;
       let query = supabase
@@ -122,7 +122,7 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
         } else {
           query = query.or(`business_unit_code.eq.${businessUnitCode},entry_number.ilike.${businessUnitCode}-%`);
         }
-      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
+      } else if (selectedCompany && !selectedCompany.parent_company_id) {
         // Parent companies drop filter
       } else if (selectedCompany) {
         // Fallback to prefix matching for legacy bridged records natively prefixed with short_code
@@ -143,7 +143,7 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
       const data = await fetchAllRows(query);
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
@@ -172,7 +172,7 @@ export const useJournalEntryLines = (entryId: string) => {
 
 // ============ Financial Periods ============
 export const useFinancialPeriods = () => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
@@ -192,17 +192,18 @@ export const useFinancialPeriods = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useCurrentPeriod = () => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["current-period", selectedCompanyId],
+    queryKey: ["current-period", effectiveCompanyId],
     queryFn: async () => {
-      if (!selectedCompanyId) return null;
+      if (!effectiveCompanyId) return null;
       const today = new Date().toISOString().split("T")[0];
       let query = supabase
         .from("financial_periods")
@@ -211,27 +212,27 @@ export const useCurrentPeriod = () => {
         .gte("end_date", today)
         .eq("is_closed", false);
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       const { data, error } = await query.single();
       if (error && error.code !== "PGRST116") throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Customers (AR) ============
 // Filters by business_unit_code when a sub-company is selected
 export const useCustomers = () => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["customers", selectedCompanyId, effectiveCompanyId, autoBusinessUnitCode],
+    queryKey: ["customers", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       if (!effectiveCompanyId) return null;
       let query = supabase
@@ -251,42 +252,43 @@ export const useCustomers = () => {
       const data = await fetchAllRows(query);
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useCustomerBalance = (customerId: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["customer-balance", customerId, selectedCompanyId],
+    queryKey: ["customer-balance", customerId, effectiveCompanyId],
     queryFn: async () => {
-      if (!selectedCompanyId) return null;
+      if (!effectiveCompanyId || !customerId) return null;
       let query = supabase
-        .from("ar_invoices")
-        .select("balance")
-        .eq("customer_id", customerId)
-        .neq("status", "paid");
+        .from("customers")
+        .select("current_balance")
+        .eq("id", customerId);
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
-      const data = await fetchAllRows(query);
-      return data.reduce((sum: number, inv: any) => sum + (inv.balance || 0), 0);
+      const { data, error } = await query.single();
+      if (error) throw error;
+      return data?.current_balance || 0;
     },
-    enabled: !!customerId && !!selectedCompanyId,
+    enabled: !!customerId && !!effectiveCompanyId,
   });
 };
 
 // ============ Vendors (AP) ============
 // Filters by business_unit_code when a sub-company is selected
 export const useVendors = () => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["vendors", selectedCompanyId, effectiveCompanyId],
+    queryKey: ["vendors", effectiveCompanyId],
     queryFn: async () => {
       if (!effectiveCompanyId) return null;
       let query = supabase
@@ -301,221 +303,142 @@ export const useVendors = () => {
       const data = await fetchAllRows(query);
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useVendorBalance = (vendorId: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["vendor-balance", vendorId, selectedCompanyId],
+    queryKey: ["vendor-balance", vendorId, effectiveCompanyId],
     queryFn: async () => {
-      if (!selectedCompanyId) return null;
+      if (!effectiveCompanyId || !vendorId) return null;
       let query = supabase
-        .from("ap_invoices")
-        .select("balance")
-        .eq("vendor_id", vendorId)
-        .neq("status", "paid");
+        .from("vendors")
+        .select("current_balance")
+        .eq("id", vendorId);
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
-      const data = await fetchAllRows(query);
-      return data.reduce((sum: number, inv: any) => sum + (inv.balance || 0), 0);
+      const { data, error } = await query.single();
+      if (error) throw error;
+      return data?.current_balance || 0;
     },
-    enabled: !!vendorId && !!selectedCompanyId,
+    enabled: !!vendorId && !!effectiveCompanyId,
   });
 };
 
 // ============ AR Invoices ============
 // Filters by business_unit_code when a sub-company is selected
-export const useARInvoices = (status?: string) => {
-  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
+export const useARInvoices = (status?: "all" | "draft" | "sent" | "paid" | "partially_paid" | "void") => {
+  const { selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["ar-invoices", selectedCompanyId, status, effectiveCompanyId, autoBusinessUnitCode],
+    queryKey: ["ar-invoices", status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       if (!effectiveCompanyId) return null;
-      let query: any = supabase
+      let query = supabase
         .from("ar_invoices")
-        .select(`
-          *,
-          customers (
-            customer_code,
-            customer_name,
-            billing_address,
-            phone,
-            email
-          ),
-          bus_categories (
-            name,
-            color,
-            code
-          ),
-          school_ar_invoices (
-            school_students (
-              route,
-              school_location,
-              bus_reg_no
-            )
-          )
-        `)
-        .order("created_at", { ascending: false });
+        .select("*, customers(customer_name), routes(route_name, route_no), buses(bus_no)")
+        .order("invoice_date", { ascending: false });
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
 
-      // Filter by business unit for sub-company views
-      if (autoBusinessUnitCode) {
-        if (autoBusinessUnitCode === "SBO") {
-          query = query.or(`business_unit_code.eq.SBO,invoice_number.ilike.SBS-%`);
-        } else {
-          query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},invoice_number.ilike.${autoBusinessUnitCode}-%`);
-        }
-      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
-        // Parent companies drop filter
-      } else if (selectedCompany) {
-        // Fallback to prefix matching for legacy bridged records since invoice generator natively prefixes with short_code
-        const cName = selectedCompany.name.toLowerCase();
-        if (cName.includes("yutong")) {
-          query = query.ilike("invoice_number", "YUT-%");
-        } else if (cName.includes("sinotruck")) {
-          query = query.ilike("invoice_number", "SNT-%");
-        } else if (cName.includes("school bus")) {
-          query = query.ilike("invoice_number", "SBS-%");
-        } else if (cName.includes("special hire")) {
-          query = query.ilike("invoice_number", "SPH-%");
-        } else if (cName.includes("light vehicle")) {
-          query = query.ilike("invoice_number", "LTV-%");
-        }
+      if (status && status !== "all") {
+        query = query.eq("status", status);
       }
 
-      if (status) {
-        query = query.eq("status", status);
+      // Filter by business unit for sub-company views
+      if (autoBusinessUnitCode) {
+        query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},invoice_number.ilike.${autoBusinessUnitCode}-%`);
+      } else if (selectedCompany && !selectedCompany.parent_company_id) {
+        // Parent companies drop filter
+      } else if (selectedCompany) {
+        // Fallback for legacy setups
+        const cName = selectedCompany.name.toLowerCase();
+        if (cName.includes("school bus")) query = query.or("invoice_number.ilike.SBS-%,business_unit_code.eq.SBO");
+        else if (cName.includes("special hire")) query = query.or("invoice_number.ilike.SPH-%,business_unit_code.eq.SPH");
+        else if (cName.includes("yutong")) query = query.or("invoice_number.ilike.YUT-%,business_unit_code.eq.YUT");
+        else if (cName.includes("sinotruck")) query = query.or("invoice_number.ilike.SNT-%,business_unit_code.eq.SNT");
+        else if (cName.includes("light vehicle")) query = query.or("invoice_number.ilike.LTV-%,business_unit_code.eq.LTV");
       }
 
       const data = await fetchAllRows(query);
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ AP Invoices ============
 // Filters by business_unit_code when a sub-company is selected
-export const useAPInvoices = (status?: string) => {
-  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
+export const useAPInvoices = (status?: "all" | "draft" | "sent" | "paid" | "partially_paid" | "void") => {
+  const { selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["ap-invoices", selectedCompanyId, status, effectiveCompanyId, autoBusinessUnitCode],
+    queryKey: ["ap-invoices", status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       if (!effectiveCompanyId) return null;
-      let query: any = supabase
+      let query = supabase
         .from("ap_invoices")
-        .select(`
-          *,
-          vendors (
-            vendor_code,
-            vendor_name,
-            address,
-            bank_account,
-            bank_name,
-            bank_branch,
-            tax_id,
-            currency,
-            email,
-            phone,
-            contact_person,
-            payment_terms
-          ),
-          routes (
-            id,
-            route_name,
-            route_no
-          ),
-          buses (
-            id,
-            bus_no
-          ),
-          school_routes (
-            id,
-            route_name,
-            route_code
-          )
-        `)
-        .order("created_at", { ascending: false });
+        .select("*, vendors(vendor_name), routes(route_name, route_no), buses(bus_no)")
+        .order("invoice_date", { ascending: false });
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
 
-      // Filter by business unit for sub-company views
-      if (autoBusinessUnitCode) {
-        if (autoBusinessUnitCode === "SBO") {
-          query = query.or(`business_unit_code.eq.SBO,invoice_number.ilike.SBS-%`);
-        } else {
-          query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},invoice_number.ilike.${autoBusinessUnitCode}-%`);
-        }
-      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
-        // Parent companies drop filter
-      } else if (selectedCompany) {
-        // Fallback to prefix matching for legacy bridged records since invoice generator natively prefixes with short_code
-        const cName = selectedCompany.name.toLowerCase();
-        if (cName.includes("yutong")) {
-          query = query.ilike("invoice_number", "YUT-%");
-        } else if (cName.includes("sinotruck")) {
-          query = query.ilike("invoice_number", "SNT-%");
-        } else if (cName.includes("school bus")) {
-          query = query.ilike("invoice_number", "SBS-%");
-        } else if (cName.includes("special hire")) {
-          query = query.ilike("invoice_number", "SPH-%");
-        } else if (cName.includes("light vehicle")) {
-          query = query.ilike("invoice_number", "LTV-%");
-        }
+      if (status && status !== "all") {
+        query = query.eq("status", status);
       }
 
-      if (status) {
-        query = query.eq("status", status);
+      // Filter by business unit for sub-company views
+      if (autoBusinessUnitCode) {
+        query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},invoice_number.ilike.${autoBusinessUnitCode}-%`);
+      } else if (selectedCompany && !selectedCompany.parent_company_id) {
+        // Parent companies drop filter
+      } else if (selectedCompany) {
+        // Fallback for legacy setups
+        const cName = selectedCompany.name.toLowerCase();
+        if (cName.includes("school bus")) query = query.or("invoice_number.ilike.SBS-%,business_unit_code.eq.SBO");
+        else if (cName.includes("special hire")) query = query.or("invoice_number.ilike.SPH-%,business_unit_code.eq.SPH");
+        else if (cName.includes("yutong")) query = query.or("invoice_number.ilike.YUT-%,business_unit_code.eq.YUT");
+        else if (cName.includes("sinotruck")) query = query.or("invoice_number.ilike.SNT-%,business_unit_code.eq.SNT");
+        else if (cName.includes("light vehicle")) query = query.or("invoice_number.ilike.LTV-%,business_unit_code.eq.LTV");
       }
 
       const data = await fetchAllRows(query);
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ AR Receipts ============
 // Filters by business_unit_code when a sub-company is selected
 export const useARReceipts = () => {
-  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
+  const { selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["ar-receipts", selectedCompanyId, effectiveCompanyId, autoBusinessUnitCode],
+    queryKey: ["ar-receipts", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ar_receipts")
-        .select(`
-          *,
-          customers (
-            customer_code,
-            customer_name,
-            billing_address,
-            phone,
-            email
-          )
-        `)
-        .order("created_at", { ascending: false });
+        .select("*, customers(customer_name), bank_accounts(account_name)")
+        .order("receipt_date", { ascending: false });
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
@@ -523,113 +446,52 @@ export const useARReceipts = () => {
 
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
-        if (autoBusinessUnitCode === "SBO") {
-          query = query.or(`business_unit_code.eq.SBO,receipt_number.ilike.SBS-%`);
-        } else {
-          query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},receipt_number.ilike.${autoBusinessUnitCode}-%`);
-        }
-      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
+        query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},receipt_number.ilike.${autoBusinessUnitCode}-%`);
+      } else if (selectedCompany && !selectedCompany.parent_company_id) {
         // Parent companies drop filter
       } else if (selectedCompany) {
-        // Fallback to prefix matching
+        // Fallback for legacy setups
         const cName = selectedCompany.name.toLowerCase();
-        if (cName.includes("yutong")) {
-          query = query.ilike("receipt_number", "YUT-%");
-        } else if (cName.includes("sinotruck")) {
-          query = query.ilike("receipt_number", "SNT-%");
-        } else if (cName.includes("school bus")) {
-          query = query.ilike("receipt_number", "SBS-%");
-        } else if (cName.includes("special hire")) {
-          query = query.ilike("receipt_number", "SPH-%");
-        } else if (cName.includes("light vehicle")) {
-          query = query.ilike("receipt_number", "LTV-%");
-        }
+        if (cName.includes("school bus")) query = query.or("receipt_number.ilike.SBS-%,business_unit_code.eq.SBO");
+        else if (cName.includes("special hire")) query = query.or("receipt_number.ilike.SPH-%,business_unit_code.eq.SPH");
+        else if (cName.includes("yutong")) query = query.or("receipt_number.ilike.YUT-%,business_unit_code.eq.YUT");
+        else if (cName.includes("sinotruck")) query = query.or("receipt_number.ilike.SNT-%,business_unit_code.eq.SNT");
+        else if (cName.includes("light vehicle")) query = query.or("receipt_number.ilike.LTV-%,business_unit_code.eq.LTV");
       }
 
       const data = await fetchAllRows(query);
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ AP Payments ============
 // Filters by business_unit_code when a sub-company is selected
 export const useAPPayments = () => {
-  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
+  const { selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["ap-payments", selectedCompanyId, effectiveCompanyId, autoBusinessUnitCode],
+    queryKey: ["ap-payments", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ap_payments")
         .select(`
           *,
-          vendors (
-            vendor_code,
-            vendor_name,
-            address,
-            bank_account,
-            bank_name,
-            bank_branch,
-            tax_id,
-            currency,
-            email,
-            phone,
-            contact_person
-          ),
-          bank_accounts (
-            id,
-            account_name,
-            bank_name,
-            account_number
-          ),
-          vendor_bank_accounts (
-            id,
-            bank_name,
-            bank_branch,
-            account_number,
-            account_holder_name,
-            account_label
-          ),
-          customers!ap_payments_payee_customer_id_fkey (
-            id,
-            customer_code,
-            customer_name
-          )
+          vendors (vendor_name),
+          bank_accounts (account_name)
         `)
-        .order("created_at", { ascending: false });
+        .order("payment_date", { ascending: false });
 
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
 
-      // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
-        if (autoBusinessUnitCode === "SBO") {
-          query = query.or(`business_unit_code.eq.SBO,payment_number.ilike.SBS-%`);
-        } else {
-          query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},payment_number.ilike.${autoBusinessUnitCode}-%`);
-        }
-      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
-        // Parent companies drop filter
-      } else if (selectedCompany) {
-        // Fallback to prefix matching
-        const cName = selectedCompany.name.toLowerCase();
-        if (cName.includes("yutong")) {
-          query = query.ilike("payment_number", "YUT-%");
-        } else if (cName.includes("sinotruck")) {
-          query = query.ilike("payment_number", "SNT-%");
-        } else if (cName.includes("school bus")) {
-          query = query.ilike("payment_number", "SBS-%");
-        } else if (cName.includes("special hire")) {
-          query = query.ilike("payment_number", "SPH-%");
-        } else if (cName.includes("light vehicle")) {
-          query = query.ilike("payment_number", "LTV-%");
-        }
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       try {
@@ -663,19 +525,19 @@ export const useAPPayments = () => {
         return fallbackData;
       }
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Bank Accounts ============
 // Bank accounts are section-specific (each sub-company can have its own bank accounts)
 export const useBankAccounts = () => {
-  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId } = useCompany();
+  const { selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["bank-accounts", effectiveCompanyId],
+    queryKey: ["bank-accounts", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       if (!effectiveCompanyId) return null;
       // Use explicit column selection to avoid PostgREST errors from non-existent columns (e.g. 'status')
@@ -690,7 +552,7 @@ export const useBankAccounts = () => {
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
         query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},shared_business_units.cs.{${autoBusinessUnitCode}}`);
-      } else if (selectedCompany && !selectedCompany.name.includes("Holding") && !selectedCompany.parent_company_id) {
+      } else if (selectedCompany && !selectedCompany.parent_company_id) {
         // Parent companies drop filter
       } else if (selectedCompany) {
         // Fallback for legacy setups if autoBusinessUnitCode isn't explicitly set
@@ -729,7 +591,7 @@ export const useBankAccounts = () => {
       if (data) {
         const enhancedData = data.map(item => ({
           ...item,
-          account_code: item.chart_of_accounts?.account_code || null
+          account_code: (item.chart_of_accounts as any)?.account_code || null
         }));
         
         return enhancedData.sort((a, b) => {
@@ -744,7 +606,7 @@ export const useBankAccounts = () => {
 
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
@@ -774,7 +636,7 @@ export const useBankTransactions = (bankAccountId?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
@@ -890,11 +752,12 @@ export const useLastReconciliation = (bankAccountId: string | null) => {
   return useQuery({
     queryKey: ["last-reconciliation", bankAccountId, effectiveCompanyId],
     queryFn: async () => {
-      if (!effectiveCompanyId) return null;
+      if (!effectiveCompanyId || !bankAccountId) return null;
       const { data, error } = await supabase
         .from("bank_reconciliations")
         .select("*")
-        .eq("bank_account_id", bankAccountId!)
+        .eq("bank_account_id", bankAccountId)
+        .eq("company_id", effectiveCompanyId)
         .eq("status", "completed")
         .order("statement_date", { ascending: false })
         .limit(1)
@@ -908,72 +771,80 @@ export const useLastReconciliation = (bankAccountId: string | null) => {
 
 // ============ Fixed Assets ============
 export const useFixedAssets = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["fixed-assets", selectedCompanyId],
+    queryKey: ["fixed-assets", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("fixed_assets")
-        .select(`
-          *,
-          asset_categories (
-            category_code,
-            category_name,
-            depreciation_method,
-            useful_life_years
-          )
-        `)
+        .select(`*, asset_types (type_name, asset_account_id, depreciation_account_id, accumulated_depr_account_id)`)
         .order("asset_code");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useAssetCategories = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["asset-categories", selectedCompanyId],
+    queryKey: ["asset-categories", effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("asset_categories")
         .select("*")
         .order("category_code");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useDepreciationSchedule = (assetId?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["depreciation-schedule", assetId, selectedCompanyId],
+    queryKey: ["depreciation-schedule", assetId, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("asset_depreciation_schedule")
         .select("*")
         .order("depreciation_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       if (assetId) {
@@ -984,7 +855,7 @@ export const useDepreciationSchedule = (assetId?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
@@ -1006,43 +877,47 @@ export const useTaxCodes = () => {
 
 // ============ Cost Centers ============
 export const useCostCenters = () => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["cost-centers", selectedCompanyId],
+    queryKey: ["cost-centers", effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("cost_centers")
         .select("*")
         .eq("is_active", true)
         .order("center_code");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Budgets ============
 export const useBudgets = (fiscalYear?: number) => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["budgets", fiscalYear, selectedCompanyId],
+    queryKey: ["budgets", fiscalYear, effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("budgets")
         .select("*")
         .order("budget_name");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       if (fiscalYear) {
@@ -1053,27 +928,28 @@ export const useBudgets = (fiscalYear?: number) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Audit Logs ============
 export const useAuditLogs = (tableName?: string, recordId?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["audit-logs", tableName, recordId, selectedCompanyId],
-    enabled: !!selectedCompanyId,
+    queryKey: ["audit-logs", tableName, recordId, effectiveCompanyId],
+    enabled: !!effectiveCompanyId,
     queryFn: async () => {
-      if (!selectedCompanyId) return null;
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("accounting_audit_log")
         .select("*")
         .order("changed_at", { ascending: false })
         .limit(100);
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       if (tableName) {
@@ -1092,11 +968,11 @@ export const useAuditLogs = (tableName?: string, recordId?: string) => {
 
 // ============ Dashboard Summaries ============
 export const useAccountingSummary = () => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["accounting-summary", selectedCompanyId, effectiveCompanyId],
+    queryKey: ["accounting-summary", effectiveCompanyId],
     queryFn: async () => {
       if (!effectiveCompanyId) return null;
       let query = supabase
@@ -1145,23 +1021,30 @@ export const useAccountingSummary = () => {
 
       return summary;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useARSummary = () => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["ar-summary", selectedCompanyId],
+    queryKey: ["ar-summary", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ar_invoices")
         .select("balance, due_date, status")
         .neq("status", "paid");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
@@ -1182,23 +1065,30 @@ export const useARSummary = () => {
 
       return { totalOutstanding, totalOverdue, countOverdue, totalInvoices: data?.length || 0 };
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useAPSummary = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["ap-summary", selectedCompanyId],
+    queryKey: ["ap-summary", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ap_invoices")
         .select("balance, due_date, status")
         .neq("status", "paid");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
@@ -1219,94 +1109,117 @@ export const useAPSummary = () => {
 
       return { totalOutstanding, totalOverdue, countOverdue, totalInvoices: data?.length || 0 };
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Items & Inventory ============
 export const useItems = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["items", selectedCompanyId],
+    queryKey: ["items", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("items")
         .select(`*, item_categories (category_name, category_code, valuation_method)`)
         .order("item_code");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useItemStock = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["item-stock", selectedCompanyId],
+    queryKey: ["item-stock", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("item_stock")
         .select(`*, items (item_code, item_name)`)
         .order("warehouse_id");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useItemCategories = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["item-categories", selectedCompanyId],
+    queryKey: ["item-categories", effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = (supabase as any)
         .from("item_categories")
         .select("*")
         .order("category_name");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Purchase Orders & GRN ============
 export const usePurchaseOrders = (status?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["purchase-orders", status, selectedCompanyId],
+    queryKey: ["purchase-orders", status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("purchase_orders")
         .select(`*, vendors (vendor_code, vendor_name, address, contact_person, phone, email, tax_id)`)
         .order("order_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       if (status) query = query.eq("status", status);
@@ -1314,47 +1227,61 @@ export const usePurchaseOrders = (status?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useGoodsReceiptNotes = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["goods-receipt-notes", selectedCompanyId],
+    queryKey: ["goods-receipt-notes", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("goods_receipt_notes")
         .select(`*, vendors (vendor_name), purchase_orders (po_number)`)
         .order("created_at", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Cheque Register ============
 export const useChequeRegister = (status?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["cheque-register", status, selectedCompanyId],
+    queryKey: ["cheque-register", status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("cheque_register")
         .select("*")
         .order("cheque_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       if (status) query = query.eq("status", status);
@@ -1362,27 +1289,30 @@ export const useChequeRegister = (status?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Recurring Entries ============
 export const useRecurringEntries = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["recurring-entries", selectedCompanyId],
+    queryKey: ["recurring-entries", effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("recurring_journal_entries" as any)
         .select("*")
+        .eq("company_id", effectiveCompanyId)
         .order("template_name");
 
       const { data, error } = await query;
       if (error) throw error;
       return data as any[];
     },
-    enabled: true,
+    enabled: !!effectiveCompanyId,
   });
 };
 
@@ -1421,18 +1351,25 @@ export const useExchangeRates = (baseCurrency?: string) => {
 
 // ============ Purchase Requisitions ============
 export const usePurchaseRequisitions = (status?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["purchase-requisitions", status, selectedCompanyId],
+    queryKey: ["purchase-requisitions", status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("purchase_requisitions" as any)
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       if (status) query = query.eq("status", status);
@@ -1440,96 +1377,119 @@ export const usePurchaseRequisitions = (status?: string) => {
       if (error) throw error;
       return data as any[];
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Fund Transfers ============
 export const useFundTransfers = () => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["fund-transfers", selectedCompanyId],
+    queryKey: ["fund-transfers", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("fund_transfers" as any)
         .select("*")
         .order("transfer_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data as any[];
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Asset Disposals ============
 export const useAssetDisposals = () => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["asset-disposals", selectedCompanyId],
+    queryKey: ["asset-disposals", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("asset_disposals")
         .select(`*, fixed_assets (asset_code, asset_name)`)
         .order("disposal_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Bad Debt Provisions ============
 export const useBadDebtProvisions = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["bad-debt-provisions", selectedCompanyId],
+    queryKey: ["bad-debt-provisions", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ar_bad_debt_provisions")
         .select(`*, customers (customer_code, customer_name), ar_invoices (invoice_number)`)
         .order("provision_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Batch & Serial Numbers ============
 export const useBatchNumbers = (itemId?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["batch-numbers", itemId, selectedCompanyId],
+    queryKey: ["batch-numbers", itemId, effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("batch_numbers")
         .select(`*, items (item_code, item_name)`)
         .order("batch_number");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       if (itemId) query = query.eq("item_id", itemId);
@@ -1537,23 +1497,25 @@ export const useBatchNumbers = (itemId?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 export const useSerialNumbers = (itemId?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
 
   return useQuery({
-    queryKey: ["serial-numbers", itemId, selectedCompanyId],
+    queryKey: ["serial-numbers", itemId, effectiveCompanyId],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("serial_numbers" as any)
         .select(`*, items (item_code, item_name)`)
         .order("serial_number");
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
 
       if (itemId) query = query.eq("item_id", itemId);
@@ -1561,72 +1523,93 @@ export const useSerialNumbers = (itemId?: string) => {
       if (error) throw error;
       return data as any[];
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ WHT Certificates ============
 export const useWHTCertificates = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["wht-certificates", selectedCompanyId],
+    queryKey: ["wht-certificates", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("wht_certificates" as any)
         .select(`*, vendors (vendor_code, vendor_name)`)
         .order("certificate_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data as any[];
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Vendor Performance ============
 export const useVendorPerformance = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["vendor-performance", selectedCompanyId],
+    queryKey: ["vendor-performance", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("vendor_performance" as any)
         .select(`*, vendors (vendor_code, vendor_name)`)
         .order("period_end", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data as any[];
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Bank Reconciliation Items ============
 export const useBankReconciliationItems = (reconciliationId?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["bank-reconciliation-items", reconciliationId, selectedCompanyId],
+    queryKey: ["bank-reconciliation-items", reconciliationId, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("bank_reconciliation_items")
         .select("*")
         .order("statement_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       if (reconciliationId) query = query.eq("reconciliation_id", reconciliationId);
@@ -1634,24 +1617,44 @@ export const useBankReconciliationItems = (reconciliationId?: string) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!reconciliationId && !!selectedCompanyId,
+    enabled: !!reconciliationId && !!effectiveCompanyId,
   });
 };
 
 // ============ Period Closing Checklist ============
 export const usePeriodClosingChecklist = (periodId?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["period-closing-checklist", periodId, selectedCompanyId],
+    queryKey: ["period-closing-checklist", periodId, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
-      if (!periodId) return null;
+      if (!periodId || !effectiveCompanyId) return null;
+
+      // Unposted Journals
+      let journalQuery = supabase.from("journal_entries").select("id, status").eq("period_id", periodId).neq("status", "posted").eq("company_id", effectiveCompanyId);
+      if (autoBusinessUnitCode) journalQuery = journalQuery.eq("business_unit_code", autoBusinessUnitCode);
+
+      // Unpaid AR Invoices
+      let arQuery = supabase.from("ar_invoices").select("id, status").eq("period_id", periodId).eq("status", "unpaid").eq("company_id", effectiveCompanyId);
+      if (autoBusinessUnitCode) arQuery = arQuery.eq("business_unit_code", autoBusinessUnitCode);
+
+      // Unpaid AP Invoices
+      let apQuery = supabase.from("ap_invoices").select("id, status").eq("period_id", periodId).eq("status", "unpaid").eq("company_id", effectiveCompanyId);
+      if (autoBusinessUnitCode) apQuery = apQuery.eq("business_unit_code", autoBusinessUnitCode);
+
+      // Pending Bank Reconciliations
+      let reconQuery = supabase.from("bank_reconciliations").select("id, status").neq("status", "completed").eq("company_id", effectiveCompanyId);
+      // Reconciliations are usually per bank account, which might be branch-specific or shared.
+      // Filtering by branch if applicable.
+      if (autoBusinessUnitCode) reconQuery = reconQuery.eq("business_unit_code", autoBusinessUnitCode);
 
       const [journals, arInvoices, apInvoices, reconciliations] = await Promise.all([
-        supabase.from("journal_entries").select("id, status").eq("period_id", periodId).neq("status", "posted"),
-        supabase.from("ar_invoices").select("id, status").eq("period_id", periodId).eq("status", "unpaid"),
-        supabase.from("ap_invoices").select("id, status").eq("period_id", periodId).eq("status", "unpaid"),
-        supabase.from("bank_reconciliations").select("id, status").neq("status", "completed"),
+        journalQuery,
+        arQuery,
+        apQuery,
+        reconQuery,
       ]);
 
       return {
@@ -1661,17 +1664,20 @@ export const usePeriodClosingChecklist = (periodId?: string) => {
         pendingReconciliations: reconciliations.data?.length || 0,
       };
     },
-    enabled: !!periodId && !!selectedCompanyId,
+    enabled: !!periodId && !!effectiveCompanyId,
   });
 };
 
 // ============ AR Credit Notes ============
 export const useARCreditNotes = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["ar-credit-notes", selectedCompanyId],
+    queryKey: ["ar-credit-notes", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ar_credit_notes")
         .select(`
@@ -1681,25 +1687,32 @@ export const useARCreditNotes = () => {
         `)
         .order("credit_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ AP Debit Notes ============
 export const useAPDebitNotes = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["ap-debit-notes", selectedCompanyId],
+    queryKey: ["ap-debit-notes", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ap_debit_notes")
         .select(`
@@ -1709,25 +1722,32 @@ export const useAPDebitNotes = () => {
         `)
         .order("debit_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Asset Revaluations ============
 export const useAssetRevaluations = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["asset-revaluations", selectedCompanyId],
+    queryKey: ["asset-revaluations", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("asset_revaluations")
         .select(`
@@ -1736,25 +1756,32 @@ export const useAssetRevaluations = () => {
         `)
         .order("revaluation_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ Asset Transfers ============
 export const useAssetTransfers = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["asset-transfers", selectedCompanyId],
+    queryKey: ["asset-transfers", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("asset_transfers")
         .select(`
@@ -1763,39 +1790,50 @@ export const useAssetTransfers = () => {
         `)
         .order("transfer_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
 // ============ SSCL Transactions ============
 export const useSSCLTransactions = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
   return useQuery({
-    queryKey: ["sscl-transactions", selectedCompanyId],
+    queryKey: ["sscl-transactions", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
+      if (!effectiveCompanyId) return null;
       let query = supabase
         .from("sscl_transactions")
         .select("*")
         .order("transaction_date", { ascending: false });
 
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   });
 };
 
@@ -1888,7 +1926,7 @@ export const useTrialBalanceData = (
         total_credit: vals.credit,
       }));
     },
-    enabled: !!selectedCompanyId && !!periodStartDate,
+    enabled: !!effectiveCompanyId && !!periodStartDate,
   });
 
   // Period movements: posted JE lines within period
@@ -1951,7 +1989,7 @@ export const useTrialBalanceData = (
         total_credit: vals.credit,
       }));
     },
-    enabled: !!selectedCompanyId && !!periodStartDate && !!periodEndDate,
+    enabled: !!effectiveCompanyId && !!periodStartDate && !!periodEndDate,
   });
 
   return {

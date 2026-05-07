@@ -444,6 +444,51 @@ const findHeader = (headers: string[], ...candidates: string[]): string | null =
   return null;
 };
 
+// =========== DEBIT/CREDIT EXTRACTOR ===========
+const extractDebitCredit = (row: any, headers: string[], debitCol: string | null, creditCol: string | null): { debit: number; credit: number } => {
+  let debit = 0;
+  let credit = 0;
+
+  // Detect merged columns (e.g., "Withdrawal/Deposit" matched by both)
+  if (debitCol && creditCol && debitCol === creditCol) {
+    debitCol = null;
+    creditCol = null;
+  }
+
+  if (debitCol || creditCol) {
+    if (debitCol) debit = cleanAmount(row[debitCol]);
+    if (creditCol) credit = cleanAmount(row[creditCol]);
+  } else {
+    // Single column Amount + Type (Cr/Dr) fallback
+    const amountCol = findHeader(headers, 'Amount', 'Transaction Amount', 'Debit/Credit', 'Withdrawal/Deposit', 'Amount(LKR)');
+    const typeCol = findHeader(headers, 'Type', 'Transaction Type', 'Dr/Cr', 'Cr/Dr');
+
+    if (amountCol) {
+      const amount = cleanAmount(row[amountCol]);
+      if (typeCol && row[typeCol]) {
+        const typeVal = String(row[typeCol]).toLowerCase().trim();
+        // Identify debit keywords
+        if (typeVal === 'dr' || typeVal.includes('debit') || typeVal.includes('withdrawal') || typeVal.includes('payment')) {
+          debit = amount;
+        } else {
+          // Assume credit if it says cr, deposit, etc.
+          credit = amount;
+        }
+      } else {
+        // Fallback: check if the original amount string has a minus sign
+        const rawAmt = String(row[amountCol]).trim();
+        if (rawAmt.startsWith('-') || rawAmt.includes('DR')) {
+          debit = amount;
+        } else {
+          credit = amount;
+        }
+      }
+    }
+  }
+
+  return { debit, credit };
+};
+
 // =========== BANK FORMAT PARSERS ===========
 
 // --- COMMERCIAL BANK OF CEYLON ---
@@ -464,14 +509,14 @@ const commercialBankFormat: BankFormat = {
     const dateCol = findHeader(headers, 'Date', 'Transaction Date', 'Txn Date', 'Value Date');
     const descCol = findHeader(headers, 'Description', 'Narration', 'Particulars', 'Details');
     const chequeCol = findHeader(headers, 'Cheque No', 'Chq No', 'Cheque Number', 'Instrument');
-    const debitCol = findHeader(headers, 'Debit', 'Withdrawal', 'Dr', 'Debit Amount');
-    const creditCol = findHeader(headers, 'Credit', 'Deposit', 'Cr', 'Credit Amount');
     const balanceCol = findHeader(headers, 'Balance', 'Running Balance', 'Closing Balance');
     const refCol = findHeader(headers, 'Reference', 'Ref No', 'Trans Ref');
 
+    const debitCol = findHeader(headers, 'Debit', 'Withdrawal', 'Dr', 'Debit Amount');
+    const creditCol = findHeader(headers, 'Credit', 'Deposit', 'Cr', 'Credit Amount');
+
     return rows.map((row, idx) => {
-      const debit = cleanAmount(row[debitCol || '']);
-      const credit = cleanAmount(row[creditCol || '']);
+      const { debit, credit } = extractDebitCredit(row, headers, debitCol, creditCol);
       return {
         rowNumber: idx + 2,
         txnDate: parseDate(row[dateCol || '']),
@@ -513,15 +558,15 @@ const sampathBankFormat: BankFormat = {
     const dateCol = findHeader(headers, 'Trans Date', 'Transaction Date', 'Date', 'Txn Date');
     const valueDateCol = findHeader(headers, 'Value Date', 'Val Date');
     const descCol = findHeader(headers, 'Description', 'Narration', 'Particulars', 'Transaction Description');
-    const debitCol = findHeader(headers, 'Debit', 'Dr Amount', 'Withdrawal');
-    const creditCol = findHeader(headers, 'Credit', 'Cr Amount', 'Deposit');
     const balanceCol = findHeader(headers, 'Balance', 'Running Balance', 'Available Balance');
     const refCol = findHeader(headers, 'Reference', 'Ref', 'Trans Ref', 'Instrument No');
     const chequeCol = findHeader(headers, 'Cheque No', 'Chq No', 'Instrument');
 
+    const debitCol = findHeader(headers, 'Debit', 'Dr Amount', 'Withdrawal');
+    const creditCol = findHeader(headers, 'Credit', 'Cr Amount', 'Deposit');
+
     return rows.map((row, idx) => {
-      const debit = cleanAmount(row[debitCol || '']);
-      const credit = cleanAmount(row[creditCol || '']);
+      const { debit, credit } = extractDebitCredit(row, headers, debitCol, creditCol);
       return {
         rowNumber: idx + 2,
         txnDate: parseDate(row[dateCol || valueDateCol || '']),
@@ -602,35 +647,13 @@ const genericFormat: BankFormat = {
     const descCol = findHeader(headers, 'Description', 'Narration', 'Particulars', 'Details', 'Remarks', 'Transaction Details');
     const refCol = findHeader(headers, 'Reference', 'Ref No', 'Trans Ref', 'Reference No', 'Tran ID', 'Tran Serial');
     const chequeCol = findHeader(headers, 'Cheque No', 'Chq No', 'Cheque Number', 'Instrument');
-    
-    let debitCol = findHeader(headers, 'Debit', 'Withdrawal', 'Dr', 'Debit Amount');
-    let creditCol = findHeader(headers, 'Credit', 'Deposit', 'Cr', 'Credit Amount');
-    
-    if (debitCol && creditCol && debitCol === creditCol) {
-      debitCol = null;
-      creditCol = null;
-    }
-    
-    const amountCol = findHeader(headers, 'Amount', 'Transaction Amount');
-    const typeCol = findHeader(headers, 'Type', 'Transaction Type', 'Dr/Cr', 'Cr/Dr');
-    
     const balanceCol = findHeader(headers, 'Balance', 'Running Balance', 'Closing Balance', 'Available Balance');
 
+    const debitCol = findHeader(headers, 'Debit', 'Withdrawal', 'Dr', 'Debit Amount');
+    const creditCol = findHeader(headers, 'Credit', 'Deposit', 'Cr', 'Credit Amount');
+
     return rows.map((row, idx) => {
-      let debit = 0, credit = 0;
-      
-      if (debitCol && creditCol) {
-        debit = cleanAmount(row[debitCol]);
-        credit = cleanAmount(row[creditCol]);
-      } else if (amountCol) {
-        const amount = cleanAmount(row[amountCol]);
-        const typeVal = String(row[typeCol || ''] || '').toLowerCase();
-        if (typeVal.includes('dr') || typeVal.includes('debit') || typeVal.includes('withdrawal') || typeVal.includes('payment')) {
-          debit = amount;
-        } else {
-          credit = amount;
-        }
-      }
+      const { debit, credit } = extractDebitCredit(row, headers, debitCol, creditCol);
 
       return {
         rowNumber: idx + 2,

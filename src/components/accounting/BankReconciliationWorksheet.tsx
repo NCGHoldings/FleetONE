@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,17 +7,16 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBankAccounts, useBankTransactionsForRecon, useLastReconciliation } from "@/hooks/useAccountingData";
 import { useSaveBankReconciliation } from "@/hooks/useAccountingMutations";
-import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, BookOpen, CreditCard } from "lucide-react";
+import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, ArrowRightLeft, Search, Sparkles, BookOpen, Maximize, Minimize } from "lucide-react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import "./BankReconciliationWorksheet.css";
 import { BankStatementImportModal } from "./BankStatementImportModal";
 
 // ---------- Types ----------
 type DisplayFilter = "all" | "not_cleared" | "cleared";
-type ReconMode = "statement" | "book";
 
 interface ClearedState {
   [transactionId: string]: {
@@ -30,43 +29,24 @@ interface ClearedState {
 const fmt = (n: number) =>
   n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const typeLabel = (t: string): string => {
-  switch (t?.toLowerCase()) {
-    case "deposit": case "dp": case "receipt": return "DP";
-    case "payment": case "ps": case "withdrawal": return "PS";
-    case "transfer": case "ft": return "FT";
-    case "fee": case "charge": return "FC";
-    case "interest": return "IN";
-    case "adjustment": return "AJ";
-    default: return t?.substring(0, 3)?.toUpperCase() || "—";
-  }
-};
-
-const typeVariant = (t: string): string => {
-  switch (t?.toLowerCase()) {
-    case "deposit": case "dp": case "receipt": case "interest": return "deposit";
-    case "payment": case "ps": case "withdrawal": case "fee": case "charge": return "payment";
-    default: return "other";
-  }
-};
-
 const sourceLabel = (sourceType: string | null | undefined): { text: string; className: string } => {
   switch (sourceType) {
     case "ap_payment": return { text: "AP", className: "source-badge source-ap" };
     case "ar_receipt": return { text: "AR", className: "source-badge source-ar" };
     case "bank_fee": return { text: "FEE", className: "source-badge source-fee" };
     case "inter_bank_transfer": return { text: "IBT", className: "source-badge source-ibt" };
-    case "statement_import": return { text: "STMT", className: "source-badge source-stmt" };
-    default: return { text: "MAN", className: "source-badge source-man" };
+    default: 
+      if (sourceType?.startsWith('statement_import')) return { text: "STMT", className: "source-badge source-stmt" };
+      return { text: "MAN", className: "source-badge source-man" };
   }
 };
 
 // ================ COMPONENT ================
 const BankReconciliationWorksheet = () => {
+  const queryClient = useQueryClient();
   // --- Data hooks ---
   const { data: bankAccounts = [], isLoading: acctLoading } = useBankAccounts();
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
-  const [reconMode, setReconMode] = useState<ReconMode>("statement");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const { data: transactions = [], isLoading: txnLoading } = useBankTransactionsForRecon(
@@ -78,10 +58,11 @@ const BankReconciliationWorksheet = () => {
   const saveReconciliation = useSaveBankReconciliation();
 
   // --- UI State ---
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [statementNo, setStatementNo] = useState("");
   const [statementDate, setStatementDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [statementBalance, setStatementBalance] = useState<string>("");
-  const [displayFilter, setDisplayFilter] = useState<DisplayFilter>("all");
+  const [displayFilter, setDisplayFilter] = useState<DisplayFilter>("not_cleared");
   const [clearedState, setClearedState] = useState<ClearedState>({});
   const [showAdjustments, setShowAdjustments] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -98,14 +79,7 @@ const BankReconciliationWorksheet = () => {
   );
 
   const lastStatementBalance = lastRecon?.statement_balance ?? selectedAccount?.opening_balance ?? 0;
-
-  // In book recon mode, use bank account current_balance as the target
-  const targetBalance = useMemo(() => {
-    if (reconMode === "book") {
-      return selectedAccount?.current_balance ?? 0;
-    }
-    return parseFloat(statementBalance) || 0;
-  }, [reconMode, selectedAccount, statementBalance]);
+  const targetBalance = parseFloat(statementBalance) || 0;
 
   // Only show unreconciled transactions (or all if user wants to see previously cleared)
   const filteredTransactions = useMemo(() => {
@@ -123,27 +97,124 @@ const BankReconciliationWorksheet = () => {
     return base;
   }, [transactions, displayFilter, clearedState]);
 
+  // Group by Date
+  const groupedByDate = useMemo(() => {
+    const dates = new Set<string>();
+    const byDate: Record<string, { statement: any[]; book: any[] }> = {};
+
+    filteredTransactions.forEach(t => {
+      const dateStr = format(new Date(t.transaction_date), "yyyy-MM-dd");
+      dates.add(dateStr);
+      if (!byDate[dateStr]) byDate[dateStr] = { statement: [], book: [] };
+
+      if (t.source_type?.startsWith('statement_import')) {
+         byDate[dateStr].statement.push(t);
+      } else {
+         byDate[dateStr].book.push(t);
+      }
+    });
+
+    const sortedDates = Array.from(dates).sort();
+    return sortedDates.map(date => ({
+       date,
+       statement: byDate[date].statement,
+       book: byDate[date].book
+    }));
+  }, [filteredTransactions]);
+
+  // Split into Statement and Book (just for Auto-match logic)
+  const statementTxns = useMemo(() => filteredTransactions.filter(t => t.source_type?.startsWith('statement_import')), [filteredTransactions]);
+  const bookTxns = useMemo(() => filteredTransactions.filter(t => !t.source_type?.startsWith('statement_import')), [filteredTransactions]);
+
+  // --- Auto Match Logic ---
+  const [suggestedMatches, setSuggestedMatches] = useState<Record<string, string>>({});
+
+  const runAutoMatch = useCallback(() => {
+    const matches: Record<string, string> = {};
+    const usedBookIds = new Set<string>();
+
+    statementTxns.forEach(st => {
+      if (clearedState[st.id]?.cleared) return;
+
+      const stAmount = (st.debit_amount || 0) > 0 ? (st.debit_amount || 0) : -(st.credit_amount || 0);
+      
+      const bestMatch = bookTxns.find(bt => {
+        if (usedBookIds.has(bt.id) || clearedState[bt.id]?.cleared) return false;
+        
+        const btAmount = (bt.debit_amount || 0) > 0 ? (bt.debit_amount || 0) : -(bt.credit_amount || 0);
+        if (stAmount !== btAmount) return false;
+        
+        const diffDays = Math.abs((new Date(st.transaction_date).getTime() - new Date(bt.transaction_date).getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays > 5) return false;
+
+        if (diffDays > 2) {
+           const stRef = (st.reference || '').toLowerCase().replace(/\s/g, '');
+           const btRef = (bt.reference || '').toLowerCase().replace(/\s/g, '');
+           if (stRef && btRef && (stRef.includes(btRef) || btRef.includes(stRef))) return true;
+           return false;
+        }
+
+        return true; 
+      });
+
+      if (bestMatch) {
+        matches[st.id] = bestMatch.id;
+        usedBookIds.add(bestMatch.id);
+      }
+    });
+    setSuggestedMatches(matches);
+    toast.success(`Auto-Match completed. Found ${Object.keys(matches).length} possible matches.`);
+  }, [statementTxns, bookTxns, clearedState]);
+
+  const acceptAllMatches = useCallback(() => {
+    setClearedState(prev => {
+      const next = { ...prev };
+      Object.entries(suggestedMatches).forEach(([stId, bkId]) => {
+         const stTxn = statementTxns.find(t => t.id === stId);
+         const bkTxn = bookTxns.find(t => t.id === bkId);
+         if (stTxn && bkTxn) {
+            next[stId] = { cleared: true, clearedAmount: (stTxn.debit_amount || 0) > 0 ? (stTxn.debit_amount || 0) : (stTxn.credit_amount || 0) };
+            next[bkId] = { cleared: true, clearedAmount: (bkTxn.debit_amount || 0) > 0 ? (bkTxn.debit_amount || 0) : (bkTxn.credit_amount || 0) };
+         }
+      });
+      return next;
+    });
+    setSuggestedMatches({});
+    toast.success("Matches accepted and added to cleared selections.");
+  }, [suggestedMatches, statementTxns, bookTxns]);
+
+  const [adjustments, setAdjustments] = useState<Array<{
+    type: string;
+    amount: number;
+    description: string;
+  }>>([]);
+
   // Compute summaries
   const summary = useMemo(() => {
     let paymentCount = 0, paymentTotal = 0;
     let depositCount = 0, depositTotal = 0;
     let clearedPaymentTotal = 0, clearedDepositTotal = 0;
 
-    transactions.forEach((t) => {
+    bookTxns.forEach((t) => {
       const deposit = t.debit_amount || 0;
       const payment = t.credit_amount || 0;
-
       if (payment > 0) { paymentCount++; paymentTotal += payment; }
       if (deposit > 0) { depositCount++; depositTotal += deposit; }
-
-      const cs = clearedState[t.id];
-      if (cs?.cleared) {
-        if (payment > 0) clearedPaymentTotal += cs.clearedAmount;
-        if (deposit > 0) clearedDepositTotal += cs.clearedAmount;
-      }
     });
 
-    // Handle adjustments
+    Object.keys(clearedState).forEach(id => {
+       const cs = clearedState[id];
+       if (cs.cleared) {
+         const t = bookTxns.find(tx => tx.id === id);
+         if (t) {
+            const deposit = t.debit_amount || 0;
+            const payment = t.credit_amount || 0;
+            if (payment > 0) clearedPaymentTotal += cs.clearedAmount;
+            if (deposit > 0) clearedDepositTotal += cs.clearedAmount;
+         }
+       }
+    });
+
     let adjDepositTotal = 0;
     let adjPaymentTotal = 0;
     adjustments.forEach(adj => {
@@ -166,12 +237,35 @@ const BankReconciliationWorksheet = () => {
       stmtEndBal,
       difference,
     };
-  }, [transactions, clearedState, lastStatementBalance, targetBalance, adjustments]);
+  }, [bookTxns, clearedState, lastStatementBalance, targetBalance, adjustments]);
+
+  // Derived Match Tally
+  const matchTally = useMemo(() => {
+    let selectedStatementVal = 0;
+    let selectedBookVal = 0;
+
+    Object.keys(clearedState).forEach(id => {
+       if (clearedState[id].cleared) {
+          const stTxn = statementTxns.find(t => t.id === id);
+          if (stTxn) {
+             const amt = (stTxn.debit_amount || 0) > 0 ? (stTxn.debit_amount || 0) : -(stTxn.credit_amount || 0);
+             selectedStatementVal += amt;
+          }
+          const bkTxn = bookTxns.find(t => t.id === id);
+          if (bkTxn) {
+             const amt = (bkTxn.debit_amount || 0) > 0 ? (bkTxn.debit_amount || 0) : -(bkTxn.credit_amount || 0);
+             selectedBookVal += amt;
+          }
+       }
+    });
+    return { selectedStatementVal, selectedBookVal, diff: selectedStatementVal - selectedBookVal };
+  }, [clearedState, statementTxns, bookTxns]);
 
   // --- Handlers ---
   const handleAccountChange = useCallback((accountId: string) => {
     setSelectedAccountId(accountId);
     setClearedState({});
+    setSuggestedMatches({});
     setStatementNo("");
     setStatementBalance("");
   }, []);
@@ -180,47 +274,67 @@ const BankReconciliationWorksheet = () => {
     setClearedState((prev) => {
       const current = prev[txnId];
       const fullAmount = payment > 0 ? payment : deposit;
+      
+      // UN-CLEARING logic
       if (current?.cleared) {
         const next = { ...prev };
         delete next[txnId];
         return next;
       }
-      return { ...prev, [txnId]: { cleared: true, clearedAmount: fullAmount } };
+      
+      // CLEARING logic (with smart auto-match)
+      const next = { ...prev, [txnId]: { cleared: true, clearedAmount: fullAmount } };
+      
+      // Find which side this transaction belongs to
+      const isStatement = statementTxns.some(t => t.id === txnId);
+      const sourceTxn = isStatement ? statementTxns.find(t => t.id === txnId) : bookTxns.find(t => t.id === txnId);
+      
+      if (sourceTxn) {
+         const targetList = isStatement ? bookTxns : statementTxns;
+         const sourceDate = new Date(sourceTxn.transaction_date).getTime();
+         
+         // Find potential matches on the opposite side
+         const matches = targetList.filter(t => {
+            // Skip already cleared or reconciled ones
+            if (t.is_reconciled || next[t.id]?.cleared) return false;
+            
+            // Exact amount match is required
+            const targetPayment = t.credit_amount || 0;
+            const targetDeposit = t.debit_amount || 0;
+            if (payment > 0 && targetPayment !== payment) return false;
+            if (deposit > 0 && targetDeposit !== deposit) return false;
+            
+            // Date must be within 3 days
+            const targetDate = new Date(t.transaction_date).getTime();
+            const diffDays = Math.abs(targetDate - sourceDate) / (1000 * 60 * 60 * 24);
+            if (diffDays > 3) return false;
+            
+            return true;
+         });
+         
+         if (matches.length > 0) {
+            // Sort by closest date
+            matches.sort((a, b) => {
+               const aDiff = Math.abs(new Date(a.transaction_date).getTime() - sourceDate);
+               const bDiff = Math.abs(new Date(b.transaction_date).getTime() - sourceDate);
+               return aDiff - bDiff;
+            });
+            
+            const bestMatch = matches[0];
+            const matchFullAmount = (bestMatch.credit_amount || 0) > 0 ? (bestMatch.credit_amount || 0) : (bestMatch.debit_amount || 0);
+            next[bestMatch.id] = { cleared: true, clearedAmount: matchFullAmount };
+            
+            toast.success(`Smart Auto-Match: Selected matching LKR ${fullAmount.toLocaleString()} on the ${isStatement ? 'Book' : 'Statement'} side!`);
+         }
+      }
+      
+      return next;
     });
-  }, []);
-
-  const updateClearedAmount = useCallback((txnId: string, amount: number) => {
-    setClearedState((prev) => ({
-      ...prev,
-      [txnId]: { ...prev[txnId], cleared: true, clearedAmount: amount },
-    }));
-  }, []);
-
-  const handleSelectAll = useCallback(() => {
-    const allCleared = filteredTransactions.every((t) => clearedState[t.id]?.cleared || t.is_reconciled);
-    if (allCleared) {
-      const next: ClearedState = {};
-      Object.keys(clearedState).forEach((id) => {
-        if (!filteredTransactions.find((t) => t.id === id)) {
-          next[id] = clearedState[id];
-        }
-      });
-      setClearedState(next);
-    } else {
-      const next = { ...clearedState };
-      filteredTransactions.forEach((t) => {
-        if (!t.is_reconciled && !next[t.id]) {
-          const fullAmount = (t.debit_amount || 0) > 0 ? (t.debit_amount || 0) : (t.credit_amount || 0);
-          next[t.id] = { cleared: true, clearedAmount: fullAmount };
-        }
-      });
-      setClearedState(next);
-    }
-  }, [filteredTransactions, clearedState]);
+  }, [statementTxns, bookTxns]);
 
   const handleSave = useCallback(async () => {
     if (!selectedAccountId) return toast.error("Select a bank account");
-    if (reconMode === "statement" && !statementBalance) return toast.error("Enter statement ending balance");
+    if (!statementBalance) return toast.error("Enter statement ending balance");
     if (!statementDate) return toast.error("Enter statement date");
 
     const clearedIds = Object.entries(clearedState)
@@ -247,21 +361,17 @@ const BankReconciliationWorksheet = () => {
     });
 
     setClearedState({});
+    setSuggestedMatches({});
     setAdjustments([]);
     setStatementNo("");
     setStatementBalance("");
-  }, [selectedAccountId, reconMode, statementDate, statementNo, statementBalance, clearedState, summary, saveReconciliation]);
+  }, [selectedAccountId, statementDate, statementNo, statementBalance, clearedState, summary, saveReconciliation, adjustments]);
 
   const handleCancel = useCallback(() => {
     setClearedState({});
+    setSuggestedMatches({});
     toast.info("Cleared selections reset");
   }, []);
-
-  const [adjustments, setAdjustments] = useState<Array<{
-    type: string;
-    amount: number;
-    description: string;
-  }>>([]);
 
   const handleAddAdjustment = useCallback(() => {
     const amount = parseFloat(adjAmount);
@@ -289,9 +399,9 @@ const BankReconciliationWorksheet = () => {
   const isSaveDisabled = useMemo(() => {
     if (saveReconciliation.isPending) return true;
     if (Object.keys(clearedState).length === 0 && adjustments.length === 0) return true;
-    if (reconMode === "statement" && !statementBalance) return true;
+    if (!statementBalance) return true;
     return false;
-  }, [saveReconciliation.isPending, clearedState, reconMode, statementBalance, adjustments]);
+  }, [saveReconciliation.isPending, clearedState, statementBalance, adjustments]);
 
   // --- Loading ---
   if (acctLoading) {
@@ -305,31 +415,19 @@ const BankReconciliationWorksheet = () => {
     );
   }
 
-  return (
-    <Card className="bank-recon-root">
-      {/* ========================= HEADER ========================= */}
-      <CardHeader className="p-0">
-        <div className="bank-recon-header">
-          {/* Recon Mode Tabs */}
-          <div className="bank-recon-header-field" style={{ minWidth: 240 }}>
-            <label>Reconciliation Mode</label>
-            <Tabs value={reconMode} onValueChange={(v) => setReconMode(v as ReconMode)}>
-              <TabsList className="h-8">
-                <TabsTrigger value="statement" className="text-xs gap-1 px-2">
-                  <CreditCard className="w-3 h-3" /> Statement
-                </TabsTrigger>
-                <TabsTrigger value="book" className="text-xs gap-1 px-2">
-                  <BookOpen className="w-3 h-3" /> Book
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
+  const rootClass = isFullscreen 
+    ? "bank-recon-root flex flex-col fixed inset-0 z-[100] bg-background shadow-2xl rounded-none border-0" 
+    : "bank-recon-root flex flex-col h-[calc(100vh-140px)]";
 
-          {/* Account Code */}
-          <div className="bank-recon-header-field">
-            <label>Account Code</label>
+  return (
+    <Card className={rootClass}>
+      {/* ========================= HEADER ========================= */}
+      <CardHeader className="p-0 flex-shrink-0 z-20 border-b bg-background shadow-sm">
+        <div className="bank-recon-header flex-wrap">
+          <div className="bank-recon-header-field min-w-[200px]">
+            <label>Bank Account</label>
             <Select value={selectedAccountId || ""} onValueChange={handleAccountChange}>
-              <SelectTrigger className="w-[260px]">
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select Bank Account" />
               </SelectTrigger>
               <SelectContent>
@@ -342,308 +440,283 @@ const BankReconciliationWorksheet = () => {
             </Select>
           </div>
 
-          {/* Statement No. (only in statement mode) */}
-          {reconMode === "statement" && (
-            <div className="bank-recon-header-field">
-              <label>Statement No.</label>
-              <Input
-                value={statementNo}
-                onChange={(e) => setStatementNo(e.target.value)}
-                placeholder="e.g. 202602"
-                className="w-[140px]"
-              />
-            </div>
-          )}
-
-          {/* Statement Date */}
           <div className="bank-recon-header-field">
-            <label>{reconMode === "statement" ? "Statement Date" : "Recon Date"}</label>
+            <label>Statement No.</label>
+            <Input
+              value={statementNo}
+              onChange={(e) => setStatementNo(e.target.value)}
+              placeholder="e.g. 202602"
+              className="w-[120px]"
+            />
+          </div>
+
+          <div className="bank-recon-header-field">
+            <label>Statement Date</label>
             <Input
               type="date"
               value={statementDate}
               onChange={(e) => setStatementDate(e.target.value)}
-              className="w-[160px]"
+              className="w-[140px]"
             />
           </div>
 
-          {/* Statement Ending Balance (only in statement mode) */}
-          {reconMode === "statement" && (
-            <div className="bank-recon-header-field">
-              <label>Statement Ending Balance</label>
-              <Input
-                type="number"
-                step="0.01"
-                value={statementBalance}
-                onChange={(e) => setStatementBalance(e.target.value)}
-                placeholder="0.00"
-                className="w-[160px]"
-              />
-            </div>
-          )}
-
-          {/* Book mode: show bank account balance */}
-          {reconMode === "book" && selectedAccount && (
-            <div className="bank-recon-header-field">
-              <label>Bank Account Balance</label>
-              <span className="value">LKR {fmt(selectedAccount.current_balance || 0)}</span>
-            </div>
-          )}
-
-          {/* Last Statement Balance */}
           <div className="bank-recon-header-field">
-            <label>Last Statement Bal.</label>
+            <label>Ending Balance</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={statementBalance}
+              onChange={(e) => setStatementBalance(e.target.value)}
+              placeholder="0.00"
+              className="w-[140px]"
+            />
+          </div>
+
+          <div className="bank-recon-header-field border-l pl-4 border-muted">
+            <label>Last Reconciled Bal.</label>
             <span className="value">LKR {fmt(lastStatementBalance)}</span>
           </div>
 
-          {/* Date Range Filters */}
-          <div className="bank-recon-header-field">
-            <label>From Date</label>
-            <Input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="w-[140px]"
-            />
-          </div>
-          <div className="bank-recon-header-field">
-            <label>To Date</label>
-            <Input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="w-[140px]"
-            />
-          </div>
-
-          {/* Display Filter */}
-          <div className="bank-recon-header-field">
-            <label>Display</label>
-            <Select value={displayFilter} onValueChange={(v) => setDisplayFilter(v as DisplayFilter)}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="not_cleared">Not Cleared</SelectItem>
-                <SelectItem value="cleared">Cleared</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="ml-auto flex items-center gap-2 pr-4 pt-1">
+             <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)}>
+               <Upload className="w-4 h-4 mr-1" /> Import Statement
+             </Button>
+             <Button variant="secondary" size="sm" onClick={runAutoMatch} disabled={statementTxns.length === 0 || bookTxns.length === 0}>
+               <Sparkles className="w-4 h-4 mr-1" /> Auto Match
+             </Button>
+             <Button variant="ghost" size="icon" className="w-8 h-8 ml-2 hover:bg-muted" onClick={() => setIsFullscreen(!isFullscreen)}>
+               {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+             </Button>
           </div>
         </div>
       </CardHeader>
 
-      {/* ========================= TABLE ========================= */}
-      <CardContent className="p-0 bank-recon-table-wrap">
+      {/* ========================= MATCH TALLY BAR ========================= */}
+      {selectedAccountId && (matchTally.selectedStatementVal !== 0 || matchTally.selectedBookVal !== 0) && (
+         <div className="bg-primary/5 border-b border-primary/20 px-6 py-2 flex items-center justify-between text-sm flex-shrink-0 z-10">
+            <div className="flex items-center gap-6">
+               <span className="font-semibold flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" /> Selected Statement: LKR {fmt(matchTally.selectedStatementVal)}
+               </span>
+               <ArrowRightLeft className="w-4 h-4 text-muted-foreground" />
+               <span className="font-semibold flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-primary" /> Selected Book: LKR {fmt(matchTally.selectedBookVal)}
+               </span>
+               {matchTally.diff === 0 ? (
+                  <span className="px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full font-semibold flex items-center gap-1 text-xs">
+                     <CheckCircle className="w-3 h-3" /> MATCHED
+                  </span>
+               ) : (
+                  <span className="px-2 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-full font-semibold flex items-center gap-1 text-xs">
+                     <AlertTriangle className="w-3 h-3" /> DIFF: LKR {fmt(Math.abs(matchTally.diff))}
+                  </span>
+               )}
+            </div>
+            {Object.keys(suggestedMatches).length > 0 && (
+               <Button size="sm" variant="default" onClick={acceptAllMatches} className="h-7 text-xs">
+                  Accept All Auto-Matches
+               </Button>
+            )}
+         </div>
+      )}
+
+      {/* ========================= SPLIT VIEW TABLES ========================= */}
+      <CardContent className="p-0 flex flex-1 overflow-hidden relative">
         {!selectedAccountId ? (
-          <div className="bank-recon-empty">
+          <div className="bank-recon-empty m-auto">
             <Landmark />
             <p className="text-lg font-medium">Select a Bank Account</p>
-            <p className="text-sm">Choose an account above to begin reconciliation</p>
+            <p className="text-sm text-muted-foreground">Choose an account above to begin reconciliation</p>
           </div>
         ) : txnLoading ? (
-          <div className="bank-recon-empty">
-            <FileText />
+          <div className="bank-recon-empty m-auto">
+            <Search className="animate-pulse" />
             <p>Loading transactions…</p>
           </div>
-        ) : filteredTransactions.length === 0 ? (
-          <div className="bank-recon-empty">
-            <FileText />
-            <p className="text-lg font-medium">No Transactions Found</p>
-            <p className="text-sm">
-              {displayFilter === "cleared"
-                ? "No cleared transactions"
-                : displayFilter === "not_cleared"
-                  ? "All transactions are cleared"
-                  : "No transactions for this account"}
-            </p>
-          </div>
         ) : (
-          <table className="bank-recon-table">
-            <thead>
-              <tr>
-                <th className="w-[40px]">#</th>
-                <th className="w-[50px]">
-                  <input
-                    type="checkbox"
-                    className="cleared-checkbox"
-                    checked={filteredTransactions.length > 0 && filteredTransactions.every((t) => clearedState[t.id]?.cleared || t.is_reconciled)}
-                    onChange={handleSelectAll}
-                    title="Select / Deselect All"
-                  />
-                </th>
-                <th className="w-[60px]">Type</th>
-                <th className="w-[60px]">Source</th>
-                <th className="w-[100px]">Date</th>
-                <th>Trans. No.</th>
-                <th>Ref. 1</th>
-                <th className="num-col">Deposit</th>
-                <th className="num-col">Payment</th>
-                <th className="num-col w-[120px]">Cleared Amt</th>
-                <th>Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTransactions.map((t, idx) => {
-                const deposit = t.debit_amount || 0;
-                const payment = t.credit_amount || 0;
-                const cs = clearedState[t.id];
-                const isCleared = cs?.cleared || t.is_reconciled;
-                const isAlreadyReconciled = !!t.is_reconciled;
-                const source = sourceLabel(t.source_type);
+          <div className="flex flex-col w-full h-full relative">
+            {/* Headers row (Sticky) */}
+            <div className="flex w-full divide-x divide-border border-b sticky top-0 z-10 bg-background shadow-sm flex-shrink-0">
+                <div className="flex-1 flex justify-between items-center px-4 py-2 bg-muted/10">
+                   <span className="flex items-center gap-2 font-semibold text-sm"><FileText className="w-4 h-4 text-blue-600" /> Bank Statement</span>
+                   <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">{statementTxns.length} items</span>
+                </div>
+                <div className="flex-1 flex justify-between items-center px-4 py-2">
+                   <span className="flex items-center gap-2 font-semibold text-sm"><BookOpen className="w-4 h-4 text-emerald-600" /> System Records (Book)</span>
+                   <div className="flex gap-2">
+                      <Select value={displayFilter} onValueChange={(v) => setDisplayFilter(v as DisplayFilter)}>
+                        <SelectTrigger className="h-6 text-xs w-[120px] bg-muted/50 border-0">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="not_cleared">Unreconciled</SelectItem>
+                          <SelectItem value="cleared">Cleared Only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">{bookTxns.length} items</span>
+                   </div>
+                </div>
+            </div>
 
-                const rowClass = [
-                  isCleared ? "row-cleared" : "",
-                  deposit > 0 ? "row-deposit" : payment > 0 ? "row-payment" : "",
-                ].filter(Boolean).join(" ");
+            {/* Scrollable Container */}
+            <div className="flex-1 overflow-auto bg-muted/5">
+                {groupedByDate.length === 0 ? (
+                  <div className="p-12 text-center text-muted-foreground text-sm">No transactions found for the selected criteria.</div>
+                ) : (
+                  <div className="pb-12">
+                     {groupedByDate.map((group) => (
+                        <div key={group.date} className="flex flex-col border-b border-border shadow-sm">
+                           {/* Date Header Badge */}
+                           <div className="w-full bg-accent/40 py-1.5 px-4 text-[11px] font-bold text-muted-foreground tracking-wider uppercase border-y flex items-center justify-center sticky top-0 z-10 backdrop-blur">
+                              {format(new Date(group.date), "dd MMM yyyy")}
+                           </div>
+                           
+                           {/* Row Content */}
+                           <div className="flex w-full divide-x divide-border">
+                              {/* Left side (Statement) */}
+                              <div className="flex-1 bg-background flex flex-col">
+                                 {group.statement.length === 0 ? (
+                                    <div className="flex-1 flex items-center justify-center text-[10px] text-muted-foreground/40 italic py-4 bg-muted/5">No statement entries</div>
+                                 ) : (
+                                    <table className="w-full text-xs table-fixed">
+                                       <tbody>
+                                          {group.statement.map(t => {
+                                             const isCleared = clearedState[t.id]?.cleared || t.is_reconciled;
+                                             const isSuggested = suggestedMatches[t.id];
+                                             const deposit = t.debit_amount || 0;
+                                             const payment = t.credit_amount || 0;
+                                             const rowClass = isCleared ? "bg-blue-50/50 dark:bg-blue-900/10" : isSuggested ? "bg-green-50/50 dark:bg-green-900/10 border-l-2 border-green-500" : "hover:bg-accent/50";
+                                             return (
+                                                <tr key={t.id} className={`border-b border-border/50 cursor-pointer transition-colors ${rowClass}`} onClick={() => toggleCleared(t.id, payment, deposit)}>
+                                                   <td className="w-[30px] p-2 align-top text-center"><input type="checkbox" checked={isCleared} onChange={() => {}} className="cursor-pointer" /></td>
+                                                   <td className="p-2 align-top">
+                                                      <div className="font-medium text-[11px] leading-tight truncate" title={t.description}>{t.description}</div>
+                                                      {t.reference && <div className="text-[9px] font-mono text-muted-foreground mt-0.5">{t.reference}</div>}
+                                                   </td>
+                                                   <td className="w-[80px] p-2 align-top text-right text-red-600 font-medium">{payment > 0 ? fmt(payment) : ""}</td>
+                                                   <td className="w-[80px] p-2 align-top text-right text-green-600 font-medium">{deposit > 0 ? fmt(deposit) : ""}</td>
+                                                </tr>
+                                             );
+                                          })}
+                                       </tbody>
+                                    </table>
+                                 )}
+                              </div>
 
-                return (
-                  <tr key={t.id} className={rowClass}>
-                    <td>{idx + 1}</td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        className="cleared-checkbox"
-                        checked={isCleared}
-                        disabled={isAlreadyReconciled}
-                        onChange={() => toggleCleared(t.id, payment, deposit)}
-                        title="Toggle cleared"
-                      />
-                    </td>
-                    <td>
-                      <span className={`type-badge ${typeVariant(t.transaction_type)}`}>
-                        {typeLabel(t.transaction_type)}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={source.className}>{source.text}</span>
-                    </td>
-                    <td>{t.transaction_date ? format(new Date(t.transaction_date), "dd/MM/yyyy") : "—"}</td>
-                    <td className="font-mono text-xs">{t.reference || t.id.substring(0, 8)}</td>
-                    <td>{t.cheque_number || "—"}</td>
-                    <td className="num-col">{deposit > 0 ? `LKR ${fmt(deposit)}` : "—"}</td>
-                    <td className="num-col">{payment > 0 ? `LKR ${fmt(payment)}` : "—"}</td>
-                    <td className="num-col">
-                      {isCleared ? (
-                        isAlreadyReconciled ? (
-                          <span className="font-semibold" style={{ color: "hsl(142 76% 30%)" }}>
-                            LKR {fmt(payment > 0 ? payment : deposit)}
-                          </span>
-                        ) : (
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="cleared-amount-input"
-                            value={cs?.clearedAmount ?? ""}
-                            onChange={(e) => updateClearedAmount(t.id, parseFloat(e.target.value) || 0)}
-                            title="Cleared amount"
-                          />
-                        )
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="text-sm text-muted-foreground">{t.description || "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                              {/* Right side (Book) */}
+                              <div className="flex-1 bg-background flex flex-col">
+                                 {group.book.length === 0 ? (
+                                    <div className="flex-1 flex items-center justify-center text-[10px] text-muted-foreground/40 italic py-4 bg-muted/5">No system entries</div>
+                                 ) : (
+                                    <table className="w-full text-xs table-fixed">
+                                       <tbody>
+                                          {group.book.map(t => {
+                                             const isCleared = clearedState[t.id]?.cleared || t.is_reconciled;
+                                             const isSuggested = Object.values(suggestedMatches).includes(t.id);
+                                             const deposit = t.debit_amount || 0;
+                                             const payment = t.credit_amount || 0;
+                                             const source = sourceLabel(t.source_type);
+                                             const rowClass = isCleared ? "bg-blue-50/50 dark:bg-blue-900/10" : isSuggested ? "bg-green-50/50 dark:bg-green-900/10 border-r-2 border-green-500" : "hover:bg-accent/50";
+                                             return (
+                                                <tr key={t.id} className={`border-b border-border/50 cursor-pointer transition-colors ${rowClass}`} onClick={() => !t.is_reconciled && toggleCleared(t.id, payment, deposit)}>
+                                                   <td className="w-[30px] p-2 align-top text-center"><input type="checkbox" checked={isCleared} disabled={t.is_reconciled} onChange={() => {}} className="cursor-pointer" /></td>
+                                                   <td className="w-[40px] p-2 align-top"><span className={`${source.className} scale-75 origin-top-left inline-block`}>{source.text}</span></td>
+                                                   <td className="p-2 align-top">
+                                                      <div className="font-medium text-[11px] leading-tight truncate" title={t.description || ''}>{t.description || t.transaction_type}</div>
+                                                      <div className="text-[9px] font-mono text-muted-foreground mt-0.5">{t.reference || t.cheque_number || t.id.substring(0,8)}</div>
+                                                   </td>
+                                                   <td className="w-[80px] p-2 align-top text-right text-red-600 font-medium">{payment > 0 ? fmt(payment) : ""}</td>
+                                                   <td className="w-[80px] p-2 align-top text-right text-emerald-600 font-medium">{deposit > 0 ? fmt(deposit) : ""}</td>
+                                                </tr>
+                                             );
+                                          })}
+                                       </tbody>
+                                    </table>
+                                 )}
+                              </div>
+                           </div>
+                        </div>
+                     ))}
+                  </div>
+                )}
+            </div>
+          </div>
         )}
       </CardContent>
 
       {/* ========================= SUMMARY FOOTER ========================= */}
       {selectedAccountId && (
-        <div className="bank-recon-summary">
-          {/* LEFT: Payment & Deposit totals (SAP-style) */}
-          <div className="bank-recon-summary-left">
-            <div className="bank-recon-summary-row">
-              <span className="summary-label">Payment</span>
-              <span className="summary-count">{summary.paymentCount}</span>
-              <span className="summary-amount negative">LKR {fmt(summary.paymentTotal)}</span>
-            </div>
-            <div className="bank-recon-summary-row">
-              <span className="summary-label">Deposit</span>
-              <span className="summary-count">{summary.depositCount}</span>
-              <span className="summary-amount positive">LKR {fmt(summary.depositTotal)}</span>
-            </div>
-
-            {adjustments.length > 0 && (
-              <div className="bank-recon-adjustments-list mt-2 pt-2 border-t border-dashed border-muted-foreground/30">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1 tracking-wider">Pending Adjustments</p>
-                {adjustments.map((adj, i) => (
-                  <div key={i} className="flex justify-between items-center text-[11px] py-0.5 group">
-                    <div className="flex gap-2 items-center">
-                      <span className={`w-2 h-2 rounded-full ${adj.type === 'interest_earned' ? 'bg-green-500' : 'bg-red-500'}`} />
-                      <span className="font-medium text-foreground/80">{adj.description}</span>
-                    </div>
-                    <div className="flex gap-2 items-center">
-                      <span className={adj.type === 'interest_earned' ? 'text-green-600' : 'text-red-600'}>
-                        {adj.type === 'interest_earned' ? '+' : '-'} LKR {fmt(adj.amount)}
-                      </span>
-                      <button 
-                        onClick={() => removeAdjustment(i)}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        <div className="bank-recon-summary flex-shrink-0 z-20 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+          {/* LEFT: Adjustments */}
+          <div className="bank-recon-summary-left flex-1 border-r border-border pr-6">
+             <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Adjustments</span>
+                <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => setShowAdjustments(true)}>
+                  <SlidersHorizontal className="w-3 h-3 mr-1" /> Add
+                </Button>
+             </div>
+            
+            {adjustments.length === 0 ? (
+               <div className="text-xs text-muted-foreground italic">No manual adjustments</div>
+            ) : (
+               <div className="bank-recon-adjustments-list mt-1 space-y-1">
+                 {adjustments.map((adj, i) => (
+                   <div key={i} className="flex justify-between items-center text-[11px] py-0.5 group bg-muted/30 px-2 rounded">
+                     <div className="flex gap-2 items-center">
+                       <span className={`w-1.5 h-1.5 rounded-full ${adj.type === 'interest_earned' ? 'bg-green-500' : 'bg-red-500'}`} />
+                       <span className="font-medium text-foreground/80 truncate max-w-[150px]">{adj.description}</span>
+                     </div>
+                     <div className="flex gap-2 items-center">
+                       <span className={adj.type === 'interest_earned' ? 'text-green-600 font-mono' : 'text-red-600 font-mono'}>
+                         {adj.type === 'interest_earned' ? '+' : '-'} {fmt(adj.amount)}
+                       </span>
+                       <button 
+                         onClick={() => removeAdjustment(i)}
+                         className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                       >
+                         <X className="w-3 h-3" />
+                       </button>
+                     </div>
+                   </div>
+                 ))}
+               </div>
             )}
           </div>
 
           {/* RIGHT: Cleared Book Balance / Target Balance / Difference */}
-          <div className="bank-recon-summary-right">
-            <div className="bank-recon-balance-row">
-              <span className="balance-label">Cleared Book Balance</span>
-              <span className={`balance-value ${summary.clearedBookBalance >= 0 ? "positive" : "negative"}`}>
+          <div className="bank-recon-summary-right flex-[1.5] pl-6 py-1">
+            <div className="bank-recon-balance-row text-sm py-0.5">
+              <span className="balance-label text-muted-foreground">Cleared Book Balance</span>
+              <span className={`balance-value font-mono ${summary.clearedBookBalance >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                 LKR {fmt(summary.clearedBookBalance)}
               </span>
             </div>
-            <div className="bank-recon-balance-row">
-              <span className="balance-label">
-                {reconMode === "statement" ? "Statement Ending Balance" : "Bank Account Balance"}
-              </span>
-              <span className="balance-value neutral">
+            <div className="bank-recon-balance-row text-sm py-0.5 border-b border-muted pb-1 mb-1">
+              <span className="balance-label font-medium">Statement Ending Balance</span>
+              <span className="balance-value neutral font-mono font-bold">
                 LKR {fmt(summary.stmtEndBal)}
               </span>
             </div>
-            <div className="bank-recon-balance-row difference-row">
-              <span className="balance-label">Difference</span>
-              <span className={`balance-value ${summary.difference === 0 ? "match" : "negative"}`}>
+            <div className="bank-recon-balance-row difference-row text-base">
+              <span className="balance-label font-bold uppercase tracking-wide">Difference</span>
+              <span className={`balance-value font-mono font-bold ${summary.difference === 0 ? "text-green-600" : "text-red-600"}`}>
                 {summary.difference === 0 ? (
-                  <><CheckCircle className="inline w-4 h-4 mr-1" />LKR 0.00</>
+                  <><CheckCircle className="inline w-5 h-5 mr-1" />LKR 0.00</>
                 ) : (
-                  <><AlertTriangle className="inline w-4 h-4 mr-1" />LKR {fmt(Math.abs(summary.difference))}</>
+                  <><AlertTriangle className="inline w-5 h-5 mr-1" />LKR {fmt(Math.abs(summary.difference))}</>
                 )}
               </span>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* ========================= ACTION BUTTONS ========================= */}
-      {selectedAccountId && (
-        <div className="bank-recon-actions">
-          {reconMode === "statement" && (
-            <Button variant="outline" onClick={() => setShowImportModal(true)}>
-              <Upload className="w-4 h-4 mr-2" />
-              Import Statement
-            </Button>
-          )}
-          <Button variant="outline" onClick={() => setShowAdjustments(true)}>
-            <SlidersHorizontal className="w-4 h-4 mr-2" />
-            Adjustments
-          </Button>
-          <Button variant="outline" onClick={handleCancel}>
-            <X className="w-4 h-4 mr-2" />
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isSaveDisabled}>
-            <Save className="w-4 h-4 mr-2" />
-            {saveReconciliation.isPending ? "Saving…" : "Save"}
-          </Button>
+            <div className="flex items-center justify-end gap-2 mt-3 pt-2">
+               <Button variant="outline" size="sm" onClick={handleCancel}>Cancel</Button>
+               <Button size="sm" onClick={handleSave} disabled={isSaveDisabled || summary.difference !== 0} className={summary.difference === 0 ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
+                 <Save className="w-4 h-4 mr-2" />
+                 {saveReconciliation.isPending ? "Saving…" : summary.difference === 0 ? "Complete Reconcile" : "Save Draft"}
+               </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -653,8 +726,8 @@ const BankReconciliationWorksheet = () => {
           <DialogHeader>
             <DialogTitle>Record Adjustment</DialogTitle>
           </DialogHeader>
-          <div className="adjustments-form">
-            <div className="field-row">
+          <div className="adjustments-form space-y-4 py-4">
+            <div className="space-y-2">
               <Label>Adjustment Type</Label>
               <Select value={adjType} onValueChange={setAdjType}>
                 <SelectTrigger>
@@ -668,7 +741,7 @@ const BankReconciliationWorksheet = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="field-row">
+            <div className="space-y-2">
               <Label>Amount</Label>
               <Input
                 type="number"
@@ -678,7 +751,7 @@ const BankReconciliationWorksheet = () => {
                 placeholder="0.00"
               />
             </div>
-            <div className="field-row">
+            <div className="space-y-2">
               <Label>Description</Label>
               <Textarea
                 value={adjDescription}
@@ -703,6 +776,8 @@ const BankReconciliationWorksheet = () => {
         bankAccountId={selectedAccountId}
         onImportComplete={() => {
           setClearedState({});
+          setSuggestedMatches({});
+          queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
         }}
       />
     </Card>

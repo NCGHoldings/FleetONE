@@ -134,7 +134,13 @@ export function useSchoolBusFinanceSettings() {
 // that belong to a *different* company so callers can fail loudly instead of
 // silently posting JE lines into the wrong company's COA.
 export async function validateGLAccountsBelongToCompany(
-  settings: { trade_receivable_account_id?: string | null; sbs_collection_account_id?: string | null; advance_payments_liability_account_id?: string | null } | null | undefined,
+  settings: { 
+    trade_receivable_account_id?: string | null; 
+    sbs_collection_account_id?: string | null; 
+    advance_payments_liability_account_id?: string | null;
+    vat_output_account_id?: string | null;
+    wht_payable_account_id?: string | null;
+  } | null | undefined,
   effectiveCompanyId: string,
 ): Promise<{ ok: boolean; mismatched: Array<{ id: string; account_code: string; company_id: string }> }> {
   if (!settings) return { ok: false, mismatched: [] };
@@ -142,6 +148,8 @@ export async function validateGLAccountsBelongToCompany(
     settings.trade_receivable_account_id,
     settings.sbs_collection_account_id,
     settings.advance_payments_liability_account_id,
+    settings.vat_output_account_id,
+    settings.wht_payable_account_id,
   ].filter((x): x is string => !!x);
   if (ids.length === 0) return { ok: false, mismatched: [] };
 

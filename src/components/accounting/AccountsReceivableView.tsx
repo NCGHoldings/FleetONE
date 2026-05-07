@@ -496,7 +496,7 @@ export const AccountsReceivableView = () => {
 
       {/* Invoice Detail View Dialog */}
       <Dialog open={!!viewInvoice} onOpenChange={() => setViewInvoice(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Invoice Details</DialogTitle>
             <DialogDescription>

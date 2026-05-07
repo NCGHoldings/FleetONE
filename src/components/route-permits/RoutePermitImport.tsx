@@ -38,6 +38,7 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
     // Permit details
     "Permit Number": "permit_no",
     "Permit No": "permit_no",
+    "Permit Details": "permit_no",
     
     // Bus allocation - handle quotes and variations
     "Allocated Bus Number": "allocated_bus_number",
@@ -50,6 +51,7 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
     "Name of the Owner/Operator": "owner_name", // With forward slash
     "Name of the Owner,Operator": "owner_name", // With comma
     "Name of the Owner Operator": "owner_name", // No punctuation
+    "Permit Holder Details": "owner_name",
     "Owner Name": "owner_name",
     
     // Address and contact
@@ -322,8 +324,8 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
 
     // Map additional fields to match database schema
     mapped.max_fare = mapped.approved_maximum_fare || null;
-    mapped.ntc_number = mapped.permit_no || null; // Use permit number as NTC number
-    
+    mapped.ntc_number = mapped.permit_no || null;
+
     // Set permit status based on permit_active_inactive or default to 'valid'
     if (mapped.permit_active_inactive === 'active') {
       mapped.permit_status = 'valid';
@@ -331,6 +333,14 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
       mapped.permit_status = 'expired';
     } else {
       mapped.permit_status = 'valid';
+    }
+
+    // Final safety check: if permit_no is still missing, generate one
+    if (!mapped.permit_no) {
+      // Use a timestamp-based suffix to avoid collisions during bulk imports
+      const timestamp = Date.now().toString().slice(-4);
+      mapped.permit_no = `PRM-AUTO-${timestamp}-${(rowIndex + 1).toString().padStart(3, '0')}`;
+      mapped.ntc_number = mapped.permit_no;
     }
 
     return mapped;
@@ -471,7 +481,10 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
           try {
             const { data: insertData, error } = await supabase
               .from('route_permits')
-              .insert(batchData)
+              .upsert(batchData, { 
+                onConflict: 'permit_no',
+                ignoreDuplicates: false // We want to update existing records with fresh Excel data
+              })
               .select();
 
             if (error) {
