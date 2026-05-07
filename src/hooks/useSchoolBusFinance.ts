@@ -80,6 +80,8 @@ export interface SchoolBusFinanceSettings {
   auto_post_payments: boolean;
   invoice_prefix: string;
   billing_percentage: number; // Default monthly charge percentage (e.g., 80 = charge 80% of fixed amount)
+  vat_output_account_id: string | null;
+  wht_payable_account_id: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -253,6 +255,8 @@ function sanitizeSettingsForDB(settings: Record<string, any>): Record<string, an
     'salary_expense_account_id',
     'expense_cash_account_id',
     'branch_id',
+    'vat_output_account_id',
+    'wht_payable_account_id',
   ];
   
   const sanitized = { ...settings };
@@ -693,27 +697,53 @@ export function useGenerateBulkARInvoices() {
             throw jeError;
           }
 
+          // Calculate VAT split (Inclusive 18%)
+          const vatRate = 0.18;
+          const vatAccountId = settings?.vat_output_account_id;
+          
+          let baseAmount = amount;
+          let vatAmount = 0;
+
+          if (vatAccountId) {
+            baseAmount = Math.round((amount / (1 + vatRate)) * 100) / 100;
+            vatAmount = Math.round((amount - baseAmount) * 100) / 100;
+            console.log(`[SBS GL] VAT split for ${student.student_name}: Total ${amount}, Base ${baseAmount}, VAT ${vatAmount}`);
+          }
+
           // 2. Create journal entry lines for this student
+          const jeLines: any[] = [
+            {
+              journal_entry_id: journalEntry.id,
+              account_id: settings.trade_receivable_account_id,
+              description: `AR - ${student.student_name} (${invoiceNumber})`,
+              debit: amount,
+              credit: 0,
+              company_id: effectiveCompanyId,
+            },
+            {
+              journal_entry_id: journalEntry.id,
+              account_id: settings.sbs_collection_account_id,
+              description: `Collection - ${student.student_name}${vatAccountId ? ' (Excl. VAT)' : ''}`,
+              debit: 0,
+              credit: baseAmount,
+              company_id: effectiveCompanyId,
+            },
+          ];
+
+          if (vatAccountId && vatAmount > 0) {
+            jeLines.push({
+              journal_entry_id: journalEntry.id,
+              account_id: vatAccountId,
+              description: `VAT Output (18% Inclusive) - ${student.student_name}`,
+              debit: 0,
+              credit: vatAmount,
+              company_id: effectiveCompanyId,
+            });
+          }
+
           const { error: linesError } = await supabase
             .from("journal_entry_lines")
-            .insert([
-              {
-                journal_entry_id: journalEntry.id,
-                account_id: settings.trade_receivable_account_id,
-                description: `AR - ${student.student_name} (${invoiceNumber})`,
-                debit: amount,
-                credit: 0,
-                company_id: effectiveCompanyId,
-              },
-              {
-                journal_entry_id: journalEntry.id,
-                account_id: settings.sbs_collection_account_id,
-                description: `Collection - ${student.student_name}`,
-                debit: 0,
-                credit: amount,
-                company_id: effectiveCompanyId,
-              },
-            ]);
+            .insert(jeLines);
 
           if (linesError) {
             console.error(`JE lines error for ${student.student_name}:`, linesError);
@@ -791,6 +821,8 @@ export function useGenerateBulkARInvoices() {
                 invoice_date: format(new Date(), "yyyy-MM-dd"),
                 due_date: format(new Date(new Date().setDate(new Date().getDate() + 30)), "yyyy-MM-dd"),
                 total_amount: amount,
+                tax_amount: vatAmount > 0 ? vatAmount : null,
+                subtotal: vatAmount > 0 ? baseAmount : null,
                 balance: netBalanceRemaining,
                 paid_amount: advanceApplyAmount,
                 status: arStatus,

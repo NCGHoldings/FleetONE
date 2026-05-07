@@ -422,29 +422,56 @@ export async function postInvoiceToGLStandalone({
 
   if (jeError) throw jeError;
 
+  // Calculate VAT split (Inclusive 18%)
+  const vatRate = 0.18;
+  const vatAccountId = settings?.vat_output_account_id;
+  
+  let baseAmount = totalAmount;
+  let vatAmount = 0;
+
+  if (vatAccountId) {
+    baseAmount = Math.round((totalAmount / (1 + vatRate)) * 100) / 100;
+    vatAmount = Math.round((totalAmount - baseAmount) * 100) / 100;
+    console.log(`[SPH GL] VAT split applied: Total ${totalAmount}, Base ${baseAmount}, VAT ${vatAmount}`);
+  }
+
   // Create journal entry lines
   // DR Trade Receivable (Asset increases with Debit)
   // CR Special Hire Revenue (Revenue increases with Credit)
+  // CR VAT Output (if configured)
+  const lines: any[] = [
+    {
+      journal_entry_id: journalEntry.id,
+      account_id: settings.trade_receivable_account_id,
+      description: `Receivable - ${customerName} (${invoiceNo})`,
+      debit: totalAmount,
+      credit: 0,
+      company_id: effectiveCompanyId,
+    },
+    {
+      journal_entry_id: journalEntry.id,
+      account_id: revenueAccountId,
+      description: `Revenue - Special Hire ${invoiceNo}${vatAccountId ? ' (Excl. VAT)' : ''}`,
+      debit: 0,
+      credit: baseAmount,
+      company_id: effectiveCompanyId,
+    }
+  ];
+
+  if (vatAccountId && vatAmount > 0) {
+    lines.push({
+      journal_entry_id: journalEntry.id,
+      account_id: vatAccountId,
+      description: `VAT Output (18% Inclusive) - ${invoiceNo}`,
+      debit: 0,
+      credit: vatAmount,
+      company_id: effectiveCompanyId,
+    });
+  }
+
   const { error: linesError } = await supabase
     .from("journal_entry_lines")
-    .insert([
-      {
-        journal_entry_id: journalEntry.id,
-        account_id: settings.trade_receivable_account_id,
-        description: `Receivable - ${customerName} (${invoiceNo})`,
-        debit: totalAmount,
-        credit: 0,
-        company_id: effectiveCompanyId,
-      },
-      {
-        journal_entry_id: journalEntry.id,
-        account_id: revenueAccountId,
-        description: `Revenue - Special Hire ${invoiceNo}`,
-        debit: 0,
-        credit: totalAmount,
-        company_id: effectiveCompanyId,
-      },
-    ]);
+    .insert(lines);
 
   if (linesError) throw linesError;
 
@@ -588,29 +615,56 @@ export async function postPostTripAdjustmentToGLStandalone({
 
   if (jeError) throw jeError;
 
+  // Calculate VAT split (Inclusive 18%)
+  const vatRate = 0.18;
+  const vatAccountId = settings?.vat_output_account_id;
+  
+  let baseAmount = adjustmentAmount;
+  let vatAmount = 0;
+
+  if (vatAccountId) {
+    baseAmount = Math.round((adjustmentAmount / (1 + vatRate)) * 100) / 100;
+    vatAmount = Math.round((adjustmentAmount - baseAmount) * 100) / 100;
+    console.log(`[SPH GL] Adjustment VAT split applied: Total ${adjustmentAmount}, Base ${baseAmount}, VAT ${vatAmount}`);
+  }
+
   // Create journal entry lines
   // DR Trade Receivable (customer owes more)
   // CR Revenue (additional revenue recognized)
+  // CR VAT Output (if configured)
+  const lines: any[] = [
+    {
+      journal_entry_id: journalEntry.id,
+      account_id: settings.trade_receivable_account_id,
+      description: `Adjustment receivable - ${customerName} (${quotationNo})`,
+      debit: adjustmentAmount,
+      credit: 0,
+      company_id: effectiveCompanyId,
+    },
+    {
+      journal_entry_id: journalEntry.id,
+      account_id: revenueAccountId,
+      description: `Adjustment revenue - ${quotationNo}${vatAccountId ? ' (Excl. VAT)' : ''}`,
+      debit: 0,
+      credit: baseAmount,
+      company_id: effectiveCompanyId,
+    }
+  ];
+
+  if (vatAccountId && vatAmount > 0) {
+    lines.push({
+      journal_entry_id: journalEntry.id,
+      account_id: vatAccountId,
+      description: `VAT Output (18% Inclusive) - Adjustment ${quotationNo}`,
+      debit: 0,
+      credit: vatAmount,
+      company_id: effectiveCompanyId,
+    });
+  }
+
   const { error: linesError } = await supabase
     .from("journal_entry_lines")
-    .insert([
-      {
-        journal_entry_id: journalEntry.id,
-        account_id: settings.trade_receivable_account_id,
-        description: `Adjustment receivable - ${customerName} (${quotationNo})`,
-        debit: adjustmentAmount,
-        credit: 0,
-        company_id: effectiveCompanyId,
-      },
-      {
-        journal_entry_id: journalEntry.id,
-        account_id: revenueAccountId,
-        description: `Adjustment revenue - ${quotationNo}`,
-        debit: 0,
-        credit: adjustmentAmount,
-        company_id: effectiveCompanyId,
-      },
-    ]);
+    .insert(lines);
 
   if (linesError) throw linesError;
 

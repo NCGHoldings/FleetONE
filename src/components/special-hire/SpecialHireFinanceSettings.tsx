@@ -336,6 +336,46 @@ export function SpecialHireFinanceSettings() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Receipt className="h-5 w-5" />
+            Tax Account Mappings (Inclusive 18% VAT)
+          </CardTitle>
+          <CardDescription>
+            Configure accounts for VAT and Withholding Tax. When set, revenue is automatically split (Total / 1.18).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label>VAT Output Account (Credit on Invoice)</Label>
+              <SearchableFinanceAccountSelector
+                value={settings.vat_output_account_id || null}
+                onValueChange={(value) => 
+                  setSettings({ ...settings, vat_output_account_id: value || "" })
+                }
+                accounts={chartOfAccounts || []}
+                placeholder="Select VAT account..."
+              />
+              <p className="text-xs text-muted-foreground">If set, invoice totals will be treated as 118% (100 Base + 18 VAT)</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>WHT Payable Account (Optional)</Label>
+              <SearchableFinanceAccountSelector
+                value={settings.wht_payable_account_id || null}
+                onValueChange={(value) => 
+                  setSettings({ ...settings, wht_payable_account_id: value || "" })
+                }
+                accounts={chartOfAccounts || []}
+                placeholder="Select WHT account..."
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Automation &amp; Workflow Rules</CardTitle>
           <CardDescription>
             Configure which events trigger automatic journal entries in the General Ledger

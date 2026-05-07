@@ -68,6 +68,8 @@ export function SchoolBusFinanceSettings() {
     maintenance_expense_account_id: "",
     salary_expense_account_id: "",
     expense_cash_account_id: "",
+    vat_output_account_id: "",
+    wht_payable_account_id: "",
   });
 
   // Branch settings state - use branch_gl_account_id for direct COA mapping
@@ -128,6 +130,8 @@ export function SchoolBusFinanceSettings() {
           maintenance_expense_account_id: defaultSetting.maintenance_expense_account_id || "",
           salary_expense_account_id: defaultSetting.salary_expense_account_id || "",
           expense_cash_account_id: defaultSetting.expense_cash_account_id || "",
+          vat_output_account_id: defaultSetting.vat_output_account_id || "",
+          wht_payable_account_id: defaultSetting.wht_payable_account_id || "",
         });
 
         // Also load via RPC to get the liability account reliably
@@ -429,6 +433,44 @@ export function SchoolBusFinanceSettings() {
 
           <Separator />
 
+          {/* Tax Account Mappings */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <Receipt className="h-4 w-4" />
+              Tax Account Mappings (Inclusive 18% VAT)
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label>VAT Output Account (Credit on Invoice)</Label>
+                <SearchableFinanceAccountSelector
+                  value={defaultSettings.vat_output_account_id || null}
+                  onValueChange={(value) =>
+                    setDefaultSettings({ ...defaultSettings, vat_output_account_id: value || "" })
+                  }
+                  accounts={liabilityAccounts}
+                  placeholder="Select VAT account"
+                />
+                <p className="text-xs text-muted-foreground">
+                  If set, student billing will be split: 100/118 to Revenue and 18/118 to this account.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>WHT Payable Account (Optional)</Label>
+                <SearchableFinanceAccountSelector
+                  value={defaultSettings.wht_payable_account_id || null}
+                  onValueChange={(value) =>
+                    setDefaultSettings({ ...defaultSettings, wht_payable_account_id: value || "" })
+                  }
+                  accounts={liabilityAccounts}
+                  placeholder="Select WHT account"
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Auto-posting toggles */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -716,9 +758,15 @@ export function SchoolBusFinanceSettings() {
                   <span className="font-mono">XXX,XXX</span>
                 </div>
                 <div className="flex justify-between items-center p-2 bg-red-50 rounded">
-                  <span>CR: SBS Collection Revenue</span>
+                  <span>CR: SBS Collection Revenue (Base)</span>
                   <span className="font-mono">XXX,XXX</span>
                 </div>
+                {defaultSettings.vat_output_account_id && (
+                  <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                    <span>CR: VAT Output (18% Inclusive)</span>
+                    <span className="font-mono">XX,XXX</span>
+                  </div>
+                )}
               </div>
             </div>
 

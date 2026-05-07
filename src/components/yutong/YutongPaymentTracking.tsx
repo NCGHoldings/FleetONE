@@ -96,16 +96,15 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   const loadBankAccounts = async () => {
     try {
       const { data, error } = await supabase
-        .from('chart_of_accounts')
-        .select('id, account_code, account_name')
-        .eq('company_id', NCG_HOLDING_ID)
-        .eq('account_type', 'asset')
+        .from('bank_accounts')
+        .select('id, account_name, bank_name, account_number')
+        .in('company_id', [NCG_HOLDING_ID, 'a0000000-0000-0000-0000-000000000003'])
         .eq('is_active', true)
-        .order('account_code');
+        .order('bank_name');
       if (error) throw error;
       setBankAccounts(data || []);
     } catch (error) {
-      console.error('Error loading asset accounts:', error);
+      console.error('Error loading bank accounts:', error);
     }
   };
 
@@ -263,6 +262,10 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         ? equityAccounts.find(b => b.id === paymentForm.bank_account_id)
         : bankAccounts.find(b => b.id === paymentForm.bank_account_id);
 
+      const bankNameStr = paymentForm.payment_method === 'opening_balance'
+        ? selectedBank ? `${selectedBank.account_code} - ${selectedBank.account_name}` : null
+        : selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_name}` : null;
+
       // Insert payment record with created_by
       const { data: payment, error: paymentError } = await supabase
         .from('yutong_customer_payments')
@@ -274,7 +277,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           payment_method: paymentForm.payment_method,
           payment_reference: paymentForm.reference_no || null,
           bank_account_id: paymentForm.bank_account_id,
-          bank_name: selectedBank ? `${selectedBank.account_code} - ${selectedBank.account_name}` : null,
+          bank_name: bankNameStr,
           custom_credit_account_id: paymentForm.custom_credit_account_id || null,
           payment_slip_url: paymentSlipUrl,
           notes: paymentForm.notes || null,
@@ -933,7 +936,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                       <SelectItem key={bank.id} value={bank.id}>
                         <div className="flex items-center gap-2">
                           <Landmark className="h-3 w-3 text-muted-foreground" />
-                          {bank.account_code} - {bank.account_name}
+                          {bank.bank_name} - {bank.account_name} ({bank.account_number})
                         </div>
                       </SelectItem>
                     ))}
