@@ -3,13 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, Clock, DollarSign, Database, RefreshCw, FileText, ArrowRight, Undo2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { reverseJournalEntry } from '@/hooks/useEditAccountingMutations';
 import { toast } from 'sonner';
+import { CheckCircle, Clock, DollarSign, Database, RefreshCw, FileText, ArrowRight, Undo2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { GLBreakdownPreview } from './GLBreakdownPreview';
 import { 
   postVehiclePaymentToGL, 
   fetchVehicleFinanceSettings, 
@@ -35,6 +36,13 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
   const [arInvoice, setArInvoice] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
   const [isReversing, setIsReversing] = useState<string | null>(null);
+  
+  // GL Review states
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isReversalReviewModalOpen, setIsReversalReviewModalOpen] = useState(false);
+  const [reviewPayment, setReviewPayment] = useState<any>(null);
+  const [isConfirmingSync, setIsConfirmingSync] = useState(false);
+  const [manualOverrides, setManualOverrides] = useState<{ bankId: string | null; creditId: string | null }>({ bankId: null, creditId: null });
 
   useEffect(() => {
     if (isOpen && orderId) {
@@ -117,7 +125,15 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
   };
 
   const handleSyncPaymentToGL = async (payment: any) => {
+    setReviewPayment(payment);
+    setIsReviewModalOpen(true);
+  };
+
+  const confirmSyncPaymentToGL = async () => {
+    if (!reviewPayment || isSyncing) return;
+    const payment = reviewPayment;
     setIsSyncing(payment.id);
+    setIsConfirmingSync(true);
     try {
       const settings = await fetchVehicleFinanceSettings(module, NCG_HOLDING_ID);
       if (!settings) {
@@ -155,8 +171,8 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
         paymentMethod: payment.payment_method,
         settings,
         effectiveCompanyId: NCG_HOLDING_ID,
-        customBankAccountId: payment.bank_account_id,
-        customCreditAccountId: payment.custom_credit_account_id,
+        customBankAccountId: manualOverrides.bankId || payment.bank_account_id,
+        customCreditAccountId: manualOverrides.creditId || payment.custom_credit_account_id,
       });
 
       if (glResult) {
@@ -194,12 +210,20 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
       toast.error('Failed to sync to GL');
     } finally {
       setIsSyncing(null);
+      setIsConfirmingSync(false);
+      setIsReviewModalOpen(false);
+      setReviewPayment(null);
     }
   };
 
   const handleReversePayment = async (payment: any) => {
-    if (!window.confirm('Are you sure you want to reverse this payment? This will create a reversing Journal Entry.')) return;
-    
+    setReviewPayment(payment);
+    setIsReversalReviewModalOpen(true);
+  };
+
+  const confirmReversePayment = async () => {
+    if (!reviewPayment) return;
+    const payment = reviewPayment;
     setIsReversing(payment.id);
     try {
       if (payment.journal_entry_id) {
@@ -222,6 +246,8 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
       toast.error(error.message || 'Failed to reverse payment');
     } finally {
       setIsReversing(null);
+      setIsReversalReviewModalOpen(false);
+      setReviewPayment(null);
     }
   };
 
@@ -499,6 +525,115 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
           </TabsContent>
         </Tabs>
 
+        <Dialog open={isReviewModalOpen} onOpenChange={setIsReviewModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-blue-600" />
+                Review GL Impact
+              </DialogTitle>
+              <DialogDescription>
+                Verify the debit and credit lines before posting to the General Ledger.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-4">
+              {reviewPayment && (
+                <GLBreakdownPreview 
+                  customerId={orderData?.finance_customer_id || ""}
+                  companyId={NCG_HOLDING_ID}
+                  amount={reviewPayment.payment_amount}
+                  paymentType={orderData?.ar_invoice_id ? 'balance' : 'advance'}
+                  customBankAccountId={reviewPayment.bank_account_id}
+                  customCreditAccountId={reviewPayment.custom_credit_account_id}
+                  paymentMethod={reviewPayment.payment_method}
+                  onOverridesChange={setManualOverrides}
+                />
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setIsReviewModalOpen(false)} disabled={isConfirmingSync}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={confirmSyncPaymentToGL} 
+                disabled={isConfirmingSync}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isConfirmingSync ? (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                )}
+                {isConfirmingSync ? 'Syncing...' : 'Confirm & Post to GL'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* GL Reversal Review Modal */}
+        <Dialog open={isReversalReviewModalOpen} onOpenChange={setIsReversalReviewModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Undo2 className="h-5 w-5 text-orange-600" />
+                Reverse GL Transaction
+              </DialogTitle>
+              <DialogDescription>
+                This will create a reversing entry to cancel out the original transaction.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-4">
+              {reviewPayment && (
+                <div className="space-y-4">
+                  <div className="p-3 bg-orange-50 border border-orange-100 rounded-md text-xs text-orange-800">
+                    <strong>Original Entry:</strong> {reviewPayment.journal_entries?.entry_number || 'Linked Entry'}
+                  </div>
+                  
+                  <GLBreakdownPreview 
+                    customerId={orderData?.finance_customer_id || ""}
+                    companyId={NCG_HOLDING_ID}
+                    amount={reviewPayment.payment_amount}
+                    paymentType={orderData?.ar_invoice_id ? 'balance' : 'advance'}
+                    customBankAccountId={reviewPayment.bank_account_id}
+                    customCreditAccountId={reviewPayment.custom_credit_account_id}
+                    paymentMethod={reviewPayment.payment_method}
+                  />
+                  
+                  <div className="mt-4 p-4 bg-slate-50 border rounded-lg">
+                    <h4 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" /> Reversal Logic
+                    </h4>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      The system will automatically flip the original Debit and Credit lines. 
+                      <strong> Bank</strong> will be Credited, and <strong>{orderData?.ar_invoice_id ? 'Receivable' : 'Advance'}</strong> will be Debited.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setIsReversalReviewModalOpen(false)} disabled={!!isReversing}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={confirmReversePayment} 
+                disabled={!!isReversing}
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                {isReversing ? (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Undo2 className="h-4 w-4 mr-2" />
+                )}
+                {isReversing ? 'Reversing...' : 'Confirm Reversal'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );

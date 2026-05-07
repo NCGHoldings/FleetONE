@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Save, DollarSign, Building2, CreditCard, Calculator } from 'lucide-react';
+import { Loader2, Save, DollarSign, Building2, CreditCard, Calculator, RefreshCw } from 'lucide-react';
 import { SearchableFinanceAccountSelector } from './SearchableFinanceAccountSelector';
 import { 
   VehicleModule, 
@@ -21,6 +21,13 @@ import {
   saveVehicleFinanceSettings,
   NCG_HOLDING_ID 
 } from '@/hooks/useVehicleSalesFinance';
+import { 
+  useActiveCustomerCategories, 
+  useUpdateCustomerCategory,
+  CustomerCategory 
+} from '@/hooks/useCustomerCategories';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SearchableAccountSelector } from '../accounting/shared/SearchableAccountSelector';
 
 interface VehicleFinanceSettingsBaseProps {
   module: VehicleModule;
@@ -59,6 +66,9 @@ export function VehicleFinanceSettingsBase({
     invoice_prefix: `${module.toUpperCase().substring(0, 3)}-INV`,
     receipt_prefix: `${module.toUpperCase().substring(0, 3)}-RCT`,
   });
+
+  const { data: customerCategories, isLoading: categoriesLoading } = useActiveCustomerCategories();
+  const updateCategoryMutation = useUpdateCustomerCategory();
 
   useEffect(() => {
     loadData();
@@ -101,10 +111,8 @@ export function VehicleFinanceSettingsBase({
    */
   const validateSettings = (): boolean => {
     const requiredFields = [
-      { key: 'default_bank_account_id', label: 'Bank Account' },
       { key: 'customer_advance_account_id', label: 'Customer Advance Account' },
       { key: 'sales_revenue_account_id', label: 'Sales Revenue Account' },
-      { key: 'trade_receivable_account_id', label: 'Trade Receivable Account' },
     ];
     
     const missingFields = requiredFields.filter(f => !(settings as any)[f.key]);
@@ -144,10 +152,8 @@ export function VehicleFinanceSettingsBase({
 
   const isRequiredField = (field: keyof VehicleFinanceSettings): boolean => {
     return [
-      'default_bank_account_id', 
       'customer_advance_account_id',
       'sales_revenue_account_id',
-      'trade_receivable_account_id'
     ].includes(field);
   };
 
@@ -234,7 +240,7 @@ export function VehicleFinanceSettingsBase({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {renderAccountSelect(
-                'Trade Receivable Account',
+                'Trade Receivable Account (Fallback)',
                 'trade_receivable_account_id',
                 ['asset'],
                 'Select trade receivable account'
@@ -258,7 +264,7 @@ export function VehicleFinanceSettingsBase({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {renderAccountSelect(
-                'Default Bank Account',
+                'Default Bank Account (Fallback)',
                 'default_bank_account_id',
                 ['asset'],
                 'Select bank account'
@@ -368,6 +374,113 @@ export function VehicleFinanceSettingsBase({
                 />
               </div>
             </div>
+          </div>
+
+          <Separator />
+
+          {/* Customer Category Mappings */}
+          <div className="bg-muted/30 p-4 rounded-xl border border-border/50">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Calculator className="h-5 w-5 text-primary" />
+                  Customer Category Mappings
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Configure specific GL routing for standard categories. Global settings above will act as fallbacks.
+                </p>
+              </div>
+              {updateCategoryMutation.isPending && (
+                <div className="flex items-center gap-2 text-xs text-primary animate-pulse">
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  Saving mapping...
+                </div>
+              )}
+            </div>
+            
+            {categoriesLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
+              </div>
+            ) : (
+              <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+                <Table className="erp-table-professional">
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="w-[180px] font-bold">Category</TableHead>
+                      <TableHead className="font-bold">AR Account (Primary)</TableHead>
+                      <TableHead className="font-bold">Revenue Account</TableHead>
+                      <TableHead className="font-bold">Advance Account</TableHead>
+                      <TableHead className="font-bold">Bank Account (Primary)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {customerCategories?.filter(cat => 
+                      ['internal', 'external', 'intercompany', 'inter company'].some(term => 
+                        cat.category_name.toLowerCase().includes(term)
+                      )
+                    ).map((category) => (
+                      <TableRow key={category.id} className="hover:bg-muted/30 transition-colors">
+                        <TableCell className="font-medium">
+                          <div className="text-sm font-semibold text-primary">{category.category_name}</div>
+                          <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">{category.category_code}</div>
+                        </TableCell>
+                        <TableCell className="min-w-[200px]">
+                          <SearchableAccountSelector
+                            value={category.ar_account_id}
+                            onValueChange={(value) => 
+                              updateCategoryMutation.mutate({ id: category.id, ar_account_id: value })
+                            }
+                            accounts={getAccountsByType(['asset'])}
+                            placeholder="Select AR Account"
+                          />
+                        </TableCell>
+                        <TableCell className="min-w-[200px]">
+                          <SearchableAccountSelector
+                            value={category.revenue_account_id}
+                            onValueChange={(value) => 
+                              updateCategoryMutation.mutate({ id: category.id, revenue_account_id: value })
+                            }
+                            accounts={getAccountsByType(['revenue', 'income'])}
+                            placeholder="Select Revenue Account"
+                          />
+                        </TableCell>
+                        <TableCell className="min-w-[200px]">
+                          <SearchableAccountSelector
+                            value={category.advance_account_id}
+                            onValueChange={(value) => 
+                              updateCategoryMutation.mutate({ id: category.id, advance_account_id: value })
+                            }
+                            accounts={getAccountsByType(['liability'])}
+                            placeholder="Select Advance Account"
+                          />
+                        </TableCell>
+                        <TableCell className="min-w-[200px]">
+                          <SearchableAccountSelector
+                            value={category.bank_account_id}
+                            onValueChange={(value) => 
+                              updateCategoryMutation.mutate({ id: category.id, bank_account_id: value })
+                            }
+                            accounts={getAccountsByType(['asset'])}
+                            placeholder="Select Bank Account"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {(!customerCategories || customerCategories.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-12 text-muted-foreground italic bg-muted/10">
+                          <div className="flex flex-col items-center gap-2">
+                            <Calculator className="h-8 w-8 opacity-20" />
+                            <p>No customer categories found. Configure them in Customer settings.</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end pt-4">

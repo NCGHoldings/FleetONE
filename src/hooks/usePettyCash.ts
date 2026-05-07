@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { useCompany } from "@/contexts/CompanyContext";
+import { useCompany, NCG_HOLDING_ID } from "@/contexts/CompanyContext";
 
 export interface PettyCashFund {
   id: string;
@@ -96,12 +96,14 @@ export const usePettyCashFunds = (filters?: { branchId?: string; fundType?: stri
         .from("petty_cash_funds")
         .select(`
           *,
-          branch:school_branches(branch_name)
+          branch:school_branches(branch_name),
+          gl_account:chart_of_accounts(account_code, account_name),
+          company:companies(name, short_code)
         `)
         .eq("is_active", true)
         .order("fund_name");
 
-      if (selectedCompanyId) {
+      if (selectedCompanyId && selectedCompanyId !== NCG_HOLDING_ID) {
         query = query.eq("company_id", selectedCompanyId);
       }
       if (filters?.branchId) {
@@ -130,7 +132,8 @@ export const usePettyCashTransactions = (fundId?: string, filters?: { status?: s
         .select(`
           *,
           fund:petty_cash_funds(fund_name, business_unit_code),
-          gl_account:chart_of_accounts(account_code, account_name)
+          gl_account:chart_of_accounts(account_code, account_name),
+          company:companies(name, short_code)
         `)
         .order("created_at", { ascending: false });
 
@@ -172,12 +175,13 @@ export const useAllPettyCashTransactions = (filters?: {
         .select(`
           *,
           fund:petty_cash_funds(fund_name, business_unit_code),
-          gl_account:chart_of_accounts(account_code, account_name)
+          gl_account:chart_of_accounts(account_code, account_name),
+          company:companies(name, short_code)
         `)
         .order("created_at", { ascending: false })
         .limit(500);
 
-      if (selectedCompanyId) {
+      if (selectedCompanyId && selectedCompanyId !== NCG_HOLDING_ID) {
         query = query.eq("company_id", selectedCompanyId);
       }
       if (filters?.transactionType && filters.transactionType !== "all") {
@@ -444,11 +448,12 @@ export const useCreatePettyCashTransaction = () => {
         .eq("id", data.petty_cash_fund_id!);
 
       // 5. AUTO-CREATE AP PAYMENT for replenishments (audit-grade visibility)
+      let createdApPaymentId: string | null = null;
       if (txnType === "replenishment" && amount > 0) {
         try {
           const effectiveCompanyId = getEffectiveCompanyId() || selectedCompanyId;
           const businessUnitCode = getBusinessUnitCode() || fund.business_unit_code || null;
-          const paymentNumber = `PC-REPL-${Date.now().toString().slice(-8)}`;
+          const paymentNumber = `PV-REPL-${Date.now().toString().slice(-8)}`;
 
           const { data: apPayment } = await supabase
             .from("ap_payments")
@@ -469,6 +474,7 @@ export const useCreatePettyCashTransaction = () => {
             .single();
 
           if (apPayment) {
+            createdApPaymentId = apPayment.id;
             // Link AP payment reference back to petty cash transaction description
             await supabase
               .from("petty_cash_transactions")
@@ -611,6 +617,13 @@ export const useCreatePettyCashTransaction = () => {
                 .from("petty_cash_transactions")
                 .update({ journal_entry_id: je.id })
                 .eq("id", result.id);
+
+              if (createdApPaymentId) {
+                await supabase
+                  .from("ap_payments")
+                  .update({ journal_entry_id: je.id })
+                  .eq("id", createdApPaymentId);
+              }
             }
           } else {
             console.warn("Petty cash GL posting skipped: missing debit or credit account", { debitAccountId, creditAccountId });
@@ -650,7 +663,7 @@ export const usePettyCashDashboard = () => {
         .from("petty_cash_funds")
         .select(`*, branch:school_branches(branch_name)`)
         .eq("is_active", true);
-      if (selectedCompanyId) fundsQuery = fundsQuery.eq("company_id", selectedCompanyId);
+      if (selectedCompanyId && selectedCompanyId !== NCG_HOLDING_ID) fundsQuery = fundsQuery.eq("company_id", selectedCompanyId);
       const { data: funds, error: fundsErr } = await fundsQuery;
       if (fundsErr) throw fundsErr;
 
@@ -659,7 +672,7 @@ export const usePettyCashDashboard = () => {
         .from("petty_cash_transactions")
         .select("*")
         .gte("created_at", monthStart);
-      if (selectedCompanyId) txnQuery = txnQuery.eq("company_id", selectedCompanyId);
+      if (selectedCompanyId && selectedCompanyId !== NCG_HOLDING_ID) txnQuery = txnQuery.eq("company_id", selectedCompanyId);
       const { data: transactions, error: txnErr } = await txnQuery;
       if (txnErr) throw txnErr;
 
@@ -711,7 +724,7 @@ export const usePettyCashDashboard = () => {
 
 // ============ IOU Hooks (unchanged) ============
 
-export const useIOURecords = (filters?: { status?: string }) => {
+export const useIOURecords = (filters?: { status?: string; dateFrom?: string; dateTo?: string }) => {
   const { selectedCompanyId } = useCompany();
 
   return useQuery({
@@ -719,11 +732,13 @@ export const useIOURecords = (filters?: { status?: string }) => {
     queryFn: async () => {
       let query = supabase
         .from("iou_records")
-        .select(`*, staff:staff_registry(staff_name)`)
+        .select(`*, staff:staff_registry(staff_name), company:companies(name, short_code)`)
         .order("created_at", { ascending: false });
 
-      if (selectedCompanyId) query = query.eq("company_id", selectedCompanyId);
+      if (selectedCompanyId && selectedCompanyId !== NCG_HOLDING_ID) query = query.eq("company_id", selectedCompanyId);
       if (filters?.status && filters.status !== "all") query = query.eq("status", filters.status);
+      if (filters?.dateFrom) query = query.gte("created_at", filters.dateFrom);
+      if (filters?.dateTo) query = query.lte("created_at", filters.dateTo);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -782,6 +797,7 @@ export const useCreateIOU = () => {
       if (error) throw error;
 
       const amount = data.amount || 0;
+      let createdApPaymentId: string | null = null;
 
       // Handle Petty Cash Transaction & Balance Reduction
       if (fund && data.petty_cash_fund_id && amount > 0) {
@@ -840,6 +856,8 @@ export const useCreateIOU = () => {
           })
           .select()
           .single();
+
+        createdApPaymentId = apPayment?.id || null;
 
         // 3. Create Bank Transaction to deduct balance
         await supabase.from("bank_transactions").insert({
@@ -1000,6 +1018,13 @@ export const useCreateIOU = () => {
                 .from("iou_records")
                 .update({ journal_entry_id: je.id })
                 .eq("id", result.id);
+
+              if (createdApPaymentId) {
+                await supabase
+                  .from("ap_payments")
+                  .update({ journal_entry_id: je.id })
+                  .eq("id", createdApPaymentId);
+              }
             }
           } else {
             console.warn("IOU GL posting skipped: missing advance or cash/bank account");

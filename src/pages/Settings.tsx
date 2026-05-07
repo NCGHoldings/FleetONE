@@ -34,73 +34,18 @@ import { ModuleFinanceSettingsView } from "@/components/settings/ModuleFinanceSe
 import { CoreGLSettings } from "@/components/settings/CoreGLSettings";
 import { CustomerCategoryManagement } from "@/components/accounting/CustomerCategoryManagement";
 import { VendorCategoryManagement } from "@/components/accounting/VendorCategoryManagement";
+import { PasswordChangeForm } from "@/components/auth/PasswordChangeForm";
 
 export default function Settings() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
-
   const [preferences, setPreferences] = useState({
     emailNotifications: true,
     pushNotifications: false,
     paymentReminders: true,
     tripUpdates: true,
   });
-
-  const handlePasswordChange = async () => {
-    if (!user) return;
-
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "New passwords do not match",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (passwordData.newPassword.length < 6) {
-      toast({
-        title: "Error",
-        description: "Password must be at least 6 characters",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: passwordData.newPassword,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Password Updated",
-        description: "Your password has been changed successfully.",
-      });
-      
-      setPasswordData({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handlePreferenceChange = (key: keyof typeof preferences) => {
     setPreferences((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -186,54 +131,7 @@ export default function Settings() {
 
         <TabsContent value="account" className="space-y-6 mt-6">
           <div className="grid gap-6 max-w-2xl">
-        {/* Account Security */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock className="w-5 h-5" />
-              Account Security
-            </CardTitle>
-            <CardDescription>Update your password and security settings</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="current-password">Current Password</Label>
-              <Input
-                id="current-password"
-                type="password"
-                value={passwordData.currentPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                disabled={loading}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="new-password">New Password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={passwordData.newPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                disabled={loading}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                value={passwordData.confirmPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                disabled={loading}
-              />
-            </div>
-
-            <Button onClick={handlePasswordChange} disabled={loading}>
-              Change Password
-            </Button>
-          </CardContent>
-        </Card>
+        <PasswordChangeForm />
 
         {/* Notification Preferences */}
         <Card>

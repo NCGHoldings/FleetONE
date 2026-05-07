@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users, BookOpen, TrendingUp, Route, Table2, Wallet, Landmark, Search } from "lucide-react";
+import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users, BookOpen, TrendingUp, Route, Table2, Wallet, Landmark, Search, Clock } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useDailyBusGroupedTrips } from "@/hooks/useDailyBusGroupedTrips";
@@ -27,6 +27,7 @@ import { CashierSettlementDashboard } from "@/components/ncg-express/CashierSett
 import { BankDepositDashboard } from "@/components/ncg-express/BankDepositDashboard";
 import { FleetMasterSpreadsheet } from "@/components/fleet/FleetMasterSpreadsheet";
 import { LogSheetUploadModal } from "@/components/trips/LogSheetUploadModal";
+import { SubmissionTrackingDashboard } from "@/components/trips/SubmissionTrackingDashboard";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 
@@ -37,7 +38,7 @@ export default function DailyTrips() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [dateMode, setDateMode] = useState<"single" | "range">("single");
   const [viewMode, setViewMode] = useState<"table" | "cards" | "crew">(isMobile ? "cards" : "table");
-  const [mainTab, setMainTab] = useState<"trips" | "bus-pl" | "route-pl" | "fleet-sheet" | "cash-settlement" | "bank-deposit">("trips");
+  const [mainTab, setMainTab] = useState<"trips" | "submission-monitor" | "bus-pl" | "route-pl" | "fleet-sheet" | "cash-settlement" | "bank-deposit">("trips");
   const [showImportModal, setShowImportModal] = useState(false);
   const [showGLExportModal, setShowGLExportModal] = useState(false);
   const [showRouteGLAdmin, setShowRouteGLAdmin] = useState(false);
@@ -110,6 +111,10 @@ export default function DailyTrips() {
                 <TabsTrigger value="trips" className="gap-2">
                   <LayoutList className="h-4 w-4" />
                   Daily Trips
+                </TabsTrigger>
+                <TabsTrigger value="submission-monitor" className="gap-2 text-blue-600 dark:text-blue-400">
+                  <Clock className="h-4 w-4" />
+                  Submission Monitor
                 </TabsTrigger>
                 <TabsTrigger value="fleet-sheet" className="gap-2">
                   <Table2 className="h-4 w-4" />
@@ -398,6 +403,60 @@ export default function DailyTrips() {
       ) : mainTab === "fleet-sheet" ? (
         <div className="container mx-auto p-4">
           <FleetMasterSpreadsheet initialDate={selectedDate} />
+        </div>
+      ) : mainTab === "submission-monitor" ? (
+        <div className="container mx-auto p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800 dark:text-slate-100">
+                <Clock className="w-5 h-5 text-blue-500" />
+                Submission Tracking & SLA Monitor
+              </h2>
+              <p className="text-sm text-muted-foreground">Monitor real-time data completeness and identify delayed trip submissions.</p>
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setSelectedDate(subDays(selectedDate, 1))}
+                title="Previous Day"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-[200px] justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(selectedDate, "PPP")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => date && setSelectedDate(date)}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+                title="Next Day"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <SubmissionTrackingDashboard selectedDate={selectedDate} />
         </div>
       ) : mainTab === "cash-settlement" ? (
         <div className="container mx-auto p-4">

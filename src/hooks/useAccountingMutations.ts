@@ -1417,6 +1417,14 @@ export const useCreateAPPayment = () => {
           await supabase.from("ap_payments").update({ journal_entry_id: glResult.journalEntryId }).eq("id", data.id);
         } else if (!glResult.success) {
           console.error("Direct Payment GL Posting failed:", glResult.error);
+          throw new Error(`Transaction Aborted: Journal Entry generation failed. ${glResult.error}`);
+        }
+      } else if (payment.is_direct_payment && payment.amount > 0) {
+        if (!payment.direct_lines?.length) {
+          throw new Error("Transaction Aborted: Direct payments must have at least one line item.");
+        }
+        if (!bankGLAccountId) {
+          throw new Error("Transaction Aborted: Bank account has no linked GL account. Configure it in Banking → Edit Account → GL Account.");
         }
       } else if (!payment.is_direct_payment && payeeType === "vendor") {
         // Normal / Advance payment GL posting — resolve via vendor category mappings

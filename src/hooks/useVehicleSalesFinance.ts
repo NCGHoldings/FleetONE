@@ -197,6 +197,22 @@ export async function createVehicleCustomer({
     // Create new customer with auto-generated code
     const customerCode = `${businessUnitCode}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
+    // DEFAULT to External category if none provided
+    let effectiveCategoryId = customerCategoryId || null;
+    if (!effectiveCategoryId) {
+      const { data: externalCat } = await supabase
+        .from('customer_categories')
+        .select('id')
+        .eq('company_id', companyId)
+        .ilike('category_name', 'External')
+        .maybeSingle();
+      
+      if (externalCat) {
+        effectiveCategoryId = externalCat.id;
+        console.log(`[${module.toUpperCase()} Finance] Auto-assigned 'External' category to new customer`);
+      }
+    }
+
     const { data: newCustomer, error: insertError } = await supabase
       .from('customers')
       .insert({
@@ -206,7 +222,7 @@ export async function createVehicleCustomer({
         phone: customerPhone || null,
         email: customerEmail || null,
         customer_type: 'individual',
-        customer_category_id: customerCategoryId || null,
+        customer_category_id: effectiveCategoryId,
         business_unit_code: businessUnitCode,
         is_active: true,
       })
@@ -352,6 +368,7 @@ export async function postVehiclePaymentToGL({
   effectiveCompanyId,
   customBankAccountId,
   customCreditAccountId,
+  customerId,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -363,6 +380,7 @@ export async function postVehiclePaymentToGL({
   effectiveCompanyId: string;
   customBankAccountId?: string;
   customCreditAccountId?: string;
+  customerId?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
@@ -380,7 +398,33 @@ export async function postVehiclePaymentToGL({
       return null;
     }
 
-    const bankAccountId = customBankAccountId || settings.default_bank_account_id;
+    // Resolve accounts via Category resolution if customerId is provided
+    let tradeReceivableId = settings.trade_receivable_account_id;
+    let salesRevenueId = settings.sales_revenue_account_id;
+    let customerAdvanceId = settings.customer_advance_account_id;
+    let bankAccountId = customBankAccountId || settings.default_bank_account_id;
+
+    if (customerId) {
+      try {
+        const { resolveCustomerARAccounts } = await import('@/hooks/useCustomerCategories');
+        const resolved = await resolveCustomerARAccounts(customerId, effectiveCompanyId);
+        
+        if (resolved.arAccountId) tradeReceivableId = resolved.arAccountId;
+        if (resolved.revenueAccountId) salesRevenueId = resolved.revenueAccountId;
+        if (resolved.advanceAccountId) customerAdvanceId = resolved.advanceAccountId;
+        // Use resolved bank account ONLY IF customBankAccountId was not provided
+        if (!customBankAccountId && resolved.bankAccountId) {
+          bankAccountId = resolved.bankAccountId;
+        }
+        
+        console.log(`[${module.toUpperCase()} Finance] Payment GL resolution complete`, {
+          bankAccountId, tradeReceivableId, salesRevenueId, customerAdvanceId, source: resolved.source
+        });
+      } catch (err) {
+        console.warn(`[${module.toUpperCase()} Finance] Customer resolution failed for payment, using fallbacks`, err);
+      }
+    }
+
     if (!bankAccountId) {
       console.error(`[${module.toUpperCase()} Finance] Missing bank account`);
       toast.error('Missing GL account configuration for bank');
@@ -434,18 +478,18 @@ export async function postVehiclePaymentToGL({
 
     // CREDIT: Based on payment type
     if (paymentType === 'advance') {
-      // CR Account: Priority 1. Custom Override, 2. Advance Account
+      // CR Account: Priority 1. Custom Override, 2. Resolved Advance Account
       lines.push({
         journal_entry_id: journalEntry.id,
-        account_id: customCreditAccountId || settings.customer_advance_account_id,
+        account_id: customCreditAccountId || customerAdvanceId,
         description: `${businessUnitCode} Advance from ${customerName} - ${orderNo}`,
         debit: 0,
         credit: amount,
         company_id: effectiveCompanyId,
       });
     } else if (paymentType === 'balance') {
-      // CR Account: Priority 1. Custom Override, 2. Trade Receivable, 3. Revenue
-      const creditAccountId = customCreditAccountId || settings.trade_receivable_account_id || settings.sales_revenue_account_id;
+      // CR Account: Priority 1. Custom Override, 2. Resolved Trade Receivable, 3. Resolved Revenue
+      const creditAccountId = customCreditAccountId || tradeReceivableId || salesRevenueId;
       
       lines.push({
         journal_entry_id: journalEntry.id,
@@ -456,10 +500,10 @@ export async function postVehiclePaymentToGL({
         company_id: effectiveCompanyId,
       });
     } else {
-      // Full payment: CR Account Priority 1. Custom Override, 2. Revenue
+      // Full payment: CR Account Priority 1. Custom Override, 2. Resolved Revenue
       lines.push({
         journal_entry_id: journalEntry.id,
-        account_id: customCreditAccountId || settings.sales_revenue_account_id,
+        account_id: customCreditAccountId || salesRevenueId,
         description: `${businessUnitCode} Full payment from ${customerName} - ${orderNo}`,
         debit: 0,
         credit: amount,
@@ -705,6 +749,7 @@ export async function applyAdvanceToReceivable({
   advanceAmount,
   settings,
   effectiveCompanyId,
+  customerId,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -712,11 +757,27 @@ export async function applyAdvanceToReceivable({
   advanceAmount: number;
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
+  customerId?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
+    
+    // Resolve accounts via Category resolution if customerId is provided
+    let tradeReceivableId = settings.trade_receivable_account_id;
+    let customerAdvanceId = settings.customer_advance_account_id;
 
-    if (!settings.customer_advance_account_id || !settings.trade_receivable_account_id) {
+    if (customerId) {
+      try {
+        const { resolveCustomerARAccounts } = await import('@/hooks/useCustomerCategories');
+        const resolved = await resolveCustomerARAccounts(customerId, effectiveCompanyId);
+        if (resolved.arAccountId) tradeReceivableId = resolved.arAccountId;
+        if (resolved.advanceAccountId) customerAdvanceId = resolved.advanceAccountId;
+      } catch (err) {
+        console.warn(`[${module.toUpperCase()} Finance] Customer resolution failed for advance application`, err);
+      }
+    }
+
+    if (!customerAdvanceId || !tradeReceivableId) {
       console.error(`[${module.toUpperCase()} Finance] Missing accounts for advance application`);
       return null;
     }
@@ -748,7 +809,7 @@ export async function applyAdvanceToReceivable({
     const lines = [
       {
         journal_entry_id: journalEntry.id,
-        account_id: settings.customer_advance_account_id,
+        account_id: customerAdvanceId,
         description: `${businessUnitCode} Advance applied - ${customerName}`,
         debit: advanceAmount,
         credit: 0,
@@ -756,7 +817,7 @@ export async function applyAdvanceToReceivable({
       },
       {
         journal_entry_id: journalEntry.id,
-        account_id: settings.trade_receivable_account_id,
+        account_id: tradeReceivableId,
         description: `${businessUnitCode} Advance applied - ${customerName}`,
         debit: 0,
         credit: advanceAmount,

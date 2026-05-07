@@ -14,6 +14,17 @@ import { useChartOfAccounts } from "@/hooks/useAccountingData";
 import { useCreateJournalEntry, usePostJournalEntry } from "@/hooks/useAccountingMutations";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useVendors, useCustomers } from "@/hooks/useAccountingData";
+import { 
+  Building2, 
+  User, 
+  Receipt, 
+  CreditCard, 
+  ArrowRightLeft, 
+  FileText,
+  AlertTriangle,
+  ExternalLink
+} from "lucide-react";
 
 interface Props {
   importData: MasterExpenseImport;
@@ -42,6 +53,29 @@ export function ExpenseMappingGrid({ importData }: Props) {
       .filter(a => a.account_type === "asset" || a.account_type === "liability" || a.account_type === "equity")
       .map(a => ({ value: a.id, label: `${a.account_code || ""} - ${a.account_name}`.replace(/^ - /, "") }));
   }, [accounts]);
+
+  const apAccounts = useMemo(() => {
+    return (accounts || [])
+      .filter(a => a.account_type === "liability" && a.account_name.toLowerCase().includes("payable"))
+      .map(a => ({ value: a.id, label: `${a.account_code || ""} - ${a.account_name}`.replace(/^ - /, "") }));
+  }, [accounts]);
+
+  const arAccounts = useMemo(() => {
+    return (accounts || [])
+      .filter(a => a.account_type === "asset" && a.account_name.toLowerCase().includes("receivable"))
+      .map(a => ({ value: a.id, label: `${a.account_code || ""} - ${a.account_name}`.replace(/^ - /, "") }));
+  }, [accounts]);
+
+  const { data: vendors } = useVendors();
+  const { data: customers } = useCustomers();
+
+  const vendorOptions = useMemo(() => {
+    return (vendors || []).map(v => ({ value: v.id, label: v.vendor_name }));
+  }, [vendors]);
+
+  const customerOptions = useMemo(() => {
+    return (customers || []).map(c => ({ value: c.id, label: c.customer_name }));
+  }, [customers]);
   
   // Mapping options
   const [vehicles, setVehicles] = useState<{id: string, bus_no: string}[]>([]);
@@ -201,7 +235,7 @@ export function ExpenseMappingGrid({ importData }: Props) {
     }
   };
   
-  const handleManualMapping = async (recordId: string, field: "mapped_vehicle_id" | "mapped_quotation_id" | "mapped_expense_account_id" | "mapped_payment_account_id", value: string | null) => {
+  const handleManualMapping = async (recordId: string, field: string, value: string | null) => {
      try {
        await updateRecordInDb(recordId, { [field]: value });
        setRecords(records.map(r => {
@@ -219,29 +253,48 @@ export function ExpenseMappingGrid({ importData }: Props) {
   };
 
   const postSingleToGL = async (record: MasterExpenseRecord) => {
-    if (!record.mapped_expense_account_id || !record.mapped_payment_account_id) {
-      throw new Error("Missing Expense Account or Payment Mode");
+    const category = importData.import_category || "Expense";
+    
+    let drAccountId: string | undefined;
+    let crAccountId: string | undefined;
+    let description = "";
+
+    if (category === "AP_Invoice") {
+      drAccountId = record.mapped_expense_account_id || undefined;
+      crAccountId = record.mapped_payment_account_id || undefined; // AP Account selected in payment mode column
+      description = `AP Invoice: ${record.vendor_name || record.raw_data["Vendor"] || "Unknown"} - ${record.document_number || "Import"}`;
+    } else if (category === "AP_Payment") {
+      drAccountId = record.mapped_expense_account_id || undefined; // AP Account selected in expense column
+      crAccountId = record.mapped_payment_account_id || undefined; // Bank/Cash selected in payment column
+      description = `AP Payment: ${record.vendor_name || record.raw_data["Vendor"] || "Unknown"} - ${record.document_number || "Import"}`;
+    } else {
+      // Default Expense flow
+      drAccountId = record.mapped_expense_account_id || undefined;
+      crAccountId = record.mapped_payment_account_id || undefined;
+      description = `Expense Import: ${importData.expense_type} - ${record.raw_data["TRIP ID"] || record.raw_data["TRNX_ID"] || "Generic"}`;
     }
 
-    const description = `Expense Import: ${importData.expense_type} - ${record.raw_data["TRIP ID"] || record.raw_data["TRNX_ID"] || "Generic"}`;
-    
+    if (!drAccountId || !crAccountId) {
+      throw new Error(`Missing Account Mappings for ${category}`);
+    }
+
     const journalEntry = await createJournal.mutateAsync({
-      entry_number: `EXP-${record.id.substring(0, 8).toUpperCase()}`,
+      entry_number: `${category.substring(0, 3).toUpperCase()}-${record.id.substring(0, 8).toUpperCase()}`,
       entry_date: record.expense_date || new Date().toISOString().split('T')[0],
       description: description,
       company_id: selectedCompanyId,
-      source_module: "expense",
+      source_module: category.toLowerCase(),
       total_debit: record.amount,
       total_credit: record.amount,
       lines: [
         {
-          account_id: record.mapped_expense_account_id,
+          account_id: drAccountId,
           debit_amount: record.amount,
           credit_amount: 0,
           description: description
         },
         {
-          account_id: record.mapped_payment_account_id,
+          account_id: crAccountId,
           debit_amount: 0,
           credit_amount: record.amount,
           description: description
@@ -276,14 +329,19 @@ export function ExpenseMappingGrid({ importData }: Props) {
   };
 
   // Bulk Operations
+  const [bulkVendorId, setBulkVendorId] = useState<string>("");
+  const [bulkCustomerId, setBulkCustomerId] = useState<string>("");
+
   const handleApplyBulkMapping = async () => {
-    if (!bulkExpenseAccountId && !bulkPaymentAccountId) return;
+    if (!bulkExpenseAccountId && !bulkPaymentAccountId && !bulkVendorId && !bulkCustomerId) return;
     
     let successCount = 0;
     try {
       const updates: any = {};
       if (bulkExpenseAccountId) updates.mapped_expense_account_id = bulkExpenseAccountId;
       if (bulkPaymentAccountId) updates.mapped_payment_account_id = bulkPaymentAccountId;
+      if (bulkVendorId) updates.mapped_vendor_id = bulkVendorId;
+      if (bulkCustomerId) updates.mapped_customer_id = bulkCustomerId;
 
       const targetRecords = records.filter(r => selectedIds.has(r.id) && !r.is_confirmed);
       
@@ -302,6 +360,8 @@ export function ExpenseMappingGrid({ importData }: Props) {
       toast.success(`Applied mapping to ${successCount} records.`);
       setBulkExpenseAccountId("");
       setBulkPaymentAccountId("");
+      setBulkVendorId("");
+      setBulkCustomerId("");
     } catch (e: any) {
       toast.error("Failed to apply bulk mapping", { description: e.message });
     }
@@ -482,24 +542,38 @@ export function ExpenseMappingGrid({ importData }: Props) {
           </div>
           
           {!isSpecialHire && selectedIds.size > 0 && (
-            <div className="flex items-center gap-2 w-full sm:w-auto bg-blue-50/50 p-1.5 rounded-md border border-blue-100">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto bg-blue-50/50 p-2 rounded-md border border-blue-100">
               <span className="text-xs font-medium text-blue-800 whitespace-nowrap pl-2">Bulk Map ({selectedIds.size}):</span>
-              <div className="w-[200px]">
+              
+              {(importData.import_category === "AP_Invoice" || importData.import_category === "AP_Payment") && (
+                <div className="w-[180px]">
+                  <SearchableSelect
+                    options={vendorOptions}
+                    value={bulkVendorId || "none"}
+                    onValueChange={(val) => setBulkVendorId(val === "none" ? "" : val)}
+                    placeholder="Select Vendor..."
+                    searchPlaceholder="Search vendors..."
+                    triggerClassName="h-8 text-xs bg-white"
+                  />
+                </div>
+              )}
+
+              <div className="w-[180px]">
                 <SearchableSelect
-                  options={expenseOptions}
+                  options={importData.import_category === "AP_Payment" ? apAccounts : expenseOptions}
                   value={bulkExpenseAccountId || "none"}
                   onValueChange={(val) => setBulkExpenseAccountId(val === "none" ? "" : val)}
-                  placeholder="Select Expense..."
+                  placeholder={importData.import_category === "AP_Payment" ? "Select AP Account..." : "Select Expense..."}
                   searchPlaceholder="Search..."
                   triggerClassName="h-8 text-xs bg-white"
                 />
               </div>
-              <div className="w-[200px]">
+              <div className="w-[180px]">
                 <SearchableSelect
-                  options={paymentOptions}
+                  options={importData.import_category === "AP_Invoice" ? apAccounts : paymentOptions}
                   value={bulkPaymentAccountId || "none"}
                   onValueChange={(val) => setBulkPaymentAccountId(val === "none" ? "" : val)}
-                  placeholder="Select Payment..."
+                  placeholder={importData.import_category === "AP_Invoice" ? "Select AP Account..." : "Select Payment..."}
                   searchPlaceholder="Search..."
                   triggerClassName="h-8 text-xs bg-white"
                 />
@@ -509,7 +583,7 @@ export function ExpenseMappingGrid({ importData }: Props) {
                 variant="default"
                 className="h-8 text-xs bg-blue-600 hover:bg-blue-700"
                 onClick={handleApplyBulkMapping}
-                disabled={!bulkExpenseAccountId && !bulkPaymentAccountId}
+                disabled={!bulkExpenseAccountId && !bulkPaymentAccountId && !bulkVendorId && !bulkCustomerId}
               >
                 Apply
               </Button>
@@ -539,8 +613,15 @@ export function ExpenseMappingGrid({ importData }: Props) {
                 </>
               ) : (
                 <>
-                  <TableHead className="w-[200px]">Expense Account</TableHead>
-                  <TableHead className="w-[200px]">Payment Mode</TableHead>
+                  {(importData.import_category === "AP_Invoice" || importData.import_category === "AP_Payment") && (
+                    <TableHead className="w-[180px]">Vendor</TableHead>
+                  )}
+                  <TableHead className="w-[180px]">
+                    {importData.import_category === "AP_Payment" ? "AP Account" : "Expense Account"}
+                  </TableHead>
+                  <TableHead className="w-[180px]">
+                    {importData.import_category === "AP_Invoice" ? "AP Account" : "Payment Mode"}
+                  </TableHead>
                   <TableHead className="w-[120px] text-right">Action</TableHead>
                 </>
               )}
@@ -626,24 +707,37 @@ export function ExpenseMappingGrid({ importData }: Props) {
                     </>
                   ) : (
                     <>
+                      {(importData.import_category === "AP_Invoice" || importData.import_category === "AP_Payment") && (
+                        <TableCell>
+                           <SearchableSelect
+                             options={vendorOptions}
+                             value={r.mapped_vendor_id || "none"}
+                             onValueChange={(val) => handleManualMapping(r.id, "mapped_vendor_id", val === "none" ? null : val)}
+                             disabled={r.is_confirmed}
+                             placeholder="Select Vendor..."
+                             searchPlaceholder="Search vendors..."
+                             emptyLabel="None"
+                           />
+                        </TableCell>
+                      )}
                       <TableCell>
                          <SearchableSelect
-                           options={expenseOptions}
+                           options={importData.import_category === "AP_Payment" ? apAccounts : expenseOptions}
                            value={r.mapped_expense_account_id || "none"}
                            onValueChange={(val) => handleManualMapping(r.id, "mapped_expense_account_id", val === "none" ? null : val)}
                            disabled={r.is_confirmed || createJournal.isPending || postJournal.isPending}
-                           placeholder="Select Expense Account..."
+                           placeholder="Select Account..."
                            searchPlaceholder="Search account..."
                            emptyLabel="None"
                          />
                       </TableCell>
                       <TableCell>
                          <SearchableSelect
-                           options={paymentOptions}
+                           options={importData.import_category === "AP_Invoice" ? apAccounts : paymentOptions}
                            value={r.mapped_payment_account_id || "none"}
                            onValueChange={(val) => handleManualMapping(r.id, "mapped_payment_account_id", val === "none" ? null : val)}
                            disabled={r.is_confirmed || createJournal.isPending || postJournal.isPending}
-                           placeholder="Select Payment Mode..."
+                           placeholder="Select Account..."
                            searchPlaceholder="Search account..."
                            emptyLabel="None"
                          />

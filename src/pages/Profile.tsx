@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { ProfileSignatureManager } from "@/components/staff/ProfileSignatureManager";
 import { User, Mail, Phone, Calendar, Briefcase, Upload, Save, ShieldCheck } from "lucide-react";
 import { MFAEnrollment } from "@/components/auth/MFAEnrollment";
+import { PasswordChangeForm } from "@/components/auth/PasswordChangeForm";
 
 export default function Profile() {
   const { user, userProfile, userRoles } = useAuth();
@@ -272,6 +273,7 @@ export default function Profile() {
         {/* Signature Section */}
         <div className="space-y-6">
           <MFAEnrollment />
+          <PasswordChangeForm />
           <ProfileSignatureManager />
         </div>
       </div>

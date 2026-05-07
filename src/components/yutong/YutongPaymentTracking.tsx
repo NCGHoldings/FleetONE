@@ -7,19 +7,23 @@ import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { DollarSign, CheckCircle, Clock, FileText, Plus, RefreshCw, Eye, Download, MoreHorizontal, Receipt, Landmark, Upload, Image } from 'lucide-react';
+import { 
+  DollarSign, CheckCircle, Clock, FileText, Plus, RefreshCw, Eye, 
+  Download, MoreHorizontal, Receipt, Landmark, Upload, Image, 
+  Database, AlertCircle, Undo2 
+} from 'lucide-react';
 import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceManagement';
 import { useYutongCashReceipts, YutongCashReceipt } from '@/hooks/useYutongCashReceipts';
 import { YutongCashReceiptModal } from './YutongCashReceiptModal';
 import { VehicleFinanceSettlement } from '@/components/accounting/shared/VehicleFinanceSettlement';
 import { SearchableAccountSelector } from '@/components/accounting/shared/SearchableAccountSelector';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { GLBreakdownPreview } from '@/components/accounting/shared/GLBreakdownPreview';
+import { reverseJournalEntry } from '@/hooks/useEditAccountingMutations';
 import {
   fetchVehicleFinanceSettings,
   createVehicleCustomer,
@@ -45,7 +49,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   const [isFinanceHubOpen, setIsFinanceHubOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
   const { regenerateInvoice } = useYutongOrderInvoiceManagement();
-  const { createCashReceipt, getCashReceiptByPaymentId, regenerateCashReceipt } = useYutongCashReceipts();
+  const { createCashReceipt, regenerateCashReceipt } = useYutongCashReceipts();
   
   // Cash receipt states
   const [cashReceipts, setCashReceipts] = useState<Record<string, YutongCashReceipt>>({});
@@ -62,6 +66,14 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  
+  // GL Review states
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isReversalReviewModalOpen, setIsReversalReviewModalOpen] = useState(false);
+  const [reviewPayment, setReviewPayment] = useState<any>(null);
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [isReversing, setIsReversing] = useState(false);
+  const [manualOverrides, setManualOverrides] = useState<{ bankId: string | null; creditId: string | null }>({ bankId: null, creditId: null });
   
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
@@ -147,7 +159,6 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     
     setIsLoading(true);
     try {
-      // Load order details
       const { data: order, error: orderError } = await supabase
         .from('yutong_orders')
         .select('*, yutong_quotations(quotation_no, customer_name, customer_category_id)')
@@ -157,7 +168,6 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       if (orderError) throw orderError;
       setOrderDetails(order);
 
-      // Load payment schedules
       const { data: scheduleData, error: scheduleError } = await supabase
         .from('yutong_payment_schedules')
         .select('*')
@@ -167,19 +177,16 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       if (scheduleError) throw scheduleError;
       setSchedules(scheduleData || []);
 
-      // Load customer payments
       const { data: paymentData, error: paymentError } = await supabase
         .from('yutong_customer_payments')
-        .select('*')
+        .select('*, journal_entries(entry_number)')
         .eq('order_id', selectedOrderId)
         .order('payment_date', { ascending: false });
 
       if (paymentError) throw paymentError;
       setPayments(paymentData || []);
 
-      // Load cash receipts for each payment
       if (paymentData && paymentData.length > 0) {
-        console.log('Loading cash receipts for order:', selectedOrderId);
         const { data: receiptsData, error: receiptsError } = await supabase
           .from('yutong_cash_receipts')
           .select('*')
@@ -188,7 +195,6 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         if (receiptsError) {
           console.error('Error loading cash receipts:', receiptsError);
         } else if (receiptsData) {
-          console.log('Loaded cash receipts:', receiptsData.length, 'receipts');
           const receiptsMap: Record<string, YutongCashReceipt> = {};
           receiptsData.forEach((receipt: YutongCashReceipt) => {
             receiptsMap[receipt.payment_id] = receipt;
@@ -196,7 +202,6 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           setCashReceipts(receiptsMap);
         }
       } else {
-        // Clear cash receipts if no payments
         setCashReceipts({});
       }
 
@@ -215,27 +220,23 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       const amount = parseFloat(paymentForm.amount);
       if (isNaN(amount) || amount <= 0) {
         toast.error('Please enter a valid payment amount');
+        setIsSubmitting(false);
         return;
       }
 
       if (!selectedOrderId) {
         toast.error('No order selected');
+        setIsSubmitting(false);
         return;
       }
 
-      if (!paymentForm.bank_account_id) {
-        toast.error(paymentForm.payment_method === 'opening_balance' ? 'Please select an equity account' : 'Please select a bank account');
-        return;
-      }
-
-      // Get current user for created_by field
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
         toast.error('Authentication error. Please log in again.');
+        setIsSubmitting(false);
         return;
       }
 
-      // Upload payment proof if provided
       let paymentSlipUrl: string | null = null;
       if (paymentProofFile) {
         setIsUploading(true);
@@ -249,6 +250,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           console.error('Upload error:', uploadError);
           toast.error('Failed to upload payment proof');
           setIsUploading(false);
+          setIsSubmitting(false);
           return;
         }
         
@@ -257,7 +259,6 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         setIsUploading(false);
       }
 
-      // Get selected bank account name
       const selectedBank = paymentForm.payment_method === 'opening_balance'
         ? equityAccounts.find(b => b.id === paymentForm.bank_account_id)
         : bankAccounts.find(b => b.id === paymentForm.bank_account_id);
@@ -266,7 +267,6 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         ? selectedBank ? `${selectedBank.account_code} - ${selectedBank.account_name}` : null
         : selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_name}` : null;
 
-      // Insert payment record with created_by
       const { data: payment, error: paymentError } = await supabase
         .from('yutong_customer_payments')
         .insert({
@@ -290,6 +290,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       if (paymentError) {
         console.error('Payment insert error:', paymentError);
         toast.error(`Failed to record payment: ${paymentError.message}`);
+        setIsSubmitting(false);
         return;
       }
 
@@ -306,49 +307,102 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     }
   };
 
-  /**
-   * PROPER ACCOUNTING FLOW:
-   * Cash Receipt (Payment Verification) = GL Entry ONLY (DR Bank / CR Customer Advance)
-   * AR Invoice is created when SYSTEM INVOICE is approved, NOT at payment time
-   */
-  const handleVerifyPayment = async (paymentId: string) => {
-    if (verifyingId === paymentId) return;
-    setVerifyingId(paymentId);
+  const handleReversePayment = async (payment: any) => {
+    setReviewPayment(payment);
+    setIsReversalReviewModalOpen(true);
+  };
+
+  const confirmReversePayment = async () => {
+    if (!reviewPayment || isReversing) return;
+    const payment = reviewPayment;
+    setIsReversing(true);
     try {
-      const payment = payments.find(p => p.id === paymentId);
+      if (payment.journal_entry_id) {
+        const reversedId = await reverseJournalEntry(payment.journal_entry_id, NCG_HOLDING_ID);
+        if (!reversedId) throw new Error('Failed to reverse GL entry');
+      }
+
+      await supabase
+        .from('yutong_customer_payments')
+        .update({
+          status: 'reversed',
+        })
+        .eq('id', payment.id);
+        
+      toast.success('Payment reversed successfully');
+      loadPaymentData();
+    } catch (error: any) {
+      console.error('Error reversing payment:', error);
+      toast.error(error.message || 'Failed to reverse payment');
+    } finally {
+      setIsReversing(false);
+      setIsReversalReviewModalOpen(false);
+      setReviewPayment(null);
+    }
+  };
+
+  const handleResyncPayment = async (paymentId: string) => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase
+        .from('yutong_customer_payments')
+        .update({
+          status: 'pending',
+          journal_entry_id: null,
+          ar_receipt_id: null,
+          verified_at: null,
+          verified_by: null
+        })
+        .eq('id', paymentId);
+
+      if (error) throw error;
+      
+      toast.success('Payment reset to pending. You can now re-verify it.');
+      loadPaymentData();
+      onRefresh();
+    } catch (error: any) {
+      console.error('Error resyncing payment:', error);
+      toast.error('Failed to resync payment');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyPayment = async (paymentId: string) => {
+    const payment = payments.find(p => p.id === paymentId);
+    if (!payment) return;
+    
+    setReviewPayment(payment);
+    setIsReviewModalOpen(true);
+  };
+
+  const confirmVerifyPayment = async () => {
+    if (!reviewPayment || verifyingId) return;
+    const paymentId = reviewPayment.id;
+    setVerifyingId(paymentId);
+    setIsReviewing(true);
+    try {
+      const payment = reviewPayment;
       if (!payment) {
         toast.error('Payment not found');
         return;
       }
 
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error('Authentication required');
         return;
       }
 
-      // Fetch finance settings
       const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
       if (!settings) {
-        toast.error('Finance settings not configured. Please configure Yutong Finance Settings first.');
-        return;
-      }
-
-      // Validate required accounts for advance payment GL posting
-      if (!settings.default_bank_account_id) {
-        toast.error('Bank Account not configured. Go to Finance → Settings → Yutong Finance.');
-        return;
-      }
-      if (!settings.customer_advance_account_id) {
-        toast.error('Customer Advance Account not configured. Go to Finance → Settings → Yutong Finance.');
+        toast.error('Finance settings not configured.');
         return;
       }
 
       const customerName = orderDetails?.yutong_quotations?.customer_name || 'Unknown';
       const orderNo = orderDetails?.order_no;
 
-      // 1. Create/Get Finance Customer
       let customerId = orderDetails?.finance_customer_id;
       if (!customerId && settings.auto_create_customer) {
         const categoryId = (orderDetails as any)?.customer_category_id 
@@ -366,37 +420,24 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
             orderId: selectedOrderId!,
             financeCustomerId: customerId,
           });
-          // Update local state to reflect the customer
           setOrderDetails((prev: any) => ({ ...prev, finance_customer_id: customerId }));
         }
       }
 
-      // 2. Re-fetch order to get latest ar_invoice_id (may have been approved after modal opened)
-      const { data: freshOrder, error: freshError } = await supabase
+      const { data: freshOrder } = await supabase
         .from('yutong_orders')
         .select('ar_invoice_id, finance_customer_id')
         .eq('id', selectedOrderId!)
         .single();
 
-      if (freshError || !freshOrder) {
-        toast.error('Failed to load latest order state. Please try again.');
-        setVerifyingId(null);
-        return;
-      }
-
-      // Use fresh data only - no stale fallback
-      const arInvoiceId = freshOrder.ar_invoice_id;
+      const arInvoiceId = freshOrder?.ar_invoice_id;
       const paymentType = arInvoiceId ? 'balance' : 'advance';
-      // Also use fresh customer ID if available
-      if (freshOrder.finance_customer_id) {
-        customerId = freshOrder.finance_customer_id;
-      }
+      if (freshOrder?.finance_customer_id) customerId = freshOrder.finance_customer_id;
       
       let journalEntryId: string | undefined;
       let arReceiptId: string | undefined;
       
       if (settings.auto_post_on_verify) {
-        // If pre-invoice -> advance (Liability). If post-invoice -> balance (Trade Receivable).
         const glResult = await postVehiclePaymentToGL({
           module: 'yutong',
           orderNo,
@@ -406,16 +447,13 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           paymentMethod: payment.payment_method,
           settings,
           effectiveCompanyId: NCG_HOLDING_ID,
-          customBankAccountId: payment.bank_account_id,
-          customCreditAccountId: payment.custom_credit_account_id || undefined,
+          customBankAccountId: manualOverrides.bankId || payment.bank_account_id,
+          customCreditAccountId: manualOverrides.creditId || payment.custom_credit_account_id || undefined,
+          customerId,
         });
 
         if (glResult) {
           journalEntryId = glResult.journalEntryId;
-          const label = arInvoiceId ? 'Trade Receivable' : 'Customer Advance';
-          toast.success(`GL Entry posted: ${glResult.entryNumber} (DR Bank / CR ${label})`);
-          
-          // If AR invoice exists, also create an AR Receipt immediately to reduce balance
           if (arInvoiceId) {
             const receiptResult = await createVehicleARReceipt({
               module: 'yutong',
@@ -428,20 +466,17 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
               settings,
               effectiveCompanyId: NCG_HOLDING_ID,
             });
-            if (receiptResult) {
-              arReceiptId = receiptResult.receiptId;
-              toast.success(`AR Receipt Created: ${receiptResult.receiptNumber}`);
-            }
+            if (receiptResult) arReceiptId = receiptResult.receiptId;
           }
         } else {
-          toast.error('Failed to post GL entry. Check Finance Settings.');
+          toast.error('Failed to post GL entry.');
           setVerifyingId(null);
+          setIsReviewing(false);
           return;
         }
       }
 
-      // 3. Update payment status with GL link and AR Receipt link
-      const { error } = await supabase
+      await supabase
         .from('yutong_customer_payments')
         .update({
           status: 'verified',
@@ -452,15 +487,10 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         })
         .eq('id', paymentId);
 
-      if (error) throw error;
-
-      // 4. Update order totals
       await updateOrderFinancials();
-
-      // 5. Regenerate all invoices for this order with updated payment data
       await regenerateOrderInvoices();
 
-      toast.success('Payment verified successfully. GL entry posted (Bank vs Customer Advance).');
+      toast.success('Payment verified successfully.');
       loadPaymentData();
       onRefresh();
     } catch (error: any) {
@@ -468,35 +498,28 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       toast.error('Failed to verify payment');
     } finally {
       setVerifyingId(null);
+      setIsReviewing(false);
+      setIsReviewModalOpen(false);
+      setReviewPayment(null);
     }
   };
 
   const updateOrderFinancials = async () => {
     if (!selectedOrderId) return;
-    
     try {
-      // Calculate total verified payments
-      const { data: verifiedPayments, error: paymentsError } = await supabase
+      const { data: verifiedPayments } = await supabase
         .from('yutong_customer_payments')
         .select('payment_amount')
         .eq('order_id', selectedOrderId)
         .eq('status', 'verified');
 
-      if (paymentsError) throw paymentsError;
-
       const totalPaid = verifiedPayments?.reduce((sum, p) => sum + p.payment_amount, 0) || 0;
       const balanceDue = (orderDetails?.total_amount || 0) - totalPaid;
 
-      // Update order
-      const { error: updateError } = await supabase
+      await supabase
         .from('yutong_orders')
-        .update({
-          total_paid: totalPaid,
-          balance_due: balanceDue
-        })
+        .update({ total_paid: totalPaid, balance_due: balanceDue })
         .eq('id', selectedOrderId);
-
-      if (updateError) throw updateError;
     } catch (error) {
       console.error('Error updating order financials:', error);
     }
@@ -504,27 +527,19 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
 
   const regenerateOrderInvoices = async () => {
     if (!selectedOrderId) return;
-    
     try {
-      // Get all invoice documents for this order
-      const { data: invoiceRecords, error: recordsError } = await supabase
+      const { data: invoiceRecords } = await supabase
         .from('yutong_invoice_records')
         .select('id')
         .eq('order_id', selectedOrderId);
 
-      if (recordsError) throw recordsError;
-
-      // Get documents for these records
       if (invoiceRecords && invoiceRecords.length > 0) {
         const recordIds = invoiceRecords.map(r => r.id);
-        const { data: documents, error: docsError } = await supabase
+        const { data: documents } = await supabase
           .from('yutong_invoice_documents')
           .select('id')
           .in('invoice_record_id', recordIds);
 
-        if (docsError) throw docsError;
-
-        // Regenerate each invoice
         for (const doc of documents || []) {
           await regenerateInvoice(doc.id);
         }
@@ -550,18 +565,9 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     setPaymentProofPreview(null);
   };
 
-  // Cash Receipt handlers
   const handleGenerateReceipt = async (payment: any) => {
     if (!selectedOrderId) return;
-    
-    const receipt = await createCashReceipt(
-      payment.id,
-      selectedOrderId,
-      payment.payment_amount,
-      payment.payment_method,
-      payment.payment_date
-    );
-    
+    const receipt = await createCashReceipt(payment.id, selectedOrderId, payment.payment_amount, payment.payment_method, payment.payment_date);
     if (receipt) {
       setCashReceipts(prev => ({ ...prev, [payment.id]: receipt }));
       setSelectedReceipt(receipt);
@@ -577,46 +583,29 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     }
   };
 
-  // Handle regenerating a cash receipt with updated format
   const handleRegenerateReceipt = async (paymentId: string) => {
     const receipt = cashReceipts[paymentId];
-    if (!receipt) {
-      toast.error('Receipt not found');
-      return;
-    }
-    
+    if (!receipt) return;
     const updatedReceipt = await regenerateCashReceipt(receipt.id);
     if (updatedReceipt) {
       setCashReceipts(prev => ({ ...prev, [paymentId]: updatedReceipt }));
-      // If this receipt is currently selected, update it
-      if (selectedReceipt?.id === updatedReceipt.id) {
-        setSelectedReceipt(updatedReceipt);
-      }
+      if (selectedReceipt?.id === updatedReceipt.id) setSelectedReceipt(updatedReceipt);
     }
   };
 
   const handleRefreshReceipts = async () => {
-    // Reload cash receipts
     if (selectedOrderId) {
-      const { data: receiptsData, error } = await supabase
+      const { data: receiptsData } = await supabase
         .from('yutong_cash_receipts')
         .select('*')
         .eq('order_id', selectedOrderId);
 
-      if (!error && receiptsData) {
+      if (receiptsData) {
         const receiptsMap: Record<string, YutongCashReceipt> = {};
         receiptsData.forEach((receipt: YutongCashReceipt) => {
           receiptsMap[receipt.payment_id] = receipt;
         });
         setCashReceipts(receiptsMap);
-        
-        // Update selected receipt if it's open
-        if (selectedReceipt) {
-          const updatedReceipt = receiptsData.find((r: YutongCashReceipt) => r.id === selectedReceipt.id);
-          if (updatedReceipt) {
-            setSelectedReceipt(updatedReceipt);
-          }
-        }
       }
     }
   };
@@ -625,7 +614,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     const variants: Record<string, { variant: any; icon: any }> = {
       pending: { variant: 'outline', icon: Clock },
       verified: { variant: 'default', icon: CheckCircle },
-      rejected: { variant: 'destructive', icon: FileText }
+      reversed: { variant: 'destructive', icon: Undo2 }
     };
     const config = variants[status] || variants.pending;
     const Icon = config.icon;
@@ -693,7 +682,6 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Payment Summary */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
               <CardContent className="pt-6">
@@ -721,7 +709,6 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
             </Card>
           </div>
 
-          {/* Payment Schedule */}
           {schedules.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold mb-3">Payment Schedule</h3>
@@ -730,7 +717,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                   <TableRow>
                     <TableHead>Milestone</TableHead>
                     <TableHead>Due Date</TableHead>
-                    <TableHead className="text-right" data-column-type="number">Amount</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -739,7 +726,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                     <TableRow key={schedule.id}>
                       <TableCell className="font-medium">{schedule.milestone_name}</TableCell>
                       <TableCell>{new Date(schedule.due_date).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right" data-column-type="number">LKR {schedule.amount.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">LKR {schedule.amount.toLocaleString()}</TableCell>
                       <TableCell>{getStatusBadge(schedule.status)}</TableCell>
                     </TableRow>
                   ))}
@@ -748,13 +735,10 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
             </div>
           )}
 
-          {/* Payment History */}
           <div>
             <h3 className="text-lg font-semibold mb-3">Payment History</h3>
             {payments.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No payments recorded yet
-              </div>
+              <div className="text-center py-8 text-muted-foreground">No payments recorded yet</div>
             ) : (
               <Table className="erp-table-professional">
                 <TableHeader>
@@ -762,7 +746,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                     <TableHead>Date</TableHead>
                     <TableHead>Reference</TableHead>
                     <TableHead>Method</TableHead>
-                    <TableHead className="text-right" data-column-type="number">Amount</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -773,29 +757,17 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                       <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
                       <TableCell>{payment.payment_reference || '-'}</TableCell>
                       <TableCell className="capitalize">{payment.payment_method?.replace('_', ' ')}</TableCell>
-                      <TableCell className="text-right font-semibold" data-column-type="number">
-                        LKR {payment.payment_amount.toLocaleString()}
-                      </TableCell>
+                      <TableCell className="text-right font-semibold">LKR {payment.payment_amount.toLocaleString()}</TableCell>
                       <TableCell>{getStatusBadge(payment.status)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {payment.payment_slip_url && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => window.open(payment.payment_slip_url, '_blank')}
-                              title="View Payment Proof"
-                            >
+                            <Button size="sm" variant="ghost" onClick={() => window.open(payment.payment_slip_url, '_blank')}>
                               <Eye className="h-4 w-4" />
                             </Button>
                           )}
                           {payment.status === 'pending' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleVerifyPayment(payment.id)}
-                              disabled={verifyingId === payment.id}
-                            >
+                            <Button size="sm" variant="outline" onClick={() => handleVerifyPayment(payment.id)} disabled={verifyingId === payment.id}>
                               {verifyingId === payment.id ? (
                                 <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
                               ) : (
@@ -805,7 +777,6 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                             </Button>
                           )}
                           
-                          {/* Cash Receipt Actions */}
                           {payment.status === 'verified' && (
                             <>
                               {cashReceipts[payment.id] ? (
@@ -819,33 +790,37 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={() => handleViewReceipt(payment.id)}>
-                                      <Eye className="h-4 w-4 mr-2" />
-                                      View Receipt
+                                      <Eye className="h-4 w-4 mr-2" /> View Receipt
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => {
-                                      setSelectedReceipt(cashReceipts[payment.id]);
-                                      setIsReceiptModalOpen(true);
-                                    }}>
-                                      <Download className="h-4 w-4 mr-2" />
-                                      Download PDF
+                                    <DropdownMenuItem onClick={() => { setSelectedReceipt(cashReceipts[payment.id]); setIsReceiptModalOpen(true); }}>
+                                      <Download className="h-4 w-4 mr-2" /> Download PDF
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleRegenerateReceipt(payment.id)}>
-                                      <RefreshCw className="h-4 w-4 mr-2" />
-                                      Regenerate Receipt
+                                      <RefreshCw className="h-4 w-4 mr-2" /> Regenerate
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleGenerateReceipt(payment)}
-                                >
-                                  <Receipt className="h-4 w-4 mr-1" />
-                                  Generate Receipt
+                                <Button size="sm" variant="outline" onClick={() => handleGenerateReceipt(payment)}>
+                                  <Receipt className="h-4 w-4 mr-1" /> Receipt
                                 </Button>
                               )}
+                              <Button size="sm" variant="ghost" onClick={() => handleReversePayment(payment)} className="text-orange-600 hover:text-orange-700">
+                                <Undo2 className="h-4 w-4" />
+                              </Button>
                             </>
+                          )}
+                          
+                          {payment.status === 'reversed' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => handleResyncPayment(payment.id)}
+                              className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                            >
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Resync
+                            </Button>
                           )}
                         </div>
                       </TableCell>
@@ -860,35 +835,20 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
 
       <Dialog open={isRecordModalOpen} onOpenChange={setIsRecordModalOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Record Customer Payment</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Record Customer Payment</DialogTitle></DialogHeader>
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             <div>
               <Label>Payment Amount (LKR) *</Label>
-               <CurrencyInput
-                value={paymentForm.amount}
-                onValueChange={(num) => setPaymentForm({ ...paymentForm, amount: num.toString() })}
-                placeholder="Enter amount"
-              />
+               <CurrencyInput value={paymentForm.amount} onValueChange={(num) => setPaymentForm({ ...paymentForm, amount: num.toString() })} placeholder="Enter amount" />
             </div>
             <div>
               <Label>Payment Date *</Label>
-              <Input
-                type="date"
-                value={paymentForm.payment_date}
-                onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })}
-              />
+              <Input type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} />
             </div>
             <div>
               <Label>Payment Method *</Label>
-              <Select
-                value={paymentForm.payment_method}
-                onValueChange={(value) => setPaymentForm({ ...paymentForm, payment_method: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={paymentForm.payment_method} onValueChange={(value) => setPaymentForm({ ...paymentForm, payment_method: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                   <SelectItem value="cheque">Cheque</SelectItem>
@@ -902,43 +862,23 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
             {paymentForm.payment_method === 'opening_balance' ? (
               <div>
                 <Label>Equity COA Account *</Label>
-                <Select
-                  value={paymentForm.bank_account_id}
-                  onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select equity account" />
-                  </SelectTrigger>
+                <Select value={paymentForm.bank_account_id} onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}>
+                  <SelectTrigger><SelectValue placeholder="Select equity account" /></SelectTrigger>
                   <SelectContent>
                     {equityAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        <div className="flex items-center gap-2">
-                          <Landmark className="h-3 w-3 text-muted-foreground" />
-                          {account.account_code} - {account.account_name}
-                        </div>
-                      </SelectItem>
+                      <SelectItem key={account.id} value={account.id}>{account.account_code} - {account.account_name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             ) : (
               <div>
-                <Label>Bank Account *</Label>
-                <Select
-                  value={paymentForm.bank_account_id}
-                  onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select bank account" />
-                  </SelectTrigger>
+                <Label>Bank Account (Optional)</Label>
+                <Select value={paymentForm.bank_account_id} onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}>
+                  <SelectTrigger><SelectValue placeholder="Select bank account" /></SelectTrigger>
                   <SelectContent>
                     {bankAccounts.map((bank) => (
-                      <SelectItem key={bank.id} value={bank.id}>
-                        <div className="flex items-center gap-2">
-                          <Landmark className="h-3 w-3 text-muted-foreground" />
-                          {bank.bank_name} - {bank.account_name} ({bank.account_number})
-                        </div>
-                      </SelectItem>
+                      <SelectItem key={bank.id} value={bank.id}>{bank.bank_name} - {bank.account_name} ({bank.account_number})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -946,96 +886,116 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
             )}
             <div>
               <Label>Reference Number</Label>
-              <Input
-                value={paymentForm.reference_no}
-                onChange={(e) => setPaymentForm({ ...paymentForm, reference_no: e.target.value })}
-                placeholder="Transaction/cheque reference"
-              />
+              <Input value={paymentForm.reference_no} onChange={(e) => setPaymentForm({ ...paymentForm, reference_no: e.target.value })} placeholder="Transaction/cheque reference" />
             </div>
             <div>
               <Label>Payment Proof (Optional)</Label>
-              <div className="flex items-center gap-2 mt-1">
-                <Input
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] || null;
-                    setPaymentProofFile(file);
-                    if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview);
-                    setPaymentProofPreview(file && file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
-                  }}
-                  className="flex-1"
-                />
-                {paymentProofFile && (
-                  <Badge variant="secondary" className="gap-1 whitespace-nowrap">
-                    <Image className="h-3 w-3" />
-                    {paymentProofFile.name.slice(0, 15)}...
-                  </Badge>
-                )}
-              </div>
-              {paymentProofPreview && (
-                <img src={paymentProofPreview} alt="Payment proof preview" className="mt-2 max-h-32 rounded border object-contain" />
-              )}
-              <p className="text-xs text-muted-foreground mt-1">Upload bank slip, receipt photo, or transfer confirmation</p>
+              <Input type="file" accept="image/*,.pdf" onChange={(e) => { const file = e.target.files?.[0] || null; setPaymentProofFile(file); if (paymentProofPreview) URL.revokeObjectURL(paymentProofPreview); setPaymentProofPreview(file && file.type.startsWith('image/') ? URL.createObjectURL(file) : null); }} />
+              {paymentProofPreview && <img src={paymentProofPreview} alt="Preview" className="mt-2 max-h-32 rounded border object-contain" />}
             </div>
             <div className="space-y-2 pt-2 border-t">
-              <Label className="text-blue-600 font-semibold flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                GL Credit Account Override (Optional)
-              </Label>
-              <SearchableAccountSelector
-                companyId={NCG_HOLDING_ID}
-                value={paymentForm.custom_credit_account_id}
-                onValueChange={(val) => setPaymentForm({ ...paymentForm, custom_credit_account_id: val })}
-                placeholder="Select custom credit account (e.g. specific liability or revenue)"
-              />
-              <p className="text-[10px] text-muted-foreground italic">
-                * By default, payments hit 'Customer Advances' (before invoice) or 'Trade Receivables' (after invoice). Use this to override.
-              </p>
+              <Label className="text-blue-600 font-semibold flex items-center gap-2"><FileText className="h-4 w-4" />GL Credit Override</Label>
+              <SearchableAccountSelector companyId={NCG_HOLDING_ID} value={paymentForm.custom_credit_account_id} onValueChange={(val) => setPaymentForm({ ...paymentForm, custom_credit_account_id: val })} placeholder="Override credit account" />
             </div>
             <div>
               <Label>Notes</Label>
-              <Textarea
-                value={paymentForm.notes}
-                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                placeholder="Additional notes"
-                rows={3}
-              />
+              <Textarea value={paymentForm.notes} onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} placeholder="Additional notes" rows={3} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRecordModalOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setIsRecordModalOpen(false)}>Cancel</Button>
             <Button onClick={handleRecordPayment} disabled={isUploading || isSubmitting}>
-              {isSubmitting ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <DollarSign className="h-4 w-4 mr-2" />
-              )}
-              {isSubmitting ? 'Recording...' : isUploading ? 'Uploading...' : 'Record Payment'}
+              {isSubmitting ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <DollarSign className="h-4 w-4 mr-2" />}
+              {isSubmitting ? 'Recording...' : 'Record Payment'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Cash Receipt Modal */}
-      <YutongCashReceiptModal
-        isOpen={isReceiptModalOpen}
-        onClose={() => setIsReceiptModalOpen(false)}
-        receipt={selectedReceipt}
-        onRefresh={handleRefreshReceipts}
-      />
+      <YutongCashReceiptModal isOpen={isReceiptModalOpen} onClose={() => setIsReceiptModalOpen(false)} receipt={selectedReceipt} onRefresh={handleRefreshReceipts} />
       
-      {/* Finance Hub Modal */}
       {selectedOrderId && (
-        <VehicleFinanceSettlement
-          isOpen={isFinanceHubOpen}
-          onClose={() => setIsFinanceHubOpen(false)}
-          orderId={selectedOrderId}
-          module="yutong"
-        />
+        <VehicleFinanceSettlement isOpen={isFinanceHubOpen} onClose={() => setIsFinanceHubOpen(false)} orderId={selectedOrderId} module="yutong" />
       )}
+
+      {/* GL Verification Review Modal */}
+      <Dialog open={isReviewModalOpen} onOpenChange={setIsReviewModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-blue-600" />Verify GL Transaction</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {reviewPayment && (
+              <GLBreakdownPreview 
+                customerId={orderDetails?.finance_customer_id || ""}
+                companyId={NCG_HOLDING_ID}
+                amount={reviewPayment.payment_amount}
+                paymentType={orderDetails?.ar_invoice_id ? 'balance' : 'advance'}
+                customBankAccountId={reviewPayment.bank_account_id}
+                customCreditAccountId={reviewPayment.custom_credit_account_id}
+                paymentMethod={reviewPayment.payment_method}
+                onOverridesChange={setManualOverrides}
+              />
+            )}
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-lg">
+              <h4 className="text-sm font-bold text-blue-800 mb-1 flex items-center gap-2"><AlertCircle className="h-4 w-4" /> System Guidance</h4>
+              <p className="text-xs text-blue-700 leading-relaxed">
+                Verifying this payment will sync it to the <strong>General Ledger</strong>. 
+                {orderDetails?.ar_invoice_id ? ' It will credit Trade Receivables.' : ' It will credit Customer Advances.'}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsReviewModalOpen(false)} disabled={isReviewing}>Cancel</Button>
+            <Button onClick={confirmVerifyPayment} disabled={isReviewing} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {isReviewing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+              {isReviewing ? 'Verifying...' : 'Confirm & Post to GL'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* GL Reversal Review Modal */}
+      <Dialog open={isReversalReviewModalOpen} onOpenChange={setIsReversalReviewModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Undo2 className="h-5 w-5 text-orange-600" />Reverse GL Transaction</DialogTitle>
+            <DialogDescription>This will create a reversing entry to cancel out the original transaction.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {reviewPayment && (
+              <div className="space-y-4">
+                <div className="p-3 bg-orange-50 border border-orange-100 rounded-md text-xs text-orange-800">
+                  <strong>Original Entry:</strong> {reviewPayment.journal_entries?.entry_number || 'Linked Entry'}
+                </div>
+                <GLBreakdownPreview 
+                  customerId={orderDetails?.finance_customer_id || ""}
+                  companyId={NCG_HOLDING_ID}
+                  amount={reviewPayment.payment_amount}
+                  paymentType={orderDetails?.ar_invoice_id ? 'balance' : 'advance'}
+                  customBankAccountId={reviewPayment.bank_account_id}
+                  customCreditAccountId={reviewPayment.custom_credit_account_id}
+                  paymentMethod={reviewPayment.payment_method}
+                />
+                <div className="mt-4 p-4 bg-slate-50 border rounded-lg">
+                  <h4 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-2"><AlertCircle className="h-4 w-4" /> Reversal Logic</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    The system will automatically flip the original Debit and Credit lines. 
+                    <strong> Bank</strong> will be Credited, and <strong>{orderDetails?.ar_invoice_id ? 'Receivable' : 'Advance'}</strong> will be Debited.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsReversalReviewModalOpen(false)} disabled={isReversing}>Cancel</Button>
+            <Button onClick={confirmReversePayment} disabled={isReversing} className="bg-orange-600 hover:bg-orange-700 text-white">
+              {isReversing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Undo2 className="h-4 w-4 mr-2" />}
+              {isReversing ? 'Reversing...' : 'Confirm Reversal'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

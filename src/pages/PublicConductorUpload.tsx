@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Check, Loader2, Send, Languages, Calculator, Plus, Trash2, ChevronDown, ChevronUp, Upload, CreditCard, Banknote, Camera, Route, Sun, Moon, Sparkles, Navigation, Bus, User, BadgeCent, Receipt, ArrowRight } from 'lucide-react';
+import { Check, CheckCircle, Loader2, Send, Calculator, Trash2, Upload, CreditCard, Banknote, Camera, Route, Sun, Moon, Sparkles, Navigation, Bus, User, Receipt, ArrowLeft } from 'lucide-react';
 import { createAnonymousClient } from '@/integrations/supabase/public-client';
 import { GamificationBanner } from '@/components/trips/GamificationBanner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,6 +21,7 @@ const translations = {
     driverName: "Driver Name *",
     conductorName: "Conductor Name *",
     busNumber: "Bus Number *",
+    routeName: "Route Name",
     tripDate: "Date *",
     addTrip: "Add Trip",
     tripTitle: "Trip",
@@ -49,12 +50,15 @@ const translations = {
     actualDeposit: "Actual Deposit Amount",
     bankName: "Bank / Branch Name",
     uploadSlip: "Upload Bank Slip",
-    submit: "Submit Details",
+    submit: "Submit",
+    submitTrip: "Submit Trip",
+    submitFuel: "Submit Fuel",
+    submitExpenses: "Submit Expenses",
     submitting: "Submitting...",
     successTitle: "Submission Received!",
-    successDesc: "Your trip details have been successfully submitted.",
+    successDesc: "Your details have been successfully submitted.",
     trackingCode: "Your tracking code:",
-    submitAnother: "Submit Another Day"
+    submitAnother: "Back to Hub"
   },
   si: {
     title: "ගමන් විස්තර ඉදිරිපත් කිරීම",
@@ -65,6 +69,7 @@ const translations = {
     driverName: "රියදුරුගේ නම *",
     conductorName: "කොන්දොස්තරගේ නම *",
     busNumber: "බස් රථයේ අංකය *",
+    routeName: "මාර්ගය",
     tripDate: "දිනය *",
     addTrip: "ගමනක් එකතු කරන්න",
     tripTitle: "ගමන",
@@ -93,12 +98,15 @@ const translations = {
     actualDeposit: "තැන්පත් කළ මුදල",
     bankName: "බැංකුවේ නම / ශාඛාව",
     uploadSlip: "බැංකු රිසිට්පත යොදන්න",
-    submit: "ගමන් විස්තර ඉදිරිපත් කරන්න",
+    submit: "ඉදිරිපත් කරන්න",
+    submitTrip: "ගමන ඉදිරිපත් කරන්න",
+    submitFuel: "ඉන්ධන ඉදිරිපත් කරන්න",
+    submitExpenses: "වියදම් ඉදිරිපත් කරන්න",
     submitting: "ඉදිරිපත් කරමින්...",
     successTitle: "සාර්ථකයි!",
-    successDesc: "ඔබගේ ගමන් විස්තර සාර්ථකව ඉදිරිපත් කරන ලදී.",
+    successDesc: "ඔබගේ විස්තර සාර්ථකව ඉදිරිපත් කරන ලදී.",
     trackingCode: "ඔබේ ලුහුබැඳීමේ කේතය:",
-    submitAnother: "තවත් දිනක් ඇතුලත් කරන්න"
+    submitAnother: "ප්‍රධාන මෙනුවට"
   },
   ta: {
     title: "பயண விவரங்கள்",
@@ -109,6 +117,7 @@ const translations = {
     driverName: "ஓட்டுனர் பெயர் *",
     conductorName: "நடத்துனர் பெயர் *",
     busNumber: "பேருந்து எண் *",
+    routeName: "பாதை",
     tripDate: "தேதி *",
     addTrip: "பயணம் சேர்க்க",
     tripTitle: "பயணம்",
@@ -138,11 +147,14 @@ const translations = {
     bankName: "வங்கி / கிளை பெயர்",
     uploadSlip: "ரசீதை பதிவேற்றவும்",
     submit: "சமர்ப்பிக்கவும்",
+    submitTrip: "பயணத்தை சமர்ப்பிக்கவும்",
+    submitFuel: "எரிபொருளை சமர்ப்பிக்கவும்",
+    submitExpenses: "செலவுகளை சமர்ப்பிக்கவும்",
     submitting: "சமர்ப்பிக்கிறது...",
     successTitle: "வெற்றி!",
-    successDesc: "உங்கள் பயண விவரங்கள் வெற்றிகரமாக சமர்ப்பிக்கப்பட்டன.",
+    successDesc: "உங்கள் விவரங்கள் வெற்றிகரமாக சமர்ப்பிக்கப்பட்டன.",
     trackingCode: "உங்கள் கண்காணிப்பு குறியீடு:",
-    submitAnother: "மற்றொரு நாள் சமர்ப்பிக்கவும்"
+    submitAnother: "பிரதான மெனுவிற்கு"
   }
 };
 
@@ -181,7 +193,6 @@ interface Trip {
     luggage: string;
     miscIncome: string;
   };
-  expanded: boolean;
 }
 
 // Custom Autocomplete Input for mobile reliability
@@ -272,21 +283,25 @@ export default function PublicConductorUpload() {
     } catch { return defaultVal; }
   };
 
-  const [lang, setLang] = useState<Language>('en');
+  const [lang, setLang] = useState<Language>('si');
   const t = translations[lang];
 
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submissionCode, setSubmissionCode] = useState('');
   
+  // UI State: 'hub' | 'trip' | 'fuel' | 'expenses'
+  const [currentStep, setCurrentStep] = useState<'hub' | 'trip' | 'fuel' | 'expenses'>('hub');
+  
   // Gamification & Route Master State
+  const [fuelPrice, setFuelPrice] = useState<number>(350);
   const [routeTarget, setRouteTarget] = useState<number>(0);
   const [fetchingMaster, setFetchingMaster] = useState(false);
   
   // Autocomplete Memory
-  const [history, setHistory] = useState(() => loadState('history', { buses: [], drivers: [], conductors: [] }));
+  const [history, setHistory] = useState(() => loadState('history', { buses: [], drivers: [], conductors: [], routes: [] }));
   
-  // Form State
+  // Global Form State
   const [formData, setFormData] = useState(() => loadState('global', {
     driverName: '',
     conductorName: '',
@@ -295,245 +310,64 @@ export default function PublicConductorUpload() {
     tripDate: new Date().toISOString().split('T')[0],
   }));
 
-  const [trips, setTrips] = useState<Trip[]>(() => loadState('trips', [{
-    id: '1', startOdo: '', endOdo: '', expanded: true,
+  // Trip State (Only managing one trip at a time for submission)
+  const [currentTripNumber, setCurrentTripNumber] = useState<number>(1);
+  const [trip, setTrip] = useState<Trip>(() => loadState('current_trip', {
+    id: '1', startOdo: '', endOdo: '',
     income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' }
-  }]));
+  }));
 
+  // Expenses State
   const [expenses, setExpenses] = useState<Record<string, string>>(() => loadState('expenses', {}));
   const [showAllExpenses, setShowAllExpenses] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
 
-  // Fuel Details
+  // Fuel Details State
   const getCurrentTime = () => new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-  const [fuelDetails, setFuelDetails] = useState(() => loadState('fuelDetails', {
-    time: getCurrentTime(),
-    odometer: '',
-    liters: '',
-    paymentMethod: 'card' as 'cash' | 'card'
+  const [fuelDetails, setFuelDetails] = useState<any>(() => loadState('fuelDetails', {
+    time: getCurrentTime(), odometer: '', liters: '', paymentMethod: 'cash'
   }));
 
-  // Bank Deposit Details
-  const [bankDeposit, setBankDeposit] = useState(() => loadState('bankDeposit', {
-    amount: '',
-    bankName: ''
-  }));
-  const [slipFile, setSlipFile] = useState<File | null>(null);
-  const [slipPreview, setSlipPreview] = useState<string | null>(null);
+  const [completedTrips, setCompletedTrips] = useState<{tripNumber: number, total: number, time: string}[]>(() => loadState('completedTrips', []));
 
   // Auto-save Effect
   useEffect(() => {
     if (!submitted) {
       localStorage.setItem('conductor_form_global', JSON.stringify(formData));
-      localStorage.setItem('conductor_form_trips', JSON.stringify(trips));
+      localStorage.setItem('conductor_form_current_trip', JSON.stringify(trip));
       localStorage.setItem('conductor_form_expenses', JSON.stringify(expenses));
       localStorage.setItem('conductor_form_fuelDetails', JSON.stringify(fuelDetails));
-      localStorage.setItem('conductor_form_bankDeposit', JSON.stringify(bankDeposit));
+      localStorage.setItem('conductor_form_completedTrips', JSON.stringify(completedTrips));
     }
-  }, [formData, trips, expenses, fuelDetails, bankDeposit, submitted]);
+  }, [formData, trip, expenses, fuelDetails, completedTrips, submitted]);
 
-  // Route Master Auto-Fill Hook
+  // Fetch interconnected fuel price
   useEffect(() => {
-    const fetchMasterConfig = async () => {
-      const bus = formData.busNumber?.trim().toUpperCase();
-      if (!bus || bus.length < 4) return;
-      
-      console.log('🔄 Fetching config for Bus:', bus, 'Date:', formData.tripDate);
-      setFetchingMaster(true);
+    const fetchFuelPrice = async () => {
       try {
-        const supabase = createAnonymousClient();
-        const busVariations = [
-          bus, 
-          bus.replace('-', ' '), 
-          bus.replace('-', '')
-        ];
-
-        console.log('🔍 Searching bus variations:', busVariations);
-
-        // Fetch the bus ID first to check daily_trips
-        const { data: busData, error: busError } = await supabase
-          .from('buses')
-          .select('id, expected_km_per_liter, fleet_master_roster(day_target, default_driver, default_conductor)')
-          .in('bus_no', busVariations)
-          .limit(1)
+        const supabasePublic = createAnonymousClient();
+        const { data } = await supabasePublic
+          .from('fuel_settings')
+          .select('diesel_price_lkr_per_l')
+          .eq('is_default', true)
           .single();
-
-        if (busError) {
-          console.error('❌ Error fetching bus:', busError);
-        } else if (busData) {
-          console.log('✅ Bus found in DB:', busData.id);
-
-          // Check daily_trips for an allocation for today
-          console.log('🔍 Searching daily_trips for bus_id:', busData.id, 'trip_date:', formData.tripDate);
-          const { data: dailyTripsData, error: tripsError } = await supabase
-            .from('daily_trips')
-            .select('id, trip_no, notes, route_id, route_label, routes(route_name, master_config)')
-            .eq('bus_id', busData.id)
-            .eq('trip_date', formData.tripDate)
-            .order('trip_no', { ascending: true });
-
-          if (tripsError) {
-            console.error('❌ Error fetching daily_trips:', tripsError);
-          } else {
-            console.log('📋 daily_trips results:', dailyTripsData);
-          }
-
-          let allocatedDriver = '';
-          let allocatedConductor = '';
-          let allocatedRoute = '';
-          let allocatedConfig: any = null;
-
-          if (dailyTripsData && dailyTripsData.length > 0) {
-            console.log(`✅ Found ${dailyTripsData.length} trips allocated today!`);
-            
-            // Auto-fill trips array to match allocated count (if form is still mostly empty)
-            if (trips.length === 1 && !trips[0].income.busCollection && !trips[0].endOdo) {
-              const newTrips = dailyTripsData.map((t, index) => ({
-                id: t.id || Date.now().toString() + index,
-                startOdo: '',
-                endOdo: '',
-                expanded: index === 0,
-                income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' }
-              }));
-              console.log('🔄 Spawning', newTrips.length, 'trip forms automatically');
-              setTrips(newTrips);
-            }
-
-            // Scan through all trips to find the first available names and config
-            for (const trip of dailyTripsData) {
-              console.log(`🔎 Inspecting Trip ${trip.trip_no || trip.id}:`, trip);
-              try {
-                const notes = typeof trip.notes === 'string' 
-                  ? JSON.parse(trip.notes) 
-                  : (trip.notes || {});
-                
-                console.log(`📝 Parsed Notes for ${trip.trip_no || trip.id}:`, notes);
-                
-                if (!allocatedDriver && notes?.driver && notes.driver !== 'N/A') allocatedDriver = notes.driver;
-                if (!allocatedConductor && notes?.conductor && notes.conductor !== 'N/A') allocatedConductor = notes.conductor;
-                
-                if (trip.routes) {
-                  if (!allocatedRoute && (trip.routes as any).route_name) {
-                    allocatedRoute = (trip.routes as any).route_name;
-                  }
-                  if (!allocatedConfig && (trip.routes as any).master_config) {
-                    allocatedConfig = (trip.routes as any).master_config;
-                  }
-                }
-                
-                // Fallback 1: route_label column directly on daily_trips
-                if (!allocatedRoute && trip.route_label) {
-                  allocatedRoute = trip.route_label;
-                }
-                
-                // Fallback 2: notes if route ID wasn't properly linked in the DB
-                if (!allocatedRoute && notes) {
-                  if (notes.route && notes.route !== 'null') allocatedRoute = notes.route;
-                  else if (notes.excel_route_name && notes.excel_route_name !== 'null') allocatedRoute = notes.excel_route_name;
-                  else if (notes.route_no && notes.route_no !== 'null') allocatedRoute = notes.route_no;
-                  else if (notes.excel_route_no && notes.excel_route_no !== 'null') allocatedRoute = notes.excel_route_no;
-                }
-
-                // If we found all needed details, we can stop scanning
-                if (allocatedDriver && allocatedConductor && allocatedRoute && allocatedConfig) break;
-              } catch (e) {
-                console.error('Failed to parse trip notes for trip:', trip.id, e);
-              }
-            }
-            
-            console.log('🎯 Final extracted crew details:', { allocatedDriver, allocatedConductor, allocatedRoute, hasConfig: !!allocatedConfig });
-          } else {
-            console.log('⚠️ No daily_trips found for this date & bus combination');
-          }
-
-          if (allocatedDriver || allocatedConductor || allocatedRoute) {
-            setFormData(prev => ({
-              ...prev,
-              ...(allocatedDriver ? { driverName: allocatedDriver } : {}),
-              ...(allocatedConductor ? { conductorName: allocatedConductor } : {}),
-              ...(allocatedRoute ? { routeName: allocatedRoute } : {}),
-            }));
-            
-            // Apply expenses from the allocated route immediately
-            if (allocatedConfig) {
-              if (allocatedConfig.revenue_target && !routeTarget) {
-                setRouteTarget(Number(allocatedConfig.revenue_target));
-              }
-              setExpenses(prev => ({
-                ...prev,
-                ...(allocatedConfig.meal_allowance && !prev['food'] ? { food: allocatedConfig.meal_allowance } : {}),
-                ...(allocatedConfig.highway_fee && !prev['highway_charges'] ? { highway_charges: allocatedConfig.highway_fee } : {}),
-                ...(allocatedConfig.runner_fee && !prev['runner'] ? { runner: allocatedConfig.runner_fee } : {}),
-              }));
-            }
-
-            toast({
-              title: "Allocations Found",
-              description: `Auto-filled ${dailyTripsData?.length || 1} trip(s)${allocatedConfig ? ' & standard expenses' : ''} for ${allocatedRoute || 'today'}.`,
-            });
-          }
-
-          // Roster Fallback Logic
-          const activeRoster = Array.isArray(busData.fleet_master_roster) ? busData.fleet_master_roster[0] : busData.fleet_master_roster;
-          
-          if (activeRoster) {
-            // Auto-fill Gamification Targets from Roster
-            if (activeRoster.day_target) {
-              setRouteTarget(Number(activeRoster.day_target));
-            }
-            
-            // Auto-fill Scheduled Crew from Roster if form is empty AND no allocation found
-            if (!allocatedDriver && activeRoster.default_driver && !formData.driverName) {
-              setFormData(prev => ({ ...prev, driverName: activeRoster.default_driver }));
-            }
-            if (!allocatedConductor && activeRoster.default_conductor && !formData.conductorName) {
-              setFormData(prev => ({ ...prev, conductorName: activeRoster.default_conductor }));
-            }
-          }
-
-          // Fetch the route config fallback for standard costs (meal, highway)
-          const { data: routeData } = await supabase
-            .from('routes')
-            .select('master_config, route_name, id')
-            .eq('is_active', true);
-
-          const routeMatch = routeData?.find(r => r.master_config && busVariations.includes(r.master_config.default_bus));
-          if (routeMatch && routeMatch.master_config) {
-            const config = routeMatch.master_config;
-            
-            // Auto-fill Gamification Targets
-            if (config.revenue_target && !routeTarget) {
-              setRouteTarget(Number(config.revenue_target));
-            }
-            
-            // Auto-fill standard expenses (only if they aren't already set)
-            setExpenses(prev => ({
-              ...prev,
-              ...(config.meal_allowance && !prev['food'] ? { food: config.meal_allowance } : {}),
-              ...(config.highway_fee && !prev['highway_charges'] ? { highway_charges: config.highway_fee } : {}),
-              ...(config.runner_fee && !prev['runner'] ? { runner: config.runner_fee } : {}),
-            }));
-
-            // Auto-fill Crew if they are empty
-            setFormData((prev: any) => ({
-              ...prev,
-              driverName: prev.driverName || (!allocatedDriver && config.default_driver) || '',
-              conductorName: prev.conductorName || (!allocatedConductor && config.default_conductor) || '',
-              routeName: prev.routeName || (!allocatedRoute && routeMatch.route_name) || ''
-            }));
-          }
+        if (data && data.diesel_price_lkr_per_l) {
+          setFuelPrice(data.diesel_price_lkr_per_l);
         }
       } catch (err) {
-        console.error('Failed to fetch route master config:', err);
-      } finally {
-        setFetchingMaster(false);
+        console.error("Failed to fetch fuel price", err);
       }
     };
+    fetchFuelPrice();
+  }, []);
 
-    // Debounce the fetch slightly
-    const timeoutId = setTimeout(fetchMasterConfig, 800);
-    return () => clearTimeout(timeoutId);
-  }, [formData.busNumber, formData.tripDate]);
+  // Auto-calculate liters based on fuel cost and price
+  useEffect(() => {
+    const costNum = parseFloat(expenses['fuel_cost']) || 0;
+    const calculatedLiters = fuelPrice > 0 && costNum > 0 ? (costNum / fuelPrice).toFixed(2) : '';
+    if (fuelDetails.liters !== calculatedLiters) {
+      setFuelDetails(prev => ({ ...prev, liters: calculatedLiters }));
+    }
+  }, [expenses, fuelPrice]);
 
   // Derived calculations
   const calculateTripTotal = (incomeObj?: Record<string, string>) => {
@@ -541,19 +375,11 @@ export default function PublicConductorUpload() {
     return Object.values(incomeObj).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
   };
 
-  const totalIncome = trips.reduce((sum, trip) => sum + calculateTripTotal(trip.income), 0);
+  const totalIncome = calculateTripTotal(trip.income);
   const totalExpenses = Object.values(expenses).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
-  const netBalance = totalIncome - totalExpenses;
-  
-  // Suggested deposit includes fuel cost if it was paid by card
-  const fuelCostValue = parseFloat(expenses['fuel_cost']) || 0;
-  const isFuelCard = fuelDetails.paymentMethod === 'card';
-  
-  const suggestedDeposit = (netBalance > 0 ? netBalance : 0) + (isFuelCard ? fuelCostValue : 0);
 
-  // Autocomplete DataLists
-  const saveToHistory = (type: 'buses' | 'drivers' | 'conductors', value: string) => {
-    if (!value.trim()) return;
+  const saveToHistory = (type: 'buses' | 'drivers' | 'conductors' | 'routes', value: string) => {
+    if (!value || !value.trim()) return;
     setHistory((prev: any) => {
       const arr = prev[type] || [];
       if (!arr.includes(value.trim())) {
@@ -565,142 +391,47 @@ export default function PublicConductorUpload() {
     });
   };
 
-  const addTrip = () => {
-    const lastTrip = trips[trips.length - 1];
-    const newStartOdo = lastTrip?.endOdo || '';
-    
-    const newTrips = trips.map(t => ({ ...t, expanded: false })); // Collapse others
-    
-    setTrips([...newTrips, {
-      id: Date.now().toString(),
-      startOdo: newStartOdo,
-      endOdo: '',
-      expanded: true,
-      income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' }
-    }]);
-  };
-
-  const updateTrip = (id: string, field: keyof Trip, value: any) => {
-    setTrips(trips.map(t => t.id === id ? { ...t, [field]: value } : t));
-  };
-
-  const updateTripIncome = (id: string, field: string, value: string) => {
-    setTrips(trips.map(t => t.id === id ? { ...t, income: { ...t.income, [field]: value } } : t));
-  };
-
-  const removeTrip = (id: string) => {
-    if (trips.length > 1) {
-      setTrips(trips.filter(t => t.id !== id));
-    }
-  };
-
-  const toggleTrip = (id: string) => {
-    setTrips(trips.map(t => t.id === id ? { ...t, expanded: !t.expanded } : t));
-  };
-
-  const handleFuelCostChange = (val: string) => {
-    // Auto-sync with expenses
-    setExpenses(prev => ({ ...prev, fuel_cost: val }));
-  };
-
-  const handleSlipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSlipFile(file);
-      
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSlipPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const validateGlobalFields = () => {
     if (!formData.conductorName || !formData.driverName || !formData.busNumber || !formData.tripDate) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields in the top section.",
+        description: "Please fill in all global details first.",
         variant: "destructive"
       });
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const submitPartialPayload = async (submissionType: 'trip_revenue' | 'fuel' | 'expenses', specificData: any) => {
+    if (!validateGlobalFields()) return;
 
     setLoading(true);
 
     try {
       const supabasePublic = createAnonymousClient();
       
-      // Build structured JSON
-      const formattedTrips = trips.map((t, idx) => ({
-        trip_number: idx + 1,
-        start_odometer: parseFloat(t.startOdo) || null,
-        end_odometer: parseFloat(t.endOdo) || null,
-        income: {
-          call_booking: parseFloat(t.income.callBooking) || 0,
-          agent_booking: parseFloat(t.income.agentBooking) || 0,
-          bus_collection: parseFloat(t.income.busCollection) || 0,
-          luggage_income: parseFloat(t.income.luggage) || 0,
-          miscellaneous_income: parseFloat(t.income.miscIncome) || 0,
-          total: calculateTripTotal(t.income)
-        }
-      }));
-
-      const formattedExpenses = Object.entries(expenses).reduce((acc: any, [key, val]) => {
-        if (parseFloat(val) > 0) acc[key] = parseFloat(val);
-        return acc;
-      }, {});
-      formattedExpenses.total = totalExpenses;
-
-      let slipUrl = null;
-      if (slipFile) {
-        const ext = slipFile.name.split('.').pop();
-        const filePath = `slips/${formData.busNumber}_${Date.now()}.${ext}`;
-        const { data: uploadData, error: uploadError } = await supabasePublic.storage
-          .from('conductor-submissions')
-          .upload(filePath, slipFile);
-          
-        if (!uploadError && uploadData) {
-          const { data: { publicUrl } } = supabasePublic.storage.from('conductor-submissions').getPublicUrl(uploadData.path);
-          slipUrl = publicUrl;
-        }
-      }
-
       const structuredData = {
         driver_name: formData.driverName,
+        conductor_name: formData.conductorName,
         bus_number: formData.busNumber,
+        route_name: formData.routeName,
         trip_date: formData.tripDate,
-        trips: formattedTrips,
-        expenses: formattedExpenses,
-        fuel_details: {
-          time: fuelDetails.time,
-          odometer: fuelDetails.odometer,
-          liters: parseFloat(fuelDetails.liters) || null,
-          payment_method: fuelDetails.paymentMethod
-        },
-        bank_deposit: {
-          suggested_amount: suggestedDeposit,
-          actual_amount: parseFloat(bankDeposit.amount) || 0,
-          bank_name: bankDeposit.bankName,
-          slip_url: slipUrl
-        },
-        total_income: totalIncome,
-        net_balance: netBalance,
-        data_entry_method: 'manual_form_v2'
+        submission_type: submissionType, // Tells backoffice what this payload contains
+        data_entry_method: 'hub_spoke_v3',
+        ...specificData
       };
 
-      // Save to autocomplete history
       saveToHistory('buses', formData.busNumber);
       saveToHistory('drivers', formData.driverName);
       saveToHistory('conductors', formData.conductorName);
+      saveToHistory('routes', formData.routeName);
 
       const { error: insertError } = await supabasePublic
         .from('conductor_submissions')
         .insert({
           conductor_name: formData.conductorName,
-          conductor_phone: '0000000000', // Dummy to satisfy constraint
+          conductor_phone: '0000000000',
           bus_number: formData.busNumber,
           trip_date: formData.tripDate,
           image_url: 'manual_data_entry_no_image', 
@@ -711,17 +442,28 @@ export default function PublicConductorUpload() {
 
       if (insertError) throw insertError;
 
-      // We cannot select the generated code back due to RLS, so we generate a UI-only code
       const uiCode = 'SUB-' + new Date().getTime().toString().slice(-6);
       setSubmissionCode(uiCode);
       setSubmitted(true);
       
-      // Clear auto-save
-      localStorage.removeItem('conductor_form_global');
-      localStorage.removeItem('conductor_form_trips');
-      localStorage.removeItem('conductor_form_expenses');
-      localStorage.removeItem('conductor_form_fuelDetails');
-      localStorage.removeItem('conductor_form_bankDeposit');
+      // Clear relevant local storage
+      if (submissionType === 'trip_revenue') {
+        const newCompleted = [...completedTrips, { 
+          tripNumber: currentTripNumber, 
+          total: calculateTripTotal(specificData?.trips?.[0]?.income), 
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) 
+        }];
+        setCompletedTrips(newCompleted);
+        localStorage.setItem('conductor_form_completedTrips', JSON.stringify(newCompleted));
+
+        localStorage.removeItem('conductor_form_current_trip');
+        setCurrentTripNumber(prev => prev + 1); // Increment trip number for next time
+        setTrip({ id: Date.now().toString(), startOdo: '', endOdo: '', income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' } });
+      } else if (submissionType === 'fuel') {
+        localStorage.removeItem('conductor_form_fuelDetails');
+      } else if (submissionType === 'expenses') {
+        localStorage.removeItem('conductor_form_expenses');
+      }
 
       toast({ title: t.successTitle, description: t.successDesc });
     } catch (error: any) {
@@ -731,11 +473,62 @@ export default function PublicConductorUpload() {
     }
   };
 
+  const handleSubmitTrip = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitPartialPayload('trip_revenue', {
+      trips: [{
+        trip_number: currentTripNumber,
+        start_odometer: parseFloat(trip.startOdo) || null,
+        end_odometer: parseFloat(trip.endOdo) || null,
+        income: {
+          call_booking: parseFloat(trip.income.callBooking) || 0,
+          agent_booking: parseFloat(trip.income.agentBooking) || 0,
+          bus_collection: parseFloat(trip.income.busCollection) || 0,
+          luggage_income: parseFloat(trip.income.luggage) || 0,
+          miscellaneous_income: parseFloat(trip.income.miscIncome) || 0,
+          total: totalIncome
+        }
+      }],
+      total_income: totalIncome
+    });
+  };
+
+  const handleSubmitFuel = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitPartialPayload('fuel', {
+      fuel_details: {
+        time: fuelDetails.time,
+        odometer: fuelDetails.odometer,
+        liters: parseFloat(fuelDetails.liters) || null,
+        payment_method: fuelDetails.paymentMethod
+      },
+      // Automatically map fuel to expenses
+      expenses: {
+        fuel_cost: parseFloat(expenses['fuel_cost']) || 0
+      }
+    });
+  };
+
+  const handleSubmitExpenses = (e: React.FormEvent) => {
+    e.preventDefault();
+    const formattedExpenses = Object.entries(expenses).reduce((acc: any, [key, val]) => {
+      if (parseFloat(val) > 0) acc[key] = parseFloat(val);
+      return acc;
+    }, {});
+    formattedExpenses.total = totalExpenses;
+
+    submitPartialPayload('expenses', {
+      expenses: formattedExpenses
+    });
+  };
+
+  const updateTripIncome = (field: string, value: string) => {
+    setTrip({ ...trip, income: { ...trip.income, [field]: value } });
+  };
+
   const resetForm = () => {
     setSubmitted(false);
-    setFormData({ driverName: '', conductorName: '', busNumber: '', tripDate: new Date().toISOString().split('T')[0] });
-    setTrips([{ id: '1', startOdo: '', endOdo: '', expanded: true, income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' } }]);
-    setExpenses({});
+    setCurrentStep('hub');
   };
 
   if (submitted) {
@@ -778,6 +571,12 @@ export default function PublicConductorUpload() {
           <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-64 h-64 rounded-full bg-emerald-500/20 blur-3xl" />
           
           <div className="relative p-6 pt-8 pb-10 z-10">
+            {currentStep !== 'hub' && (
+              <Button variant="ghost" className="mb-4 text-white hover:bg-white/10 -ml-2 h-8 px-2" onClick={() => setCurrentStep('hub')}>
+                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Hub
+              </Button>
+            )}
+
             <div className="flex justify-between items-start mb-6">
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
@@ -789,7 +588,7 @@ export default function PublicConductorUpload() {
                   NCG Speed Crew
                 </span>
                 <h1 className="text-2xl font-black tracking-tight text-white drop-shadow-sm">
-                  {displayGreeting}
+                  {currentStep === 'hub' ? displayGreeting : currentStep === 'trip' ? 'Trip Revenue' : currentStep === 'fuel' ? 'Fuel Entry' : 'Expenses'}
                 </h1>
               </motion.div>
               
@@ -812,175 +611,173 @@ export default function PublicConductorUpload() {
               transition={{ delay: 0.1 }}
               className="text-blue-100 text-sm max-w-[250px] leading-relaxed"
             >
-              {t.subtitle}
+              {currentStep === 'hub' ? t.subtitle : `Submit your ${currentStep} details`}
             </motion.p>
           </div>
         </div>
 
-        {!window.matchMedia('(display-mode: standalone)').matches && (
-          <div className="bg-amber-50 p-3 flex items-center justify-between border-b border-amber-100 px-5">
-            <div className="text-xs text-amber-800 font-medium flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5" /> For the best experience, install our app!
-            </div>
-            <Button size="sm" variant="outline" className="h-7 text-xs bg-white hover:bg-amber-100 text-amber-700 border-amber-200 rounded-full" onClick={() => window.location.href = '/install?app=crew'}>
-              Install
-            </Button>
-          </div>
-        )}
-
         <CardContent className="p-0 sm:p-2 bg-slate-50/50">
-          <form onSubmit={handleSubmit} className="relative pb-6">
+          <div className="relative pb-6">
             
-            {/* Elegant Step Indicator */}
-            <div className="px-5 pt-6 pb-2">
-              <div className="flex bg-slate-100/80 backdrop-blur-sm p-1.5 rounded-2xl mb-4 border border-slate-200">
-                <button 
-                  type="button" 
-                  onClick={() => setCurrentStep(1)} 
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition-all duration-300 ${currentStep === 1 ? 'bg-white shadow-[0_2px_10px_rgba(0,0,0,0.06)] text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+            <AnimatePresence mode="wait">
+              {currentStep === 'hub' && (
+                <motion.div 
+                  key="hub"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  className="space-y-6 pt-4 px-4 sm:px-5"
                 >
-                  <Navigation className={`w-4 h-4 ${currentStep === 1 ? 'text-blue-500' : 'text-slate-400'}`} />
-                  1. Details
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setCurrentStep(2)} 
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition-all duration-300 ${currentStep === 2 ? 'bg-white shadow-[0_2px_10px_rgba(0,0,0,0.06)] text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  <Receipt className={`w-4 h-4 ${currentStep === 2 ? 'text-blue-500' : 'text-slate-400'}`} />
-                  2. {t.expenses}
-                </button>
-              </div>
-            </div>
-
-            <div className="px-4 sm:px-5">
-              <AnimatePresence mode="wait">
-                {currentStep === 1 && (
-                  <motion.div 
-                    key="step1"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                    className="space-y-6"
-                  >
-              
-              {/* Gamification Banner */}
-              <GamificationBanner totalIncome={totalIncome} totalExpenses={totalExpenses} routeTarget={routeTarget} />
-
-              {/* Global Details */}
-              <div className="bg-white p-5 rounded-[1.5rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-5 relative">
-                {fetchingMaster && (
-                  <div className="absolute top-4 right-4 flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full animate-pulse border border-blue-100">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Auto-filling...
-                  </div>
-                )}
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-1.5 h-5 bg-blue-500 rounded-full" />
-                <h3 className="font-extrabold text-slate-800 text-lg tracking-tight">{t.globalDetails}</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.tripDate}</Label>
-                  <Input type="date" value={formData.tripDate} onChange={(e) => setFormData({ ...formData, tripDate: e.target.value })} required className="bg-slate-50 border-slate-200 focus-visible:ring-blue-500 transition-all" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.busNumber}</Label>
-                  <AutocompleteInput 
-                    value={formData.busNumber} 
-                    onChange={(v) => setFormData({ ...formData, busNumber: v })} 
-                    options={history.buses || []} 
-                    placeholder="NA-1234" 
-                    uppercase={true} 
-                    autoFormat="bus"
-                    icon={<Bus className="w-4 h-4" />}
-                  />
-                </div>
-                <div className="space-y-2 col-span-2 sm:col-span-1">
-                  <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.driverName}</Label>
-                  <AutocompleteInput 
-                    value={formData.driverName} 
-                    onChange={(v) => setFormData({ ...formData, driverName: v })} 
-                    options={history.drivers || []} 
-                    placeholder="Driver Name"
-                    icon={<User className="w-4 h-4" />}
-                  />
-                </div>
-                <div className="space-y-2 col-span-2 sm:col-span-1">
-                  <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.conductorName}</Label>
-                  <AutocompleteInput 
-                    value={formData.conductorName} 
-                    onChange={(v) => setFormData({ ...formData, conductorName: v })} 
-                    options={history.conductors || []} 
-                    placeholder="Conductor Name"
-                    icon={<User className="w-4 h-4 text-emerald-500" />}
-                  />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">Route</Label>
-                  {formData.routeName ? (
-                    <div className="bg-emerald-50/50 border border-emerald-200 px-4 py-3 rounded-xl text-sm font-bold text-emerald-800 flex items-center justify-between shadow-sm">
-                      <div className="flex items-center gap-2.5">
-                        <Route className="w-4 h-4 text-emerald-600" />
-                        {formData.routeName}
+                  {/* Global Details */}
+                  <div className="bg-white p-5 rounded-[1.5rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-1.5 h-5 bg-blue-500 rounded-full" />
+                      <h3 className="font-extrabold text-slate-800 text-lg tracking-tight">{t.globalDetails}</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.tripDate}</Label>
+                        <Input type="date" value={formData.tripDate} onChange={(e) => setFormData({ ...formData, tripDate: e.target.value })} required className="bg-slate-50 border-slate-200 focus-visible:ring-blue-500 transition-all" />
                       </div>
-                      <Button type="button" variant="ghost" size="sm" className="h-7 px-3 text-xs bg-white border border-emerald-100 shadow-sm text-emerald-700 hover:text-emerald-900 rounded-lg hover:bg-emerald-100/50" onClick={() => setFormData({ ...formData, routeName: '' })}>
-                        Edit
-                      </Button>
-                    </div>
-                  ) : (
-                    <AutocompleteInput 
-                      value={formData.routeName || ''}
-                      onChange={(e) => setFormData({ ...formData, routeName: e })}
-                      options={[]}
-                      placeholder="Enter Route Name manually..."
-                      icon={<Route className="w-4 h-4 text-amber-500" />}
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Trips Accordion */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-5 bg-emerald-500 rounded-full" />
-                  <h3 className="font-bold text-slate-800">{t.income} / Trips</h3>
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={addTrip} className="h-8 text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100">
-                  <Plus className="w-4 h-4 mr-1" /> {t.addTrip}
-                </Button>
-              </div>
-
-              {trips.map((trip, index) => (
-                <div key={trip.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-200">
-                  <div 
-                    className={`p-3 flex items-center justify-between cursor-pointer select-none ${trip.expanded ? 'bg-emerald-50/50 border-b border-slate-100' : ''}`}
-                    onClick={() => toggleTrip(trip.id)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 font-bold text-xs">
-                        {index + 1}
-                      </span>
-                      <span className="font-bold text-slate-700">{t.tripTitle} {index + 1}</span>
-                      {!trip.expanded && calculateTripTotal(trip.income) > 0 && (
-                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-                          Rs. {calculateTripTotal(trip.income)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {trips.length > 1 && (
-                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); removeTrip(trip.id); }}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {trip.expanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.busNumber}</Label>
+                        <AutocompleteInput 
+                          value={formData.busNumber} 
+                          onChange={(v) => setFormData({ ...formData, busNumber: v })} 
+                          options={history.buses || []} 
+                          placeholder="NA-1234" 
+                          uppercase={true} 
+                          autoFormat="bus"
+                          icon={<Bus className="w-4 h-4" />}
+                        />
+                      </div>
+                      <div className="space-y-2 col-span-2">
+                        <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.routeName}</Label>
+                        <AutocompleteInput 
+                          value={formData.routeName} 
+                          onChange={(v) => setFormData({ ...formData, routeName: v })} 
+                          options={history.routes || []} 
+                          placeholder={lang === 'si' ? 'කොළඹ - මහනුවර' : 'Colombo - Kandy'}
+                          icon={<Route className="w-4 h-4 text-blue-500" />}
+                        />
+                      </div>
+                      <div className="space-y-2 col-span-2 sm:col-span-1">
+                        <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.driverName}</Label>
+                        <AutocompleteInput 
+                          value={formData.driverName} 
+                          onChange={(v) => setFormData({ ...formData, driverName: v })} 
+                          options={history.drivers || []} 
+                          placeholder="Driver Name"
+                          icon={<User className="w-4 h-4" />}
+                        />
+                      </div>
+                      <div className="space-y-2 col-span-2 sm:col-span-1">
+                        <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.conductorName}</Label>
+                        <AutocompleteInput 
+                          value={formData.conductorName} 
+                          onChange={(v) => setFormData({ ...formData, conductorName: v })} 
+                          options={history.conductors || []} 
+                          placeholder="Conductor Name"
+                          icon={<User className="w-4 h-4 text-emerald-500" />}
+                        />
+                      </div>
                     </div>
                   </div>
-                  
-                  {trip.expanded && (
+
+                  {/* Submitted Trips Summary */}
+                  {completedTrips.length > 0 && (
+                    <div className="bg-emerald-50 rounded-[1.5rem] p-5 border border-emerald-100 shadow-[0_4px_20px_rgb(0,0,0,0.02)] space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-emerald-800 text-sm">Today's Submitted Trips</h4>
+                        <div className="bg-white text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full text-xs font-bold">
+                          {completedTrips.length} {completedTrips.length === 1 ? 'Trip' : 'Trips'}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {completedTrips.map(ct => (
+                          <div key={ct.tripNumber} className="flex justify-between items-center bg-white p-3 rounded-xl border border-emerald-100/50 text-sm text-slate-600 shadow-sm">
+                            <span className="font-semibold flex items-center gap-2"><CheckCircle className="w-4 h-4 text-emerald-500" /> Trip {ct.tripNumber}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-slate-400">{ct.time}</span>
+                              <span className="font-black text-emerald-700">Rs. {ct.total.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hub Actions */}
+                  <div className="space-y-3">
+                    <button 
+                      onClick={() => { if (validateGlobalFields()) setCurrentStep('trip'); }}
+                      className="w-full bg-white p-5 rounded-[1.5rem] border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] flex items-center justify-between hover:border-emerald-200 hover:shadow-md transition-all group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                          <Bus className="w-6 h-6" />
+                        </div>
+                        <div className="text-left">
+                          <h4 className="font-bold text-lg text-slate-800">{lang === 'si' ? 'ගමන් ආදායම්' : t.income}</h4>
+                          <p className="text-xs text-slate-500 font-medium">Submit revenue trip by trip</p>
+                        </div>
+                      </div>
+                      <Navigation className="w-5 h-5 text-slate-300 group-hover:text-emerald-500 transition-colors transform group-hover:translate-x-1" />
+                    </button>
+
+                    <button 
+                      onClick={() => { if (validateGlobalFields()) setCurrentStep('fuel'); }}
+                      className="w-full bg-white p-5 rounded-[1.5rem] border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] flex items-center justify-between hover:border-orange-200 hover:shadow-md transition-all group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center group-hover:bg-orange-100 transition-colors">
+                          <Banknote className="w-6 h-6" />
+                        </div>
+                        <div className="text-left">
+                          <h4 className="font-bold text-lg text-slate-800">{lang === 'si' ? 'ඉන්ධන' : 'Fuel Details'}</h4>
+                          <p className="text-xs text-slate-500 font-medium">Record diesel and pumping details</p>
+                        </div>
+                      </div>
+                      <Navigation className="w-5 h-5 text-slate-300 group-hover:text-orange-500 transition-colors transform group-hover:translate-x-1" />
+                    </button>
+
+                    <button 
+                      onClick={() => { if (validateGlobalFields()) setCurrentStep('expenses'); }}
+                      className="w-full bg-white p-5 rounded-[1.5rem] border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] flex items-center justify-between hover:border-rose-200 hover:shadow-md transition-all group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center group-hover:bg-rose-100 transition-colors">
+                          <Receipt className="w-6 h-6" />
+                        </div>
+                        <div className="text-left">
+                          <h4 className="font-bold text-lg text-slate-800">{lang === 'si' ? 'වියදම්' : t.expenses}</h4>
+                          <p className="text-xs text-slate-500 font-medium">Record daily operational costs</p>
+                        </div>
+                      </div>
+                      <Navigation className="w-5 h-5 text-slate-300 group-hover:text-rose-500 transition-colors transform group-hover:translate-x-1" />
+                    </button>
+
+                  </div>
+                </motion.div>
+              )}
+
+              {currentStep === 'trip' && (
+                <motion.div 
+                  key="trip"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="space-y-6 pt-4 px-4 sm:px-5"
+                >
+                  <form onSubmit={handleSubmitTrip} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="p-4 bg-emerald-50/50 border-b border-slate-100 flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-5 bg-emerald-500 rounded-full" />
+                        <h3 className="font-bold text-slate-800">{t.tripTitle} {currentTripNumber}</h3>
+                      </div>
+                    </div>
+                    
                     <div className="p-4 space-y-4">
                       {/* Odometer */}
                       <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
@@ -988,8 +785,7 @@ export default function PublicConductorUpload() {
                           <Label className="text-xs font-bold text-slate-500">{t.startOdo}</Label>
                           <Input 
                             type="number" inputMode="decimal" placeholder="0" 
-                            value={trip.startOdo} onChange={(e) => updateTrip(trip.id, 'startOdo', e.target.value)} 
-                            onFocus={(e) => e.target.select()}
+                            value={trip.startOdo} onChange={(e) => setTrip({...trip, startOdo: e.target.value})} 
                             className="h-8 text-sm" 
                           />
                         </div>
@@ -997,8 +793,7 @@ export default function PublicConductorUpload() {
                           <Label className="text-xs font-bold text-slate-500">{t.endOdo}</Label>
                           <Input 
                             type="number" inputMode="decimal" placeholder="0" 
-                            value={trip.endOdo} onChange={(e) => updateTrip(trip.id, 'endOdo', e.target.value)} 
-                            onFocus={(e) => e.target.select()}
+                            value={trip.endOdo} onChange={(e) => setTrip({...trip, endOdo: e.target.value})} 
                             className="h-8 text-sm" 
                           />
                         </div>
@@ -1020,288 +815,159 @@ export default function PublicConductorUpload() {
                                 type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
                                 className="h-9 text-right font-medium focus-visible:ring-emerald-500" 
                                 value={trip.income?.[inc.key as keyof typeof trip.income] || ''} 
-                                onChange={(e) => updateTripIncome(trip.id, inc.key, e.target.value)} 
+                                onChange={(e) => updateTripIncome(inc.key, e.target.value)} 
                                 onFocus={(e) => e.target.select()}
                               />
                             </div>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
 
-            {/* Expenses Section */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-5 bg-rose-500 rounded-full" />
-                  <h3 className="font-bold text-slate-800">{t.expenses}</h3>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                {EXPENSE_CATEGORIES.filter(c => c.primary || showAllExpenses).map((cat) => (
-                  <div key={cat.key} className="flex items-center justify-between py-1 border-b border-slate-50">
-                    <Label className="text-sm font-semibold text-slate-600 truncate mr-2">
-                      {lang === 'en' ? cat.en : lang === 'si' ? cat.si : cat.ta}
-                    </Label>
-                    <div className="relative w-28 shrink-0">
-                      <Input 
-                        type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
-                        className="h-8 text-right font-medium text-sm focus-visible:ring-rose-500 bg-rose-50/30 border-rose-100" 
-                        value={expenses[cat.key] || ''} 
-                        onChange={(e) => setExpenses({...expenses, [cat.key]: e.target.value})} 
-                        onFocus={(e) => e.target.select()}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <Button 
-                type="button" variant="ghost" 
-                className="w-full text-sm text-slate-500 hover:text-slate-800 mt-2" 
-                onClick={() => setShowAllExpenses(!showAllExpenses)}
-              >
-                {showAllExpenses ? t.hideExpenses : t.showAllExpenses}
-              </Button>
-            </div>
-                  </motion.div>
-                )}
-
-                {currentStep === 2 && (
-                  <motion.div 
-                    key="step2"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                    className="space-y-6 pb-6"
-                  >
-            {/* STEP 2: Expenses & Fuel & Bank */}
-
-            {/* Fuel Details Section */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-5 bg-orange-500 rounded-full" />
-                  <h3 className="font-bold text-slate-800">{t.fuelDetails}</h3>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3 bg-orange-50/50 p-3 rounded-lg border border-orange-100/50">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-600 flex justify-between">
-                    {t.fuelTime}
-                    <button type="button" onClick={() => setFuelDetails({...fuelDetails, time: getCurrentTime()})} className="text-[10px] text-blue-600 hover:underline">Now</button>
-                  </Label>
-                  <Input type="time" value={fuelDetails.time} onChange={e => setFuelDetails({...fuelDetails, time: e.target.value})} className="h-9 bg-white" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-600">{t.fuelOdo}</Label>
-                  <Input type="number" inputMode="decimal" placeholder="0" value={fuelDetails.odometer} onChange={e => setFuelDetails({...fuelDetails, odometer: e.target.value})} className="h-9 bg-white" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-600">{t.fuelLiters}</Label>
-                  <Input type="number" inputMode="decimal" placeholder="0.0" value={fuelDetails.liters} onChange={e => setFuelDetails({...fuelDetails, liters: e.target.value})} className="h-9 bg-white" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-600">{t.fuelCost}</Label>
-                  <Input type="number" inputMode="decimal" placeholder="0.00" value={expenses['fuel_cost'] || ''} onChange={e => handleFuelCostChange(e.target.value)} className="h-9 bg-white" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-600">{t.fuelPayment}</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div 
-                    onClick={() => setFuelDetails({...fuelDetails, paymentMethod: 'cash'})}
-                    className={`flex items-center justify-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${fuelDetails.paymentMethod === 'cash' ? 'bg-orange-100 border-orange-300 text-orange-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
-                  >
-                    <Banknote className="w-4 h-4" /> {t.cash}
-                  </div>
-                  <div 
-                    onClick={() => setFuelDetails({...fuelDetails, paymentMethod: 'card'})}
-                    className={`flex items-center justify-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${fuelDetails.paymentMethod === 'card' ? 'bg-orange-100 border-orange-300 text-orange-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
-                  >
-                    <CreditCard className="w-4 h-4" /> {t.card}
-                  </div>
-                </div>
-                {isFuelCard && (
-                  <p className="text-[10px] text-orange-600 font-medium px-1">
-                    * Card payment will not be deducted from the cash handover amount.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Bank Deposit Section */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-5 bg-purple-500 rounded-full" />
-                  <h3 className="font-bold text-slate-800">{t.bankDeposit}</h3>
-                </div>
-              </div>
-
-              <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 flex items-center justify-between">
-                <span className="text-sm font-semibold text-purple-800 flex flex-col">
-                  {t.suggestedDeposit}
-                  {isFuelCard && fuelCostValue > 0 && (
-                    <span className="text-[10px] text-purple-600/80 font-normal mt-0.5">+ Rs. {fuelCostValue.toFixed(2)} Card Fuel added to deposit</span>
-                  )}
-                </span>
-                <span className="text-lg font-black text-purple-700">Rs. {suggestedDeposit.toFixed(2)}</span>
-              </div>
-
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-600">{t.actualDeposit}</Label>
-                  <Input 
-                    type="number" inputMode="decimal" placeholder="0.00" 
-                    value={bankDeposit.amount} onChange={e => setBankDeposit({...bankDeposit, amount: e.target.value})} 
-                    className="h-10 text-lg font-bold" 
-                  />
-                </div>
-                
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-600">{t.bankName}</Label>
-                  <Input 
-                    placeholder="e.g. BOC / Commercial Bank" 
-                    value={bankDeposit.bankName} onChange={e => setBankDeposit({...bankDeposit, bankName: e.target.value})} 
-                  />
-                </div>
-
-                <div className="space-y-1.5 pt-2">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-xs font-bold text-slate-600">{t.uploadSlip}</Label>
-                    <span className="text-[10px] text-slate-400 font-medium">(Optional)</span>
-                  </div>
-                  
-                  {!slipPreview ? (
-                    <div className="flex gap-2">
-                      {/* Camera Button */}
-                      <div className="relative flex-1">
-                        <input 
-                          type="file" accept="image/*" capture="environment"
-                          onChange={handleSlipChange}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                        />
-                        <div className="flex flex-col items-center justify-center gap-1 p-3 border border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors h-full text-center">
-                          <Camera className="w-5 h-5 text-slate-500" />
-                          <span className="text-[11px] font-bold text-slate-600">Take Photo</span>
-                        </div>
+                      <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
+                        <span className="font-bold text-slate-600 text-sm">Trip Subtotal</span>
+                        <span className="font-black text-emerald-600 text-lg">Rs. {totalIncome.toFixed(2)}</span>
                       </div>
 
-                      {/* Gallery / File Button */}
-                      <div className="relative flex-1">
-                        <input 
-                          type="file" accept="image/*"
-                          onChange={handleSlipChange}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      <Button type="submit" disabled={loading} className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md">
+                        {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
+                        {t.submitTrip}
+                      </Button>
+                    </div>
+                  </form>
+                </motion.div>
+              )}
+
+              {currentStep === 'fuel' && (
+                <motion.div 
+                  key="fuel"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="space-y-6 pt-4 px-4 sm:px-5"
+                >
+                  <form onSubmit={handleSubmitFuel} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-1.5 h-5 bg-orange-500 rounded-full" />
+                      <h3 className="font-bold text-slate-800">{t.fuelDetails}</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 bg-orange-50/50 p-3 rounded-lg border border-orange-100/50">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-600 flex justify-between">
+                          {t.fuelTime}
+                          <button type="button" onClick={() => setFuelDetails({...fuelDetails, time: getCurrentTime()})} className="text-[10px] text-blue-600 hover:underline">Now</button>
+                        </Label>
+                        <Input type="time" value={fuelDetails.time || ''} onChange={e => setFuelDetails({...fuelDetails, time: e.target.value})} className="h-9 bg-white" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-600">{t.fuelOdo}</Label>
+                        <Input type="number" inputMode="decimal" placeholder="0" value={fuelDetails.odometer || ''} onChange={e => setFuelDetails({...fuelDetails, odometer: e.target.value})} className="h-9 bg-white" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-600">{t.fuelCost}</Label>
+                        <Input 
+                          type="number" 
+                          inputMode="decimal" 
+                          placeholder="0.00" 
+                          value={expenses['fuel_cost'] || ''} 
+                          onChange={e => setExpenses({...expenses, fuel_cost: e.target.value})} 
+                          className="h-9 bg-white" 
                         />
-                        <div className="flex flex-col items-center justify-center gap-1 p-3 border border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors h-full text-center">
-                          <Upload className="w-5 h-5 text-slate-500" />
-                          <span className="text-[11px] font-bold text-slate-600">Upload Slip</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-600">{t.fuelLiters} (Auto)</Label>
+                        <Input 
+                          type="number" 
+                          inputMode="decimal" 
+                          placeholder="0.0" 
+                          value={fuelDetails.liters || ''} 
+                          disabled
+                          className="h-9 bg-slate-100 text-slate-500 cursor-not-allowed" 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold text-slate-600">{t.fuelPayment}</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div 
+                          onClick={() => setFuelDetails({...fuelDetails, paymentMethod: 'cash'})}
+                          className={`flex items-center justify-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${fuelDetails.paymentMethod === 'cash' ? 'bg-orange-100 border-orange-300 text-orange-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                        >
+                          <Banknote className="w-4 h-4" /> {t.cash}
+                        </div>
+                        <div 
+                          onClick={() => setFuelDetails({...fuelDetails, paymentMethod: 'card'})}
+                          className={`flex items-center justify-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${fuelDetails.paymentMethod === 'card' ? 'bg-orange-100 border-orange-300 text-orange-800 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                        >
+                          <CreditCard className="w-4 h-4" /> {t.card}
                         </div>
                       </div>
                     </div>
-                  ) : (
-                    <div className="space-y-3 mt-3 animate-in zoom-in-95 duration-200">
-                      <div className="relative rounded-xl overflow-hidden border-2 border-emerald-500/50 bg-black/5 flex justify-center p-2">
-                        <img src={slipPreview} alt="Bank Slip Preview" className="w-auto h-auto max-h-48 object-contain rounded-md shadow-sm" />
-                        <button 
-                          type="button" 
-                          onClick={() => { setSlipFile(null); setSlipPreview(null); }}
-                          className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-all active:scale-95"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          onClick={() => { setSlipFile(null); setSlipPreview(null); }}
-                          className="flex-1 text-xs border-slate-300 text-slate-600 h-10 hover:bg-slate-100"
-                        >
-                          Re-upload
-                        </Button>
-                        <Button 
-                          type="button" 
-                          className="flex-[2] text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white h-10 shadow-lg shadow-emerald-600/20"
-                          onClick={(e) => { e.preventDefault(); }}
-                        >
-                          <Check className="w-4 h-4 mr-1.5" /> Use this Photo
-                        </Button>
-                      </div>
+
+                    <Button type="submit" disabled={loading} className="w-full h-12 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl shadow-md mt-4">
+                      {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
+                      {t.submitFuel}
+                    </Button>
+                  </form>
+                </motion.div>
+              )}
+
+              {currentStep === 'expenses' && (
+                <motion.div 
+                  key="expenses"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="space-y-6 pt-4 px-4 sm:px-5"
+                >
+                  <form onSubmit={handleSubmitExpenses} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-1.5 h-5 bg-rose-500 rounded-full" />
+                      <h3 className="font-bold text-slate-800">{t.expenses}</h3>
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-            {/* End Step 2 */}
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                      {EXPENSE_CATEGORIES.filter(c => c.primary || showAllExpenses).map((cat) => (
+                        <div key={cat.key} className="flex items-center justify-between py-1 border-b border-slate-50">
+                          <Label className="text-sm font-semibold text-slate-600 truncate mr-2">
+                            {lang === 'en' ? cat.en : lang === 'si' ? cat.si : cat.ta}
+                          </Label>
+                          <div className="relative w-28 shrink-0">
+                            <Input 
+                              type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
+                              className="h-8 text-right font-medium text-sm focus-visible:ring-rose-500 bg-rose-50/30 border-rose-100" 
+                              value={expenses[cat.key] || ''} 
+                              onChange={(e) => setExpenses({...expenses, [cat.key]: e.target.value})} 
+                              onFocus={(e) => e.target.select()}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
 
-            {/* Fixed Bottom Summary & Submit */}
-            <div className="sticky bottom-4 z-10 bg-slate-900 text-white p-4 sm:p-5 rounded-2xl shadow-2xl space-y-3 mt-8 border border-slate-700/50 backdrop-blur-xl">
-              <div className="flex items-center gap-2 mb-1 opacity-80">
-                <Calculator className="w-4 h-4" />
-                <h3 className="font-bold text-xs uppercase tracking-wider">Summary</h3>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-700/50">
-                <span className="text-emerald-400 text-sm font-medium">{t.totalIncome}</span>
-                <span className="font-mono text-emerald-400 font-bold">Rs. {totalIncome.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-700/50">
-                <span className="text-rose-400 text-sm font-medium">{t.totalExpenses}</span>
-                <span className="font-mono text-rose-400 font-bold">- Rs. {totalExpenses.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center pt-1 pb-3 border-b border-slate-700/50">
-                <span className="font-black text-slate-100">{t.netBalance}</span>
-                <span className="font-mono font-black text-xl text-white">Rs. {netBalance.toFixed(2)}</span>
-              </div>
+                    <Button 
+                      type="button" variant="ghost" 
+                      className="w-full text-sm text-slate-500 hover:text-slate-800 mt-2" 
+                      onClick={() => setShowAllExpenses(!showAllExpenses)}
+                    >
+                      {showAllExpenses ? t.hideExpenses : t.showAllExpenses}
+                    </Button>
 
-              <div className="pt-2 flex gap-3">
-                {currentStep === 2 && (
-                  <Button 
-                    type="button"
-                    variant="outline"
-                    onClick={() => setCurrentStep(1)} 
-                    className="flex-1 h-14 border-slate-600 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
-                  >
-                    ← Back
-                  </Button>
-                )}
-                
-                {currentStep === 1 ? (
-                  <Button 
-                    type="button"
-                    onClick={() => setCurrentStep(2)} 
-                    className="w-full h-14 bg-blue-600 hover:bg-blue-500 text-white font-black text-lg rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all active:scale-[0.98] border-0"
-                  >
-                    Next: Expenses →
-                  </Button>
-                ) : (
-                  <Button 
-                    type="submit" 
-                    disabled={loading} 
-                    className="flex-[2] h-14 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all active:scale-[0.98] border-0"
-                  >
-                    {loading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t.submitting}</> : <><Send className="mr-2 h-5 w-5" /> {t.submit}</>}
-                  </Button>
-                )}
-              </div>
-            </div>
+                    <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
+                      <span className="font-bold text-slate-600 text-sm">Expenses Subtotal</span>
+                      <span className="font-black text-rose-600 text-lg">Rs. {totalExpenses.toFixed(2)}</span>
+                    </div>
 
-          </form>
+                    <Button type="submit" disabled={loading} className="w-full h-12 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow-md mt-4">
+                      {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
+                      {t.submitExpenses}
+                    </Button>
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </CardContent>
       </Card>
     </div>

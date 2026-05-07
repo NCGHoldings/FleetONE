@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Bus } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Bus, PlusCircle } from 'lucide-react';
 
 interface SubmissionReviewModalProps {
   open: boolean;
@@ -39,7 +39,8 @@ export const SubmissionReviewModal = ({
   const [validation, setValidation] = useState({
     busFound: false,
     driverFound: false,
-    conductorFound: false
+    conductorFound: false,
+    routeFound: false
   });
 
   useEffect(() => {
@@ -65,15 +66,16 @@ export const SubmissionReviewModal = ({
   // Check if trip already exists when bus number or date changes
   useEffect(() => {
     if (open && editedData.bus_number && editedData.trip_date) {
-      checkExistingTrip(editedData.bus_number, editedData.trip_date, editedData.driver_name, editedData.conductor_name);
+      checkExistingTrip(editedData.bus_number, editedData.trip_date, editedData.driver_name, editedData.conductor_name, editedData.route_name);
     }
-  }, [editedData.bus_number, editedData.trip_date, editedData.driver_name, editedData.conductor_name]);
+  }, [editedData.bus_number, editedData.trip_date, editedData.driver_name, editedData.conductor_name, editedData.route_name]);
 
-  const checkExistingTrip = async (busNumber: string, tripDate: string, driverName?: string, conductorName?: string) => {
+  const checkExistingTrip = async (busNumber: string, tripDate: string, driverName?: string, conductorName?: string, routeName?: string) => {
     try {
       let busFound = false;
       let driverFound = false;
       let conductorFound = false;
+      let routeFound = false;
 
       // 1. Check Bus
       const { data: bus } = await supabase
@@ -86,14 +88,14 @@ export const SubmissionReviewModal = ({
         busFound = true;
         const { data: trip } = await supabase
           .from('daily_trips')
-          .select('id, income, distance_km')
+          .select('id, income, distance_km, total_expenses')
           .eq('bus_id', bus.id)
           .eq('trip_date', tripDate)
           .maybeSingle();
         
         if (trip) {
           setExistingTripId(trip.id);
-          const hasData = (trip.income && trip.income > 0) || (trip.distance_km && trip.distance_km > 0);
+          const hasData = (trip.income && trip.income > 0) || (trip.distance_km && trip.distance_km > 0) || (trip.total_expenses && trip.total_expenses > 0);
           setExistingTripHasData(!!hasData);
         } else {
           setExistingTripId(null);
@@ -126,7 +128,17 @@ export const SubmissionReviewModal = ({
         if (c) conductorFound = true;
       }
 
-      setValidation({ busFound, driverFound, conductorFound });
+      // 4. Check Route
+      if (routeName && routeName.trim() !== '') {
+        const { data: r } = await supabase
+          .from('routes')
+          .select('id')
+          .ilike('route_name', `%${routeName.trim()}%`)
+          .maybeSingle();
+        if (r) routeFound = true;
+      }
+
+      setValidation({ busFound, driverFound, conductorFound, routeFound });
     } catch (e) {
       console.error("Error checking validation", e);
     }
@@ -169,11 +181,19 @@ export const SubmissionReviewModal = ({
         conductorId = c?.id;
       }
 
-      // 2. Map payload to daily_trips format
-      const totalIncome = parseFloat(editedData.total_income || 0);
-      const totalExpenses = parseFloat(editedData.expenses?.total || 0);
+      let routeId = null;
+      if (editedData.route_name) {
+        const { data: r } = await supabase
+          .from('routes')
+          .select('id')
+          .ilike('route_name', `%${editedData.route_name.trim()}%`)
+          .maybeSingle();
+        routeId = r?.id;
+      }
 
-      // Group trips by date
+      // 2. Map payload to daily_trips format
+      const submissionType = editedData.submission_type || 'full';
+      
       const tripsByDate: Record<string, any[]> = {};
       if (editedData.trips && editedData.trips.length > 0) {
         editedData.trips.forEach((trip: any) => {
@@ -188,31 +208,87 @@ export const SubmissionReviewModal = ({
       for (const [date, mappedTrips] of Object.entries(tripsByDate)) {
         const isPrimaryDate = date === editedData.trip_date;
         
-        // Find existing trip for this specific date
+        // Find existing trip for this specific date FULLY to merge properly
         const { data: existingTrip } = await supabase
           .from('daily_trips')
-          .select('id')
+          .select('*')
           .eq('bus_id', bus.id)
           .eq('trip_date', date)
           .maybeSingle();
 
-        const dateIncome = mappedTrips.length > 0 
-          ? mappedTrips.reduce((sum, t) => sum + (parseFloat(t.income?.total) || 0), 0)
-          : totalIncome;
-        
-        const tripPayload = {
+        const tripPayload: any = {
           bus_id: bus.id,
           trip_date: date,
           driver_id: driverId,
           conductor_id: conductorId,
-          income: dateIncome,
-          income_details: mappedTrips,
-          total_expenses: isPrimaryDate ? totalExpenses : 0,
-          other_expenses_details: isPrimaryDate ? editedData.expenses : null,
-          net_income: isPrimaryDate ? (dateIncome - totalExpenses) : dateIncome,
+          route_id: routeId || existingTrip?.route_id,
           data_source: 'manual',
-          notes: `Uploaded via Conductor Portal: ${submission.submission_code}`
+          notes: existingTrip?.notes 
+            ? `${existingTrip.notes} | Partial (${submissionType}): ${submission.submission_code}`
+            : `Uploaded via Conductor Portal: ${submission.submission_code}`
         };
+
+        if (existingTrip) {
+          let newIncome = parseFloat(existingTrip.income || 0);
+          let newIncomeDetails = existingTrip.income_details || [];
+          let newTotalExpenses = parseFloat(existingTrip.total_expenses || 0);
+          let newOtherExpensesDetails: Record<string, any> = typeof existingTrip.other_expenses_details === 'object' && existingTrip.other_expenses_details !== null 
+            ? existingTrip.other_expenses_details 
+            : {};
+
+          if (submissionType === 'trip_revenue' || submissionType === 'full') {
+            const tripIncome = mappedTrips.length > 0 
+              ? mappedTrips.reduce((sum, t) => sum + (parseFloat(t.income?.total) || 0), 0)
+              : parseFloat(editedData.total_income || 0);
+              
+            newIncome += tripIncome;
+            if (Array.isArray(newIncomeDetails)) {
+              newIncomeDetails = [...newIncomeDetails, ...mappedTrips];
+            } else {
+              newIncomeDetails = mappedTrips;
+            }
+          }
+
+          if ((submissionType === 'fuel' || submissionType === 'expenses' || submissionType === 'full') && isPrimaryDate) {
+            if (editedData.expenses) {
+              const incomingExpTotal = parseFloat(editedData.expenses.total || editedData.expenses.fuel_cost || 0);
+              newTotalExpenses += incomingExpTotal;
+              
+              Object.entries(editedData.expenses).forEach(([k, v]) => {
+                if (k !== 'total') {
+                   newOtherExpensesDetails[k] = (parseFloat(newOtherExpensesDetails[k] || 0) + parseFloat(v as string));
+                }
+              });
+            }
+            if (editedData.fuel_details) {
+               newOtherExpensesDetails['fuel_details'] = editedData.fuel_details;
+            }
+          }
+
+          tripPayload.income = newIncome;
+          tripPayload.income_details = newIncomeDetails;
+          tripPayload.total_expenses = newTotalExpenses;
+          tripPayload.other_expenses_details = newOtherExpensesDetails;
+          tripPayload.net_income = newIncome - newTotalExpenses;
+        } else {
+          // Creating new trip
+          const dateIncome = mappedTrips.length > 0 
+            ? mappedTrips.reduce((sum, t) => sum + (parseFloat(t.income?.total) || 0), 0)
+            : (submissionType === 'trip_revenue' || submissionType === 'full' ? parseFloat(editedData.total_income || 0) : 0);
+            
+          const expTotal = isPrimaryDate && (submissionType === 'fuel' || submissionType === 'expenses' || submissionType === 'full') 
+            ? parseFloat(editedData.expenses?.total || editedData.expenses?.fuel_cost || 0) 
+            : 0;
+
+          const mergedExpensesDetails: Record<string, any> = { ...(editedData.expenses || {}) };
+          if (editedData.fuel_details) mergedExpensesDetails['fuel_details'] = editedData.fuel_details;
+
+          tripPayload.income = dateIncome;
+          tripPayload.income_details = mappedTrips;
+          tripPayload.total_expenses = expTotal;
+          tripPayload.other_expenses_details = isPrimaryDate ? mergedExpensesDetails : null;
+          tripPayload.net_income = dateIncome - expTotal;
+        }
 
         let newTripId;
 
@@ -227,7 +303,8 @@ export const SubmissionReviewModal = ({
           if (tripError) throw new Error(`Failed to update daily trip: ${tripError.message}`);
           newTripId = data.id;
           
-          if (isPrimaryDate) {
+          // Only delete if full overwrite is expected
+          if (submissionType === 'full' && isPrimaryDate) {
             await supabase.from('daily_bus_expenses').delete().eq('daily_trip_id', existingTrip.id);
           }
         } else {
@@ -241,8 +318,8 @@ export const SubmissionReviewModal = ({
           newTripId = data.id;
         }
 
-        // 3. Create individual expense records (Only on primary date)
-        if (isPrimaryDate && editedData.expenses) {
+        // 3. Create individual expense records (Only on primary date for relevant types)
+        if (isPrimaryDate && editedData.expenses && (submissionType === 'fuel' || submissionType === 'expenses' || submissionType === 'full')) {
           const expenseInserts = Object.entries(editedData.expenses)
             .filter(([key]) => key !== 'total')
             .map(([category, amount]) => ({
@@ -339,6 +416,8 @@ export const SubmissionReviewModal = ({
 
   if (!submission) return null;
 
+  const isPartial = editedData.submission_type && editedData.submission_type !== 'full';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
@@ -356,16 +435,26 @@ export const SubmissionReviewModal = ({
 
         {existingTripId && (
           <div className={`border p-3 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3 ${
-            existingTripHasData 
+            existingTripHasData && !isPartial
               ? 'bg-red-50 border-red-200 text-red-800' 
               : 'bg-amber-50 border-amber-200 text-amber-800'
           }`}>
             <div className="flex items-center text-sm font-medium">
-              <AlertTriangle className={`w-5 h-5 mr-2 ${existingTripHasData ? 'text-red-500' : 'text-amber-500'}`} />
-              {existingTripHasData ? (
-                <span>Warning: Financial data already exists for {editedData.bus_number} on {editedData.trip_date}. Approving will <strong>overwrite</strong> the existing data!</span>
+              {existingTripHasData && !isPartial ? (
+                <>
+                  <AlertTriangle className="w-5 h-5 mr-2 text-red-500" />
+                  <span>Warning: Financial data already exists for {editedData.bus_number} on {editedData.trip_date}. Approving will <strong>overwrite</strong> the existing data!</span>
+                </>
+              ) : isPartial ? (
+                <>
+                  <PlusCircle className="w-5 h-5 mr-2 text-amber-500" />
+                  <span>A trip exists for {editedData.bus_number} on {editedData.trip_date}. Approving will <strong>merge and append</strong> this partial data to it.</span>
+                </>
               ) : (
-                <span>An empty scheduled trip exists for {editedData.bus_number} on {editedData.trip_date}. Approving will fill it with this financial data.</span>
+                <>
+                  <AlertTriangle className="w-5 h-5 mr-2 text-amber-500" />
+                  <span>An empty scheduled trip exists for {editedData.bus_number} on {editedData.trip_date}. Approving will fill it with this financial data.</span>
+                </>
               )}
             </div>
             <Button size="sm" variant="outline" className="bg-white whitespace-nowrap shrink-0" onClick={() => window.open(`/trips?date=${editedData.trip_date}`, '_blank')}>
@@ -386,19 +475,30 @@ export const SubmissionReviewModal = ({
                   className="w-full rounded-lg border shadow-sm"
                 />
               </div>
-            ) : editedData.data_entry_method === 'manual_form_v2' ? (
+            ) : editedData.data_entry_method === 'manual_form_v2' || editedData.data_entry_method === 'hub_spoke_v3' ? (
               <div className="bg-slate-900 text-white p-5 rounded-xl shadow-lg space-y-5">
-                <h3 className="font-bold text-xl mb-4 border-b border-slate-800 pb-2">Financial Summary</h3>
+                <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
+                  <h3 className="font-bold text-xl">Financial Summary</h3>
+                  {editedData.submission_type && (
+                     <Badge variant="outline" className="text-blue-300 border-blue-500/30 uppercase tracking-wider text-[10px]">
+                       {editedData.submission_type.replace('_', ' ')}
+                     </Badge>
+                  )}
+                </div>
                 
                 <div className="space-y-3 text-sm">
-                  <div className="flex justify-between items-center text-slate-300">
-                    <span className="font-medium">Total Income ({editedData.trips?.length || 0} Trips)</span>
-                    <span className="text-emerald-400 font-bold text-lg">Rs. {editedData.total_income?.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-slate-300">
-                    <span className="font-medium">Total Expenses</span>
-                    <span className="text-red-400 font-bold text-lg">- Rs. {editedData.expenses?.total?.toFixed(2)}</span>
-                  </div>
+                  {(!editedData.submission_type || editedData.submission_type === 'trip_revenue') && (
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="font-medium">Total Income ({editedData.trips?.length || 0} Trips)</span>
+                      <span className="text-emerald-400 font-bold text-lg">Rs. {(editedData.total_income || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {(!editedData.submission_type || editedData.submission_type === 'expenses' || editedData.submission_type === 'fuel') && (
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="font-medium">Total Expenses</span>
+                      <span className="text-red-400 font-bold text-lg">- Rs. {(editedData.expenses?.total || editedData.expenses?.fuel_cost || 0).toFixed(2)}</span>
+                    </div>
+                  )}
                   
                   {editedData.fuel_details?.payment_method === 'card' && (
                     <div className="flex justify-between items-center text-slate-300">
@@ -410,10 +510,12 @@ export const SubmissionReviewModal = ({
                     </div>
                   )}
 
-                  <div className="pt-3 border-t border-slate-700 flex justify-between font-black text-xl">
-                    <span>Net Balance</span>
-                    <span className="text-white">Rs. {editedData.net_balance?.toFixed(2)}</span>
-                  </div>
+                  {!editedData.submission_type && (
+                    <div className="pt-3 border-t border-slate-700 flex justify-between font-black text-xl">
+                      <span>Net Balance</span>
+                      <span className="text-white">Rs. {editedData.net_balance?.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {editedData.bank_deposit && (
@@ -438,7 +540,7 @@ export const SubmissionReviewModal = ({
                 )}
 
                 {/* detailed Trip breakdown */}
-                {editedData.trips && editedData.trips.length > 0 && (
+                {(!editedData.submission_type || editedData.submission_type === 'trip_revenue') && editedData.trips && editedData.trips.length > 0 && (
                   <div className="mt-6 pt-4 border-t border-slate-800">
                     <p className="text-xs text-blue-400 font-bold uppercase mb-3 tracking-wider">Trip-by-Trip Details</p>
                     <div className="space-y-3">
@@ -482,7 +584,7 @@ export const SubmissionReviewModal = ({
                 )}
 
                 {/* Expenses Breakdown */}
-                {(editedData.expenses && Object.keys(editedData.expenses).length > 1) || editedData.fuel_details ? (
+                {(!editedData.submission_type || editedData.submission_type === 'expenses' || editedData.submission_type === 'fuel') && ((editedData.expenses && Object.keys(editedData.expenses).length > 0) || editedData.fuel_details) ? (
                   <div className="mt-4 pt-4 border-t border-slate-800">
                     <p className="text-xs text-red-400 font-bold uppercase mb-3 tracking-wider">Expenses & Fuel Details</p>
                     
@@ -561,6 +663,25 @@ export const SubmissionReviewModal = ({
                     onChange={(e) => setEditedData({ ...editedData, trip_date: e.target.value })}
                   />
                   <p className="text-[10px] text-muted-foreground">Used as the default date for trips and all expenses.</p>
+                </div>
+                
+                <div className="space-y-2 col-span-2">
+                  <div className="flex justify-between items-center mb-1">
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Route Name</Label>
+                    {editedData.route_name && (
+                      validation.routeFound ? (
+                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] py-0 h-5"><CheckCircle className="w-3 h-3 mr-1" /> Verified</Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] py-0 h-5"><AlertTriangle className="w-3 h-3 mr-1" /> Unmatched</Badge>
+                      )
+                    )}
+                  </div>
+                  <Input
+                    className="font-semibold h-11"
+                    value={editedData.route_name || ''}
+                    onChange={(e) => setEditedData({ ...editedData, route_name: e.target.value })}
+                    placeholder="Enter route name"
+                  />
                 </div>
               </div>
 
@@ -656,7 +777,7 @@ export const SubmissionReviewModal = ({
                     className="flex-1 h-12 text-md font-semibold"
                   >
                     <CheckCircle className="mr-2 h-5 w-5" />
-                    Approve & Apply
+                    {isPartial ? 'Merge & Apply' : 'Approve & Apply'}
                   </Button>
                   <Button
                     onClick={handleReject}
@@ -669,7 +790,9 @@ export const SubmissionReviewModal = ({
                   </Button>
                 </div>
                 <p className="text-xs text-center text-slate-500 mt-2">
-                  Approving will insert this data directly into the Daily Trips ledger.
+                  {isPartial 
+                    ? "Approving will merge this data into the Daily Trips ledger." 
+                    : "Approving will insert this data directly into the Daily Trips ledger."}
                 </p>
               </div>
             )}

@@ -242,6 +242,7 @@ export const IOUManagementView = () => {
             <TableRow>
               <TableHead>IOU #</TableHead>
               <TableHead>Staff</TableHead>
+              <TableHead>Section</TableHead>
               <TableHead>Unit</TableHead>
               <TableHead>Purpose</TableHead>
               <TableHead>Issued</TableHead>
@@ -256,18 +257,18 @@ export const IOUManagementView = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-8">
+                <TableCell colSpan={12} className="text-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                 </TableCell>
               </TableRow>
             ) : ious?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                   No IOU records found
                 </TableCell>
               </TableRow>
             ) : (
-              ious?.map((iou) => {
+              ious?.map((iou: any) => {
                 const config = statusConfig[iou.status as keyof typeof statusConfig];
                 const StatusIcon = config?.icon || Clock;
                 const progress = ((iou.amount - iou.balance) / iou.amount) * 100;
@@ -283,6 +284,11 @@ export const IOUManagementView = () => {
                         <User className="h-4 w-4 text-muted-foreground" />
                         {iou.staff?.staff_name || iou.staff_name_draft || "-"}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {iou.company ? (
+                        <Badge variant="secondary" className="text-xs">{iou.company.short_code || iou.company.name}</Badge>
+                      ) : "-"}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{iou.business_unit_code}</Badge>

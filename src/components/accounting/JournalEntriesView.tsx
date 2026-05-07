@@ -409,6 +409,7 @@ export const JournalEntriesView = () => {
         columns={columns}
         data={filteredEntries}
         enableColumnFilters
+        variant="professional"
       />
 
       {/* Entry Detail Dialog */}

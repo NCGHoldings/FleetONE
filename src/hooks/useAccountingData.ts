@@ -345,7 +345,7 @@ export const useARInvoices = (status?: "all" | "draft" | "sent" | "paid" | "part
       if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ar_invoices")
-        .select("*, customers(customer_name), routes(route_name, route_no), buses(bus_no)")
+        .select("*, customers(customer_name)")
         .order("invoice_date", { ascending: false });
 
       if (effectiveCompanyId) {
@@ -391,7 +391,7 @@ export const useAPInvoices = (status?: "all" | "draft" | "sent" | "paid" | "part
       if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ap_invoices")
-        .select("*, vendors(vendor_name), routes(route_name, route_no), buses(bus_no)")
+        .select("*, vendors(vendor_name)")
         .order("invoice_date", { ascending: false });
 
       if (effectiveCompanyId) {

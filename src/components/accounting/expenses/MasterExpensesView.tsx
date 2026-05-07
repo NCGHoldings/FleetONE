@@ -13,11 +13,12 @@ export default function MasterExpenses() {
   const [selectedImport, setSelectedImport] = useState<MasterExpenseImport | null>(null);
   const [showUploader, setShowUploader] = useState(false);
 
-  // Group imports by Sector and then by Expense Type
+  // Group imports by Sector and then by Expense Type / Category
   const groupedImports = imports.reduce((acc, imp) => {
     if (!acc[imp.sector]) acc[imp.sector] = {};
-    if (!acc[imp.sector][imp.expense_type]) acc[imp.sector][imp.expense_type] = [];
-    acc[imp.sector][imp.expense_type].push(imp);
+    const typeLabel = imp.expense_type === "Master_Data" ? imp.import_category || "Generic" : imp.expense_type;
+    if (!acc[imp.sector][typeLabel]) acc[imp.sector][typeLabel] = [];
+    acc[imp.sector][typeLabel].push(imp);
     return acc;
   }, {} as Record<string, Record<string, MasterExpenseImport[]>>);
 
@@ -27,10 +28,10 @@ export default function MasterExpenses() {
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-3">
               <FolderTree className="h-8 w-8 text-primary" />
-              Master Expenses Archive
+              Master Data Pipeline
             </h1>
             <p className="text-muted-foreground mt-1">
-              Centralized repository for external expense sheets, intelligent mapping, and historical tracking.
+              Centralized repository for bulk financial imports, intelligent mapping, and historical tracking.
             </p>
           </div>
         </div>
@@ -42,7 +43,7 @@ export default function MasterExpenses() {
                <CardHeader className="py-4 border-b bg-muted/30">
                  <div className="flex items-center justify-between">
                    <CardTitle className="text-base flex items-center gap-2">
-                     <FileSpreadsheet className="h-4 w-4" /> Expense Files
+                     <FileSpreadsheet className="h-4 w-4" /> Data Archive
                    </CardTitle>
                    <button 
                      onClick={() => { setShowUploader(true); setSelectedImport(null); }}
@@ -58,7 +59,7 @@ export default function MasterExpenses() {
                    <div className="p-8 text-center text-muted-foreground">Loading files...</div>
                  ) : imports.length === 0 ? (
                    <div className="p-8 text-center text-muted-foreground text-sm">
-                     No expense files uploaded yet.<br/>Click the + icon to start.
+                     No data files uploaded yet.<br/>Click the + icon to start.
                    </div>
                  ) : (
                    <div className="p-3 space-y-4">
@@ -68,7 +69,7 @@ export default function MasterExpenses() {
                          {Object.entries(types).map(([type, files]) => (
                            <div key={`${sector}-${type}`} className="space-y-1 pl-2 border-l-2 border-primary/10 ml-2">
                              <div className="text-sm font-semibold text-foreground/80 pl-2 mb-1 flex items-center gap-2">
-                               {type}
+                               {type.replace('_', ' ')}
                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">{files.length}</Badge>
                              </div>
                              {files.map(file => (

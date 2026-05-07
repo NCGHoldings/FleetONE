@@ -337,8 +337,9 @@ export const APPaymentsView = () => {
       </div>
 
       {/* Payments Table */}
-      <Card>
-        <Table>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[1400px]">
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">
@@ -515,7 +516,8 @@ export const APPaymentsView = () => {
               ))
             )}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       </Card>
 
       {/* Payment Form Dialog */}

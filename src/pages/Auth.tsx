@@ -29,14 +29,16 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const [error, setError] = useState("");
   const [slide, setSlide] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const [showMFA, setShowMFA] = useState(false);
   const [mfaCode, setMfaCode] = useState("");
   const [isVerifyingMFA, setIsVerifyingMFA] = useState(false);
+  const [mode, setMode] = useState<"signin" | "forgot">("signin");
+  const [showMFA, setShowMFA] = useState(false);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -72,9 +74,10 @@ export default function Auth() {
       if (error) {
         setError(error.message);
       } else {
+        setResetSent(true);
         toast({
-          title: "Password reset email sent",
-          description: "Check your inbox for a link to reset your password.",
+          title: "Check your email",
+          description: "We've sent a password reset link to " + trimmedEmail,
         });
       }
     } catch {
@@ -192,11 +195,13 @@ export default function Auth() {
           {/* Heading */}
           <div className="mb-7">
             <h1 className="text-3xl font-bold text-white mb-1.5">
-              {showMFA ? "Security Verification" : "Welcome back"}
+              {showMFA ? "Security Verification" : mode === "forgot" ? "Reset Password" : "Welcome back"}
             </h1>
             <p className="text-sm" style={{ color: "#8b9ab3" }}>
               {showMFA 
                 ? "Enter the 6-digit code from your authenticator app" 
+                : mode === "forgot"
+                ? "Enter your email to receive password reset instructions"
                 : "Enter your credentials to access the workspace"}
             </p>
           </div>
@@ -256,6 +261,83 @@ export default function Auth() {
                   </Button>
                 </div>
               </form>
+            ) : mode === "forgot" ? (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-email" className="text-xs font-medium" style={{ color: "#8b9ab3" }}>
+                    Email Address
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#8b9ab3" }}>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </span>
+                    <Input
+                      id="forgot-email"
+                      type="email"
+                      placeholder="name@ncgholdings.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={forgotLoading}
+                      className="h-12 pl-10 rounded-xl border-0 text-white placeholder:text-gray-600
+                                 focus-visible:ring-1 focus-visible:ring-amber-500/50"
+                      style={{ background: "#2e3548" }}
+                    />
+                  </div>
+                </div>
+
+                {error && (
+                  <Alert variant="destructive" className="rounded-xl py-2.5 border-red-900/50 bg-red-950/40">
+                    <AlertDescription className="text-red-400 text-xs">{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                {resetSent && (
+                  <Alert className="rounded-xl py-2.5 border-amber-900/50 bg-amber-950/40">
+                    <AlertDescription className="text-amber-400 text-xs">
+                      Reset link sent! If you don't see it, check your spam folder.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleForgotPassword}
+                    disabled={forgotLoading || !email}
+                    className="w-full h-11 font-bold text-sm rounded-xl text-black transition-all
+                               hover:opacity-90 active:scale-[0.98] shadow-lg"
+                    style={{ background: "#f59e0b", boxShadow: "0 4px 20px rgba(245,158,11,0.3)" }}
+                  >
+                    {forgotLoading ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending Reset Link...</>
+                    ) : (
+                      "Send Reset Instructions"
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setMode("signin");
+                      setError("");
+                      setResetSent(false);
+                    }}
+                    className="w-full text-xs text-gray-400 hover:text-white"
+                  >
+                    Back to Sign In
+                  </Button>
+                </div>
+
+                <div className="pt-4 border-t border-white/5">
+                  <p className="text-xs text-center leading-relaxed" style={{ color: "#64748b" }}>
+                    If you don't receive an email, your organization may have restricted external mail. 
+                    Please <span className="text-amber-500/80 font-medium">contact your administrator</span> to receive a manual recovery link.
+                  </p>
+                </div>
+              </div>
             ) : (
               <form onSubmit={handleSignIn} className="space-y-5">
                 {/* Email */}
@@ -293,12 +375,12 @@ export default function Auth() {
                     </Label>
                     <button
                       type="button"
-                      onClick={handleForgotPassword}
-                      disabled={loading || forgotLoading}
-                      className="text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-40"
+                      onClick={() => setMode("forgot")}
+                      disabled={loading}
+                      className="text-xs font-medium transition-opacity hover:opacity-80"
                       style={{ color: "#f59e0b" }}
                     >
-                      {forgotLoading ? "Sending..." : "Forgot password?"}
+                      Forgot password?
                     </button>
                   </div>
                   <div className="relative">

@@ -160,6 +160,7 @@ export const PettyCashFundsTab = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Fund Name</TableHead>
+              <TableHead>Section</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Branch</TableHead>
               <TableHead>Unit</TableHead>
@@ -174,16 +175,21 @@ export const PettyCashFundsTab = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell>
+                <TableCell colSpan={11} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell>
               </TableRow>
             ) : funds?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No funds found</TableCell>
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">No funds found</TableCell>
               </TableRow>
             ) : (
-              funds?.map((fund) => (
+              funds?.map((fund: any) => (
                 <TableRow key={fund.id}>
                   <TableCell className="font-medium">{fund.fund_name}</TableCell>
+                  <TableCell>
+                    {fund.company ? (
+                      <Badge variant="secondary" className="text-xs">{fund.company.short_code || fund.company.name}</Badge>
+                    ) : "-"}
+                  </TableCell>
                   <TableCell><Badge variant="outline">{fund.fund_type || "main"}</Badge></TableCell>
                   <TableCell>
                     {fund.branch ? (

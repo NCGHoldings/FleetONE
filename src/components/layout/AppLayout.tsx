@@ -4,7 +4,7 @@ import { AppSidebar } from "./AppSidebar";
 import { Header } from "./Header";
 import { ThemeDecorations } from "../seasonal/ThemeDecorations";
 import { ThemeStyleInjector } from "../seasonal/ThemeStyleInjector";
-import { SystemIssueReportButton } from "../issues/SystemIssueReportButton";
+
 import { QuickToolsWidget } from "./QuickToolsWidget";
 import { GlobalTestBanner } from "./GlobalTestBanner";
 import { ExternalSystemContext, ExternalSystem } from "./ExternalSystemContext";
@@ -36,7 +36,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             </main>
           </div>
         </div>
-        <SystemIssueReportButton />
+
         <QuickToolsWidget />
         {externalSystem && (
           <ExternalSystemOverlay

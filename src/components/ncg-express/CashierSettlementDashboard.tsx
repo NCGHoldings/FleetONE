@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { useCashReconciliation, CashSettlementRow, TripDetail } from "@/hooks/useCashReconciliation";
 import { useBankDeposits } from "@/hooks/useBankDeposits";
+import { useAllPettyCashTransactions, usePettyCashFunds, useIOURecords } from "@/hooks/usePettyCash";
+import { startOfDay, endOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -97,6 +99,16 @@ function TripEditor({ trip, onSave, onCancel }: {
 export function CashierSettlementDashboard({ date }: CashierSettlementDashboardProps) {
   const { data, summary, loading, error, refetch, saveSettlement, saveTripDetails } = useCashReconciliation(date);
   const { deposits, totalUnsettledCash, loading: depositsLoading, recordDeposit } = useBankDeposits(date);
+  
+  const { data: pcFunds } = usePettyCashFunds();
+  const { data: pcTxns } = useAllPettyCashTransactions({ 
+    dateFrom: startOfDay(date).toISOString(), 
+    dateTo: endOfDay(date).toISOString() 
+  });
+  const { data: ious } = useIOURecords({ 
+    dateFrom: startOfDay(date).toISOString(), 
+    dateTo: endOfDay(date).toISOString() 
+  });
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editActual, setEditActual] = useState<number>(0);
@@ -476,6 +488,30 @@ export function CashierSettlementDashboard({ date }: CashierSettlementDashboardP
           <CardContent>
             <p className="text-3xl font-bold font-mono text-primary mb-1">LKR {fmt(totalUnsettledCash > 0 ? totalUnsettledCash : 0)}</p>
             <p className="text-xs text-muted-foreground">Accumulated physical cash minus previous bank deposits</p>
+            
+            {/* Cash Flow Cross Check */}
+            <div className="mt-4 p-3 bg-muted rounded-md space-y-2 text-sm border">
+              <div className="flex justify-between font-semibold mb-1 border-b pb-1">
+                <span>Daily Finance Cross-Check</span>
+              </div>
+              <div className="flex justify-between text-green-600 dark:text-green-400">
+                <span>Bus Expected Cash</span>
+                <span className="font-mono">LKR {fmt(summary.total_expected_cash)}</span>
+              </div>
+              <div className="flex justify-between text-purple-600 dark:text-purple-400">
+                <span>Total Settled IOUs</span>
+                <span className="font-mono">+ LKR {fmt((ious || []).filter(i => i.status === "settled").reduce((sum, i) => sum + i.amount, 0))}</span>
+              </div>
+              <div className="flex justify-between text-red-600 dark:text-red-400">
+                <span>New IOUs Issued</span>
+                <span className="font-mono">- LKR {fmt((ious || []).filter(i => i.status !== "settled").reduce((sum, i) => sum + i.amount, 0))}</span>
+              </div>
+              <div className="flex justify-between text-red-600 dark:text-red-400">
+                <span>PC Disbursements</span>
+                <span className="font-mono">- LKR {fmt((pcTxns || []).filter(t => t.transaction_type === "disbursement").reduce((sum, t) => sum + t.amount, 0))}</span>
+              </div>
+            </div>
+
             <div className="mt-4 space-y-3 border-t pt-4">
               <div className="flex gap-2">
                 <Input type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="Amount" className="font-mono flex-1" />
@@ -509,6 +545,74 @@ export function CashierSettlementDashboard({ date }: CashierSettlementDashboardP
                       <p className="text-xs text-muted-foreground">Ref: {dep.reference_no || '—'}</p>
                     </div>
                     <span className="font-mono font-semibold text-green-600 dark:text-green-400">LKR {fmt(dep.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Petty Cash & IOU Settlement Hub View ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+        {/* Petty Cash Panel */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Petty Cash Flows (Today)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(!pcTxns || pcTxns.length === 0) ? (
+              <p className="text-muted-foreground text-sm py-4 text-center">No petty cash transactions today.</p>
+            ) : (
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+                {pcTxns.map(txn => (
+                  <div key={txn.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg text-sm border-l-4" style={{borderLeftColor: txn.transaction_type === 'disbursement' ? 'rgb(220 38 38)' : 'rgb(22 163 74)'}}>
+                    <div>
+                      <p className="font-semibold">{txn.fund?.fund_name || 'General Fund'} <Badge variant="outline" className="ml-1 text-[10px] h-4 leading-3 uppercase">{txn.transaction_type}</Badge></p>
+                      <p className="text-xs text-muted-foreground">{txn.description || txn.expense_category || 'No details'}</p>
+                    </div>
+                    <span className={cn("font-mono font-semibold", txn.transaction_type === 'disbursement' ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>
+                      {txn.transaction_type === 'disbursement' ? '-' : '+'}LKR {fmt(txn.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="mt-4 pt-3 border-t space-y-2">
+              <h5 className="text-xs font-semibold uppercase text-muted-foreground">Current Float Balances</h5>
+              <div className="grid grid-cols-2 gap-2">
+                {(pcFunds || []).map(f => (
+                  <div key={f.id} className="p-2 border rounded text-xs flex justify-between bg-background">
+                    <span className="truncate mr-2">{f.fund_name}</span>
+                    <span className="font-mono font-semibold">₨{fmt(f.current_balance)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* IOU Panel */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Staff IOUs & Advances (Today)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(!ious || ious.length === 0) ? (
+              <p className="text-muted-foreground text-sm py-4 text-center">No IOUs issued or settled today.</p>
+            ) : (
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+                {ious.map(iou => (
+                  <div key={iou.id} className="flex flex-col gap-1 p-3 bg-muted/50 rounded-lg text-sm border-l-4" style={{borderLeftColor: iou.status === 'settled' ? 'rgb(22 163 74)' : 'rgb(234 179 8)'}}>
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold">{iou.staff?.staff_name || iou.staff_name_draft || 'Unknown Staff'} <Badge variant="outline" className="ml-1 text-[10px] h-4 leading-3">{iou.iou_number}</Badge></p>
+                      <span className="font-mono font-semibold text-primary">LKR {fmt(iou.amount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <p className="text-xs text-muted-foreground truncate max-w-[200px]">{iou.purpose || 'No purpose stated'}</p>
+                      <Badge className="text-[10px] h-4 py-0" variant={iou.status === 'settled' ? 'default' : 'secondary'}>{iou.status}</Badge>
+                    </div>
                   </div>
                 ))}
               </div>

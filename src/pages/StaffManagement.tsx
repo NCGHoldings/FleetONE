@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { Users, UserPlus, Shield, Edit, Trash2, Lock, AlertTriangle } from "lucide-react";
+import { Users, UserPlus, Shield, Edit, Trash2, Lock, AlertTriangle, KeyRound, Copy, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -43,6 +43,7 @@ interface RoleManagementCellProps {
   isSuperAdmin: boolean;
   onOpenPageAccess: () => void;
   onOpenCompanyAccess: () => void;
+  onResetPassword: () => void;
 }
 
 function RoleManagementCell({ staff, onToggleRole, isSuperAdmin, onOpenPageAccess, onOpenCompanyAccess }: RoleManagementCellProps) {
@@ -76,7 +77,7 @@ function RoleManagementCell({ staff, onToggleRole, isSuperAdmin, onOpenPageAcces
       </div>
       
       {isSuperAdmin && (
-        <div className="flex gap-2 mt-2">
+        <div className="flex flex-wrap gap-2 mt-2">
           <Button variant="outline" size="sm" onClick={onOpenPageAccess}>
             <Lock className="h-4 w-4 mr-2" />
             Page Access
@@ -84,6 +85,15 @@ function RoleManagementCell({ staff, onToggleRole, isSuperAdmin, onOpenPageAcces
           <Button variant="outline" size="sm" onClick={onOpenCompanyAccess}>
             <Building2 className="h-4 w-4 mr-2" />
             Company Access
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onResetPassword}
+            className="text-amber-600 border-amber-200 hover:bg-amber-50"
+          >
+            <KeyRound className="h-4 w-4 mr-2" />
+            Reset Password
           </Button>
         </div>
       )}
@@ -102,6 +112,9 @@ export default function StaffManagement() {
   const [pageAccessTarget, setPageAccessTarget] = useState<Profile | null>(null);
   const [companyAccessOpen, setCompanyAccessOpen] = useState(false);
   const [companyAccessTarget, setCompanyAccessTarget] = useState<Profile | null>(null);
+  const [recoveryLink, setRecoveryLink] = useState<string | null>(null);
+  const [recoveryDialogOpen, setRecoveryDialogOpen] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
   
   // Form states
   const [firstName, setFirstName] = useState("");
@@ -273,6 +286,48 @@ export default function StaffManagement() {
     }
   };
 
+  const handleResetPassword = async (staffMember: Profile) => {
+    if (!isSuperAdmin) {
+      toast.error('Access denied - Super Admin only');
+      return;
+    }
+
+    if (!staffMember.email) {
+      toast.error('This user does not have a recorded email address');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-generate-recovery-link', {
+        body: { email: staffMember.email },
+      });
+
+      if (error) throw error;
+
+      if (data.recoveryUrl) {
+        setRecoveryLink(data.recoveryUrl);
+        setRecoveryDialogOpen(true);
+        toast.success('Recovery link generated successfully');
+      } else {
+        toast.error('Failed to generate recovery link');
+      }
+    } catch (error: any) {
+      console.error('Error generating recovery link:', error);
+      toast.error(error.message || 'Failed to generate recovery link');
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setIsCopied(true);
+      toast.success('Link copied to clipboard');
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      toast.error('Failed to copy link');
+    }
+  };
+
   const resetForm = () => {
     setFirstName("");
     setLastName("");
@@ -334,6 +389,7 @@ export default function StaffManagement() {
           isSuperAdmin={isSuperAdmin} 
           onOpenPageAccess={() => { setPageAccessTarget(row.original); setPageAccessOpen(true); }}
           onOpenCompanyAccess={() => { setCompanyAccessTarget(row.original); setCompanyAccessOpen(true); }}
+          onResetPassword={() => handleResetPassword(row.original)}
         />
       ),
     }] : []),
@@ -681,6 +737,47 @@ export default function StaffManagement() {
                 userId={companyAccessTarget?.user_id || null}
                 userName={companyAccessTarget ? `${companyAccessTarget.first_name} ${companyAccessTarget.last_name}` : undefined}
               />
+
+              <Dialog open={recoveryDialogOpen} onOpenChange={setRecoveryDialogOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <KeyRound className="h-5 w-5 text-amber-500" />
+                      Recovery Link Generated
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <p className="text-sm text-muted-foreground">
+                      Share this one-time recovery link with the user. They can use it to set a new password.
+                    </p>
+                    <div className="flex gap-2 p-3 bg-muted rounded-lg border border-border">
+                      <code className="text-xs break-all flex-1 select-all">
+                        {recoveryLink}
+                      </code>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => recoveryLink && copyToClipboard(recoveryLink)}
+                        className="shrink-0"
+                      >
+                        {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <div className="flex gap-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="text-xs text-amber-800">
+                          <p className="font-semibold mb-1">Security Warning:</p>
+                          <p>This link is extremely sensitive. Only share it through secure channels. It will expire shortly.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button onClick={() => setRecoveryDialogOpen(false)}>Close</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </>
           )}
         </CardContent>

@@ -267,22 +267,32 @@ export const DrillDownModal = ({
       
       // Fetch AR Receipts (to find parent invoice)
       if (arReceiptRefs.size > 0) {
-        const { data } = await supabase.from('ar_receipts').select('receipt_number, invoice_id, ar_invoices(invoice_number)').in('receipt_number', Array.from(arReceiptRefs));
-        data?.forEach(rcp => { 
-          if (rcp.ar_invoices?.invoice_number) {
-            balances[rcp.receipt_number] = { balance: 0, type: 'receipt', parentRef: rcp.ar_invoices.invoice_number }; 
-          }
-        });
+        const { data: receipts } = await supabase.from('ar_receipts').select('id, receipt_number').in('receipt_number', Array.from(arReceiptRefs));
+        if (receipts && receipts.length > 0) {
+          const receiptMap = Object.fromEntries(receipts.map(r => [r.id, r.receipt_number]));
+          const { data: allocations } = await supabase.from('ar_receipt_allocations').select('receipt_id, ar_invoices(invoice_number)').in('receipt_id', receipts.map(r => r.id));
+          allocations?.forEach(alloc => { 
+            const receiptNumber = receiptMap[alloc.receipt_id];
+            if (receiptNumber && alloc.ar_invoices?.invoice_number) {
+              balances[receiptNumber] = { balance: 0, type: 'receipt', parentRef: alloc.ar_invoices.invoice_number }; 
+            }
+          });
+        }
       }
       
       // Fetch AP Payments (to find parent invoice)
       if (apPaymentRefs.size > 0) {
-        const { data } = await supabase.from('ap_payments').select('payment_number, invoice_id, ap_invoices(invoice_number)').in('payment_number', Array.from(apPaymentRefs));
-        data?.forEach(pay => { 
-          if (pay.ap_invoices?.invoice_number) {
-            balances[pay.payment_number] = { balance: 0, type: 'receipt', parentRef: pay.ap_invoices.invoice_number }; 
-          }
-        });
+        const { data: payments } = await supabase.from('ap_payments').select('id, payment_number').in('payment_number', Array.from(apPaymentRefs));
+        if (payments && payments.length > 0) {
+          const paymentMap = Object.fromEntries(payments.map(p => [p.id, p.payment_number]));
+          const { data: allocations } = await supabase.from('ap_payment_allocations').select('payment_id, ap_invoices(invoice_number)').in('payment_id', payments.map(p => p.id));
+          allocations?.forEach(alloc => { 
+            const paymentNumber = paymentMap[alloc.payment_id];
+            if (paymentNumber && alloc.ap_invoices?.invoice_number) {
+              balances[paymentNumber] = { balance: 0, type: 'receipt', parentRef: alloc.ap_invoices.invoice_number }; 
+            }
+          });
+        }
       }
       
       return balances;
@@ -744,13 +754,8 @@ export const DrillDownModal = ({
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="max-w-[150px] truncate flex items-center gap-2">
+                      <TableCell className="max-w-[150px] truncate" title={t.description || entry?.description}>
                         <span>{t.description || entry?.description}</span>
-                        {t.reconciliation_id && (
-                          <Badge variant="outline" className="text-[10px] h-5 bg-green-50 text-green-700 border-green-200">
-                            ✔ Reconciled
-                          </Badge>
-                        )}
                       </TableCell>
                       <TableCell className="text-right font-mono text-green-600 dark:text-green-400">
                         {(t.debit || 0) > 0 && <CurrencyDisplay amount={t.debit} />}
@@ -765,6 +770,16 @@ export const DrillDownModal = ({
                         {(() => {
                           const ref = entry?.reference;
                           const invData = ref ? invoiceBalances?.[ref] : undefined;
+                          
+                          // If it was manually reconciled via the old ledger matching system
+                          if (t.reconciliation_id) {
+                            return (
+                              <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200 flex items-center w-max">
+                                <CheckCircle className="w-3 h-3 mr-1" /> Reconciled
+                              </Badge>
+                            );
+                          }
+
                           if (!invData) return null;
 
                           if (invData.type === 'invoice') {

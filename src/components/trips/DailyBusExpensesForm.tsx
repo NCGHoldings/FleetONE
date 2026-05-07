@@ -62,6 +62,24 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense, readOnly =
     fetchBuses();
   }, []);
 
+  // Interconnect with global fuel settings
+  useEffect(() => {
+    const fetchFuelSettings = async () => {
+      const { data } = await supabase
+        .from('fuel_settings')
+        .select('diesel_price_lkr_per_l')
+        .eq('is_default', true)
+        .single();
+      if (data && data.diesel_price_lkr_per_l && !existingExpense) {
+        setExpenses(prev => ({
+          ...prev,
+          diesel_price_per_liter: data.diesel_price_lkr_per_l
+        }));
+      }
+    };
+    fetchFuelSettings();
+  }, [existingExpense]);
+
   // Auto-select initial bus if provided
   useEffect(() => {
     if (initialBusId && !selectedBusId) {

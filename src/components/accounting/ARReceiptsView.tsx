@@ -224,8 +224,9 @@ export const ARReceiptsView = () => {
       </div>
 
       {/* Receipts Table */}
-      <Card>
-        <Table>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[1000px]">
           <TableHeader>
             <TableRow>
               <TableHead>Receipt #</TableHead>
@@ -334,7 +335,8 @@ export const ARReceiptsView = () => {
               ))
             )}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       </Card>
 
       {/* Receipt Form Dialog */}

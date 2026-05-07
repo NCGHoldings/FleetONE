@@ -74,7 +74,7 @@ export const PettyCashDisbursementsTab = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("buses")
-        .select("id, bus_no, vehicle_type")
+        .select("id, bus_no, vehicle_name")
         .eq("status", "Active")
         .order("bus_no");
       if (error) throw error;
@@ -204,6 +204,7 @@ export const PettyCashDisbursementsTab = () => {
             <TableRow>
               <TableHead>Voucher #</TableHead>
               <TableHead>Date</TableHead>
+              <TableHead>Section</TableHead>
               <TableHead>Fund</TableHead>
               <TableHead>Payee</TableHead>
               <TableHead>Category</TableHead>
@@ -218,17 +219,22 @@ export const PettyCashDisbursementsTab = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell>
+                <TableCell colSpan={12} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell>
               </TableRow>
             ) : groupedTransactions?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No vouchers found</TableCell>
+                <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">No vouchers found</TableCell>
               </TableRow>
             ) : (
-              groupedTransactions?.map((txn) => (
+              groupedTransactions?.map((txn: any) => (
                 <TableRow key={txn.id}>
                   <TableCell className="font-mono text-sm">{txn.voucher_number || "-"}</TableCell>
                   <TableCell>{format(new Date(txn.created_at), "MMM dd, yyyy")}</TableCell>
+                  <TableCell>
+                    {txn.company ? (
+                      <Badge variant="secondary" className="text-xs">{txn.company.short_code || txn.company.name}</Badge>
+                    ) : "-"}
+                  </TableCell>
                   <TableCell>{txn.fund?.fund_name || "-"}</TableCell>
                   <TableCell>{txn.payee_name || "-"}</TableCell>
                   <TableCell>
@@ -365,7 +371,7 @@ export const PettyCashDisbursementsTab = () => {
                             <SelectItem value="none">No Vehicle</SelectItem>
                             {buses?.map((bus) => (
                               <SelectItem key={bus.id} value={bus.bus_no}>
-                                {bus.bus_no} {bus.vehicle_type ? `(${bus.vehicle_type})` : ""}
+                                {bus.bus_no} {bus.vehicle_name ? `(${bus.vehicle_name})` : ""}
                               </SelectItem>
                             ))}
                           </SelectContent>

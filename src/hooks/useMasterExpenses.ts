@@ -10,6 +10,8 @@ export interface MasterExpenseImport {
   upload_date: string;
   sector: string;
   expense_type: string;
+  import_category?: string;
+  mapping_config?: any;
   total_amount: number;
   status: string;
   company_id: string;
@@ -21,8 +23,16 @@ export interface MasterExpenseRecord {
   raw_data: any;
   expense_date: string | null;
   amount: number;
+  document_number?: string | null;
+  external_reference?: string | null;
+  vendor_name?: string | null;
+  customer_name?: string | null;
+  business_unit?: string | null;
+  chassis_no?: string | null;
   mapped_vehicle_id: string | null;
   mapped_quotation_id: string | null;
+  mapped_vendor_id?: string | null;
+  mapped_customer_id?: string | null;
   mapped_expense_account_id?: string | null;
   mapped_payment_account_id?: string | null;
   gl_journal_id?: string | null;
@@ -79,11 +89,15 @@ export const useMasterExpenses = () => {
       fileName,
       sector,
       expenseType,
+      importCategory = "Expense",
+      mappingConfig = {},
       records
     }: {
       fileName: string;
       sector: string;
       expenseType: string;
+      importCategory?: string;
+      mappingConfig?: any;
       records: any[];
     }) => {
       if (!companyId) throw new Error("No active company");
@@ -98,6 +112,8 @@ export const useMasterExpenses = () => {
           file_name: fileName,
           sector,
           expense_type: expenseType,
+          import_category: importCategory,
+          mapping_config: mappingConfig,
           total_amount: totalAmount,
           status: "Pending Mapping"
         })
@@ -115,8 +131,16 @@ export const useMasterExpenses = () => {
         raw_data: r.raw_data,
         expense_date: r.expense_date,
         amount: r.amount || 0,
+        document_number: r.document_number || null,
+        external_reference: r.external_reference || null,
+        vendor_name: r.vendor_name || null,
+        customer_name: r.customer_name || null,
+        business_unit: r.business_unit || null,
+        chassis_no: r.chassis_no || null,
         mapped_vehicle_id: r.mapped_vehicle_id || null,
         mapped_quotation_id: r.mapped_quotation_id || null,
+        mapped_vendor_id: r.mapped_vendor_id || null,
+        mapped_customer_id: r.mapped_customer_id || null,
         is_confirmed: r.is_confirmed || false
       }));
 

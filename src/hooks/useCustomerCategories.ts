@@ -12,6 +12,7 @@ export interface CustomerCategory {
   ar_account_id: string | null;
   revenue_account_id: string | null;
   advance_account_id: string | null;
+  bank_account_id: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -151,6 +152,7 @@ export async function resolveCustomerARAccounts(
   arAccountId: string | null;
   revenueAccountId: string | null;
   advanceAccountId: string | null;
+  bankAccountId: string | null;
   source: "customer" | "category" | "global";
   missingAccounts: string[];
 }> {
@@ -163,7 +165,8 @@ export async function resolveCustomerARAccounts(
       customer_categories (
         ar_account_id,
         revenue_account_id,
-        advance_account_id
+        advance_account_id,
+        bank_account_id
       )
     `)
     .eq("id", customerId)
@@ -172,13 +175,14 @@ export async function resolveCustomerARAccounts(
   // Always fetch global fallback for gap-filling
   const { data: glSettings } = await (supabase as any)
     .from("gl_settings")
-    .select("trade_receivable_account_id, sales_revenue_account_id, customer_advance_account_id")
+    .select("trade_receivable_account_id, sales_revenue_account_id, customer_advance_account_id, bank_account_id")
     .eq("company_id", companyId)
     .maybeSingle();
 
   let arAccountId: string | null = null;
   let revenueAccountId: string | null = null;
   let advanceAccountId: string | null = null;
+  let bankAccountId: string | null = null;
   let source: "customer" | "category" | "global" = "global";
 
   // Priority 1: Customer-specific override
@@ -188,7 +192,24 @@ export async function resolveCustomerARAccounts(
   }
 
   // Priority 2: Category mapping
-  const category = customer?.customer_categories as any;
+  let category = customer?.customer_categories as any;
+
+  // AUTO-DEFAULT to External if no category assigned
+  if (!category && !customer?.customer_category_id) {
+    console.log(`[GL Resolution] No category found for customer ${customerId}, searching for 'External' default`);
+    const { data: externalCat } = await supabase
+      .from('customer_categories')
+      .select('ar_account_id, revenue_account_id, advance_account_id, bank_account_id')
+      .eq('company_id', companyId)
+      .ilike('category_name', 'External')
+      .maybeSingle();
+    
+    if (externalCat) {
+      category = externalCat;
+      console.log(`[GL Resolution] Applied 'External' category defaults`);
+    }
+  }
+
   if (!arAccountId && category?.ar_account_id) {
     arAccountId = category.ar_account_id;
     source = "category";
@@ -199,16 +220,20 @@ export async function resolveCustomerARAccounts(
   if (!advanceAccountId && category?.advance_account_id) {
     advanceAccountId = category.advance_account_id;
   }
+  if (!bankAccountId && category?.bank_account_id) {
+    bankAccountId = category.bank_account_id;
+  }
 
   // Priority 3: Global fallback for any remaining gaps
   if (!arAccountId) arAccountId = glSettings?.trade_receivable_account_id || null;
   if (!revenueAccountId) revenueAccountId = glSettings?.sales_revenue_account_id || null;
   if (!advanceAccountId) advanceAccountId = glSettings?.customer_advance_account_id || null;
+  if (!bankAccountId) bankAccountId = glSettings?.bank_account_id || null;
 
   // Build missing accounts list for actionable UI feedback
   const missingAccounts: string[] = [];
   if (!arAccountId) missingAccounts.push("Trade Receivable (Settings → Core GL → trade_receivable_account_id, OR Customer Category → AR Account)");
   if (!revenueAccountId) missingAccounts.push("Sales Revenue (Settings → Core GL → sales_revenue_account_id, OR Customer Category → Revenue Account)");
 
-  return { arAccountId, revenueAccountId, advanceAccountId, source, missingAccounts };
+  return { arAccountId, revenueAccountId, advanceAccountId, bankAccountId, source, missingAccounts };
 }
