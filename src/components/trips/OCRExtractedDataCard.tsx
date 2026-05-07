@@ -99,6 +99,8 @@ export const OCRExtractedDataCard = ({ data, isOpen = false, onToggleOpen, actua
   const initialMappedExpenses = data.mapped_expenses || mapOCRExpensesToDB(data.daily_expenses);
   const [mappedExpenses, setMappedExpenses] = useState<DBExpenseFields>(initialMappedExpenses);
 
+  const hasEdits = JSON.stringify(mappedExpenses) !== JSON.stringify(initialMappedExpenses) || JSON.stringify(editedData) !== JSON.stringify(data);
+
   // Normalize route name to handle different dash characters (en-dash, em-dash, etc.)
   const normalizeRouteName = (name: string | null) => {
     if (!name) return '';
@@ -1018,7 +1020,7 @@ export const OCRExtractedDataCard = ({ data, isOpen = false, onToggleOpen, actua
                     <div className="space-y-1 text-xs max-h-[300px] overflow-y-auto">
                       {DB_EXPENSE_CATEGORIES.map(({ key, label }, index) => {
                         const currentValue = mappedExpenses[key as keyof DBExpenseFields];
-                        const originalValue = originalMappedExpenses[key as keyof DBExpenseFields];
+                        const originalValue = initialMappedExpenses[key as keyof DBExpenseFields];
                         const hasChanged = hasEdits && currentValue !== originalValue;
                         
                         return (currentValue > 0 || isEditing) ? (

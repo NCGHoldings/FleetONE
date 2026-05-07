@@ -34,6 +34,9 @@ export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const [showMFA, setShowMFA] = useState(false);
+  const [mfaCode, setMfaCode] = useState("");
+  const [isVerifyingMFA, setIsVerifyingMFA] = useState(false);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -86,28 +89,79 @@ export default function Auth() {
     setLoading(true);
     setError("");
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
+
       if (error) {
         if (error.message.includes("Invalid login credentials")) {
-          setError("Invalid email or password. Please check your credentials and try again.");
-        } else if (error.message.includes("Email not confirmed")) {
-          setError("Please check your email and click the confirmation link before signing in.");
+          setError("Invalid email or password.");
         } else {
           setError(error.message);
         }
+        setLoading(false);
         return;
       }
+
+      // Check for MFA requirement
+      const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      
+      if (mfaError) {
+        console.error("MFA check error:", mfaError);
+        navigate("/");
+        return;
+      }
+
+      if (mfaData.nextLevel === "aal2" && mfaData.currentLevel !== "aal2") {
+        setShowMFA(true);
+        setLoading(false);
+        return;
+      }
+
       toast({ title: "Welcome back!", description: "Successfully signed in to FleetONE." });
       const from = (location.state as any)?.from?.pathname || "/";
       navigate(from);
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
       console.error("Sign in error:", err);
-    } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMFAVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mfaCode.length !== 6) return;
+
+    setIsVerifyingMFA(true);
+    setError("");
+    try {
+      // 1. Get the factor
+      const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+      if (factorsError) throw factorsError;
+
+      const factor = factors.totp[0]; // Take the first factor
+      if (!factor) throw new Error("No MFA factor found");
+
+      // 2. Challenge & Verify
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId: factor.id
+      });
+      if (challengeError) throw challengeError;
+
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: factor.id,
+        challengeId: challengeData.id,
+        code: mfaCode
+      });
+      if (verifyError) throw verifyError;
+
+      toast({ title: "Verified!", description: "MFA verification successful." });
+      const from = (location.state as any)?.from?.pathname || "/";
+      navigate(from);
+    } catch (err: any) {
+      setError(err.message || "Invalid verification code");
+      setIsVerifyingMFA(false);
     }
   };
 
@@ -137,9 +191,13 @@ export default function Auth() {
 
           {/* Heading */}
           <div className="mb-7">
-            <h1 className="text-3xl font-bold text-white mb-1.5">Welcome back</h1>
+            <h1 className="text-3xl font-bold text-white mb-1.5">
+              {showMFA ? "Security Verification" : "Welcome back"}
+            </h1>
             <p className="text-sm" style={{ color: "#8b9ab3" }}>
-              Enter your credentials to access the workspace
+              {showMFA 
+                ? "Enter the 6-digit code from your authenticator app" 
+                : "Enter your credentials to access the workspace"}
             </p>
           </div>
 
@@ -148,103 +206,154 @@ export default function Auth() {
             className="rounded-2xl p-6 mb-5"
             style={{ background: "#242938", border: "1px solid rgba(255,255,255,0.06)" }}
           >
-            <form onSubmit={handleSignIn} className="space-y-5">
-
-              {/* Email */}
-              <div className="space-y-1.5">
-                <Label htmlFor="signin-email" className="text-xs font-medium" style={{ color: "#8b9ab3" }}>
-                  Email Address
-                </Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#8b9ab3" }}>
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </span>
-                  <Input
-                    id="signin-email"
-                    type="email"
-                    placeholder="name@ncgholdings.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="h-11 pl-9 text-sm rounded-xl border-0 text-white placeholder:text-gray-600
-                               focus-visible:ring-1 focus-visible:ring-amber-500/50"
-                    style={{ background: "#2e3548" }}
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="signin-password" className="text-xs font-medium" style={{ color: "#8b9ab3" }}>
-                    Password
+            {showMFA ? (
+              <form onSubmit={handleMFAVerify} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="mfa-code" className="text-xs font-medium" style={{ color: "#8b9ab3" }}>
+                    Verification Code
                   </Label>
-                  <button
-                    type="button"
-                    onClick={handleForgotPassword}
-                    disabled={loading || forgotLoading}
-                    className="text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-40"
-                    style={{ color: "#f59e0b" }}
-                  >
-                    {forgotLoading ? "Sending..." : "Forgot password?"}
-                  </button>
-                </div>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#8b9ab3" }}>
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  </span>
                   <Input
-                    id="signin-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="h-11 pl-9 pr-10 text-sm rounded-xl border-0 text-white placeholder:text-gray-600
+                    id="mfa-code"
+                    type="text"
+                    placeholder="000000"
+                    maxLength={6}
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
+                    autoFocus
+                    className="h-12 text-center text-xl tracking-[0.5em] font-mono rounded-xl border-0 text-white
                                focus-visible:ring-1 focus-visible:ring-amber-500/50"
                     style={{ background: "#2e3548" }}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    disabled={loading}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-80"
-                    style={{ color: "#8b9ab3" }}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
                 </div>
-              </div>
 
-              {error && (
-                <Alert variant="destructive" className="rounded-xl py-2.5 border-red-900/50 bg-red-950/40">
-                  <AlertDescription className="text-red-400 text-xs">{error}</AlertDescription>
-                </Alert>
-              )}
-
-              {/* Submit */}
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full h-11 font-bold text-sm rounded-xl text-black transition-all
-                           hover:opacity-90 active:scale-[0.98] shadow-lg"
-                style={{ background: "#f59e0b", boxShadow: "0 4px 20px rgba(245,158,11,0.3)" }}
-              >
-                {loading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</>
-                ) : (
-                  "Sign In"
+                {error && (
+                  <Alert variant="destructive" className="rounded-xl py-2.5 border-red-900/50 bg-red-950/40">
+                    <AlertDescription className="text-red-400 text-xs">{error}</AlertDescription>
+                  </Alert>
                 )}
-              </Button>
-            </form>
+
+                <div className="space-y-3">
+                  <Button
+                    type="submit"
+                    disabled={isVerifyingMFA || mfaCode.length !== 6}
+                    className="w-full h-11 font-bold text-sm rounded-xl text-black transition-all
+                               hover:opacity-90 active:scale-[0.98] shadow-lg"
+                    style={{ background: "#f59e0b", boxShadow: "0 4px 20px rgba(245,158,11,0.3)" }}
+                  >
+                    {isVerifyingMFA ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying...</>
+                    ) : (
+                      "Verify & Sign In"
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setShowMFA(false)}
+                    className="w-full text-xs text-gray-400 hover:text-white"
+                  >
+                    Back to Login
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleSignIn} className="space-y-5">
+                {/* Email */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="signin-email" className="text-xs font-medium" style={{ color: "#8b9ab3" }}>
+                    Email Address
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#8b9ab3" }}>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </span>
+                    <Input
+                      id="signin-email"
+                      type="email"
+                      placeholder="name@ncgholdings.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={loading}
+                      className="h-11 pl-9 text-sm rounded-xl border-0 text-white placeholder:text-gray-600
+                                 focus-visible:ring-1 focus-visible:ring-amber-500/50"
+                      style={{ background: "#2e3548" }}
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="signin-password" className="text-xs font-medium" style={{ color: "#8b9ab3" }}>
+                      Password
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      disabled={loading || forgotLoading}
+                      className="text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-40"
+                      style={{ color: "#f59e0b" }}
+                    >
+                      {forgotLoading ? "Sending..." : "Forgot password?"}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#8b9ab3" }}>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </span>
+                    <Input
+                      id="signin-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      disabled={loading}
+                      className="h-11 pl-9 pr-10 text-sm rounded-xl border-0 text-white placeholder:text-gray-600
+                                 focus-visible:ring-1 focus-visible:ring-amber-500/50"
+                      style={{ background: "#2e3548" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={loading}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-80"
+                      style={{ color: "#8b9ab3" }}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <Alert variant="destructive" className="rounded-xl py-2.5 border-red-900/50 bg-red-950/40">
+                    <AlertDescription className="text-red-400 text-xs">{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Submit */}
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-11 font-bold text-sm rounded-xl text-black transition-all
+                             hover:opacity-90 active:scale-[0.98] shadow-lg"
+                  style={{ background: "#f59e0b", boxShadow: "0 4px 20px rgba(245,158,11,0.3)" }}
+                >
+                  {loading ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</>
+                  ) : (
+                    "Sign In"
+                  )}
+                </Button>
+              </form>
+            )}
           </div>
 
           {/* Feature chips — always visible, 2 items */}

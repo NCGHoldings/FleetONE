@@ -91,8 +91,14 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
       group.fuel_liters += (trip.fuel_liters || 0);
     });
 
-    // Sort by Bus Number
+    // Sort by Route Name, then by Bus Number
     return Array.from(groups.values()).sort((a, b) => {
+      const routeA = a.routes ? `${a.routes.route_no || ''} ${a.routes.route_name || ''}`.trim() : (a.buses?.route || '-');
+      const routeB = b.routes ? `${b.routes.route_no || ''} ${b.routes.route_name || ''}`.trim() : (b.buses?.route || '-');
+      
+      const routeCompare = routeA.localeCompare(routeB);
+      if (routeCompare !== 0) return routeCompare;
+
       const busA = (a.buses?.bus_no || a.buses?.registration_number || "");
       const busB = (b.buses?.bus_no || b.buses?.registration_number || "");
       return busA.localeCompare(busB);
@@ -139,21 +145,21 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
-            <TableHeader className="bg-blue-50/50 dark:bg-slate-800/50">
-              <TableRow>
-                <TableHead className="font-semibold whitespace-nowrap">Route (Permit)</TableHead>
-                <TableHead className="font-semibold whitespace-nowrap">Bus Model</TableHead>
-                <TableHead className="font-semibold whitespace-nowrap">Bus Number</TableHead>
-                <TableHead className="text-center font-semibold whitespace-nowrap">No of Trips</TableHead>
-                <TableHead className="text-right font-semibold whitespace-nowrap">Start Meter</TableHead>
-                <TableHead className="text-right font-semibold whitespace-nowrap">End Meter</TableHead>
-                <TableHead className="text-right font-semibold whitespace-nowrap">Total Mileage</TableHead>
-                <TableHead className="text-right font-semibold whitespace-nowrap">Fuel Liter</TableHead>
-                <TableHead className="text-right font-semibold whitespace-nowrap">Fuel Consumption</TableHead>
-                <TableHead className="text-right font-semibold whitespace-nowrap text-yellow-600 dark:text-yellow-400 bg-yellow-50/50 dark:bg-yellow-900/10">Standard Rate</TableHead>
-                <TableHead className="text-right font-semibold whitespace-nowrap">Perform</TableHead>
+        <div className="overflow-x-auto rounded-md border-2 border-slate-300 dark:border-slate-700 shadow-sm">
+          <Table className="border-collapse [&_th]:border-r [&_th]:border-b [&_td]:border-r [&_td]:border-b dark:[&_th]:border-slate-600 dark:[&_td]:border-slate-700 [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0">
+            <TableHeader className="bg-slate-800 text-slate-100 dark:bg-slate-900">
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="font-semibold whitespace-nowrap text-slate-100">Route (Permit)</TableHead>
+                <TableHead className="font-semibold whitespace-nowrap text-slate-100">Bus Model</TableHead>
+                <TableHead className="font-semibold whitespace-nowrap text-slate-100">Bus Number</TableHead>
+                <TableHead className="text-center font-semibold whitespace-nowrap text-slate-100">No of Trips</TableHead>
+                <TableHead className="text-right font-semibold whitespace-nowrap text-slate-100">Start Meter</TableHead>
+                <TableHead className="text-right font-semibold whitespace-nowrap text-slate-100">End Meter</TableHead>
+                <TableHead className="text-right font-semibold whitespace-nowrap text-slate-100">Total Mileage</TableHead>
+                <TableHead className="text-right font-semibold whitespace-nowrap text-slate-100">Fuel Liter</TableHead>
+                <TableHead className="text-right font-bold whitespace-nowrap bg-yellow-400 text-yellow-950 border-r-yellow-500">Fuel Consumption</TableHead>
+                <TableHead className="text-right font-semibold whitespace-nowrap bg-blue-200 text-blue-900 border-r-blue-300">Standard Rate</TableHead>
+                <TableHead className="text-right font-semibold whitespace-nowrap text-slate-100">Perform</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -171,13 +177,37 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
                   </TableCell>
                 </TableRow>
               ) : (
-                processedData.map((group) => {
-                  const busModel = group.buses?.model || '-';
-                  const busNumber = group.buses?.bus_no || group.buses?.registration_number || '-';
-                  const routeName = group.routes ? `${group.routes.route_no || ''} ${group.routes.route_name || ''}`.trim() : (group.buses?.route || '-');
-                  
-                  const startMeter = group.odo_start ?? 0;
-                  const endMeter = group.odo_end ?? 0;
+                (() => {
+                  let currentRouteName = "";
+                  let routeColorIndex = -1;
+                  const rowColors = [
+                    "bg-green-50/60 hover:bg-green-100 dark:bg-green-950/30 dark:hover:bg-green-900/40",
+                    "bg-orange-50/60 hover:bg-orange-100 dark:bg-orange-950/30 dark:hover:bg-orange-900/40",
+                    "bg-blue-50/60 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-900/40",
+                    "bg-purple-50/60 hover:bg-purple-100 dark:bg-purple-950/30 dark:hover:bg-purple-900/40",
+                    "bg-rose-50/60 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40",
+                  ];
+
+                  return processedData.map((group, index) => {
+                    const busModel = group.buses?.model || '-';
+                    const busNumber = group.buses?.bus_no || group.buses?.registration_number || '-';
+                    const routeName = group.routes ? `${group.routes.route_no || ''} ${group.routes.route_name || ''}`.trim() : (group.buses?.route || '-');
+                    
+                    if (routeName !== currentRouteName) {
+                      currentRouteName = routeName;
+                      routeColorIndex = (routeColorIndex + 1) % rowColors.length;
+                    }
+                    
+                    const isNewRoute = index > 0 && routeName !== (() => {
+                      const prev = processedData[index-1];
+                      return prev.routes ? `${prev.routes.route_no || ''} ${prev.routes.route_name || ''}`.trim() : (prev.buses?.route || '-');
+                    })();
+
+                    const borderClass = isNewRoute ? "border-t-2 border-t-slate-300 dark:border-t-slate-600" : "border-t border-slate-100 dark:border-slate-800/50";
+                    const rowClass = rowColors[routeColorIndex];
+                    
+                    const startMeter = group.odo_start ?? 0;
+                    const endMeter = group.odo_end ?? 0;
                   // If we have both meters, use the difference, otherwise sum of distances
                   const totalMileage = (startMeter > 0 && endMeter > startMeter) 
                     ? (endMeter - startMeter) 
@@ -193,42 +223,43 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
                   const performance = actualConsumption - standardRate;
                   
                   // Color coding for performance
-                  let perfColor = "";
+                  let perfClass = "";
                   if (fuelLiters > 0 && standardRate > 0) {
-                    if (performance >= 0) perfColor = "text-green-600 dark:text-green-400 font-medium";
-                    else if (performance >= -0.5) perfColor = "text-amber-600 dark:text-amber-400 font-medium";
-                    else perfColor = "text-red-600 dark:text-red-400 font-bold";
+                    if (performance > 0) perfClass = "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 font-bold";
+                    else if (performance < 0) perfClass = "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 font-bold";
+                    else perfClass = "font-medium";
                   }
 
                   return (
-                    <TableRow key={group.id} className="hover:bg-muted/50 transition-colors">
-                      <TableCell className="max-w-[200px] truncate" title={routeName || '-'}>{routeName || '-'}</TableCell>
+                    <TableRow key={group.id} className={`transition-colors border-slate-300 dark:border-slate-700 ${rowClass} ${borderClass}`}>
+                      <TableCell className="max-w-[200px] truncate font-semibold" title={routeName || '-'}>{routeName || '-'}</TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{busModel}</TableCell>
                       <TableCell className="whitespace-nowrap font-medium">{busNumber}</TableCell>
-                      <TableCell className="text-center font-medium bg-slate-50 dark:bg-slate-800/50">{group.no_of_trips}</TableCell>
+                      <TableCell className="text-center font-medium bg-black/5 dark:bg-white/5">{group.no_of_trips}</TableCell>
                       
                       <TableCell className="text-right whitespace-nowrap">{startMeter > 0 ? startMeter.toLocaleString() : '-'}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">{endMeter > 0 ? endMeter.toLocaleString() : '-'}</TableCell>
-                      <TableCell className="text-right whitespace-nowrap font-semibold">{totalMileage.toFixed(1)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap font-bold">{totalMileage.toFixed(0)}</TableCell>
                       
                       <TableCell className="text-right whitespace-nowrap">{fuelLiters > 0 ? fuelLiters.toFixed(2) : '-'}</TableCell>
                       
-                      <TableCell className="text-right font-medium whitespace-nowrap">
+                      <TableCell className="text-right font-bold whitespace-nowrap bg-yellow-300 text-yellow-950 dark:bg-yellow-600/40 dark:text-yellow-100 border-x-yellow-400 dark:border-x-yellow-700/50">
                         {actualConsumption > 0 ? actualConsumption.toFixed(2) : '-'}
                       </TableCell>
                       
-                      <TableCell className="text-right font-semibold text-yellow-600 dark:text-yellow-400 bg-yellow-50/30 dark:bg-yellow-900/10 whitespace-nowrap">
+                      <TableCell className="text-right font-semibold whitespace-nowrap bg-blue-50 text-blue-900 dark:bg-blue-900/20 dark:text-blue-100 border-r-blue-200 dark:border-r-blue-800/50">
                         {standardRate > 0 ? standardRate.toFixed(2) : '-'}
                       </TableCell>
                       
-                      <TableCell className={`text-right whitespace-nowrap ${perfColor}`}>
+                      <TableCell className={`text-right whitespace-nowrap ${perfClass}`}>
                         {standardRate > 0 && fuelLiters > 0 
                           ? (performance > 0 ? '+' : '') + performance.toFixed(2) 
                           : '-'}
                       </TableCell>
                     </TableRow>
                   );
-                })
+                  });
+                })()
               )}
             </TableBody>
           </Table>

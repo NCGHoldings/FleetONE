@@ -1628,6 +1628,14 @@ export const generateSPHARInvoiceTemplate = (): string => `
     <tr><td class="lb">Contact Number</td><td class="vl">{{customer_phone}}</td><td class="lb">Quote No</td><td class="vl">{{reference}}</td></tr>
     <tr><td class="lb">Address</td><td class="vl">{{customer_address}}</td><td class="lb">Bus Type</td><td class="vl"></td></tr>
   </table>
+
+  {{SECTION:1.0:Purpose:required}}
+  <div class="nt">
+    <strong>Purpose of Hire:</strong><br>
+    {{notes}}
+  </div>
+
+  {{SECTION:2.0:Hire Details:required}}
   <table class="li">
     <thead>
       <tr>
@@ -1639,37 +1647,38 @@ export const generateSPHARInvoiceTemplate = (): string => `
     </thead>
     <tbody>
       <tr>
-        <td>Special Hire</td>
+        <td>{{description}}</td>
         <td>{{notes}}</td>
         <td>TBA</td>
         <td><strong>{{total_amount}}</strong></td>
       </tr>
     </tbody>
   </table>
+
   <div class="sm">
     <table>
-      <tr><td class="sl">Sub Total</td><td class="sr">{{total_amount}}</td></tr>
-      <tr><td class="sl">Discount</td><td class="sr dc">{{discount_amount}}</td></tr>
-      <tr class="ar"><td class="sl">Advance Paid</td><td class="aa">{{paid_amount}}</td></tr>
-      <tr class="br"><td class="bl">BALANCE DUE</td><td class="ba">{{balance}}</td></tr>
+      <tr><td class="sl">Total Amount</td><td class="sr">{{total_amount}}</td></tr>
+      <tr class="dc"><td class="sl">Discount</td><td class="sr">0.00</td></tr>
+      <tr class="ar"><td class="sl">Advance Received</td><td class="aa">{{paid_amount}}</td></tr>
+      <tr class="br"><td class="sl bl">Balance to be Paid</td><td class="ba">{{balance}}</td></tr>
     </table>
   </div>
+
+  {{SECTION:3.0:Bank Details:optional}}
+  <div class="nt" style="background: #eff6ff; border-color: #bfdbfe;">
+    <strong>Bank Details for Payments:</strong><br>
+    Account No : 1001077213<br>
+    Account Name : NCG Holdings Private Limited<br>
+    Bank & Branch : Commercial Bank - Nugegoda
+  </div>
+
+  {{SECTION:4.0:Terms and Conditions:optional}}
   <div class="nt">
-    <div style="margin-bottom: 12px;"><strong>Notes:</strong> {{notes}}</div>
-    <table style="width: 100%; border: none; font-size: 12px;">
-      <tr>
-        <td style="vertical-align: top; width: 50%; padding-right: 10px;">
-          <strong>Payment Info -</strong><br/>
-          Account No : 1001077213<br/>
-          Account Name : NCG Holdings Private Limited<br/>
-          Bank & Branch : Commercial Bank - Nugegoda
-        </td>
-        <td style="vertical-align: top; width: 50%;">
-          <strong>Terms & Conditions -</strong><br/>
-          1. Cheques are to be drawn in favour of NCG HOLDINGS PRIVATE LIMITED and A/C payee only.
-        </td>
-      </tr>
-    </table>
+    <strong>Terms & Conditions:</strong><br>
+    1. Cheques are to be drawn in favour of NCG HOLDINGS PRIVATE LIMITED and A/C payee only.<br>
+    2. Full payment must be settled before the trip.<br>
+    3. Cancellation charges apply if cancelled within 24 hours.<br>
+    4. Prices are subject to fuel price fluctuations.
   </div>
   <table class="sg">
     <thead><tr><th>Prepared By</th><th>Checked By</th><th>Approved By</th></tr></thead>
@@ -1765,7 +1774,291 @@ export const generateSPHARReceiptTemplate = (): string => `
 </div>
 `;
 
-// Export all templates as a map
+// ==================== SPH Quotation (Special Hire) ====================
+export const generateSPHARQuotationTemplate = (): string => `
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 0; color: #000; }
+  .qpg { max-width: 210mm; margin: 0 auto; padding: 20px; background: #fff; }
+  .qhd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+  .qhd .qlo img { width: 150px !important; height: auto !important; object-fit: contain !important; }
+  .qhd .qco { text-align: right; font-size: 14px; }
+  .qtt { text-align: center; font-size: 20px; font-weight: bold; text-decoration: underline; margin-bottom: 20px; }
+  .qinf { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  .qinf td { border: 1px solid #000; padding: 8px; font-size: 13px; width: 50%; }
+  .qinf strong { display: block; margin-bottom: 2px; }
+  .qpt { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  .qpt th { border: 1px solid #000; padding: 8px; text-align: left; background: #f3f4f6; font-size: 13px; }
+  .qpt td { border: 1px solid #000; padding: 8px; font-size: 13px; }
+  .qtot { text-align: right; margin-bottom: 16px; font-size: 14px; line-height: 1.8; }
+  .qnt { font-size: 11px; margin-bottom: 24px; padding: 10px; background: #f9fafb; border: 1px solid #e5e7eb; }
+  .qsg { width: 100%; border-collapse: collapse; margin-top: 30px; font-size: 14px; }
+  .qsg th { border: 1px solid #000; padding: 8px; text-align: center; background: #f3f4f6; }
+  .qsg td { border: 1px solid #000; padding: 12px; vertical-align: top; }
+  .qsgl { height: 50px; border-bottom: 1px solid #000; margin: 5px 0; }
+  .qft { margin-top: 40px; text-align: center; font-size: 10px; color: #666; }
+  @media print { body { background: #fff; } .qpg { margin: 0; padding: 10px; max-width: 100%; } }
+</style>
+<div class="qpg">
+  <div class="qhd">
+    <div class="qlo">{{company_logo}}</div>
+    <div class="qco">
+      <strong>{{company_name}}</strong><br>
+      {{company_address}}<br>
+      {{company_phone}}
+    </div>
+  </div>
+  <div class="qtt">QUOTATION</div>
+  <table class="qinf">
+    <tr>
+      <td><strong>Quotation No.</strong>{{quotation_number}}</td>
+      <td><strong>Date</strong>{{quotation_date}}</td>
+    </tr>
+    <tr>
+      <td><strong>Reference</strong>{{reference}}</td>
+      <td><strong>Valid Until</strong>{{due_date}}</td>
+    </tr>
+    <tr>
+      <td colspan="2"><strong>Customer</strong>{{customer_name}}<br>{{customer_address}}<br>{{customer_phone}}</td>
+    </tr>
+  </table>
+  <table class="qpt">
+    <thead><tr><th>Description</th><th style="text-align:right;">Amount</th></tr></thead>
+    <tbody><tr>
+      <td>{{notes}}</td>
+      <td style="text-align:right;font-weight:bold;">{{total_amount}}</td>
+    </tr></tbody>
+  </table>
+  <div class="qtot">
+    <p><strong>Total Amount:</strong> {{total_amount}}</p>
+  </div>
+  <div class="qnt">
+    <strong>Notes & Terms:</strong><br>
+    1. This quotation is valid for 7 days.<br>
+    2. Booking is confirmed only upon advance payment.<br>
+    3. {{notes}}
+  </div>
+  <table class="qsg">
+    <thead><tr><th>Prepared By</th><th>Approved By</th></tr></thead>
+    <tbody><tr>
+      <td><strong>Name:</strong> {{prepared_by}}<br><strong>Signature:</strong><div class="qsgl">{{prepared_by_signature}}</div><strong>Date:</strong> {{print_date}}</td>
+      <td><strong>Name:</strong> .........................<br><strong>Signature:</strong><div class="qsgl"></div><strong>Date:</strong> .........................</td>
+    </tr></tbody>
+  </table>
+  <div class="qft">Page 1 of 1<br>NCG Express Transport Management System</div>
+</div>
+`;
+
+// ==================== School Bus Invoice ====================
+export const generateSchoolInvoiceTemplate = (): string => `
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 0; color: #000; }
+  .pg { max-width: 210mm; margin: 0 auto; padding: 20px; background: #fff; border: 1px solid #eee; }
+  .hd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #1e40af; padding-bottom: 15px; }
+  .hd .lo img { height: 70px !important; width: auto !important; object-fit: contain !important; }
+  .hd .co { text-align: right; font-size: 14px; color: #334155; }
+  .tt { text-align: center; font-size: 22px; font-weight: bold; color: #1e40af; text-transform: uppercase; letter-spacing: 1px; margin: 20px 0; }
+  .it { width: 100%; margin-bottom: 20px; font-size: 14px; border-collapse: collapse; }
+  .it td { padding: 6px 8px; border: 1px solid #e2e8f0; }
+  .it .lb { font-weight: bold; width: 20%; background: #f8fafc; color: #475569; }
+  .it .vl { width: 30%; color: #1e293b; }
+  .li { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+  .li th { border: 1px solid #cbd5e1; padding: 10px; text-align: left; background: #f1f5f9; color: #334155; font-weight: bold; }
+  .li td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; color: #334155; }
+  .sm { display: flex; justify-content: flex-end; margin-top: 20px; }
+  .sm table { border-collapse: collapse; font-size: 15px; min-width: 300px; }
+  .sm td { border: 1px solid #cbd5e1; padding: 10px; }
+  .sm .sl { font-weight: bold; color: #475569; background: #f8fafc; }
+  .sm .sr { text-align: right; font-weight: bold; color: #1e293b; }
+  .sm .ba { font-size: 18px; color: #1e40af; background: #eff6ff; }
+  .nt { margin-top: 25px; padding: 15px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; line-height: 1.6; }
+  .sg { width: 100%; border-collapse: collapse; margin-top: 40px; font-size: 13px; }
+  .sg th { border: 1px solid #cbd5e1; padding: 10px; text-align: center; background: #f8fafc; color: #475569; }
+  .sg td { border: 1px solid #cbd5e1; padding: 15px; vertical-align: top; min-height: 80px; }
+  .sgl { height: 50px; border-bottom: 1px dashed #cbd5e1; margin: 10px 0; display: flex; align-items: center; justify-content: center; }
+  .ft { margin-top: 40px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 10px; }
+  @media print { body { background: #fff; } .pg { margin: 0; padding: 10px; max-width: 100%; border: none; } .hd { border-bottom-color: #000; } .tt { color: #000; } }
+</style>
+<div class="pg">
+  {{SECTION:1:Header:Required}}
+  <div class="hd">
+    <div class="lo">{{company_logo}}</div>
+    <div class="co">
+      <strong>{{company_name}}</strong><br>
+      {{company_address}}<br>
+      Tel: {{company_phone}} | Email: {{company_email}}
+    </div>
+  </div>
+  
+  <div class="tt">INVOICE (SCHOOL BUS SERVICE)</div>
+  
+  {{SECTION:2:Student Details:Required}}
+  <table class="it">
+    <tr>
+      <td class="lb">Student Name</td><td class="vl"><strong>{{student_name}}</strong></td>
+      <td class="lb">Invoice No</td><td class="vl"><strong>{{invoice_number}}</strong></td>
+    </tr>
+    <tr>
+      <td class="lb">Admission No</td><td class="vl">{{admission_no}}</td>
+      <td class="lb">Invoice Date</td><td class="vl">{{invoice_date}}</td>
+    </tr>
+    <tr>
+      <td class="lb">Grade / Class</td><td class="vl">{{grade}}</td>
+      <td class="lb">Billing Month</td><td class="vl"><strong>{{invoice_month}}</strong></td>
+    </tr>
+  </table>
+
+  {{SECTION:3:Billing Details:Required}}
+  <table class="li">
+    <thead>
+      <tr>
+        <th style="width:60%">Description</th>
+        <th style="width:40%; text-align:right;">Amount (LKR)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>School Bus Service Fee - {{invoice_month}}</td>
+        <td style="text-align:right;">{{total_amount}}</td>
+      </tr>
+      <tr>
+        <td>Previous Arrears / (Advance)</td>
+        <td style="text-align:right;">{{arrears_amount}}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="sm">
+    <table>
+      <tr class="ba">
+        <td class="sl">Total Payable</td>
+        <td class="sr">{{grand_total}}</td>
+      </tr>
+    </table>
+  </div>
+
+  {{SECTION:4:Bank Details:Optional}}
+  <div class="nt" style="background: #eff6ff; border-color: #bfdbfe;">
+    <strong>Bank Details for Payments:</strong><br>
+    Bank: Commercial Bank - Nugegoda<br>
+    Account Name: NCG Holding (Pvt) Ltd<br>
+    Account No: 1001077213<br>
+    <small>Please mention <strong>{{admission_no}}</strong> as the reference when making payments.</small>
+  </div>
+
+  {{SECTION:5:Signatures:Required}}
+  <table class="sg">
+    <thead><tr><th>Prepared By</th><th>Approved By</th><th>Parent Acknowledgement</th></tr></thead>
+    <tbody><tr>
+      <td><strong>Name:</strong> {{prepared_by}}<br><strong>Signature:</strong><div class="sgl">{{prepared_by_signature}}</div><strong>Date:</strong> {{print_date}}</td>
+      <td><strong>Name:</strong> {{approved_by}}<br><strong>Signature:</strong><div class="sgl">{{approved_by_signature}}</div><strong>Date:</strong> .........................</td>
+      <td><br><br><div class="sgl"></div><div style="text-align:center;">Signature & Date</div></td>
+    </tr></tbody>
+  </table>
+  
+  <div class="ft">
+    This is a computer-generated document. No signature is required for validity unless specified.<br>
+    Generated via NCG FleetONE Transport Management System
+  </div>
+</div>
+`;
+
+// ==================== School Bus Receipt ====================
+export const generateSchoolReceiptTemplate = (): string => `
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; padding: 0; color: #000; }
+  .pg { max-width: 210mm; margin: 0 auto; padding: 25px; background: #fff; border: 1px solid #eee; }
+  .hd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px; border-bottom: 2px solid #16a34a; padding-bottom: 15px; }
+  .hd .lo img { height: 70px !important; width: auto !important; object-fit: contain !important; }
+  .hd .co { text-align: right; font-size: 14px; color: #334155; }
+  .tt { text-align: center; font-size: 24px; font-weight: bold; color: #16a34a; text-transform: uppercase; letter-spacing: 2px; margin: 25px 0; }
+  .it { width: 100%; margin-bottom: 25px; font-size: 15px; border-collapse: collapse; }
+  .it td { padding: 10px 12px; border: 1px solid #e2e8f0; }
+  .it .lb { font-weight: bold; width: 25%; background: #f8fafc; color: #475569; }
+  .it .vl { width: 75%; color: #1e293b; }
+  .amt-box { background: #f0fdf4; border: 2px solid #16a34a; padding: 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin: 25px 0; }
+  .amt-text { font-size: 28px; font-weight: bold; color: #16a34a; }
+  .amt-label { font-size: 14px; color: #166534; text-transform: uppercase; font-weight: bold; }
+  .words { font-style: italic; font-size: 14px; color: #475569; margin-top: 5px; }
+  .sg { width: 100%; border-collapse: collapse; margin-top: 50px; font-size: 14px; }
+  .sg td { padding: 20px; vertical-align: bottom; width: 50%; }
+  .sgl { border-bottom: 1px solid #94a3b8; height: 60px; margin-bottom: 10px; position: relative; }
+  .sgl img { position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); max-height: 55px; }
+  .ft { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 15px; }
+  @media print { body { background: #fff; } .pg { margin: 0; padding: 15px; max-width: 100%; border: none; } }
+</style>
+<div class="pg">
+  {{SECTION:1:Header:Required}}
+  <div class="hd">
+    <div class="lo">{{company_logo}}</div>
+    <div class="co">
+      <strong>{{company_name}}</strong><br>
+      {{company_address}}<br>
+      Tel: {{company_phone}} | Email: {{company_email}}
+    </div>
+  </div>
+  
+  <div class="tt">OFFICIAL RECEIPT</div>
+  
+  <table class="it" style="margin-bottom: 10px;">
+    <tr>
+      <td class="lb">Receipt Number</td><td class="vl"><strong>{{receipt_number}}</strong></td>
+    </tr>
+    <tr>
+      <td class="lb">Date Received</td><td class="vl">{{receipt_date}}</td>
+    </tr>
+  </table>
+
+  {{SECTION:2:Payment Details:Required}}
+  <table class="it">
+    <tr>
+      <td class="lb">Received From</td><td class="vl"><strong>{{student_name}}</strong> ({{admission_no}})</td>
+    </tr>
+    <tr>
+      <td class="lb">Being Payment For</td><td class="vl">School Bus Service - {{notes}}</td>
+    </tr>
+    <tr>
+      <td class="lb">Payment Method</td><td class="vl">{{payment_method}} {{reference}}</td>
+    </tr>
+  </table>
+
+  <div class="amt-box">
+    <div>
+      <div class="amt-label">Amount Received</div>
+      <div class="amt-text">LKR {{total_amount}}</div>
+    </div>
+    <div style="text-align: right; max-width: 60%;">
+      <div class="amt-label">Amount in Words</div>
+      <div class="words">{{amount_in_words}}</div>
+    </div>
+  </div>
+
+  {{SECTION:3:Signatures:Required}}
+  <table class="sg">
+    <tr>
+      <td>
+        <div class="sgl">{{prepared_by_signature}}</div>
+        <div style="text-align: center;">
+          <strong>{{prepared_by}}</strong><br>
+          <small>Authorized Signature</small>
+        </div>
+      </td>
+      <td>
+        <div class="sgl"></div>
+        <div style="text-align: center;">
+          <br>
+          <small>Customer Acknowledgment</small>
+        </div>
+      </td>
+    </tr>
+  </table>
+  
+  <div class="ft">
+    Thank you for your prompt payment.<br>
+    Generated via NCG FleetONE Transport Management System
+  </div>
+</div>
+`;
+
 // Export all templates as a map
 export const defaultTemplates: Record<string, () => string> = {
   ar_invoice: generateARInvoiceTemplate,
@@ -1784,8 +2077,13 @@ export const defaultTemplates: Record<string, () => string> = {
   petty_cash_voucher: generatePettyCashVoucherTemplate,
   iou_voucher: generateIOUVoucherTemplate,
   purchase_order: generatePurchaseOrderTemplate,
+  sph_invoice: generateSPHARInvoiceTemplate,
+  sph_receipt: generateSPHARReceiptTemplate,
+  sph_quotation: generateSPHARQuotationTemplate,
   sph_ar_invoice: generateSPHARInvoiceTemplate,
   sph_ar_receipt: generateSPHARReceiptTemplate,
+  school_invoice: generateSchoolInvoiceTemplate,
+  school_receipt: generateSchoolReceiptTemplate,
 };
 
 // SPH-specific template overrides: when company short_code is SPH, use these for AR docs
@@ -1812,6 +2110,11 @@ export const templateDisplayNames: Record<string, string> = {
   petty_cash_voucher: "Petty Cash Voucher",
   iou_voucher: "IOU Voucher",
   purchase_order: "Purchase Order",
+  sph_invoice: "Special Hire Invoice",
+  sph_receipt: "Special Hire Receipt",
+  sph_quotation: "Special Hire Quotation",
+  school_invoice: "School Bus Invoice",
+  school_receipt: "School Bus Receipt",
 };
 export function generatePurchaseOrderTemplate(): string { return `
 <style>
@@ -1940,3 +2243,4 @@ export function generatePurchaseOrderTemplate(): string { return `
 </div>
 `;
 }
+

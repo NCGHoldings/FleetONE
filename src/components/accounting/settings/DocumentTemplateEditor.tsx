@@ -11,8 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCreateDocumentTemplate, useUpdateDocumentTemplate, useUploadHeaderImage, HeaderMode } from "@/hooks/useDocumentTemplates";
-import { Upload, Code, Eye, Copy, X, Info, Image, FileText, Type, Layout } from "lucide-react";
 import { toast } from "sonner";
+import { parseHTMLDocumentTemplate } from "@/utils/htmlDocumentTemplateParser";
+import { ListChecks } from "lucide-react";
 
 interface DocumentTemplateEditorProps {
   open: boolean;
@@ -567,6 +568,10 @@ export const DocumentTemplateEditor = ({
                   <Info className="h-4 w-4 mr-2" />
                   Placeholders
                 </TabsTrigger>
+                <TabsTrigger value="sections">
+                  <ListChecks className="h-4 w-4 mr-2" />
+                  Sections
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="editor" className="mt-4">
@@ -614,6 +619,63 @@ export const DocumentTemplateEditor = ({
                         </Button>
                       </div>
                     ))}
+                  </div>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="sections" className="mt-4">
+                <Card className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold">Template Sections</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Extracting sections from {'{{SECTION:...}}'} markers in your HTML.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {parseHTMLDocumentTemplate(formData.html_content).sections.length > 0 ? (
+                      parseHTMLDocumentTemplate(formData.html_content).sections.map((section) => (
+                        <div key={section.sectionId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                          <div className="flex items-center gap-3">
+                            <Badge variant="outline">{section.sectionNumber}</Badge>
+                            <div>
+                              <p className="font-medium">{section.sectionTitle}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {section.isRequired ? "Required Section" : "Optional Section"}
+                                {section.supportsSubSections && " • Supports Sub-sections"}
+                              </p>
+                            </div>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              const textarea = document.getElementById("html-editor") as HTMLTextAreaElement;
+                              if (textarea) {
+                                const searchText = `{{SECTION:${section.sectionNumber}:${section.sectionTitle}`;
+                                const index = formData.html_content.indexOf(searchText);
+                                if (index !== -1) {
+                                  textarea.focus();
+                                  textarea.setSelectionRange(index, index + searchText.length);
+                                  setActiveTab("editor");
+                                }
+                              }
+                            }}
+                          >
+                            <Code className="h-4 w-4 mr-2" />
+                            Go to Code
+                          </Button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+                        <Info className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                        <p>No section markers found in this template.</p>
+                        <p className="text-xs mt-1">Use {'{{SECTION:1.0:Title:required}}'} to define sections.</p>
+                      </div>
+                    )}
                   </div>
                 </Card>
               </TabsContent>

@@ -19,6 +19,8 @@ import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { DeleteSchoolPaymentDialog } from './DeleteSchoolPaymentDialog';
+import { FinanceDocumentPreviewModal } from '../accounting/shared/FinanceDocumentPreviewModal';
+import { Printer } from 'lucide-react';
 
 interface SchoolBusFinanceSettlementProps {
   studentId: string;
@@ -70,6 +72,15 @@ export function SchoolBusFinanceSettlement({
   } | null>(null);
 
   const [transactionToDelete, setTransactionToDelete] = useState<any>(null);
+  const [previewModal, setPreviewModal] = useState<{
+    isOpen: boolean;
+    documentType: 'school_invoice' | 'school_receipt';
+    documentData: any;
+  }>({
+    isOpen: false,
+    documentType: 'school_invoice',
+    documentData: null
+  });
 
   const { data: activeStudents = [] } = useStudentsForBulkAR(student?.branch_id || null);
 
@@ -515,15 +526,32 @@ export function SchoolBusFinanceSettlement({
                                     Reallocate
                                   </Button>
                                 )}
-                                <Button 
-                                  variant="outline" 
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 w-full md:w-auto text-xs h-8"
-                                  onClick={() => setTransactionToDelete(payment)}
-                                  disabled={actionLoading}
-                                >
-                                  <Trash2 className="w-3 h-3 mr-1" />
-                                  Reverse
-                                </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    className="text-slate-600 hover:text-slate-700 hover:bg-slate-50 border-slate-200 w-full md:w-auto text-xs h-8"
+                                    onClick={() => setPreviewModal({
+                                      isOpen: true,
+                                      documentType: 'school_receipt',
+                                      documentData: {
+                                        ...payment,
+                                        student_name: student?.student_name,
+                                        admission_no: student?.admission_no,
+                                        prepared_by: 'Authorized Officer'
+                                      }
+                                    })}
+                                  >
+                                    <Printer className="w-3 h-3 mr-1" />
+                                    Print
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 w-full md:w-auto text-xs h-8"
+                                    onClick={() => setTransactionToDelete(payment)}
+                                    disabled={actionLoading}
+                                  >
+                                    <Trash2 className="w-3 h-3 mr-1" />
+                                    Reverse
+                                  </Button>
                             </div>
                           </div>
                         ))}
@@ -599,6 +627,26 @@ export function SchoolBusFinanceSettlement({
                                       Allocate Payment
                                     </Button>
                                   )}
+
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="h-7 text-xs bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200 w-fit"
+                                    onClick={() => setPreviewModal({
+                                      isOpen: true,
+                                      documentType: 'school_invoice',
+                                      documentData: {
+                                        ...inv,
+                                        student_name: student?.student_name,
+                                        admission_no: student?.admission_no,
+                                        grade: student?.grade,
+                                        prepared_by: 'Accounts Officer'
+                                      }
+                                    })}
+                                  >
+                                    <Printer className="w-3 h-3 mr-1" />
+                                    Print Invoice
+                                  </Button>
                                 </div>
                               </td>
                             </tr>
@@ -1101,6 +1149,13 @@ export function SchoolBusFinanceSettlement({
           fetchFinanceData();
           setTransactionToDelete(null);
         }}
+      />
+
+      <FinanceDocumentPreviewModal
+        isOpen={previewModal.isOpen}
+        onClose={() => setPreviewModal(prev => ({ ...prev, isOpen: false }))}
+        documentType={previewModal.documentType}
+        documentData={previewModal.documentData}
       />
     </Dialog>
   );

@@ -4886,7 +4886,7 @@ export const useDeleteAPPayment = () => {
   const { getEffectiveCompanyId } = useCompany();
   return useMutation({
     mutationFn: async (id: string) => {
-      // 1. Fetch payment
+      // 1. Fetch payment and its allocations
       const { data: payment } = await supabase
         .from("ap_payments")
         .select("id, journal_entry_id, bank_account_id, amount")
@@ -4894,7 +4894,40 @@ export const useDeleteAPPayment = () => {
         .single();
       if (!payment) throw new Error("Payment not found");
 
-      // 2. Delete allocations
+      const { data: allocations } = await supabase
+        .from("ap_payment_allocations")
+        .select("invoice_id, allocated_amount, wht_deducted, write_off_amount")
+        .eq("payment_id", id);
+
+      // 2. Revert invoice balances
+      if (allocations && allocations.length > 0) {
+        for (const alloc of allocations) {
+          const { data: invoice } = await supabase
+            .from("ap_invoices")
+            .select("total_amount, paid_amount")
+            .eq("id", alloc.invoice_id)
+            .single();
+
+          if (invoice) {
+            const totalAllocated = Number(alloc.allocated_amount || 0) + 
+                                 Number(alloc.wht_deducted || 0) + 
+                                 Number(alloc.write_off_amount || 0);
+            const newPaid = Math.max(0, Number(invoice.paid_amount || 0) - totalAllocated);
+            const newBalance = Number(invoice.total_amount || 0) - newPaid;
+
+            await supabase
+              .from("ap_invoices")
+              .update({
+                paid_amount: newPaid,
+                balance: newBalance,
+                status: newBalance <= 0 ? "paid" : newBalance < Number(invoice.total_amount) ? "partial" : "unpaid",
+              })
+              .eq("id", alloc.invoice_id);
+          }
+        }
+      }
+
+      // 3. Delete allocations
       await supabase.from("ap_payment_allocations").delete().eq("payment_id", id);
 
       // 2b. Delete linked cheque register entries
@@ -4950,7 +4983,7 @@ export const useDeleteARReceipt = () => {
   const { getEffectiveCompanyId } = useCompany();
   return useMutation({
     mutationFn: async (id: string) => {
-      // 1. Fetch receipt
+      // 1. Fetch receipt and its allocations
       const { data: receipt } = await supabase
         .from("ar_receipts")
         .select("id, journal_entry_id, bank_account_id, amount")
@@ -4958,7 +4991,39 @@ export const useDeleteARReceipt = () => {
         .single();
       if (!receipt) throw new Error("Receipt not found");
 
-      // 2. Delete allocations
+      const { data: allocations } = await supabase
+        .from("ar_receipt_allocations")
+        .select("invoice_id, allocated_amount, write_off_amount")
+        .eq("receipt_id", id);
+
+      // 2. Revert invoice balances
+      if (allocations && allocations.length > 0) {
+        for (const alloc of allocations) {
+          const { data: invoice } = await supabase
+            .from("ar_invoices")
+            .select("total_amount, paid_amount")
+            .eq("id", alloc.invoice_id)
+            .single();
+
+          if (invoice) {
+            const totalAllocated = Number(alloc.allocated_amount || 0) + 
+                                 Number(alloc.write_off_amount || 0);
+            const newPaid = Math.max(0, Number(invoice.paid_amount || 0) - totalAllocated);
+            const newBalance = Number(invoice.total_amount || 0) - newPaid;
+
+            await supabase
+              .from("ar_invoices")
+              .update({
+                paid_amount: newPaid,
+                balance: newBalance,
+                status: newBalance <= 0 ? "paid" : newBalance < Number(invoice.total_amount) ? "partial" : "unpaid",
+              })
+              .eq("id", alloc.invoice_id);
+          }
+        }
+      }
+
+      // 3. Delete allocations
       await supabase.from("ar_receipt_allocations").delete().eq("receipt_id", id);
 
       // 2b. Delete linked cheque register entries

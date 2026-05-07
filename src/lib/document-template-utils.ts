@@ -1095,6 +1095,36 @@ export const mapDocumentToPlaceholders = (
         
       break;
     }
+
+    case 'school_invoice': {
+      placeholders['{{invoice_number}}'] = documentData?.invoice_number || '';
+      placeholders['{{invoice_date}}'] = formatDate(documentData?.invoice_date || documentData?.created_at);
+      placeholders['{{invoice_month}}'] = documentData?.invoice_month ? format(new Date(documentData.invoice_month), 'MMMM yyyy') : '';
+      placeholders['{{student_name}}'] = documentData?.student_name || documentData?.school_students?.student_name || '';
+      placeholders['{{admission_no}}'] = documentData?.admission_no || documentData?.school_students?.admission_no || '';
+      placeholders['{{grade}}'] = documentData?.grade || documentData?.school_students?.grade || '';
+      placeholders['{{total_amount}}'] = formatCurrency(documentData?.amount);
+      placeholders['{{arrears_amount}}'] = formatCurrency(documentData?.arrears_amount || 0);
+      placeholders['{{grand_total}}'] = formatCurrency((documentData?.amount || 0) + (documentData?.arrears_amount || 0));
+      placeholders['{{amount_in_words}}'] = numberToWords((documentData?.amount || 0) + (documentData?.arrears_amount || 0));
+      placeholders['{{notes}}'] = documentData?.notes || '';
+      placeholders['{{prepared_by}}'] = documentData?.prepared_by || '';
+      break;
+    }
+
+    case 'school_receipt': {
+      placeholders['{{receipt_number}}'] = documentData?.receipt_number || '';
+      placeholders['{{receipt_date}}'] = formatDate(documentData?.payment_date || documentData?.created_at);
+      placeholders['{{student_name}}'] = documentData?.student_name || documentData?.school_students?.student_name || '';
+      placeholders['{{admission_no}}'] = documentData?.admission_no || documentData?.school_students?.admission_no || '';
+      placeholders['{{total_amount}}'] = formatCurrency(documentData?.amount_paid || documentData?.amount);
+      placeholders['{{amount_in_words}}'] = numberToWords(documentData?.amount_paid || documentData?.amount || 0);
+      placeholders['{{payment_method}}'] = documentData?.payment_method?.toUpperCase() || '';
+      placeholders['{{reference}}'] = documentData?.reference_no || documentData?.reference || '';
+      placeholders['{{notes}}'] = documentData?.notes || (documentData?.invoice_month ? format(new Date(documentData.invoice_month), 'MMMM yyyy') : '');
+      placeholders['{{prepared_by}}'] = documentData?.prepared_by || '';
+      break;
+    }
   }
   // Automatically map ALL fields from documentData as {{field_name}} placeholders.
   // This ensures custom templates can reference any data field without explicit mapping.

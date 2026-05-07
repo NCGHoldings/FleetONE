@@ -13,12 +13,13 @@ serve(async (req) => {
   try {
     const { imageBase64, sheetType = 'daily_trip' } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY');
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    if (!LOVABLE_API_KEY && !GOOGLE_API_KEY) {
+      throw new Error('No API keys configured');
     }
 
-    console.log(`Starting OCR extraction with Lovable AI (Type: ${sheetType})`);
+    console.log(`Starting OCR extraction (Type: ${sheetType})`);
 
     let prompt = "";
     
@@ -231,55 +232,78 @@ Return JSON in this exact format:
 NOTE: If driver or conductor name is not visible, return null for those fields.`;
     }
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: prompt
-            },
-            {
-              type: 'image_url',
-              image_url: { 
-                url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
+    let content = "";
+
+    try {
+      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+      
+      console.log('Calling Lovable AI Gateway...');
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              {
+                type: 'image_url',
+                image_url: { 
+                  url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
+                }
               }
-            }
-          ]
-        }],
-        response_format: { type: "json_object" }
-      })
-    });
+            ]
+          }],
+          response_format: { type: "json_object" }
+        })
+      });
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        console.error('Rate limit exceeded');
-        return new Response(JSON.stringify({ error: 'Rate limits exceeded, please try again later.' }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Status ${response.status}: ${errorText}`);
       }
-      if (response.status === 402) {
-        console.error('Payment required');
-        return new Response(JSON.stringify({ error: 'Payment required, please add credits to your Lovable AI workspace.' }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+
+      const data = await response.json();
+      content = data.choices[0].message.content;
+    } catch (lovableError) {
+      console.error('Lovable AI failed, falling back to Gemini:', lovableError);
+      
+      if (!GOOGLE_API_KEY) {
+        throw new Error(`Lovable failed and GOOGLE_API_KEY is not configured. Lovable Error: ${lovableError}`);
       }
-      const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+      
+      console.log('Calling Direct Google Gemini API...');
+      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              {
+                inline_data: {
+                  mime_type: "image/jpeg",
+                  data: imageBase64.includes('base64,') ? imageBase64.split('base64,')[1] : imageBase64
+                }
+              }
+            ]
+          }],
+          generationConfig: { response_mime_type: "application/json" }
+        })
+      });
+
+      if (!geminiResponse.ok) {
+        const errorData = await geminiResponse.text();
+        throw new Error(`Gemini API error: ${geminiResponse.status} - ${errorData}`);
+      }
+
+      const geminiData = await geminiResponse.json();
+      content = geminiData.candidates[0].content.parts[0].text;
     }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content;
     
     console.log('OCR extraction successful');
     console.log('Raw AI response:', content);

@@ -305,8 +305,8 @@ export const TemplateInitializerButton = ({
               return;
             }
             
-            // Target only ar_invoice and ar_receipt
-            const sphTypeCodes = ['ar_invoice', 'ar_receipt'];
+            // Target only ar_invoice, ar_receipt, and sph_quotation
+            const sphTypeCodes = ['ar_invoice', 'ar_receipt', 'sph_invoice', 'sph_receipt', 'sph_quotation'];
             const sphTypes = templateTypes.filter(t => sphTypeCodes.includes(t.type_code));
             
             if (sphTypes.length === 0) {
@@ -357,7 +357,7 @@ export const TemplateInitializerButton = ({
             }
             
             setIsInitializing(false);
-            toast.success(`Updated SPH templates: AR Invoice + AR Receipt for ${sphCompany.name}`);
+            toast.success(`Updated SPH templates: Invoice, Receipt & Quotation for ${sphCompany.name}`);
             onComplete?.();
           }}
         >

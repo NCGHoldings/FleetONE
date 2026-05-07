@@ -158,7 +158,9 @@ export default function RealTimeTracking() {
         const dbData = trackingData.find(d => 
           d.bus_no === busNo || 
           d.bus_no === v.nm || 
-          d.bus_no.replace(/\s+/g, '') === busNo.replace(/\s+/g, '')
+          d.bus_no.replace(/[\s-]/g, '').toLowerCase() === busNo.replace(/[\s-]/g, '').toLowerCase() ||
+          d.bus_no.replace(/[\s-]/g, '').toLowerCase() === v.nm.replace(/[\s-]/g, '').toLowerCase() ||
+          d.id === `fios-${v.id}`
         );
 
         const lastUpdate = v.pos?.t ? new Date(v.pos.t * 1000).toISOString() : new Date().toISOString();
@@ -176,10 +178,10 @@ export default function RealTimeTracking() {
            status: speed > 0 ? 'active' : 'inactive',
            last_update: lastUpdate,
            route_name: dbData?.route_name || 'Unassigned',
-           fuel_level_liters: dbData?.fuel_level_liters,
+           fuel_level_liters: v.prms?.fuel_liters?.v || v.prms?.fuel?.v || v.prms?.fuel_l?.v || v.prms?.tank_level?.v || v.prms?.can_fuel?.v || v.prms?.fls?.v || v.prms?.fuel_level?.v || dbData?.fuel_level_liters,
            tire_pressure: dbData?.tire_pressure,
            engine_health: getEngineHealth(speed, lastUpdate),
-           odometer_km: dbData?.odometer_km,
+           odometer_km: v.prms?.mileage?.v || v.prms?.odometer?.v || v.prms?.can_odometer?.v || v.prms?.total_distance?.v || v.prms?.distance?.v || v.prms?.odo?.v || dbData?.odometer_km,
            fios_device_id: v.id,
            heading_degrees: v.pos?.c || 0,
            satellite_count: v.pos?.sc || 0,
@@ -202,13 +204,56 @@ export default function RealTimeTracking() {
 
   const fetchTrackingData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('real_time_tracking')
-        .select('*')
-        .order('last_update', { ascending: false });
+      // 1. Fetch master buses as a robust fallback for odometer
+      const { data: busData } = await supabase
+        .from('buses')
+        .select('id, bus_no, current_mileage, status');
 
-      if (error) throw error;
-      setTrackingData((data as any) || []);
+      let trackingResult: any[] = [];
+      
+      // 2. Try fetching real_time_tracking (might throw 406 if schema is stale)
+      try {
+        const { data, error } = await supabase
+          .from('real_time_tracking')
+          .select('*')
+          .order('last_update', { ascending: false });
+
+        if (error) {
+          console.warn('Real-time tracking fetch warning:', error);
+        } else if (data) {
+          trackingResult = data;
+        }
+      } catch (e) {
+        console.warn('Could not fetch real_time_tracking, relying on fallback:', e);
+      }
+
+      // 3. Merge bus master data into tracking result to guarantee odometer fallback
+      if (busData) {
+        const finalData = [...trackingResult];
+        busData.forEach(b => {
+          const existing = finalData.find(t => t.bus_no === b.bus_no);
+          if (existing) {
+            // Apply fallback if tracking record lacks odometer
+            if (!existing.odometer_km && b.current_mileage) {
+              existing.odometer_km = b.current_mileage;
+            }
+          } else {
+            // Create a baseline tracking record so FIOS can merge into it
+            finalData.push({
+              id: b.id,
+              bus_id: b.id,
+              bus_no: b.bus_no,
+              odometer_km: b.current_mileage || 0,
+              status: b.status || 'inactive',
+              last_update: new Date().toISOString(),
+              current_location: 'Awaiting FIOS Signal',
+            });
+          }
+        });
+        setTrackingData(finalData);
+      } else {
+        setTrackingData(trackingResult);
+      }
     } catch (error) {
       console.error('Error fetching tracking data:', error);
       toast.error('Failed to load tracking data');
@@ -453,6 +498,62 @@ export default function RealTimeTracking() {
       ),
     },
     {
+       accessorKey: "odometer_km",
+      header: "Odometer",
+      cell: ({ row }) => {
+        const odometer = row.original.odometer_km;
+        const dailyMileage = row.original.daily_mileage_km;
+        const odometerSource = row.original.odometer_source || 'manual';
+        
+        const getSourceBadge = () => {
+          switch(odometerSource) {
+            case 'fios':
+              return <Badge variant="default" className="text-xs">FIOS</Badge>;
+            case 'gps_calculated':
+              return <Badge variant="secondary" className="text-xs">GPS</Badge>;
+            default:
+              return <Badge variant="outline" className="text-xs">Manual</Badge>;
+          }
+        };
+        
+        return (
+          <div className="space-y-1">
+            {odometer && odometer > 0 ? (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{odometer.toFixed(1)} km</span>
+                  {getSourceBadge()}
+                </div>
+                {dailyMileage && dailyMileage > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    +{dailyMileage.toFixed(1)} km today
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <span className="text-muted-foreground">-</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setSelectedBusForOdometer({ 
+                      id: row.original.bus_id, 
+                      no: row.original.bus_no
+                    });
+                    setIsOdometerEntryOpen(true);
+                  }}
+                  className="h-6 text-xs px-2"
+                >
+                  Set Base
+                </Button>
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => (
@@ -558,62 +659,7 @@ export default function RealTimeTracking() {
         )
       },
     },
-    {
-       accessorKey: "odometer_km",
-      header: "Odometer",
-      cell: ({ row }) => {
-        const odometer = row.original.odometer_km;
-        const dailyMileage = row.original.daily_mileage_km;
-        const odometerSource = row.original.odometer_source || 'manual';
-        
-        const getSourceBadge = () => {
-          switch(odometerSource) {
-            case 'fios':
-              return <Badge variant="default" className="text-xs">FIOS</Badge>;
-            case 'gps_calculated':
-              return <Badge variant="secondary" className="text-xs">GPS</Badge>;
-            default:
-              return <Badge variant="outline" className="text-xs">Manual</Badge>;
-          }
-        };
-        
-        return (
-          <div className="space-y-1">
-            {odometer && odometer > 0 ? (
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{odometer.toFixed(1)} km</span>
-                  {getSourceBadge()}
-                </div>
-                {dailyMileage && dailyMileage > 0 && (
-                  <div className="text-xs text-muted-foreground">
-                    +{dailyMileage.toFixed(1)} km today
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground">-</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setSelectedBusForOdometer({ 
-                      id: row.original.bus_id, 
-                      no: row.original.bus_no
-                    });
-                    setIsOdometerEntryOpen(true);
-                  }}
-                  className="h-6 text-xs px-2"
-                >
-                  Set Base
-                </Button>
-              </div>
-            )}
-          </div>
-        );
-      },
-    },
+
     {
       id: "service_status",
       header: "Service Status",

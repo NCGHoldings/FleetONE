@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DeleteSchoolPaymentDialog } from "./DeleteSchoolPaymentDialog";
+import { FinanceDocumentPreviewModal } from "../accounting/shared/FinanceDocumentPreviewModal";
+import { Printer } from "lucide-react";
 
 interface PaymentTransaction {
   id: string;
@@ -36,6 +38,15 @@ export function PaymentHistoryModal({ isOpen, onClose, studentId, studentName }:
   const [loading, setLoading] = useState(false);
 
   const [transactionToDelete, setTransactionToDelete] = useState<PaymentTransaction | null>(null);
+  const [previewModal, setPreviewModal] = useState<{
+    isOpen: boolean;
+    documentType: 'school_invoice' | 'school_receipt';
+    documentData: any;
+  }>({
+    isOpen: false,
+    documentType: 'school_receipt',
+    documentData: null
+  });
 
   useEffect(() => {
     if (isOpen && studentId) {
@@ -209,15 +220,34 @@ export function PaymentHistoryModal({ isOpen, onClose, studentId, studentName }:
                           {transaction.reference_no || "-"}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => handleDeleteTransaction(transaction)}
-                            title="Delete this payment"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex justify-end gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              onClick={() => setPreviewModal({
+                                isOpen: true,
+                                documentType: 'school_receipt',
+                                documentData: {
+                                  ...transaction,
+                                  student_name: studentName,
+                                  prepared_by: 'Authorized Officer'
+                                }
+                              })}
+                              title="Print Receipt"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => handleDeleteTransaction(transaction)}
+                              title="Delete this payment"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -249,6 +279,13 @@ export function PaymentHistoryModal({ isOpen, onClose, studentId, studentName }:
           fetchPaymentHistory();
           setTransactionToDelete(null);
         }}
+      />
+
+      <FinanceDocumentPreviewModal
+        isOpen={previewModal.isOpen}
+        onClose={() => setPreviewModal(prev => ({ ...prev, isOpen: false }))}
+        documentType={previewModal.documentType}
+        documentData={previewModal.documentData}
       />
     </Dialog>
   );

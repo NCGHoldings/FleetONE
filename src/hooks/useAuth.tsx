@@ -12,6 +12,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   hasRole: (role: string) => boolean;
   isAuthenticated: boolean;
+  mfaFactors: any[];
+  aal: "aal1" | "aal2" | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +24,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [mfaFactors, setMfaFactors] = useState<any[]>([]);
+  const [aal, setAal] = useState<"aal1" | "aal2" | null>(null);
   
 
   const fetchUserProfile = async (userId: string) => {
@@ -57,6 +61,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const fetchMFAFactors = async () => {
+    try {
+      const { data, error } = await supabase.auth.mfa.listFactors();
+      if (error) throw error;
+      setMfaFactors(data.totp || []);
+    } catch (err) {
+      console.error("Error fetching MFA factors:", err);
+    }
+  };
+
+  const fetchAAL = async () => {
+    try {
+      const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (error) throw error;
+      setAal(data.currentLevel as any);
+    } catch (err) {
+      console.error("Error fetching AAL:", err);
+    }
+  };
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -66,13 +90,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Defer Supabase calls with setTimeout to avoid deadlock
           setTimeout(() => {
             fetchUserProfile(session.user.id);
+            fetchMFAFactors();
+            fetchAAL();
           }, 0);
         } else {
           setUserProfile(null);
           setUserRoles([]);
+          setMfaFactors([]);
+          setAal(null);
         }
         
         setLoading(false);
@@ -87,6 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setTimeout(() => {
           fetchUserProfile(session.user.id);
+          fetchMFAFactors();
+          fetchAAL();
         }, 0);
       }
       
@@ -125,6 +154,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     hasRole,
     isAuthenticated,
+    mfaFactors,
+    aal,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

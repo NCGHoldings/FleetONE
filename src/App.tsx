@@ -12,6 +12,7 @@ import { SeasonalThemeProvider } from "./components/seasonal/SeasonalThemeProvid
 import { CompanyProvider } from "./contexts/CompanyContext";
 import { ThemeProvider } from "next-themes";
 import { SystemErrorBoundary } from "./components/safety/SystemErrorBoundary";
+import { MFAGuard } from "./components/auth/MFAGuard";
 import { toast } from "sonner";
 
 // Pages
@@ -197,9 +198,11 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
                   <PageAccessGuard pageId="executive_dashboard">
-                    <AppLayout>
-                      <ExecutiveDashboard />
-                    </AppLayout>
+                    <MFAGuard>
+                      <AppLayout>
+                        <ExecutiveDashboard />
+                      </AppLayout>
+                    </MFAGuard>
                   </PageAccessGuard>
                 </ProtectedRoute>
               } 
@@ -218,9 +221,11 @@ const App = () => (
               path="/settings" 
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <Settings />
-                  </AppLayout>
+                  <MFAGuard>
+                    <AppLayout>
+                      <Settings />
+                    </AppLayout>
+                  </MFAGuard>
                 </ProtectedRoute>
               } 
             />
@@ -848,7 +853,9 @@ const App = () => (
               path="/accounting"
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'finance']}>
-                  <Accounting />
+                  <MFAGuard>
+                    <Accounting />
+                  </MFAGuard>
                 </ProtectedRoute>
               } 
             />

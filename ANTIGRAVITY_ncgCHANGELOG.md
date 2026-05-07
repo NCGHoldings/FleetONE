@@ -1,3 +1,18 @@
+## 2026-05-06
+
+### ✅ Industrialized School Bus Financial Documentation
+
+**Files Modified:**
+- `src/lib/document-template-seeder.ts` — Registered `school_invoice` and `school_receipt` templates. Implemented `generateSchoolInvoiceTemplate` and `generateSchoolReceiptTemplate` using the dynamic `{{SECTION}}` marker system. Fixed a `ReferenceError` by moving template function definitions before their usage in the `defaultTemplates` object.
+- `src/components/accounting/settings/DocumentTemplateEditor.tsx` — Fixed a JSX syntax error where `{{SECTION:...}}` text was being incorrectly parsed as a JavaScript expression. Wrapped the text in a string literal.
+- `src/lib/document-template-utils.ts` — Extended `mapDocumentToPlaceholders` to handle school-specific data points (`student_name`, `admission_no`, `grade`, `invoice_month`, etc.). Fixed a syntax error (missing closing brace) that was breaking the module structure.
+- `src/components/school/SchoolBusFinanceSettlement.tsx` — Integrated `FinanceDocumentPreviewModal` and added "Print Invoice" and "Print" buttons to the Invoices and Payments tabs.
+- `src/components/school/PaymentHistoryModal.tsx` — Integrated `FinanceDocumentPreviewModal` and added a print icon button to each transaction row.
+
+**Architecture Notes:**
+- Standardized on the ERP's dynamic section system, allowing users to customize Bank Details, T&Cs, and Signatures via the `DocumentTemplateEditor`.
+- Mapped operational school bus data directly to financial placeholders for zero-config document generation.
+
 ## 2026-05-03
 
 ### ✅ SPH AR Templates Line Items & Signature Fix

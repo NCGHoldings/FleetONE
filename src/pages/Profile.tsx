@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { ProfileSignatureManager } from "@/components/staff/ProfileSignatureManager";
-import { User, Mail, Phone, Calendar, Briefcase, Upload, Save } from "lucide-react";
+import { User, Mail, Phone, Calendar, Briefcase, Upload, Save, ShieldCheck } from "lucide-react";
+import { MFAEnrollment } from "@/components/auth/MFAEnrollment";
 
 export default function Profile() {
   const { user, userProfile, userRoles } = useAuth();
@@ -269,7 +270,8 @@ export default function Profile() {
         </Card>
 
         {/* Signature Section */}
-        <div>
+        <div className="space-y-6">
+          <MFAEnrollment />
           <ProfileSignatureManager />
         </div>
       </div>
