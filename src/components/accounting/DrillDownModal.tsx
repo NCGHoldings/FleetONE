@@ -41,7 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Loader2, Download, X, Filter, Bus, Route, Trash2, FileText } from "lucide-react";
+import { Loader2, Download, X, Filter, Bus, Route, Trash2, FileText, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { reverseAndDeleteJournalEntry } from "@/lib/gl-posting-utils";
 import { useReconcileJournalLines } from "@/hooks/useAccountingMutations";
@@ -220,6 +220,74 @@ export const DrillDownModal = ({
       return data;
     },
     enabled: open && resolvedAccountIds.length > 0,
+  });
+
+  // Fetch invoice balances for auto-reconciliation display
+  const { data: invoiceBalances } = useQuery({
+    queryKey: ["drilldown-invoice-balances", transactions?.map(t => (t.journal_entries as any)?.reference).join(',')],
+    queryFn: async () => {
+      if (!transactions || transactions.length === 0) return {};
+      
+      const arInvoiceRefs = new Set<string>();
+      const apInvoiceRefs = new Set<string>();
+      const arReceiptRefs = new Set<string>();
+      const apPaymentRefs = new Set<string>();
+      
+      transactions.forEach(t => {
+        const entry = t.journal_entries as any;
+        if (!entry || !entry.reference) return;
+        
+        const ref = entry.reference;
+        const source = entry.source_module;
+        
+        if (source === 'ar_invoice' || source === 'manual_ar' || ref.includes('-INV-') || ref.startsWith('INV-')) {
+          arInvoiceRefs.add(ref);
+        } else if (source === 'ap_invoice' || ref.includes('API-') || ref.startsWith('API-')) {
+          apInvoiceRefs.add(ref);
+        } else if (source === 'ar_receipt' || ref.includes('-RCP-') || ref.startsWith('RCP-') || entry.entry_number?.startsWith('SBS-PAY-')) {
+          arReceiptRefs.add(ref);
+        } else if (source === 'ap_payment' || source === 'advance_payment' || ref.includes('-PAY-') || ref.startsWith('PAY-')) {
+          apPaymentRefs.add(ref);
+        }
+      });
+      
+      const balances: Record<string, { balance: number, type: 'invoice' | 'receipt', parentRef?: string }> = {};
+      
+      // Fetch AR Invoices
+      if (arInvoiceRefs.size > 0) {
+        const { data } = await supabase.from('ar_invoices').select('invoice_number, balance').in('invoice_number', Array.from(arInvoiceRefs));
+        data?.forEach(inv => { balances[inv.invoice_number] = { balance: inv.balance, type: 'invoice' }; });
+      }
+      
+      // Fetch AP Invoices
+      if (apInvoiceRefs.size > 0) {
+        const { data } = await supabase.from('ap_invoices').select('invoice_number, balance').in('invoice_number', Array.from(apInvoiceRefs));
+        data?.forEach(inv => { balances[inv.invoice_number] = { balance: inv.balance, type: 'invoice' }; });
+      }
+      
+      // Fetch AR Receipts (to find parent invoice)
+      if (arReceiptRefs.size > 0) {
+        const { data } = await supabase.from('ar_receipts').select('receipt_number, invoice_id, ar_invoices(invoice_number)').in('receipt_number', Array.from(arReceiptRefs));
+        data?.forEach(rcp => { 
+          if (rcp.ar_invoices?.invoice_number) {
+            balances[rcp.receipt_number] = { balance: 0, type: 'receipt', parentRef: rcp.ar_invoices.invoice_number }; 
+          }
+        });
+      }
+      
+      // Fetch AP Payments (to find parent invoice)
+      if (apPaymentRefs.size > 0) {
+        const { data } = await supabase.from('ap_payments').select('payment_number, invoice_id, ap_invoices(invoice_number)').in('payment_number', Array.from(apPaymentRefs));
+        data?.forEach(pay => { 
+          if (pay.ap_invoices?.invoice_number) {
+            balances[pay.payment_number] = { balance: 0, type: 'receipt', parentRef: pay.ap_invoices.invoice_number }; 
+          }
+        });
+      }
+      
+      return balances;
+    },
+    enabled: open && !!transactions && transactions.length > 0,
   });
 
   const totalCurrentBalance = useMemo(() => {
@@ -448,7 +516,7 @@ export const DrillDownModal = ({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             Account Transactions: {accountName}
@@ -610,9 +678,10 @@ export const DrillDownModal = ({
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Debit</TableHead>
                   <TableHead className="text-right">Credit</TableHead>
-                   <TableHead className="text-right">Balance</TableHead>
-                   <TableHead className="w-10"></TableHead>
-                 </TableRow>
+                  <TableHead className="text-right">Balance</TableHead>
+                  <TableHead>Status / Link</TableHead>
+                  <TableHead className="w-10"></TableHead>
+                </TableRow>
               </TableHeader>
               <TableBody>
                 {transactionsWithBalance.map((t) => {
@@ -691,6 +760,35 @@ export const DrillDownModal = ({
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         <CurrencyDisplay amount={t.runningBalance} />
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const ref = entry?.reference;
+                          const invData = ref ? invoiceBalances?.[ref] : undefined;
+                          if (!invData) return null;
+
+                          if (invData.type === 'invoice') {
+                            if (invData.balance === 0) {
+                              return (
+                                <Badge className="text-[10px] bg-green-100 text-green-800 hover:bg-green-100 border-0 flex items-center w-max cursor-pointer" onClick={() => handleViewDocument(ref, entry.source_module, entry.id, entry.entry_number)}>
+                                  <CheckCircle className="w-3 h-3 mr-1" /> Reconciled (Bal 0)
+                                </Badge>
+                              );
+                            }
+                            return (
+                              <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-300 bg-amber-50 cursor-pointer" onClick={() => handleViewDocument(ref, entry.source_module, entry.id, entry.entry_number)}>
+                                Bal: {invData.balance.toLocaleString()}
+                              </Badge>
+                            );
+                          } else if (invData.type === 'receipt' && invData.parentRef) {
+                            return (
+                              <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 cursor-pointer" onClick={() => handleViewDocument(invData.parentRef!, 'ar_invoice', entry.id, '')}>
+                                Applied to: {invData.parentRef}
+                              </Badge>
+                            );
+                          }
+                          return null;
+                        })()}
                       </TableCell>
                       <TableCell>
                         <Button

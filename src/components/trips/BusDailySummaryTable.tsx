@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, MoreVertical, Edit, Plus, TrendingUp, AlertTriangle, Pencil, BookOpen, Loader2, Fuel, Gauge, AlertCircle, BadgeCheck } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreVertical, Edit, Plus, TrendingUp, AlertTriangle, Pencil, BookOpen, Loader2, Fuel, Gauge, AlertCircle, BadgeCheck, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -60,6 +60,9 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
     distance_km?: number;
     start_time?: string;
     end_time?: string;
+    start_odo?: number;
+    end_odo?: number;
+    fuel_liters?: number;
   } | null>(null);
 
   const toggleExpanded = (busId: string) => {
@@ -155,6 +158,42 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
     }).format(amount);
   };
 
+  const getCompleteness = (summary: BusDailySummary) => {
+    if (summary.trips.length === 0) return { percent: 0, missing: ['No trips'] };
+    
+    let total = 3; // Daily Expenses, Daily Odometer, Daily Fuel
+    let earned = 0;
+    let missing: string[] = [];
+    
+    // Daily Checks
+    if (summary.has_expenses) earned += 1; 
+    else missing.push('Expenses');
+    
+    if (summary.min_start_odo && summary.max_end_odo) earned += 1; 
+    else missing.push('Daily Odometer');
+    
+    if (summary.total_fuel_liters > 0 || summary.fuel_cost > 0) earned += 1; 
+    else missing.push('Fuel Data');
+    
+    // Trip Checks
+    let missingIncome = 0;
+    let missingRoute = 0;
+    
+    summary.trips.forEach(trip => {
+      total += 2; // Income, Route
+      if (trip.income > 0) earned += 1; else missingIncome++;
+      if (trip.route_id) earned += 1; else missingRoute++;
+    });
+    
+    if (missingIncome > 0) missing.push(`${missingIncome} Trip Income`);
+    if (missingRoute > 0) missing.push(`${missingRoute} Route`);
+    
+    return {
+      percent: Math.round((earned / total) * 100),
+      missing
+    };
+  };
+
   if (summaries.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -189,20 +228,33 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
           >
             <div className={`border rounded-xl bg-card transition-all duration-300 hover:shadow-md ${isExpanded ? 'shadow-md ring-1 ring-primary/10' : 'hover:border-primary/20'}`}>
               {/* Summary Row */}
-              <div className="p-4">
+              <div 
+                className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                onClick={() => toggleExpanded(summary.bus_id)}
+              >
                 <div className="grid grid-cols-12 gap-4 items-center">
                   <div className="col-span-3 flex items-center gap-3">
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="sm" className={`h-7 w-7 p-0 rounded-full transition-all duration-200 ${isExpanded ? 'bg-primary/10 text-primary' : 'hover:bg-primary/5'}`}>
-                        <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
-                      </Button>
-                    </CollapsibleTrigger>
+                    <Button variant="ghost" size="sm" className={`h-7 w-7 p-0 rounded-full transition-all duration-200 ${isExpanded ? 'bg-primary/10 text-primary' : 'hover:bg-primary/5'}`}>
+                      <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                    </Button>
                     <div className="flex items-center gap-2.5">
                       <div className={`w-1 h-10 rounded-full ${summary.profit_margin >= 50 ? 'bg-gradient-to-b from-green-400 to-emerald-500' : summary.profit_margin >= 30 ? 'bg-gradient-to-b from-amber-400 to-yellow-500' : summary.net_profit >= 0 ? 'bg-gradient-to-b from-orange-400 to-red-400' : 'bg-gradient-to-b from-red-500 to-red-600'}`} />
                       <div>
                         <div className="font-bold text-base tracking-tight">{summary.bus_no}</div>
                         <div className="text-xs text-muted-foreground max-w-[180px] truncate">
                           {summary.routes.join(", ") || "No route"}
+                        </div>
+                        {/* Data Completeness Progress */}
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <div className="h-1.5 w-24 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${getCompleteness(summary).percent === 100 ? 'bg-green-500' : 'bg-blue-500'}`} 
+                              style={{ width: `${getCompleteness(summary).percent}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-muted-foreground font-medium">
+                            {getCompleteness(summary).percent}% Data
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -265,7 +317,7 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
                     </Badge>
                   </div>
 
-                  <div className="col-span-1 flex justify-end">
+                  <div className="col-span-1 flex justify-end" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full hover:bg-muted">
@@ -311,10 +363,28 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
               {/* Expanded Trip Details */}
               <CollapsibleContent>
                 <div className="border-t bg-gradient-to-b from-muted/40 to-muted/10 p-4">
-                  <h4 className="font-semibold mb-4 text-sm flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                    Trip Details for {summary.bus_no} {summary.date.includes('to') ? `(${summary.date})` : `on ${format(new Date(summary.date), "PPP")}`}
-                  </h4>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+                    <h4 className="font-semibold text-sm flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                      Trip Details for {summary.bus_no} {summary.date.includes('to') ? `(${summary.date})` : `on ${format(new Date(summary.date), "PPP")}`}
+                    </h4>
+                    
+                    {/* Completeness Warning Badges */}
+                    {getCompleteness(summary).percent < 100 ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-muted-foreground font-medium">Missing Data:</span>
+                        {getCompleteness(summary).missing.map((item, i) => (
+                          <Badge key={i} variant="outline" className="text-[10px] text-amber-600 border-amber-200 bg-amber-50">
+                            <AlertTriangle className="w-3 h-3 mr-1" /> {item}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] text-green-600 border-green-200 bg-green-50">
+                        <CheckCircle2 className="w-3 h-3 mr-1" /> All Data Complete
+                      </Badge>
+                    )}
+                  </div>
                   
                   {/* Tree View Trips */}
                   <div className="relative ml-3">
@@ -459,6 +529,9 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
                                       distance_km: trip.distance_km,
                                       start_time: trip.start_time,
                                       end_time: trip.end_time,
+                                      start_odo: trip.start_odo,
+                                      end_odo: trip.end_odo,
+                                      fuel_liters: trip.fuel_liters,
                                     })}
                                   >
                                     <Pencil className="h-3 w-3" />

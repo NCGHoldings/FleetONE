@@ -719,90 +719,147 @@ export const useCreateARReceipt = () => {
       if (bankGLAccountId && receipt.amount > 0) {
         const { postARReceiptToGL, postAdvanceReceiptToGL } = await import("@/lib/gl-posting-utils");
 
-        let glResult: { success: boolean; journalEntryId?: string; error?: string };
+          let glResult: { success: boolean; journalEntryId?: string; error?: string };
 
-        if (receipt.is_advance) {
-          // Use resolved advance account or fallback to COA search
-          let customerAdvanceId = advanceAccountId;
-          if (!customerAdvanceId) {
-            const { data: advanceAccounts } = await supabase
-              .from("chart_of_accounts")
-              .select("id")
-              .eq("company_id", effectiveCompanyId)
-              .eq("account_type", "liability")
-              .eq("is_active", true)
-              .ilike("account_name", "%customer advance%")
-              .limit(1);
-            customerAdvanceId = advanceAccounts?.[0]?.id || null;
-          }
+          if (receipt.is_advance) {
+            // Use resolved advance account or fallback to COA search
+            let customerAdvanceId = advanceAccountId;
+            if (!customerAdvanceId) {
+              const { data: advanceAccounts } = await supabase
+                .from("chart_of_accounts")
+                .select("id")
+                .eq("company_id", effectiveCompanyId)
+                .eq("account_type", "liability")
+                .eq("is_active", true)
+                .ilike("account_name", "%customer advance%")
+                .limit(1);
+              customerAdvanceId = advanceAccounts?.[0]?.id || null;
+            }
 
-          if (customerAdvanceId) {
-            glResult = await postAdvanceReceiptToGL({
-              receiptNumber: receipt.receipt_number,
-              receiptDate: receipt.receipt_date,
-              amount: receipt.amount,
-              bankAccountId: bankGLAccountId,
-              customerAdvanceId: customerAdvanceId,
-              companyId: effectiveCompanyId,
-              businessUnitCode: businessUnitCode || undefined,
-              customerName: customerName,
-            });
+            if (customerAdvanceId) {
+              glResult = await postAdvanceReceiptToGL({
+                receiptNumber: receipt.receipt_number,
+                receiptDate: receipt.receipt_date,
+                amount: receipt.amount,
+                bankAccountId: bankGLAccountId,
+                customerAdvanceId: customerAdvanceId,
+                companyId: effectiveCompanyId,
+                businessUnitCode: businessUnitCode || undefined,
+                customerName: customerName,
+              });
+            } else {
+              glResult = { success: false, error: "Customer Advance account not found in COA" };
+              console.warn("[AR Receipt GL] Customer Advance account not found, skipping advance GL posting");
+              toast.warning("GL posting skipped: 'Customer Advance' account not found in Chart of Accounts.");
+            }
           } else {
-            glResult = { success: false, error: "Customer Advance account not found in COA" };
-            console.warn("[AR Receipt GL] Customer Advance account not found, skipping advance GL posting");
-            toast.warning("GL posting skipped: 'Customer Advance' account not found in Chart of Accounts.");
-          }
-        } else if (tradeReceivableId) {
-          const totalWriteOff = receipt.allocations?.reduce((sum, a) => sum + (a.write_off_amount || 0), 0) || 0;
-          const writeOffAccountId = receipt.allocations?.find(a => a.write_off_amount && a.write_off_amount > 0)?.write_off_account_id || undefined;
+            // COMBINED / DIRECT / AR RECEIPT
+            const glLines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
+            const bankFeeAmount = receipt.bank_fee_amount || 0;
+            const netBankAmount = receipt.amount - bankFeeAmount;
 
-          glResult = await postARReceiptToGL({
-            receiptNumber: receipt.receipt_number,
-            receiptDate: receipt.receipt_date,
-            amount: receipt.amount,
-            writeOffAmount: totalWriteOff > 0 ? totalWriteOff : undefined,
-            bankAccountId: bankGLAccountId,
-            tradeReceivableId: tradeReceivableId,
-            writeOffAccountId: writeOffAccountId,
-            companyId: effectiveCompanyId,
-            businessUnitCode: businessUnitCode || undefined,
-            customerName: customerName,
-          });
-        } else if (receipt.is_direct_receipt && receipt.direct_lines?.length) {
-          // Direct Receipt GL Posting: DR Bank, CR each direct line account
-          const glLines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
-          
-          // DR Bank
-          glLines.push({
-            account_id: bankGLAccountId,
-            description: `Direct Receipt - ${receipt.receipt_number}`,
-            debit: receipt.amount,
-            credit: 0,
-          });
-          
-          // CR each income account
-          for (const line of receipt.direct_lines) {
+            // 1. DR Bank (Net)
             glLines.push({
-              account_id: line.account_id,
-              description: line.description || `Income - ${receipt.receipt_number}`,
-              debit: 0,
-              credit: line.amount,
+              account_id: bankGLAccountId,
+              description: `Receipt ${receipt.receipt_number}${customerName ? ` - ${customerName}` : ""}`,
+              debit: netBankAmount,
+              credit: 0,
+            });
+
+            // 2. DR Bank Fee (if any)
+            if (bankFeeAmount > 0) {
+              const { data: expenseAccounts } = await supabase
+                .from("chart_of_accounts")
+                .select("id")
+                .eq("company_id", effectiveCompanyId)
+                .eq("account_type", "expense")
+                .eq("is_active", true)
+                .ilike("account_name", "%bank charge%")
+                .limit(1);
+              
+              const feeAccountId = expenseAccounts?.[0]?.id;
+              if (feeAccountId) {
+                glLines.push({
+                  account_id: feeAccountId,
+                  description: `Bank Fee - ${receipt.receipt_number}`,
+                  debit: bankFeeAmount,
+                  credit: 0,
+                });
+              } else {
+                glLines[0].debit += bankFeeAmount; // Revert to gross if no fee account
+                console.warn("[AR Receipt GL] Bank charge account not found");
+              }
+            }
+
+            // 3. CR Trade Receivable (for allocations)
+            const totalAllocated = receipt.allocations?.reduce((sum, a) => sum + a.allocated_amount, 0) || 0;
+            const totalWriteOff = receipt.allocations?.reduce((sum, a) => sum + (a.write_off_amount || 0), 0) || 0;
+            
+            if ((totalAllocated > 0 || totalWriteOff > 0) && tradeReceivableId) {
+              glLines.push({
+                account_id: tradeReceivableId,
+                description: `Reduce Receivable - ${receipt.receipt_number}`,
+                debit: 0,
+                credit: totalAllocated + totalWriteOff,
+              });
+
+              // 4. DR Write-offs (if any)
+              if (totalWriteOff > 0) {
+                const writeOffAccountId = receipt.allocations?.find(a => a.write_off_amount && a.write_off_amount > 0)?.write_off_account_id;
+                if (writeOffAccountId) {
+                  glLines.push({
+                    account_id: writeOffAccountId,
+                    description: `Write-off/Discount - ${receipt.receipt_number}`,
+                    debit: totalWriteOff,
+                    credit: 0,
+                  });
+                }
+              }
+            }
+
+            // 5. CR Direct Income Lines
+            if (receipt.is_direct_receipt && receipt.direct_lines?.length) {
+              for (const line of receipt.direct_lines) {
+                if (line.amount > 0 && line.account_id) {
+                  glLines.push({
+                    account_id: line.account_id,
+                    description: line.description || `Income - ${receipt.receipt_number}`,
+                    debit: 0,
+                    credit: line.amount,
+                  });
+                }
+              }
+            }
+
+            // 6. Final Balancing: CR Trade Receivable for any unallocated portion
+            const currentDebit = glLines.reduce((sum, l) => sum + l.debit, 0);
+            const currentCredit = glLines.reduce((sum, l) => sum + l.credit, 0);
+            const diff = currentDebit - currentCredit;
+            
+            if (Math.abs(diff) > 0.01) {
+              if (tradeReceivableId) {
+                glLines.push({
+                  account_id: tradeReceivableId,
+                  description: `Receipt Portion - ${receipt.receipt_number}`,
+                  debit: 0,
+                  credit: diff,
+                });
+              } else {
+                glResult = { success: false, error: "Journal entry is not balanced and no Trade Receivable account found." };
+              }
+            }
+
+            const { createAndPostJournalEntry } = await import("@/lib/gl-posting-utils");
+            glResult = await createAndPostJournalEntry({
+              entry_date: receipt.receipt_date,
+              description: `Receipt ${receipt.receipt_number}${customerName ? ` from ${customerName}` : ""}`,
+              reference: receipt.receipt_number,
+              company_id: effectiveCompanyId,
+              business_unit_code: businessUnitCode,
+              source_module: 'ar_receipt',
+              lines: glLines,
             });
           }
-          
-          const { createAndPostJournalEntry } = await import("@/lib/gl-posting-utils");
-          glResult = await createAndPostJournalEntry({
-            entry_date: receipt.receipt_date,
-            description: `Direct Receipt ${receipt.receipt_number}${customerName ? ` from ${customerName}` : ""}`,
-            reference: receipt.receipt_number,
-            company_id: effectiveCompanyId,
-            business_unit_code: businessUnitCode,
-            source_module: 'ar_receipt',
-            lines: glLines,
-          });
-        } else {
-          glResult = { success: false, error: "Trade Receivable account not found in COA" };
-        }
 
         // Link journal entry to receipt if GL posting succeeded
         if (glResult.success && glResult.journalEntryId) {
@@ -3380,10 +3437,30 @@ export const useSaveBankReconciliation = () => {
       adjusted_book_balance: number;
       difference: number;
       cleared_transaction_ids: string[];
-      cleared_amounts: Record<string, number>;
+      adjustments?: Array<{
+        type: string;
+        amount: number;
+        description: string;
+      }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
+      // 0. Fetch Bank Account GL ID and GL Settings
+      const { data: bankAcct } = await supabase
+        .from("bank_accounts")
+        .select("gl_account_id, account_name")
+        .eq("id", data.bank_account_id)
+        .single();
+      
+      const { data: glSettings } = await supabase
+        .from("gl_settings")
+        .select("expense_account_id, sales_revenue_account_id")
+        .eq("company_id", selectedCompanyId)
+        .maybeSingle();
+
+      const bankGLId = bankAcct?.gl_account_id;
+      if (!bankGLId) throw new Error(`Bank account "${bankAcct?.account_name}" is not linked to a GL account. Configure this in Banking -> Bank Accounts.`);
+
       // 1. Create the reconciliation header
       const { data: recon, error: reconError } = await supabase
         .from("bank_reconciliations")
@@ -3431,6 +3508,58 @@ export const useSaveBankReconciliation = () => {
           })
           .in("id", data.cleared_transaction_ids);
         if (updateError) throw updateError;
+      }
+
+      // 4. Handle Adjustments (Post JEs)
+      if (data.adjustments && data.adjustments.length > 0) {
+        const { createAndPostJournalEntry } = await import("@/lib/gl-posting-utils");
+        
+        for (const adj of data.adjustments) {
+          let targetGLId = glSettings?.expense_account_id;
+          
+          // Try to find a more specific account for interest earned
+          if (adj.type === "interest_earned") {
+            const { data: interestAcct } = await supabase
+              .from("chart_of_accounts")
+              .select("id")
+              .eq("company_id", selectedCompanyId)
+              .ilike("account_name", "%Interest Income%")
+              .maybeSingle();
+            
+            targetGLId = interestAcct?.id || glSettings?.sales_revenue_account_id || targetGLId;
+          }
+
+          if (!targetGLId) {
+            console.warn(`No target GL account found for adjustment: ${adj.description}. Falling back to suspense.`);
+            // You might want to fetch a specific suspense account here
+          }
+
+          if (targetGLId && bankGLId) {
+            const isRevenue = adj.type === "interest_earned";
+            
+            await createAndPostJournalEntry({
+              entry_date: data.statement_date,
+              description: `Bank Recon Adjustment: ${adj.description}`,
+              reference: `RECON-ADJ-${recon.id.substring(0,8)}`,
+              company_id: selectedCompanyId,
+              source_module: 'bank_reconciliation',
+              lines: [
+                {
+                  account_id: bankGLId,
+                  description: adj.description,
+                  debit: isRevenue ? adj.amount : 0,
+                  credit: isRevenue ? 0 : adj.amount,
+                },
+                {
+                  account_id: targetGLId,
+                  description: adj.description,
+                  debit: isRevenue ? 0 : adj.amount,
+                  credit: isRevenue ? adj.amount : 0,
+                }
+              ]
+            });
+          }
+        }
       }
 
       return recon;

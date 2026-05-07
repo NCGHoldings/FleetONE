@@ -353,14 +353,14 @@ export const InventoryView = () => {
           </TabsList>
 
           <TabsContent value="items" className="mt-4">
-            <DataTable enableColumnFilters
+            <DataTable variant="professional" enableColumnFilters
               columns={itemColumns}
               data={filteredItems}
             />
           </TabsContent>
 
           <TabsContent value="stock" className="mt-4">
-            <DataTable enableColumnFilters
+            <DataTable variant="professional" enableColumnFilters
               columns={stockColumns}
               data={filteredStock}
             />

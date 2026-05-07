@@ -229,7 +229,7 @@ export const FixedAssetsView = () => {
               </div>
             </div>
 
-            <DataTable enableColumnFilters columns={assetColumns} data={assets || []} searchKey="asset_name" />
+            <DataTable variant="professional" enableColumnFilters columns={assetColumns} data={assets || []} searchKey="asset_name" />
           </Card>
         </TabsContent>
 
@@ -248,7 +248,7 @@ export const FixedAssetsView = () => {
               </Button>
             </div>
 
-            <DataTable enableColumnFilters columns={categoryColumns} data={categories || []} searchKey="category_name" />
+            <DataTable variant="professional" enableColumnFilters columns={categoryColumns} data={categories || []} searchKey="category_name" />
           </Card>
         </TabsContent>
 
@@ -267,7 +267,7 @@ export const FixedAssetsView = () => {
               </Button>
             </div>
 
-            <DataTable enableColumnFilters columns={depreciationColumns} data={depreciation || []} searchKey="depreciation_date" />
+            <DataTable variant="professional" enableColumnFilters columns={depreciationColumns} data={depreciation || []} searchKey="depreciation_date" />
           </Card>
         </TabsContent>
       </Tabs>

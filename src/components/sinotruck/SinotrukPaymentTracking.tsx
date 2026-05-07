@@ -688,12 +688,12 @@ export function SinotrukPaymentTracking({ orderId, onRefresh }: SinotrukPaymentT
           {schedules.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold mb-3">Payment Schedule</h3>
-              <Table>
+              <Table className="erp-table-professional">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Milestone</TableHead>
                     <TableHead>Due Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right" data-column-type="number">Amount</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -702,7 +702,7 @@ export function SinotrukPaymentTracking({ orderId, onRefresh }: SinotrukPaymentT
                     <TableRow key={schedule.id}>
                       <TableCell className="font-medium">{schedule.milestone_name}</TableCell>
                       <TableCell>{new Date(schedule.due_date).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right">LKR {schedule.amount.toLocaleString()}</TableCell>
+                      <TableCell className="text-right" data-column-type="number">LKR {schedule.amount.toLocaleString()}</TableCell>
                       <TableCell>{getStatusBadge(schedule.status)}</TableCell>
                     </TableRow>
                   ))}
@@ -719,13 +719,13 @@ export function SinotrukPaymentTracking({ orderId, onRefresh }: SinotrukPaymentT
                 No payments recorded yet
               </div>
             ) : (
-              <Table>
+              <Table className="erp-table-professional">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Reference</TableHead>
                     <TableHead>Method</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right" data-column-type="number">Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -736,7 +736,7 @@ export function SinotrukPaymentTracking({ orderId, onRefresh }: SinotrukPaymentT
                       <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
                       <TableCell>{payment.payment_reference || '-'}</TableCell>
                       <TableCell className="capitalize">{payment.payment_method?.replace('_', ' ')}</TableCell>
-                      <TableCell className="text-right font-semibold">
+                      <TableCell className="text-right font-semibold" data-column-type="number">
                         LKR {payment.payment_amount.toLocaleString()}
                       </TableCell>
                       <TableCell>{getStatusBadge(payment.status)}</TableCell>

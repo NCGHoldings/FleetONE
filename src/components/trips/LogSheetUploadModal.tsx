@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Upload, Loader2, Save, Camera, Search, AlertCircle, CheckCircle2, CalendarIcon, ChevronDown, ChevronRight, Route } from 'lucide-react';
+import { Upload, Loader2, Save, Camera, Search, AlertCircle, CheckCircle2, CalendarIcon, ChevronDown, ChevronRight, Route, ChevronUp, Trash2, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -265,6 +265,54 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
       }
     }
     
+    setEditedLogs(newLogs);
+  };
+
+  const handleAddRow = () => {
+    const newLogs = [...editedLogs];
+    let nextDateStr = format(new Date(), 'yyyy-MM-dd');
+    if (newLogs.length > 0) {
+      const lastRowDate = newLogs[newLogs.length - 1].date;
+      if (lastRowDate) {
+        const parsed = parse(lastRowDate, 'yyyy-MM-dd', new Date());
+        if (isValid(parsed)) {
+          nextDateStr = format(addDays(parsed, 1), 'yyyy-MM-dd');
+        }
+      }
+    }
+    newLogs.push({
+      date: nextDateStr,
+      start_location: null,
+      start_odo: null,
+      start_time: null,
+      end_location: null,
+      end_odo: null,
+      end_time: null,
+      distance: null,
+      fuel_liters: null,
+      driver_name: null,
+      conductor_name: null,
+    });
+    setEditedLogs(newLogs);
+  };
+
+  const handleDeleteRow = (index: number) => {
+    const newLogs = [...editedLogs];
+    newLogs.splice(index, 1);
+    setEditedLogs(newLogs);
+  };
+
+  const handleShiftRow = (index: number, direction: 'up' | 'down') => {
+    const newLogs = [...editedLogs];
+    if (direction === 'up' && index > 0) {
+      const temp = newLogs[index];
+      newLogs[index] = newLogs[index - 1];
+      newLogs[index - 1] = temp;
+    } else if (direction === 'down' && index < newLogs.length - 1) {
+      const temp = newLogs[index];
+      newLogs[index] = newLogs[index + 1];
+      newLogs[index + 1] = temp;
+    }
     setEditedLogs(newLogs);
   };
 
@@ -536,6 +584,7 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                     <TableHead>Fuel (L)</TableHead>
                     <TableHead>Driver</TableHead>
                     <TableHead>System Status</TableHead>
+                    <TableHead className="w-[100px] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -667,10 +716,43 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                             <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">New Trip</Badge>
                           )}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                              disabled={index === 0}
+                              onClick={() => handleShiftRow(index, 'up')}
+                              title="Move Up"
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                              disabled={index === editedLogs.length - 1}
+                              onClick={() => handleShiftRow(index, 'down')}
+                              title="Move Down"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => handleDeleteRow(index)}
+                              title="Delete Row"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                       {isExpanded && dbRows && dbRows.length > 1 && (
                         <TableRow className="bg-muted/10 border-b-2 border-primary/20">
-                          <TableCell colSpan={8} className="p-0">
+                          <TableCell colSpan={9} className="p-0">
                             <div className="p-4 pl-12 bg-gradient-to-b from-muted/30 to-muted/10 shadow-inner">
                               <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-3 tracking-wider flex items-center gap-2">
                                 <Route className="h-3 w-3" />
@@ -723,6 +805,12 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                   })}
                 </TableBody>
               </Table>
+              <div className="p-4 border-t border-dashed bg-muted/20 flex justify-center">
+                <Button variant="outline" size="sm" className="w-full md:w-auto border-dashed hover:bg-muted/50" onClick={handleAddRow}>
+                  <PlusCircle className="h-4 w-4 mr-2 text-primary" />
+                  Add Missing Row
+                </Button>
+              </div>
             </div>
 
             <div className="flex justify-between items-center bg-background border-t pt-4 sticky bottom-0 z-10">

@@ -16,6 +16,8 @@ import { DollarSign, CheckCircle, Clock, FileText, Plus, RefreshCw, Eye, Downloa
 import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceManagement';
 import { useYutongCashReceipts, YutongCashReceipt } from '@/hooks/useYutongCashReceipts';
 import { YutongCashReceiptModal } from './YutongCashReceiptModal';
+import { VehicleFinanceSettlement } from '@/components/accounting/shared/VehicleFinanceSettlement';
+import { SearchableAccountSelector } from '@/components/accounting/shared/SearchableAccountSelector';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import {
@@ -40,6 +42,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [isFinanceHubOpen, setIsFinanceHubOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
   const { regenerateInvoice } = useYutongOrderInvoiceManagement();
   const { createCashReceipt, getCashReceiptByPaymentId, regenerateCashReceipt } = useYutongCashReceipts();
@@ -66,6 +69,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     payment_method: 'bank_transfer',
     reference_no: '',
     bank_account_id: '',
+    custom_credit_account_id: '',
     notes: ''
   });
 
@@ -271,6 +275,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           payment_reference: paymentForm.reference_no || null,
           bank_account_id: paymentForm.bank_account_id,
           bank_name: selectedBank ? `${selectedBank.account_code} - ${selectedBank.account_name}` : null,
+          custom_credit_account_id: paymentForm.custom_credit_account_id || null,
           payment_slip_url: paymentSlipUrl,
           notes: paymentForm.notes || null,
           status: 'pending',
@@ -399,6 +404,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           settings,
           effectiveCompanyId: NCG_HOLDING_ID,
           customBankAccountId: payment.bank_account_id,
+          customCreditAccountId: payment.custom_credit_account_id || undefined,
         });
 
         if (glResult) {
@@ -532,6 +538,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       payment_method: 'bank_transfer',
       reference_no: '',
       bank_account_id: '',
+      custom_credit_account_id: '',
       notes: ''
     });
     setSelectedSchedule(null);
@@ -671,6 +678,10 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                   </SelectContent>
                 </Select>
               )}
+              <Button onClick={() => setIsFinanceHubOpen(true)} size="sm" variant="secondary" disabled={!selectedOrderId}>
+                <Landmark className="h-4 w-4 mr-2" />
+                Finance Hub
+              </Button>
               <Button onClick={() => setIsRecordModalOpen(true)} size="sm" disabled={!selectedOrderId}>
                 <Plus className="h-4 w-4 mr-2" />
                 Record Payment
@@ -711,12 +722,12 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           {schedules.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold mb-3">Payment Schedule</h3>
-              <Table>
+              <Table className="erp-table-professional">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Milestone</TableHead>
                     <TableHead>Due Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right" data-column-type="number">Amount</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -725,7 +736,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                     <TableRow key={schedule.id}>
                       <TableCell className="font-medium">{schedule.milestone_name}</TableCell>
                       <TableCell>{new Date(schedule.due_date).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right">LKR {schedule.amount.toLocaleString()}</TableCell>
+                      <TableCell className="text-right" data-column-type="number">LKR {schedule.amount.toLocaleString()}</TableCell>
                       <TableCell>{getStatusBadge(schedule.status)}</TableCell>
                     </TableRow>
                   ))}
@@ -742,13 +753,13 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                 No payments recorded yet
               </div>
             ) : (
-              <Table>
+              <Table className="erp-table-professional">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Reference</TableHead>
                     <TableHead>Method</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right" data-column-type="number">Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -759,7 +770,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                       <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
                       <TableCell>{payment.payment_reference || '-'}</TableCell>
                       <TableCell className="capitalize">{payment.payment_method?.replace('_', ' ')}</TableCell>
-                      <TableCell className="text-right font-semibold">
+                      <TableCell className="text-right font-semibold" data-column-type="number">
                         LKR {payment.payment_amount.toLocaleString()}
                       </TableCell>
                       <TableCell>{getStatusBadge(payment.status)}</TableCell>
@@ -964,6 +975,21 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
               )}
               <p className="text-xs text-muted-foreground mt-1">Upload bank slip, receipt photo, or transfer confirmation</p>
             </div>
+            <div className="space-y-2 pt-2 border-t">
+              <Label className="text-blue-600 font-semibold flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                GL Credit Account Override (Optional)
+              </Label>
+              <SearchableAccountSelector
+                companyId={NCG_HOLDING_ID}
+                value={paymentForm.custom_credit_account_id}
+                onValueChange={(val) => setPaymentForm({ ...paymentForm, custom_credit_account_id: val })}
+                placeholder="Select custom credit account (e.g. specific liability or revenue)"
+              />
+              <p className="text-[10px] text-muted-foreground italic">
+                * By default, payments hit 'Customer Advances' (before invoice) or 'Trade Receivables' (after invoice). Use this to override.
+              </p>
+            </div>
             <div>
               <Label>Notes</Label>
               <Textarea
@@ -997,6 +1023,16 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         receipt={selectedReceipt}
         onRefresh={handleRefreshReceipts}
       />
+      
+      {/* Finance Hub Modal */}
+      {selectedOrderId && (
+        <VehicleFinanceSettlement
+          isOpen={isFinanceHubOpen}
+          onClose={() => setIsFinanceHubOpen(false)}
+          orderId={selectedOrderId}
+          module="yutong"
+        />
+      )}
     </>
   );
 }

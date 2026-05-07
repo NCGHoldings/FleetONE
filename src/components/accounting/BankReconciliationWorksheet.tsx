@@ -143,8 +143,16 @@ const BankReconciliationWorksheet = () => {
       }
     });
 
+    // Handle adjustments
+    let adjDepositTotal = 0;
+    let adjPaymentTotal = 0;
+    adjustments.forEach(adj => {
+      if (adj.type === "interest_earned") adjDepositTotal += adj.amount;
+      else adjPaymentTotal += adj.amount;
+    });
+
     const bookBalance = lastStatementBalance + depositTotal - paymentTotal;
-    const clearedBookBalance = lastStatementBalance + clearedDepositTotal - clearedPaymentTotal;
+    const clearedBookBalance = lastStatementBalance + clearedDepositTotal - clearedPaymentTotal + adjDepositTotal - adjPaymentTotal;
     const stmtEndBal = targetBalance;
     const difference = clearedBookBalance - stmtEndBal;
 
@@ -152,12 +160,13 @@ const BankReconciliationWorksheet = () => {
       paymentCount, paymentTotal,
       depositCount, depositTotal,
       clearedPaymentTotal, clearedDepositTotal,
+      adjDepositTotal, adjPaymentTotal,
       bookBalance,
       clearedBookBalance,
       stmtEndBal,
       difference,
     };
-  }, [transactions, clearedState, lastStatementBalance, targetBalance]);
+  }, [transactions, clearedState, lastStatementBalance, targetBalance, adjustments]);
 
   // --- Handlers ---
   const handleAccountChange = useCallback((accountId: string) => {
@@ -234,9 +243,11 @@ const BankReconciliationWorksheet = () => {
       difference: summary.difference,
       cleared_transaction_ids: clearedIds,
       cleared_amounts: clearedAmounts,
+      adjustments: adjustments,
     });
 
     setClearedState({});
+    setAdjustments([]);
     setStatementNo("");
     setStatementBalance("");
   }, [selectedAccountId, reconMode, statementDate, statementNo, statementBalance, clearedState, summary, saveReconciliation]);
@@ -246,24 +257,41 @@ const BankReconciliationWorksheet = () => {
     toast.info("Cleared selections reset");
   }, []);
 
+  const [adjustments, setAdjustments] = useState<Array<{
+    type: string;
+    amount: number;
+    description: string;
+  }>>([]);
+
   const handleAddAdjustment = useCallback(() => {
     const amount = parseFloat(adjAmount);
     if (!amount || !adjDescription) {
       return toast.error("Enter amount and description");
     }
-    toast.info(`Adjustment "${adjDescription}" for LKR ${fmt(amount)} noted. (Full JE posting coming soon)`);
+    
+    setAdjustments(prev => [...prev, {
+      type: adjType,
+      amount,
+      description: adjDescription
+    }]);
+
     setShowAdjustments(false);
     setAdjAmount("");
     setAdjDescription("");
     setAdjType("bank_charge");
-  }, [adjAmount, adjDescription]);
+    toast.success("Adjustment added to reconciliation list");
+  }, [adjAmount, adjDescription, adjType]);
+
+  const removeAdjustment = (index: number) => {
+    setAdjustments(prev => prev.filter((_, i) => i !== index));
+  };
 
   const isSaveDisabled = useMemo(() => {
     if (saveReconciliation.isPending) return true;
-    if (Object.keys(clearedState).length === 0) return true;
+    if (Object.keys(clearedState).length === 0 && adjustments.length === 0) return true;
     if (reconMode === "statement" && !statementBalance) return true;
     return false;
-  }, [saveReconciliation.isPending, clearedState, reconMode, statementBalance]);
+  }, [saveReconciliation.isPending, clearedState, reconMode, statementBalance, adjustments]);
 
   // --- Loading ---
   if (acctLoading) {
@@ -538,6 +566,31 @@ const BankReconciliationWorksheet = () => {
               <span className="summary-count">{summary.depositCount}</span>
               <span className="summary-amount positive">LKR {fmt(summary.depositTotal)}</span>
             </div>
+
+            {adjustments.length > 0 && (
+              <div className="bank-recon-adjustments-list mt-2 pt-2 border-t border-dashed border-muted-foreground/30">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1 tracking-wider">Pending Adjustments</p>
+                {adjustments.map((adj, i) => (
+                  <div key={i} className="flex justify-between items-center text-[11px] py-0.5 group">
+                    <div className="flex gap-2 items-center">
+                      <span className={`w-2 h-2 rounded-full ${adj.type === 'interest_earned' ? 'bg-green-500' : 'bg-red-500'}`} />
+                      <span className="font-medium text-foreground/80">{adj.description}</span>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <span className={adj.type === 'interest_earned' ? 'text-green-600' : 'text-red-600'}>
+                        {adj.type === 'interest_earned' ? '+' : '-'} LKR {fmt(adj.amount)}
+                      </span>
+                      <button 
+                        onClick={() => removeAdjustment(i)}
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* RIGHT: Cleared Book Balance / Target Balance / Difference */}

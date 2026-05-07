@@ -29,6 +29,8 @@ import {
   updatePaymentJournalLink,
   NCG_HOLDING_ID,
 } from '@/hooks/useVehicleSalesFinance';
+import { VehicleFinanceSettlement } from '@/components/accounting/shared/VehicleFinanceSettlement';
+import { SearchableAccountSelector } from '@/components/accounting/shared/SearchableAccountSelector';
 
 interface SinotruckPaymentTrackingProps {
   orderId: string;
@@ -41,6 +43,7 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [isFinanceHubOpen, setIsFinanceHubOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
   const [verifyingPayment, setVerifyingPayment] = useState<string | null>(null);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
@@ -56,6 +59,7 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
     reference_no: '',
     bank_account_id: '',
     cheque_no: '',
+    custom_credit_account_id: '',
     notes: ''
   });
 
@@ -199,6 +203,7 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
           bank_account_id: paymentForm.bank_account_id,
           bank_name: bankNameStr,
           cheque_no: paymentForm.cheque_no || null,
+          custom_credit_account_id: paymentForm.custom_credit_account_id || null,
           payment_slip_url: paymentSlipUrl,
           notes: paymentForm.notes || null,
           status: 'pending',
@@ -318,6 +323,8 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
           paymentMethod: payment.payment_method,
           settings,
           effectiveCompanyId: NCG_HOLDING_ID,
+          customBankAccountId: payment.bank_account_id,
+          customCreditAccountId: payment.custom_credit_account_id || undefined,
         });
 
         if (glResult) {
@@ -388,6 +395,7 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
       reference_no: '',
       bank_account_id: '',
       cheque_no: '',
+      custom_credit_account_id: '',
       notes: ''
     });
     setSelectedSchedule(null);
@@ -463,7 +471,11 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
         </div>
 
         {/* Record Payment Button */}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button onClick={() => setIsFinanceHubOpen(true)} variant="secondary">
+            <Landmark className="h-4 w-4 mr-2" />
+            Finance Hub
+          </Button>
           <Button onClick={() => setIsRecordModalOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Record Payment
@@ -705,6 +717,22 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
               />
             </div>
 
+            <div className="space-y-2 pt-2 border-t">
+              <Label className="text-blue-600 font-semibold flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                GL Credit Account Override (Optional)
+              </Label>
+              <SearchableAccountSelector
+                companyId={NCG_HOLDING_ID}
+                value={paymentForm.custom_credit_account_id}
+                onValueChange={(val) => setPaymentForm({ ...paymentForm, custom_credit_account_id: val })}
+                placeholder="Select custom credit account (e.g. specific liability or revenue)"
+              />
+              <p className="text-[10px] text-muted-foreground italic">
+                * By default, payments hit 'Customer Advances' (before invoice) or 'Trade Receivables' (after invoice). Use this to override.
+              </p>
+            </div>
+
             {paymentForm.payment_method === 'cheque' && (
               <div className="space-y-2">
                 <Label>Cheque Number</Label>
@@ -762,6 +790,16 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Finance Hub Modal */}
+      {orderId && (
+        <VehicleFinanceSettlement
+          isOpen={isFinanceHubOpen}
+          onClose={() => setIsFinanceHubOpen(false)}
+          orderId={orderId}
+          module="sinotruck"
+        />
+      )}
     </>
   );
 }

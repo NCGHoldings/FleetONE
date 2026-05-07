@@ -18,9 +18,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { DollarSign, CheckCircle, Clock, Plus, RefreshCw, MoreHorizontal, FileText, Receipt, Eye, Landmark, Image } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, Plus, RefreshCw, MoreHorizontal, FileText, Receipt, Eye, Landmark, Image, ShieldCheck } from 'lucide-react';
 import { useLightVehicleCashReceipts, LightVehicleCashReceipt } from '@/hooks/useLightVehicleCashReceipts';
 import { LightVehicleCashReceiptModal } from './LightVehicleCashReceiptModal';
+import { SearchableAccountSelector } from '@/components/accounting/shared/SearchableAccountSelector';
 import {
   fetchVehicleFinanceSettings,
   createVehicleCustomer,
@@ -28,8 +29,10 @@ import {
   postVehiclePaymentToGL,
   createVehicleARReceipt,
   updateOrderFinanceLinks,
+  updatePaymentJournalLink,
   NCG_HOLDING_ID,
 } from '@/hooks/useVehicleSalesFinance';
+import { VehicleFinanceSettlement } from '@/components/accounting/shared/VehicleFinanceSettlement';
 
 interface LightVehiclePaymentTrackingProps {
   orderId: string;
@@ -42,6 +45,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [isFinanceHubOpen, setIsFinanceHubOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
   const [verifyingPayment, setVerifyingPayment] = useState<string | null>(null);
   const [receipts, setReceipts] = useState<LightVehicleCashReceipt[]>([]);
@@ -61,6 +65,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
     payment_method: 'bank_transfer',
     reference_no: '',
     bank_account_id: '',
+    custom_credit_account_id: '',
     cheque_no: '',
     notes: ''
   });
@@ -237,8 +242,9 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
           payment_date: paymentForm.payment_date,
           payment_method: paymentForm.payment_method,
           reference_number: paymentForm.reference_no || null,
-          bank_account_id: paymentForm.bank_account_id,
+          bank_account_id: paymentForm.payment_method === 'opening_balance' ? null : paymentForm.bank_account_id,
           bank_name: bankNameStr,
+          custom_credit_account_id: paymentForm.payment_method === 'opening_balance' ? paymentForm.bank_account_id : (paymentForm.custom_credit_account_id || null),
           cheque_no: paymentForm.cheque_no || null,
           payment_slip_url: paymentSlipUrl,
           notes: paymentForm.notes || null,
@@ -364,6 +370,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
           paymentMethod: payment.payment_method,
           settings,
           effectiveCompanyId: NCG_HOLDING_ID,
+          customCreditAccountId: payment.custom_credit_account_id || undefined,
         });
 
         if (glResult) {
@@ -439,6 +446,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
       payment_method: 'bank_transfer',
       reference_no: '',
       bank_account_id: '',
+      custom_credit_account_id: '',
       cheque_no: '',
       notes: ''
     });
@@ -515,7 +523,11 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
         </div>
 
         {/* Record Payment Button */}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button onClick={() => setIsFinanceHubOpen(true)} variant="secondary">
+            <Landmark className="h-4 w-4 mr-2" />
+            Finance Hub
+          </Button>
           <Button onClick={() => setIsRecordModalOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Record Payment
@@ -845,6 +857,16 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Finance Hub Modal */}
+      {orderId && (
+        <VehicleFinanceSettlement
+          isOpen={isFinanceHubOpen}
+          onClose={() => setIsFinanceHubOpen(false)}
+          orderId={orderId}
+          module="lightvehicle"
+        />
+      )}
     </>
   );
 }

@@ -363,12 +363,11 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
   const totalDirect = directLines.reduce((sum, l) => sum + l.amount, 0);
 
   useEffect(() => {
-    if (isDirectReceipt) {
-      form.setValue("amount", totalDirect);
-    } else if (!isAdvance) {
-      form.setValue("amount", totalAllocated);
+    if (!isAdvance) {
+      // Sum both allocations and direct lines for the total receipt amount
+      form.setValue("amount", totalAllocated + totalDirect);
     }
-  }, [totalAllocated, totalDirect, form, isAdvance, isDirectReceipt]);
+  }, [totalAllocated, totalDirect, form, isAdvance]);
 
   const handleAdvanceToggle = (checked: boolean) => {
     setIsAdvance(checked);
@@ -384,7 +383,6 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
     if (checked) {
       setIsAdvance(false);
       form.setValue("is_advance", false);
-      setAllocations([]);
     }
   };
 
@@ -440,8 +438,8 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
           write_off_amount: a.write_off_amount,
           write_off_account_id: globalWriteOffAccountId || undefined,
         })),
-        is_direct_receipt: isDirectReceipt,
-        direct_lines: isDirectReceipt ? directLines : undefined,
+        is_direct_receipt: isDirectReceipt || directLines.some(l => l.account_id && l.amount > 0),
+        direct_lines: directLines.filter(l => l.account_id && l.amount > 0),
       });
       onOpenChange(false);
       form.reset();
@@ -465,13 +463,9 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
     }
   };
 
-  const canSubmit = isDirectReceipt
-    ? form.watch("amount") > 0 && selectedCustomerId && directLines.every(l => l.account_id && l.amount > 0)
-    : isAdvance 
-      ? form.watch("amount") > 0 && selectedCustomerId 
-      : selectedPartyType === "vendor" 
-        ? form.watch("amount") > 0 && selectedCustomerId
-        : totalAllocated > 0 || (form.watch("amount") > 0 && selectedCustomerId);
+  const canSubmit = isAdvance 
+    ? form.watch("amount") > 0 && selectedCustomerId 
+    : (totalAllocated > 0 || totalDirect > 0 || form.watch("amount") > 0) && selectedCustomerId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

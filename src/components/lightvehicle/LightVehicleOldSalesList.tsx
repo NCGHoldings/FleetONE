@@ -13,6 +13,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useLightVehicleOldSalesManagement, OldSalesRecord } from '@/hooks/useLightVehicleOldSalesManagement';
 import { LightVehicleOldSalesDetailModal } from './LightVehicleOldSalesDetailModal';
 import { LightVehicleOldSalesConvertModal } from './LightVehicleOldSalesConvertModal';
+import { LightVehicleOldSalesEditModal } from './LightVehicleOldSalesEditModal';
+import { LightVehicleOldSalePaymentModal } from './LightVehicleOldSalePaymentModal';
 import { format } from 'date-fns';
 
 export const LightVehicleOldSalesList: React.FC = () => {
@@ -22,6 +24,8 @@ export const LightVehicleOldSalesList: React.FC = () => {
     fetchOldSales, 
     convertToQuotation, 
     createOrderFromOldSale,
+    updateOldSale,
+    recordOldSalePayment,
     deleteOldSale,
     getMissingFields
   } = useLightVehicleOldSalesManagement();
@@ -31,6 +35,8 @@ export const LightVehicleOldSalesList: React.FC = () => {
   const [selectedRecord, setSelectedRecord] = useState<OldSalesRecord | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [conversionType, setConversionType] = useState<'quotation' | 'order'>('quotation');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -54,6 +60,16 @@ export const LightVehicleOldSalesList: React.FC = () => {
   const handleViewDetails = (record: OldSalesRecord) => {
     setSelectedRecord(record);
     setShowDetailModal(true);
+  };
+
+  const handleEditRecord = (record: OldSalesRecord) => {
+    setSelectedRecord(record);
+    setShowEditModal(true);
+  };
+
+  const handleRecordPayment = (record: OldSalesRecord) => {
+    setSelectedRecord(record);
+    setShowPaymentModal(true);
   };
 
   const handleConvertToQuotation = async (record: OldSalesRecord) => {
@@ -261,6 +277,19 @@ export const LightVehicleOldSalesList: React.FC = () => {
                               <Eye className="h-4 w-4 mr-2" />
                               View Details
                             </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleEditRecord(record)}
+                            >
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Edit Record
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleRecordPayment(record)}
+                              className="text-blue-600 focus:text-blue-600"
+                            >
+                              <DollarSign className="h-4 w-4 mr-2" />
+                              Record Payment (Hit AR)
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               onClick={() => handleConvertToQuotation(record)}
@@ -325,6 +354,34 @@ export const LightVehicleOldSalesList: React.FC = () => {
         onConvert={handleConvertWithData}
         onCreateOrder={handleCreateOrderWithData}
         conversionType={conversionType}
+      />
+
+      <LightVehicleOldSalesEditModal
+        record={selectedRecord}
+        open={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedRecord(null);
+        }}
+        onSave={async (id, data) => {
+          const success = await updateOldSale(id, data);
+          if (success) fetchOldSales();
+          return success;
+        }}
+      />
+
+      <LightVehicleOldSalePaymentModal
+        record={selectedRecord}
+        open={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setSelectedRecord(null);
+        }}
+        onRecord={async (rec, data) => {
+          const result = await recordOldSalePayment(rec, data);
+          if (result) fetchOldSales();
+          return result;
+        }}
       />
 
       {/* Delete Confirmation Dialog */}

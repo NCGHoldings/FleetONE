@@ -31,6 +31,7 @@ import {
 import { Search, Filter, Download, Eye, Settings } from "lucide-react";
 import { EnhancedSearch } from "@/components/ui/enhanced-search";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import "@/styles/professional-erp.css";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -46,6 +47,7 @@ interface DataTableProps<TData, TValue> {
   editableFields?: string[];
   onCellEdit?: (rowId: string, field: string, value: any) => Promise<void>;
   enableColumnFilters?: boolean;
+  variant?: "default" | "professional";
 }
 
 export function DataTable<TData, TValue>({
@@ -62,6 +64,7 @@ export function DataTable<TData, TValue>({
   editableFields = [],
   onCellEdit,
   enableColumnFilters = false,
+  variant = "default",
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -221,9 +224,9 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border/50 bg-card overflow-hidden">
+      <div className={`rounded-lg border border-border/50 bg-card overflow-hidden ${variant === 'professional' ? 'erp-table-professional' : ''}`}>
         <div className="overflow-x-auto">
-          <Table className="w-full">
+          <Table className={`w-full ${variant === 'professional' ? 'erp-table-professional' : ''}`}>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="border-border/50 bg-muted/50">
@@ -233,15 +236,27 @@ export function DataTable<TData, TValue>({
                       <TableHead 
                         key={header.id} 
                         className={`
-                          font-semibold text-foreground/90 px-4 py-3 text-left
+                          ${variant === 'professional' ? 'font-bold' : 'font-semibold'} 
+                          text-foreground/90 px-4 py-3 text-left
                           ${canSort ? 'cursor-pointer hover:bg-muted/70 transition-colors select-none' : ''}
                           ${header.column.getIsSorted() ? 'bg-muted/80' : ''}
                           whitespace-nowrap
                         `}
+                        data-column-type={
+                          (() => {
+                            const h = (header.column.columnDef.header as string)?.toLowerCase() || "";
+                            return h.includes('lkr') || h.includes('amount') || h.includes('balance') || 
+                                   h.includes('price') || h.includes('cost') || h.includes('value') || 
+                                   h.includes('rate') || h.includes('quantity') || h.includes('qty') || 
+                                   h.includes('level') || h.includes('accum') || h.includes('depr') ||
+                                   h.includes('total') || h.includes('hours') || h.includes('km')
+                                   ? "number" : "text";
+                          })()
+                        }
                         onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                         style={{
                           width: header.getSize() !== 150 ? header.getSize() : 'auto',
-                          minWidth: '120px'
+                          minWidth: variant === 'professional' ? '80px' : '120px'
                         }}
                       >
                         <div className="flex items-center gap-2">
@@ -286,10 +301,21 @@ export function DataTable<TData, TValue>({
                     {row.getVisibleCells().map((cell) => (
                       <TableCell 
                         key={cell.id} 
-                        className="px-4 py-3 text-sm"
+                        className={`px-4 py-3 ${variant === 'professional' ? 'text-[13px]' : 'text-sm'}`}
+                        data-column-type={
+                          (() => {
+                            const h = (cell.column.columnDef.header as string)?.toLowerCase() || "";
+                            return h.includes('lkr') || h.includes('amount') || h.includes('balance') || 
+                                   h.includes('price') || h.includes('cost') || h.includes('value') || 
+                                   h.includes('rate') || h.includes('quantity') || h.includes('qty') || 
+                                   h.includes('level') || h.includes('accum') || h.includes('depr') ||
+                                   h.includes('total') || h.includes('hours') || h.includes('km')
+                                   ? "number" : "text";
+                          })()
+                        }
                         style={{
                           width: cell.column.getSize() !== 150 ? cell.column.getSize() : 'auto',
-                          minWidth: '120px'
+                          minWidth: variant === 'professional' ? '80px' : '120px'
                         }}
                        >
                          <div className="truncate" title={typeof cell.getValue() === 'string' ? String(cell.getValue()) : undefined}>

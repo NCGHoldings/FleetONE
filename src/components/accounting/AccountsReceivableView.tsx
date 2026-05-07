@@ -454,20 +454,16 @@ export const AccountsReceivableView = () => {
           </TabsList>
 
           <TabsContent value="all" className="mt-4">
-            <DataTable
-              columns={columns}
-              data={filteredInvoices}
-              enableColumnFilters
-            />
+            <DataTable enableColumnFilters columns={columns} data={filteredInvoices} variant="professional" />
           </TabsContent>
           <TabsContent value="unpaid">
-            <DataTable columns={columns} data={filteredInvoices} enableColumnFilters />
+            <DataTable enableColumnFilters columns={columns} data={filteredInvoices} variant="professional" />
           </TabsContent>
           <TabsContent value="partial">
-            <DataTable columns={columns} data={filteredInvoices} enableColumnFilters />
+            <DataTable enableColumnFilters columns={columns} data={filteredInvoices} variant="professional" />
           </TabsContent>
           <TabsContent value="paid">
-            <DataTable columns={columns} data={filteredInvoices} enableColumnFilters />
+            <DataTable enableColumnFilters columns={columns} data={filteredInvoices} variant="professional" />
           </TabsContent>
         </Tabs>
       </Card>

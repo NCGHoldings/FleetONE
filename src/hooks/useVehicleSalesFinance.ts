@@ -369,13 +369,13 @@ export async function postVehiclePaymentToGL({
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
 
     // Validate required accounts based on payment type
-    if (paymentType === 'advance' && !settings.customer_advance_account_id) {
+    if (paymentType === 'advance' && !settings.customer_advance_account_id && !customCreditAccountId) {
       console.error(`[${module.toUpperCase()} Finance] Missing customer advance account`);
       toast.error('Missing GL account configuration for customer advance');
       return null;
     }
 
-    if ((paymentType === 'balance' || paymentType === 'full') && !settings.sales_revenue_account_id) {
+    if ((paymentType === 'balance' || paymentType === 'full') && !settings.sales_revenue_account_id && !customCreditAccountId) {
       console.error(`[${module.toUpperCase()} Finance] Missing sales revenue account`);
       toast.error('Missing GL account configuration for sales revenue');
       return null;
@@ -435,42 +435,32 @@ export async function postVehiclePaymentToGL({
 
     // CREDIT: Based on payment type
     if (paymentType === 'advance') {
-      // CR Customer Advance Receipt (Liability)
+      // CR Account: Priority 1. Custom Override, 2. Advance Account
       lines.push({
         journal_entry_id: journalEntry.id,
-        account_id: settings.customer_advance_account_id,
+        account_id: customCreditAccountId || settings.customer_advance_account_id,
         description: `${businessUnitCode} Advance from ${customerName} - ${orderNo}`,
         debit: 0,
         credit: amount,
         company_id: effectiveCompanyId,
       });
     } else if (paymentType === 'balance') {
-      // CR Trade Receivable
-      if (settings.trade_receivable_account_id) {
-        lines.push({
-          journal_entry_id: journalEntry.id,
-          account_id: settings.trade_receivable_account_id,
-          description: `${businessUnitCode} Balance payment from ${customerName} - ${orderNo}`,
-          debit: 0,
-          credit: amount,
-          company_id: effectiveCompanyId,
-        });
-      } else {
-        // Fallback to revenue
-        lines.push({
-          journal_entry_id: journalEntry.id,
-          account_id: settings.sales_revenue_account_id,
-          description: `${businessUnitCode} Balance payment from ${customerName} - ${orderNo}`,
-          debit: 0,
-          credit: amount,
-          company_id: effectiveCompanyId,
-        });
-      }
-    } else {
-      // Full payment: CR Revenue directly
+      // CR Account: Priority 1. Custom Override, 2. Trade Receivable, 3. Revenue
+      const creditAccountId = customCreditAccountId || settings.trade_receivable_account_id || settings.sales_revenue_account_id;
+      
       lines.push({
         journal_entry_id: journalEntry.id,
-        account_id: settings.sales_revenue_account_id,
+        account_id: creditAccountId,
+        description: `${businessUnitCode} Balance payment from ${customerName} - ${orderNo}`,
+        debit: 0,
+        credit: amount,
+        company_id: effectiveCompanyId,
+      });
+    } else {
+      // Full payment: CR Account Priority 1. Custom Override, 2. Revenue
+      lines.push({
+        journal_entry_id: journalEntry.id,
+        account_id: customCreditAccountId || settings.sales_revenue_account_id,
         description: `${businessUnitCode} Full payment from ${customerName} - ${orderNo}`,
         debit: 0,
         credit: amount,

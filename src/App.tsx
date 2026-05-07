@@ -14,6 +14,7 @@ import { ThemeProvider } from "next-themes";
 import { SystemErrorBoundary } from "./components/safety/SystemErrorBoundary";
 import { MFAGuard } from "./components/auth/MFAGuard";
 import { toast } from "sonner";
+import "@/styles/professional-erp.css";
 
 // Pages
 import Auth from "./pages/Auth";

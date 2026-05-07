@@ -18,6 +18,9 @@ interface TripData {
   distance_km?: number;
   start_time?: string;
   end_time?: string;
+  start_odo?: number;
+  end_odo?: number;
+  fuel_liters?: number;
 }
 
 interface InlineRevenueEditorProps {
@@ -35,12 +38,18 @@ export function InlineRevenueEditor({
 }: InlineRevenueEditorProps) {
   const [income, setIncome] = useState<number>(0);
   const [distance, setDistance] = useState<number>(0);
+  const [startOdo, setStartOdo] = useState<number | ''>('');
+  const [endOdo, setEndOdo] = useState<number | ''>('');
+  const [fuelLiters, setFuelLiters] = useState<number | ''>('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen && trip) {
       setIncome(trip.income || 0);
       setDistance(trip.distance_km || 0);
+      setStartOdo(trip.start_odo || '');
+      setEndOdo(trip.end_odo || '');
+      setFuelLiters(trip.fuel_liters || '');
     }
   }, [isOpen, trip]);
 
@@ -49,13 +58,25 @@ export function InlineRevenueEditor({
 
     setSaving(true);
     try {
+      const updates: any = {
+        income: income,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (startOdo !== '') updates.odometer_start = startOdo;
+      if (endOdo !== '') updates.odometer_end = endOdo;
+      if (fuelLiters !== '') updates.fuel_liters = fuelLiters;
+      
+      // Calculate distance if both odometers are provided and valid
+      if (startOdo !== '' && endOdo !== '' && Number(endOdo) > Number(startOdo)) {
+         updates.distance_km = Number(endOdo) - Number(startOdo);
+      } else {
+         updates.distance_km = distance;
+      }
+
       const { error } = await supabase
         .from("daily_trips")
-        .update({
-          income: income,
-          distance_km: distance,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updates)
         .eq("id", trip.id);
 
       if (error) throw error;
@@ -127,36 +148,75 @@ export function InlineRevenueEditor({
 
           {/* Editable Fields */}
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="income">Revenue (LKR)</Label>
-              <Input
-                id="income"
-                type="number"
-                min="0"
-                step="100"
-                value={income || ''}
-                onChange={(e) => setIncome(parseFloat(e.target.value) || 0)}
-                placeholder="Enter revenue"
-                className="text-lg font-medium"
-              />
-              <p className="text-xs text-muted-foreground">
-                Current: {formatCurrency(trip.income)}
-              </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="income">Revenue (LKR)</Label>
+                <Input
+                  id="income"
+                  type="number"
+                  min="0"
+                  step="100"
+                  value={income || ''}
+                  onChange={(e) => setIncome(parseFloat(e.target.value) || 0)}
+                  placeholder="Enter revenue"
+                  className="text-lg font-medium border-green-200 focus-visible:ring-green-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="distance">Distance (km)</Label>
+                <Input
+                  id="distance"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={distance || ''}
+                  onChange={(e) => setDistance(parseFloat(e.target.value) || 0)}
+                  placeholder="e.g. 150.5"
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="distance">Distance (km)</Label>
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+              <div className="space-y-2">
+                <Label htmlFor="startOdo" className="text-muted-foreground">Start Odometer</Label>
+                <Input
+                  id="startOdo"
+                  type="number"
+                  min="0"
+                  value={startOdo}
+                  onChange={(e) => setStartOdo(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                  placeholder={trip.start_odo?.toString() || "e.g. 125000"}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="endOdo" className="text-muted-foreground">End Odometer</Label>
+                <Input
+                  id="endOdo"
+                  type="number"
+                  min="0"
+                  value={endOdo}
+                  onChange={(e) => setEndOdo(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                  placeholder={trip.end_odo?.toString() || "e.g. 125150"}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t">
+              <Label htmlFor="fuel" className="text-muted-foreground">Fuel Filled (Liters)</Label>
               <Input
-                id="distance"
+                id="fuel"
                 type="number"
                 min="0"
                 step="0.1"
-                value={distance || ''}
-                onChange={(e) => setDistance(parseFloat(e.target.value) || 0)}
-                placeholder="Enter distance"
+                value={fuelLiters}
+                onChange={(e) => setFuelLiters(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                placeholder={trip.fuel_liters?.toString() || "e.g. 45.5"}
+                className="w-full sm:w-1/2 border-blue-200 focus-visible:ring-blue-500"
               />
-              <p className="text-xs text-muted-foreground">
-                Current: {trip.distance_km?.toFixed(1) || 0} km
+              <p className="text-[10px] text-muted-foreground mt-1">
+                You only need to enter fuel/odo once per day on any trip to reach 100% completeness.
               </p>
             </div>
           </div>

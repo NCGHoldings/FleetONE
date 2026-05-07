@@ -418,6 +418,78 @@ export const useLightVehicleOldSalesManagement = () => {
     }
   }, [toast]);
 
+  // Update old sale record
+  const updateOldSale = useCallback(async (id: string, updates: Partial<OldSalesRecord>) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('lightvehicle_old_sales')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Updated',
+        description: 'Record has been updated successfully',
+      });
+
+      return true;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update record';
+      toast({
+        title: 'Update Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  // Record payment for an old sale (Hit AR)
+  const recordOldSalePayment = useCallback(async (record: OldSalesRecord, paymentData: any) => {
+    setLoading(true);
+    try {
+      // Logic for recording payment directly against an old sale
+      // This will hit the lightvehicle_customer_payments table
+      const { data, error } = await supabase
+        .from('lightvehicle_customer_payments')
+        .insert({
+          order_id: record.converted_to_order_id, // Link to order if exists
+          old_sale_id: record.id,
+          payment_amount: paymentData.amount,
+          payment_date: paymentData.date,
+          payment_method: paymentData.method,
+          bank_account_id: paymentData.bankAccountId,
+          status: 'pending',
+          notes: paymentData.notes || `Payment for old sale: ${record.quotation_no || 'N/A'}`
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: 'Payment Recorded',
+        description: 'Payment has been recorded and is pending GL sync',
+      });
+
+      return data;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to record payment';
+      toast({
+        title: 'Payment Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
   // Delete import batch and all its records
   const deleteImportBatch = useCallback(async (batchId: string) => {
     try {
@@ -454,6 +526,8 @@ export const useLightVehicleOldSalesManagement = () => {
     importOldSales,
     convertToQuotation,
     createOrderFromOldSale,
+    updateOldSale,
+    recordOldSalePayment,
     deleteOldSale,
     deleteImportBatch,
     getMissingFields,
