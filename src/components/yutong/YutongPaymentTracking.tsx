@@ -51,6 +51,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   
   // Bank accounts state
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [equityAccounts, setEquityAccounts] = useState<any[]>([]);
   
   // Payment proof upload state
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
@@ -70,6 +71,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
 
   useEffect(() => {
     loadBankAccounts();
+    loadEquityAccounts();
   }, []);
 
   useEffect(() => {
@@ -100,6 +102,22 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       setBankAccounts(data || []);
     } catch (error) {
       console.error('Error loading asset accounts:', error);
+    }
+  };
+
+  const loadEquityAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chart_of_accounts')
+        .select('id, account_code, account_name')
+        .eq('company_id', NCG_HOLDING_ID)
+        .eq('account_type', 'equity')
+        .eq('is_active', true)
+        .order('account_code');
+      if (error) throw error;
+      setEquityAccounts(data || []);
+    } catch (error) {
+      console.error('Error loading equity accounts:', error);
     }
   };
 
@@ -203,7 +221,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       }
 
       if (!paymentForm.bank_account_id) {
-        toast.error('Please select a bank account');
+        toast.error(paymentForm.payment_method === 'opening_balance' ? 'Please select an equity account' : 'Please select a bank account');
         return;
       }
 
@@ -237,7 +255,9 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       }
 
       // Get selected bank account name
-      const selectedBank = bankAccounts.find(b => b.id === paymentForm.bank_account_id);
+      const selectedBank = paymentForm.payment_method === 'opening_balance'
+        ? equityAccounts.find(b => b.id === paymentForm.bank_account_id)
+        : bankAccounts.find(b => b.id === paymentForm.bank_account_id);
 
       // Insert payment record with created_by
       const { data: payment, error: paymentError } = await supabase
@@ -860,30 +880,56 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                   <SelectItem value="cheque">Cheque</SelectItem>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="online">Online Payment</SelectItem>
+                  <SelectItem value="opening_balance">Opening Balance</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Bank Account *</Label>
-              <Select
-                value={paymentForm.bank_account_id}
-                onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select bank account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bankAccounts.map((bank) => (
-                    <SelectItem key={bank.id} value={bank.id}>
-                      <div className="flex items-center gap-2">
-                        <Landmark className="h-3 w-3 text-muted-foreground" />
-                        {bank.account_code} - {bank.account_name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            
+            {paymentForm.payment_method === 'opening_balance' ? (
+              <div>
+                <Label>Equity COA Account *</Label>
+                <Select
+                  value={paymentForm.bank_account_id}
+                  onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select equity account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {equityAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        <div className="flex items-center gap-2">
+                          <Landmark className="h-3 w-3 text-muted-foreground" />
+                          {account.account_code} - {account.account_name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div>
+                <Label>Bank Account *</Label>
+                <Select
+                  value={paymentForm.bank_account_id}
+                  onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select bank account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bankAccounts.map((bank) => (
+                      <SelectItem key={bank.id} value={bank.id}>
+                        <div className="flex items-center gap-2">
+                          <Landmark className="h-3 w-3 text-muted-foreground" />
+                          {bank.account_code} - {bank.account_name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label>Reference Number</Label>
               <Input

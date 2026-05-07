@@ -391,7 +391,9 @@ export async function postVehiclePaymentToGL({
     // Build entry description
     const entryPrefix = paymentType === 'advance' ? 'ADV' : paymentType === 'balance' ? 'BAL' : 'REV';
     const entryNumber = `${businessUnitCode}-${entryPrefix}-${orderNo}-${Date.now().toString(36).toUpperCase()}`;
-    const description = `${businessUnitCode} ${paymentType.toUpperCase()} - ${orderNo} - ${customerName}`;
+    const methodDisplay = paymentMethod === 'opening_balance' ? 'Opening Balance' : (paymentMethod || 'Payment');
+    const actionDisplay = paymentMethod === 'opening_balance' ? 'recorded' : 'received';
+    const description = `${businessUnitCode} ${paymentType.toUpperCase()} (${methodDisplay}) - ${orderNo} - ${customerName}`;
 
     // Create journal entry
     const { data: journalEntry, error: jeError } = await (supabase as any)
@@ -421,11 +423,11 @@ export async function postVehiclePaymentToGL({
     // Create journal entry lines based on payment type
     const lines = [];
 
-    // DEBIT: Bank/Cash Account
+    // DEBIT: Bank/Cash/Equity Account
     lines.push({
       journal_entry_id: journalEntry.id,
       account_id: bankAccountId,
-      description: `${businessUnitCode} ${paymentMethod || 'Payment'} received - ${orderNo}`,
+      description: `${businessUnitCode} ${methodDisplay} ${actionDisplay} - ${orderNo}`,
       debit: amount,
       credit: 0,
       company_id: effectiveCompanyId,

@@ -48,6 +48,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
   const [selectedReceipt, setSelectedReceipt] = useState<LightVehicleCashReceipt | null>(null);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [equityAccounts, setEquityAccounts] = useState<any[]>([]);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -66,6 +67,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
 
   useEffect(() => {
     loadBankAccounts();
+    loadEquityAccounts();
   }, []);
 
   useEffect(() => {
@@ -86,6 +88,22 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
       setBankAccounts(data || []);
     } catch (error) {
       console.error('Error loading bank accounts:', error);
+    }
+  };
+
+  const loadEquityAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chart_of_accounts')
+        .select('id, account_code, account_name')
+        .eq('company_id', NCG_HOLDING_ID)
+        .eq('account_type', 'equity')
+        .eq('is_active', true)
+        .order('account_code');
+      if (error) throw error;
+      setEquityAccounts(data || []);
+    } catch (error) {
+      console.error('Error loading equity accounts:', error);
     }
   };
 
@@ -173,7 +191,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
       }
 
       if (!paymentForm.bank_account_id) {
-        toast.error('Please select a bank account');
+        toast.error(paymentForm.payment_method === 'opening_balance' ? 'Please select an equity account' : 'Please select a bank account');
         return;
       }
 
@@ -202,7 +220,13 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
         setIsUploading(false);
       }
 
-      const selectedBank = bankAccounts.find(b => b.id === paymentForm.bank_account_id);
+      const selectedBank = paymentForm.payment_method === 'opening_balance'
+        ? equityAccounts.find(b => b.id === paymentForm.bank_account_id)
+        : bankAccounts.find(b => b.id === paymentForm.bank_account_id);
+
+      const bankNameStr = paymentForm.payment_method === 'opening_balance'
+        ? selectedBank ? `${selectedBank.account_code} - ${selectedBank.account_name}` : null
+        : selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_name}` : null;
 
       const { error } = await supabase
         .from('lightvehicle_customer_payments')
@@ -214,7 +238,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
           payment_method: paymentForm.payment_method,
           reference_number: paymentForm.reference_no || null,
           bank_account_id: paymentForm.bank_account_id,
-          bank_name: selectedBank ? `${selectedBank.bank_name} - ${selectedBank.account_name}` : null,
+          bank_name: bankNameStr,
           cheque_no: paymentForm.cheque_no || null,
           payment_slip_url: paymentSlipUrl,
           notes: paymentForm.notes || null,
@@ -704,31 +728,56 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
                   <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                   <SelectItem value="cheque">Cheque</SelectItem>
                   <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="opening_balance">Opening Balance</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Bank Account *</Label>
-              <Select
-                value={paymentForm.bank_account_id}
-                onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select bank account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bankAccounts.map((bank) => (
-                    <SelectItem key={bank.id} value={bank.id}>
-                      <div className="flex items-center gap-2">
-                        <Landmark className="h-3 w-3 text-muted-foreground" />
-                        {bank.bank_name} - {bank.account_name} ({bank.account_number})
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {paymentForm.payment_method === 'opening_balance' ? (
+              <div className="space-y-2">
+                <Label>Equity COA Account *</Label>
+                <Select
+                  value={paymentForm.bank_account_id}
+                  onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select equity account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {equityAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        <div className="flex items-center gap-2">
+                          <Landmark className="h-3 w-3 text-muted-foreground" />
+                          {account.account_code} - {account.account_name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Bank Account *</Label>
+                <Select
+                  value={paymentForm.bank_account_id}
+                  onValueChange={(value) => setPaymentForm({ ...paymentForm, bank_account_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select bank account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bankAccounts.map((bank) => (
+                      <SelectItem key={bank.id} value={bank.id}>
+                        <div className="flex items-center gap-2">
+                          <Landmark className="h-3 w-3 text-muted-foreground" />
+                          {bank.bank_name} - {bank.account_name} ({bank.account_number})
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Reference No</Label>
