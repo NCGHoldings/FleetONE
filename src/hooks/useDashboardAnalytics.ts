@@ -131,7 +131,7 @@ export function useDashboardAnalytics() {
         conductorsOnDuty,
       };
     },
-    refetchInterval: 30000, // 30 seconds
+    refetchInterval: 5 * 60 * 1000, // 5 min — reduced from 30s
   });
 
   // Revenue trend (last 30 days)
@@ -193,7 +193,7 @@ export function useDashboardAnalytics() {
         lastUpdate: item.last_update,
       }));
     },
-    refetchInterval: 30000,
+    refetchInterval: 5 * 60 * 1000, // 5 min — reduced from 30s
   });
 
   // Live alerts
@@ -276,7 +276,7 @@ export function useDashboardAnalytics() {
 
       return alertsList.slice(0, 8);
     },
-    refetchInterval: 60000, // 1 minute
+    refetchInterval: 5 * 60 * 1000, // 5 min — reduced from 1min
   });
 
   // Route performance

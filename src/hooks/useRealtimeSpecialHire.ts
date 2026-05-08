@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -85,15 +85,19 @@ export interface QuotationWithPayments {
   }>;
 }
 
+// Unique per browser tab — prevents duplicate WS subscriptions accumulating
+// when the component remounts on page reload (old subscription not yet GC'd)
+const SESSION_ID = Math.random().toString(36).slice(2, 8);
+
 export function useRealtimeSpecialHire() {
   const [quotations, setQuotations] = useState<QuotationWithPayments[]>([]);
   const [loading, setLoading] = useState(true);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchQuotationsWithPayments = async () => {
+  const fetchQuotationsWithPayments = useCallback(async () => {
     try {
       console.log('Fetching quotations with payments and invoices...');
       
-      // Fetch confirmed quotations using cursor-based pagination to bypass offset limits
       const batchSize = 1000;
       let allQuotationsData: any[] = [];
       let lastCreatedAt: string | null = null;
@@ -133,8 +137,6 @@ export function useRealtimeSpecialHire() {
       }
 
       const quotationsData = allQuotationsData;
-
-      // Fetch all payments for these quotations
       const quotationIds = quotationsData?.map(q => q.id) || [];
       
       const { data: paymentsData, error: paymentsError } = await supabase
@@ -159,7 +161,6 @@ export function useRealtimeSpecialHire() {
 
       if (paymentsError) throw paymentsError;
 
-      // Fetch all invoices for these quotations
       const { data: invoicesData, error: invoicesError } = await supabase
         .from('special_hire_invoices')
         .select(`
@@ -179,7 +180,6 @@ export function useRealtimeSpecialHire() {
 
       if (invoicesError) throw invoicesError;
 
-      // Fetch all finalized post-trip adjustments for these quotations
       const { data: adjustmentsData, error: adjustmentsError } = await supabase
         .from('special_hire_trip_adjustments')
         .select(`
@@ -199,50 +199,41 @@ export function useRealtimeSpecialHire() {
         console.warn('Error fetching adjustments (non-blocking):', adjustmentsError);
       }
 
-      // Build adjustment lookup map (latest finalized adjustment per quotation)
       const adjustmentMap: Record<string, any> = {};
       (adjustmentsData || []).forEach(adj => {
         adjustmentMap[adj.quotation_id] = adj;
       });
 
-      // Combine the data
       const enrichedQuotations: QuotationWithPayments[] = quotationsData?.map(quotation => {
         const quotationPayments = paymentsData?.filter(p => p.quotation_id === quotation.id) || [];
         const quotationInvoices = invoicesData?.filter(i => i.quotation_id === quotation.id) || [];
         const adjustment = adjustmentMap[quotation.id];
 
-        // Calculate total amounts from actual database records
         const approvedPayments = quotationPayments.filter(p => p.status === 'approved');
         const calculatedTotalPaid = approvedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
         
-        // Base quotation total (without adjustments)
         const baseTotal = (quotation.gross_revenue || 0) + 
                           (quotation.fuel_cost_fuel_only || 0) + 
                           (quotation.commission_pass_through_amount || 0) + 
                           (quotation.total_additional_charges || 0) - 
                           (quotation.discount_amount_lkr || 0);
         
-        // Add post-trip adjustment amounts if finalized
         const adjustmentAmount = adjustment?.adjustment_amount || 0;
         const finalTotal = baseTotal + adjustmentAmount;
-        
         const calculatedBalance = Math.max(finalTotal - calculatedTotalPaid, 0);
 
         return {
           ...quotation,
           bus_type: quotation.bus_types?.name || 'Unknown',
-          // Transform additional_charges to match interface
           additional_charges: typeof quotation.additional_charges === 'string' 
             ? quotation.additional_charges 
             : JSON.stringify(quotation.additional_charges || []),
-          // Use calculated values that include adjustments
           total_paid: calculatedTotalPaid,
           balance_due: calculatedBalance,
           advance_paid: Math.max(
             quotation.advance_paid || 0,
             approvedPayments.filter(p => p.payment_type === 'advance').reduce((sum, p) => sum + (p.amount || 0), 0)
           ),
-          // Include adjustment data for the Financial column
           adjustment_amount: adjustmentAmount,
           has_finalized_adjustment: !!adjustment,
           payments: quotationPayments.map(p => ({
@@ -285,77 +276,52 @@ export function useRealtimeSpecialHire() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Debounce realtime callbacks — rapid successive DB events (e.g. payment +
+  // invoice created together) only trigger ONE full reload after 1.5s of quiet
+  const debouncedRefetch = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchQuotationsWithPayments(), 1500);
+  }, [fetchQuotationsWithPayments]);
 
   useEffect(() => {
     fetchQuotationsWithPayments();
-  }, []);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [fetchQuotationsWithPayments]);
 
   useEffect(() => {
     console.log('Setting up real-time subscriptions...');
-    
-    // Subscribe to quotations changes
+
+    // SESSION_ID suffix ensures each browser tab gets a unique channel name.
+    // Generic names like 'quotations-changes' caused orphaned subscriptions to
+    // stack up on every page reload — each one triggering a full 5-query refetch.
     const quotationsChannel = supabase
-      .channel('quotations-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'special_hire_quotations'
-        },
-        (payload) => {
-          console.log('Quotation change detected:', payload);
-          fetchQuotationsWithPayments();
-        }
-      )
-      .subscribe();
+      .channel(`quotations-changes-${SESSION_ID}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'special_hire_quotations' },
+        (payload) => { console.log('Quotation change:', payload.eventType); debouncedRefetch(); }
+      ).subscribe();
 
-    // Subscribe to payments changes
     const paymentsChannel = supabase
-      .channel('payments-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'special_hire_payments'
-        },
-        (payload) => {
-          console.log('Payment change detected:', payload);
-          fetchQuotationsWithPayments();
-        }
-      )
-      .subscribe();
+      .channel(`payments-changes-${SESSION_ID}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'special_hire_payments' },
+        (payload) => { console.log('Payment change:', payload.eventType); debouncedRefetch(); }
+      ).subscribe();
 
-    // Subscribe to invoices changes
     const invoicesChannel = supabase
-      .channel('invoices-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'special_hire_invoices'
-        },
-        (payload) => {
-          console.log('Invoice change detected:', payload);
-          fetchQuotationsWithPayments();
-        }
-      )
-      .subscribe();
+      .channel(`invoices-changes-${SESSION_ID}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'special_hire_invoices' },
+        (payload) => { console.log('Invoice change:', payload.eventType); debouncedRefetch(); }
+      ).subscribe();
 
     return () => {
       console.log('Cleaning up real-time subscriptions...');
       supabase.removeChannel(quotationsChannel);
       supabase.removeChannel(paymentsChannel);
       supabase.removeChannel(invoicesChannel);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, []);
+  }, [debouncedRefetch]);
 
-  return {
-    quotations,
-    loading,
-    refetch: fetchQuotationsWithPayments
-  };
+  return { quotations, loading, refetch: fetchQuotationsWithPayments };
 }

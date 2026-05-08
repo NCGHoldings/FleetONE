@@ -60,7 +60,7 @@ export function useExecutiveDashboard(options: UseExecutiveDashboardOptions = {}
   const {
     startDate = startOfMonth(new Date()),
     endDate = endOfMonth(new Date()),
-    refreshInterval = 30000, // 30 seconds
+    refreshInterval = 5 * 60 * 1000, // 5 min — reduced from 30s
   } = options;
 
   const startDateStr = format(startDate, 'yyyy-MM-dd');

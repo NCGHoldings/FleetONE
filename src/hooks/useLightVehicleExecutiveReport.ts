@@ -400,7 +400,7 @@ export function useLightVehicleExecutiveReport(filters?: LightVehicleReportFilte
   return useQuery({
     queryKey: ['lightvehicle-executive-report', effectiveFilters],
     queryFn: () => fetchReportData(effectiveFilters),
-    refetchInterval: 60000,
-    staleTime: 30000,
+    refetchInterval: 10 * 60 * 1000, // 10 min — this fn fires 16 parallel queries
+    staleTime: 5 * 60 * 1000,
   });
 }
