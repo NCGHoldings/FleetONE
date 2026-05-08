@@ -758,12 +758,187 @@ export function useYutongOrderInvoiceManagement() {
     }
   };
 
+  const syncInvoiceToFinanceHub = async (invoiceId: string): Promise<{ success: boolean; error?: any }> => {
+    setIsLoading(true);
+    try {
+      // Get invoice record with order details
+      const { data: invoice, error: invError } = await supabase
+        .from('yutong_invoice_records')
+        .select('*')
+        .eq('id', invoiceId)
+        .single();
+      
+      if (invError) throw invError;
+
+      if (invoice.status !== 'approved') {
+        throw new Error('Only approved invoices can be synced to Finance Hub.');
+      }
+
+      // Get order details for finance integration
+      const { data: orderDetails, error: orderError } = await supabase
+        .from('yutong_orders')
+        .select('*, yutong_quotations(customer_name, customer_category_id, customer_phone, customer_email)')
+        .eq('id', invoice.order_id)
+        .single();
+
+      if (orderError) throw orderError;
+
+      // ==========================================
+      // FINANCE INTEGRATION - PROPER ACCOUNTING
+      // ==========================================
+      const approvalCategory = invoice.invoice_category || 'direct_invoice';
+      
+      if (approvalCategory === 'proforma_invoice') {
+        toast.info('Proforma invoices do not require AR/GL posting.');
+        return { success: true };
+      }
+
+      const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
+
+      // Ensure finance_customer_id exists before proceeding
+      if (settings && !orderDetails?.finance_customer_id && orderDetails?.yutong_quotations?.customer_name) {
+        console.log('[Yutong Sync] Resolving finance customer prior to GL posting...');
+        const { createVehicleCustomer } = await import('@/hooks/useVehicleSalesFinance');
+        const newCustomerId = await createVehicleCustomer({
+          module: 'yutong',
+          companyId: NCG_HOLDING_ID,
+          customerName: orderDetails.yutong_quotations.customer_name,
+          customerPhone: orderDetails.yutong_quotations.customer_phone || undefined,
+          customerEmail: orderDetails.yutong_quotations.customer_email || undefined,
+          customerCategoryId: orderDetails.yutong_quotations.customer_category_id || undefined,
+        });
+
+        if (newCustomerId) {
+          await supabase
+            .from('yutong_orders')
+            .update({ finance_customer_id: newCustomerId })
+            .eq('id', invoice.order_id);
+            
+          orderDetails.finance_customer_id = newCustomerId;
+          console.log('[Yutong Sync] Resolved and linked finance customer:', newCustomerId);
+        }
+      }
+      
+      if (settings && orderDetails?.finance_customer_id) {
+        const customerName = orderDetails?.yutong_quotations?.customer_name || 'Unknown';
+        const orderNo = orderDetails?.order_no;
+        const invoiceAmount = invoice.invoice_amount;
+        const totalPaid = orderDetails?.total_paid || 0;
+
+        let arInvoiceId = orderDetails?.ar_invoice_id;
+        
+        const isTax = approvalCategory === 'tax_invoice' || approvalCategory === 'direct_invoice';
+        
+        let taxAmt = isTax ? (invoiceAmount - invoiceAmount / 1.18) : undefined;
+        let taxRateVal = 18;
+        
+        // Attempt to fetch exact tax info from documents
+        const { data: documentData } = await supabase
+          .from('yutong_invoice_documents')
+          .select('invoice_data')
+          .eq('invoice_record_id', invoiceId)
+          .maybeSingle();
+
+        if (documentData && documentData.invoice_data) {
+           const invData = documentData.invoice_data as any;
+           if (invData.tax_rate) taxRateVal = invData.tax_rate;
+           if (invData.vat_amount) taxAmt = invData.vat_amount;
+        }
+        
+        if (arInvoiceId) {
+          // Check if it already has JE
+          const { data: arCheck } = await (supabase as any)
+            .from('ar_invoices')
+            .select('journal_entry_id')
+            .eq('id', arInvoiceId)
+            .single();
+            
+          if (arCheck?.journal_entry_id) {
+            toast.success('Invoice is already fully synced to Finance Hub!');
+            return { success: true };
+          }
+        } else {
+          // Create AR Invoice
+          const arResult = await createVehicleARInvoice({
+            module: 'yutong',
+            orderId: invoice.order_id,
+            orderNo,
+            customerId: orderDetails.finance_customer_id,
+            totalAmount: invoiceAmount,
+            advanceAmount: totalPaid,
+            companyId: NCG_HOLDING_ID,
+            settings,
+            customerCategoryId: (orderDetails as any)?.customer_category_id 
+              || orderDetails?.yutong_quotations?.customer_category_id,
+            invoiceNo: invoice.invoice_no,
+            taxAmount: taxAmt,
+          });
+
+          if (arResult) {
+            arInvoiceId = arResult.invoiceId;
+            await updateOrderFinanceLinks({
+              module: 'yutong',
+              orderId: invoice.order_id,
+              arInvoiceId: arResult.invoiceId,
+            });
+          } else {
+            console.error('[Yutong Sync] AR Invoice creation FAILED');
+            toast.error('Failed to create AR Invoice. Check GL accounts in Finance Settings.');
+            return { success: false, error: new Error('AR Invoice creation failed') };
+          }
+        }
+
+        // Post Revenue Recognition GL
+        const revenueGLResult = await postVehicleInvoiceToGL({
+          module: 'yutong',
+          orderNo,
+          customerName,
+          customerId: orderDetails.finance_customer_id,
+          invoiceAmount,
+          settings,
+          effectiveCompanyId: NCG_HOLDING_ID,
+          isTaxInvoice: isTax,
+          taxRate: taxRateVal,
+          invoiceNo: invoice.invoice_no,
+        });
+
+        if (revenueGLResult) {
+          console.log(`[Yutong Sync] Revenue GL posted: ${revenueGLResult.entryNumber}`);
+          if (arInvoiceId) {
+            await supabase
+              .from('ar_invoices')
+              .update({ journal_entry_id: revenueGLResult.journalEntryId })
+              .eq('id', arInvoiceId);
+          }
+          toast.success('Successfully synced to Finance Hub!');
+        } else {
+          console.error('[Yutong Sync] Revenue GL posting FAILED');
+          toast.error('Warning: Sync completed but GL posting failed. Check Finance Settings.');
+          return { success: false, error: new Error('GL Posting Failed') };
+        }
+      } else {
+        console.error('[Yutong Sync] Skip reason -> settings:', !!settings, 'finance_customer_id:', orderDetails?.finance_customer_id, 'order_has_quotation:', !!orderDetails?.yutong_quotations);
+        toast.error('Finance settings or customer not found. Cannot sync.');
+        return { success: false, error: new Error('Finance settings or customer not found.') };
+      }
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error syncing invoice:', error);
+      toast.error('Failed to sync invoice: ' + error.message);
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     isLoading,
     generateAndStoreDraftInvoice,
     approveInvoice,
     getInvoicesByOrder,
     getInvoiceDocuments,
-    regenerateInvoice
+    regenerateInvoice,
+    syncInvoiceToFinanceHub
   };
 }

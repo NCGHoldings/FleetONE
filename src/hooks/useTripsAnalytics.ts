@@ -32,10 +32,11 @@ export interface TripData {
   net_income: number;
   km_per_liter: number;
   status?: string;
-  odo_start?: number;
-  odo_end?: number;
+  odometer_start?: number;
+  odometer_end?: number;
+  distance_km?: number;
   notes?: any; // JSON field containing driver/conductor names
-  buses?: { registration_number: string; bus_no?: string };
+  buses?: { registration_number: string; bus_no?: string; model?: string; expected_km_per_liter?: number; route?: string };
   routes?: { route_no: string; route_name: string };
   profiles?: { first_name: string; last_name: string };
   fuel_liters?: number;
@@ -106,7 +107,7 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
         .from('daily_trips')
         .select(`
           *,
-          buses(bus_no, registration_number, model, type, capacity, route),
+          buses(bus_no, registration_number, model, type, capacity, route, expected_km_per_liter),
           routes(route_no, route_name),
           profiles!driver_id(first_name, last_name)
         `)

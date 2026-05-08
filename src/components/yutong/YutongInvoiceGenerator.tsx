@@ -9,6 +9,7 @@ import { YutongInvoiceViewModal } from './YutongInvoiceViewModal';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 interface YutongQuotation {
   id: string;
@@ -46,7 +47,8 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
   const { 
     generateAndStoreDraftInvoice, 
     getInvoiceDocuments, 
-    isLoading 
+    isLoading,
+    syncInvoiceToFinanceHub
   } = useYutongInvoiceManagement();
   
   const [existingDocuments, setExistingDocuments] = useState<YutongStoredDocument[]>([]);
@@ -114,6 +116,14 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
       loadExistingDocuments();
       onSuccess?.();
       toast.success('Invoice generated successfully');
+    }
+  };
+
+  const handleSyncToFinance = async (invoiceId: string) => {
+    const result = await syncInvoiceToFinanceHub(invoiceId);
+    if (result.success) {
+      loadExistingDocuments();
+      onSuccess?.();
     }
   };
 
@@ -264,13 +274,37 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
                             )}
                           </div>
                         </div>
-                        <Button
-                          onClick={() => handleViewDocument(document)}
-                          variant="outline"
-                          size="sm"
-                        >
-                          View & Manage
-                        </Button>
+                        <div className="flex gap-2">
+                          {document.document_status === 'approved' && (
+                            <Button
+                              onClick={async (e) => {
+                                console.log('BUTTON ONCLICK FIRED for quotation invoice:', document.id);
+                                e.stopPropagation();
+                                e.preventDefault();
+                                const invData = await supabase.from('yutong_invoices').select('id').eq('quotation_id', quotation.id).order('generated_at', { ascending: false }).limit(1).single();
+                                if (invData.data?.id) {
+                                  console.log('Found invoice ID to sync:', invData.data.id);
+                                  handleSyncToFinance(invData.data.id);
+                                } else {
+                                  console.error('No yutong_invoices record found for this quotation');
+                                }
+                              }}
+                              variant="secondary"
+                              size="sm"
+                              disabled={isLoading}
+                              title="Sync to Finance Hub"
+                            >
+                              Sync
+                            </Button>
+                          )}
+                          <Button
+                            onClick={() => handleViewDocument(document)}
+                            variant="outline"
+                            size="sm"
+                          >
+                            View & Manage
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>

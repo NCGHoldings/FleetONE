@@ -369,6 +369,7 @@ export async function postVehiclePaymentToGL({
   customBankAccountId,
   customCreditAccountId,
   customerId,
+  paymentDate,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -588,6 +589,7 @@ export async function postVehicleInvoiceToGL({
   taxRate,
   invoiceNo,
   itemCategoryName,
+  invoiceDate,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -669,8 +671,7 @@ export async function postVehicleInvoiceToGL({
         total_debit: invoiceAmount,
         total_credit: invoiceAmount,
         business_unit_code: businessUnitCode,
-        posted_at: new Date().toISOString(),
-        notes: invoiceNo ? `Invoice: ${invoiceNo}` : undefined,
+        posted_at: new Date().toISOString()
       })
       .select('id, entry_number')
       .single();

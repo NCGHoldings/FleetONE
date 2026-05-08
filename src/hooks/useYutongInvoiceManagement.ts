@@ -3,6 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { generateYutongInvoicePDF, type YutongInvoiceData } from '@/lib/yutong-invoice-generator';
+import {
+  fetchVehicleFinanceSettings,
+  createVehicleCustomer,
+  createVehicleARInvoice,
+  postVehicleInvoiceToGL,
+  NCG_HOLDING_ID,
+} from '@/hooks/useVehicleSalesFinance';
 
 export interface YutongStoredInvoice {
   id: string;
@@ -119,6 +126,7 @@ export const useYutongInvoiceManagement = () => {
         .select(`
           *,
           yutong_quotations (
+            id,
             quotation_no,
             customer_name,
             customer_phone,
@@ -133,7 +141,8 @@ export const useYutongInvoiceManagement = () => {
             delivery_timeline,
             warranty_terms,
             special_features,
-            valid_until
+            valid_until,
+            customer_category_id
           )
         `)
         .eq('id', invoiceId)
@@ -206,6 +215,102 @@ export const useYutongInvoiceManagement = () => {
         .eq('id', documentId);
 
       if (updateDocError) throw updateDocError;
+
+      // ==========================================
+      // FINANCE INTEGRATION - AR & GL POSTING
+      // ==========================================
+      try {
+        const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
+        
+        if (settings && invoiceData.amount > 0) {
+          // 1. Check if an order exists for this quotation
+          const { data: existingOrder } = await supabase
+            .from('yutong_orders')
+            .select('id, order_no, finance_customer_id, total_paid')
+            .eq('quotation_id', quotation.id)
+            .maybeSingle();
+
+          let financeCustomerId = existingOrder?.finance_customer_id;
+          
+          // 2. Create or find customer if not exists
+          if (!financeCustomerId && quotation.customer_name) {
+            financeCustomerId = await createVehicleCustomer({
+              module: 'yutong',
+              companyId: NCG_HOLDING_ID,
+              customerName: quotation.customer_name,
+              customerPhone: quotation.customer_phone || undefined,
+              customerEmail: quotation.customer_email || undefined,
+              customerCategoryId: quotation.customer_category_id || undefined,
+            });
+            
+            // Link back to order if it exists
+            if (financeCustomerId && existingOrder) {
+              await supabase
+                .from('yutong_orders')
+                .update({ finance_customer_id: financeCustomerId })
+                .eq('id', existingOrder.id);
+            }
+          }
+
+          if (financeCustomerId) {
+            const orderNo = existingOrder?.order_no || quotation.quotation_no;
+            // Provide a dummy ID if no order exists, as createVehicleARInvoice expects one
+            // AR_invoices itself doesn't strictly foreign-key to yutong_orders on orderId
+            const orderId = existingOrder?.id || quotation.id; 
+            const totalPaid = existingOrder?.total_paid || 0;
+            const invoiceAmount = invoiceData.amount;
+            
+            // 3. Create AR Invoice
+            const arResult = await createVehicleARInvoice({
+              module: 'yutong',
+              orderId: orderId,
+              orderNo: orderNo,
+              customerId: financeCustomerId,
+              totalAmount: invoiceAmount,
+              advanceAmount: totalPaid,
+              companyId: NCG_HOLDING_ID,
+              settings,
+              customerCategoryId: quotation.customer_category_id,
+              invoiceNo: invoiceData.invoice_no,
+              // Calculate standard 18% VAT
+              taxAmount: invoiceAmount - (invoiceAmount / 1.18),
+            });
+
+            if (arResult) {
+              console.log('[Yutong Invoice] Created AR Invoice:', arResult.invoiceNumber);
+              
+              // 4. Post to GL
+              if (settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
+                const glResult = await postVehicleInvoiceToGL({
+                  module: 'yutong',
+                  orderNo: orderNo,
+                  customerName: quotation.customer_name,
+                  customerId: financeCustomerId,
+                  invoiceAmount: invoiceAmount,
+                  settings,
+                  effectiveCompanyId: NCG_HOLDING_ID,
+                  isTaxInvoice: true,
+                  taxRate: 18,
+                  invoiceNo: invoiceData.invoice_no,
+                });
+
+                if (glResult) {
+                  console.log('[Yutong Invoice] Posted to GL:', glResult.entryNumber);
+                  
+                  // Update AR Invoice with JE ID
+                  await supabase
+                    .from('ar_invoices')
+                    .update({ journal_entry_id: glResult.journalEntryId })
+                    .eq('id', arResult.invoiceId);
+                }
+              }
+            }
+          }
+        }
+      } catch (financeError) {
+        console.error('[Yutong Invoice] Finance integration failed:', financeError);
+        toast.error('Invoice approved, but Finance integration encountered an issue.');
+      }
 
       toast.success('Invoice approved successfully');
       return { success: true };
@@ -349,6 +454,146 @@ export const useYutongInvoiceManagement = () => {
     }
   };
 
+  const syncInvoiceToFinanceHub = async (invoiceId: string) => {
+    try {
+      setIsLoading(true);
+
+      const { data: invoiceData, error: invoiceError } = await supabase
+        .from('yutong_invoices')
+        .select(`
+          *,
+          yutong_quotations (
+            id,
+            quotation_no,
+            customer_name,
+            customer_phone,
+            customer_email,
+            company_name,
+            bus_model,
+            quantity,
+            unit_price,
+            discount_percentage,
+            total_price,
+            payment_terms,
+            delivery_timeline,
+            warranty_terms,
+            special_features,
+            valid_until,
+            customer_category_id
+          )
+        `)
+        .eq('id', invoiceId)
+        .single();
+
+      if (invoiceError) throw invoiceError;
+
+      const quotation = (invoiceData as any).yutong_quotations;
+      if (!quotation) throw new Error('Quotation data not found');
+
+      if (invoiceData.status !== 'approved') {
+         throw new Error('Only approved invoices can be synced.');
+      }
+
+      // ==========================================
+      // FINANCE INTEGRATION - AR & GL POSTING
+      // ==========================================
+      const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
+      
+      if (settings && invoiceData.amount > 0) {
+        // 1. Check if an order exists for this quotation
+        const { data: existingOrder } = await supabase
+          .from('yutong_orders')
+          .select('id, order_no, finance_customer_id, total_paid')
+          .eq('quotation_id', quotation.id)
+          .maybeSingle();
+
+        let financeCustomerId = existingOrder?.finance_customer_id;
+        
+        // 2. Create or find customer if not exists
+        if (!financeCustomerId && quotation.customer_name) {
+          financeCustomerId = await createVehicleCustomer({
+            module: 'yutong',
+            companyId: NCG_HOLDING_ID,
+            customerName: quotation.customer_name,
+            customerPhone: quotation.customer_phone || undefined,
+            customerEmail: quotation.customer_email || undefined,
+            customerCategoryId: quotation.customer_category_id || undefined,
+          });
+          
+          // Link back to order if it exists
+          if (financeCustomerId && existingOrder) {
+            await supabase
+              .from('yutong_orders')
+              .update({ finance_customer_id: financeCustomerId })
+              .eq('id', existingOrder.id);
+          }
+        }
+
+        if (financeCustomerId) {
+          const orderNo = existingOrder?.order_no || quotation.quotation_no;
+          const orderId = existingOrder?.id || quotation.id; 
+          const totalPaid = existingOrder?.total_paid || 0;
+          const invoiceAmount = invoiceData.amount;
+          
+          // 3. Create AR Invoice
+          const arResult = await createVehicleARInvoice({
+            module: 'yutong',
+            orderId: orderId,
+            orderNo: orderNo,
+            customerId: financeCustomerId,
+            totalAmount: invoiceAmount,
+            advanceAmount: totalPaid,
+            companyId: NCG_HOLDING_ID,
+            settings,
+            customerCategoryId: quotation.customer_category_id,
+            invoiceNo: invoiceData.invoice_no,
+            // Calculate standard 18% VAT
+            taxAmount: invoiceAmount - (invoiceAmount / 1.18),
+          });
+
+          if (arResult) {
+            console.log('[Yutong Sync] Created AR Invoice:', arResult.invoiceNumber);
+            
+            // 4. Post to GL
+            if (settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
+              const glResult = await postVehicleInvoiceToGL({
+                module: 'yutong',
+                orderNo: orderNo,
+                customerName: quotation.customer_name,
+                customerId: financeCustomerId,
+                invoiceAmount: invoiceAmount,
+                settings,
+                effectiveCompanyId: NCG_HOLDING_ID,
+                isTaxInvoice: true,
+                taxRate: 18,
+                invoiceNo: invoiceData.invoice_no,
+              });
+
+              if (glResult) {
+                console.log('[Yutong Sync] Posted to GL:', glResult.entryNumber);
+                
+                // Update AR Invoice with JE ID
+                await supabase
+                  .from('ar_invoices')
+                  .update({ journal_entry_id: glResult.journalEntryId })
+                  .eq('id', arResult.invoiceId);
+              }
+            }
+          }
+        }
+      }
+
+      toast.success('Invoice synced successfully');
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error syncing invoice:', error);
+      toast.error('Failed to sync invoice: ' + error.message);
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     isLoading,
     generateAndStoreDraftInvoice,
@@ -356,5 +601,6 @@ export const useYutongInvoiceManagement = () => {
     getInvoicesByQuotation,
     getInvoiceDocuments,
     regenerateInvoice,
+    syncInvoiceToFinanceHub,
   };
 };

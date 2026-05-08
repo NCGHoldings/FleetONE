@@ -122,7 +122,7 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
           odometer_end: null,
           distance_km: 0,
           fuel_liters: 0,
-          standard_fuel_rate: trip.standard_fuel_rate || 0,
+          standard_fuel_rate: trip.buses?.expected_km_per_liter || trip.standard_fuel_rate || 0,
           km_per_liter: trip.km_per_liter || 0
         });
       }

@@ -60,7 +60,8 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     isLoading,
     generateAndStoreDraftInvoice,
     getInvoicesByOrder,
-    getInvoiceDocuments
+    getInvoiceDocuments,
+    syncInvoiceToFinanceHub
   } = useYutongOrderInvoiceManagement();
 
   const vehicleDetailsComplete = !!(
@@ -352,6 +353,21 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     }
   };
 
+  const handleSyncToFinance = async (invoiceId: string) => {
+    toast.info('Sync initiated... Check console for details.');
+    console.log('SYNC CLICKED for invoiceId:', invoiceId);
+    try {
+      const result = await syncInvoiceToFinanceHub(invoiceId);
+      console.log('SYNC RESULT:', result);
+      if (result.success) {
+        loadData();
+        if (onRefresh) onRefresh();
+      }
+    } catch (e) {
+      console.error('SYNC ERROR:', e);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     if (status === 'approved') {
       return <Badge className="bg-success">{status}</Badge>;
@@ -495,6 +511,23 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
                         {getStatusBadge(doc.document_status)}
                         
                         <div className="flex gap-2">
+                          {doc.document_status === 'approved' && invoice && invoice.invoice_category !== 'proforma_invoice' && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={(e) => {
+                                console.log('BUTTON ONCLICK FIRED for invoice:', invoice.id);
+                                e.stopPropagation();
+                                e.preventDefault();
+                                handleSyncToFinance(invoice.id);
+                              }}
+                              disabled={isLoading}
+                              title="Sync to Finance Hub"
+                            >
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Sync
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
