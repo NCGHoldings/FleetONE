@@ -371,6 +371,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
           settings,
           effectiveCompanyId: NCG_HOLDING_ID,
           customCreditAccountId: payment.custom_credit_account_id || undefined,
+          paymentDate: payment.payment_date,
         });
 
         if (glResult) {

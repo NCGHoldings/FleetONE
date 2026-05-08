@@ -519,7 +519,19 @@ export default function DailyTrips() {
         open={showLogSheetModal}
         onOpenChange={setShowLogSheetModal}
         selectedDate={selectedDate}
-        onSuccess={() => {
+        onSuccess={(uploadedMonth?: string) => {
+          if (uploadedMonth) {
+             const [y, m] = uploadedMonth.split('-');
+             const newDate = new Date(parseInt(y), parseInt(m) - 1, 1);
+             setSelectedDate(newDate);
+             
+             // Automatically switch to viewing the entire uploaded month so the user can instantly see the new data
+             const start = new Date(parseInt(y), parseInt(m) - 1, 1);
+             const end = new Date(parseInt(y), parseInt(m), 0); // last day of month
+             
+             setDateRange({ from: start, to: end });
+             setDateMode("range");
+          }
           handleRefetch();
         }}
       />

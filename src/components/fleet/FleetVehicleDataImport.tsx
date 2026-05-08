@@ -201,123 +201,138 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawData = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
 
-      if (rawData.length < 2) {
-        toast({ title: "Error", description: "Excel file has no data rows", variant: "destructive" });
-        return;
-      }
-
-      let headerRowIdx = 0;
-      for (let i = 0; i < Math.min(10, rawData.length); i++) {
-        const row = rawData[i] as any[];
-        if (row && row.filter(c => c != null && String(c).trim()).length >= 3) {
-          headerRowIdx = i;
-          break;
-        }
-      }
-
-      const headers = Array.from(rawData[headerRowIdx] as any[]).map(h => String(h || "").trim());
-      const { mapping: colMap, headerMap: detectedHeaderMap } = detectHeaders(headers);
-      setHeaderMap(detectedHeaderMap);
-
-      if (colMap.bus_no === undefined) {
-        toast({ title: "Error", description: "Could not find 'Vehicle No' column in the Excel", variant: "destructive" });
-        return;
-      }
+      let totalHeaderMap: { excel: string; field: string }[] = [];
+      const rows: ParsedRow[] = [];
+      const excelBusNos = new Set<string>();
 
       const { data: existingBuses } = await supabase.from("buses").select("id, bus_no");
       const busMap = new Map<string, { id: string; bus_no: string }>();
       (existingBuses || []).forEach(b => busMap.set(normalizeBusNo(b.bus_no), b));
 
-      const rows: ParsedRow[] = [];
-      const excelBusNos = new Set<string>();
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        const rawData = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
 
-      for (let i = headerRowIdx + 1; i < rawData.length; i++) {
-        const row = rawData[i] as any[];
-        if (!row || row.every(c => c == null || String(c).trim() === "")) continue;
+        if (rawData.length < 2) continue;
 
-        const getValue = (field: string) => {
-          const idx = colMap[field];
-          if (idx === undefined) return undefined;
-          const v = row?.[idx];
-          return v != null ? String(v).trim() : undefined;
-        };
-
-        const getDateValue = (field: string) => {
-          const idx = colMap[field];
-          if (idx === undefined) return undefined;
-          return parseExcelDate(row?.[idx]);
-        };
-
-        const busNo = getValue("bus_no");
-        if (!busNo) continue;
-
-        excelBusNos.add(normalizeBusNo(busNo));
-
-        const capacityStr = getValue("capacity");
-        const yearStr = getValue("year");
-        const revenueStr = getValue("revenue_amount");
-
-        const mapped: MappedData = {
-          bus_no: busNo,
-          vehicle_name: getValue("vehicle_name"),
-          vehicle_brand: getValue("vehicle_brand"),
-          permit_no: getValue("permit_no"),
-          permit_category: getValue("permit_category"),
-          capacity: capacityStr ? parseInt(capacityStr) || undefined : undefined,
-          chassis_number: getValue("chassis_number"),
-          engine_number: getValue("engine_number"),
-          type: getValue("type"),
-          route: getValue("route"),
-          year: yearStr ? parseInt(yearStr) || undefined : undefined,
-          owner_name: getValue("owner_name"),
-          owner_address: getValue("owner_address"),
-          owner_nic: getValue("owner_nic"),
-          ownership_type: getValue("owner_name"), // "Ownership" column maps to ownership classification
-          leasing_bank: getValue("leasing_bank"),
-          leasing_end_date: getDateValue("leasing_end_date"),
-          permit_expiry_date: getDateValue("permit_expiry_date"),
-          revenue_license_expiry: getDateValue("revenue_license_expiry"),
-          revenue_amount: revenueStr ? parseFloat(revenueStr) || undefined : undefined,
-          insurance_company: getValue("insurance_company"),
-          insurance_expiry: getDateValue("insurance_expiry"),
-          insurance_month: getValue("insurance_month"),
-          default_driver_name: getValue("default_driver_name"),
-          driver_phone: getValue("driver_phone"),
-          documents_status: getValue("documents_status"),
-        };
-
-        // If "Ownership" column was detected under owner_name but it's really an ownership type
-        // check if the value looks like a type (Own, Leased, Hired) vs a person's name
-        if (mapped.owner_name) {
-          const ownerLower = mapped.owner_name.toLowerCase();
-          if (["own", "leased", "hired", "company", "private"].includes(ownerLower)) {
-            mapped.ownership_type = mapped.owner_name;
-            mapped.owner_name = undefined;
-          } else {
-            mapped.ownership_type = undefined; // It's a real name, not a type
+        let headerRowIdx = 0;
+        let foundHeader = false;
+        for (let i = 0; i < Math.min(10, rawData.length); i++) {
+          const row = rawData[i] as any[];
+          if (row && row.filter(c => c != null && String(c).trim()).length >= 3) {
+            headerRowIdx = i;
+            foundHeader = true;
+            break;
           }
         }
 
-        const normalizedNo = normalizeBusNo(busNo);
-        const match = busMap.get(normalizedNo);
+        if (!foundHeader) continue;
 
-        const fieldsToUpdate = Object.entries(mapped)
-          .filter(([k, v]) => k !== "bus_no" && v != null && String(v).trim() !== "")
-          .map(([k]) => k);
+        const headers = Array.from(rawData[headerRowIdx] as any[]).map(h => String(h || "").trim());
+        const { mapping: colMap, headerMap: detectedHeaderMap } = detectHeaders(headers);
 
-        rows.push({
-          rowIndex: i,
-          raw: Object.fromEntries(headers.map((h, idx) => [h || `col_${idx}`, row?.[idx] ?? null])),
-          mapped,
-          matchStatus: match ? "matched" : "new",
-          matchedBusId: match?.id,
-          matchedBusNo: match?.bus_no,
-          fieldsToUpdate,
+        detectedHeaderMap.forEach(hm => {
+           if (!totalHeaderMap.some(t => t.field === hm.field)) {
+             totalHeaderMap.push(hm);
+           }
         });
+
+        if (colMap.bus_no === undefined) {
+          console.warn(`Skipping sheet ${sheetName} - no 'Vehicle No' column found.`);
+          continue;
+        }
+
+        for (let i = headerRowIdx + 1; i < rawData.length; i++) {
+          const row = rawData[i] as any[];
+          if (!row || row.every(c => c == null || String(c).trim() === "")) continue;
+
+          const getValue = (field: string) => {
+            const idx = colMap[field];
+            if (idx === undefined) return undefined;
+            const v = row?.[idx];
+            return v != null ? String(v).trim() : undefined;
+          };
+
+          const getDateValue = (field: string) => {
+            const idx = colMap[field];
+            if (idx === undefined) return undefined;
+            return parseExcelDate(row?.[idx]);
+          };
+
+          const busNo = getValue("bus_no");
+          if (!busNo) continue;
+
+          excelBusNos.add(normalizeBusNo(busNo));
+
+          const capacityStr = getValue("capacity");
+          const yearStr = getValue("year");
+          const revenueStr = getValue("revenue_amount");
+
+          const mapped: MappedData = {
+            bus_no: busNo,
+            vehicle_name: getValue("vehicle_name"),
+            vehicle_brand: getValue("vehicle_brand"),
+            permit_no: getValue("permit_no"),
+            permit_category: getValue("permit_category"),
+            capacity: capacityStr ? parseInt(capacityStr) || undefined : undefined,
+            chassis_number: getValue("chassis_number"),
+            engine_number: getValue("engine_number"),
+            type: getValue("type"),
+            route: getValue("route"),
+            year: yearStr ? parseInt(yearStr) || undefined : undefined,
+            owner_name: getValue("owner_name"),
+            owner_address: getValue("owner_address"),
+            owner_nic: getValue("owner_nic"),
+            ownership_type: getValue("owner_name"), 
+            leasing_bank: getValue("leasing_bank"),
+            leasing_end_date: getDateValue("leasing_end_date"),
+            permit_expiry_date: getDateValue("permit_expiry_date"),
+            revenue_license_expiry: getDateValue("revenue_license_expiry"),
+            revenue_amount: revenueStr ? parseFloat(revenueStr) || undefined : undefined,
+            insurance_company: getValue("insurance_company"),
+            insurance_expiry: getDateValue("insurance_expiry"),
+            insurance_month: getValue("insurance_month"),
+            default_driver_name: getValue("default_driver_name"),
+            driver_phone: getValue("driver_phone"),
+            documents_status: getValue("documents_status"),
+          };
+
+          if (mapped.owner_name) {
+            const ownerLower = mapped.owner_name.toLowerCase();
+            if (["own", "leased", "hired", "company", "private"].includes(ownerLower)) {
+              mapped.ownership_type = mapped.owner_name;
+              mapped.owner_name = undefined;
+            } else {
+              mapped.ownership_type = undefined; 
+            }
+          }
+
+          const normalizedNo = normalizeBusNo(busNo);
+          const match = busMap.get(normalizedNo);
+
+          const fieldsToUpdate = Object.entries(mapped)
+            .filter(([k, v]) => k !== "bus_no" && v != null && String(v).trim() !== "")
+            .map(([k]) => k);
+
+          rows.push({
+            rowIndex: i,
+            raw: Object.fromEntries(headers.map((h, idx) => [h || `col_${idx}`, row?.[idx] ?? null])),
+            mapped,
+            matchStatus: match ? "matched" : "new",
+            matchedBusId: match?.id,
+            matchedBusNo: match?.bus_no,
+            fieldsToUpdate,
+          });
+        }
       }
+
+      if (rows.length === 0) {
+        toast({ title: "Error", description: "No valid bus data found in any sheet", variant: "destructive" });
+        return;
+      }
+
+      setHeaderMap(totalHeaderMap);
 
       const unmatched: UnmatchedDbBus[] = (existingBuses || [])
         .filter(b => !excelBusNos.has(normalizeBusNo(b.bus_no)))
@@ -329,7 +344,7 @@ export function FleetVehicleDataImport({ open, onOpenChange, onSuccess }: FleetV
 
       toast({
         title: "Excel Parsed",
-        description: `Found ${rows.length} rows: ${rows.filter(r => r.matchStatus === "matched").length} matched, ${rows.filter(r => r.matchStatus === "new").length} new. ${unmatched.length} DB buses not in Excel.`,
+        description: `Found ${rows.length} rows across sheets: ${rows.filter(r => r.matchStatus === "matched").length} matched, ${rows.filter(r => r.matchStatus === "new").length} new. ${unmatched.length} DB buses not in Excel.`,
       });
     } catch (err: any) {
       toast({ title: "Parse Error", description: err.message, variant: "destructive" });

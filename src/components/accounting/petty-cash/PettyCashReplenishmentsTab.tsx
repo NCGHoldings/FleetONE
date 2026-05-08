@@ -70,14 +70,42 @@ export const PettyCashReplenishmentsTab = () => {
     const searchRef = match ? match[1] : refUpper;
 
     try {
-      const { data, error } = await supabase
-        .from(orderTable)
-        .select('id')
-        .ilike(orderCol, `%${searchRef.trim()}%`)
-        .maybeSingle();
+      let orderIdStr = null;
+
+      if (module === 'yutong') {
+         if (searchRef.startsWith('QUO-')) {
+             const { data: qData } = await supabase.from('yutong_quotations')
+                 .select('id')
+                 .ilike('quotation_no', `%${searchRef.trim()}%`)
+                 .maybeSingle();
+                 
+             if (qData) {
+                 const { data: oData } = await supabase.from('yutong_orders')
+                     .select('id')
+                     .eq('quotation_id', qData.id)
+                     .maybeSingle();
+                 if (oData) orderIdStr = oData.id;
+             }
+         }
+         
+         if (!orderIdStr) {
+             const { data } = await supabase.from('yutong_orders')
+                 .select('id')
+                 .ilike('order_no', `%${searchRef.trim()}%`)
+                 .maybeSingle();
+             if (data) orderIdStr = data.id;
+         }
+      } else {
+          const { data } = await supabase
+            .from(orderTable)
+            .select('id')
+            .ilike(orderCol, `%${searchRef.trim()}%`)
+            .maybeSingle();
+          if (data) orderIdStr = data.id;
+      }
       
-      if (data?.id) {
-        setFinanceHubState({ isOpen: true, orderId: data.id, module });
+      if (orderIdStr) {
+        setFinanceHubState({ isOpen: true, orderId: orderIdStr, module });
       } else {
         toast({ title: "Order Not Found", description: `Could not find a ${module} order matching ${searchRef}`, variant: "destructive" });
       }

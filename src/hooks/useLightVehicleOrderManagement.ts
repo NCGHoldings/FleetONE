@@ -347,15 +347,17 @@ export const useLightVehicleOrderManagement = () => {
               if (settings) {
                   const description = `ADVANCE PAYMENT FOR LIGHT VEHICLE ORDER ${orderDetails.order_number} - ${orderDetails.lightvehicle_quotations?.customer_name || 'CUSTOMER'}`;
                   
-                  await postVehiclePaymentToGL(
-                      paymentData.payment_amount,
-                      description,
-                      'advance',
-                      NCG_HOLDING_ID,
+                  await postVehiclePaymentToGL({
+                      module: 'lightvehicle',
+                      orderNo: orderDetails.order_number,
+                      customerName: orderDetails.lightvehicle_quotations?.customer_name || 'CUSTOMER',
+                      amount: paymentData.payment_amount,
+                      paymentType: 'advance',
+                      paymentMethod: paymentData.payment_method,
                       settings,
-                      paymentData.order_id,
-                      'lightvehicle'
-                  );
+                      effectiveCompanyId: NCG_HOLDING_ID,
+                      paymentDate: paymentData.payment_date,
+                  });
               }
           }
       } catch (glError) {

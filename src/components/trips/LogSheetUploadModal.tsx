@@ -20,7 +20,7 @@ interface LogSheetUploadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedDate: Date;
-  onSuccess: () => void;
+  onSuccess: (monthYear?: string) => void;
 }
 
 interface DBTripRow {
@@ -154,6 +154,12 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
   };
 
   const lookupBus = async (busNo: string) => {
+    if (!busNo || busNo.trim().length < 2) {
+      setBusId(null);
+      toast.error('Please enter a valid bus number');
+      return;
+    }
+
     const { data } = await supabase
       .from('buses')
       .select('id, bus_no')
@@ -227,6 +233,27 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
   const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newMY = e.target.value;
     setMonthYear(newMY);
+    
+    // Auto-update all rows in editedLogs to match the new year-month, keeping their days
+    if (editedLogs.length > 0) {
+      const [yearStr, monthStr] = newMY.split('-');
+      const year = parseInt(yearStr);
+      const month = parseInt(monthStr) - 1; // 0-indexed
+      
+      const newLogs = [...editedLogs];
+      newLogs.forEach((log) => {
+        if (log.date) {
+           const parsedDate = parse(log.date, 'yyyy-MM-dd', new Date());
+           if (isValid(parsedDate)) {
+             // Keep the day, change the month and year
+             const newDate = new Date(year, month, parsedDate.getDate());
+             log.date = format(newDate, 'yyyy-MM-dd');
+           }
+        }
+      });
+      setEditedLogs(newLogs);
+    }
+
     if (busId) {
       fetchDbData(busId, newMY);
     }
@@ -440,7 +467,7 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
       }
 
       toast.success(`Successfully saved ${successCount} log sheet rows!`);
-      onSuccess();
+      onSuccess(monthYear);
       onOpenChange(false);
     } catch (error: any) {
       console.error('Save Error:', error);
@@ -545,6 +572,7 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                   <Input 
                     value={busNumber} 
                     onChange={e => setBusNumber(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleManualBusLookup(); }}
                     placeholder="e.g. NC-8226"
                   />
                   <Button variant="secondary" size="icon" onClick={handleManualBusLookup}>
@@ -774,14 +802,18 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                                     </div>
                                     <div>
                                       {i === 0 ? (
-                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{trip.odometer_start || '-'}</Badge>
+                                        <Badge variant="outline" className={log.start_odo ? "bg-purple-50 text-purple-700 border-purple-200 font-bold" : "bg-blue-50 text-blue-700 border-blue-200"}>
+                                          {log.start_odo || trip.odometer_start || '-'} {log.start_odo ? '(Auto-Fill)' : ''}
+                                        </Badge>
                                       ) : (
                                         <span className="text-muted-foreground">{trip.odometer_start || '-'}</span>
                                       )}
                                     </div>
                                     <div>
                                       {i === dbRows.length - 1 ? (
-                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{trip.odometer_end || '-'}</Badge>
+                                        <Badge variant="outline" className={log.end_odo ? "bg-purple-50 text-purple-700 border-purple-200 font-bold" : "bg-blue-50 text-blue-700 border-blue-200"}>
+                                          {log.end_odo || trip.odometer_end || '-'} {log.end_odo ? '(Auto-Fill)' : ''}
+                                        </Badge>
                                       ) : (
                                         <span className="text-muted-foreground">{trip.odometer_end || '-'}</span>
                                       )}
@@ -792,9 +824,9 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                                   </div>
                                 ))}
                               </div>
-                              <div className="mt-3 text-[10px] text-muted-foreground bg-blue-50/50 p-2 rounded border border-blue-100 flex items-start gap-2">
-                                <AlertCircle className="h-3 w-3 text-blue-500 mt-0.5 shrink-0" />
-                                <p><strong>Allocation Plan:</strong> When saved, the Start Odo (<span className="font-mono">{log.start_odo || '0'}</span>) will be applied to the <strong>first trip</strong>, and the End Odo (<span className="font-mono">{log.end_odo || '0'}</span>) will be applied to the <strong>last trip</strong>.</p>
+                              <div className="mt-3 text-[10px] text-muted-foreground bg-purple-50/50 p-2 rounded border border-purple-100 flex items-start gap-2">
+                                <AlertCircle className="h-3 w-3 text-purple-500 mt-0.5 shrink-0" />
+                                <p><strong>Smart Allocation:</strong> When you click save, the system will apply the Start Odometer (<span className="font-mono font-bold text-purple-700">{log.start_odo || '0'}</span>) to the <strong>first trip</strong>, and the End Odometer (<span className="font-mono font-bold text-purple-700">{log.end_odo || '0'}</span>) to the <strong>last trip</strong>. The purple badges above show a preview of what the database records will look like.</p>
                               </div>
                             </div>
                           </TableCell>

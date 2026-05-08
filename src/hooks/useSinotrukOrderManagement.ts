@@ -290,15 +290,17 @@ export const useSinotrukOrderManagement = () => {
                     if (settings) {
                         const description = `ADVANCE PAYMENT FOR SINOTRUK ORDER ${orderDetails.order_no} - ${orderDetails.sinotruck_quotations?.customer_name || 'CUSTOMER'}`;
                         
-                        await postVehiclePaymentToGL(
-                            paymentData.payment_amount,
-                            description,
-                            'advance',
-                            NCG_HOLDING_ID,
+                        await postVehiclePaymentToGL({
+                            module: 'sinotruck',
+                            orderNo: orderDetails.order_no,
+                            customerName: orderDetails.sinotruck_quotations?.customer_name || 'CUSTOMER',
+                            amount: paymentData.payment_amount,
+                            paymentType: 'advance',
+                            paymentMethod: paymentData.payment_method,
                             settings,
-                            paymentData.order_id,
-                            'sinotruck'
-                        );
+                            effectiveCompanyId: NCG_HOLDING_ID,
+                            paymentDate: paymentData.payment_date,
+                        });
                     }
                 }
             } catch (glError) {

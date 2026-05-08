@@ -173,6 +173,7 @@ export function YutongFinanceSettlementHub() {
             settings,
             effectiveCompanyId: NCG_HOLDING_ID,
             customBankAccountId: bankAccountIdToUse,
+            paymentDate: payment.payment_date,
           });
 
           if (glResult) {

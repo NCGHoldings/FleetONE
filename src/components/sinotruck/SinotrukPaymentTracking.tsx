@@ -450,6 +450,7 @@ export function SinotrukPaymentTracking({ orderId, onRefresh }: SinotrukPaymentT
           customBankAccountId: manualOverrides.bankId || payment.bank_account_id,
           customCreditAccountId: manualOverrides.creditId || payment.custom_credit_account_id || undefined,
           customerId,
+          paymentDate: payment.payment_date,
         });
 
         if (glResult) {

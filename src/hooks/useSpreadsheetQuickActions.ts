@@ -174,6 +174,7 @@ export function useSpreadsheetQuickActions(refetch: () => void) {
           paymentMethod: payment.payment_method,
           settings,
           effectiveCompanyId: NCG_HOLDING_ID,
+          paymentDate: payment.payment_date,
         });
         if (glResult) {
           journalEntryId = glResult.journalEntryId;

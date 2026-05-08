@@ -332,6 +332,7 @@ export const useYutongOrderManagement = () => {
               paymentMethod: paymentData.payment_method,
               settings,
               effectiveCompanyId: NCG_HOLDING_ID,
+              paymentDate: paymentData.payment_date,
             });
 
             if (glResult) {

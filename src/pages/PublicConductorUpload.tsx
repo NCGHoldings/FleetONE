@@ -311,7 +311,10 @@ export default function PublicConductorUpload() {
   }));
 
   // Trip State (Only managing one trip at a time for submission)
-  const [currentTripNumber, setCurrentTripNumber] = useState<number>(1);
+  const [currentTripNumber, setCurrentTripNumber] = useState<number>(() => {
+    const completed = loadState('completedTrips', []);
+    return completed.length > 0 ? Math.max(...completed.map((t: any) => t.tripNumber)) + 1 : 1;
+  });
   const [trip, setTrip] = useState<Trip>(() => loadState('current_trip', {
     id: '1', startOdo: '', endOdo: '',
     income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' }

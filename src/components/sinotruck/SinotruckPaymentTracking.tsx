@@ -325,6 +325,7 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
           effectiveCompanyId: NCG_HOLDING_ID,
           customBankAccountId: payment.bank_account_id,
           customCreditAccountId: payment.custom_credit_account_id || undefined,
+          paymentDate: payment.payment_date,
         });
 
         if (glResult) {

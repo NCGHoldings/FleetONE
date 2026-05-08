@@ -381,6 +381,7 @@ export async function postVehiclePaymentToGL({
   customBankAccountId?: string;
   customCreditAccountId?: string;
   customerId?: string;
+  paymentDate?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
@@ -444,7 +445,7 @@ export async function postVehiclePaymentToGL({
       .insert({
         company_id: effectiveCompanyId,
         entry_number: entryNumber,
-        entry_date: new Date().toISOString().split('T')[0],
+        entry_date: paymentDate || new Date().toISOString().split('T')[0],
         description,
         reference: `${businessUnitCode}-${entryPrefix}-${orderNo}`,
         source_module: `${module}_sales`,
@@ -599,6 +600,7 @@ export async function postVehicleInvoiceToGL({
   taxRate?: number;
   invoiceNo?: string;
   itemCategoryName?: string;
+  invoiceDate?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
@@ -659,7 +661,7 @@ export async function postVehicleInvoiceToGL({
       .insert({
         company_id: effectiveCompanyId,
         entry_number: entryNumber,
-        entry_date: new Date().toISOString().split('T')[0],
+        entry_date: invoiceDate || new Date().toISOString().split('T')[0],
         description,
         reference: invoiceNo || `${businessUnitCode}-INV-${orderNo}`,
         source_module: `${module}_sales`,
@@ -750,6 +752,7 @@ export async function applyAdvanceToReceivable({
   settings,
   effectiveCompanyId,
   customerId,
+  applicationDate,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -758,6 +761,7 @@ export async function applyAdvanceToReceivable({
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
   customerId?: string;
+  applicationDate?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
@@ -790,7 +794,7 @@ export async function applyAdvanceToReceivable({
       .insert({
         company_id: effectiveCompanyId,
         entry_number: entryNumber,
-        entry_date: new Date().toISOString().split('T')[0],
+        entry_date: applicationDate || new Date().toISOString().split('T')[0],
         description,
         reference: `${businessUnitCode}-ADV-APPLY-${orderNo}`,
         source_module: `${module}_sales`,

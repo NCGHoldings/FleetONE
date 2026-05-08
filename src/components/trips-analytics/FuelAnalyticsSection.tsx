@@ -7,6 +7,8 @@ import { Search, Calendar, Fuel, ArrowRight } from "lucide-react";
 import { TripData } from "@/hooks/useTripsAnalytics";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface FuelAnalyticsSectionProps {
   rawTrips: TripData[];
@@ -16,11 +18,29 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
   const [searchTerm, setSearchTerm] = useState("");
   
   const availableDates = useMemo(() => {
+    // Make sure we generate at least today's date if rawTrips is empty
     const dates = new Set(rawTrips.map(t => t.trip_date).filter(Boolean));
-    return Array.from(dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    const sorted = Array.from(dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    if (sorted.length === 0) {
+      const today = new Date();
+      sorted.push(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`);
+    }
+    return sorted;
   }, [rawTrips]);
 
   const [selectedDate, setSelectedDate] = useState<string>("");
+
+  const { data: activeBuses } = useQuery({
+    queryKey: ['active_buses_fuel_section'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('buses')
+        .select('id, bus_no, registration_number, model, type, route, expected_km_per_liter')
+        .eq('status', 'active');
+      if (error) throw error;
+      return data || [];
+    }
+  });
 
   useEffect(() => {
     if (!selectedDate && availableDates.length > 0) {
@@ -51,20 +71,55 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
     // Group by Bus and Route
     const groups = new Map<string, any>();
 
+    // First add all active buses
+    if (activeBuses && activeBuses.length > 0) {
+      activeBuses.forEach(bus => {
+        // Only apply search filter to empty buses
+        if (searchTerm) {
+          const lowerSearch = searchTerm.toLowerCase();
+          const matchesSearch = (bus.bus_no || "").toLowerCase().includes(lowerSearch) ||
+                                (bus.registration_number || "").toLowerCase().includes(lowerSearch) ||
+                                (bus.route || "").toLowerCase().includes(lowerSearch);
+          if (!matchesSearch) return;
+        }
+        
+        const key = `${bus.id}_unknown_route`;
+        groups.set(key, {
+          id: key,
+          trip_date: selectedDate,
+          buses: bus,
+          routes: null,
+          no_of_trips: 0,
+          odometer_start: null,
+          odometer_end: null,
+          distance_km: 0,
+          fuel_liters: 0,
+          standard_fuel_rate: bus.expected_km_per_liter || 0,
+          km_per_liter: 0
+        });
+      });
+    }
+
     filtered.forEach(trip => {
       const busId = trip.bus_id || 'unknown';
       const routeId = trip.route_id || 'unknown';
       const key = `${busId}_${routeId}`;
 
       if (!groups.has(key)) {
+        const existingKeyForBus = `${busId}_unknown_route`;
+        if (groups.has(existingKeyForBus)) {
+          // Upgrade the dummy entry to this actual route entry, or delete it and create a new one
+          groups.delete(existingKeyForBus);
+        }
+        
         groups.set(key, {
           id: key,
           trip_date: trip.trip_date,
           buses: trip.buses,
           routes: trip.routes,
           no_of_trips: 0,
-          odo_start: null,
-          odo_end: null,
+          odometer_start: null,
+          odometer_end: null,
           distance_km: 0,
           fuel_liters: 0,
           standard_fuel_rate: trip.standard_fuel_rate || 0,
@@ -76,14 +131,14 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
       group.no_of_trips += 1;
       
       // Get min start meter and max end meter
-      if (trip.odo_start !== null && trip.odo_start !== undefined) {
-        if (group.odo_start === null || trip.odo_start < group.odo_start) {
-          group.odo_start = trip.odo_start;
+      if (trip.odometer_start !== null && trip.odometer_start !== undefined) {
+        if (group.odometer_start === null || trip.odometer_start < group.odometer_start) {
+          group.odometer_start = trip.odometer_start;
         }
       }
-      if (trip.odo_end !== null && trip.odo_end !== undefined) {
-        if (group.odo_end === null || trip.odo_end > group.odo_end) {
-          group.odo_end = trip.odo_end;
+      if (trip.odometer_end !== null && trip.odometer_end !== undefined) {
+        if (group.odometer_end === null || trip.odometer_end > group.odometer_end) {
+          group.odometer_end = trip.odometer_end;
         }
       }
 
@@ -103,7 +158,7 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
       const busB = (b.buses?.bus_no || b.buses?.registration_number || "");
       return busA.localeCompare(busB);
     });
-  }, [rawTrips, searchTerm, selectedDate]);
+  }, [rawTrips, searchTerm, selectedDate, activeBuses]);
 
   return (
     <div className="space-y-6">
@@ -206,8 +261,8 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
                     const borderClass = isNewRoute ? "border-t-2 border-t-slate-300 dark:border-t-slate-600" : "border-t border-slate-100 dark:border-slate-800/50";
                     const rowClass = rowColors[routeColorIndex];
                     
-                    const startMeter = group.odo_start ?? 0;
-                    const endMeter = group.odo_end ?? 0;
+                    const startMeter = group.odometer_start ?? 0;
+                    const endMeter = group.odometer_end ?? 0;
                   // If we have both meters, use the difference, otherwise sum of distances
                   const totalMileage = (startMeter > 0 && endMeter > startMeter) 
                     ? (endMeter - startMeter) 
