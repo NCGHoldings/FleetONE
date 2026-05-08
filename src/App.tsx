@@ -857,7 +857,9 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'finance']}>
                   <MFAGuard>
-                    <Accounting />
+                    <AppLayout>
+                      <Accounting />
+                    </AppLayout>
                   </MFAGuard>
                 </ProtectedRoute>
               } 

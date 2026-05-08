@@ -82,47 +82,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Keep track of mounted state to avoid state updates on unmounted component
+    let isMounted = true;
+
+    // Helper to initialize user data
+    let isInitializing = false;
+    
+    const initializeUserData = async (sessionUser: User | null) => {
+      if (isInitializing) return;
+      isInitializing = true;
+      console.log("[Auth] Starting initializeUserData for user:", sessionUser?.id);
+      
+      if (sessionUser) {
+        try {
+          await Promise.all([
+            fetchUserProfile(sessionUser.id),
+            fetchMFAFactors(),
+            fetchAAL()
+          ]);
+          console.log("[Auth] initializeUserData Promise.all finished");
+        } catch (e) {
+          console.error("[Auth] initializeUserData error:", e);
+        }
+      } else {
+        setUserProfile(null);
+        setUserRoles([]);
+        setMfaFactors([]);
+        setAal(null);
+      }
+      
+      console.log("[Auth] Setting loading to false (isMounted: " + isMounted + ")");
+      if (isMounted) setLoading(false);
+      isInitializing = false;
+    };
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state change:', event, session);
+        if (!isMounted) return;
         setSession(session);
         setUser(session?.user ?? null);
         
-        if (session?.user) {
-          setTimeout(() => {
-            fetchUserProfile(session.user.id);
-            fetchMFAFactors();
-            fetchAAL();
-          }, 0);
-        } else {
-          setUserProfile(null);
-          setUserRoles([]);
-          setMfaFactors([]);
-          setAal(null);
-        }
-        
-        setLoading(false);
+        await initializeUserData(session?.user ?? null);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (!isMounted) return;
+      if (error) {
+        console.error("Error getting session:", error);
+        setLoading(false);
+        return;
+      }
       setSession(session);
       setUser(session?.user ?? null);
       
-      if (session?.user) {
-        setTimeout(() => {
-          fetchUserProfile(session.user.id);
-          fetchMFAFactors();
-          fetchAAL();
-        }, 0);
-      }
-      
-      setLoading(false);
+      await initializeUserData(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    // Fallback: force loading to false after 3 seconds to prevent infinite loading
+    const forceLoadTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.warn("[Auth] Force clearing loading state due to timeout");
+        setLoading(false);
+      }
+    }, 3000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(forceLoadTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
