@@ -87,7 +87,7 @@ export interface QuotationWithPayments {
 
 // Unique per browser tab — prevents duplicate WS subscriptions accumulating
 // when the component remounts on page reload (old subscription not yet GC'd)
-const SESSION_ID = Math.random().toString(36).slice(2, 8);
+const SESSION_ID = crypto.randomUUID().slice(0, 8);
 
 export function useRealtimeSpecialHire() {
   const [quotations, setQuotations] = useState<QuotationWithPayments[]>([]);
