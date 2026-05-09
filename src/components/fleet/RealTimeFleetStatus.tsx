@@ -35,7 +35,7 @@ export default function RealTimeFleetStatus() {
         dailyKm: t.daily_mileage_km || 0,
       }));
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 5 * 60 * 1000, // 5 minutes (was 30s — caused server overload)
   });
 
   if (isLoading) {

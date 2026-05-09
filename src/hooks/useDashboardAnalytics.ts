@@ -131,7 +131,8 @@ export function useDashboardAnalytics() {
         conductorsOnDuty,
       };
     },
-    refetchInterval: 5 * 60 * 1000, // 5 min — reduced from 30s
+    refetchInterval: 5 * 60 * 1000, // 5 minutes (was 30s — caused server overload)
+    refetchOnWindowFocus: false,
   });
 
   // Revenue trend (last 30 days)
@@ -193,7 +194,8 @@ export function useDashboardAnalytics() {
         lastUpdate: item.last_update,
       }));
     },
-    refetchInterval: 5 * 60 * 1000, // 5 min — reduced from 30s
+    refetchInterval: 5 * 60 * 1000, // 5 minutes (was 30s — caused server overload)
+    refetchOnWindowFocus: false,
   });
 
   // Live alerts
@@ -276,7 +278,7 @@ export function useDashboardAnalytics() {
 
       return alertsList.slice(0, 8);
     },
-    refetchInterval: 5 * 60 * 1000, // 5 min — reduced from 1min
+    refetchInterval: 10 * 60 * 1000, // 10 minutes (was 60s — caused server overload)
   });
 
   // Route performance

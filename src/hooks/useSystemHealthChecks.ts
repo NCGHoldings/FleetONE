@@ -40,7 +40,7 @@ export function useSystemHealthChecks(): UseSystemHealthChecksReturn {
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [lastRunTime, setLastRunTime] = useState<Date | null>(null);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false); // DISABLED by default — was true, causing 6 heavy DB/Storage/Realtime tests every 5 min
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const addLog = useCallback((status: HealthStatus, message: string, latency?: number) => {

@@ -21,7 +21,7 @@ export const VerifyHubView = () => {
       if (error) throw error;
       return data;
     },
-    refetchInterval: 5000, // Instant millisecond checks refresh every 5s
+    refetchInterval: 2 * 60 * 1000, // 2 minutes (was 5s — caused server overload)
   });
 
   const { data: stats, isLoading: isLoadingStats } = useQuery({
@@ -31,7 +31,7 @@ export const VerifyHubView = () => {
       if (error) throw error;
       return data;
     },
-    refetchInterval: 5000,
+    refetchInterval: 2 * 60 * 1000, // 2 minutes (was 5s — caused server overload)
   });
 
   return (

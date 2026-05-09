@@ -96,7 +96,8 @@ export function ExecutiveLiveAlerts() {
 
       return alertsList.slice(0, 6);
     },
-    refetchInterval: 60000, // Refresh every minute
+    refetchInterval: 10 * 60 * 1000, // 10 minutes (was 60s)
+    refetchOnWindowFocus: false,
   });
 
   const getAlertIcon = (type: Alert['type']) => {

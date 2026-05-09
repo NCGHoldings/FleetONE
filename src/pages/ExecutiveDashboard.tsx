@@ -44,7 +44,7 @@ export default function ExecutiveDashboard() {
   } = useExecutiveDashboard({
     startDate: dateRange.from,
     endDate: dateRange.to,
-    refreshInterval: autoRefresh ? 30000 : 0,
+    refreshInterval: autoRefresh ? 5 * 60 * 1000 : 0, // 5 min (was 30s — 3 heavy queries killed the server)
   });
 
   useEffect(() => {

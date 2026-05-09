@@ -400,7 +400,8 @@ export function useSinotrukExecutiveReport(filters?: SinotrukReportFilters) {
   return useQuery({
     queryKey: ['sinotruck-executive-report', effectiveFilters],
     queryFn: () => fetchReportData(effectiveFilters),
-    refetchInterval: 10 * 60 * 1000, // 10 min — this fn fires 16 parallel queries
+    refetchInterval: 10 * 60 * 1000, // 10 minutes (was 60s — 16+ queries each call)
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }

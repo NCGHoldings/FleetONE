@@ -21,7 +21,7 @@ export function LatencySparkline() {
       if (error) throw error;
       return data || [];
     },
-    refetchInterval: 60000 // Refetch every minute
+    refetchInterval: 5 * 60 * 1000 // 5 minutes (was 60s — caused server overload)
   });
 
   const chartData = useMemo(() => {

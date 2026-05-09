@@ -38,7 +38,7 @@ export function HealthHistoryTable() {
       if (error) throw error;
       return data as HealthLog[];
     },
-    refetchInterval: 30000
+    refetchInterval: 5 * 60 * 1000 // 5 minutes (was 30s — caused server overload)
   });
 
   // Group logs by timestamp (within 5 second windows)

@@ -112,8 +112,9 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
-      staleTime: 2 * 60 * 1000,
+      staleTime: 2 * 60 * 1000, // 2 minutes — prevents duplicate fetches across components
       gcTime: 10 * 60 * 1000,
+      refetchOnReconnect: false, // Don't stampede after network recovery
     },
   },
   queryCache: new QueryCache({
