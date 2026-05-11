@@ -922,9 +922,15 @@ export const DrillDownModal = ({
           <Card>
             <CardContent className="pt-4">
               <p className="text-sm text-muted-foreground">Ending Balance</p>
-              <p className={`text-xl font-semibold ${totalCurrentBalance >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                <CurrencyDisplay amount={totalCurrentBalance} />
-              </p>
+              {/* Filter-aware: BBF + net movement of filtered transactions */}
+              {(() => {
+                const endingBalance = broughtForwardBalance + netMovement;
+                return (
+                  <p className={`text-xl font-semibold ${endingBalance >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                    <CurrencyDisplay amount={endingBalance} />
+                  </p>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>
