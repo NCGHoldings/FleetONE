@@ -369,10 +369,10 @@ export const DrillDownModal = ({
     setIsRecalculating(true);
     try {
       for (const accountId of resolvedAccountIds) {
-        // 1. Get the account type and opening_balance
+        // 1. Get the account type and current_balance
         const { data: account } = await supabase
           .from("chart_of_accounts")
-          .select("id, account_type, opening_balance, current_balance")
+          .select("id, account_type, current_balance")
           .eq("id", accountId)
           .single();
 
@@ -393,10 +393,10 @@ export const DrillDownModal = ({
 
         // 4. Calculate the correct current_balance based on account type
         const isDebitNormal = ["asset", "expense", "expenses"].includes((account.account_type || "").toLowerCase());
-        const openingBalance = Number(account.opening_balance) || 0;
+        // Note: chart_of_accounts has no opening_balance column; accounts start at 0
         const correctBalance = isDebitNormal
-          ? openingBalance + (totalDebit - totalCredit)
-          : openingBalance + (totalCredit - totalDebit);
+          ? (totalDebit - totalCredit)
+          : (totalCredit - totalDebit);
 
         // 5. Update the COA record
         const { error, data: updateData } = await supabase
@@ -409,7 +409,6 @@ export const DrillDownModal = ({
         
         console.log("RECALCULATION STATS:", {
           accountId,
-          openingBalance,
           totalDebit,
           totalCredit,
           correctBalance,
@@ -419,7 +418,7 @@ export const DrillDownModal = ({
           updateData
         });
         
-        toast.success(`Calculated: ${correctBalance} from (Open: ${openingBalance} + Net: ${totalDebit - totalCredit}). Update returned ${updateData?.length || 0} rows.`);
+        toast.success(`Recalculated: ${correctBalance.toLocaleString()} (Debits: ${totalDebit.toLocaleString()}, Credits: ${totalCredit.toLocaleString()}). Updated ${updateData?.length || 0} row(s).`);
       }
 
       // 6. Invalidate all related caches
@@ -446,13 +445,13 @@ export const DrillDownModal = ({
     queryFn: async () => {
       if (resolvedAccountIds.length === 0) return null;
 
-      // Get the COA opening_balance for context
+      // Get the COA current_balance for context (no opening_balance column exists)
       const { data: coaData } = await supabase
         .from("chart_of_accounts")
-        .select("id, account_code, account_name, opening_balance, current_balance, account_type")
+        .select("id, account_code, account_name, current_balance, account_type")
         .in("id", resolvedAccountIds);
 
-      const coaOpeningBalance = coaData?.reduce((sum, a) => sum + (Number(a.opening_balance) || 0), 0) || 0;
+      const coaOpeningBalance = 0; // chart_of_accounts has no opening_balance column
       const coaCurrentBalance = coaData?.reduce((sum, a) => sum + (Number(a.current_balance) || 0), 0) || 0;
       const accountType = coaData?.[0]?.account_type || "unknown";
 
