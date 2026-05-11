@@ -198,7 +198,8 @@ export const PostTripAdjustmentModal = ({
 
   // Calculate extra KM whenever actual KM changes
   useEffect(() => {
-    setExtraKm(actualKm - originalKm);
+    // Round to 2 decimal places to avoid floating point precision issues (e.g., 44.39999999999998 → 44.4)
+    setExtraKm(Math.round((actualKm - originalKm) * 100) / 100);
   }, [actualKm, originalKm]);
 
   const addExpenseLine = () => {
@@ -296,7 +297,7 @@ export const PostTripAdjustmentModal = ({
           if (settings) {
             // Build adjustment details string
             const details: string[] = [];
-            if (extraKm > 0) details.push(`Extra ${extraKm} km`);
+            if (extraKm > 0) details.push(`Extra ${parseFloat(extraKm.toFixed(2))} km`);
             if (timeAdjustmentResult?.totalTimeAdjustment && timeAdjustmentResult.totalTimeAdjustment > 0) details.push(`Time adj LKR ${timeAdjustmentResult.totalTimeAdjustment.toLocaleString()}`);
             if (totals.total_additional_expenses > 0) details.push(`Addl expenses LKR ${totals.total_additional_expenses.toLocaleString()}`);
 
@@ -437,8 +438,8 @@ export const PostTripAdjustmentModal = ({
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 {isExtraKmPositive
-                  ? `Customer traveled ${Math.abs(extraKm)} km MORE than quoted. Additional charge: LKR ${totals.extra_km_total_charge.toLocaleString()}`
-                  : `Customer traveled ${Math.abs(extraKm)} km LESS than quoted. Credit: LKR ${Math.abs(totals.extra_km_total_charge).toLocaleString()}`}
+                  ? `Customer traveled ${parseFloat(Math.abs(extraKm).toFixed(2))} km MORE than quoted. Additional charge: LKR ${totals.extra_km_total_charge.toLocaleString()}`
+                  : `Customer traveled ${parseFloat(Math.abs(extraKm).toFixed(2))} km LESS than quoted. Credit: LKR ${Math.abs(totals.extra_km_total_charge).toLocaleString()}`}
               </AlertDescription>
             </Alert>
           )}
@@ -712,7 +713,7 @@ export const PostTripAdjustmentModal = ({
               {extraKm !== 0 && (
                 <div className="flex justify-between">
                   <span>
-                    Extra KM Charge ({Math.abs(extraKm)} km @ LKR {kmRate}):
+                    Extra KM Charge ({parseFloat(Math.abs(extraKm).toFixed(2))} km @ LKR {kmRate}):
                   </span>
                   <span
                     className={`font-semibold ${

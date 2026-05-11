@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -6,6 +6,7 @@ import { Download, TrendingUp, DollarSign, Fuel, Bus, Users, Route, Calendar, Al
 import { subDays, format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { useTripsAnalytics } from '@/hooks/useTripsAnalytics';
 import AnimatedKPICard from '@/components/trips-analytics/AnimatedKPICard';
 import AdvancedFilterPanel from '@/components/trips-analytics/AdvancedFilterPanel';
@@ -42,13 +43,39 @@ function TripsAnalyticsContent() {
     drivers?: string[];
     buses?: string[];
     times?: string[];
+    odometerOnly?: boolean;
   }>({
     startDate: subDays(new Date(), 30),
     endDate: new Date()
   });
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
 
-  const { data: analytics, isLoading, error } = useTripsAnalytics(dateRange);
+  const { session, loading: authLoading } = useAuth();
+  // Grace period: auth force-timeout fires at 3s, but session may arrive slightly later
+  // Wait 6s before concluding session is truly missing
+  const [sessionGraceExpired, setSessionGraceExpired] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSessionGraceExpired(true), 6000);
+    return () => clearTimeout(timer);
+  }, []);
+  const authReady = !authLoading && !!session;
+
+  const { data: analytics, isLoading, error } = useTripsAnalytics(dateRange, authReady);
+
+  // Loading timeout: If loading takes more than 20s, show error with retry
+  const [loadingTooLong, setLoadingTooLong] = useState(false);
+  useEffect(() => {
+    if (isLoading || authLoading) {
+      const timer = setTimeout(() => setLoadingTooLong(true), 20000);
+      return () => clearTimeout(timer);
+    } else {
+      setLoadingTooLong(false);
+    }
+  }, [isLoading, authLoading]);
+
+  // Debug logging to trace white screen issues
+  console.log('[TripsAnalytics] Render state:', { authLoading, hasSession: !!session, authReady, isLoading, hasError: !!error, hasAnalytics: !!analytics, totalTrips: analytics?.overview?.totalTrips });
 
   // Fetch ALL trips for cascading filter options (past 1 year)
   // This is separate from the main query so cascading shows all available options
@@ -74,6 +101,7 @@ function TripsAnalyticsContent() {
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     refetchOnWindowFocus: false,
+    enabled: authReady, // Wait for auth before querying
   });
 
 const handleFilterChange = useCallback((filters: any) => {
@@ -99,7 +127,8 @@ const handleFilterChange = useCallback((filters: any) => {
         eq(prev.routes, filters.routes) &&
         eq(prev.drivers, filters.drivers) &&
         eq(prev.buses, filters.buses) &&
-        eq(prev.times, filters.times)
+        eq(prev.times, filters.times) &&
+        (prev.odometerOnly ?? false) === (filters.odometerOnly ?? false)
       ) {
         return prev;
       }
@@ -111,6 +140,7 @@ const handleFilterChange = useCallback((filters: any) => {
         drivers: filters.drivers,
         buses: filters.buses,
         times: filters.times,
+        odometerOnly: filters.odometerOnly,
       };
     });
   }, []);
@@ -229,7 +259,42 @@ const handleFilterChange = useCallback((filters: any) => {
     );
   }
 
-  if (isLoading) {
+  // If auth finished loading, grace period passed, and still no session → user is not authenticated
+  if (!authLoading && !session && sessionGraceExpired) {
+    return (
+      <div className="container mx-auto p-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Session Expired</AlertTitle>
+          <AlertDescription className="flex items-center gap-4">
+            <span>Your session has expired or could not be verified. Please refresh to reconnect.</span>
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              Refresh Page
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if ((isLoading || authLoading) && loadingTooLong) {
+    return (
+      <div className="container mx-auto p-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Loading Timeout</AlertTitle>
+          <AlertDescription className="flex items-center gap-4">
+            <span>Analytics data is taking too long to load. This is usually caused by a network issue.</span>
+            <Button variant="outline" size="sm" onClick={() => { setLoadingTooLong(false); window.location.reload(); }}>
+              Refresh Page
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (isLoading || authLoading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
@@ -703,7 +768,21 @@ const handleFilterChange = useCallback((filters: any) => {
 export default function TripsAnalytics() {
   return (
     <AnalyticsErrorBoundary fallbackMessage="Failed to render the Trip Analytics dashboard. Please try refreshing the page.">
-      <TripsAnalyticsContent />
+      <React.Suspense fallback={
+        <div className="container mx-auto p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+        </div>
+      }>
+        <TripsAnalyticsContent />
+      </React.Suspense>
     </AnalyticsErrorBoundary>
   );
 }

@@ -117,7 +117,9 @@ export default function QuickTripsEntry() {
 
       setTrips(transformedTrips);
       
-      if (transformedTrips.length > 0 && !selectedTripId) {
+      // Validate selected trip still exists, or auto-select first incomplete
+      const selectedExists = selectedTripId && transformedTrips.some(t => t.id === selectedTripId);
+      if (transformedTrips.length > 0 && !selectedExists) {
         const firstIncomplete = transformedTrips.find(t => !hasData(t));
         setSelectedTripId(firstIncomplete?.id || transformedTrips[0].id);
       }
@@ -178,8 +180,10 @@ export default function QuickTripsEntry() {
       await loadTripsForDate(newDate);
       
       // After loading, auto-select the first trip from the OCR-extracted bus
+      // Use a small delay to ensure the state from loadTripsForDate has committed
       if (data.busNumber) {
-        setTimeout(() => {
+        // Use requestAnimationFrame + microtask to wait for React state commit
+        requestAnimationFrame(() => {
           setTrips(currentTrips => {
             const busTrips = currentTrips.filter(t => t.bus_no === data.busNumber);
             if (busTrips.length > 0) {
@@ -188,7 +192,7 @@ export default function QuickTripsEntry() {
             }
             return currentTrips;
           });
-        }, 500);
+        });
       }
     } else {
       // Otherwise just refresh current date

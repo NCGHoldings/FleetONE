@@ -1111,6 +1111,7 @@ export function usePostPaymentToGL() {
       previousBalance?: number;    // Student's credit balance from previous months (positive = credit)
       customArAccountId?: string;  // Override Trade Receivables account (e.g. for Suspense)
       customBankAccountId?: string; // Override Bank account (e.g. for Suspense -> AR reversals)
+      transactionDate?: string;    // Override date for the entry
       studentId?: string;          // Added: Student ID to update operational record
     }) => {
       // Get finance settings for this branch
@@ -1241,7 +1242,7 @@ export function usePostPaymentToGL() {
         .from("journal_entries")
         .insert({
           entry_number: entryNumber,
-          entry_date: format(new Date(), "yyyy-MM-dd"),
+          entry_date: transactionDate || format(new Date(), "yyyy-MM-dd"),
           description: `School Bus Payment - ${studentName}${hasOverpayment ? " (includes advance)" : hasCreditConsumption ? " (credit applied)" : ""}`,
           reference: referenceNo || paymentId,
           total_debit: totalDebitAmount,
@@ -1383,7 +1384,7 @@ export function usePostPaymentToGL() {
             business_unit_code: 'SBO',
             customer_id: receiptCustomerId,
             receipt_number: receiptNumber,
-            receipt_date: format(new Date(), "yyyy-MM-dd"),
+            receipt_date: transactionDate || format(new Date(), "yyyy-MM-dd"),
             amount: amount,
             payment_method: paymentMethod === 'Adjustment' ? 'other' : paymentMethod === 'Bank Transfer' ? 'bank_transfer' : paymentMethod.toLowerCase(),
             reference: referenceNo || paymentId,
@@ -1546,6 +1547,7 @@ export function usePostGroupedPaymentToGL() {
       referenceNo?: string;
       description?: string;
       customBankAccountId?: string;
+      transactionDate?: string;
       allocations: Array<{
         paymentId: string;
         amount: number;
@@ -1695,7 +1697,7 @@ export function usePostGroupedPaymentToGL() {
         .from("journal_entries")
         .insert({
           entry_number: entryNumber,
-          entry_date: format(new Date(), "yyyy-MM-dd"),
+          entry_date: transactionDate || format(new Date(), "yyyy-MM-dd"),
           description: description || `Grouped School Bus Payment - ${allocations.length} Student(s)`,
           reference: referenceNo || allocations[0]?.paymentId,
           total_debit: totalDebitAmount,
@@ -1784,7 +1786,7 @@ export function usePostGroupedPaymentToGL() {
               business_unit_code: 'SBO',
               customer_id: receiptCustomerId,
               receipt_number: receiptNumber,
-              receipt_date: format(new Date(), "yyyy-MM-dd"),
+              receipt_date: transactionDate || format(new Date(), "yyyy-MM-dd"),
               amount: alloc.amount,
               payment_method: paymentMethod === 'Bank Transfer' ? 'bank_transfer' : paymentMethod.toLowerCase(),
               reference: referenceNo || alloc.paymentId,

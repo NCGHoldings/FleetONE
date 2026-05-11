@@ -144,6 +144,15 @@ export default function SchoolBusExpenseImport() {
         .ilike("account_name", "%FLOAT%")
         .order("account_name");
 
+      // Fetch intercompany payable accounts
+      const { data: interCompanyData } = await supabase
+        .from("chart_of_accounts")
+        .select("id, account_name, current_balance")
+        .eq("company_id", effectiveCompanyId)
+        .eq("is_active", true)
+        .ilike("account_name", "%INTER COMPANY PAYABLE%")
+        .order("account_name");
+
       if (!isMounted) return;
 
       const combined: any[] = [];
@@ -155,6 +164,16 @@ export default function SchoolBusExpenseImport() {
             id: a.id, 
             account_name: a.account_name, 
             bank_name: 'Cash Float', 
+            account_number: '', 
+            current_balance: a.current_balance || 0,
+            type: 'float'
+        })));
+      }
+      if (interCompanyData) {
+        combined.push(...interCompanyData.map((a: any) => ({ 
+            id: a.id, 
+            account_name: a.account_name, 
+            bank_name: 'Intercompany Payable', 
             account_number: '', 
             current_balance: a.current_balance || 0,
             type: 'float'
@@ -650,7 +669,7 @@ export default function SchoolBusExpenseImport() {
                 return (
                 <div className="space-y-4 pt-2 border-t border-primary/10">
                   <div className="space-y-2">
-                    <Label className="text-xs font-semibold">Pay From Account (Asset)</Label>
+                    <Label className="text-xs font-semibold">Pay From Account (Asset / Intercompany Liability)</Label>
                     <Select value={directPaymentAccountId} onValueChange={setDirectPaymentAccountId}>
                       <SelectTrigger className="bg-white">
                          <SelectValue placeholder="Select Float / Bank Account..." />

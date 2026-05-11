@@ -16,7 +16,8 @@ import {
   Bookmark,
   Sparkles,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Gauge
 } from 'lucide-react';
 import { format, subDays, startOfWeek, startOfMonth } from 'date-fns';
 import { cn, safeParseJSON } from '@/lib/utils';
@@ -109,6 +110,7 @@ export default function AdvancedFilterPanel({
   const [selectedDrivers, setSelectedDrivers] = useState<string[]>([]);
   const [selectedBuses, setSelectedBuses] = useState<string[]>([]);
   const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
+  const [odometerOnly, setOdometerOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(true);
   const [savedPresets, setSavedPresets] = useState<FilterPreset[]>([]);
@@ -167,6 +169,7 @@ export default function AdvancedFilterPanel({
       drivers: selectedDrivers.length > 0 ? selectedDrivers : undefined,
       buses: selectedBuses.length > 0 ? selectedBuses : undefined,
       times: selectedTimes.length > 0 ? selectedTimes : undefined,
+      odometerOnly: odometerOnly || undefined,
     });
   };
 
@@ -175,6 +178,7 @@ export default function AdvancedFilterPanel({
     setSelectedDrivers([]);
     setSelectedBuses([]);
     setSelectedTimes([]);
+    setOdometerOnly(false);
     setSearchQuery('');
     applyPreset('30days');
   };
@@ -255,7 +259,7 @@ export default function AdvancedFilterPanel({
   // NOTE: Removed auto-emit on mount - user must explicitly click "Apply Filters"
   // This prevents unwanted 30-day resets when filters are being selected
 
-  const activeFilterCount = selectedRoutes.length + selectedDrivers.length + selectedBuses.length + selectedTimes.length;
+  const activeFilterCount = selectedRoutes.length + selectedDrivers.length + selectedBuses.length + selectedTimes.length + (odometerOnly ? 1 : 0);
 
   const handleApplyFilters = () => {
     emitFilters();
@@ -940,6 +944,22 @@ export default function AdvancedFilterPanel({
             )}
           </div>
 
+          {/* Odometer Data Only Toggle */}
+          <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+            <Checkbox
+              id="odometer-only"
+              checked={odometerOnly}
+              onCheckedChange={(checked) => setOdometerOnly(checked === true)}
+            />
+            <label htmlFor="odometer-only" className="flex items-center gap-2 text-sm font-medium cursor-pointer flex-1">
+              <Gauge className="w-4 h-4 text-primary" />
+              Odometer Data Only
+              <span className="text-xs text-muted-foreground font-normal">
+                — Show only trips with distance / odometer entries
+              </span>
+            </label>
+          </div>
+
           {/* Active Filters Display */}
           {activeFilterCount > 0 && (
             <motion.div
@@ -983,6 +1003,16 @@ export default function AdvancedFilterPanel({
                   />
                 </Badge>
               ))}
+              {odometerOnly && (
+                <Badge variant="secondary" className="group cursor-pointer bg-primary/10">
+                  <Gauge className="w-3 h-3 mr-1" />
+                  Odometer Data Only
+                  <X 
+                    className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => setOdometerOnly(false)}
+                  />
+                </Badge>
+              )}
             </motion.div>
           )}
 

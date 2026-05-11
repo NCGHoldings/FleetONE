@@ -202,11 +202,15 @@ export const OCRExtractedDataCard = ({ data, isOpen = false, onToggleOpen, actua
   useEffect(() => {
     const checkMultiDayRoute = async () => {
       try {
+        // Use editedData.busNumber to pick up user corrections after OCR scan
+        const currentBusNumber = editedData.busNumber;
+        if (!currentBusNumber?.trim()) return;
+
         // Get bus's route and ID
         const { data: busData } = await supabase
           .from('buses')
           .select('route, id')
-          .eq('bus_no', data.busNumber)
+          .eq('bus_no', currentBusNumber)
           .single();
 
         let multiDayData = null;
@@ -214,13 +218,13 @@ export const OCRExtractedDataCard = ({ data, isOpen = false, onToggleOpen, actua
         // Try matching by assigned route first
         if (busData?.route) {
           const normalizedRoute = normalizeRouteName(busData.route);
-          const { data } = await supabase
+          const { data: multiDayResult } = await supabase
             .from('multi_day_route_config')
             .select('*')
             .eq('is_enabled', true)
             .or(`route_name.ilike.%${normalizedRoute}%,route_pattern.ilike.%${normalizedRoute}%`)
             .maybeSingle();
-          multiDayData = data;
+          multiDayData = multiDayResult;
         }
 
         // FALLBACK: If no route assigned, check recent trips for this bus
@@ -237,13 +241,13 @@ export const OCRExtractedDataCard = ({ data, isOpen = false, onToggleOpen, actua
             const mostCommonRoute = recentTrips[0].routes?.route_name;
             if (mostCommonRoute) {
               const normalizedRoute = normalizeRouteName(mostCommonRoute);
-              const { data } = await supabase
+              const { data: fallbackMultiDayResult } = await supabase
                 .from('multi_day_route_config')
                 .select('*')
                 .eq('is_enabled', true)
                 .or(`route_name.ilike.%${normalizedRoute}%,route_pattern.ilike.%${normalizedRoute}%`)
                 .maybeSingle();
-              multiDayData = data;
+              multiDayData = fallbackMultiDayResult;
             }
           }
         }
@@ -289,7 +293,7 @@ export const OCRExtractedDataCard = ({ data, isOpen = false, onToggleOpen, actua
     };
 
     checkMultiDayRoute();
-  }, [data.busNumber, actualSaveDate]);
+  }, [editedData.busNumber, actualSaveDate]);
 
   // Update trip dates when date range changes - simplified sequential distribution
   useEffect(() => {
@@ -357,11 +361,8 @@ export const OCRExtractedDataCard = ({ data, isOpen = false, onToggleOpen, actua
       ...prev,
       busNumber: newBusNumber
     }));
-    
-    // Auto re-check multi-day route when bus number changes in manual mode
-    if (manualMultiDayEnabled && !isMultiDayRoute) {
-      recheckMultiDayRoute(newBusNumber);
-    }
+    // Multi-day route re-check is handled automatically by the useEffect
+    // watching editedData.busNumber
   };
 
   const handleTripIncomeChange = (tripIndex: number, field: keyof SingleTrip['income'], value: number) => {

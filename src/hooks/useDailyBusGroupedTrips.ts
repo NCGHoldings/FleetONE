@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -114,17 +114,28 @@ export function useDailyBusGroupedTrips(
   const [fleetSummary, setFleetSummary] = useState<FleetSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Ref-based fetch counter to cancel stale async fetches
+  const fetchCounterRef = useRef(0);
+
   useEffect(() => {
     if (!enabled) {
       setLoading(false);
       return;
     }
     if (selectedDate || (dateRange?.from && dateRange?.to)) {
-      fetchGroupedData();
+      // Increment counter — any in-flight fetch with a lower counter will be discarded
+      fetchCounterRef.current += 1;
+      const myFetchId = fetchCounterRef.current;
+      fetchGroupedData(myFetchId);
+    } else {
+      // No valid date provided — clear loading and reset data
+      setLoading(false);
+      setBusSummaries([]);
+      setFleetSummary(null);
     }
   }, [selectedDate, dateRange?.from, dateRange?.to, enabled]);
 
-  const fetchGroupedData = async () => {
+  const fetchGroupedData = async (fetchId?: number) => {
     try {
       setLoading(true);
       
@@ -141,6 +152,7 @@ export function useDailyBusGroupedTrips(
         fromDateStr = toDateStr = format(selectedDate, 'yyyy-MM-dd');
       } else {
         console.warn('⚠️ No date or date range provided');
+        setLoading(false);
         return;
       }
 
@@ -184,10 +196,27 @@ export function useDailyBusGroupedTrips(
       const { data: tripsData, error: tripsError } = await tripsQuery;
       const queryEndTime = performance.now();
       
+      // DIAGNOSTIC: Log every fetch result
+      const tripsWithIncome = (tripsData || []).filter((t: any) => (t.income || 0) > 0);
+      console.log(`[DailyBusGroupedTrips] Fetch for ${fromDateStr}${isRangeQuery ? ' to ' + toDateStr : ''}:`, {
+        totalTrips: tripsData?.length || 0,
+        tripsWithIncome: tripsWithIncome.length,
+        totalIncome: tripsWithIncome.reduce((s: number, t: any) => s + (t.income || 0), 0),
+        queryTimeMs: Math.round(queryEndTime - queryStartTime),
+        uniqueBuses: new Set((tripsData || []).map((t: any) => t.bus_id)).size,
+      });
       
       if (tripsError) {
         console.error('❌ Trips query error:', tripsError);
         throw tripsError;
+      }
+
+      // GUARD: If we already have data but new fetch returns 0 trips,
+      // this may be a transient auth/network issue — don't wipe existing data
+      if (busSummaries.length > 0 && (!tripsData || tripsData.length === 0)) {
+        console.warn('[DailyBusGroupedTrips] ⚠️ New fetch returned 0 trips but we had', busSummaries.length, 'buses. Retaining existing data (possible auth/network glitch).');
+        setLoading(false);
+        return;
       }
 
 
@@ -415,6 +444,12 @@ export function useDailyBusGroupedTrips(
         : 0;
 
 
+      // Don't update state if this fetch was superseded by a newer one
+      if (fetchId !== undefined && fetchId !== fetchCounterRef.current) {
+        console.log('[DailyBusGroupedTrips] Fetch #' + fetchId + ' superseded by #' + fetchCounterRef.current + ', discarding stale results');
+        return;
+      }
+
       setBusSummaries(summaries);
       setFleetSummary(fleet);
     } catch (error: any) {
@@ -433,6 +468,6 @@ export function useDailyBusGroupedTrips(
     busSummaries,
     fleetSummary,
     loading,
-    refetch: fetchGroupedData,
+    refetch: () => fetchGroupedData(),
   };
 }

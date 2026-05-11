@@ -261,11 +261,37 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
         }
       };
       fetchLines();
-    } else {
+    } else if (open) {
+      // === FULL RESET for new invoice ===
+      // Reset the react-hook-form to fresh defaults
+      form.reset({
+        invoice_number: "",
+        vendor_bill_number: "",
+        vendor_id: "",
+        invoice_date: format(new Date(), "yyyy-MM-dd"),
+        due_date: format(addDays(new Date(), 30), "yyyy-MM-dd"),
+        apply_wht: false,
+        wht_rate: 5,
+        notes: "",
+        business_unit_code: businessUnitCode || "",
+      });
+      // Reset invoice lines to a single empty line
       setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
+      // Reset route/bus/school route selections
       setSelectedRouteId("");
       setSelectedBusId("");
       setSelectedSchoolRouteId("");
+      // Reset Pay Now state
+      setPayNow(false);
+      setPaymentMethod("bank_transfer");
+      setPaymentBankAccountId("");
+      setPaymentChequeNumber("");
+      setPaymentReference("");
+      // Reset cost allocation state
+      setAllocateToUnits(false);
+      setCostAllocations([]);
+      // Reset submit lock
+      submitLock.current = false;
     }
   }, [open, editingInvoice]);
 

@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
-import { Bus, Fuel, TrendingUp, Activity, Gauge, Calendar } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Bus, Fuel, TrendingUp, Activity, Gauge, Calendar, Filter } from "lucide-react";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
@@ -46,6 +49,8 @@ const getGapColor = (gap: number) => {
 };
 
 export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
+  const [showDataOnly, setShowDataOnly] = useState(true);
+
   if (!busStats || busStats.length === 0) {
     return (
       <Card className="border-2 border-dashed border-muted">
@@ -281,10 +286,31 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
       {/* Fleet Performance Table */}
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bus className="w-5 h-5 text-primary" />
-            Complete Fleet Performance
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Bus className="w-5 h-5 text-primary" />
+              Complete Fleet Performance
+            </CardTitle>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <Label htmlFor="data-only-toggle" className="text-sm font-medium cursor-pointer whitespace-nowrap">
+                  Data Rows Only
+                </Label>
+                <Switch
+                  id="data-only-toggle"
+                  checked={showDataOnly}
+                  onCheckedChange={setShowDataOnly}
+                />
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                {showDataOnly
+                  ? `${busStats.filter(b => b.totalTrips > 0 || (b.totalIncome ?? 0) > 0 || (b.totalExpenses ?? 0) > 0).length} of ${busStats.length}`
+                  : `${busStats.length} total`
+                }
+              </Badge>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -309,7 +335,10 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {busStats.map((bus, idx) => {
+                {(showDataOnly
+                  ? busStats.filter(b => b.totalTrips > 0 || (b.totalIncome ?? 0) > 0 || (b.totalExpenses ?? 0) > 0)
+                  : busStats
+                ).map((bus, idx) => {
                   const fuelPct = bus.fuelPercentage ?? 0;
                   const stdRate = bus.stdFuelRate ?? 0;
                   const iPerKm = bus.incomePerKm ?? 0;

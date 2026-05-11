@@ -242,6 +242,7 @@ export function FinanceImportApprovalDialog() {
                 description: item.description,
                 allocations: glAllocations,
                 customBankAccountId: selectedOverrideBankAccountId || undefined,
+                transactionDate: item.txn_date,
               });
             } catch (glError) {
               console.error("Grouped GL posting failed for item", item.id, glError);
@@ -285,7 +286,8 @@ export function FinanceImportApprovalDialog() {
               referenceNo: item.description,
               fixedAmount: item.amount,
               customArAccountId: selectedSuspenseAccountId, // Divert from standard AR to Suspense
-              customBankAccountId: selectedOverrideBankAccountId || undefined // Override bank if selected
+              customBankAccountId: selectedOverrideBankAccountId || undefined, // Override bank if selected
+              transactionDate: item.txn_date,
             });
             
             await supabase

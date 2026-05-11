@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, Edit2, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import { DeleteSchoolPaymentDialog } from "./DeleteSchoolPaymentDialog";
 import { FinanceDocumentPreviewModal } from "../accounting/shared/FinanceDocumentPreviewModal";
 import { Printer } from "lucide-react";
@@ -36,6 +38,10 @@ interface PaymentHistoryModalProps {
 export function PaymentHistoryModal({ isOpen, onClose, studentId, studentName }: PaymentHistoryModalProps) {
   const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const [editingTxId, setEditingTxId] = useState<string | null>(null);
+  const [editDateValue, setEditDateValue] = useState<string>("");
 
   const [transactionToDelete, setTransactionToDelete] = useState<PaymentTransaction | null>(null);
   const [previewModal, setPreviewModal] = useState<{
@@ -71,6 +77,70 @@ export function PaymentHistoryModal({ isOpen, onClose, studentId, studentName }:
       console.error("Error fetching payment history:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditDate = async (txId: string) => {
+    if (!editDateValue) return;
+
+    try {
+      const newDate = new Date(editDateValue);
+      if (isNaN(newDate.getTime())) {
+        toast({ title: "Invalid Date", variant: "destructive" });
+        return;
+      }
+      const formattedDate = newDate.toISOString().split('T')[0];
+
+      // Fetch the transaction to see if it has a journal entry
+      const { data: tx } = await supabase
+        .from('school_payment_transactions')
+        .select('id, journal_entry_id')
+        .eq('id', txId)
+        .single();
+
+      if (!tx) throw new Error("Transaction not found");
+
+      // 1. Update the payment transaction
+      await supabase
+        .from('school_payment_transactions')
+        .update({ payment_date: formattedDate })
+        .eq('id', tx.id);
+
+      // 2. Sync General Ledger and Finance records
+      if (tx.journal_entry_id) {
+        await supabase
+          .from('journal_entries')
+          .update({ entry_date: formattedDate })
+          .eq('id', tx.journal_entry_id);
+          
+        await supabase
+          .from('ar_receipts')
+          .update({ receipt_date: formattedDate })
+          .eq('journal_entry_id', tx.journal_entry_id);
+      }
+
+      // 3. Update the student's last_payment_date cache if it's the latest transaction
+      const { data: latestTx } = await supabase
+        .from('school_payment_transactions')
+        .select('id, payment_date')
+        .eq('student_id', studentId)
+        .order('payment_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (latestTx && latestTx.id === tx.id) {
+        await supabase
+          .from('school_students')
+          .update({ last_payment_date: formattedDate })
+          .eq('id', studentId);
+      }
+
+      toast({ title: "Date Updated", description: "Payment date successfully updated." });
+      setEditingTxId(null);
+      fetchPaymentHistory();
+    } catch (error: any) {
+      console.error("Error updating date:", error);
+      toast({ title: "Update Failed", description: error.message, variant: "destructive" });
     }
   };
 
@@ -183,7 +253,48 @@ export function PaymentHistoryModal({ isOpen, onClose, studentId, studentName }:
                     transactions.map((transaction) => (
                       <TableRow key={transaction.id}>
                         <TableCell className="font-medium">
-                          {format(new Date(transaction.payment_date), "MMM dd, yyyy")}
+                          {editingTxId === transaction.id ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="date"
+                                value={editDateValue}
+                                onChange={(e) => setEditDateValue(e.target.value)}
+                                className="h-7 text-xs w-[130px] px-2 py-1"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-green-600"
+                                onClick={() => handleEditDate(transaction.id)}
+                              >
+                                <Check className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground"
+                                onClick={() => setEditingTxId(null)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              {format(new Date(transaction.payment_date), "MMM dd, yyyy")}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5"
+                                onClick={() => {
+                                  setEditDateValue(transaction.payment_date);
+                                  setEditingTxId(transaction.id);
+                                }}
+                                title="Edit Date"
+                              >
+                                <Edit2 className="h-3 w-3 text-muted-foreground hover:text-blue-600" />
+                              </Button>
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           {format(new Date(transaction.payment_month), "MMM yyyy")}

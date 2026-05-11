@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { startOfDay, endOfDay, subDays, differenceInDays, format } from 'date-fns';
 import { groupBy, sumBy, meanBy, orderBy } from 'lodash';
 
+
 export interface AnalyticsFilters {
   startDate: Date;
   endDate: Date;
@@ -13,6 +14,7 @@ export interface AnalyticsFilters {
   buses?: string[];
   times?: string[];
   status?: string;
+  odometerOnly?: boolean;
 }
 
 export interface TripData {
@@ -88,7 +90,7 @@ export interface Insight {
   action?: string;
 }
 
-export function useTripsAnalytics(filters: AnalyticsFilters) {
+export function useTripsAnalytics(filters: AnalyticsFilters, enabled: boolean = true) {
   const stableKey = {
     startDate: format(filters.startDate, 'yyyy-MM-dd'),
     endDate: format(filters.endDate, 'yyyy-MM-dd'),
@@ -97,36 +99,91 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
     buses: (filters.buses ?? []).slice().sort(),
     times: (filters.times ?? []).slice().sort(),
     status: filters.status ?? null,
+    odometerOnly: filters.odometerOnly ?? false,
   };
 
   return useQuery<ReturnType<typeof processAnalyticsData>, Error>({
     queryKey: ['trips-analytics', stableKey],
+    enabled, // Caller controls when query fires (e.g. after auth ready)
     queryFn: async () => {
+      const queryStart = Date.now();
+      console.log('[useTripsAnalytics] ===== QUERY START =====', { startDate: stableKey.startDate, endDate: stableKey.endDate });
+
+      // Helper: wrap Supabase calls in a timeout so they can't hang forever
+      const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+        return Promise.race([
+          promise,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`[${label}] Timed out after ${ms}ms`)), ms)
+          )
+        ]);
+      };
+
+      // Verify auth token is actually valid before querying
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession?.access_token) {
+        throw new Error('No valid auth session — please refresh the page');
+      }
+
       // Fetch trips data with related tables
-      const { data: trips, error: tripsError } = await supabase
-        .from('daily_trips')
-        .select(`
-          *,
-          buses(bus_no, registration_number, model, type, capacity, route, expected_km_per_liter),
-          routes(route_no, route_name),
-          profiles!driver_id(first_name, last_name)
-        `)
-        .gte('trip_date', stableKey.startDate)
-        .lte('trip_date', stableKey.endDate)
-        .order('trip_date', { ascending: false });
+      // Driver names come from the `notes` JSON field, not from profiles join
+      console.log('[useTripsAnalytics] Fetching daily_trips...');
+      const tripsResult = await withTimeout(
+        supabase
+          .from('daily_trips')
+          .select(`
+            *,
+            buses(bus_no, registration_number, model, type, capacity, route, expected_km_per_liter),
+            routes(route_no, route_name)
+          `)
+          .gte('trip_date', stableKey.startDate)
+          .lte('trip_date', stableKey.endDate)
+          .order('trip_date', { ascending: false }),
+        25000,
+        'daily_trips'
+      );
 
-      if (tripsError) throw tripsError; console.log("[useTripsAnalytics] Raw trips from DB:", trips?.length, "StartDate:", stableKey.startDate, "EndDate:", stableKey.endDate);
+      const { data: tripsData, error: tripsError } = tripsResult;
+      const trips = tripsData || [];
 
-      // Fetch expenses data - remove buses join to avoid errors
-      const { data: expenses, error: expensesError } = await supabase
-        .from('daily_bus_expenses')
-        .select('*')
-        .gte('expense_date', stableKey.startDate)
-        .lte('expense_date', stableKey.endDate);
+      console.log('[useTripsAnalytics] Trips result:', {
+        count: trips.length,
+        error: tripsError?.message || null,
+        elapsed: Date.now() - queryStart + 'ms'
+      });
+
+      if (tripsError) throw tripsError;
+
+      // Fetch expenses data
+      console.log('[useTripsAnalytics] Fetching daily_bus_expenses...');
+      let expenses: any[] = [];
+      let expensesError: any = null;
+      try {
+        const expResult = await withTimeout(
+          supabase
+            .from('daily_bus_expenses')
+            .select('*')
+            .gte('expense_date', stableKey.startDate)
+            .lte('expense_date', stableKey.endDate),
+          25000,
+          'daily_bus_expenses'
+        );
+        expenses = expResult.data || [];
+        expensesError = expResult.error;
+      } catch (expTimeout) {
+        console.warn('[useTripsAnalytics] Expenses fetch failed/timed out:', expTimeout);
+        expensesError = expTimeout;
+      }
+
+      console.log('[useTripsAnalytics] Expenses result:', {
+        count: expenses.length,
+        error: expensesError?.message || null,
+        elapsed: Date.now() - queryStart + 'ms'
+      });
 
       // Don't throw on expense errors - continue with trips data only
       if (expensesError) {
-        console.warn('Could not fetch expenses, continuing with trips data only:', expensesError);
+        console.warn('[useTripsAnalytics] Could not fetch expenses, continuing with trips data only');
       }
 
       // Helper to parse notes JSON for driver/conductor names
@@ -146,7 +203,6 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
         filteredTrips = filteredTrips.filter(t => {
           if (!t.routes) return false;
           const routeDisplayName = `${t.routes.route_no} - ${t.routes.route_name}`;
-          // Use exact matching only - no includes() which causes wrong matches
           return stableKey.routes!.some(selectedRoute => 
             selectedRoute === routeDisplayName || 
             selectedRoute === t.routes.route_no ||
@@ -188,9 +244,18 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
       if (stableKey.times && stableKey.times.length > 0) {
         filteredTrips = filteredTrips.filter(t => {
           if (!t.start_time) return false;
-          // Extract HH:MM from start_time (handles both "HH:MM" and "HH:MM:SS" formats)
           const tripTime = t.start_time.substring(0, 5);
           return stableKey.times!.includes(tripTime);
+        });
+      }
+
+      // Filter by odometer data presence - only keep trips with actual distance/odometer entries
+      if (stableKey.odometerOnly) {
+        filteredTrips = filteredTrips.filter(t => {
+          const hasDistance = t.distance_km && t.distance_km > 0;
+          const hasOdoStart = t.odo_start && t.odo_start > 0;
+          const hasOdoEnd = t.odo_end && t.odo_end > 0;
+          return hasDistance || hasOdoStart || hasOdoEnd;
         });
       }
 
@@ -204,13 +269,32 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
         );
       }
 
-      return processAnalyticsData(filteredTrips, filteredExpenses, filters, !!expensesError);
+      console.log('[useTripsAnalytics] After filtering:', {
+        rawTrips: trips.length,
+        filteredTrips: filteredTrips.length,
+        filteredExpenses: filteredExpenses.length,
+        totalElapsed: Date.now() - queryStart + 'ms'
+      });
+
+      try {
+        const result = processAnalyticsData(filteredTrips, filteredExpenses, filters, !!expensesError);
+        console.log('[useTripsAnalytics] ===== QUERY COMPLETE =====', {
+          totalTrips: result.overview.totalTrips,
+          totalIncome: result.overview.totalIncome,
+          totalElapsed: Date.now() - queryStart + 'ms'
+        });
+        return result;
+      } catch (processingError) {
+        console.error('[useTripsAnalytics] Data processing error:', processingError);
+        throw new Error(`Analytics processing failed: ${processingError instanceof Error ? processingError.message : String(processingError)}`);
+      }
     },
     staleTime: 30000,
     gcTime: 300000,
-    refetchOnWindowFocus: false,
-    retry: 1,
-    refetchInterval: false, // Disabled to prevent auto-refresh during filtering
+    refetchOnWindowFocus: true, // Re-fetch when user comes back to tab
+    retry: 2,
+    retryDelay: (attempt) => Math.min(3000 * (attempt + 1), 10000), // 3s, 6s
+    refetchInterval: false,
   });
 }
 
@@ -521,16 +605,21 @@ function processAnalyticsData(
     };
   });
 
-  // Generate insights
-  const insights = generateInsights({
-    trips,
-    driverStats: rankedDrivers,
-    routeStats,
-    busStats,
-    incomeChange,
-    profitChange,
-    avgEfficiency
-  });
+  // Generate insights (wrapped in try-catch to prevent crashes from bad data)
+  let insights: Insight[] = [];
+  try {
+    insights = generateInsights({
+      trips,
+      driverStats: rankedDrivers,
+      routeStats,
+      busStats,
+      incomeChange,
+      profitChange,
+      avgEfficiency
+    });
+  } catch (e) {
+    console.error('[useTripsAnalytics] Error generating insights:', e);
+  }
 
   // Time-based analysis
   const tripsByHour = groupBy(trips, t => {

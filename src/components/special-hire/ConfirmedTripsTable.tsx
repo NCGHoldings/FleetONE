@@ -29,7 +29,7 @@ import { PostTripAdjustmentModal } from './PostTripAdjustmentModal';
 import { GenerateBalanceInvoiceModal } from './GenerateBalanceInvoiceModal';
 import { VehicleAssignmentModal } from './VehicleAssignmentModal';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
-import { resolveBusType, calculateTotalKm, getTripDistance } from '@/lib/special-hire-invoice-helpers';
+import { resolveBusType, calculateTotalKm, getTripDistance, getQuotationAdditionalDistance } from '@/lib/special-hire-invoice-helpers';
 import { getDocumentLabel } from '@/lib/special-hire-document-helpers';
 import { PaymentTimelineFresh } from './PaymentTimelineFresh';
 import { SpecialHireFinanceSettlement } from './SpecialHireFinanceSettlement';
@@ -2154,7 +2154,12 @@ export function ConfirmedTripsTable() {
           quotationNo={selectedTrip.quotation_no}
           customerName={selectedTrip.customer_name}
           originalAmount={calculateTotalAmount(selectedTrip) - (selectedTrip.adjustment_amount || 0)}
-          originalKm={getTripDistance(selectedTrip) || (selectedTrip as any).total_distance_km || 0}
+          originalKm={(() => {
+            // Include quotation additional distance (e.g. +10km buffer) in the original quoted KM
+            const baseKm = getTripDistance(selectedTrip) || (selectedTrip as any).total_distance_km || 0;
+            const { distanceKm: additionalKm } = getQuotationAdditionalDistance(selectedTrip);
+            return Math.round((baseKm + additionalKm) * 100) / 100;
+          })()}
           advancePaid={selectedTrip.total_paid || selectedTrip.advance_paid || 0}
           onAdjustmentSaved={() => {
             loadAdjustmentData(selectedTrip.id);
