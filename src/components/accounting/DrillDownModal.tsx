@@ -922,13 +922,23 @@ export const DrillDownModal = ({
           <Card>
             <CardContent className="pt-4">
               <p className="text-sm text-muted-foreground">Ending Balance</p>
-              {/* Filter-aware: BBF + net movement of filtered transactions */}
+              {/* Always equals last row's running balance — consistent with the table */}
               {(() => {
-                const endingBalance = broughtForwardBalance + netMovement;
+                const endingBalance = transactionsWithBalance.length > 0
+                  ? transactionsWithBalance[transactionsWithBalance.length - 1].runningBalance
+                  : broughtForwardBalance;
                 return (
-                  <p className={`text-xl font-semibold ${endingBalance >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                    <CurrencyDisplay amount={endingBalance} />
-                  </p>
+                  <>
+                    <p className={`text-xl font-semibold ${endingBalance >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                      <CurrencyDisplay amount={endingBalance} />
+                    </p>
+                    {transactionsWithBalance.length === 0 && endingBalance !== 0 && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">= Opening balance (no movement in period)</p>
+                    )}
+                    {transactionsWithBalance.length === 0 && endingBalance === 0 && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">No transactions found</p>
+                    )}
+                  </>
                 );
               })()}
             </CardContent>
