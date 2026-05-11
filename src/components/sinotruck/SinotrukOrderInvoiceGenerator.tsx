@@ -178,9 +178,7 @@ export function SinotrukOrderInvoiceGenerator({ order, onRefresh }: SinotrukOrde
       warnings.push('Seating capacity not specified - will use "N/A" in invoice.');
     }
     
-    if (!quotation?.attention_to?.trim()) {
-      warnings.push('Attention-to person not specified - will use customer name.');
-    }
+    // attention_to is optional — falls back to customer_name silently (see attn field below)
     
     return { 
       errors, 
