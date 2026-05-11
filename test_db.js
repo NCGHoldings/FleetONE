@@ -1,36 +1,37 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ path: '.env' });
 
-const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
 
 async function run() {
-  // Login as admin
-  const { data: auth, error: authErr } = await supabase.auth.signInWithPassword({
-    email: 'admin@aiv.lk',
-    password: 'password123'
-  });
-  
-  if (authErr) {
-    console.log("Auth err:", authErr);
-    // try another common one
-    const { data: auth2, error: err2 } = await supabase.auth.signInWithPassword({
-      email: 'team4@atcs.lk',
-      password: 'password123'
-    });
-    if (err2) {
-       console.log("Auth2 err:", err2);
-       return;
-    }
+  const { data: entries, error } = await supabase
+    .from('journal_entry_lines')
+    .select(`
+      debit, credit, 
+      account:chart_of_accounts!inner(account_code, account_name),
+      journal_entry:journal_entries!inner(entry_date, business_unit_code, status)
+    `)
+    .neq('journal_entry.status', 'draft')
+    .neq('journal_entry.status', 'void');
+    
+  if (error) {
+    console.error("Error", error);
+    return;
   }
   
-  const { data: buses } = await supabase.from('buses').select('id, bus_no').ilike('bus_no', '%8242%');
-  console.log("Buses:", buses);
+  let totals = {};
+  entries?.forEach(e => {
+    if (!e.account) return;
+    const code = e.account.account_code + ' ' + e.account.account_name;
+    if (!totals[code]) totals[code] = 0;
+    totals[code] += (e.credit || 0) - (e.debit || 0);
+  });
   
-  if (buses && buses.length > 0) {
-    for (const bus of buses) {
-      const { data: trips } = await supabase.from('daily_trips').select('trip_date, trip_no').eq('bus_id', bus.id);
-      console.log(`Trips for ${bus.bus_no} (id: ${bus.id}):`, trips?.length);
+  console.log("GL Balances:");
+  for (const [k, v] of Object.entries(totals)) {
+    if (Math.abs(v) > 0.01) {
+      console.log(`${k}: ${v}`);
     }
   }
 }

@@ -115,10 +115,9 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
         query = query.eq("status", status);
       }
 
-      // Filter by specific business unit if provided (auto or override)
       if (businessUnitCode && businessUnitCode !== "all") {
         if (businessUnitCode === "SBO") {
-          query = query.or(`business_unit_code.eq.SBO,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%`);
+          query = query.or(`business_unit_code.eq.SBO,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%`);
         } else {
           query = query.or(`business_unit_code.eq.${businessUnitCode},entry_number.ilike.${businessUnitCode}-%`);
         }
@@ -132,7 +131,7 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
         } else if (cName.includes("sinotruck")) {
           query = query.or("entry_number.ilike.SNT-%,business_unit_code.eq.SNT");
         } else if (cName.includes("school bus")) {
-          query = query.or("entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,business_unit_code.eq.SBO");
+          query = query.or("entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%,business_unit_code.eq.SBO");
         } else if (cName.includes("special hire")) {
           query = query.or("entry_number.ilike.SPH-%,business_unit_code.eq.SPH");
         } else if (cName.includes("light vehicle")) {
@@ -1860,7 +1859,7 @@ export const useTrialBalanceData = (
   periodEndDate: string | null,
   costCenterId?: string
 ) => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
@@ -1881,15 +1880,39 @@ export const useTrialBalanceData = (
       if (effectiveCompanyId) {
         jeQuery = jeQuery.eq("company_id", effectiveCompanyId);
       }
+
+      // Apply business unit filter with legacy entry_number prefix fallback
+      // This matches the same pattern used in useJournalEntries to catch both
+      // modern entries (with business_unit_code) and legacy entries (with prefix only)
       if (autoBusinessUnitCode) {
-        jeQuery = jeQuery.eq("business_unit_code", autoBusinessUnitCode);
+        if (autoBusinessUnitCode === "SBO") {
+          jeQuery = jeQuery.or(`business_unit_code.eq.SBO,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%`);
+        } else {
+          jeQuery = jeQuery.or(`business_unit_code.eq.${autoBusinessUnitCode},entry_number.ilike.${autoBusinessUnitCode}-%`);
+        }
+      } else if (selectedCompany && !selectedCompany.parent_company_id) {
+        // Parent companies see all entries (no BU filter)
+      } else if (selectedCompany) {
+        // Fallback for legacy records using company name matching
+        const cName = selectedCompany.name.toLowerCase();
+        if (cName.includes("yutong")) {
+          jeQuery = jeQuery.or("entry_number.ilike.YUT-%,business_unit_code.eq.YUT");
+        } else if (cName.includes("sinotruck")) {
+          jeQuery = jeQuery.or("entry_number.ilike.SNT-%,business_unit_code.eq.SNT");
+        } else if (cName.includes("school bus")) {
+          jeQuery = jeQuery.or("entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%,business_unit_code.eq.SBO");
+        } else if (cName.includes("special hire")) {
+          jeQuery = jeQuery.or("entry_number.ilike.SPH-%,business_unit_code.eq.SPH");
+        } else if (cName.includes("light vehicle")) {
+          jeQuery = jeQuery.or("entry_number.ilike.LTV-%,business_unit_code.eq.LTV");
+        }
       }
 
-      const { data: entries, error: jeError } = await jeQuery;
-      if (jeError) throw jeError;
+      // Use fetchAllRows to handle pagination (prevents silent truncation at >1000 entries)
+      const entries = await fetchAllRows(jeQuery);
       if (!entries || entries.length === 0) return [];
 
-      const entryIds = entries.map(e => e.id);
+      const entryIds = entries.map((e: any) => e.id);
 
       // Fetch lines for those entries in batches (Supabase IN filter limit)
       const batchSize = 200;
@@ -1946,15 +1969,37 @@ export const useTrialBalanceData = (
       if (effectiveCompanyId) {
         jeQuery = jeQuery.eq("company_id", effectiveCompanyId);
       }
+
+      // Apply business unit filter with legacy entry_number prefix fallback
       if (autoBusinessUnitCode) {
-        jeQuery = jeQuery.eq("business_unit_code", autoBusinessUnitCode);
+        if (autoBusinessUnitCode === "SBO") {
+          jeQuery = jeQuery.or(`business_unit_code.eq.SBO,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%`);
+        } else {
+          jeQuery = jeQuery.or(`business_unit_code.eq.${autoBusinessUnitCode},entry_number.ilike.${autoBusinessUnitCode}-%`);
+        }
+      } else if (selectedCompany && !selectedCompany.parent_company_id) {
+        // Parent companies see all entries (no BU filter)
+      } else if (selectedCompany) {
+        // Fallback for legacy records using company name matching
+        const cName = selectedCompany.name.toLowerCase();
+        if (cName.includes("yutong")) {
+          jeQuery = jeQuery.or("entry_number.ilike.YUT-%,business_unit_code.eq.YUT");
+        } else if (cName.includes("sinotruck")) {
+          jeQuery = jeQuery.or("entry_number.ilike.SNT-%,business_unit_code.eq.SNT");
+        } else if (cName.includes("school bus")) {
+          jeQuery = jeQuery.or("entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%,business_unit_code.eq.SBO");
+        } else if (cName.includes("special hire")) {
+          jeQuery = jeQuery.or("entry_number.ilike.SPH-%,business_unit_code.eq.SPH");
+        } else if (cName.includes("light vehicle")) {
+          jeQuery = jeQuery.or("entry_number.ilike.LTV-%,business_unit_code.eq.LTV");
+        }
       }
 
-      const { data: entries, error: jeError } = await jeQuery;
-      if (jeError) throw jeError;
+      // Use fetchAllRows to handle pagination (prevents silent truncation at >1000 entries)
+      const entries = await fetchAllRows(jeQuery);
       if (!entries || entries.length === 0) return [];
 
-      const entryIds = entries.map(e => e.id);
+      const entryIds = entries.map((e: any) => e.id);
 
       const batchSize = 200;
       const allLines: { account_id: string; debit: number; credit: number }[] = [];

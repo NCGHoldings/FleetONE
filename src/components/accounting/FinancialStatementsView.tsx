@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -236,14 +237,13 @@ export const FinancialStatementsView = () => {
       
       if (businessUnit && businessUnit !== "all") {
         if (businessUnit === "SBO") {
-          q = q.or(`business_unit_code.eq.SBO,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%`);
+          q = q.or(`business_unit_code.eq.SBO,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%`);
         } else {
           q = q.or(`business_unit_code.eq.${businessUnit},entry_number.ilike.${businessUnit}-%`);
         }
       }
 
-      const { data, error } = await q;
-      if (error) throw error;
+      const data = await fetchAllRows(q);
       return data || [];
     },
   });

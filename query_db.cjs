@@ -1,14 +1,13 @@
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 
-// Read .env file for credentials
 const envFile = fs.readFileSync('.env', 'utf8');
 const lines = envFile.split('\n');
 let url = '';
 let key = '';
 for (const line of lines) {
-  if (line.startsWith('VITE_SUPABASE_URL=')) url = line.split('=')[1].trim();
-  if (line.startsWith('VITE_SUPABASE_SERVICE_ROLE_KEY=') || line.startsWith('VITE_SUPABASE_ANON_KEY=')) key = line.split('=')[1].trim();
+  if (line.startsWith('VITE_SUPABASE_URL=')) url = line.split('=')[1].replace(/['"]/g, '').trim();
+  if (line.startsWith('VITE_SUPABASE_PUBLISHABLE_KEY=')) key = line.split('=')[1].replace(/['"]/g, '').trim();
 }
 
 const supabase = createClient(url, key);
@@ -24,7 +23,6 @@ async function run() {
       credit,
       journal_entries!inner(entry_date, source_module, business_unit_code)
     `);
-    //.eq('journal_entries.business_unit_code', 'SBO');
 
   if (error) {
     console.error(error);
@@ -33,11 +31,13 @@ async function run() {
   
   let accounts = {};
   data.forEach(row => {
-    if (!accounts[row.account_name]) {
-       accounts[row.account_name] = { debit: 0, credit: 0, code: row.account_code };
+    const acct = row.account_name + ' (' + row.account_code + ')';
+    if (!accounts[acct]) {
+       accounts[acct] = { debit: 0, credit: 0, count: 0 };
     }
-    accounts[row.account_name].debit += (row.debit || 0);
-    accounts[row.account_name].credit += (row.credit || 0);
+    accounts[acct].debit += (row.debit || 0);
+    accounts[acct].credit += (row.credit || 0);
+    accounts[acct].count += 1;
   });
   
   console.log(accounts);

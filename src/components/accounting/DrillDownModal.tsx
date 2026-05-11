@@ -41,7 +41,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Loader2, Download, X, Filter, Bus, Route, Trash2, FileText, CheckCircle } from "lucide-react";
+import { Loader2, Download, X, Filter, Bus, Route, Trash2, FileText, CheckCircle, Eye, ChevronDown, ChevronRight, Info, RefreshCw, ShieldCheck } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { reverseAndDeleteJournalEntry } from "@/lib/gl-posting-utils";
 import { useReconcileJournalLines } from "@/hooks/useAccountingMutations";
@@ -81,6 +82,10 @@ export const DrillDownModal = ({
   const [deleteConfirmJEId, setDeleteConfirmJEId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showReconciled, setShowReconciled] = useState(true);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const [breakdownExpanded, setBreakdownExpanded] = useState<Record<string, boolean>>({});
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [showRecalcConfirm, setShowRecalcConfirm] = useState(false);
 
   const [previewDocType, setPreviewDocType] = useState<string>("");
   const [previewDocData, setPreviewDocData] = useState<any>(null);
@@ -314,6 +319,174 @@ export const DrillDownModal = ({
 
   // The true Brought Forward balance is whatever is needed to make the running balance equal totalCurrentBalance
   const broughtForwardBalance = totalCurrentBalance - fetchedNetMovement;
+
+  // === Recalculate Balance Handler ===
+  // Recalculates current_balance from ALL posted journal entry lines for this account
+  const handleRecalculateBalance = async () => {
+    if (resolvedAccountIds.length === 0) return;
+    setIsRecalculating(true);
+    try {
+      for (const accountId of resolvedAccountIds) {
+        // 1. Get the account type and opening_balance
+        const { data: account } = await supabase
+          .from("chart_of_accounts")
+          .select("id, account_type, opening_balance, current_balance")
+          .eq("id", accountId)
+          .single();
+
+        if (!account) continue;
+
+        // 2. Fetch ALL posted JE lines for this account
+        const allLines = await fetchAllRows(
+          supabase
+            .from("journal_entry_lines")
+            .select(`id, debit, credit, journal_entries!inner(status)`)
+            .eq("account_id", accountId)
+            .eq("journal_entries.status", "posted")
+        );
+
+        // 3. Sum debits and credits
+        const totalDebit = allLines.reduce((s: number, l: any) => s + (Number(l.debit) || 0), 0);
+        const totalCredit = allLines.reduce((s: number, l: any) => s + (Number(l.credit) || 0), 0);
+
+        // 4. Calculate the correct current_balance based on account type
+        const isDebitNormal = ["asset", "expense"].includes(account.account_type || "");
+        const openingBalance = Number(account.opening_balance) || 0;
+        const correctBalance = isDebitNormal
+          ? openingBalance + (totalDebit - totalCredit)
+          : openingBalance + (totalCredit - totalDebit);
+
+        // 5. Update the COA record
+        const { error } = await supabase
+          .from("chart_of_accounts")
+          .update({ current_balance: correctBalance })
+          .eq("id", accountId);
+
+        if (error) throw error;
+
+        console.log(
+          `[Recalculate] Account ${accountId}: old=${account.current_balance}, new=${correctBalance}, ` +
+          `debits=${totalDebit}, credits=${totalCredit}, type=${account.account_type}, lines=${allLines.length}`
+        );
+      }
+
+      // 6. Invalidate all related caches
+      queryClient.invalidateQueries({ queryKey: ["drill-down-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["drill-down-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bbf-breakdown"] });
+      queryClient.invalidateQueries({ queryKey: ["trial-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+
+      toast.success("Balance recalculated successfully! The Brought Forward will now show the correct value.");
+      setShowRecalcConfirm(false);
+      setShowBreakdown(false);
+    } catch (error) {
+      console.error("Recalculate balance error:", error);
+      toast.error("Failed to recalculate balance: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
+  // === Opening Balance Breakdown Query ===
+  // Fetches ALL journal entries for this account to show how the brought forward is composed
+  const { data: breakdownData, isLoading: breakdownLoading } = useQuery({
+    queryKey: ["bbf-breakdown", resolvedAccountIds, dateRange],
+    queryFn: async () => {
+      if (resolvedAccountIds.length === 0) return null;
+
+      // Get the COA opening_balance for context
+      const { data: coaData } = await supabase
+        .from("chart_of_accounts")
+        .select("id, account_code, account_name, opening_balance, current_balance, account_type")
+        .in("id", resolvedAccountIds);
+
+      const coaOpeningBalance = coaData?.reduce((sum, a) => sum + (Number(a.opening_balance) || 0), 0) || 0;
+      const coaCurrentBalance = coaData?.reduce((sum, a) => sum + (Number(a.current_balance) || 0), 0) || 0;
+      const accountType = coaData?.[0]?.account_type || "unknown";
+
+      // Fetch ALL journal entry lines for this account (no date filter)
+      let query = supabase
+        .from("journal_entry_lines")
+        .select(`
+          id, debit, credit, description,
+          journal_entries!inner(
+            id, entry_number, entry_date, description, status, 
+            business_unit_code, reference, source_module
+          )
+        `)
+        .in("account_id", resolvedAccountIds)
+        .eq("journal_entries.status", "posted")
+        .order("created_at", { ascending: true });
+
+      const allEntries = await fetchAllRows(query);
+
+      // Split into "before filter" and "within filter" groups
+      const beforeFilter: any[] = [];
+      const withinFilter: any[] = [];
+
+      allEntries.forEach((entry: any) => {
+        const je = entry.journal_entries as any;
+        if (!je) return;
+        const entryDate = je.entry_date;
+
+        // If no date filter, everything is "within"
+        if (!dateRange.from) {
+          withinFilter.push(entry);
+          return;
+        }
+
+        const filterFrom = format(dateRange.from, "yyyy-MM-dd");
+        if (entryDate < filterFrom) {
+          beforeFilter.push(entry);
+        } else {
+          withinFilter.push(entry);
+        }
+      });
+
+      // Group "before" entries by source_module
+      const bySource: Record<string, { entries: any[]; totalDebit: number; totalCredit: number }> = {};
+      beforeFilter.forEach((entry: any) => {
+        const je = entry.journal_entries as any;
+        const source = je?.source_module || "manual";
+        if (!bySource[source]) bySource[source] = { entries: [], totalDebit: 0, totalCredit: 0 };
+        bySource[source].entries.push(entry);
+        bySource[source].totalDebit += entry.debit || 0;
+        bySource[source].totalCredit += entry.credit || 0;
+      });
+
+      // Group "before" entries by month
+      const byMonth: Record<string, { totalDebit: number; totalCredit: number; count: number }> = {};
+      beforeFilter.forEach((entry: any) => {
+        const je = entry.journal_entries as any;
+        const month = je?.entry_date?.substring(0, 7) || "unknown";
+        if (!byMonth[month]) byMonth[month] = { totalDebit: 0, totalCredit: 0, count: 0 };
+        byMonth[month].totalDebit += entry.debit || 0;
+        byMonth[month].totalCredit += entry.credit || 0;
+        byMonth[month].count++;
+      });
+
+      const totalBeforeDebit = beforeFilter.reduce((s, e) => s + (e.debit || 0), 0);
+      const totalBeforeCredit = beforeFilter.reduce((s, e) => s + (e.credit || 0), 0);
+      const computedBBF = coaOpeningBalance + (totalBeforeDebit - totalBeforeCredit);
+
+      return {
+        coaOpeningBalance,
+        coaCurrentBalance,
+        accountType,
+        beforeFilterCount: beforeFilter.length,
+        withinFilterCount: withinFilter.length,
+        totalAllEntries: allEntries.length,
+        totalBeforeDebit,
+        totalBeforeCredit,
+        netBeforeMovement: totalBeforeDebit - totalBeforeCredit,
+        computedBBF,
+        bySource,
+        byMonth,
+      };
+    },
+    enabled: showBreakdown && open && resolvedAccountIds.length > 0,
+  });
 
   // Filter by transaction type and reconciliation status
   const filteredTransactions = useMemo(() => {
@@ -821,7 +994,27 @@ export const DrillDownModal = ({
                 })}
                 <TableRow className="bg-muted/50 font-medium">
                   <TableCell colSpan={resolvedAccountIds.length > 1 ? 9 : 8} className="text-right py-3">
-                    Balance Brought Forward
+                    <div className="flex items-center justify-end gap-2">
+                      <span>Balance Brought Forward</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 text-xs gap-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                              onClick={() => setShowBreakdown(true)}
+                            >
+                              <Eye className="h-3 w-3" />
+                              View Breakdown
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>See how this opening balance is composed</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </TableCell>
                   <TableCell></TableCell>
                   <TableCell></TableCell>
@@ -898,6 +1091,267 @@ export const DrillDownModal = ({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    {/* === Opening Balance Breakdown Dialog === */}
+    <Dialog open={showBreakdown} onOpenChange={setShowBreakdown}>
+      <DialogContent className="max-w-[800px] max-h-[85vh] overflow-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Info className="h-5 w-5 text-blue-500" />
+            Opening Balance Breakdown
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            How the Balance Brought Forward of <span className="font-semibold text-foreground"><CurrencyDisplay amount={broughtForwardBalance} /></span> is composed
+          </p>
+        </DialogHeader>
+
+        {breakdownLoading ? (
+          <div className="flex items-center justify-center h-40">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : breakdownData ? (
+          <div className="space-y-4">
+            {/* COA vs Computed comparison */}
+            <div className="grid grid-cols-3 gap-3">
+              <Card>
+                <CardContent className="pt-4 pb-3">
+                  <p className="text-xs text-muted-foreground">COA Opening Balance</p>
+                  <p className="text-lg font-semibold">
+                    <CurrencyDisplay amount={breakdownData.coaOpeningBalance} />
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Set during chart of accounts setup</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4 pb-3">
+                  <p className="text-xs text-muted-foreground">Pre-Filter JE Movements</p>
+                  <p className="text-lg font-semibold">
+                    <CurrencyDisplay amount={breakdownData.netBeforeMovement} />
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">{breakdownData.beforeFilterCount} entries before date filter</p>
+                </CardContent>
+              </Card>
+              <Card className={breakdownData.computedBBF !== broughtForwardBalance ? "border-amber-300 bg-amber-50/50" : "border-green-300 bg-green-50/50"}>
+                <CardContent className="pt-4 pb-3">
+                  <p className="text-xs text-muted-foreground">Computed BBF</p>
+                  <p className="text-lg font-semibold">
+                    <CurrencyDisplay amount={breakdownData.computedBBF} />
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {breakdownData.computedBBF === broughtForwardBalance 
+                      ? "✅ Matches display" 
+                      : `⚠️ Display shows ${broughtForwardBalance.toLocaleString()}`}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Formula explanation */}
+            <div className="bg-muted/50 rounded-lg p-3 text-sm">
+              <p className="font-medium mb-1">Formula:</p>
+              <p className="font-mono text-xs">
+                BBF = COA Current Balance ({breakdownData.coaCurrentBalance.toLocaleString()}) − Fetched Net Movement ({fetchedNetMovement.toLocaleString()}) = <span className="font-bold">{broughtForwardBalance.toLocaleString()}</span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Total entries on this account: {breakdownData.totalAllEntries} ({breakdownData.beforeFilterCount} before filter, {breakdownData.withinFilterCount} within filter)
+              </p>
+            </div>
+
+            {/* By Source Module */}
+            {Object.keys(breakdownData.bySource).length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-2">By Source Module (Before Date Filter)</h4>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Source</TableHead>
+                      <TableHead className="text-right">Entries</TableHead>
+                      <TableHead className="text-right">Total Debit</TableHead>
+                      <TableHead className="text-right">Total Credit</TableHead>
+                      <TableHead className="text-right">Net</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.entries(breakdownData.bySource)
+                      .sort(([,a], [,b]) => Math.abs(b.totalDebit - b.totalCredit) - Math.abs(a.totalDebit - a.totalCredit))
+                      .map(([source, data]) => {
+                        const net = data.totalDebit - data.totalCredit;
+                        const isExpanded = breakdownExpanded[source];
+                        return (
+                          <>
+                            <TableRow key={source} className="cursor-pointer hover:bg-muted/50" onClick={() => setBreakdownExpanded(prev => ({ ...prev, [source]: !prev[source] }))}>
+                              <TableCell className="flex items-center gap-1">
+                                {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                <Badge variant="outline" className="text-xs">
+                                  {source.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">{data.entries.length}</TableCell>
+                              <TableCell className="text-right font-mono text-green-600">{data.totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                              <TableCell className="text-right font-mono text-red-600">{data.totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                              <TableCell className={`text-right font-mono font-medium ${net >= 0 ? 'text-green-700' : 'text-red-700'}`}>{net.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                            </TableRow>
+                            {isExpanded && data.entries.slice(0, 50).map((entry: any, idx: number) => {
+                              const je = entry.journal_entries as any;
+                              return (
+                                <TableRow key={`${source}-${idx}`} className="bg-muted/20 text-xs">
+                                  <TableCell className="pl-8 font-mono text-muted-foreground" colSpan={1}>
+                                    {je?.entry_date} — {je?.entry_number}
+                                  </TableCell>
+                                  <TableCell className="text-right text-muted-foreground">{je?.reference || '-'}</TableCell>
+                                  <TableCell className="text-right font-mono text-green-600">{(entry.debit || 0) > 0 ? entry.debit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''}</TableCell>
+                                  <TableCell className="text-right font-mono text-red-600">{(entry.credit || 0) > 0 ? entry.credit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''}</TableCell>
+                                  <TableCell className="text-right font-mono text-muted-foreground">{((entry.debit || 0) - (entry.credit || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                            {isExpanded && data.entries.length > 50 && (
+                              <TableRow className="bg-muted/20 text-xs">
+                                <TableCell colSpan={5} className="text-center text-muted-foreground italic">
+                                  ... and {data.entries.length - 50} more entries
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </>
+                        );
+                      })}
+                    <TableRow className="font-semibold bg-muted/50">
+                      <TableCell>Total</TableCell>
+                      <TableCell className="text-right">{breakdownData.beforeFilterCount}</TableCell>
+                      <TableCell className="text-right font-mono text-green-700">{breakdownData.totalBeforeDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="text-right font-mono text-red-700">{breakdownData.totalBeforeCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                      <TableCell className={`text-right font-mono font-bold ${breakdownData.netBeforeMovement >= 0 ? 'text-green-700' : 'text-red-700'}`}>{breakdownData.netBeforeMovement.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* By Month */}
+            {Object.keys(breakdownData.byMonth).length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Monthly Summary (Before Date Filter)</h4>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Month</TableHead>
+                      <TableHead className="text-right">Entries</TableHead>
+                      <TableHead className="text-right">Debit</TableHead>
+                      <TableHead className="text-right">Credit</TableHead>
+                      <TableHead className="text-right">Net</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.entries(breakdownData.byMonth)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([month, data]) => {
+                        const net = data.totalDebit - data.totalCredit;
+                        return (
+                          <TableRow key={month}>
+                            <TableCell className="font-mono text-sm">{month}</TableCell>
+                            <TableCell className="text-right">{data.count}</TableCell>
+                            <TableCell className="text-right font-mono text-green-600">{data.totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                            <TableCell className="text-right font-mono text-red-600">{data.totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                            <TableCell className={`text-right font-mono ${net >= 0 ? 'text-green-700' : 'text-red-700'}`}>{net.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {breakdownData.beforeFilterCount === 0 && !dateRange.from && (
+              <div className="text-center text-muted-foreground py-6">
+                <p className="text-sm">No date filter is applied — the entire balance is from the COA current_balance field.</p>
+                <p className="text-xs mt-1">COA Current Balance: <span className="font-mono font-semibold">{breakdownData.coaCurrentBalance.toLocaleString()}</span></p>
+                <p className="text-xs">All {breakdownData.totalAllEntries} journal entries are shown in the table above.</p>
+              </div>
+            )}
+
+            {/* === Recalculate Balance Action === */}
+            {broughtForwardBalance !== 0 && (
+              <div className="border-t pt-4 mt-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <RefreshCw className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-amber-800">Balance Out of Sync</h4>
+                      <p className="text-xs text-amber-700 mt-1">
+                        The COA <code className="bg-amber-100 px-1 rounded">current_balance</code> does not match the actual journal entry data.
+                        This causes the phantom Brought Forward of <span className="font-semibold"><CurrencyDisplay amount={broughtForwardBalance} /></span>.
+                      </p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        Click <strong>Recalculate</strong> to recompute the balance from {breakdownData.totalAllEntries} posted journal entries. This will set BBF to <strong>LKR 0.00</strong>.
+                      </p>
+                      <div className="mt-3 flex gap-2">
+                        {!showRecalcConfirm ? (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5"
+                            onClick={() => setShowRecalcConfirm(true)}
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Recalculate Balance
+                          </Button>
+                        ) : (
+                          <div className="bg-white border border-amber-300 rounded-md p-3 w-full">
+                            <p className="text-xs text-amber-800 font-medium mb-2">
+                              ⚠️ This will update the <code className="bg-amber-100 px-1 rounded">current_balance</code> field in the Chart of Accounts for {resolvedAccountIds.length} account(s).
+                              The balance will be recalculated from all {breakdownData.totalAllEntries} posted journal entries.
+                            </p>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="gap-1.5"
+                                onClick={handleRecalculateBalance}
+                                disabled={isRecalculating}
+                              >
+                                {isRecalculating ? (
+                                  <><Loader2 className="h-3.5 w-3.5 animate-spin" />Recalculating...</>
+                                ) : (
+                                  <><ShieldCheck className="h-3.5 w-3.5" />Yes, Recalculate Now</>
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setShowRecalcConfirm(false)}
+                                disabled={isRecalculating}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {broughtForwardBalance === 0 && (
+              <div className="border-t pt-4 mt-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Balance is in sync</p>
+                    <p className="text-xs text-green-700">The COA current_balance matches the journal entry data. No action needed.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center text-muted-foreground py-6">
+            No breakdown data available
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
 
     {previewDocType && previewDocData && (
       <FinanceDocumentPreviewModal

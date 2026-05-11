@@ -292,21 +292,8 @@ export function useSchoolBusBulkExpenses() {
       const validExpenses = [];
 
       for (const expense of payload.expenses) {
-        // Duplicate guard: skip if a fuel-import JE already exists for (bus, date)
-        const { data: existingFuelLine } = await supabase
-          .from("journal_entry_lines")
-          .select("journal_entry_id, journal_entries!inner(id, entry_date, source_module)")
-          .eq("bus_id", expense.busId)
-          .eq("journal_entries.source_module", `school_bus_${payload.globalExpenseType || 'fuel'}_import`)
-          .eq("journal_entries.entry_date", expense.expenseDate)
-          .limit(1)
-          .maybeSingle();
-
-        if (existingFuelLine?.journal_entry_id) {
-          skippedCount += 1;
-          continue;
-        }
-        
+        // Multi-Trip Logic: We no longer skip if a JE exists for the same date/bus.
+        // The LogSheetUploadModal is trusted, and daily_bus_expenses handles the aggregation of values.
         validExpenses.push(expense);
         totalAmount += expense.amount;
       }

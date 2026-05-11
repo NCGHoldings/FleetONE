@@ -81,6 +81,7 @@ export interface ScanResult {
   summaries: GLGapSummary[];
   allGaps: GLGap[];
   auditScore: AuditScoreResult;
+  orphanedJournalEntries?: any[];
 }
 
 // ============ Scanner Configuration ============
@@ -224,6 +225,22 @@ const SCAN_TARGETS: ScanTarget[] = [
     suggestedDebit: "Leasing Liability + Interest",
     suggestedCredit: "Bank / Cash",
     severity: "warning",
+  },
+  {
+    module: "school_bus_payments",
+    moduleLabel: "School Bus Payments",
+    tableName: "school_payment_transactions",
+    refColumn: "reference_no",
+    dateColumn: "payment_month",
+    amountColumn: "amount_paid",
+    glCheckType: "journal_entry_id",
+    hasCompanyId: false, // school_payment_transactions doesn't have company_id
+    extraFilters: {  }, // All real payments should have gl_posted
+    suggestedDebit: "Bank / Cash",
+    suggestedCredit: "Trade Receivables",
+    severity: "critical",
+    glSettingsKey: "bank_account_id",
+    glSettingsCreditKey: "trade_receivable_account_id",
   },
 ];
 
@@ -891,6 +908,60 @@ export function useGLIntegrityScanner() {
         } catch (err) {
           console.warn(`Scanner: Failed to scan ${target.tableName}:`, err);
         }
+      }
+
+      // Check for Orphaned Journal Entries (JEs where source record is missing)
+      try {
+        const { data: sboJEs } = await supabase
+          .from("journal_entries")
+          .select("id, reference, entry_number, entry_date, total_debit")
+          .eq("business_unit_code", "SBO")
+          .eq("status", "posted")
+          .order("created_at", { ascending: false })
+          .limit(200);
+
+        if (sboJEs && sboJEs.length > 0) {
+          // Identify School Bus Invoices
+          const invoiceRefs = sboJEs.filter((j: any) => j.reference?.startsWith('SBS-')).map((j: any) => j.reference);
+          let existingInvoices = new Set<string>();
+          if (invoiceRefs.length > 0) {
+             const { data: validInvoices } = await supabase.from('school_ar_invoices').select('invoice_number').in('invoice_number', invoiceRefs);
+             existingInvoices = new Set(validInvoices?.map((v: any) => v.invoice_number) || []);
+          }
+
+          // Identify School Bus Payments
+          const paymentRefs = sboJEs.filter((j: any) => j.reference?.startsWith('PAY-') || j.reference?.startsWith('XFR-')).map((j: any) => j.reference);
+          let existingPayments = new Set<string>();
+          if (paymentRefs.length > 0) {
+             const { data: validPayments } = await supabase.from('school_payment_transactions').select('reference_no').in('reference_no', paymentRefs);
+             existingPayments = new Set(validPayments?.map((v: any) => v.reference_no) || []);
+          }
+          
+          for (const je of sboJEs) {
+             const isInvoiceOrphan = je.reference?.startsWith('SBS-') && !existingInvoices.has(je.reference);
+             const isPaymentOrphan = (je.reference?.startsWith('PAY-') || je.reference?.startsWith('XFR-')) && !existingPayments.has(je.reference);
+             
+             if (isInvoiceOrphan || isPaymentOrphan) {
+                allGaps.push({
+                  id: `orphan_je_${je.id}`,
+                  module: "orphaned_journal_entries",
+                  moduleLabel: "Orphaned Journal Entries",
+                  tableName: "journal_entries",
+                  recordId: je.id,
+                  recordRef: je.entry_number || je.reference || je.id,
+                  recordDate: je.entry_date,
+                  amount: je.total_debit,
+                  description: `⚠️ ORPHANED GL ENTRY - Source reference "${je.reference}" not found. Action: Delete via Automation Dashboard.`,
+                  severity: "critical",
+                  suggestedDebit: "N/A",
+                  suggestedCredit: "N/A",
+                  canAutoPost: false,
+                });
+             }
+          }
+        }
+      } catch (err) {
+         console.warn("Scanner: Failed to check orphaned JEs:", err);
       }
 
       // Group by module

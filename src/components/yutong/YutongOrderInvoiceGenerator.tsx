@@ -166,7 +166,8 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
         warnings.push('Customer address is missing - will use "TBA".');
         customerAddress = 'TBA';
       } else {
-        errors.push('Customer address is required for this invoice type. Please edit the customer profile to add the address.');
+        warnings.push('Customer address is missing - will use "Address not provided". Please edit the customer profile to add the address later.');
+        customerAddress = 'Address not provided';
       }
     }
     

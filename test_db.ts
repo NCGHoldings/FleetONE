@@ -1,17 +1,37 @@
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-dotenv.config();
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
 const supabase = createClient(process.env.VITE_SUPABASE_URL!, process.env.VITE_SUPABASE_ANON_KEY!);
 
 async function run() {
-  const { data: bus } = await supabase.from('buses').select('id, bus_no').eq('bus_no', 'NG 8242').single();
-  console.log("Bus:", bus);
-  if (bus) {
-    const { data: trips } = await supabase.from('daily_trips').select('trip_date, trip_no').eq('bus_id', bus.id).gte('trip_date', '2026-05-01').lte('trip_date', '2026-05-31');
-    console.log(`Found ${trips?.length} trips for bus ${bus.bus_no} in May 2026`);
-    if (trips && trips.length > 0) {
-      console.log(trips.slice(0, 5));
+  const { data: entries, error } = await supabase
+    .from('journal_entry_lines')
+    .select(`
+      debit, credit, 
+      account:chart_of_accounts(account_code, account_name),
+      journal_entry:journal_entries!inner(entry_date, business_unit_code, status)
+    `)
+    .neq('journal_entries.status', 'draft')
+    .neq('journal_entries.status', 'void');
+    
+  if (error) {
+    console.error("Error", error);
+    return;
+  }
+  
+  let totals: Record<string, number> = {};
+  entries?.forEach((e: any) => {
+    if (!e.account) return;
+    const code = e.account.account_code + ' ' + e.account.account_name;
+    if (!totals[code]) totals[code] = 0;
+    totals[code] += (e.credit || 0) - (e.debit || 0);
+  });
+  
+  console.log("GL Balances:");
+  for (const [k, v] of Object.entries(totals)) {
+    if (Math.abs(v) > 0.01) {
+      console.log(`${k}: ${v}`);
     }
   }
 }

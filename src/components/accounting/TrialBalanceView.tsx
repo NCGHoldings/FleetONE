@@ -24,11 +24,9 @@ import {
   useFinancialPeriods,
   useCostCenters,
   useTrialBalanceData,
-  useAutoBusinessUnitFilter,
 } from "@/hooks/useAccountingData";
 import { format } from "date-fns";
 import { DataExportMenu } from "@/components/ui/DataExportMenu";
-import { BusinessUnitSelector } from "./shared/BusinessUnitSelector";
 
 interface TrialBalanceRow {
   accountCode: string;
@@ -49,17 +47,10 @@ export const TrialBalanceView = () => {
   const { data: accounts = [] } = useChartOfAccounts();
   const { data: periods = [] } = useFinancialPeriods();
   const { data: costCenters = [] } = useCostCenters();
-  const autoBU = useAutoBusinessUnitFilter();
 
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
   const [selectedCostCenter, setSelectedCostCenter] = useState("all");
   const [showZeroBalances, setShowZeroBalances] = useState(false);
-  const [businessUnit, setBusinessUnit] = useState<string>(autoBU || "all");
-
-  // Sync with context if it changes
-  useMemo(() => {
-    if (autoBU) setBusinessUnit(autoBU);
-  }, [autoBU]);
 
   const selectedPeriod = periods.find((p: any) => p.id === selectedPeriodId);
 
