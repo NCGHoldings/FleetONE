@@ -434,6 +434,8 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
                         <TableHead>Paid Amount</TableHead>
                         <TableHead>Balance</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>GL Status</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -447,6 +449,66 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
                           <Badge variant={arInvoice.status === 'paid' ? 'default' : 'outline'}>
                             {arInvoice.status?.toUpperCase() || 'UNPAID'}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {arInvoice.journal_entry_id ? (
+                            <div className="flex items-center text-green-600 text-sm">
+                              <CheckCircle className="h-4 w-4 mr-1" /> Linked
+                            </div>
+                          ) : (
+                            <div className="flex items-center text-muted-foreground text-sm">
+                              <Clock className="h-4 w-4 mr-1" /> Unlinked
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {!arInvoice.journal_entry_id && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={async () => {
+                                if (!arInvoice || isSyncing === arInvoice.id) return;
+                                setIsSyncing(arInvoice.id);
+                                try {
+                                  const settings = await fetchVehicleFinanceSettings(module, NCG_HOLDING_ID);
+                                  if (!settings) {
+                                    toast.error('Finance settings not configured for this module.');
+                                    return;
+                                  }
+                                  const { postVehicleInvoiceToGL } = await import('@/hooks/useVehicleSalesFinance');
+                                  const customerName = orderData?.[`${module}_quotations`]?.customer_name || 'Unknown';
+                                  const result = await postVehicleInvoiceToGL({
+                                    module,
+                                    orderNo: orderData?.order_no,
+                                    customerName,
+                                    customerId: orderData?.finance_customer_id,
+                                    invoiceAmount: arInvoice.total_amount,
+                                    settings,
+                                    effectiveCompanyId: NCG_HOLDING_ID,
+                                    invoiceNo: arInvoice.invoice_number,
+                                    invoiceDate: arInvoice.invoice_date,
+                                  });
+                                  if (result) {
+                                    await supabase.from('ar_invoices').update({ journal_entry_id: result.journalEntryId }).eq('id', arInvoice.id);
+                                    toast.success(`Invoice synced to GL successfully: ${result.entryNumber}`);
+                                    loadFinanceData();
+                                  }
+                                } catch (e: any) {
+                                  toast.error(e.message || 'Error syncing invoice to GL');
+                                } finally {
+                                  setIsSyncing(null);
+                                }
+                              }}
+                              disabled={isSyncing === arInvoice.id}
+                            >
+                              {isSyncing === arInvoice.id ? (
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                              )}
+                              Sync GL
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     </TableBody>

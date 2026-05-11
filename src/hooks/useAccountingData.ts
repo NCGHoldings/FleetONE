@@ -436,7 +436,7 @@ export const useARReceipts = () => {
       if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ar_receipts")
-        .select("*, customers(customer_name), bank_accounts(account_name)")
+        .select("*, customers(customer_name), bank_accounts(account_name, bank_name, account_number)")
         .order("receipt_date", { ascending: false });
 
       if (effectiveCompanyId) {
@@ -481,7 +481,7 @@ export const useAPPayments = () => {
         .select(`
           *,
           vendors (vendor_name),
-          bank_accounts (account_name)
+          bank_accounts (account_name, bank_name, account_number)
         `)
         .order("payment_date", { ascending: false });
 
@@ -509,7 +509,8 @@ export const useAPPayments = () => {
             ),
             vendor_bank_accounts (
               id, bank_name, bank_branch, account_number, account_holder_name, account_label
-            )
+            ),
+            bank_accounts (account_name, bank_name, account_number)
           `)
           .order("created_at", { ascending: false });
 

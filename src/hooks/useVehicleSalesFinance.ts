@@ -644,7 +644,7 @@ export async function postVehicleInvoiceToGL({
     if (!tradeReceivableId || !salesRevenueId) {
       console.error(`[${module.toUpperCase()} Finance] Missing required accounts for invoice posting`);
       toast.error('Missing GL account configuration for invoice posting');
-      return null;
+      throw new Error(`Missing required GL accounts: ${!tradeReceivableId ? 'Trade Receivable ' : ''}${!salesRevenueId ? 'Sales Revenue' : ''}`);
     }
 
     const refLabel = invoiceNo || orderNo;
@@ -678,7 +678,7 @@ export async function postVehicleInvoiceToGL({
 
     if (jeError) {
       console.error(`[${module.toUpperCase()} Finance] Invoice journal entry error:`, jeError);
-      return null;
+      throw new Error(`Failed to create GL entry: ${jeError.message}`);
     }
 
     // DR Trade Receivable (full amount)
@@ -730,15 +730,15 @@ export async function postVehicleInvoiceToGL({
 
     if (linesError) {
       await supabase.from('journal_entries').delete().eq('id', journalEntry.id);
-      return null;
+      throw new Error(`Failed to create GL entry lines: ${linesError.message}`);
     }
 
     await updateCOABalances(lines);
 
     return { journalEntryId: journalEntry.id, entryNumber: journalEntry.entry_number };
-  } catch (error) {
+  } catch (error: any) {
     console.error(`[${module.toUpperCase()} Finance] Exception posting invoice to GL:`, error);
-    return null;
+    throw error;
   }
 }
 

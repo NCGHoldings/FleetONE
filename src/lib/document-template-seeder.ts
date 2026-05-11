@@ -600,6 +600,7 @@ export const generateAPPaymentVoucherTemplate = (): string => `
 <div class="page">
   <div class="header-container">
     <h2>NCG HOLDINGS PRIVATE LIMITED</h2>
+    {{business_unit_header}}
     <h3>{{voucher_title}}</h3>
   </div>
 

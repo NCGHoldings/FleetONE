@@ -11,6 +11,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -41,7 +47,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Loader2, Download, X, Filter, Bus, Route, Trash2, FileText, CheckCircle, Eye, ChevronDown, ChevronRight, Info, RefreshCw, ShieldCheck } from "lucide-react";
+import { Loader2, Download, X, Filter, Bus, Route, Trash2, FileText, CheckCircle, Eye, ChevronDown, ChevronRight, Info, RefreshCw, ShieldCheck, Columns } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { reverseAndDeleteJournalEntry } from "@/lib/gl-posting-utils";
@@ -91,6 +97,24 @@ export const DrillDownModal = ({
   const [previewDocData, setPreviewDocData] = useState<any>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
+  const defaultColumns = ["date", "entry_number", "account", "bu", "bus", "route", "reference", "description", "debit", "credit", "balance", "status"];
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("drilldown-visible-columns");
+      return saved ? JSON.parse(saved) : defaultColumns;
+    } catch {
+      return defaultColumns;
+    }
+  });
+
+  const toggleColumn = (columnId: string) => {
+    setVisibleColumns(prev => {
+      const newCols = prev.includes(columnId) ? prev.filter(c => c !== columnId) : [...prev, columnId];
+      localStorage.setItem("drilldown-visible-columns", JSON.stringify(newCols));
+      return newCols;
+    });
+  };
+
   const reconcileMutation = useReconcileJournalLines();
 
   const handleDeleteJE = async () => {
@@ -101,6 +125,8 @@ export const DrillDownModal = ({
       if (result.success) {
         toast.success("Journal entry deleted and COA balances reversed");
         queryClient.invalidateQueries({ queryKey: ["account-transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["drilldown-accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["bbf-breakdown"] });
         queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       } else {
         toast.error(result.error || "Failed to delete journal entry");
@@ -219,7 +245,7 @@ export const DrillDownModal = ({
       if (resolvedAccountIds.length === 0) return [];
       const { data, error } = await supabase
         .from("chart_of_accounts")
-        .select("id, current_balance")
+        .select("id, current_balance, account_type")
         .in("id", resolvedAccountIds);
       if (error) throw error;
       return data;
@@ -309,15 +335,31 @@ export const DrillDownModal = ({
     return accountsData?.reduce((sum, acc) => sum + (Number(acc.current_balance) || 0), 0) || 0;
   }, [accountsData]);
 
+  // Determine if this account group is debit-normal or credit-normal
+  // current_balance is stored TYPE-ADJUSTED by updateAccountBalance():
+  //   - Debit-normal (asset/expense): balance += (debit - credit)
+  //   - Credit-normal (revenue/liability/equity): balance += (credit - debit)
+  const isDebitNormal = useMemo(() => {
+    if (!accountsData || accountsData.length === 0) return true;
+    const accountType = (accountsData[0] as any)?.account_type || "";
+    return ["asset", "expense"].includes(accountType);
+  }, [accountsData]);
+
   // Calculate the total net movement of all FETCHED transactions
+  // TYPE-ADJUSTED to match the same convention as current_balance
   const fetchedNetMovement = useMemo(() => {
     if (!transactions) return 0;
     const debits = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
     const credits = transactions.reduce((sum, t) => sum + (t.credit || 0), 0);
-    return debits - credits;
-  }, [transactions]);
+    // Match the sign convention used by updateAccountBalance():
+    //   Debit-normal: debit - credit  (debits increase balance)
+    //   Credit-normal: credit - debit  (credits increase balance)
+    return isDebitNormal ? (debits - credits) : (credits - debits);
+  }, [transactions, isDebitNormal]);
 
-  // The true Brought Forward balance is whatever is needed to make the running balance equal totalCurrentBalance
+  // The true Brought Forward balance is whatever is needed to make
+  // the running balance equal totalCurrentBalance.
+  // Both current_balance and fetchedNetMovement now use the SAME sign convention.
   const broughtForwardBalance = totalCurrentBalance - fetchedNetMovement;
 
   // === Recalculate Balance Handler ===
@@ -350,34 +392,43 @@ export const DrillDownModal = ({
         const totalCredit = allLines.reduce((s: number, l: any) => s + (Number(l.credit) || 0), 0);
 
         // 4. Calculate the correct current_balance based on account type
-        const isDebitNormal = ["asset", "expense"].includes(account.account_type || "");
+        const isDebitNormal = ["asset", "expense", "expenses"].includes((account.account_type || "").toLowerCase());
         const openingBalance = Number(account.opening_balance) || 0;
         const correctBalance = isDebitNormal
           ? openingBalance + (totalDebit - totalCredit)
           : openingBalance + (totalCredit - totalDebit);
 
         // 5. Update the COA record
-        const { error } = await supabase
+        const { error, data: updateData } = await supabase
           .from("chart_of_accounts")
           .update({ current_balance: correctBalance })
-          .eq("id", accountId);
+          .eq("id", accountId)
+          .select();
 
         if (error) throw error;
-
-        console.log(
-          `[Recalculate] Account ${accountId}: old=${account.current_balance}, new=${correctBalance}, ` +
-          `debits=${totalDebit}, credits=${totalCredit}, type=${account.account_type}, lines=${allLines.length}`
-        );
+        
+        console.log("RECALCULATION STATS:", {
+          accountId,
+          openingBalance,
+          totalDebit,
+          totalCredit,
+          correctBalance,
+          oldBalance: account.current_balance,
+          isDebitNormal,
+          accountType: account.account_type,
+          updateData
+        });
+        
+        toast.success(`Calculated: ${correctBalance} from (Open: ${openingBalance} + Net: ${totalDebit - totalCredit}). Update returned ${updateData?.length || 0} rows.`);
       }
 
       // 6. Invalidate all related caches
-      queryClient.invalidateQueries({ queryKey: ["drill-down-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["drill-down-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["account-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["drilldown-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["bbf-breakdown"] });
       queryClient.invalidateQueries({ queryKey: ["trial-balance"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
 
-      toast.success("Balance recalculated successfully! The Brought Forward will now show the correct value.");
       setShowRecalcConfirm(false);
       setShowBreakdown(false);
     } catch (error) {
@@ -507,14 +558,27 @@ export const DrillDownModal = ({
   }, [transactions, transactionType, showReconciled]);
 
   // Calculate running balance
+  const { totalDebit, totalCredit, netMovement } = useMemo(() => {
+    if (!filteredTransactions) return { totalDebit: 0, totalCredit: 0, netMovement: 0 };
+    const debit = filteredTransactions.reduce((sum, t) => sum + (t.debit || 0), 0);
+    const credit = filteredTransactions.reduce((sum, t) => sum + (t.credit || 0), 0);
+    const isDebitNormal = ["asset", "expense", "expenses"].includes(((accountsData?.[0] as any)?.account_type || "").toLowerCase());
+    const net = isDebitNormal ? debit - credit : credit - debit;
+    return { totalDebit: debit, totalCredit: credit, netMovement: net };
+  }, [filteredTransactions, accountsData]);
+
   const transactionsWithBalance = useMemo(() => {
     if (!filteredTransactions) return [];
     let runningBalance = broughtForwardBalance;
     return [...filteredTransactions].reverse().map((t) => {
-      runningBalance += (t.debit || 0) - (t.credit || 0);
+      // Use the same type-adjusted convention as the BBF and current_balance
+      const movement = isDebitNormal
+        ? (t.debit || 0) - (t.credit || 0)
+        : (t.credit || 0) - (t.debit || 0);
+      runningBalance += movement;
       return { ...t, runningBalance };
     }).reverse();
-  }, [filteredTransactions, broughtForwardBalance]);
+  }, [filteredTransactions, broughtForwardBalance, isDebitNormal]);
 
   const handleViewDocument = async (reference: string, sourceModule: string, jeId: string, entryNumber: string = '') => {
     if (!reference) return;
@@ -600,9 +664,8 @@ export const DrillDownModal = ({
   };
 
   // Calculate totals
-  const totalDebits = filteredTransactions?.reduce((sum, t) => sum + (t.debit || 0), 0) || 0;
-  const totalCredits = filteredTransactions?.reduce((sum, t) => sum + (t.credit || 0), 0) || 0;
-  const netMovement = totalDebits - totalCredits;
+  const totalDebits = totalDebit;
+  const totalCredits = totalCredit;
 
   const selectedNetBalance = useMemo(() => {
     if (selectedRows.size === 0) return 0;
@@ -786,6 +849,42 @@ export const DrillDownModal = ({
             </label>
           </div>
 
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="ml-auto">
+                <Columns className="h-4 w-4 mr-2" />
+                Columns
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[200px]">
+              {[
+                { id: "date", label: "Date" },
+                { id: "entry_number", label: "Entry #" },
+                { id: "account", label: "Account" },
+                { id: "bu", label: "BU" },
+                { id: "bus", label: "Bus" },
+                { id: "route", label: "Route" },
+                { id: "reference", label: "Reference" },
+                { id: "description", label: "Description" },
+                { id: "debit", label: "Debit" },
+                { id: "credit", label: "Credit" },
+                { id: "balance", label: "Balance" },
+                { id: "status", label: "Status / Link" },
+              ].map(col => {
+                if (col.id === "account" && resolvedAccountIds.length <= 1) return null;
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={visibleColumns.includes(col.id)}
+                    onCheckedChange={() => toggleColumn(col.id)}
+                  >
+                    {col.label}
+                  </DropdownMenuCheckboxItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
 
           {hasActiveFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -851,18 +950,18 @@ export const DrillDownModal = ({
                       onCheckedChange={selectAllRows}
                     />
                   </TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Entry #</TableHead>
-                  {resolvedAccountIds.length > 1 && <TableHead>Account</TableHead>}
-                  <TableHead>BU</TableHead>
-                  <TableHead>Bus</TableHead>
-                  <TableHead>Route</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Debit</TableHead>
-                  <TableHead className="text-right">Credit</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                  <TableHead>Status / Link</TableHead>
+                  {visibleColumns.includes("date") && <TableHead>Date</TableHead>}
+                  {visibleColumns.includes("entry_number") && <TableHead>Entry #</TableHead>}
+                  {resolvedAccountIds.length > 1 && visibleColumns.includes("account") && <TableHead>Account</TableHead>}
+                  {visibleColumns.includes("bu") && <TableHead>BU</TableHead>}
+                  {visibleColumns.includes("bus") && <TableHead>Bus</TableHead>}
+                  {visibleColumns.includes("route") && <TableHead>Route</TableHead>}
+                  {visibleColumns.includes("reference") && <TableHead>Reference</TableHead>}
+                  {visibleColumns.includes("description") && <TableHead>Description</TableHead>}
+                  {visibleColumns.includes("debit") && <TableHead className="text-right">Debit</TableHead>}
+                  {visibleColumns.includes("credit") && <TableHead className="text-right">Credit</TableHead>}
+                  {visibleColumns.includes("balance") && <TableHead className="text-right">Balance</TableHead>}
+                  {visibleColumns.includes("status") && <TableHead>Status / Link</TableHead>}
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -883,101 +982,123 @@ export const DrillDownModal = ({
                           onCheckedChange={() => toggleRowSelection(t.id)}
                         />
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {format(new Date(entry?.entry_date || t.created_at), "dd MMM yyyy")}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {entry?.entry_number}
-                      </TableCell>
-                      {resolvedAccountIds.length > 1 && (
+                      {visibleColumns.includes("date") && (
+                        <TableCell className="whitespace-nowrap">
+                          {format(new Date(entry?.entry_date || t.created_at), "dd MMM yyyy")}
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes("entry_number") && (
+                        <TableCell className="font-mono text-xs">
+                          {entry?.entry_number}
+                        </TableCell>
+                      )}
+                      {resolvedAccountIds.length > 1 && visibleColumns.includes("account") && (
                         <TableCell className="text-xs font-mono">
                           {accountInfo ? `${accountInfo.account_code} - ${accountInfo.account_name}` : "-"}
                         </TableCell>
                       )}
-                      <TableCell>
-                        {entry?.business_unit_code && (
-                          <Badge variant="outline" className="text-xs">
-                            {entry.business_unit_code}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {busInfo?.bus_no && (
-                          <Badge variant="secondary" className="text-xs">
-                            {busInfo.bus_no}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs max-w-[100px] truncate" title={routeInfo?.route_name}>
-                        {routeInfo?.route_name || "-"}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1.5">
-                          {entry?.reference || "-"}
-                          {entry?.reference && entry?.reference !== "-" && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-5 w-5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 p-0"
-                              onClick={() => handleViewDocument(entry.reference, entry.source_module, entry.id, entry.entry_number)}
-                              title="View Document"
-                            >
-                              <FileText className="h-3 w-3" />
-                            </Button>
+                      {visibleColumns.includes("bu") && (
+                        <TableCell>
+                          {entry?.business_unit_code && (
+                            <Badge variant="outline" className="text-xs">
+                              {entry.business_unit_code}
+                            </Badge>
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[150px] truncate" title={t.description || entry?.description}>
-                        <span>{t.description || entry?.description}</span>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400">
-                        {(t.debit || 0) > 0 && <CurrencyDisplay amount={t.debit} />}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-red-600 dark:text-red-400">
-                        {(t.credit || 0) > 0 && <CurrencyDisplay amount={t.credit} />}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        <CurrencyDisplay amount={t.runningBalance} />
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const ref = entry?.reference;
-                          const invData = ref ? invoiceBalances?.[ref] : undefined;
-                          
-                          // If it was manually reconciled via the old ledger matching system
-                          if (t.reconciliation_id) {
-                            return (
-                              <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200 flex items-center w-max">
-                                <CheckCircle className="w-3 h-3 mr-1" /> Reconciled
-                              </Badge>
-                            );
-                          }
-
-                          if (!invData) return null;
-
-                          if (invData.type === 'invoice') {
-                            if (invData.balance === 0) {
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes("bus") && (
+                        <TableCell className="text-xs">
+                          {busInfo?.bus_no && (
+                            <Badge variant="secondary" className="text-xs">
+                              {busInfo.bus_no}
+                            </Badge>
+                          )}
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes("route") && (
+                        <TableCell className="text-xs max-w-[100px] truncate" title={routeInfo?.route_name}>
+                          {routeInfo?.route_name || "-"}
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes("reference") && (
+                        <TableCell className="text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1.5">
+                            {entry?.reference || "-"}
+                            {entry?.reference && entry?.reference !== "-" && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-5 w-5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 p-0"
+                                onClick={() => handleViewDocument(entry.reference, entry.source_module, entry.id, entry.entry_number)}
+                                title="View Document"
+                              >
+                                <FileText className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes("description") && (
+                        <TableCell className="max-w-[150px] truncate" title={t.description || entry?.description}>
+                          <span>{t.description || entry?.description}</span>
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes("debit") && (
+                        <TableCell className="text-right font-mono text-green-600 dark:text-green-400">
+                          {(t.debit || 0) > 0 && <CurrencyDisplay amount={t.debit} />}
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes("credit") && (
+                        <TableCell className="text-right font-mono text-red-600 dark:text-red-400">
+                          {(t.credit || 0) > 0 && <CurrencyDisplay amount={t.credit} />}
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes("balance") && (
+                        <TableCell className="text-right font-mono">
+                          <CurrencyDisplay amount={t.runningBalance} />
+                        </TableCell>
+                      )}
+                      {visibleColumns.includes("status") && (
+                        <TableCell>
+                          {(() => {
+                            const ref = entry?.reference;
+                            const invData = ref ? invoiceBalances?.[ref] : undefined;
+                            
+                            // If it was manually reconciled via the old ledger matching system
+                            if (t.reconciliation_id) {
                               return (
-                                <Badge className="text-[10px] bg-green-100 text-green-800 hover:bg-green-100 border-0 flex items-center w-max cursor-pointer" onClick={() => handleViewDocument(ref, entry.source_module, entry.id, entry.entry_number)}>
-                                  <CheckCircle className="w-3 h-3 mr-1" /> Reconciled (Bal 0)
+                                <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200 flex items-center w-max">
+                                  <CheckCircle className="w-3 h-3 mr-1" /> Reconciled
                                 </Badge>
                               );
                             }
-                            return (
-                              <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-300 bg-amber-50 cursor-pointer" onClick={() => handleViewDocument(ref, entry.source_module, entry.id, entry.entry_number)}>
-                                Bal: {invData.balance.toLocaleString()}
-                              </Badge>
-                            );
-                          } else if (invData.type === 'receipt' && invData.parentRef) {
-                            return (
-                              <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 cursor-pointer" onClick={() => handleViewDocument(invData.parentRef!, 'ar_invoice', entry.id, '')}>
-                                Applied to: {invData.parentRef}
-                              </Badge>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </TableCell>
+
+                            if (!invData) return null;
+
+                            if (invData.type === 'invoice') {
+                              if (invData.balance === 0) {
+                                return (
+                                  <Badge className="text-[10px] bg-green-100 text-green-800 hover:bg-green-100 border-0 flex items-center w-max cursor-pointer" onClick={() => handleViewDocument(ref, entry.source_module, entry.id, entry.entry_number)}>
+                                    <CheckCircle className="w-3 h-3 mr-1" /> Reconciled (Bal 0)
+                                  </Badge>
+                                );
+                              }
+                              return (
+                                <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-300 bg-amber-50 cursor-pointer" onClick={() => handleViewDocument(ref, entry.source_module, entry.id, entry.entry_number)}>
+                                  Bal: {invData.balance.toLocaleString()}
+                                </Badge>
+                              );
+                            } else if (invData.type === 'receipt' && invData.parentRef) {
+                              return (
+                                <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 cursor-pointer" onClick={() => handleViewDocument(invData.parentRef!, 'ar_invoice', entry.id, '')}>
+                                  Applied to: {invData.parentRef}
+                                </Badge>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Button
                           variant="ghost"
@@ -993,7 +1114,7 @@ export const DrillDownModal = ({
                   );
                 })}
                 <TableRow className="bg-muted/50 font-medium">
-                  <TableCell colSpan={resolvedAccountIds.length > 1 ? 9 : 8} className="text-right py-3">
+                  <TableCell colSpan={visibleColumns.filter(c => ["date", "entry_number", "account", "bu", "bus", "route", "reference", "description", "debit", "credit"].includes(c) && (c !== "account" || resolvedAccountIds.length > 1)).length + 1} className="text-right py-3">
                     <div className="flex items-center justify-end gap-2">
                       <span>Balance Brought Forward</span>
                       <TooltipProvider>
@@ -1016,11 +1137,12 @@ export const DrillDownModal = ({
                       </TooltipProvider>
                     </div>
                   </TableCell>
-                  <TableCell></TableCell>
-                  <TableCell></TableCell>
-                  <TableCell className="text-right font-mono">
-                    <CurrencyDisplay amount={broughtForwardBalance} />
-                  </TableCell>
+                  {visibleColumns.includes("balance") && (
+                    <TableCell className="text-right font-mono">
+                      <CurrencyDisplay amount={broughtForwardBalance} />
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes("status") && <TableCell></TableCell>}
                   <TableCell></TableCell>
                 </TableRow>
               </TableBody>
@@ -1148,11 +1270,16 @@ export const DrillDownModal = ({
 
             {/* Formula explanation */}
             <div className="bg-muted/50 rounded-lg p-3 text-sm">
-              <p className="font-medium mb-1">Formula:</p>
+              <p className="font-medium mb-1">Formula <Badge variant="outline" className="ml-1 text-[10px]">{isDebitNormal ? "Debit-Normal" : "Credit-Normal"}</Badge>:</p>
               <p className="font-mono text-xs">
-                BBF = COA Current Balance ({breakdownData.coaCurrentBalance.toLocaleString()}) − Fetched Net Movement ({fetchedNetMovement.toLocaleString()}) = <span className="font-bold">{broughtForwardBalance.toLocaleString()}</span>
+                BBF = COA Current Balance ({breakdownData.coaCurrentBalance.toLocaleString()}) − Type-Adjusted Net Movement ({fetchedNetMovement.toLocaleString()}) = <span className="font-bold">{broughtForwardBalance.toLocaleString()}</span>
               </p>
               <p className="text-xs text-muted-foreground mt-1">
+                {isDebitNormal 
+                  ? "Net Movement = Debits − Credits (debit-normal convention)"
+                  : "Net Movement = Credits − Debits (credit-normal convention)"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
                 Total entries on this account: {breakdownData.totalAllEntries} ({breakdownData.beforeFilterCount} before filter, {breakdownData.withinFilterCount} within filter)
               </p>
             </div>

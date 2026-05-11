@@ -32,6 +32,7 @@ import { InvoiceMatchingView } from "@/components/accounting/InvoiceMatchingView
 import { DayBookView } from "@/components/accounting/reports/DayBookView";
 import { BankReconciliationWorksheet } from "@/components/accounting/BankReconciliationWorksheet";
 import { TrialBalanceView } from "@/components/accounting/TrialBalanceView";
+import { GeneralLedgerReport } from "@/components/accounting/GeneralLedgerReport";
 // Phase 2 Components
 import { FundTransferForm } from "@/components/accounting/FundTransferForm";
 import { AssetDisposalForm } from "@/components/accounting/AssetDisposalForm";
@@ -845,6 +846,7 @@ const Accounting = () => {
                   <TabsTrigger value="receipts-payments">Receipts & Payments</TabsTrigger>
                   <TabsTrigger value="day-book">Day Book</TabsTrigger>
                   <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
+                  <TabsTrigger value="general-ledger">General Ledger</TabsTrigger>
                   <TabsTrigger value="statements">Financial Statements</TabsTrigger>
                   <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
                   <TabsTrigger value="segments">Segment Reports</TabsTrigger>
@@ -873,6 +875,10 @@ const Accounting = () => {
 
               <TabsContent value="trial-balance">
                 <TrialBalanceView />
+              </TabsContent>
+
+              <TabsContent value="general-ledger">
+                <GeneralLedgerReport />
               </TabsContent>
 
               <TabsContent value="statements">

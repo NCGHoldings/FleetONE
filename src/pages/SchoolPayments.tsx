@@ -427,6 +427,64 @@ export default function SchoolPayments() {
     }
   };
 
+  const handleCellEdit = async (rowId: string, field: string, value: any) => {
+    if (field === "last_payment_date") {
+      try {
+        const newDate = new Date(value);
+        if (isNaN(newDate.getTime())) {
+          toast({ title: "Invalid Date", description: "Please enter a valid date.", variant: "destructive" });
+          return;
+        }
+        const formattedDate = newDate.toISOString().split('T')[0];
+
+        // Find the latest transaction for this student
+        const { data: latestTx, error: txError } = await supabase
+          .from('school_payment_transactions')
+          .select('id, journal_entry_id, payment_date')
+          .eq('student_id', rowId)
+          .order('payment_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (txError || !latestTx) {
+          toast({ title: "No transactions", description: "No payment history found to edit.", variant: "destructive" });
+          return;
+        }
+
+        // 1. Update the payment transaction
+        await supabase
+          .from('school_payment_transactions')
+          .update({ payment_date: formattedDate })
+          .eq('id', latestTx.id);
+
+        // 2. Update the student's last_payment_date cache
+        await supabase
+          .from('school_students')
+          .update({ last_payment_date: formattedDate })
+          .eq('id', rowId);
+
+        // 3. Sync General Ledger and Finance records
+        if (latestTx.journal_entry_id) {
+          await supabase
+            .from('journal_entries')
+            .update({ entry_date: formattedDate })
+            .eq('id', latestTx.journal_entry_id);
+            
+          await supabase
+            .from('ar_receipts')
+            .update({ receipt_date: formattedDate })
+            .eq('journal_entry_id', latestTx.journal_entry_id);
+        }
+
+        toast({ title: "Date Updated", description: "Payment date successfully updated across all financial records." });
+        fetchStudents();
+      } catch (error: any) {
+        console.error("Error updating date:", error);
+        toast({ title: "Update Failed", description: error.message, variant: "destructive" });
+      }
+    }
+  };
+
   const columns: ColumnDef<Student>[] = [
     {
       accessorKey: "student_name",
@@ -1193,6 +1251,8 @@ export default function SchoolPayments() {
                 searchKey="student_name"
                 title="Student Payments"
                 enableColumnFilters={true}
+                editableFields={["last_payment_date"]}
+                onCellEdit={handleCellEdit}
               />
             </CardContent>
           </Card>

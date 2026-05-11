@@ -26,6 +26,11 @@ const FIELD_OPTIONS = [
   { value: 'color', label: 'Color' },
   { value: 'customer_name', label: 'Customer Name' },
   { value: 'year_of_manufacture', label: 'Year of Manufacture' },
+  { value: 'address', label: 'Address' },
+  { value: 'status', label: 'Status' },
+  { value: 'invoice_amount', label: 'Invoice Amount' },
+  { value: 'vat', label: 'VAT' },
+  { value: 'total_amount', label: 'Total Amount' },
   { value: 'order_no', label: 'Order No (stored in raw data)' },
   { value: 'skip', label: '-- Skip Column --' },
 ];
@@ -100,7 +105,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
     if (allData.length > 0 && columnMappings.length > 0) {
       const mappedFields: Record<number, string | null> = {};
       columnMappings.forEach((m, idx) => {
-        mappedFields[idx] = m.mappedTo;
+        mappedFields[idx] = m?.mappedTo || null;
       });
       
       const headerIndices = new Set<number>();
@@ -129,8 +134,20 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
         return;
       }
 
-      const fileHeaders = (jsonData[0] as string[]).map(h => String(h || '').trim());
-      const dataRows = jsonData.slice(1).filter(row => row.some(cell => cell !== null && cell !== ''));
+      // Find the actual header row (skip metadata rows like "Upload Time")
+      let headerRowIndex = 0;
+      for (let i = 0; i < Math.min(10, jsonData.length); i++) {
+        const row = jsonData[i] || [];
+        const nonEmptyCount = row.filter(cell => cell !== null && cell !== undefined && String(cell).trim() !== '').length;
+        if (nonEmptyCount >= 3) {
+          headerRowIndex = i;
+          break;
+        }
+      }
+
+      const rawHeaders = Array.from(jsonData[headerRowIndex] || []) as any[];
+      const fileHeaders = rawHeaders.map(h => String(h || '').trim());
+      const dataRows = jsonData.slice(headerRowIndex + 1).filter(row => row && row.some(cell => cell !== null && cell !== ''));
 
       setFile(acceptedFile);
       setHeaders(fileHeaders);
@@ -233,7 +250,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
   const handleImport = async () => {
     if (!file) return;
 
-    const modelMapping = columnMappings.find(m => m.mappedTo === 'model');
+    const modelMapping = columnMappings.find(m => m?.mappedTo === 'model');
     if (!modelMapping) {
       toast.error('Please map at least the "Model" column');
       return;
@@ -243,7 +260,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
     try {
       const mappingObj: Record<string, string> = {};
       columnMappings.forEach(m => {
-        if (m.mappedTo) {
+        if (m?.mappedTo) {
           mappingObj[m.excelColumn] = m.mappedTo;
         }
       });
@@ -266,17 +283,18 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
           const record: any = { raw_data: {} };
           headers.forEach((header, idx) => {
             const mapping = columnMappings[idx];
-            const value = row[idx];
+            const value = row ? row[idx] : null;
             record.raw_data[header] = value;
             
             if (mapping?.mappedTo && value !== null && value !== undefined) {
-              if (mapping.mappedTo === 'order_no') {
-                // Store order_no only in raw_data
-                record.raw_data['_order_no'] = String(value).trim();
-              } else if (mapping.mappedTo === 'year_of_manufacture') {
-                record[mapping.mappedTo] = parseInt(String(value)) || null;
+              const mappedTo = mapping.mappedTo;
+              if (['order_no', 'address', 'status', 'invoice_amount', 'vat', 'total_amount'].includes(mappedTo)) {
+                // Store non-schema fields directly in raw_data with underscore prefix
+                record.raw_data[`_${mappedTo}`] = String(value).trim();
+              } else if (mappedTo === 'year_of_manufacture') {
+                record[mappedTo] = parseInt(String(value)) || null;
               } else {
-                record[mapping.mappedTo] = String(value).trim();
+                record[mappedTo] = String(value).trim();
               }
             }
           });
@@ -313,12 +331,12 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
 
   // Get model summary from data
   const getModelSummary = () => {
-    const modelIdx = columnMappings.findIndex(m => m.mappedTo === 'model');
+    const modelIdx = columnMappings.findIndex(m => m?.mappedTo === 'model');
     if (modelIdx === -1) return {};
     const counts: Record<string, number> = {};
     allData.forEach((row, idx) => {
       if (headerRowIndices.has(idx)) return;
-      const model = String(row[modelIdx] || '').trim();
+      const model = row ? String(row[modelIdx] || '').trim() : '';
       if (model) {
         counts[model] = (counts[model] || 0) + 1;
       }

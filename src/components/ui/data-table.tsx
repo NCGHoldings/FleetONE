@@ -116,9 +116,20 @@ export function DataTable<TData, TValue>({
     setEditingValue("");
   };
 
+  const enhancedColumns = React.useMemo(() => {
+    return columns.map(col => ({
+      ...col,
+      filterFn: col.filterFn || ((row: any, id: string, filterValue: any) => {
+        const value = row.getValue(id);
+        if (value == null) return false;
+        return String(value).toLowerCase().includes(String(filterValue).toLowerCase());
+      })
+    }));
+  }, [columns]);
+
   const table = useReactTable({
     data: filteredData,
-    columns,
+    columns: enhancedColumns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -206,6 +217,10 @@ export function DataTable<TData, TValue>({
               .getAllColumns()
               .filter((column) => column.getCanHide())
               .map((column) => {
+                let headerName = column.id;
+                if (typeof column.columnDef.header === 'string') {
+                  headerName = column.columnDef.header;
+                }
                 return (
                   <DropdownMenuCheckboxItem
                     key={column.id}
@@ -215,7 +230,7 @@ export function DataTable<TData, TValue>({
                       column.toggleVisibility(!!value)
                     }
                   >
-                    {column.id}
+                    {headerName}
                   </DropdownMenuCheckboxItem>
                 );
               })}
@@ -244,7 +259,16 @@ export function DataTable<TData, TValue>({
                         `}
                         data-column-type={
                           (() => {
-                            const h = (header.column.columnDef.header as string)?.toLowerCase() || "";
+                            let headerText = "";
+                            const headerDef = header.column.columnDef.header;
+                            if (typeof headerDef === "string") {
+                              headerText = headerDef;
+                            } else if (typeof header.column.columnDef.id === "string") {
+                              headerText = header.column.columnDef.id;
+                            } else if ((header.column.columnDef as any).accessorKey && typeof (header.column.columnDef as any).accessorKey === "string") {
+                              headerText = (header.column.columnDef as any).accessorKey;
+                            }
+                            const h = headerText.toLowerCase();
                             return h.includes('lkr') || h.includes('amount') || h.includes('balance') || 
                                    h.includes('price') || h.includes('cost') || h.includes('value') || 
                                    h.includes('rate') || h.includes('quantity') || h.includes('qty') || 
@@ -276,7 +300,7 @@ export function DataTable<TData, TValue>({
                         {enableColumnFilters && header.column.getCanFilter() && (
                           <div className="mt-2 pr-2">
                             <Input
-                              placeholder={`Filter ${header.column.columnDef.header as string}...`}
+                              placeholder={`Filter ${typeof header.column.columnDef.header === 'string' ? header.column.columnDef.header : header.column.id}...`}
                               value={(header.column.getFilterValue() ?? '') as string}
                               onChange={e => header.column.setFilterValue(e.target.value)}
                               className="h-7 text-xs font-normal"
@@ -304,7 +328,16 @@ export function DataTable<TData, TValue>({
                         className={`px-4 py-3 ${variant === 'professional' ? 'text-[13px]' : 'text-sm'}`}
                         data-column-type={
                           (() => {
-                            const h = (cell.column.columnDef.header as string)?.toLowerCase() || "";
+                            let headerText = "";
+                            const headerDef = cell.column.columnDef.header;
+                            if (typeof headerDef === "string") {
+                              headerText = headerDef;
+                            } else if (typeof cell.column.columnDef.id === "string") {
+                              headerText = cell.column.columnDef.id;
+                            } else if ((cell.column.columnDef as any).accessorKey && typeof (cell.column.columnDef as any).accessorKey === "string") {
+                              headerText = (cell.column.columnDef as any).accessorKey;
+                            }
+                            const h = headerText.toLowerCase();
                             return h.includes('lkr') || h.includes('amount') || h.includes('balance') || 
                                    h.includes('price') || h.includes('cost') || h.includes('value') || 
                                    h.includes('rate') || h.includes('quantity') || h.includes('qty') || 
@@ -327,7 +360,11 @@ export function DataTable<TData, TValue>({
                                  value={editingValue}
                                  onChange={(e) => setEditingValue(e.target.value)}
                                  className="h-8 w-full text-sm"
-                                 type={cell.column.id.includes('lkr') || cell.column.id.includes('hours') || cell.column.id.includes('km') ? 'number' : 'text'}
+                                 type={
+                                   cell.column.id.includes('lkr') || cell.column.id.includes('hours') || cell.column.id.includes('km') ? 'number' 
+                                   : cell.column.id.includes('date') ? 'date' 
+                                   : 'text'
+                                 }
                                  onKeyDown={(e) => {
                                    if (e.key === 'Enter') {
                                      handleSaveEdit();

@@ -61,7 +61,6 @@ export interface ColumnMapping {
   autoDetected: boolean;
 }
 
-// Auto-detect column mappings based on common patterns
 const COLUMN_PATTERNS: Record<string, string[]> = {
   vehicle_no: ['no', 'no.', 'number', 'sl', 's.no', 'sno', 'sr', 'serial', '#', 'item', 'item no', 'item number', 'item no.'],
   model: ['model', 'bus model', 'vehicle model', 'type'],
@@ -71,6 +70,11 @@ const COLUMN_PATTERNS: Record<string, string[]> = {
   color: ['color', 'colour', 'paint', 'shade'],
   customer_name: ['customer', 'customer name', 'buyer', 'client', 'owner', 'name'],
   year_of_manufacture: ['year', 'year of manufacture', 'yom', 'mfg year'],
+  address: ['address', 'location'],
+  status: ['status', 'state'],
+  invoice_amount: ['invoice amount', 'inv amount', 'invoice_amount'],
+  vat: ['vat', 'tax'],
+  total_amount: ['total amount', 'total', 'total_amount'],
   order_no: ['order', 'order no', 'order number', 'order no.', 'order_no'],
 };
 

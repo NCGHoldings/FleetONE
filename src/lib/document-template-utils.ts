@@ -697,8 +697,16 @@ export const mapDocumentToPlaceholders = (
         placeholders['{{allocations}}'] = generateAllocationsTable(allocations || []);
       }
       
-      // Voucher title
+      // Voucher title and Business Unit
       placeholders['{{voucher_title}}'] = documentData?.is_advance ? 'ADVANCE PAYMENT VOUCHER' : 'PAYMENT VOUCHER';
+      
+      const buCode = documentData?.business_unit_code || companyData?.short_code;
+      const buName = companyData?.short_code === buCode ? companyData?.company_name || companyData?.name : ''; 
+      if (buCode) {
+         placeholders['{{business_unit_header}}'] = `<h4 style="margin: 5px 0 0 0; font-size: 14px; font-weight: normal; text-transform: uppercase;">Business Unit: ${buCode}${buName ? ` - ${buName}` : ''}</h4>`;
+      } else {
+         placeholders['{{business_unit_header}}'] = '';
+      }
 
       // ===== Yutong / Custom Template Aliases =====
       // Voucher aliases
@@ -948,6 +956,8 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{narration}}'] = documentData?.notes || '';
       placeholders['{{source_account}}'] = documentData?.bank_accounts?.account_name || '';
       placeholders['{{source_bank}}'] = documentData?.bank_accounts?.bank_name || '';
+      placeholders['{{bank_name}}'] = documentData?.bank_accounts?.bank_name || '';
+      placeholders['{{bank_account}}'] = documentData?.bank_accounts?.account_number || '';
       placeholders['{{currency}}'] = 'LKR';
       placeholders['{{system_uuid}}'] = documentData?.id || '';
       placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';

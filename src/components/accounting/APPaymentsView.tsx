@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ConsolidatePaymentsDialog } from "./ConsolidatePaymentsDialog";
 import { ChequePrintPreview } from "./ChequePrintPreview";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
-import { useAPPayments, useVendors, useAllProfiles } from "@/hooks/useAccountingData";
+import { useAPPayments, useVendors, useAllProfiles, useCompanies } from "@/hooks/useAccountingData";
 import { useDeleteAPPayment, useApproveAPPayment } from "@/hooks/useAccountingMutations";
 import { useBankFees } from "@/hooks/useBankFees";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +40,7 @@ export const APPaymentsView = () => {
   const approvePayment = useApproveAPPayment();
   const { data: bankFees } = useBankFees();
   const { data: profiles } = useAllProfiles();
+  const { data: companies } = useCompanies();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVendor, setSelectedVendor] = useState<string>("_all");
@@ -72,20 +73,33 @@ export const APPaymentsView = () => {
     return userId.substring(0, 8);
   };
 
+  const getBusinessUnitName = (code: string | null) => {
+    if (!code) return null;
+    const bu = companies?.find(c => c.short_code === code);
+    return bu ? `${code} - ${bu.company_name}` : code;
+  };
+
   // Resolve display label for any payee type (vendor / customer / direct float)
   const getPayeeLabel = (payment: any): string => {
     const type = payment?.payee_type;
+    
     if (type === "customer") {
       const name = payment?.customers?.customer_name;
       return name ? `${name} (Customer)` : "Customer";
     }
-    if (type === "direct" || payment?.is_direct_payment) {
-      const bus = payment?.bus_no;
-      return bus ? `Bus ${bus} (Fuel Float)` : "Direct (Float)";
-    }
-    // vendor (default)
+    
+    // Vendor should always take precedence if vendor_id is present, 
+    // even if it's a direct payment (no AP Invoice).
     const vendorName = payment?.vendors?.vendor_name || (payment?.vendor_id ? getVendorName(payment.vendor_id) : null);
     if (vendorName && vendorName !== "Unknown") return vendorName;
+    
+    // If no vendor, handle direct floats
+    if (type === "direct" || payment?.is_direct_payment) {
+      const bus = payment?.bus_no;
+      if (bus) return `Bus ${bus} (Fuel Float)`;
+      return "Direct (Float)";
+    }
+    
     // last-chance fallbacks
     if (payment?.bus_no) return `Bus ${payment.bus_no} (Fuel Float)`;
     return "Unknown";
@@ -351,6 +365,7 @@ export const APPaymentsView = () => {
               </TableHead>
               <TableHead>Payment #</TableHead>
               <TableHead>Date</TableHead>
+              <TableHead>Business Unit</TableHead>
               <TableHead>Payee</TableHead>
               <TableHead>Method</TableHead>
               <TableHead>Cheque #</TableHead>
@@ -410,6 +425,11 @@ export const APPaymentsView = () => {
                     )}
                   </TableCell>
                   <TableCell>{format(new Date(payment.payment_date), "MMM dd, yyyy")}</TableCell>
+                  <TableCell>
+                    {payment.business_unit_code ? (
+                      <Badge variant="outline" className="font-mono">{payment.business_unit_code}</Badge>
+                    ) : "-"}
+                  </TableCell>
                   <TableCell>{getPayeeLabel(payment)}</TableCell>
                   <TableCell>{getPaymentMethodLabel(payment.payment_method || "")}</TableCell>
                   <TableCell className="font-mono">{payment.cheque_number || "-"}</TableCell>
