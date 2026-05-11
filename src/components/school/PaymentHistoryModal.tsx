@@ -94,7 +94,7 @@ export function PaymentHistoryModal({ isOpen, onClose, studentId, studentName }:
       // Fetch the transaction to see if it has a journal entry
       const { data: tx } = await supabase
         .from('school_payment_transactions')
-        .select('id, journal_entry_id')
+        .select('id, journal_entry_id, ar_receipt_id')
         .eq('id', txId)
         .single();
 
@@ -117,6 +117,15 @@ export function PaymentHistoryModal({ isOpen, onClose, studentId, studentName }:
           .from('ar_receipts')
           .update({ receipt_date: formattedDate })
           .eq('journal_entry_id', tx.journal_entry_id);
+
+        // 2.5 Sync Bank Transactions
+        const sourceIds = [tx.journal_entry_id];
+        if (tx.ar_receipt_id) sourceIds.push(tx.ar_receipt_id);
+        
+        await supabase
+          .from('bank_transactions')
+          .update({ transaction_date: formattedDate })
+          .in('source_id', sourceIds);
       }
 
       // 3. Update the student's last_payment_date cache if it's the latest transaction

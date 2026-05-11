@@ -49,7 +49,7 @@ envFile.split('\n').forEach(function (line) {
         env[key.trim()] = rest.join('=').trim().replace(/['"]/g, '');
     }
 });
-var supabase = (0, supabase_js_1.createClient)(env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+var supabase = (0, supabase_js_1.createClient)(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHABLE_KEY);
 function run() {
     return __awaiter(this, void 0, void 0, function () {
         var _a, txs, error, _b, jes, jeError, jeMap, mismatches, _i, txs_1, tx, jeDate, i, m, res, res2;

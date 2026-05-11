@@ -87,8 +87,14 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
       group.fuel_liters += (trip.fuel_liters || 0);
     });
 
+    // Only keep rows that have odometer data (start or end meter present)
+    const withOdometer = Array.from(groups.values()).filter(g =>
+      (g.odometer_start !== null && g.odometer_start > 0) ||
+      (g.odometer_end !== null && g.odometer_end > 0)
+    );
+
     // Sort by Route Name, then by Bus Number
-    return Array.from(groups.values()).sort((a, b) => {
+    return withOdometer.sort((a, b) => {
       const routeA = a.routes ? `${a.routes.route_no || ''} ${a.routes.route_name || ''}`.trim() : (a.buses?.route || '-');
       const routeB = b.routes ? `${b.routes.route_no || ''} ${b.routes.route_name || ''}`.trim() : (b.buses?.route || '-');
       

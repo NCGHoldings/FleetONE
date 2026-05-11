@@ -2,9 +2,9 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Download, TrendingUp, DollarSign, Fuel, Bus, Users, Route, Calendar, AlertCircle } from 'lucide-react';
+import { Download, TrendingUp, DollarSign, Fuel, Bus, Users, Route, Calendar, AlertCircle, RefreshCw } from 'lucide-react';
 import { subDays, format } from 'date-fns';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useTripsAnalytics } from '@/hooks/useTripsAnalytics';
@@ -50,6 +50,7 @@ function TripsAnalyticsContent() {
   });
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { session, loading: authLoading } = useAuth();
   // Grace period: auth force-timeout fires at 3s, but session may arrive slightly later
@@ -245,15 +246,26 @@ const handleFilterChange = useCallback((filters: any) => {
                               error.message?.includes('policy') ||
                               error.message?.includes('denied') ||
                               error.message?.includes('RLS');
+    const isTimeoutError = error.message?.includes('Timed out');
     return (
       <div className="container mx-auto p-6">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>{isPermissionError ? 'Access Denied' : 'Failed to Load Analytics'}</AlertTitle>
-          <AlertDescription>
-            {isPermissionError 
-              ? 'You do not have permission to view trip analytics data. Please contact your administrator to request access.'
-              : (error.message || 'An error occurred while loading trip analytics data')}
+          <AlertTitle>{isPermissionError ? 'Access Denied' : isTimeoutError ? 'Connection Slow' : 'Failed to Load Analytics'}</AlertTitle>
+          <AlertDescription className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <span>
+              {isPermissionError 
+                ? 'You do not have permission to view trip analytics data. Please contact your administrator to request access.'
+                : isTimeoutError
+                ? 'The database query took too long. This is usually caused by a slow network connection. Please try again.'
+                : (error.message || 'An error occurred while loading trip analytics data')}
+            </span>
+            {!isPermissionError && (
+              <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ['trips-analytics'] })} className="shrink-0">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       </div>

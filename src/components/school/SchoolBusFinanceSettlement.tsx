@@ -693,7 +693,7 @@ export function SchoolBusFinanceSettlement({
                                 </div>
                                 <div className="text-right">
                                   <Badge className="bg-slate-200 text-slate-800 hover:bg-slate-300">{je.status}</Badge>
-                                  <p className="text-xs text-slate-500 mt-1">{format(new Date(je.created_at), 'PPP')}</p>
+                                  <p className="text-xs text-slate-500 mt-1">{format(new Date(je.entry_date || je.created_at), 'PPP')}</p>
                                 </div>
                               </div>
                               <div className="overflow-x-auto">

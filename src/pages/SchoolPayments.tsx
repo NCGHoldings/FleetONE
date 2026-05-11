@@ -61,6 +61,7 @@ export default function SchoolPayments() {
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [showBulkARDialog, setShowBulkARDialog] = useState(false);
   const [showFinanceHub, setShowFinanceHub] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const { userRoles } = useAuth();
   
   const hasFinanceAccess = userRoles.includes('super_admin') || userRoles.includes('admin') || userRoles.includes('finance');
@@ -287,6 +288,102 @@ export default function SchoolPayments() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBulkSync = async () => {
+    setIsSyncing(true);
+    toast({ title: "Scanning...", description: "Scanning for mismatched dates..." });
+    try {
+      const { data: txs, error } = await supabase
+        .from('school_payment_transactions')
+        .select('id, payment_date, journal_entry_id, ar_receipt_id');
+        
+      if (error) throw error;
+      
+      const { data: jes, error: jeError } = await supabase
+        .from('journal_entries')
+        .select('id, entry_date');
+        
+      if (jeError) throw jeError;
+      
+      // Also fetch bank transactions that are linked to these JEs
+      const jeIds = txs.map(t => t.journal_entry_id).filter(Boolean);
+      const arIds = txs.map(t => t.ar_receipt_id).filter(Boolean);
+      
+      const { data: bts, error: btError } = await supabase
+        .from('bank_transactions')
+        .select('id, transaction_date, source_id')
+        .in('source_id', [...jeIds, ...arIds]);
+        
+      if (btError) throw btError;
+
+      const jeMap = new Map(jes.map(je => [je.id, je.entry_date]));
+      const btMap = new Map();
+      for (const bt of bts || []) {
+        if (!btMap.has(bt.source_id)) btMap.set(bt.source_id, []);
+        btMap.get(bt.source_id).push(bt);
+      }
+      
+      let mismatches = [];
+      for (const tx of txs) {
+        if (tx.journal_entry_id) {
+          const jeDate = jeMap.get(tx.journal_entry_id);
+          
+          let hasMismatch = false;
+          
+          if (jeDate && jeDate !== tx.payment_date) {
+            hasMismatch = true;
+          }
+          
+          // Check bank transactions
+          const linkedBts = [...(btMap.get(tx.journal_entry_id) || []), ...(tx.ar_receipt_id ? btMap.get(tx.ar_receipt_id) || [] : [])];
+          for (const bt of linkedBts) {
+            if (bt.transaction_date !== tx.payment_date) {
+              hasMismatch = true;
+            }
+          }
+          
+          if (hasMismatch) {
+            mismatches.push({
+              tx_id: tx.id,
+              je_id: tx.journal_entry_id,
+              ar_id: tx.ar_receipt_id,
+              tx_date: tx.payment_date
+            });
+          }
+        }
+      }
+      
+      if (mismatches.length === 0) {
+        toast({ title: "All Good", description: "No mismatched dates found in the database!" });
+        setIsSyncing(false);
+        return;
+      }
+
+      toast({ title: "Syncing...", description: `Found ${mismatches.length} records needing date fixes. Syncing now...` });
+      
+      let successCount = 0;
+      for (const m of mismatches) {
+        const res = await supabase.from('journal_entries').update({ entry_date: m.tx_date }).eq('id', m.je_id);
+        if (!res.error) {
+          const res2 = await supabase.from('ar_receipts').update({ receipt_date: m.tx_date }).eq('journal_entry_id', m.je_id);
+          
+          const sourceIds = [m.je_id];
+          if (m.ar_id) sourceIds.push(m.ar_id);
+          
+          await supabase.from('bank_transactions').update({ transaction_date: m.tx_date }).in('source_id', sourceIds);
+          
+          successCount++;
+        }
+      }
+      
+      toast({ title: "Sync Complete", description: `Successfully synced ${successCount} out of ${mismatches.length} records to their correct bank statement dates.` });
+      fetchStudents();
+    } catch (err: any) {
+      toast({ title: "Sync Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -822,6 +919,10 @@ export default function SchoolPayments() {
           </Button>
           <Button onClick={() => navigate("/settings?tab=school-bus-finance")} variant="ghost" size="icon">
             <Settings className="w-4 h-4" />
+          </Button>
+          <Button onClick={handleBulkSync} disabled={isSyncing} variant="default" className="bg-orange-600 hover:bg-orange-700">
+            <CheckCircle className="w-4 h-4 mr-2" />
+            {isSyncing ? "Syncing..." : "Fix April 29th Dates"}
           </Button>
           <Button onClick={handleExport} variant="outline">
             <Download className="w-4 h-4 mr-2" />
