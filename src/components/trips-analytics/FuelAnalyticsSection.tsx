@@ -1,21 +1,17 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Calendar, Fuel, ArrowRight } from "lucide-react";
+import { Calendar, Fuel, ArrowRight } from "lucide-react";
 import { TripData } from "@/hooks/useTripsAnalytics";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 
 interface FuelAnalyticsSectionProps {
   rawTrips: TripData[];
 }
 
 export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionProps) {
-  const [searchTerm, setSearchTerm] = useState("");
   
   const availableDates = useMemo(() => {
     // Make sure we generate at least today's date if rawTrips is empty
@@ -30,17 +26,7 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
 
   const [selectedDate, setSelectedDate] = useState<string>("");
 
-  const { data: activeBuses } = useQuery({
-    queryKey: ['active_buses_fuel_section'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('buses')
-        .select('id, bus_no, registration_number, model, type, route, expected_km_per_liter')
-        .eq('status', 'active');
-      if (error) throw error;
-      return data || [];
-    }
-  });
+
 
   useEffect(() => {
     if (!selectedDate && availableDates.length > 0) {
@@ -48,7 +34,7 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
     }
   }, [availableDates, selectedDate]);
 
-  // Filter and group data
+  // Filter and group data — only buses with actual trip data
   const processedData = useMemo(() => {
     let filtered = rawTrips;
 
@@ -57,48 +43,8 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
       filtered = filtered.filter(t => t.trip_date === selectedDate);
     }
 
-    // Filter by search
-    if (searchTerm) {
-      const lowerSearch = searchTerm.toLowerCase();
-      filtered = filtered.filter(trip => 
-        (trip.buses?.bus_no || "").toLowerCase().includes(lowerSearch) ||
-        (trip.buses?.registration_number || "").toLowerCase().includes(lowerSearch) ||
-        (trip.routes?.route_name || "").toLowerCase().includes(lowerSearch) ||
-        (trip.routes?.route_no || "").toLowerCase().includes(lowerSearch)
-      );
-    }
-
-    // Group by Bus and Route
+    // Group by Bus and Route — only from actual trip records
     const groups = new Map<string, any>();
-
-    // First add all active buses
-    if (activeBuses && activeBuses.length > 0) {
-      activeBuses.forEach(bus => {
-        // Only apply search filter to empty buses
-        if (searchTerm) {
-          const lowerSearch = searchTerm.toLowerCase();
-          const matchesSearch = (bus.bus_no || "").toLowerCase().includes(lowerSearch) ||
-                                (bus.registration_number || "").toLowerCase().includes(lowerSearch) ||
-                                (bus.route || "").toLowerCase().includes(lowerSearch);
-          if (!matchesSearch) return;
-        }
-        
-        const key = `${bus.id}_unknown_route`;
-        groups.set(key, {
-          id: key,
-          trip_date: selectedDate,
-          buses: bus,
-          routes: null,
-          no_of_trips: 0,
-          odometer_start: null,
-          odometer_end: null,
-          distance_km: 0,
-          fuel_liters: 0,
-          standard_fuel_rate: bus.expected_km_per_liter || 0,
-          km_per_liter: 0
-        });
-      });
-    }
 
     filtered.forEach(trip => {
       const busId = trip.bus_id || 'unknown';
@@ -106,11 +52,6 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
       const key = `${busId}_${routeId}`;
 
       if (!groups.has(key)) {
-        const existingKeyForBus = `${busId}_unknown_route`;
-        if (groups.has(existingKeyForBus)) {
-          // Upgrade the dummy entry to this actual route entry, or delete it and create a new one
-          groups.delete(existingKeyForBus);
-        }
         
         groups.set(key, {
           id: key,
@@ -158,7 +99,7 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
       const busB = (b.buses?.bus_no || b.buses?.registration_number || "");
       return busA.localeCompare(busB);
     });
-  }, [rawTrips, searchTerm, selectedDate, activeBuses]);
+  }, [rawTrips, selectedDate]);
 
   return (
     <div className="space-y-6">
@@ -170,16 +111,6 @@ export default function FuelAnalyticsSection({ rawTrips }: FuelAnalyticsSectionP
           </div>
           
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search bus or route..."
-                className="pl-9 bg-background"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
             
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />

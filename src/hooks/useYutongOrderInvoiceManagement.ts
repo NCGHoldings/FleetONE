@@ -167,6 +167,9 @@ export function useYutongOrderInvoiceManagement() {
       
       // Create invoice record with proforma fields
       console.log('💾 Step 4: Creating invoice record...');
+      // Get current user for tracking who generated the invoice
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
       const insertData: any = {
         invoice_no: invoiceNo,
         order_id: orderId,
@@ -175,6 +178,8 @@ export function useYutongOrderInvoiceManagement() {
           ? fullInvoiceData.proforma_amount || fullInvoiceData.total 
           : fullInvoiceData.total,
         status: 'draft',
+        generated_by: currentUser?.id || null,
+        generated_at: new Date().toISOString(),
         // Proforma invoice fields
         invoice_category: fullInvoiceData.invoice_category || 'direct_invoice',
         proforma_amount_percentage: fullInvoiceData.proforma_amount_percentage,

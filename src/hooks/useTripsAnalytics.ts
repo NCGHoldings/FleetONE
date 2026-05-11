@@ -110,43 +110,70 @@ export function useTripsAnalytics(filters: AnalyticsFilters, enabled: boolean = 
       console.log('[useTripsAnalytics] ===== QUERY START =====', { startDate: stableKey.startDate, endDate: stableKey.endDate });
 
       // Helper: wrap Supabase calls in a timeout so they can't hang forever
-      const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+      // Important: Promise.resolve() converts Supabase's PostgrestFilterBuilder (a thenable) 
+      // into a real Promise so Promise.race works reliably
+      const withTimeout = <T,>(promiseOrThenable: PromiseLike<T> | Promise<T>, ms: number, label: string): Promise<T> => {
         return Promise.race([
-          promise,
+          Promise.resolve(promiseOrThenable),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error(`[${label}] Timed out after ${ms}ms`)), ms)
           )
         ]);
       };
 
-      // Verify auth token is actually valid before querying
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      if (!currentSession?.access_token) {
-        throw new Error('No valid auth session — please refresh the page');
-      }
-
       // Fetch trips data with related tables
       // Driver names come from the `notes` JSON field, not from profiles join
-      console.log('[useTripsAnalytics] Fetching daily_trips...');
-      const tripsResult = await withTimeout(
-        supabase
-          .from('daily_trips')
-          .select(`
-            *,
-            buses(bus_no, registration_number, model, type, capacity, route, expected_km_per_liter),
-            routes(route_no, route_name)
-          `)
-          .gte('trip_date', stableKey.startDate)
-          .lte('trip_date', stableKey.endDate)
-          .order('trip_date', { ascending: false }),
-        25000,
-        'daily_trips'
-      );
+      console.log('[useTripsAnalytics] Fetching daily_trips... (30s timeout)');
+      
+      // Start a progress timer to track if query is hanging
+      const progressInterval = setInterval(() => {
+        console.log(`[useTripsAnalytics] ⏳ Still waiting for daily_trips... (${Math.round((Date.now() - queryStart) / 1000)}s elapsed)`);
+      }, 5000);
+      
+      let tripsResult: any;
+      try {
+        tripsResult = await withTimeout(
+          supabase
+            .from('daily_trips')
+            .select(`
+              id,
+              trip_date,
+              trip_no,
+              bus_id,
+              route_id,
+              driver_id,
+              conductor_id,
+              start_time,
+              end_time,
+              odometer_start,
+              odometer_end,
+              distance_km,
+              income,
+              fuel_liters,
+              diesel_price_per_liter,
+              notes,
+              status,
+              data_source,
+              gl_posted,
+              route_label,
+              buses(bus_no, registration_number, model, type, capacity, route, expected_km_per_liter),
+              routes(route_no, route_name)
+            `)
+            .gte('trip_date', stableKey.startDate)
+            .lte('trip_date', stableKey.endDate)
+            .order('trip_date', { ascending: false })
+            .limit(2000),
+          30000,
+          'daily_trips'
+        );
+      } finally {
+        clearInterval(progressInterval);
+      }
 
       const { data: tripsData, error: tripsError } = tripsResult;
       const trips = tripsData || [];
 
-      console.log('[useTripsAnalytics] Trips result:', {
+      console.log('[useTripsAnalytics] ✅ Trips result:', {
         count: trips.length,
         error: tripsError?.message || null,
         elapsed: Date.now() - queryStart + 'ms'
@@ -165,7 +192,7 @@ export function useTripsAnalytics(filters: AnalyticsFilters, enabled: boolean = 
             .select('*')
             .gte('expense_date', stableKey.startDate)
             .lte('expense_date', stableKey.endDate),
-          25000,
+          30000,
           'daily_bus_expenses'
         );
         expenses = expResult.data || [];
@@ -289,12 +316,15 @@ export function useTripsAnalytics(filters: AnalyticsFilters, enabled: boolean = 
         throw new Error(`Analytics processing failed: ${processingError instanceof Error ? processingError.message : String(processingError)}`);
       }
     },
-    staleTime: 30000,
-    gcTime: 300000,
-    refetchOnWindowFocus: true, // Re-fetch when user comes back to tab
-    retry: 2,
-    retryDelay: (attempt) => Math.min(3000 * (attempt + 1), 10000), // 3s, 6s
-    refetchInterval: false,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes — prevents repeated slow queries
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false, // Don't re-trigger on tab switch — query is too heavy
+    retry: (failureCount, error) => {
+      // Don't retry timeout errors — they'll just hang again
+      if (error?.message?.includes('Timed out')) return false;
+      return failureCount < 1; // Retry other errors once
+    },
+    retryDelay: 3000,
   });
 }
 

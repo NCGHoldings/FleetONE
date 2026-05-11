@@ -67,7 +67,7 @@ function TripsAnalyticsContent() {
   const [loadingTooLong, setLoadingTooLong] = useState(false);
   useEffect(() => {
     if (isLoading || authLoading) {
-      const timer = setTimeout(() => setLoadingTooLong(true), 20000);
+      const timer = setTimeout(() => setLoadingTooLong(true), 35000); // 35s — slightly above 30s query timeout
       return () => clearTimeout(timer);
     } else {
       setLoadingTooLong(false);
@@ -77,12 +77,12 @@ function TripsAnalyticsContent() {
   // Debug logging to trace white screen issues
   console.log('[TripsAnalytics] Render state:', { authLoading, hasSession: !!session, authReady, isLoading, hasError: !!error, hasAnalytics: !!analytics, totalTrips: analytics?.overview?.totalTrips });
 
-  // Fetch ALL trips for cascading filter options (past 1 year)
-  // This is separate from the main query so cascading shows all available options
+  // Fetch trips for cascading filter options (past 90 days)
+  // Deferred: fires AFTER the main analytics query completes to avoid overloading Supabase
   const { data: allTripsForCascading } = useQuery({
     queryKey: ['all-trips-for-cascading'],
     queryFn: async () => {
-      const oneYearAgo = format(subDays(new Date(), 365), 'yyyy-MM-dd');
+      const ninetyDaysAgo = format(subDays(new Date(), 90), 'yyyy-MM-dd');
       const { data } = await supabase
         .from('daily_trips')
         .select(`
@@ -95,13 +95,14 @@ function TripsAnalyticsContent() {
           routes(route_no, route_name),
           notes
         `)
-        .gte('trip_date', oneYearAgo)
-        .order('trip_date', { ascending: false });
+        .gte('trip_date', ninetyDaysAgo)
+        .order('trip_date', { ascending: false })
+        .limit(3000);
       return data || [];
     },
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
     refetchOnWindowFocus: false,
-    enabled: authReady, // Wait for auth before querying
+    enabled: authReady && !isLoading, // Fire AFTER main query completes
   });
 
 const handleFilterChange = useCallback((filters: any) => {
