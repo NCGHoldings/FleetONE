@@ -921,22 +921,26 @@ export const DrillDownModal = ({
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <p className="text-sm text-muted-foreground">Ending Balance</p>
-              {/* Always equals last row's running balance — consistent with the table */}
               {(() => {
                 const endingBalance = transactionsWithBalance.length > 0
                   ? transactionsWithBalance[transactionsWithBalance.length - 1].runningBalance
                   : broughtForwardBalance;
+                const noInPeriodTxns = transactionsWithBalance.length === 0;
                 return (
                   <>
+                    <p className="text-sm text-muted-foreground">
+                      {noInPeriodTxns && endingBalance !== 0 ? "Balance Brought Forward" : "Ending Balance"}
+                    </p>
                     <p className={`text-xl font-semibold ${endingBalance >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                       <CurrencyDisplay amount={endingBalance} />
                     </p>
-                    {transactionsWithBalance.length === 0 && endingBalance !== 0 && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">= Opening balance (no movement in period)</p>
+                    {noInPeriodTxns && endingBalance !== 0 && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-medium">
+                        ⚠ Pre-filter balance — no transactions in selected period
+                      </p>
                     )}
-                    {transactionsWithBalance.length === 0 && endingBalance === 0 && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">No transactions found</p>
+                    {noInPeriodTxns && endingBalance === 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">No transactions found</p>
                     )}
                   </>
                 );
