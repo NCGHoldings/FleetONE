@@ -224,47 +224,68 @@ export function ConfirmedTripsTable() {
     return filtered;
   }, [quotations, searchQuery, statusFilter, paymentFilter, dateFilter, documentFilter, documentsData]);
 
-  // Load adjustments for all visible trips (Batched to prevent N+1 queries)
+  // Load adjustments for all confirmed trips (Batched to prevent N+1 queries)
   useEffect(() => {
     const loadAllAdjustments = async () => {
-      if (filteredTrips.length === 0) return;
+      const confirmedQuotations = quotations.filter(q => q.status === 'confirmed');
+      if (confirmedQuotations.length === 0) return;
       
       try {
-        const tripIds = filteredTrips.map(t => t.id);
-        const chunks = [];
-        for (let i = 0; i < tripIds.length; i += 100) {
-          chunks.push(tripIds.slice(i, i + 100));
-        }
-        
-        const newAdjustmentsData: Record<string, any> = { ...adjustmentsData };
-        
-        for (const chunk of chunks) {
-          const { data, error } = await supabase
-            .from('special_hire_trip_adjustments')
-            .select('*')
-            .in('quotation_id', chunk)
-            .order('created_at', { ascending: false });
-            
-          if (error) throw error;
-          
-          if (data) {
-            data.forEach(adj => {
-              if (!newAdjustmentsData[adj.quotation_id]) {
-                newAdjustmentsData[adj.quotation_id] = adj;
-              }
-            });
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Adjustments load timeout')), 5000)
+        );
+
+        const fetchPromise = (async () => {
+          const tripIds = confirmedQuotations.map(t => t.id);
+          const chunks = [];
+          for (let i = 0; i < tripIds.length; i += 100) {
+            chunks.push(tripIds.slice(i, i + 100));
           }
-        }
+          
+          const newAdjustmentsData: Record<string, any> = {};
+          
+          await Promise.all(chunks.map(async (chunk) => {
+            const { data, error } = await supabase
+              .from('special_hire_trip_adjustments')
+              .select('*')
+              .in('quotation_id', chunk)
+              .order('created_at', { ascending: false });
+              
+            if (error) throw error;
+            
+            if (data) {
+              data.forEach(adj => {
+                if (!newAdjustmentsData[adj.quotation_id]) {
+                  newAdjustmentsData[adj.quotation_id] = adj;
+                }
+              });
+            }
+          }));
+          return newAdjustmentsData;
+        })();
+
+        const result = await Promise.race([fetchPromise, timeoutPromise]);
         
-        setAdjustmentsData(newAdjustmentsData);
+        setAdjustmentsData(prev => ({ ...prev, ...result }));
+        
+        try {
+          localStorage.setItem('cached_special_hire_adjustments', JSON.stringify(result));
+        } catch (e) {
+          // Ignore quota error
+        }
       } catch (error) {
-        console.error('Error batch loading adjustment data:', error);
+        console.warn('Error or timeout batch loading adjustment data:', error);
+        try {
+          const cached = localStorage.getItem('cached_special_hire_adjustments');
+          if (cached) {
+            setAdjustmentsData(prev => ({ ...prev, ...JSON.parse(cached) }));
+          }
+        } catch (e) {}
       }
     };
     
     loadAllAdjustments();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredTrips.length]);
+  }, [quotations]);
 
   const calculateTotalAmount = (quotation: QuotationWithPayments) => {
     const hireAll = quotation.gross_revenue || 0;
@@ -579,7 +600,6 @@ export function ConfirmedTripsTable() {
             id,
             approval_type,
             approver_name,
-            signature_data,
             approval_date,
             user_id
           )
@@ -678,63 +698,82 @@ export function ConfirmedTripsTable() {
       setDocumentsLoading(true);
       
       try {
-        const tripIds = confirmedQuotations.map(t => t.id);
-        const chunks = [];
-        for (let i = 0; i < tripIds.length; i += 100) {
-          chunks.push(tripIds.slice(i, i + 100));
-        }
-        
-        const newDocumentsData: Record<string, any[]> = {};
-        
-        for (const chunk of chunks) {
-          const { data: documents, error } = await supabase
-            .from('document_storage')
-            .select(`
-              id,
-              quotation_id,
-              document_type,
-              payment_type,
-              document_status,
-              storage_path,
-              file_name,
-              generated_at,
-              email_status,
-              ready_to_send,
-              email_sent_at,
-              document_approvals (
-                id,
-                approval_type,
-                approver_name,
-                signature_data,
-                approval_date,
-                user_id
-              )
-            `)
-            .in('quotation_id', chunk);
-            
-          if (error) throw error;
-          
-          if (documents) {
-            documents.forEach(doc => {
-              if (!newDocumentsData[doc.quotation_id]) {
-                newDocumentsData[doc.quotation_id] = [];
-              }
-              newDocumentsData[doc.quotation_id].push(doc);
-            });
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Documents load timeout')), 5000)
+        );
+
+        const fetchPromise = (async () => {
+          const tripIds = confirmedQuotations.map(t => t.id);
+          const chunks = [];
+          for (let i = 0; i < tripIds.length; i += 100) {
+            chunks.push(tripIds.slice(i, i + 100));
           }
-        }
+          
+          const newDocumentsData: Record<string, any[]> = {};
+          
+          await Promise.all(chunks.map(async (chunk) => {
+            const { data: documents, error } = await supabase
+              .from('document_storage')
+              .select(`
+                id,
+                quotation_id,
+                document_type,
+                payment_type,
+                document_status,
+                storage_path,
+                file_name,
+                generated_at,
+                email_status,
+                ready_to_send,
+                email_sent_at,
+                document_approvals (
+                  id,
+                  approval_type,
+                  approver_name,
+                  approval_date,
+                  user_id
+                )
+              `)
+              .in('quotation_id', chunk);
+              
+            if (error) throw error;
+            
+            if (documents) {
+              documents.forEach(doc => {
+                if (!newDocumentsData[doc.quotation_id]) {
+                  newDocumentsData[doc.quotation_id] = [];
+                }
+                newDocumentsData[doc.quotation_id].push(doc);
+              });
+            }
+          }));
+          return newDocumentsData;
+        })();
+
+        const result = await Promise.race([fetchPromise, timeoutPromise]);
         
-        setDocumentsData(newDocumentsData);
+        setDocumentsData(prev => ({ ...prev, ...result }));
+        
+        try {
+          localStorage.setItem('cached_special_hire_documents', JSON.stringify(result));
+        } catch (e) {
+          // Ignore quota error
+        }
       } catch (error) {
-        console.error('Error batch loading documents:', error);
+        console.warn('Error or timeout batch loading documents:', error);
+        try {
+          const cached = localStorage.getItem('cached_special_hire_documents');
+          if (cached) {
+            setDocumentsData(prev => ({ ...prev, ...JSON.parse(cached) }));
+          }
+        } catch (e) {}
       } finally {
         setDocumentsLoading(false);
       }
     };
     
     loadAllDocuments();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quotations.length]);
+  }, [quotations]);
 
   // Subscribe to realtime changes for documents and signatures
   useEffect(() => {

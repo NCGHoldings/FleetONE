@@ -1,11 +1,19 @@
+require('dotenv').config({ path: '.env' });
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function run() {
-  const { data, error } = await supabase.from('special_hire_quotations').select('company_id').limit(1);
-  console.log(data, error);
+async function test() {
+  console.log("Connecting to Supabase...");
+  const start = Date.now();
+  const { data, error } = await supabase.from('user_roles').select('*').limit(5);
+  console.log(`Query took ${Date.now() - start}ms`);
+  if (error) {
+    console.error("Error:", error);
+  } else {
+    console.log("Data:", data);
+  }
 }
-run();
+test();

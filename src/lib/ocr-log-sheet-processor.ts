@@ -13,6 +13,7 @@ export interface LogSheetRow {
   fuel_liters: number | null;
   driver_name: string | null;
   conductor_name: string | null;
+  isSecondaryTrip?: boolean;
 }
 
 export interface OCRLogSheetResult {

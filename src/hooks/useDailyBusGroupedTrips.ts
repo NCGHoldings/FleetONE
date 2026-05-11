@@ -107,17 +107,22 @@ export interface FleetSummary {
 
 export function useDailyBusGroupedTrips(
   selectedDate: Date | null,
-  dateRange?: { from: Date; to: Date } | undefined
+  dateRange?: { from: Date; to: Date } | undefined,
+  enabled: boolean = true
 ) {
   const [busSummaries, setBusSummaries] = useState<BusDailySummary[]>([]);
   const [fleetSummary, setFleetSummary] = useState<FleetSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
     if (selectedDate || (dateRange?.from && dateRange?.to)) {
       fetchGroupedData();
     }
-  }, [selectedDate, dateRange?.from, dateRange?.to]);
+  }, [selectedDate, dateRange?.from, dateRange?.to, enabled]);
 
   const fetchGroupedData = async () => {
     try {

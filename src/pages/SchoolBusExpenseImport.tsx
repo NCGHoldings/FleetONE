@@ -240,7 +240,7 @@ export default function SchoolBusExpenseImport() {
         // Map to our structure
         const mapped: MappedExpense[] = data.map((row) => {
           if (globalExpenseType === 'fuel') {
-            const vNo = row["vehicle number"] || row["vehicle no"] || row["bus no"] || row["bus number"] || row["vehicle"];
+            const vNo = row["vehicle number"] || row["vehicle no"] || row["vehicle no."] || row["bus no"] || row["bus no."] || row["bus number"] || row["bus"] || row["vehicle"];
             const vehicleNo = vNo ? String(vNo).trim() : "Unknown";
             
             // Try to exact match Bus NO ignoring spaces
@@ -277,7 +277,7 @@ export default function SchoolBusExpenseImport() {
           } else {
             // Parking / Highway / Other mapping
             // Expected format: No | Bus No | Route Name | Account Name | Bank Name | Bank Acc No | Bank Branch | Amount
-            const vNo = row["bus no"] || row["vehicle number"] || row["vehicle no"] || row["bus number"] || row["vehicle"];
+            const vNo = row["bus no"] || row["bus no."] || row["bus"] || row["vehicle number"] || row["vehicle no"] || row["vehicle no."] || row["bus number"] || row["vehicle"];
             const vehicleNo = vNo ? String(vNo).trim() : "Unknown";
             
             const matchedBus = buses.find(b => 

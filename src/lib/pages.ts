@@ -45,6 +45,7 @@ export const PAGES: PageCategories = {
     { id: "school_bus_service", title: "School Bus Service", url: "/school-bus-service" },
     { id: "complaints", title: "Complaints", url: "/complaints" },
     { id: "conductor_submissions", title: "Conductor Submissions", url: "/trips/conductor-submissions" },
+    { id: "submission_tracking", title: "Submission Tracking", url: "/trips?tab=submission-monitor" },
     { id: "late_entry_requests", title: "Late Entry Requests", url: "/trips/late-entry-requests" },
   ],
   business: [

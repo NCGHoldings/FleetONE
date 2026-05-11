@@ -1,3 +1,11 @@
+## 2026-05-10
+
+### ✅ Fixed "Staff" Role Fallback & Offline Caching (Network Hang Fix)
+
+**Files Modified:**
+- `src/hooks/useAuth.tsx` — Addressed the issue where all users defaulted to the "Staff" role during poor network conditions. Wrapped `fetchUserProfile`, `fetchMFAFactors`, and `fetchAAL` in 5-second `Promise.race` timeouts to prevent the `initializeUserData` `Promise.all` from hanging indefinitely. Implemented `localStorage` caching for user profiles and roles (`ncg_user_roles_cache`), so users retain their correct roles (e.g., Super Admin, Driver) and access even when the Supabase API is unreachable.
+- `src/hooks/usePagePermissions.ts` — Implemented a 5-second `Promise.race` timeout around the `supabase.from("user_page_permissions").select()` call to prevent `PageAccessGuard` from spinning indefinitely on "Verifying access...". Added `localStorage` caching (`ncg_permissions_cache_`) so users maintain their previously fetched module access rights during connection failures, gracefully degrading instead of completely locking them out.
+
 ## 2026-05-06
 
 ### ✅ Industrialized School Bus Financial Documentation

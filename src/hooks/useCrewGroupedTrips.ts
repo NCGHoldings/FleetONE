@@ -48,16 +48,21 @@ export interface CrewGroupedSummary {
  */
 export function useCrewGroupedTrips(
   selectedDate: Date | null,
-  dateRange?: { from: Date; to: Date } | undefined
+  dateRange?: { from: Date; to: Date } | undefined,
+  enabled: boolean = true
 ) {
   const [crewGroups, setCrewGroups] = useState<CrewGroup[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
     if (selectedDate || (dateRange?.from && dateRange?.to)) {
       fetchCrewGroupedData();
     }
-  }, [selectedDate, dateRange?.from, dateRange?.to]);
+  }, [selectedDate, dateRange?.from, dateRange?.to, enabled]);
 
   const fetchCrewGroupedData = async () => {
     try {

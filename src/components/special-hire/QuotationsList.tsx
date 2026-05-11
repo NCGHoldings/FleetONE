@@ -145,105 +145,129 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
 
   const loadQuotations = async () => {
     try {
-      // Get exact total count via a head-only query
-      const { count: exactCount } = await supabase
-        .from('special_hire_quotations')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active_version', true);
-
-      setTotalCount(exactCount || 0);
-
-      // Fetch all quotations using cursor-based pagination to bypass offset limits
-      const batchSize = 1000;
-      let allQuotationsData: any[] = [];
-      let lastCreatedAt: string | null = null;
-      let lastId: string | null = null;
-      let hasMore = true;
-
-      while (hasMore) {
-        let query = supabase
-          .from('special_hire_quotations')
-          .select(`
-            *,
-            bus_types!bus_type_id (
-              name,
-              capacity
-            )
-          `)
-          .eq('is_active_version', true)
-          .order('created_at', { ascending: false })
-          .order('id', { ascending: false })
-          .limit(batchSize);
-
-        // Apply cursor filter for subsequent batches
-        if (lastCreatedAt && lastId) {
-          query = query.or(`created_at.lt.${lastCreatedAt},and(created_at.eq.${lastCreatedAt},id.lt.${lastId})`);
-        }
-
-        const { data, error } = await query;
-
-        if (error) throw error;
-        const batch = data || [];
-        allQuotationsData = allQuotationsData.concat(batch);
-        hasMore = batch.length === batchSize;
-
-        if (batch.length > 0) {
-          const lastItem = batch[batch.length - 1];
-          lastCreatedAt = lastItem.created_at;
-          lastId = lastItem.id;
-        }
-      }
-
-      const quotationsData = allQuotationsData;
-
-      // Get all unique user IDs
-      const userIds = [...new Set(quotationsData?.map(q => q.created_by).filter(Boolean))];
-      
-      // Batch fetch all profiles in ONE query
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, first_name, last_name')
-        .in('user_id', userIds);
-
-      // Create a lookup map for quick access
-      const profileMap = new Map(
-        profiles?.map(p => [
-          p.user_id, 
-          `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown User'
-        ])
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Quotations load timeout')), 5000)
       );
 
-      // Transform data with creator names from the map
-      // Helper function for safe JSON parsing
-      const safeParseJSON = <T,>(value: any, fallback: T): T => {
-        if (value === null || value === undefined || value === '') return fallback;
-        if (typeof value === 'object') return value as T;
-        try { return JSON.parse(value); } 
-        catch { return fallback; }
-      };
+      const fetchPromise = (async () => {
+        // Get exact total count via a head-only query
+        const { count: exactCount } = await supabase
+          .from('special_hire_quotations')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active_version', true);
 
-      const transformedData = quotationsData.map((item: any) => ({
-        ...item,
-        bus_type: (() => {
-          const fleetDetails = safeParseJSON(item.bus_fleet_details, null);
-          return fleetDetails?.buses?.[0]?.bus_type_name || item.bus_types?.name || 'Unknown';
-        })(),
-        seating_capacity: item.bus_types?.capacity || 54,
-        created_by_name: item.created_by ? profileMap.get(item.created_by) || 'Unknown User' : 'System',
-        total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0),
-        intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || []),
-        audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : []),
-        additional_charges: typeof item.additional_charges === 'string' ? item.additional_charges : JSON.stringify(item.additional_charges || []),
-        bus_fleet_details: safeParseJSON(item.bus_fleet_details, null),
-        all_versions: [] // Load versions lazily when needed
-      }));
+        // Fetch all quotations using cursor-based pagination to bypass offset limits
+        const batchSize = 1000;
+        let allQuotationsData: any[] = [];
+        let lastCreatedAt: string | null = null;
+        let lastId: string | null = null;
+        let hasMore = true;
 
-      setQuotations(transformedData);
+        while (hasMore) {
+          let query = supabase
+            .from('special_hire_quotations')
+            .select(`
+              *,
+              bus_types!bus_type_id (
+                name,
+                capacity
+              )
+            `)
+            .eq('is_active_version', true)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(batchSize);
+
+          // Apply cursor filter for subsequent batches
+          if (lastCreatedAt && lastId) {
+            query = query.or(`created_at.lt.${lastCreatedAt},and(created_at.eq.${lastCreatedAt},id.lt.${lastId})`);
+          }
+
+          const { data, error } = await query;
+
+          if (error) throw error;
+          const batch = data || [];
+          allQuotationsData = allQuotationsData.concat(batch);
+          hasMore = batch.length === batchSize;
+
+          if (batch.length > 0) {
+            const lastItem = batch[batch.length - 1];
+            lastCreatedAt = lastItem.created_at;
+            lastId = lastItem.id;
+          }
+        }
+
+        const quotationsData = allQuotationsData;
+
+        // Get all unique user IDs
+        const userIds = [...new Set(quotationsData?.map(q => q.created_by).filter(Boolean))];
+        
+        // Batch fetch all profiles in ONE query
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name')
+          .in('user_id', userIds);
+
+        // Create a lookup map for quick access
+        const profileMap = new Map(
+          profiles?.map(p => [
+            p.user_id, 
+            `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown User'
+          ])
+        );
+
+        // Transform data with creator names from the map
+        // Helper function for safe JSON parsing
+        const safeParseJSON = <T,>(value: any, fallback: T): T => {
+          if (value === null || value === undefined || value === '') return fallback;
+          if (typeof value === 'object') return value as T;
+          try { return JSON.parse(value); } 
+          catch { return fallback; }
+        };
+
+        const transformedData = quotationsData.map((item: any) => ({
+          ...item,
+          bus_type: (() => {
+            const fleetDetails = safeParseJSON(item.bus_fleet_details, null);
+            return fleetDetails?.buses?.[0]?.bus_type_name || item.bus_types?.name || 'Unknown';
+          })(),
+          seating_capacity: item.bus_types?.capacity || 54,
+          created_by_name: item.created_by ? profileMap.get(item.created_by) || 'Unknown User' : 'System',
+          total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0),
+          intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || []),
+          audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : []),
+          additional_charges: typeof item.additional_charges === 'string' ? item.additional_charges : JSON.stringify(item.additional_charges || []),
+          bus_fleet_details: safeParseJSON(item.bus_fleet_details, null),
+          all_versions: [] // Load versions lazily when needed
+        }));
+
+        return { count: exactCount || 0, data: transformedData };
+      })();
+
+      const { count, data } = await Promise.race([fetchPromise, timeoutPromise]);
+      setTotalCount(count);
+      setQuotations(data);
+
+      try {
+        localStorage.setItem('cached_special_hire_all_quotations', JSON.stringify({ count, data }));
+      } catch (e) {
+        console.warn('Failed to cache quotations data:', e);
+      }
     } catch (error: any) {
-      console.error('Error in loadQuotations:', error);
-      toast.error("Failed to load quotations", {
-        description: error.message || "Unknown error occurred"
-      });
+      console.warn('Error or timeout loading quotations. Falling back to cache.', error);
+      try {
+        const cached = localStorage.getItem('cached_special_hire_all_quotations');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setTotalCount(parsed.count);
+          setQuotations(parsed.data);
+          toast.info('Viewing cached data (Offline mode)', { id: 'offline-toast' });
+        } else {
+          toast.error("Failed to load quotations", { description: error.message });
+        }
+      } catch (e) {
+        toast.error("Failed to load quotations");
+      }
     } finally {
       setLoading(false);
     }
@@ -255,6 +279,12 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
 
   // Set up realtime subscription for automatic updates
   useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const debouncedLoad = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => loadQuotations(), 1500);
+    };
+
     const channel = supabase
       .channel('quotations-changes')
       .on(
@@ -265,12 +295,13 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
           table: 'special_hire_quotations'
         },
         () => {
-          loadQuotations();
+          debouncedLoad();
         }
       )
       .subscribe();
 
     return () => {
+      clearTimeout(timeoutId);
       supabase.removeChannel(channel);
     };
   }, []);

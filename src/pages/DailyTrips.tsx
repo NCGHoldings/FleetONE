@@ -38,13 +38,31 @@ export default function DailyTrips() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [dateMode, setDateMode] = useState<"single" | "range">("single");
   const [viewMode, setViewMode] = useState<"table" | "cards" | "crew">(isMobile ? "cards" : "table");
-  const [mainTab, setMainTab] = useState<"trips" | "submission-monitor" | "bus-pl" | "route-pl" | "fleet-sheet" | "cash-settlement" | "bank-deposit">("trips");
+  
+  // Read initial tab from URL if present
+  const searchParams = new URLSearchParams(window.location.search);
+  const initialTab = (searchParams.get("tab") as any) || "trips";
+  
+  const [mainTab, setMainTab] = useState<"trips" | "submission-monitor" | "bus-pl" | "route-pl" | "fleet-sheet" | "cash-settlement" | "bank-deposit">(initialTab);
+  
   const [showImportModal, setShowImportModal] = useState(false);
   const [showGLExportModal, setShowGLExportModal] = useState(false);
   const [showRouteGLAdmin, setShowRouteGLAdmin] = useState(false);
   const [showBulkGLPostingDialog, setShowBulkGLPostingDialog] = useState(false);
   const [showLogSheetModal, setShowLogSheetModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Update URL when tab changes
+  const handleTabChange = (v: any) => {
+    setMainTab(v);
+    const newSearchParams = new URLSearchParams(window.location.search);
+    if (v === "trips") {
+      newSearchParams.delete("tab");
+    } else {
+      newSearchParams.set("tab", v);
+    }
+    navigate({ search: newSearchParams.toString() }, { replace: true });
+  };
   
   // Validate and prepare date range for hook
   const validDateRange = dateMode === "range" && dateRange?.from && dateRange?.to
@@ -54,13 +72,15 @@ export default function DailyTrips() {
   
   const { busSummaries, fleetSummary, loading, refetch } = useDailyBusGroupedTrips(
     dateMode === "single" ? selectedDate : null,
-    validDateRange
+    validDateRange,
+    mainTab === "trips" && viewMode !== "crew"
   );
 
   // Crew grouped data for crew view mode
   const { crewGroups, loading: crewLoading, refetch: refetchCrew } = useCrewGroupedTrips(
     dateMode === "single" ? selectedDate : null,
-    validDateRange
+    validDateRange,
+    mainTab === "trips" && viewMode === "crew"
   );
 
   // Combined loading state
@@ -68,8 +88,8 @@ export default function DailyTrips() {
 
   // Combined refetch
   const handleRefetch = () => {
-    refetch();
-    refetchCrew();
+    if (viewMode !== "crew") refetch();
+    if (viewMode === "crew") refetchCrew();
   };
 
   const filteredBusSummaries = busSummaries.filter(summary => {
@@ -106,7 +126,7 @@ export default function DailyTrips() {
             </div>
 
             {/* Main Module Tabs */}
-            <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)}>
+            <Tabs value={mainTab} onValueChange={handleTabChange}>
               <TabsList className="flex-wrap h-auto">
                 <TabsTrigger value="trips" className="gap-2">
                   <LayoutList className="h-4 w-4" />

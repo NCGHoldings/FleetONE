@@ -115,7 +115,7 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
         .lte('trip_date', stableKey.endDate)
         .order('trip_date', { ascending: false });
 
-      if (tripsError) throw tripsError;
+      if (tripsError) throw tripsError; console.log("[useTripsAnalytics] Raw trips from DB:", trips?.length, "StartDate:", stableKey.startDate, "EndDate:", stableKey.endDate);
 
       // Fetch expenses data - remove buses join to avoid errors
       const { data: expenses, error: expensesError } = await supabase
@@ -333,9 +333,11 @@ function processAnalyticsData(
   // Calculate previous period for comparison
   const daysInPeriod = differenceInDays(filters.endDate, filters.startDate) + 1;
   const previousStartDate = subDays(filters.startDate, daysInPeriod);
+  const previousStartDateStr = format(previousStartDate, 'yyyy-MM-dd');
+  const currentStartDateStr = format(filters.startDate, 'yyyy-MM-dd');
+  
   const previousTrips = trips.filter(t => {
-    const tripDate = new Date(t.trip_date);
-    return tripDate >= previousStartDate && tripDate < filters.startDate;
+    return t.trip_date >= previousStartDateStr && t.trip_date < currentStartDateStr;
   });
 
   const prevTotalIncome = sumBy(previousTrips, 'income');

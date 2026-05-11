@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, MoreVertical, Edit, Plus, TrendingUp, AlertTriangle, Pencil, BookOpen, Loader2, Fuel, Gauge, AlertCircle, BadgeCheck, CheckCircle2 } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreVertical, Edit, Plus, TrendingUp, AlertTriangle, Pencil, BookOpen, Loader2, Fuel, Gauge, AlertCircle, BadgeCheck, CheckCircle2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -22,6 +22,8 @@ import { InlineCrewEditor } from "./InlineCrewEditor";
 import { GLStatusBadge, GLAggregatedStatus } from "@/components/ncg-express/GLStatusBadge";
 import { useNCGExpressFinanceSettings, postTripRevenueToGL } from "@/hooks/useNCGExpressFinance";
 import { toast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
+import { supabase } from "@/integrations/supabase/client";
 interface BusDailySummaryTableProps {
   summaries: BusDailySummary[];
   onRefresh: () => void;
@@ -64,6 +66,66 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
     end_odo?: number;
     fuel_liters?: number;
   } | null>(null);
+
+  const [selectedTripIds, setSelectedTripIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+  const toggleTripSelection = (tripId: string) => {
+    const next = new Set(selectedTripIds);
+    if (next.has(tripId)) next.delete(tripId);
+    else next.add(tripId);
+    setSelectedTripIds(next);
+  };
+
+  const handleSelectAllInBus = (busId: string, checked: boolean) => {
+    const busSummary = summaries.find(s => s.bus_id === busId);
+    if (!busSummary) return;
+    
+    const next = new Set(selectedTripIds);
+    busSummary.trips.forEach(t => {
+      if (checked) next.add(t.id);
+      else next.delete(t.id);
+    });
+    setSelectedTripIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTripIds.size === 0) return;
+    
+    try {
+      setIsBulkDeleting(true);
+      
+      const tripIds = Array.from(selectedTripIds);
+      const tripsToDelete = summaries
+        .flatMap(s => s.trips)
+        .filter(t => tripIds.includes(t.id));
+        
+      const tripNos = tripsToDelete.map(t => t.trip_no);
+
+      const { error: tripError } = await supabase
+        .from("daily_trips")
+        .delete()
+        .in("id", tripIds);
+
+      if (tripError) throw tripError;
+
+      if (tripNos.length > 0) {
+        const { error: allocError } = await supabase
+          .from("driver_allocations")
+          .delete()
+          .in("trip_id", tripNos);
+        if (allocError) console.warn("Error deleting allocations:", allocError);
+      }
+
+      toast({ title: `Successfully deleted ${tripIds.length} trips` });
+      setSelectedTripIds(new Set());
+      onRefresh();
+    } catch (error: any) {
+      toast({ title: "Failed to delete trips", description: error.message, variant: "destructive" });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
 
   const toggleExpanded = (busId: string) => {
     const newExpanded = new Set(expandedBuses);
@@ -207,12 +269,54 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
+      {selectedTripIds.size > 0 && (
+        <div className="flex items-center justify-between p-3 bg-primary/5 border border-primary/20 rounded-lg animate-in slide-in-from-top-2">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+              {selectedTripIds.size} selected
+            </Badge>
+            <span className="text-sm text-muted-foreground">trips ready for deletion</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedTripIds(new Set())}
+              disabled={isBulkDeleting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting}
+            >
+              {isBulkDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Selected
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+      
+      <div className="space-y-2">
       {summaries.map((summary) => {
         const isExpanded = expandedBuses.has(summary.bus_id);
         // Divide expenses equally by number of trips
-        const allocatedExpense = summary.total_expenses / summary.trip_count;
-        const expensePercentage = 100 / summary.trip_count;
+        const allocatedExpense = summary.trip_count > 0 ? summary.total_expenses / summary.trip_count : 0;
+        const expensePercentage = summary.trip_count > 0 ? 100 / summary.trip_count : 0;
+        
+        const completeness = getCompleteness(summary);
         
         const allocatedExpenses = summary.trips.map(trip => ({
           ...trip,
@@ -248,12 +352,12 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
                         <div className="mt-1.5 flex items-center gap-2">
                           <div className="h-1.5 w-24 bg-muted rounded-full overflow-hidden">
                             <div 
-                              className={`h-full ${getCompleteness(summary).percent === 100 ? 'bg-green-500' : 'bg-blue-500'}`} 
-                              style={{ width: `${getCompleteness(summary).percent}%` }}
+                              className={`h-full ${completeness.percent === 100 ? 'bg-green-500' : 'bg-blue-500'}`} 
+                              style={{ width: `${completeness.percent}%` }}
                             />
                           </div>
                           <span className="text-[10px] text-muted-foreground font-medium">
-                            {getCompleteness(summary).percent}% Data
+                            {completeness.percent}% Data
                           </span>
                         </div>
                       </div>
@@ -364,16 +468,28 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
               <CollapsibleContent>
                 <div className="border-t bg-gradient-to-b from-muted/40 to-muted/10 p-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-                    <h4 className="font-semibold text-sm flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                      Trip Details for {summary.bus_no} {summary.date.includes('to') ? `(${summary.date})` : `on ${format(new Date(summary.date), "PPP")}`}
-                    </h4>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Checkbox 
+                          id={`select-all-${summary.bus_id}`}
+                          checked={summary.trips.length > 0 && summary.trips.every(t => selectedTripIds.has(t.id))}
+                          onCheckedChange={(checked) => handleSelectAllInBus(summary.bus_id, checked as boolean)}
+                        />
+                        <label htmlFor={`select-all-${summary.bus_id}`} className="text-sm font-medium cursor-pointer">
+                          Select All
+                        </label>
+                      </div>
+                      <h4 className="font-semibold text-sm flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                        Trip Details for {summary.bus_no} {summary.date.includes('to') ? `(${summary.date})` : `on ${format(new Date(summary.date), "PPP")}`}
+                      </h4>
+                    </div>
                     
                     {/* Completeness Warning Badges */}
-                    {getCompleteness(summary).percent < 100 ? (
+                    {completeness.percent < 100 ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs text-muted-foreground font-medium">Missing Data:</span>
-                        {getCompleteness(summary).missing.map((item, i) => (
+                        {completeness.missing.map((item, i) => (
                           <Badge key={i} variant="outline" className="text-[10px] text-amber-600 border-amber-200 bg-amber-50">
                             <AlertTriangle className="w-3 h-3 mr-1" /> {item}
                           </Badge>
@@ -399,10 +515,15 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
                           {/* Node dot */}
                           <div className={`absolute left-1.5 top-3.5 w-3 h-3 rounded-full border-2 ${trip.income > 0 ? 'bg-green-100 border-green-400' : 'bg-orange-100 border-orange-400'}`} />
 
-                          <div className="bg-card rounded-xl p-4 border shadow-sm hover:shadow-md transition-all duration-200">
+                          <div className={`bg-card rounded-xl p-4 border shadow-sm hover:shadow-md transition-all duration-200 ${selectedTripIds.has(trip.id) ? 'ring-1 ring-primary border-primary/50 bg-primary/5' : ''}`}>
                             <div className="flex justify-between items-start mb-3">
                               <div>
                                 <div className="font-semibold flex items-center gap-2">
+                                  <Checkbox
+                                    checked={selectedTripIds.has(trip.id)}
+                                    onCheckedChange={() => toggleTripSelection(trip.id)}
+                                    className="mr-1"
+                                  />
                                   <span className="text-primary text-sm">Trip #{idx + 1}</span>
                                   <span className="text-muted-foreground">•</span>
                                   <span className="flex items-center gap-1.5">
@@ -594,6 +715,7 @@ export function BusDailySummaryTable({ summaries, onRefresh, selectedDate }: Bus
           </Collapsible>
         );
       })}
+      </div>
 
       {/* Inline Expense Editor */}
       <InlineExpenseEditor

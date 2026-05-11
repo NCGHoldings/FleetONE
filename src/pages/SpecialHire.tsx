@@ -153,13 +153,11 @@ export default function SpecialHire() {
       comparisonDate.setDate(currentDate.getDate() - daysBack);
       const comparisonISO = comparisonDate.toISOString();
 
-      // Server-side counts for current period (bypasses 1000-row limit)
-      const [
-        totalRes, pendingRes, confirmedRes, pendingApprovalRes,
-        compTotalRes, compPendingRes, compConfirmedRes, compPendingApprovalRes,
-        pendingFinanceRes, compPendingFinanceRes,
-        revenueRes, compRevenueRes,
-      ] = await Promise.all([
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Stats load timeout')), 5000)
+      );
+
+      const statsPromise = Promise.all([
         // Current counts with is_active_version filter
         supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true),
         supabase.from('special_hire_quotations').select('*', { count: 'exact', head: true }).eq('is_active_version', true).eq('status', 'pending'),
@@ -177,6 +175,15 @@ export default function SpecialHire() {
         supabase.from('special_hire_payments').select('amount').eq('status', 'approved'),
         supabase.from('special_hire_payments').select('amount').eq('status', 'approved').lte('created_at', comparisonISO),
       ]);
+
+      const results = await Promise.race([statsPromise, timeoutPromise]) as any[];
+
+      const [
+        totalRes, pendingRes, confirmedRes, pendingApprovalRes,
+        compTotalRes, compPendingRes, compConfirmedRes, compPendingApprovalRes,
+        pendingFinanceRes, compPendingFinanceRes,
+        revenueRes, compRevenueRes,
+      ] = results;
 
       const totalQuotations = totalRes.count ?? 0;
       const pendingQuotations = pendingRes.count ?? 0;
@@ -197,7 +204,7 @@ export default function SpecialHire() {
         return ((current - previous) / previous) * 100;
       };
 
-      setStats({
+      const newStats = {
         totalQuotations,
         pendingQuotations,
         confirmedTrips,
@@ -210,14 +217,22 @@ export default function SpecialHire() {
         totalRevenueChange: calculateChange(totalRevenue, compTotalRevenue),
         pendingApprovalsChange: calculateChange(pendingApprovals, compPendingApprovals),
         pendingFinanceApprovalsChange: calculateChange(pendingFinanceApprovals, compPendingFinanceApprovals),
-      });
+      };
+
+      setStats(newStats);
+      localStorage.setItem(`special_hire_dashboard_stats_${comparisonPeriod}`, JSON.stringify(newStats));
     } catch (error) {
-      console.error('Error loading stats:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load dashboard statistics',
-        variant: 'destructive',
-      });
+      console.warn('Network timeout or error during stats fetch. Retaining cached stats.', error);
+      const cachedStats = localStorage.getItem(`special_hire_dashboard_stats_${comparisonPeriod}`);
+      if (cachedStats) {
+        setStats(JSON.parse(cachedStats));
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to load dashboard statistics',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
@@ -231,21 +246,30 @@ export default function SpecialHire() {
   useEffect(() => {
     if (!hasPageAccess) return;
 
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const debouncedLoadStats = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        loadStats();
+      }, 1500);
+    };
+
     const quotationsChannel = supabase
       .channel('kpi-quotations-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'special_hire_quotations' }, () => {
-        loadStats();
+        debouncedLoadStats();
       })
       .subscribe();
 
     const paymentsChannel = supabase
       .channel('kpi-payments-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'special_hire_payments' }, () => {
-        loadStats();
+        debouncedLoadStats();
       })
       .subscribe();
 
     return () => {
+      clearTimeout(timeoutId);
       supabase.removeChannel(quotationsChannel);
       supabase.removeChannel(paymentsChannel);
     };

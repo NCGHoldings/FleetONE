@@ -98,181 +98,207 @@ export function useRealtimeSpecialHire() {
     try {
       console.log('Fetching quotations with payments and invoices...');
       
-      const batchSize = 1000;
-      let allQuotationsData: any[] = [];
-      let lastCreatedAt: string | null = null;
-      let lastId: string | null = null;
-      let hasMore = true;
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Special hire data load timeout')), 5000)
+      );
 
-      while (hasMore) {
-        let query = supabase
-          .from('special_hire_quotations')
+      const fetchPromise = (async () => {
+        const batchSize = 1000;
+        let allQuotationsData: any[] = [];
+        let lastCreatedAt: string | null = null;
+        let lastId: string | null = null;
+        let hasMore = true;
+
+        while (hasMore) {
+          let query = supabase
+            .from('special_hire_quotations')
+            .select(`
+              *,
+              bus_types!bus_type_id (
+                name,
+                capacity
+              )
+            `)
+            .eq('status', 'confirmed')
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(batchSize);
+
+          if (lastCreatedAt && lastId) {
+            query = query.or(`created_at.lt.${lastCreatedAt},and(created_at.eq.${lastCreatedAt},id.lt.${lastId})`);
+          }
+
+          const { data, error: batchError } = await query;
+          if (batchError) throw batchError;
+          const batch = data || [];
+          allQuotationsData = allQuotationsData.concat(batch);
+          hasMore = batch.length === batchSize;
+
+          if (batch.length > 0) {
+            const lastItem = batch[batch.length - 1];
+            lastCreatedAt = lastItem.created_at;
+            lastId = lastItem.id;
+          }
+        }
+
+        const quotationsData = allQuotationsData;
+        const quotationIds = quotationsData?.map(q => q.id) || [];
+        
+        if (quotationIds.length === 0) return [];
+
+        const { data: paymentsData, error: paymentsError } = await supabase
+          .from('special_hire_payments')
           .select(`
-            *,
-            bus_types!bus_type_id (
-              name,
-              capacity
-            )
+            id,
+            payment_type,
+            amount,
+            payment_method,
+            reference_no,
+            payment_proof_url,
+            notes,
+            status,
+            finance_approved_by,
+            finance_approved_at,
+            paid_at,
+            created_by,
+            created_at,
+            quotation_id
           `)
-          .eq('status', 'confirmed')
-          .order('created_at', { ascending: false })
-          .order('id', { ascending: false })
-          .limit(batchSize);
+          .in('quotation_id', quotationIds);
 
-        if (lastCreatedAt && lastId) {
-          query = query.or(`created_at.lt.${lastCreatedAt},and(created_at.eq.${lastCreatedAt},id.lt.${lastId})`);
+        if (paymentsError) throw paymentsError;
+
+        const { data: invoicesData, error: invoicesError } = await supabase
+          .from('special_hire_invoices')
+          .select(`
+            id,
+            invoice_type,
+            invoice_no,
+            amount,
+            status,
+            approved_by,
+            approved_at,
+            generated_by,
+            generated_at,
+            created_at,
+            quotation_id
+          `)
+          .in('quotation_id', quotationIds);
+
+        if (invoicesError) throw invoicesError;
+
+        const { data: adjustmentsData, error: adjustmentsError } = await supabase
+          .from('special_hire_trip_adjustments')
+          .select(`
+            quotation_id,
+            adjustment_amount,
+            extra_km_total_charge,
+            total_additional_expenses,
+            total_time_adjustment,
+            adjustment_status,
+            final_trip_amount,
+            balance_due
+          `)
+          .in('quotation_id', quotationIds)
+          .eq('adjustment_status', 'finalized');
+
+        if (adjustmentsError) {
+          console.warn('Error fetching adjustments (non-blocking):', adjustmentsError);
         }
 
-        const { data, error: batchError } = await query;
-        if (batchError) throw batchError;
-        const batch = data || [];
-        allQuotationsData = allQuotationsData.concat(batch);
-        hasMore = batch.length === batchSize;
+        const adjustmentMap: Record<string, any> = {};
+        (adjustmentsData || []).forEach(adj => {
+          adjustmentMap[adj.quotation_id] = adj;
+        });
 
-        if (batch.length > 0) {
-          const lastItem = batch[batch.length - 1];
-          lastCreatedAt = lastItem.created_at;
-          lastId = lastItem.id;
-        }
-      }
+        return quotationsData?.map(quotation => {
+          const quotationPayments = paymentsData?.filter(p => p.quotation_id === quotation.id) || [];
+          const quotationInvoices = invoicesData?.filter(i => i.quotation_id === quotation.id) || [];
+          const adjustment = adjustmentMap[quotation.id];
 
-      const quotationsData = allQuotationsData;
-      const quotationIds = quotationsData?.map(q => q.id) || [];
-      
-      const { data: paymentsData, error: paymentsError } = await supabase
-        .from('special_hire_payments')
-        .select(`
-          id,
-          payment_type,
-          amount,
-          payment_method,
-          reference_no,
-          payment_proof_url,
-          notes,
-          status,
-          finance_approved_by,
-          finance_approved_at,
-          paid_at,
-          created_by,
-          created_at,
-          quotation_id
-        `)
-        .in('quotation_id', quotationIds);
+          const approvedPayments = quotationPayments.filter(p => p.status === 'approved');
+          const calculatedTotalPaid = approvedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+          
+          const baseTotal = (quotation.gross_revenue || 0) + 
+                            (quotation.fuel_cost_fuel_only || 0) + 
+                            (quotation.commission_pass_through_amount || 0) + 
+                            (quotation.total_additional_charges || 0) - 
+                            (quotation.discount_amount_lkr || 0);
+          
+          const adjustmentAmount = adjustment?.adjustment_amount || 0;
+          const finalTotal = baseTotal + adjustmentAmount;
+          const calculatedBalance = Math.max(finalTotal - calculatedTotalPaid, 0);
 
-      if (paymentsError) throw paymentsError;
+          return {
+            ...quotation,
+            bus_type: quotation.bus_types?.name || 'Unknown',
+            additional_charges: typeof quotation.additional_charges === 'string' 
+              ? quotation.additional_charges 
+              : JSON.stringify(quotation.additional_charges || []),
+            total_paid: calculatedTotalPaid,
+            balance_due: calculatedBalance,
+            advance_paid: Math.max(
+              quotation.advance_paid || 0,
+              approvedPayments.filter(p => p.payment_type === 'advance').reduce((sum, p) => sum + (p.amount || 0), 0)
+            ),
+            adjustment_amount: adjustmentAmount,
+            has_finalized_adjustment: !!adjustment,
+            payments: quotationPayments.map(p => ({
+              id: p.id,
+              payment_type: p.payment_type,
+              amount: p.amount,
+              payment_method: p.payment_method,
+              reference_no: p.reference_no,
+              payment_proof_url: p.payment_proof_url,
+              notes: p.notes,
+              status: p.status || 'pending_operations',
+              finance_approved_by: p.finance_approved_by,
+              finance_approved_at: p.finance_approved_at,
+              paid_at: p.paid_at,
+              created_by: p.created_by,
+              created_at: p.created_at,
+              quotation_id: p.quotation_id
+            })),
+            invoices: quotationInvoices.map(i => ({
+              id: i.id,
+              invoice_type: i.invoice_type,
+              invoice_no: i.invoice_no,
+              amount: i.amount,
+              status: i.status,
+              approved_by: i.approved_by,
+              approved_at: i.approved_at,
+              generated_by: i.generated_by,
+              generated_at: i.generated_at,
+              created_at: i.created_at,
+              quotation_id: i.quotation_id
+            }))
+          };
+        }) || [];
+      })();
 
-      const { data: invoicesData, error: invoicesError } = await supabase
-        .from('special_hire_invoices')
-        .select(`
-          id,
-          invoice_type,
-          invoice_no,
-          amount,
-          status,
-          approved_by,
-          approved_at,
-          generated_by,
-          generated_at,
-          created_at,
-          quotation_id
-        `)
-        .in('quotation_id', quotationIds);
-
-      if (invoicesError) throw invoicesError;
-
-      const { data: adjustmentsData, error: adjustmentsError } = await supabase
-        .from('special_hire_trip_adjustments')
-        .select(`
-          quotation_id,
-          adjustment_amount,
-          extra_km_total_charge,
-          total_additional_expenses,
-          total_time_adjustment,
-          adjustment_status,
-          final_trip_amount,
-          balance_due
-        `)
-        .in('quotation_id', quotationIds)
-        .eq('adjustment_status', 'finalized');
-
-      if (adjustmentsError) {
-        console.warn('Error fetching adjustments (non-blocking):', adjustmentsError);
-      }
-
-      const adjustmentMap: Record<string, any> = {};
-      (adjustmentsData || []).forEach(adj => {
-        adjustmentMap[adj.quotation_id] = adj;
-      });
-
-      const enrichedQuotations: QuotationWithPayments[] = quotationsData?.map(quotation => {
-        const quotationPayments = paymentsData?.filter(p => p.quotation_id === quotation.id) || [];
-        const quotationInvoices = invoicesData?.filter(i => i.quotation_id === quotation.id) || [];
-        const adjustment = adjustmentMap[quotation.id];
-
-        const approvedPayments = quotationPayments.filter(p => p.status === 'approved');
-        const calculatedTotalPaid = approvedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-        
-        const baseTotal = (quotation.gross_revenue || 0) + 
-                          (quotation.fuel_cost_fuel_only || 0) + 
-                          (quotation.commission_pass_through_amount || 0) + 
-                          (quotation.total_additional_charges || 0) - 
-                          (quotation.discount_amount_lkr || 0);
-        
-        const adjustmentAmount = adjustment?.adjustment_amount || 0;
-        const finalTotal = baseTotal + adjustmentAmount;
-        const calculatedBalance = Math.max(finalTotal - calculatedTotalPaid, 0);
-
-        return {
-          ...quotation,
-          bus_type: quotation.bus_types?.name || 'Unknown',
-          additional_charges: typeof quotation.additional_charges === 'string' 
-            ? quotation.additional_charges 
-            : JSON.stringify(quotation.additional_charges || []),
-          total_paid: calculatedTotalPaid,
-          balance_due: calculatedBalance,
-          advance_paid: Math.max(
-            quotation.advance_paid || 0,
-            approvedPayments.filter(p => p.payment_type === 'advance').reduce((sum, p) => sum + (p.amount || 0), 0)
-          ),
-          adjustment_amount: adjustmentAmount,
-          has_finalized_adjustment: !!adjustment,
-          payments: quotationPayments.map(p => ({
-            id: p.id,
-            payment_type: p.payment_type,
-            amount: p.amount,
-            payment_method: p.payment_method,
-            reference_no: p.reference_no,
-            payment_proof_url: p.payment_proof_url,
-            notes: p.notes,
-            status: p.status || 'pending_operations',
-            finance_approved_by: p.finance_approved_by,
-            finance_approved_at: p.finance_approved_at,
-            paid_at: p.paid_at,
-            created_by: p.created_by,
-            created_at: p.created_at,
-            quotation_id: p.quotation_id
-          })),
-          invoices: quotationInvoices.map(i => ({
-            id: i.id,
-            invoice_type: i.invoice_type,
-            invoice_no: i.invoice_no,
-            amount: i.amount,
-            status: i.status,
-            approved_by: i.approved_by,
-            approved_at: i.approved_at,
-            generated_by: i.generated_by,
-            generated_at: i.generated_at,
-            created_at: i.created_at,
-            quotation_id: i.quotation_id
-          }))
-        };
-      }) || [];
-
+      const enrichedQuotations = await Promise.race([fetchPromise, timeoutPromise]);
       console.log('Fetched quotations:', enrichedQuotations.length);
       setQuotations(enrichedQuotations);
+      
+      try {
+        localStorage.setItem('cached_special_hire_quotations', JSON.stringify(enrichedQuotations));
+      } catch (e) {
+        console.warn('Failed to cache quotations (possibly quota exceeded):', e);
+      }
     } catch (error: any) {
-      console.error('Error fetching quotations:', error);
-      toast.error('Failed to load special hire data');
+      console.warn('Network timeout or error during quotations fetch. Retaining cached data.', error);
+      
+      try {
+        const cached = localStorage.getItem('cached_special_hire_quotations');
+        if (cached) {
+          setQuotations(JSON.parse(cached));
+          toast.info('Viewing cached data (Offline mode)', { id: 'offline-toast' });
+        } else {
+          toast.error('Failed to load special hire data', { id: 'error-toast' });
+        }
+      } catch (e) {
+        toast.error('Failed to load special hire data', { id: 'error-toast' });
+      }
     } finally {
       setLoading(false);
     }

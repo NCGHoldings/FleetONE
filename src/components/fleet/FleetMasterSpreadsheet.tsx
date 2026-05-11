@@ -4,7 +4,7 @@ import { FleetMasterSpreadsheetCore } from './FleetMasterSpreadsheetCore';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, RefreshCw, Plus, FileSpreadsheet, Rocket, Bus, Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CalendarIcon, RefreshCw, Plus, FileSpreadsheet, Rocket, Bus, Upload, CheckCircle2, AlertTriangle, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { formatLKR } from '@/lib/accounting-utils';
@@ -57,12 +57,27 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
   const [creating, setCreating] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Sync date when parent changes
   useEffect(() => {
     if (initialDate) {
       setSelectedDate(initialDate);
     }
   }, [initialDate]);
+
+  const filteredRows = expandedRows.filter(row => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (row.bus_no && row.bus_no.toLowerCase().includes(q)) ||
+      (row.route_label && row.route_label.toLowerCase().includes(q)) ||
+      (row.default_driver && row.default_driver.toLowerCase().includes(q)) ||
+      (row.default_conductor && row.default_conductor.toLowerCase().includes(q)) ||
+      (row.bus_type && row.bus_type.toLowerCase().includes(q)) ||
+      (row.remark && row.remark.toLowerCase().includes(q))
+    );
+  });
 
   const loadAvailableBuses = async () => {
     const { data } = await supabase
@@ -234,6 +249,17 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
               Today Only
             </button>
           </div>
+
+          <div className="relative ml-2 w-48 lg:w-64">
+            <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search bus, driver, route..."
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -304,7 +330,7 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
           </div>
         )}
         <FleetMasterSpreadsheetCore
-          rows={expandedRows}
+          rows={filteredRows}
           loading={loading}
           onUpdate={updateField}
           editMode={editMode}

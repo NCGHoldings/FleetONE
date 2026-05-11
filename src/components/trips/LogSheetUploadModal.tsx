@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Upload, Loader2, Save, Camera, Search, AlertCircle, CheckCircle2, CalendarIcon, ChevronDown, ChevronRight, Route, ChevronUp, Trash2, PlusCircle } from 'lucide-react';
+import { Upload, Loader2, Save, Camera, Search, AlertCircle, CheckCircle2, CalendarIcon, ChevronDown, ChevronRight, Route, ChevronUp, Trash2, PlusCircle, Link2, Unlink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,6 +49,7 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
   const [dbData, setDbData] = useState<Record<string, DBTripRow[]>>({});
   const [editedLogs, setEditedLogs] = useState<LogSheetRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   const toggleRow = (index: number) => {
@@ -156,31 +157,69 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
   const lookupBus = async (busNo: string) => {
     if (!busNo || busNo.trim().length < 2) {
       setBusId(null);
+      setDbData({});
       toast.error('Please enter a valid bus number');
       return;
     }
 
-    const { data } = await supabase
-      .from('buses')
-      .select('id, bus_no')
-      .ilike('bus_no', `%${busNo.replace(/[^a-zA-Z0-9]/g, '%')}%`)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-      
-    if (data) {
-      setBusId(data.id);
-      setBusNumber(data.bus_no);
-      toast.success(`Bus ${data.bus_no} matched in database`);
-      await fetchDbData(data.id, monthYear);
-    } else {
-      setBusId(null);
-      toast.error('Could not match bus number to database. Please enter manually.');
+    setLookingUp(true);
+    try {
+      const sanitizedInput = busNo.replace(/[^a-zA-Z0-9]/g, '%');
+      let { data: buses } = await supabase
+        .from('buses')
+        .select('id, bus_no')
+        .ilike('bus_no', `%${sanitizedInput}%`)
+        .order('created_at', { ascending: false });
+        
+      // Fallback 1: Handle common OCR mistakes (e.g., N1 8255 -> NI 8255)
+      if (!buses || buses.length === 0) {
+        // Try replacing 1 with I and 0 with O
+        const ocrCorrected = sanitizedInput.replace(/1/g, 'I').replace(/0/g, 'O');
+        const { data: ocrBuses } = await supabase
+          .from('buses')
+          .select('id, bus_no')
+          .ilike('bus_no', `%${ocrCorrected}%`)
+          .order('created_at', { ascending: false });
+          
+        if (ocrBuses && ocrBuses.length > 0) {
+          buses = ocrBuses;
+        }
+      }
+
+      // Fallback 2: If we still have no match, try matching just the digits (usually the last 4)
+      if ((!buses || buses.length === 0)) {
+        const digits = busNo.match(/\d{3,4}/);
+        if (digits && digits[0]) {
+          const { data: fallbackBuses } = await supabase
+            .from('buses')
+            .select('id, bus_no')
+            .ilike('bus_no', `%${digits[0]}%`)
+            .order('created_at', { ascending: false });
+            
+          if (fallbackBuses && fallbackBuses.length > 0) {
+            buses = fallbackBuses;
+          }
+        }
+      }
+        
+      if (buses && buses.length > 0) {
+        const primaryBus = buses[0];
+        setBusId(primaryBus.id);
+        setBusNumber(primaryBus.bus_no);
+        toast.success(`Bus ${primaryBus.bus_no} matched in database`);
+        await fetchDbData(buses.map(b => b.id), monthYear);
+      } else {
+        setBusId(null);
+        setDbData({});
+        toast.error('Could not match bus number to database. Please check and try again.');
+      }
+    } finally {
+      setLookingUp(false);
     }
   };
 
-  const fetchDbData = async (bId: string, my: string) => {
-    if (!bId || !my) return;
+  const fetchDbData = async (bIds: string[], my: string) => {
+    if (!bIds || bIds.length === 0 || !my) return;
     
     // Parse the selected month (e.g. '2026-04')
     const [yearStr, monthStr] = my.split('-');
@@ -197,7 +236,7 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
     const { data, error } = await supabase
       .from('daily_trips')
       .select('id, trip_no, trip_date, odometer_start, odometer_end, fuel_liters, distance_km, notes, route_label, routes(route_name)')
-      .eq('bus_id', bId)
+      .in('bus_id', bIds)
       .gte('trip_date', startDate)
       .lte('trip_date', endDate)
       .order('trip_date', { ascending: true })
@@ -213,8 +252,13 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
     const dbMap: Record<string, DBTripRow[]> = {};
     if (data) {
       data.forEach(trip => {
-        // Ensure trip_date is always YYYY-MM-DD even if it's a timestamp
-        const dateKey = trip.trip_date.substring(0, 10);
+        // Handle both YYYY-MM-DD and full ISO timestamp strings safely
+        let dateKey = trip.trip_date;
+        if (dateKey.includes('T')) {
+          dateKey = format(new Date(dateKey), 'yyyy-MM-dd');
+        } else {
+          dateKey = dateKey.substring(0, 10);
+        }
         
         if (!dbMap[dateKey]) {
           dbMap[dateKey] = [];
@@ -255,7 +299,7 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
     }
 
     if (busId) {
-      fetchDbData(busId, newMY);
+      fetchDbData([busId], newMY);
     }
   };
 
@@ -276,22 +320,57 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
     setEditedLogs(newLogs);
   };
 
+  const recalculateDatesFrom = (logs: LogSheetRow[], startIndex: number) => {
+    for (let i = startIndex; i < logs.length; i++) {
+        if (i === 0) continue;
+        
+        if (logs[i].isSecondaryTrip) {
+            logs[i].date = logs[i-1].date;
+        } else {
+            const prevDateStr = logs[i-1].date;
+            if (prevDateStr) {
+                const prevDate = parse(prevDateStr, 'yyyy-MM-dd', new Date());
+                if (isValid(prevDate)) {
+                    logs[i].date = format(addDays(prevDate, 1), 'yyyy-MM-dd');
+                }
+            }
+        }
+    }
+    return logs;
+  };
+
   const handleDateChange = (index: number, newDateStr: string) => {
     if (!newDateStr) return;
     
-    const newLogs = [...editedLogs];
+    let newLogs = [...editedLogs];
     newLogs[index].date = newDateStr;
     
-    const baseDate = parse(newDateStr, 'yyyy-MM-dd', new Date());
-    
-    if (isValid(baseDate)) {
-      // Auto-increment all subsequent rows
-      for (let i = index + 1; i < newLogs.length; i++) {
-        const nextDate = addDays(baseDate, i - index);
-        newLogs[i].date = format(nextDate, 'yyyy-MM-dd');
-      }
+    if (index > 0) {
+        newLogs[index].isSecondaryTrip = false;
     }
     
+    newLogs = recalculateDatesFrom(newLogs, index + 1);
+    setEditedLogs(newLogs);
+  };
+
+  const handleToggleSecondaryTrip = (index: number) => {
+    if (index === 0) return;
+    let newLogs = [...editedLogs];
+    newLogs[index].isSecondaryTrip = !newLogs[index].isSecondaryTrip;
+    
+    if (newLogs[index].isSecondaryTrip) {
+        newLogs[index].date = newLogs[index - 1].date;
+    } else {
+        const prevDateStr = newLogs[index - 1].date;
+        if (prevDateStr) {
+            const prevDate = parse(prevDateStr, 'yyyy-MM-dd', new Date());
+            if (isValid(prevDate)) {
+                newLogs[index].date = format(addDays(prevDate, 1), 'yyyy-MM-dd');
+            }
+        }
+    }
+    
+    newLogs = recalculateDatesFrom(newLogs, index + 1);
     setEditedLogs(newLogs);
   };
 
@@ -319,26 +398,30 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
       fuel_liters: null,
       driver_name: null,
       conductor_name: null,
+      isSecondaryTrip: false,
     });
     setEditedLogs(newLogs);
   };
 
   const handleDeleteRow = (index: number) => {
-    const newLogs = [...editedLogs];
+    let newLogs = [...editedLogs];
     newLogs.splice(index, 1);
+    newLogs = recalculateDatesFrom(newLogs, index);
     setEditedLogs(newLogs);
   };
 
   const handleShiftRow = (index: number, direction: 'up' | 'down') => {
-    const newLogs = [...editedLogs];
+    let newLogs = [...editedLogs];
     if (direction === 'up' && index > 0) {
       const temp = newLogs[index];
       newLogs[index] = newLogs[index - 1];
       newLogs[index - 1] = temp;
+      newLogs = recalculateDatesFrom(newLogs, index - 1);
     } else if (direction === 'down' && index < newLogs.length - 1) {
       const temp = newLogs[index];
       newLogs[index] = newLogs[index + 1];
       newLogs[index + 1] = temp;
+      newLogs = recalculateDatesFrom(newLogs, index);
     }
     setEditedLogs(newLogs);
   };
@@ -363,110 +446,104 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
 
     setSaving(true);
     let successCount = 0;
+    let errorCount = 0;
 
     try {
       // Get the currently authenticated user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Group edited logs by date
+      const logsByDate: Record<string, LogSheetRow[]> = {};
       for (const log of editedLogs) {
         const fullDate = getFullDate(log.date);
         if (!fullDate || !isValid(parse(fullDate, 'yyyy-MM-dd', new Date()))) {
           console.warn('Invalid date extracted:', log.date);
           continue; // Skip invalid rows
         }
+        if (!logsByDate[fullDate]) logsByDate[fullDate] = [];
+        logsByDate[fullDate].push(log);
+      }
 
-        const dbRows = dbData[fullDate];
+      // Process day by day
+      for (const [fullDate, logsForDay] of Object.entries(logsByDate)) {
+        const dbRows = dbData[fullDate] || [];
+        
+        // We will map logRows to dbRows 1-to-1 up to the max available.
+        const maxRows = Math.max(logsForDay.length, dbRows.length);
+        
+        for (let i = 0; i < maxRows; i++) {
+          const log = logsForDay[i];
+          const dbRow = dbRows[i];
 
-        // Prepare JSON notes
-        const notesObj = {
-          driver: log.driver_name,
-          conductor: log.conductor_name,
-          source: 'monthly_log_ocr'
-        };
+          // If no log exists for this DB row, just skip (don't delete existing data)
+          if (!log) continue;
 
-        if (dbRows && dbRows.length > 0) {
-          // If we have multiple trips for the day, we allocate:
-          // 1. Start Odo -> First Trip
-          // 2. End Odo -> Last Trip
-          // 3. Fuel -> First Trip (based on user plan)
-          // 4. Notes -> All trips
+          // Prepare JSON notes
+          const notesObj = {
+            source: 'monthly_log_ocr',
+            driver: log.driver_name,
+            conductor: log.conductor_name
+          };
 
-          if (dbRows.length === 1) {
-            // Single trip - standard update
-            const dbRow = dbRows[0];
+          if (dbRow && log) {
+            // Both exist -> Update the specific DB trip with this log's data
             const { error } = await supabase
               .from('daily_trips')
               .update({
-                odometer_start: log.start_odo || dbRow.odometer_start,
-                odometer_end: log.end_odo || dbRow.odometer_end,
-                fuel_liters: log.fuel_liters || dbRow.fuel_liters,
-                distance_km: log.distance || dbRow.distance_km,
+                odometer_start: log.start_odo !== null ? log.start_odo : dbRow.odometer_start,
+                odometer_end: log.end_odo !== null ? log.end_odo : dbRow.odometer_end,
+                fuel_liters: log.fuel_liters !== null ? log.fuel_liters : dbRow.fuel_liters,
+                distance_km: log.distance !== null ? log.distance : dbRow.distance_km,
                 notes: { ...(dbRow.notes || {}), ...notesObj },
               })
               .eq('id', dbRow.id);
+              
             if (!error) successCount++;
-          } else {
-            // Multiple trips
-            for (let i = 0; i < dbRows.length; i++) {
-              const dbRow = dbRows[i];
-              const isFirst = i === 0;
-              const isLast = i === dbRows.length - 1;
+            else {
+              console.error("Error updating trip:", error);
+              errorCount++;
+            }
+          } else if (log && !dbRow) {
+            // Log exists but no DB row -> Insert new trip
+            const dateStr = fullDate.replace(/-/g, '');
+            // Append a suffix based on index so it is unique: T1, T2, etc.
+            // If there are existing dbRows, we offset by dbRows.length
+            const suffixIndex = (dbRows.length) + (i - dbRows.length) + 1; 
+            const prefix = `${busNumber}-${dateStr}-T${suffixIndex}`;
+            
+            const { error } = await supabase
+              .from('daily_trips')
+              .insert({
+                bus_id: busId,
+                trip_date: fullDate,
+                trip_no: prefix,
+                odometer_start: log.start_odo,
+                odometer_end: log.end_odo,
+                fuel_liters: log.fuel_liters,
+                distance_km: log.distance,
+                start_time: log.start_time,
+                end_time: log.end_time,
+                notes: notesObj,
+                income: 0,
+                income_details: {},
+              });
 
-              const updates: any = {
-                notes: { ...(dbRow.notes || {}), ...notesObj },
-              };
-
-              if (isFirst) {
-                updates.odometer_start = log.start_odo || dbRow.odometer_start;
-                updates.fuel_liters = log.fuel_liters || dbRow.fuel_liters;
-                // If it's the only one getting distance, we can put it here, or leave DB distance alone.
-              }
-              
-              if (isLast) {
-                updates.odometer_end = log.end_odo || dbRow.odometer_end;
-              }
-
-              const { error } = await supabase
-                .from('daily_trips')
-                .update(updates)
-                .eq('id', dbRow.id);
-              
-              if (!error) {
-                 // Only count the whole day as 1 success to match log rows, or we can count each. 
-                 // Let's only increment success count on the first one so the toast count matches rows.
-                 if (isFirst) successCount++;
-              }
+            if (!error) successCount++;
+            else {
+              console.error("Error inserting trip:", error);
+              errorCount++;
             }
           }
-        } else {
-          // Generate a unique trip number
-          const dateStr = fullDate.replace(/-/g, '');
-          const prefix = `${busNumber}-${dateStr}-T1`;
-          
-          // Create new DB row
-          const { error } = await supabase
-            .from('daily_trips')
-            .insert({
-              bus_id: busId,
-              trip_date: fullDate,
-              trip_no: prefix,
-              odometer_start: log.start_odo,
-              odometer_end: log.end_odo,
-              fuel_liters: log.fuel_liters,
-              distance_km: log.distance,
-              start_time: log.start_time,
-              end_time: log.end_time,
-              notes: notesObj,
-              income: 0, // Empty income
-              income_details: {},
-            });
-
-          if (!error) successCount++;
         }
       }
 
-      toast.success(`Successfully saved ${successCount} log sheet rows!`);
+      if (errorCount > 0) {
+        toast.warning(`Saved ${successCount} rows, but ${errorCount} failed. Check console for details.`);
+      } else {
+        toast.success(`Successfully saved ${successCount} log sheet rows!`);
+      }
+      
       onSuccess(monthYear);
       onOpenChange(false);
     } catch (error: any) {
@@ -571,12 +648,18 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                 <div className="flex gap-2">
                   <Input 
                     value={busNumber} 
-                    onChange={e => setBusNumber(e.target.value)}
+                    onChange={e => {
+                      setBusNumber(e.target.value);
+                      if (busId) {
+                        setBusId(null);
+                        setDbData({});
+                      }
+                    }}
                     onKeyDown={e => { if (e.key === 'Enter') handleManualBusLookup(); }}
                     placeholder="e.g. NC-8226"
                   />
-                  <Button variant="secondary" size="icon" onClick={handleManualBusLookup}>
-                    <Search className="h-4 w-4" />
+                  <Button variant="secondary" size="icon" onClick={handleManualBusLookup} disabled={lookingUp}>
+                    {lookingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
@@ -746,6 +829,22 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end items-center gap-1">
+                            {index > 0 && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                  "h-7 w-7",
+                                  log.isSecondaryTrip 
+                                    ? "text-blue-600 bg-blue-50 hover:bg-blue-100" 
+                                    : "text-muted-foreground hover:text-foreground"
+                                )}
+                                onClick={() => handleToggleSecondaryTrip(index)}
+                                title={log.isSecondaryTrip ? "Unlink from previous day" : "Link as same day trip"}
+                              >
+                                {log.isSecondaryTrip ? <Unlink className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -794,39 +893,74 @@ export function LogSheetUploadModal({ open, onOpenChange, selectedDate, onSucces
                                 <div>Driver</div>
                               </div>
                               <div className="space-y-1">
-                                {dbRows.map((trip, i) => (
-                                  <div key={trip.id} className="grid grid-cols-6 gap-2 text-xs bg-background p-2 px-3 rounded border items-center">
-                                    <div className="font-mono text-[10px] bg-muted/50 px-1 py-0.5 rounded truncate" title={trip.trip_no}>{trip.trip_no}</div>
-                                    <div className="col-span-2 font-medium truncate" title={trip.route_label || trip.routes?.route_name || 'N/A'}>
-                                      {trip.route_label || trip.routes?.route_name || 'N/A'}
-                                    </div>
-                                    <div>
-                                      {i === 0 ? (
-                                        <Badge variant="outline" className={log.start_odo ? "bg-purple-50 text-purple-700 border-purple-200 font-bold" : "bg-blue-50 text-blue-700 border-blue-200"}>
-                                          {log.start_odo || trip.odometer_start || '-'} {log.start_odo ? '(Auto-Fill)' : ''}
-                                        </Badge>
-                                      ) : (
-                                        <span className="text-muted-foreground">{trip.odometer_start || '-'}</span>
-                                      )}
-                                    </div>
-                                    <div>
-                                      {i === dbRows.length - 1 ? (
-                                        <Badge variant="outline" className={log.end_odo ? "bg-purple-50 text-purple-700 border-purple-200 font-bold" : "bg-blue-50 text-blue-700 border-blue-200"}>
-                                          {log.end_odo || trip.odometer_end || '-'} {log.end_odo ? '(Auto-Fill)' : ''}
-                                        </Badge>
-                                      ) : (
-                                        <span className="text-muted-foreground">{trip.odometer_end || '-'}</span>
-                                      )}
-                                    </div>
-                                    <div className="truncate">
-                                      {trip.notes && typeof trip.notes === 'string' && trip.notes.includes('driver') ? JSON.parse(trip.notes).driver : 'N/A'}
-                                    </div>
-                                  </div>
-                                ))}
+                                {(() => {
+                                  let distancePerTrip = 0;
+                                  const canDistribute = log.start_odo !== null && log.end_odo !== null && log.end_odo > log.start_odo;
+                                  if (canDistribute) {
+                                     const totalDistance = log.end_odo! - log.start_odo!;
+                                     distancePerTrip = Math.round(totalDistance / dbRows.length);
+                                  }
+
+                                  return dbRows.map((trip, i) => {
+                                    const isFirst = i === 0;
+                                    const isLast = i === dbRows.length - 1;
+                                    
+                                    let previewStartOdo = trip.odometer_start;
+                                    let previewEndOdo = trip.odometer_end;
+                                    let isAutoFilledStart = false;
+                                    let isAutoFilledEnd = false;
+
+                                    if (canDistribute) {
+                                      previewStartOdo = log.start_odo! + (i * distancePerTrip);
+                                      previewEndOdo = isLast ? log.end_odo : log.start_odo! + ((i + 1) * distancePerTrip);
+                                      isAutoFilledStart = true;
+                                      isAutoFilledEnd = true;
+                                    } else {
+                                      if (isFirst && log.start_odo !== null) {
+                                        previewStartOdo = log.start_odo;
+                                        isAutoFilledStart = true;
+                                      }
+                                      if (isLast && log.end_odo !== null) {
+                                        previewEndOdo = log.end_odo;
+                                        isAutoFilledEnd = true;
+                                      }
+                                    }
+
+                                    return (
+                                      <div key={trip.id} className="grid grid-cols-6 gap-2 text-xs bg-background p-2 px-3 rounded border items-center">
+                                        <div className="font-mono text-[10px] bg-muted/50 px-1 py-0.5 rounded truncate" title={trip.trip_no}>{trip.trip_no}</div>
+                                        <div className="col-span-2 font-medium truncate" title={trip.route_label || trip.routes?.route_name || 'N/A'}>
+                                          {trip.route_label || trip.routes?.route_name || 'N/A'}
+                                        </div>
+                                        <div>
+                                          {isAutoFilledStart ? (
+                                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 font-bold">
+                                              {previewStartOdo} (Auto)
+                                            </Badge>
+                                          ) : (
+                                            <span className="text-muted-foreground">{previewStartOdo || '-'}</span>
+                                          )}
+                                        </div>
+                                        <div>
+                                          {isAutoFilledEnd ? (
+                                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 font-bold">
+                                              {previewEndOdo} (Auto)
+                                            </Badge>
+                                          ) : (
+                                            <span className="text-muted-foreground">{previewEndOdo || '-'}</span>
+                                          )}
+                                        </div>
+                                        <div className="truncate">
+                                          {trip.notes && typeof trip.notes === 'string' && trip.notes.includes('driver') ? JSON.parse(trip.notes).driver : 'N/A'}
+                                        </div>
+                                      </div>
+                                    );
+                                  });
+                                })()}
                               </div>
                               <div className="mt-3 text-[10px] text-muted-foreground bg-purple-50/50 p-2 rounded border border-purple-100 flex items-start gap-2">
                                 <AlertCircle className="h-3 w-3 text-purple-500 mt-0.5 shrink-0" />
-                                <p><strong>Smart Allocation:</strong> When you click save, the system will apply the Start Odometer (<span className="font-mono font-bold text-purple-700">{log.start_odo || '0'}</span>) to the <strong>first trip</strong>, and the End Odometer (<span className="font-mono font-bold text-purple-700">{log.end_odo || '0'}</span>) to the <strong>last trip</strong>. The purple badges above show a preview of what the database records will look like.</p>
+                                <p><strong>Smart Allocation:</strong> When you click save, the system will evenly distribute the distance between the Start Odometer (<span className="font-mono font-bold text-purple-700">{log.start_odo || '0'}</span>) and the End Odometer (<span className="font-mono font-bold text-purple-700">{log.end_odo || '0'}</span>) across all <strong>{dbRows.length} trips</strong>. The purple badges above show a preview of what the database records will look like.</p>
                               </div>
                             </div>
                           </TableCell>

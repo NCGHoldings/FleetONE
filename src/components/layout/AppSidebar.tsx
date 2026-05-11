@@ -127,6 +127,11 @@ const operationsItems = [{
   url: "/complaints",
   icon: AlertTriangle
 }, {
+  id: "submission_tracking",
+  title: "Submission Tracking",
+  url: "/trips?tab=submission-monitor",
+  icon: Clock
+}, {
   id: "conductor_submissions",
   title: "Conductor Submissions",
   url: "/trips/conductor-submissions",

@@ -5,6 +5,13 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://wwjpdszkmtnzshbulkon.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3anBkc3prbXRuenNoYnVsa29uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NTQxMjAsImV4cCI6MjA3MTUzMDEyMH0.EiNNdtKsKSmiBxnpMrLjiQ45jYuJWqijjK-hCkpw_y4";
 
+// Define a global to store the public client in development
+declare global {
+  interface Window {
+    __SUPABASE_PUBLIC_CLIENT__?: any;
+  }
+}
+
 // Create a completely fresh anonymous client for each use
 // This prevents any session pollution from authenticated tabs
 export const createAnonymousClient = () => {
@@ -23,5 +30,17 @@ export const createAnonymousClient = () => {
   });
 };
 
+function getPublicClient() {
+  if (typeof window === 'undefined') {
+    return createAnonymousClient();
+  }
+
+  if (!window.__SUPABASE_PUBLIC_CLIENT__) {
+    window.__SUPABASE_PUBLIC_CLIENT__ = createAnonymousClient();
+  }
+  
+  return window.__SUPABASE_PUBLIC_CLIENT__;
+}
+
 // Default export for compatibility
-export const supabasePublic = createAnonymousClient();
+export const supabasePublic = getPublicClient();

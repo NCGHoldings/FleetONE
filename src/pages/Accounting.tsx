@@ -1,5 +1,3 @@
-import { AppLayout } from "@/components/layout/AppLayout";
-import { PageAccessGuard } from "@/components/auth/PageAccessGuard";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookOpen, FileText, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building2, Users, Package, Truck, Landmark, HardDrive, Calculator, FileCheck, ClipboardCheck, BarChart3, Settings, Zap, ShoppingCart } from "lucide-react";
@@ -173,8 +171,6 @@ const Accounting = () => {
   ];
 
   return (
-    <PageAccessGuard pageId="accounting">
-      <AppLayout>
         <div className="space-y-6">
           <div className="flex justify-between items-start">
             <div>
@@ -1029,8 +1025,6 @@ const Accounting = () => {
           )}
           </CompanyRequiredGuard>
         </div>
-      </AppLayout>
-    </PageAccessGuard>
   );
 };
 

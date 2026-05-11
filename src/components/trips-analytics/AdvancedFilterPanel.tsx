@@ -280,16 +280,14 @@ export default function AdvancedFilterPanel({
       };
     }
 
+    // Create formatted date strings once for comparison
+    const fromDateStr = format(dateRange.from, 'yyyy-MM-dd');
+    const toDateStr = format(dateRange.to, 'yyyy-MM-dd');
+
     // FIRST: Filter by current local date range selection
     let filteredTrips = rawTrips.filter(t => {
       if (!t.trip_date) return true;
-      const tripDate = new Date(t.trip_date);
-      const fromDate = new Date(dateRange.from);
-      const toDate = new Date(dateRange.to);
-      // Set to start/end of day for inclusive comparison
-      fromDate.setHours(0, 0, 0, 0);
-      toDate.setHours(23, 59, 59, 999);
-      return tripDate >= fromDate && tripDate <= toDate;
+      return t.trip_date >= fromDateStr && t.trip_date <= toDateStr;
     });
 
     // Apply Route filter if selected
@@ -336,12 +334,7 @@ export default function AdvancedFilterPanel({
     // Get trips filtered by date + drivers + buses + times (for route options)
     const tripsForRouteOptions = rawTrips.filter(t => {
       if (t.trip_date) {
-        const tripDate = new Date(t.trip_date);
-        const fromDate = new Date(dateRange.from);
-        const toDate = new Date(dateRange.to);
-        fromDate.setHours(0, 0, 0, 0);
-        toDate.setHours(23, 59, 59, 999);
-        if (tripDate < fromDate || tripDate > toDate) return false;
+        if (t.trip_date < fromDateStr || t.trip_date > toDateStr) return false;
       }
       if (selectedDrivers.length > 0) {
         const driverName = extractDriverName(t);
@@ -365,12 +358,7 @@ export default function AdvancedFilterPanel({
     // Get trips filtered by date + routes + buses + times (for driver options)
     const tripsForDriverOptions = rawTrips.filter(t => {
       if (t.trip_date) {
-        const tripDate = new Date(t.trip_date);
-        const fromDate = new Date(dateRange.from);
-        const toDate = new Date(dateRange.to);
-        fromDate.setHours(0, 0, 0, 0);
-        toDate.setHours(23, 59, 59, 999);
-        if (tripDate < fromDate || tripDate > toDate) return false;
+        if (t.trip_date < fromDateStr || t.trip_date > toDateStr) return false;
       }
       if (selectedRoutes.length > 0) {
         const routeName = extractRouteName(t);
@@ -394,12 +382,7 @@ export default function AdvancedFilterPanel({
     // Get trips filtered by date + routes + drivers + times (for bus options)
     const tripsForBusOptions = rawTrips.filter(t => {
       if (t.trip_date) {
-        const tripDate = new Date(t.trip_date);
-        const fromDate = new Date(dateRange.from);
-        const toDate = new Date(dateRange.to);
-        fromDate.setHours(0, 0, 0, 0);
-        toDate.setHours(23, 59, 59, 999);
-        if (tripDate < fromDate || tripDate > toDate) return false;
+        if (t.trip_date < fromDateStr || t.trip_date > toDateStr) return false;
       }
       if (selectedRoutes.length > 0) {
         const routeName = extractRouteName(t);
@@ -423,12 +406,7 @@ export default function AdvancedFilterPanel({
     // Get trips filtered by date + routes + drivers + buses (for time options)
     const tripsForTimeOptions = rawTrips.filter(t => {
       if (t.trip_date) {
-        const tripDate = new Date(t.trip_date);
-        const fromDate = new Date(dateRange.from);
-        const toDate = new Date(dateRange.to);
-        fromDate.setHours(0, 0, 0, 0);
-        toDate.setHours(23, 59, 59, 999);
-        if (tripDate < fromDate || tripDate > toDate) return false;
+        if (t.trip_date < fromDateStr || t.trip_date > toDateStr) return false;
       }
       if (selectedRoutes.length > 0) {
         const routeName = extractRouteName(t);
