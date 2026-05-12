@@ -73,5 +73,5 @@ export default defineConfig({
   },
 
   // Output directories
-  outputDir: 'playwright-report/test-results',
+  outputDir: 'test-results',
 });
