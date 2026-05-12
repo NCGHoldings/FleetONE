@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useBankAccounts, useBankTransactionsForRecon, useLastReconciliation } from "@/hooks/useAccountingData";
 import { useSaveBankReconciliation } from "@/hooks/useAccountingMutations";
-import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, ArrowRightLeft, Search, Sparkles, BookOpen, Maximize, Minimize } from "lucide-react";
+import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, ArrowRightLeft, Search, Sparkles, BookOpen, Maximize, Minimize, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import "./BankReconciliationWorksheet.css";
 import { BankStatementImportModal } from "./BankStatementImportModal";
 
@@ -66,6 +67,32 @@ const BankReconciliationWorksheet = () => {
   const [clearedState, setClearedState] = useState<ClearedState>({});
   const [showAdjustments, setShowAdjustments] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+
+  // --- Clear imported statement handler ---
+  const handleClearStatement = useCallback(async () => {
+    if (!selectedAccountId) return;
+    setIsClearing(true);
+    try {
+      const { error, count } = await (supabase as any)
+        .from('bank_transactions')
+        .delete({ count: 'exact' })
+        .eq('bank_account_id', selectedAccountId)
+        .like('source_type', 'statement_import%');
+
+      if (error) throw error;
+      toast.success(`Cleared ${count || 0} imported statement entries. You can now re-import a fresh statement.`);
+      setClearedState({});
+      setSuggestedMatches({});
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-recon'] });
+    } catch (err: any) {
+      toast.error(`Failed to clear: ${err.message}`);
+    } finally {
+      setIsClearing(false);
+      setShowClearConfirm(false);
+    }
+  }, [selectedAccountId, queryClient]);
 
   // --- Adjustment form state ---
   const [adjType, setAdjType] = useState("bank_charge");
@@ -481,6 +508,11 @@ const BankReconciliationWorksheet = () => {
              <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)}>
                <Upload className="w-4 h-4 mr-1" /> Import Statement
              </Button>
+             {statementTxns.length > 0 && (
+               <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950" onClick={() => setShowClearConfirm(true)}>
+                 <Trash2 className="w-4 h-4 mr-1" /> Clear Statement
+               </Button>
+             )}
              <Button variant="secondary" size="sm" onClick={runAutoMatch} disabled={statementTxns.length === 0 || bookTxns.length === 0}>
                <Sparkles className="w-4 h-4 mr-1" /> Auto Match
              </Button>
@@ -584,8 +616,13 @@ const BankReconciliationWorksheet = () => {
                                           {group.statement.map(t => {
                                              const isCleared = clearedState[t.id]?.cleared || t.is_reconciled;
                                              const isSuggested = suggestedMatches[t.id];
-                                             const deposit = t.debit_amount || 0;
-                                             const payment = t.credit_amount || 0;
+                                             // Guard: if both are non-zero (bad data), use transaction_type to pick one
+                                             let deposit = t.debit_amount || 0;
+                                             let payment = t.credit_amount || 0;
+                                             if (deposit > 0 && payment > 0) {
+                                               if (t.transaction_type === 'deposit') { payment = 0; }
+                                               else { deposit = 0; }
+                                             }
                                              const rowClass = isCleared ? "bg-blue-50/50 dark:bg-blue-900/10" : isSuggested ? "bg-green-50/50 dark:bg-green-900/10 border-l-2 border-green-500" : "hover:bg-accent/50";
                                              return (
                                                 <tr key={t.id} className={`border-b border-border/50 cursor-pointer transition-colors ${rowClass}`} onClick={() => toggleCleared(t.id, payment, deposit)}>
@@ -614,8 +651,13 @@ const BankReconciliationWorksheet = () => {
                                           {group.book.map(t => {
                                              const isCleared = clearedState[t.id]?.cleared || t.is_reconciled;
                                              const isSuggested = Object.values(suggestedMatches).includes(t.id);
-                                             const deposit = t.debit_amount || 0;
-                                             const payment = t.credit_amount || 0;
+                                             // Guard: if both are non-zero (bad data), use transaction_type to pick one
+                                             let deposit = t.debit_amount || 0;
+                                             let payment = t.credit_amount || 0;
+                                             if (deposit > 0 && payment > 0) {
+                                               if (t.transaction_type === 'deposit') { payment = 0; }
+                                               else { deposit = 0; }
+                                             }
                                              const source = sourceLabel(t.source_type);
                                              const rowClass = isCleared ? "bg-blue-50/50 dark:bg-blue-900/10" : isSuggested ? "bg-green-50/50 dark:bg-green-900/10 border-r-2 border-green-500" : "hover:bg-accent/50";
                                              return (
@@ -780,6 +822,33 @@ const BankReconciliationWorksheet = () => {
           queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
         }}
       />
+
+      {/* ========================= CLEAR STATEMENT CONFIRMATION ========================= */}
+      <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" /> Clear Imported Statement?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              This will permanently delete <strong className="text-foreground">{statementTxns.length} imported statement entries</strong> for this bank account.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              System-generated records (AP payments, AR receipts, etc.) on the Book side will <strong className="text-foreground">NOT</strong> be affected.
+            </p>
+            <p className="text-sm font-medium">After clearing, you can import a fresh bank statement file.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowClearConfirm(false)} disabled={isClearing}>Cancel</Button>
+            <Button variant="destructive" onClick={handleClearStatement} disabled={isClearing}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              {isClearing ? "Clearing..." : `Clear ${statementTxns.length} Entries`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

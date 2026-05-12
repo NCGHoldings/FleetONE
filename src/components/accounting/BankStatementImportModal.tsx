@@ -88,20 +88,26 @@ const BankStatementImportModal = ({ open, onOpenChange, bankAccountId, onImportC
     try {
       for (let i = 0; i < txns.length; i += batchSize) {
         const batch = txns.slice(i, i + batchSize);
-        const records = batch.map(t => ({
-          bank_account_id: bankAccountId,
-          transaction_date: format(t.txnDate, "yyyy-MM-dd"),
-          description: t.description,
-          reference: t.reference || null,
-          debit_amount: t.debit || 0,
-          credit_amount: t.credit || 0,
-          transaction_type: t.type === "payment" ? "payment" : "deposit",
-          cheque_number: t.chequeNumber || null,
-          source_type: `statement_import_${parseResult.bankName.replace(/\s+/g, '_').toLowerCase()}`,
-          is_reconciled: false,
-          company_id: effectiveCompanyId,
-          business_unit_code: businessUnitCode,
-        }));
+        const records = batch.map(t => {
+          // Determine the single correct amount — parser may have set both debit & credit
+          const amount = Math.max(t.debit || 0, t.credit || 0);
+          // DB convention: debit_amount = deposit (money IN), credit_amount = payment (money OUT)
+          const isDeposit = t.type === 'deposit';
+          return {
+            bank_account_id: bankAccountId,
+            transaction_date: format(t.txnDate, "yyyy-MM-dd"),
+            description: t.description,
+            reference: t.reference || null,
+            debit_amount: isDeposit ? amount : 0,
+            credit_amount: isDeposit ? 0 : amount,
+            transaction_type: isDeposit ? "deposit" : "payment",
+            cheque_number: t.chequeNumber || null,
+            source_type: `statement_import_${parseResult.bankName.replace(/\s+/g, '_').toLowerCase()}`,
+            is_reconciled: false,
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode,
+          };
+        });
 
         const { error } = await (supabase as any)
           .from("bank_transactions")

@@ -486,6 +486,16 @@ const extractDebitCredit = (row: any, headers: string[], debitCol: string | null
     }
   }
 
+  // GUARD: Ensure mutual exclusivity — a single transaction cannot be both a debit AND a credit.
+  // If both are non-zero, it's a parsing error (e.g., merged column or duplicate data).
+  if (debit > 0 && credit > 0) {
+    if (debit > credit) {
+      credit = 0;   // Larger value wins as debit (withdrawal)
+    } else {
+      debit = 0;    // Larger or equal value wins as credit (deposit)
+    }
+  }
+
   return { debit, credit };
 };
 

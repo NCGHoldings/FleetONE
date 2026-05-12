@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Fuel, ArrowRight, AlertTriangle, Pencil, Check, X } from "lucide-react";
+import { Calendar, Fuel, ArrowRight, AlertTriangle, Pencil, Check, X, FileDown } from "lucide-react";
 import { TripData } from "@/hooks/useTripsAnalytics";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Maximum reasonable mileage for a single day (km)
 const MAX_DAILY_MILEAGE = 2000;
@@ -48,6 +50,7 @@ export default function FuelAnalyticsSection({ rawTrips, onDataCorrected }: Fuel
   const [adjustDialog, setAdjustDialog] = useState<OdometerAdjustData | null>(null);
   const [adjustValues, setAdjustValues] = useState<Record<string, { start: string; end: string }>>({});
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
 
 
@@ -253,6 +256,157 @@ export default function FuelAnalyticsSection({ rawTrips, onDataCorrected }: Fuel
     return { total, perTrip };
   }, [adjustDialog, adjustValues]);
 
+  // ── PDF EXPORT ──────────────────────────────────────────
+  const handleExportPDF = () => {
+    if (processedData.length === 0) {
+      toast({ title: "No Data", description: "No fuel records to export for the selected date.", variant: "destructive" });
+      return;
+    }
+    setExporting(true);
+    try {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      // Header
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('NCG Holdings (Pvt) Ltd', 14, 15);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Fuel Consumption & Performance Report', 14, 22);
+      doc.setFontSize(10);
+      doc.text(`Date: ${selectedDate}`, 14, 28);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - 80, 28);
+
+      if (anomalyCount > 0) {
+        doc.setTextColor(220, 38, 38);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`⚠ ${anomalyCount} Anomal${anomalyCount === 1 ? 'y' : 'ies'} Detected`, 14, 34);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'normal');
+      }
+
+      // Table data
+      const headers = [
+        'Route (Permit)', 'Bus Model', 'Bus No', 'Trips',
+        'Start Meter', 'End Meter', 'Total Mileage',
+        'Fuel (L)', 'Consumption', 'Std Rate', 'Perform'
+      ];
+
+      const rows = processedData.map(group => {
+        const routeName = group.routes
+          ? `${group.routes.route_no || ''} ${group.routes.route_name || ''}`.trim()
+          : (group.buses?.route || '-');
+        const busModel = group.buses?.model || '-';
+        const busNumber = group.buses?.bus_no || group.buses?.registration_number || '-';
+        const startMeter = group.odometer_start ?? 0;
+        const endMeter = group.odometer_end ?? 0;
+        const totalMileage = (startMeter > 0 && endMeter > startMeter) ? (endMeter - startMeter) : (group.distance_km ?? 0);
+        const fuelLiters = group.fuel_liters ?? 0;
+        const standardRate = group.standard_fuel_rate ?? 0;
+        const actualConsumption = fuelLiters > 0 ? (totalMileage / fuelLiters) : (group.km_per_liter || 0);
+        const performance = actualConsumption - standardRate;
+        const isAnomaly = totalMileage > MAX_DAILY_MILEAGE;
+
+        return {
+          row: [
+            routeName,
+            busModel,
+            busNumber,
+            String(group.no_of_trips),
+            startMeter > 0 ? startMeter.toLocaleString() : '-',
+            endMeter > 0 ? endMeter.toLocaleString() : '-',
+            (isAnomaly ? '⚠ ' : '') + totalMileage.toLocaleString(),
+            fuelLiters > 0 ? fuelLiters.toFixed(2) : '-',
+            actualConsumption > 0 ? actualConsumption.toFixed(2) : '-',
+            standardRate > 0 ? standardRate.toFixed(2) : '-',
+            (standardRate > 0 && fuelLiters > 0) ? ((performance > 0 ? '+' : '') + performance.toFixed(2)) : '-'
+          ],
+          isAnomaly,
+          performance,
+          fuelLiters,
+          standardRate,
+        };
+      });
+
+      autoTable(doc, {
+        startY: anomalyCount > 0 ? 38 : 33,
+        head: [headers],
+        body: rows.map(r => r.row),
+        theme: 'grid',
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [255, 255, 255],
+          fontSize: 8,
+          fontStyle: 'bold',
+          halign: 'center',
+        },
+        columnStyles: {
+          0: { cellWidth: 45 },
+          3: { halign: 'center' },
+          4: { halign: 'right' },
+          5: { halign: 'right' },
+          6: { halign: 'right', fontStyle: 'bold' },
+          7: { halign: 'right' },
+          8: { halign: 'right', fontStyle: 'bold' },
+          9: { halign: 'right' },
+          10: { halign: 'right' },
+        },
+        styles: { fontSize: 7.5, cellPadding: 2 },
+        didParseCell: (data: any) => {
+          if (data.section !== 'body') return;
+          const rowIdx = data.row.index;
+          const meta = rows[rowIdx];
+          if (!meta) return;
+
+          // Anomaly row — light red bg
+          if (meta.isAnomaly) {
+            data.cell.styles.fillColor = [254, 226, 226];
+          }
+          // Consumption column (8) — yellow bg
+          if (data.column.index === 8) {
+            data.cell.styles.fillColor = [253, 224, 71];
+            data.cell.styles.textColor = [66, 32, 6];
+          }
+          // Standard Rate column (9) — blue bg
+          if (data.column.index === 9) {
+            data.cell.styles.fillColor = [219, 234, 254];
+            data.cell.styles.textColor = [30, 58, 138];
+          }
+          // Performance column (10)
+          if (data.column.index === 10 && meta.fuelLiters > 0 && meta.standardRate > 0) {
+            if (meta.performance > 0) {
+              data.cell.styles.fillColor = [220, 252, 231];
+              data.cell.styles.textColor = [21, 128, 61];
+            } else if (meta.performance < 0) {
+              data.cell.styles.fillColor = [254, 226, 226];
+              data.cell.styles.textColor = [185, 28, 28];
+            }
+          }
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      // Footer on every page
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setTextColor(150);
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth - 30, doc.internal.pageSize.getHeight() - 8);
+        doc.text('FleetONE — Fuel Analytics', 14, doc.internal.pageSize.getHeight() - 8);
+      }
+
+      doc.save(`Fuel_Report_${selectedDate}.pdf`);
+      toast({ title: "✅ PDF Downloaded", description: `Fuel report for ${selectedDate} saved.` });
+    } catch (err: any) {
+      console.error('PDF export error:', err);
+      toast({ title: "Export Failed", description: err.message || "Could not generate PDF", variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card className="p-6 shadow-lg">
@@ -286,6 +440,17 @@ export default function FuelAnalyticsSection({ rawTrips, onDataCorrected }: Fuel
                 </SelectContent>
               </Select>
             </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPDF}
+              disabled={exporting || processedData.length === 0}
+              className="gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950"
+            >
+              <FileDown className="h-4 w-4" />
+              {exporting ? 'Exporting…' : 'PDF Report'}
+            </Button>
           </div>
         </div>
 
