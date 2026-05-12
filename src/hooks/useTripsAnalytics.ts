@@ -121,57 +121,111 @@ export function useTripsAnalytics(filters: AnalyticsFilters, enabled: boolean = 
         ]);
       };
 
-      // Fetch trips data with related tables
-      // Driver names come from the `notes` JSON field, not from profiles join
-      console.log('[useTripsAnalytics] Fetching daily_trips... (30s timeout)');
+      // Fetch trips, buses, and routes in parallel
+      // Uses allSettled so buses/routes failures don't kill the trips query
+      console.log('[useTripsAnalytics] Fetching trips + buses + routes in parallel...');
       
       // Start a progress timer to track if query is hanging
       const progressInterval = setInterval(() => {
-        console.log(`[useTripsAnalytics] ⏳ Still waiting for daily_trips... (${Math.round((Date.now() - queryStart) / 1000)}s elapsed)`);
+        console.log(`[useTripsAnalytics] ⏳ Still waiting... (${Math.round((Date.now() - queryStart) / 1000)}s elapsed)`);
       }, 5000);
       
       let tripsResult: any;
+      let busesMap: Record<string, any> = {};
+      let routesMap: Record<string, any> = {};
       try {
-        tripsResult = await withTimeout(
-          supabase
-            .from('daily_trips')
-            .select(`
-              id,
-              trip_date,
-              trip_no,
-              bus_id,
-              route_id,
-              driver_id,
-              conductor_id,
-              start_time,
-              end_time,
-              odometer_start,
-              odometer_end,
-              distance_km,
-              income,
-              fuel_liters,
-              diesel_price_per_liter,
-              notes,
-              status,
-              data_source,
-              gl_posted,
-              route_label,
-              buses(bus_no, registration_number, model, type, capacity, route, expected_km_per_liter),
-              routes(route_no, route_name)
-            `)
-            .gte('trip_date', stableKey.startDate)
-            .lte('trip_date', stableKey.endDate)
-            .order('trip_date', { ascending: false })
-            .limit(2000),
-          30000,
-          'daily_trips'
-        );
+        // Fire all 3 queries in parallel — allSettled ensures partial success
+        const results = await Promise.allSettled([
+          // 1. Trips — the critical query
+          withTimeout(
+            supabase
+              .from('daily_trips')
+              .select(`
+                id,
+                trip_date,
+                trip_no,
+                bus_id,
+                route_id,
+                driver_id,
+                conductor_id,
+                start_time,
+                end_time,
+                odometer_start,
+                odometer_end,
+                distance_km,
+                income,
+                fuel_liters,
+                diesel_price_per_liter,
+                notes,
+                status,
+                data_source,
+                gl_posted,
+                route_label
+              `)
+              .gte('trip_date', stableKey.startDate)
+              .lte('trip_date', stableKey.endDate)
+              .order('trip_date', { ascending: false })
+              .limit(2000),
+            30000,
+            'daily_trips'
+          ),
+          // 2. Buses lookup — optional, analytics works without it
+          withTimeout(
+            supabase
+              .from('buses')
+              .select('id, bus_no, registration_number, model, type, capacity, route, expected_km_per_liter'),
+            30000,
+            'buses_lookup'
+          ),
+          // 3. Routes lookup — optional, analytics works without it
+          withTimeout(
+            supabase
+              .from('routes')
+              .select('id, route_no, route_name'),
+            30000,
+            'routes_lookup'
+          ),
+        ]);
+        
+        // Extract trips result — this is required
+        if (results[0].status === 'fulfilled') {
+          tripsResult = results[0].value;
+        } else {
+          // Trips query failed — re-throw the error
+          throw results[0].reason;
+        }
+        
+        // Extract buses — optional
+        if (results[1].status === 'fulfilled' && results[1].value?.data) {
+          for (const bus of results[1].value.data) {
+            busesMap[bus.id] = bus;
+          }
+        } else {
+          console.warn('[useTripsAnalytics] Buses lookup failed, continuing without bus names');
+        }
+        
+        // Extract routes — optional
+        if (results[2].status === 'fulfilled' && results[2].value?.data) {
+          for (const route of results[2].value.data) {
+            routesMap[route.id] = route;
+          }
+        } else {
+          console.warn('[useTripsAnalytics] Routes lookup failed, continuing without route names');
+        }
+        
+        console.log('[useTripsAnalytics] Lookups loaded:', { buses: Object.keys(busesMap).length, routes: Object.keys(routesMap).length });
       } finally {
         clearInterval(progressInterval);
       }
 
-      const { data: tripsData, error: tripsError } = tripsResult;
-      const trips = tripsData || [];
+      const { data: rawTripsData, error: tripsError } = tripsResult;
+      
+      // Merge bus/route data into trips (replaces the JOIN)
+      const trips = (rawTripsData || []).map((t: any) => ({
+        ...t,
+        buses: busesMap[t.bus_id] || null,
+        routes: routesMap[t.route_id] || null,
+      }));
 
       console.log('[useTripsAnalytics] ✅ Trips result:', {
         count: trips.length,
@@ -211,6 +265,21 @@ export function useTripsAnalytics(filters: AnalyticsFilters, enabled: boolean = 
       // Don't throw on expense errors - continue with trips data only
       if (expensesError) {
         console.warn('[useTripsAnalytics] Could not fetch expenses, continuing with trips data only');
+      }
+
+      // Fetch global diesel price from fuel_settings as fallback
+      let globalDieselPrice = 392; // Hardcoded default if fuel_settings fetch fails
+      try {
+        const { data: fuelSettings } = await supabase
+          .from('fuel_settings')
+          .select('diesel_price_lkr_per_l')
+          .eq('is_default', true)
+          .single();
+        if (fuelSettings?.diesel_price_lkr_per_l) {
+          globalDieselPrice = fuelSettings.diesel_price_lkr_per_l;
+        }
+      } catch {
+        console.warn('[useTripsAnalytics] Could not fetch fuel_settings, using default diesel price:', globalDieselPrice);
       }
 
       // Helper to parse notes JSON for driver/conductor names
@@ -304,7 +373,7 @@ export function useTripsAnalytics(filters: AnalyticsFilters, enabled: boolean = 
       });
 
       try {
-        const result = processAnalyticsData(filteredTrips, filteredExpenses, filters, !!expensesError);
+        const result = processAnalyticsData(filteredTrips, filteredExpenses, filters, !!expensesError, globalDieselPrice);
         console.log('[useTripsAnalytics] ===== QUERY COMPLETE =====', {
           totalTrips: result.overview.totalTrips,
           totalIncome: result.overview.totalIncome,
@@ -332,7 +401,8 @@ function processAnalyticsData(
   trips: TripData[], 
   expenses: any[], 
   filters: AnalyticsFilters,
-  expensesUnavailable: boolean = false
+  expensesUnavailable: boolean = false,
+  globalDieselPrice: number = 392
 ) {
   // Handle empty data
   if (!trips || trips.length === 0) {
@@ -603,6 +673,10 @@ function processAnalyticsData(
         dieselPrice = expenseData.diesel_price_per_liter;
       }
     });
+    // Use global diesel price as fallback if no per-expense price found
+    if (dieselPrice === 0) {
+      dieselPrice = globalDieselPrice;
+    }
     if (totalFuelLiters === 0 && totalFuelCost > 0 && dieselPrice > 0) {
       totalFuelLiters = totalFuelCost / dieselPrice;
     }
@@ -728,9 +802,20 @@ function processAnalyticsData(
       const key = `${t.bus_id}_${t.trip_date}`;
       const expenseData = expenseMap.get(key);
       const busStat = busStats.find(b => b.busNo === t.buses?.bus_no || b.busNo === t.buses?.registration_number);
+      
+      // 1. Try fuel_liters from expense record
       let fuelLiters = expenseData?.fuel_liters || 0;
+      // 2. Fallback: calculate from fuel_cost / diesel_price_per_liter (per expense)
       if (fuelLiters === 0 && expenseData?.fuel_cost > 0 && expenseData?.diesel_price_per_liter > 0) {
         fuelLiters = expenseData.fuel_cost / expenseData.diesel_price_per_liter;
+      }
+      // 3. Fallback: calculate from fuel_cost / global diesel price
+      if (fuelLiters === 0 && expenseData?.fuel_cost > 0 && globalDieselPrice > 0) {
+        fuelLiters = expenseData.fuel_cost / globalDieselPrice;
+      }
+      // 4. Fallback: try fuel_liters directly from the trip record
+      if (fuelLiters === 0 && t.fuel_liters && t.fuel_liters > 0) {
+        fuelLiters = t.fuel_liters;
       }
       return {
         ...t,

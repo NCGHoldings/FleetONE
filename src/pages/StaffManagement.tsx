@@ -46,7 +46,7 @@ interface RoleManagementCellProps {
   onResetPassword: () => void;
 }
 
-function RoleManagementCell({ staff, onToggleRole, isSuperAdmin, onOpenPageAccess, onOpenCompanyAccess }: RoleManagementCellProps) {
+function RoleManagementCell({ staff, onToggleRole, isSuperAdmin, onOpenPageAccess, onOpenCompanyAccess, onResetPassword }: RoleManagementCellProps) {
   const userRoles = staff.roles;
   
   return (

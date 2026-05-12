@@ -45,7 +45,7 @@ function TripsAnalyticsContent() {
     times?: string[];
     odometerOnly?: boolean;
   }>({
-    startDate: subDays(new Date(), 30),
+    startDate: subDays(new Date(), 14),
     endDate: new Date()
   });
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -722,7 +722,7 @@ const handleFilterChange = useCallback((filters: any) => {
 
         {/* Fuel Tab */}
         <TabsContent value="fuel" className="space-y-6">
-          <FuelAnalyticsSection rawTrips={analytics.rawTrips} />
+          <FuelAnalyticsSection rawTrips={analytics.rawTrips} onDataCorrected={() => queryClient.invalidateQueries({ queryKey: ['trips-analytics'] })} />
         </TabsContent>
 
         {/* Trends Tab */}

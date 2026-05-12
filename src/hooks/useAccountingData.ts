@@ -116,11 +116,34 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
       }
 
       if (businessUnitCode && businessUnitCode !== "all") {
+        // Build filter parts for the primary code
+        let filterParts = [
+          `business_unit_code.eq.${businessUnitCode}`,
+          `entry_number.ilike.${businessUnitCode}-%`
+        ];
+        // SBO has extra legacy prefixes
         if (businessUnitCode === "SBO") {
-          query = query.or(`business_unit_code.eq.SBO,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%`);
-        } else {
-          query = query.or(`business_unit_code.eq.${businessUnitCode},entry_number.ilike.${businessUnitCode}-%`);
+          filterParts.push('entry_number.ilike.SBS-%', 'entry_number.ilike.FUEL-BLK-%', 'entry_number.ilike.EXP-BLK-%');
         }
+        // Add legacy codes if the company short_code was changed
+        const cName = selectedCompany?.name?.toLowerCase() || '';
+        const legacyMap: Record<string, string> = {
+          "special hire": "SPH",
+          "school bus": "SBO", 
+          "yutong": "YUT",
+          "sinotruck": "SNT",
+          "light vehicle": "LTV",
+        };
+        for (const [nameKey, legacyCode] of Object.entries(legacyMap)) {
+          if (cName.includes(nameKey) && businessUnitCode !== legacyCode) {
+            filterParts.push(`business_unit_code.eq.${legacyCode}`);
+            filterParts.push(`entry_number.ilike.${legacyCode}-%`);
+            if (legacyCode === "SBO") {
+              filterParts.push('entry_number.ilike.SBS-%', 'entry_number.ilike.FUEL-BLK-%', 'entry_number.ilike.EXP-BLK-%');
+            }
+          }
+        }
+        query = query.or(filterParts.join(','));
       } else if (selectedCompany && !selectedCompany.parent_company_id) {
         // Parent companies drop filter
       } else if (selectedCompany) {
@@ -226,7 +249,7 @@ export const useCurrentPeriod = () => {
 // ============ Customers (AR) ============
 // Filters by business_unit_code when a sub-company is selected
 export const useCustomers = () => {
-  const { getEffectiveCompanyId } = useCompany();
+  const { selectedCompany, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
 
@@ -245,7 +268,19 @@ export const useCustomers = () => {
 
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
-        (query as any) = query.eq("business_unit_code", autoBusinessUnitCode);
+        const cName = selectedCompany?.name?.toLowerCase() || '';
+        const legacyCodes: string[] = [];
+        if (cName.includes("special hire") && autoBusinessUnitCode !== 'SPH') legacyCodes.push('SPH');
+        if (cName.includes("school bus") && autoBusinessUnitCode !== 'SBO') legacyCodes.push('SBO');
+        if (cName.includes("yutong") && autoBusinessUnitCode !== 'YUT') legacyCodes.push('YUT');
+        if (cName.includes("sinotruck") && autoBusinessUnitCode !== 'SNT') legacyCodes.push('SNT');
+        if (cName.includes("light vehicle") && autoBusinessUnitCode !== 'LTV') legacyCodes.push('LTV');
+        
+        let filterParts = [`business_unit_code.eq.${autoBusinessUnitCode}`];
+        for (const legacy of legacyCodes) {
+          filterParts.push(`business_unit_code.eq.${legacy}`);
+        }
+        query = query.or(filterParts.join(','));
       }
 
       const data = await fetchAllRows(query);
@@ -357,7 +392,27 @@ export const useARInvoices = (status?: "all" | "draft" | "sent" | "paid" | "part
 
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
-        query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},invoice_number.ilike.${autoBusinessUnitCode}-%`);
+        // Build a filter that matches the dynamic code AND any legacy/hardcoded codes
+        // Special Hire invoices were historically created with 'SPH' hardcoded
+        const cName = selectedCompany?.name?.toLowerCase() || '';
+        const legacyCodes: string[] = [];
+        if (cName.includes("special hire") && autoBusinessUnitCode !== 'SPH') legacyCodes.push('SPH');
+        if (cName.includes("school bus") && autoBusinessUnitCode !== 'SBO') legacyCodes.push('SBO');
+        if (cName.includes("yutong") && autoBusinessUnitCode !== 'YUT') legacyCodes.push('YUT');
+        if (cName.includes("sinotruck") && autoBusinessUnitCode !== 'SNT') legacyCodes.push('SNT');
+        if (cName.includes("light vehicle") && autoBusinessUnitCode !== 'LTV') legacyCodes.push('LTV');
+        
+        // Primary filter: match dynamic code
+        let filterParts = [
+          `business_unit_code.eq.${autoBusinessUnitCode}`,
+          `invoice_number.ilike.${autoBusinessUnitCode}-%`
+        ];
+        // Also match legacy codes
+        for (const legacy of legacyCodes) {
+          filterParts.push(`business_unit_code.eq.${legacy}`);
+          filterParts.push(`invoice_number.ilike.${legacy}-%`);
+        }
+        query = query.or(filterParts.join(','));
       } else if (selectedCompany && !selectedCompany.parent_company_id) {
         // Parent companies drop filter
       } else if (selectedCompany) {
@@ -403,7 +458,23 @@ export const useAPInvoices = (status?: "all" | "draft" | "sent" | "paid" | "part
 
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
-        query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},invoice_number.ilike.${autoBusinessUnitCode}-%`);
+        const cName = selectedCompany?.name?.toLowerCase() || '';
+        const legacyCodes: string[] = [];
+        if (cName.includes("special hire") && autoBusinessUnitCode !== 'SPH') legacyCodes.push('SPH');
+        if (cName.includes("school bus") && autoBusinessUnitCode !== 'SBO') legacyCodes.push('SBO');
+        if (cName.includes("yutong") && autoBusinessUnitCode !== 'YUT') legacyCodes.push('YUT');
+        if (cName.includes("sinotruck") && autoBusinessUnitCode !== 'SNT') legacyCodes.push('SNT');
+        if (cName.includes("light vehicle") && autoBusinessUnitCode !== 'LTV') legacyCodes.push('LTV');
+        
+        let filterParts = [
+          `business_unit_code.eq.${autoBusinessUnitCode}`,
+          `invoice_number.ilike.${autoBusinessUnitCode}-%`
+        ];
+        for (const legacy of legacyCodes) {
+          filterParts.push(`business_unit_code.eq.${legacy}`);
+          filterParts.push(`invoice_number.ilike.${legacy}-%`);
+        }
+        query = query.or(filterParts.join(','));
       } else if (selectedCompany && !selectedCompany.parent_company_id) {
         // Parent companies drop filter
       } else if (selectedCompany) {
@@ -436,7 +507,7 @@ export const useARReceipts = () => {
       if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ar_receipts")
-        .select("*, customers(customer_name), bank_accounts(account_name, bank_name, account_number)")
+        .select("*, customers(customer_name)")
         .order("receipt_date", { ascending: false });
 
       if (effectiveCompanyId) {
@@ -445,7 +516,23 @@ export const useARReceipts = () => {
 
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
-        query = query.or(`business_unit_code.eq.${autoBusinessUnitCode},receipt_number.ilike.${autoBusinessUnitCode}-%`);
+        const cName = selectedCompany?.name?.toLowerCase() || '';
+        const legacyCodes: string[] = [];
+        if (cName.includes("special hire") && autoBusinessUnitCode !== 'SPH') legacyCodes.push('SPH');
+        if (cName.includes("school bus") && autoBusinessUnitCode !== 'SBO') legacyCodes.push('SBO');
+        if (cName.includes("yutong") && autoBusinessUnitCode !== 'YUT') legacyCodes.push('YUT');
+        if (cName.includes("sinotruck") && autoBusinessUnitCode !== 'SNT') legacyCodes.push('SNT');
+        if (cName.includes("light vehicle") && autoBusinessUnitCode !== 'LTV') legacyCodes.push('LTV');
+        
+        let filterParts = [
+          `business_unit_code.eq.${autoBusinessUnitCode}`,
+          `receipt_number.ilike.${autoBusinessUnitCode}-%`
+        ];
+        for (const legacy of legacyCodes) {
+          filterParts.push(`business_unit_code.eq.${legacy}`);
+          filterParts.push(`receipt_number.ilike.${legacy}-%`);
+        }
+        query = query.or(filterParts.join(','));
       } else if (selectedCompany && !selectedCompany.parent_company_id) {
         // Parent companies drop filter
       } else if (selectedCompany) {
