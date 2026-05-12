@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useBankAccounts, useBankTransactionsForRecon, useLastReconciliation, useDraftReconciliation } from "@/hooks/useAccountingData";
 import { useSaveBankReconciliation, useSaveDraftReconciliation, useDeleteDraftReconciliation } from "@/hooks/useAccountingMutations";
-import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, ArrowRightLeft, Search, Sparkles, BookOpen, Maximize, Minimize, Trash2, Printer } from "lucide-react";
+import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, ArrowRightLeft, Search, Sparkles, BookOpen, Maximize, Minimize, Trash2, Printer, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +30,36 @@ interface ClearedState {
 // ---------- Helpers ----------
 const fmt = (n: number) =>
   n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Extract payee name from description patterns like "AP Payment to Vendor Name - PAY-001" or "AR Receipt from Customer - REC-001" */
+const extractPayee = (description: string | null | undefined): string => {
+  if (!description) return "—";
+  // Pattern: "AP Payment to <Payee> - <DocNo>" or "AP Payment to <Payee> (Payment: ...)"
+  const apMatch = description.match(/(?:Payment|Refund)\s+(?:to|from)\s+(.+?)(?:\s+-\s+|\s+\()/i);
+  if (apMatch) return apMatch[1].trim();
+  // Pattern: "AR Receipt from <Payee> - <DocNo>"
+  const arMatch = description.match(/Receipt\s+(?:from|to)\s+(.+?)(?:\s+-\s+|\s+\()/i);
+  if (arMatch) return arMatch[1].trim();
+  // Pattern: "Bank fee (...) - AR Receipt <DocNo> from <Payee>"
+  const feeMatch = description.match(/from\s+(.+?)$/i);
+  if (feeMatch && description.toLowerCase().includes('fee')) return feeMatch[1].trim();
+  // Petty cash / manual: just use first meaningful segment
+  const dashSplit = description.split(' - ');
+  if (dashSplit.length > 1) return dashSplit[0].trim();
+  return description.length > 30 ? description.substring(0, 30) + '…' : description;
+};
+
+/** Extract document number from description patterns like "AP Payment to Vendor - PAY-001" */
+const extractDocNo = (t: any): string => {
+  // Prefer the reference field directly (most reliable)
+  if (t.reference) return t.reference;
+  // Fallback: extract from description after the last " - "
+  const desc = t.description || '';
+  const match = desc.match(/\s+-\s+([A-Z]{2,5}-\d[\w-]*)/);
+  if (match) return match[1];
+  // Last fallback: source_type prefix + short ID
+  return t.id?.substring(0, 8) || '—';
+};
 
 const sourceLabel = (sourceType: string | null | undefined): { text: string; className: string } => {
   switch (sourceType) {
@@ -74,6 +104,14 @@ const BankReconciliationWorksheet = () => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickAddType, setQuickAddType] = useState<"payment" | "deposit">("payment");
+  const [quickAddAmount, setQuickAddAmount] = useState("");
+  const [quickAddDesc, setQuickAddDesc] = useState("");
+  const [quickAddRef, setQuickAddRef] = useState("");
+  const [quickAddDate, setQuickAddDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [editingTxnId, setEditingTxnId] = useState<string | null>(null);
+  const [editingAmount, setEditingAmount] = useState("");
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHydratingRef = useRef(false);
   const lastHydratedAccountRef = useRef<string | null>(null);
@@ -182,6 +220,37 @@ const BankReconciliationWorksheet = () => {
   const lastStatementBalance = lastRecon?.statement_balance ?? selectedAccount?.opening_balance ?? 0;
   const targetBalance = parseFloat(statementBalance) || 0;
 
+  // Build a set of "fully paired" IDs — both statement+book sides cleared
+  const pairedClearedIds = useMemo(() => {
+    const allTxns = transactions;
+    const clearedIds = Object.keys(clearedState).filter(id => clearedState[id]?.cleared);
+    const clearedStmtIds = clearedIds.filter(id => allTxns.find(t => t.id === id)?.source_type?.startsWith('statement_import'));
+    const clearedBookIds = clearedIds.filter(id => { const t = allTxns.find(tx => tx.id === id); return t && !t.source_type?.startsWith('statement_import'); });
+    // A pair is "complete" if both sides have at least one cleared entry
+    // For not_cleared filter: hide individual items only if they are cleared
+    // But the user wants: hide BOTH sides only when BOTH are ticked
+    // We'll track which cleared items have a counterpart on the other side
+    const paired = new Set<string>();
+    clearedStmtIds.forEach(stId => {
+      // Find if there's a matched book entry in cleared state
+      const stTxn = allTxns.find(t => t.id === stId);
+      if (!stTxn) return;
+      const stAmt = (stTxn.debit_amount || 0) > 0 ? (stTxn.debit_amount || 0) : -(stTxn.credit_amount || 0);
+      const matchedBook = clearedBookIds.find(bkId => {
+        if (paired.has(bkId)) return false;
+        const bkTxn = allTxns.find(t => t.id === bkId);
+        if (!bkTxn) return false;
+        const bkAmt = (bkTxn.debit_amount || 0) > 0 ? (bkTxn.debit_amount || 0) : -(bkTxn.credit_amount || 0);
+        return stAmt === bkAmt;
+      });
+      if (matchedBook) {
+        paired.add(stId);
+        paired.add(matchedBook);
+      }
+    });
+    return paired;
+  }, [transactions, clearedState]);
+
   // Only show unreconciled transactions (or all if user wants to see previously cleared)
   const filteredTransactions = useMemo(() => {
     const base = transactions.filter((t) => {
@@ -193,10 +262,11 @@ const BankReconciliationWorksheet = () => {
       return base.filter((t) => clearedState[t.id]?.cleared || t.is_reconciled);
     }
     if (displayFilter === "not_cleared") {
-      return base.filter((t) => !clearedState[t.id]?.cleared && !t.is_reconciled);
+      // Hide only fully paired items (both sides ticked)
+      return base.filter((t) => !pairedClearedIds.has(t.id) && !t.is_reconciled);
     }
     return base;
-  }, [transactions, displayFilter, clearedState]);
+  }, [transactions, displayFilter, clearedState, pairedClearedIds]);
 
   // Group by Date
   const groupedByDate = useMemo(() => {
@@ -508,12 +578,105 @@ const BankReconciliationWorksheet = () => {
     setAdjustments(prev => prev.filter((_, i) => i !== index));
   };
 
+  // --- Quick-Add Missing Entry ---
+  const handleQuickAdd = useCallback(async () => {
+    if (!selectedAccountId) return toast.error("Select a bank account first");
+    const amount = parseFloat(quickAddAmount);
+    if (!amount || amount <= 0) return toast.error("Enter a valid amount");
+    if (!quickAddDesc.trim()) return toast.error("Enter a description");
+
+    try {
+      const insertData: any = {
+        bank_account_id: selectedAccountId,
+        transaction_date: quickAddDate,
+        description: quickAddDesc.trim(),
+        reference: quickAddRef.trim() || null,
+        transaction_type: quickAddType,
+        source_type: 'manual',
+        debit_amount: quickAddType === 'deposit' ? amount : 0,
+        credit_amount: quickAddType === 'payment' ? amount : 0,
+        is_reconciled: false,
+      };
+
+      const { error } = await (supabase as any)
+        .from('bank_transactions')
+        .insert([insertData]);
+      if (error) throw error;
+
+      toast.success(`Added ${quickAddType} of LKR ${fmt(amount)} to book records`);
+      setShowQuickAdd(false);
+      setQuickAddAmount("");
+      setQuickAddDesc("");
+      setQuickAddRef("");
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-recon'] });
+    } catch (err: any) {
+      toast.error(`Failed to add entry: ${err.message}`);
+    }
+  }, [selectedAccountId, quickAddAmount, quickAddDesc, quickAddRef, quickAddDate, quickAddType, queryClient]);
+
+  // --- Inline Edit Amount ---
+  const handleInlineAmountSave = useCallback(async (txnId: string, originalPayment: number, originalDeposit: number) => {
+    const newAmount = parseFloat(editingAmount);
+    if (!newAmount || newAmount <= 0) {
+      setEditingTxnId(null);
+      return toast.error("Invalid amount");
+    }
+
+    try {
+      const updateData: any = originalPayment > 0
+        ? { credit_amount: newAmount }
+        : { debit_amount: newAmount };
+
+      const { error } = await (supabase as any)
+        .from('bank_transactions')
+        .update(updateData)
+        .eq('id', txnId);
+      if (error) throw error;
+
+      // Update cleared state if this txn was cleared
+      if (clearedState[txnId]?.cleared) {
+        setClearedState(prev => ({
+          ...prev,
+          [txnId]: { cleared: true, clearedAmount: newAmount }
+        }));
+      }
+
+      toast.success(`Amount updated to LKR ${fmt(newAmount)}`);
+      setEditingTxnId(null);
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-recon'] });
+    } catch (err: any) {
+      toast.error(`Failed: ${err.message}`);
+    }
+  }, [editingAmount, clearedState, queryClient]);
+
+  // --- Explicit Manual Save Draft ---
+  const handleManualSaveDraft = useCallback(() => {
+    if (!selectedAccountId) return toast.error("Select a bank account");
+    const clearedItems = Object.entries(clearedState)
+      .filter(([, v]) => v.cleared)
+      .map(([id, v]) => ({
+        bank_transaction_id: id,
+        cleared_amount: v.clearedAmount,
+      }));
+
+    saveDraft.mutate({
+      bank_account_id: selectedAccountId,
+      statement_date: statementDate,
+      statement_no: statementNo,
+      statement_balance: statementBalance,
+      cleared_items: clearedItems,
+    });
+    toast.success("Draft saved successfully!");
+  }, [selectedAccountId, clearedState, statementDate, statementNo, statementBalance, saveDraft]);
+
   const isSaveDisabled = useMemo(() => {
     if (saveReconciliation.isPending) return true;
     if (Object.keys(clearedState).length === 0 && adjustments.length === 0) return true;
     if (!statementBalance) return true;
     return false;
   }, [saveReconciliation.isPending, clearedState, statementBalance, adjustments]);
+
+  const hasClearedItems = Object.values(clearedState).some(v => v.cleared);
 
   // --- Loading ---
   if (acctLoading) {
@@ -598,6 +761,9 @@ const BankReconciliationWorksheet = () => {
                  <Trash2 className="w-4 h-4 mr-1" /> Clear
                </Button>
              )}
+             <Button variant="outline" size="sm" onClick={() => setShowQuickAdd(true)} disabled={!selectedAccountId}>
+               <Plus className="w-4 h-4 mr-1" /> Quick Add
+             </Button>
              <Button variant="secondary" size="sm" onClick={runAutoMatch} disabled={statementTxns.length === 0 || bookTxns.length === 0}>
                <Sparkles className="w-4 h-4 mr-1" /> Auto Match
              </Button>
@@ -655,7 +821,9 @@ const BankReconciliationWorksheet = () => {
         ) : (
           <div className="flex flex-col w-full h-full relative">
             {/* Headers row (Sticky) */}
-            <div className="flex w-full divide-x divide-border border-b sticky top-0 z-10 bg-background shadow-sm flex-shrink-0">
+            <div className="flex flex-col w-full sticky top-0 z-10 bg-background shadow-sm flex-shrink-0">
+              {/* Section titles */}
+              <div className="flex w-full divide-x divide-border border-b">
                 <div className="flex-1 flex justify-between items-center px-4 py-2 bg-muted/10">
                    <span className="flex items-center gap-2 font-semibold text-sm"><FileText className="w-4 h-4 text-blue-600" /> Bank Statement</span>
                    <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">{statementTxns.length} items</span>
@@ -676,6 +844,42 @@ const BankReconciliationWorksheet = () => {
                       <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">{bookTxns.length} items</span>
                    </div>
                 </div>
+              </div>
+              {/* Column headers */}
+              <div className="flex w-full divide-x divide-border border-b bg-muted/30">
+                {/* Statement column headers */}
+                <div className="flex-1">
+                  <table className="w-full text-[10px] table-fixed">
+                    <thead>
+                      <tr className="text-muted-foreground font-semibold uppercase tracking-wider">
+                        <th className="w-[28px] p-1"></th>
+                        <th className="w-[68px] p-1 text-left">Date</th>
+                        <th className="w-[90px] p-1 text-left">Doc No</th>
+                        <th className="p-1 text-left">Payee Name</th>
+                        <th className="w-[90px] p-1 text-right">Amount</th>
+                        <th className="w-[90px] p-1 text-left">Chq/Ref</th>
+                      </tr>
+                    </thead>
+                  </table>
+                </div>
+                {/* Book column headers */}
+                <div className="flex-1">
+                  <table className="w-full text-[10px] table-fixed">
+                    <thead>
+                      <tr className="text-muted-foreground font-semibold uppercase tracking-wider">
+                        <th className="w-[28px] p-1"></th>
+                        <th className="w-[36px] p-1 text-left">Src</th>
+                        <th className="w-[68px] p-1 text-left">Date</th>
+                        <th className="w-[90px] p-1 text-left">Doc No</th>
+                        <th className="p-1 text-left">Payee Name</th>
+                        <th className="w-[90px] p-1 text-right">Amount</th>
+                        <th className="w-[90px] p-1 text-left">Chq/Ref</th>
+                        <th className="w-[24px] p-1"></th>
+                      </tr>
+                    </thead>
+                  </table>
+                </div>
+              </div>
             </div>
 
             {/* Scrollable Container */}
@@ -703,23 +907,31 @@ const BankReconciliationWorksheet = () => {
                                           {group.statement.map(t => {
                                              const isCleared = clearedState[t.id]?.cleared || t.is_reconciled;
                                              const isSuggested = suggestedMatches[t.id];
-                                             // Guard: if both are non-zero (bad data), use transaction_type to pick one
                                              let deposit = t.debit_amount || 0;
                                              let payment = t.credit_amount || 0;
                                              if (deposit > 0 && payment > 0) {
                                                if (t.transaction_type === 'deposit') { payment = 0; }
                                                else { deposit = 0; }
                                              }
+                                             const netAmount = deposit > 0 ? deposit : payment;
+                                             const isDeposit = deposit > 0;
                                              const rowClass = isCleared ? "bg-blue-50/50 dark:bg-blue-900/10" : isSuggested ? "bg-green-50/50 dark:bg-green-900/10 border-l-2 border-green-500" : "hover:bg-accent/50";
                                              return (
                                                 <tr key={t.id} className={`border-b border-border/50 cursor-pointer transition-colors ${rowClass}`} onClick={() => toggleCleared(t.id, payment, deposit)}>
-                                                   <td className="w-[30px] p-2 align-top text-center"><input type="checkbox" checked={isCleared} onChange={() => {}} className="cursor-pointer" /></td>
-                                                   <td className="p-2 align-top">
-                                                      <div className="font-medium text-[11px] leading-tight truncate" title={t.description}>{t.description}</div>
-                                                      {t.reference && <div className="text-[9px] font-mono text-muted-foreground mt-0.5">{t.reference}</div>}
+                                                   <td className="w-[28px] px-1 py-1.5 align-middle text-center"><input type="checkbox" checked={isCleared} onChange={() => {}} className="cursor-pointer" /></td>
+                                                   <td className="w-[68px] px-1 py-1.5 align-middle text-[10px] text-muted-foreground font-mono">{format(new Date(t.transaction_date), 'dd/MM/yy')}</td>
+                                                   <td className="w-[90px] px-1 py-1.5 align-middle truncate" title={extractDocNo(t)}>
+                                                      <span className="text-[10px] font-mono font-medium">{extractDocNo(t)}</span>
                                                    </td>
-                                                   <td className="w-[80px] p-2 align-top text-right text-red-600 font-medium">{payment > 0 ? fmt(payment) : ""}</td>
-                                                   <td className="w-[80px] p-2 align-top text-right text-green-600 font-medium">{deposit > 0 ? fmt(deposit) : ""}</td>
+                                                   <td className="px-1 py-1.5 align-middle truncate" title={extractPayee(t.description)}>
+                                                      <span className="text-[11px] font-medium">{extractPayee(t.description)}</span>
+                                                   </td>
+                                                   <td className={`w-[90px] px-1 py-1.5 align-middle text-right font-mono font-medium ${isDeposit ? 'text-green-600' : 'text-red-600'}`}>
+                                                      {isDeposit ? '+' : '-'}{fmt(netAmount)}
+                                                   </td>
+                                                   <td className="w-[90px] px-1 py-1.5 align-middle truncate text-[10px] font-mono text-muted-foreground" title={t.cheque_number || t.reference || ''}>
+                                                      {t.cheque_number || t.reference || '—'}
+                                                   </td>
                                                 </tr>
                                              );
                                           })}
@@ -738,28 +950,63 @@ const BankReconciliationWorksheet = () => {
                                           {group.book.map(t => {
                                              const isCleared = clearedState[t.id]?.cleared || t.is_reconciled;
                                              const isSuggested = Object.values(suggestedMatches).includes(t.id);
-                                             // Guard: if both are non-zero (bad data), use transaction_type to pick one
                                              let deposit = t.debit_amount || 0;
                                              let payment = t.credit_amount || 0;
                                              if (deposit > 0 && payment > 0) {
                                                if (t.transaction_type === 'deposit') { payment = 0; }
                                                else { deposit = 0; }
                                              }
+                                             const netAmount = deposit > 0 ? deposit : payment;
+                                             const isDeposit = deposit > 0;
                                              const source = sourceLabel(t.source_type);
                                              const rowClass = isCleared ? "bg-blue-50/50 dark:bg-blue-900/10" : isSuggested ? "bg-green-50/50 dark:bg-green-900/10 border-r-2 border-green-500" : "hover:bg-accent/50";
+                                             const isEditing = editingTxnId === t.id;
+                                             const canEdit = !t.is_reconciled && (t.source_type === 'manual' || t.source_type === 'bank_fee');
                                              return (
-                                                <tr key={t.id} className={`border-b border-border/50 cursor-pointer transition-colors ${rowClass}`} onClick={() => !t.is_reconciled && toggleCleared(t.id, payment, deposit)}>
-                                                   <td className="w-[30px] p-2 align-top text-center"><input type="checkbox" checked={isCleared} disabled={t.is_reconciled} onChange={() => {}} className="cursor-pointer" /></td>
-                                                   <td className="w-[40px] p-2 align-top"><span className={`${source.className} scale-75 origin-top-left inline-block`}>{source.text}</span></td>
-                                                   <td className="p-2 align-top">
-                                                      <div className="font-medium text-[11px] leading-tight truncate" title={t.description || ''}>{t.description || t.transaction_type}</div>
-                                                      <div className="text-[9px] font-mono text-muted-foreground mt-0.5">{t.reference || t.cheque_number || t.id.substring(0,8)}</div>
+                                                <tr key={t.id} className={`border-b border-border/50 cursor-pointer transition-colors group/row ${rowClass}`} onClick={() => !t.is_reconciled && !isEditing && toggleCleared(t.id, payment, deposit)}>
+                                                   <td className="w-[28px] px-1 py-1.5 align-middle text-center"><input type="checkbox" checked={isCleared} disabled={t.is_reconciled} onChange={() => {}} className="cursor-pointer" /></td>
+                                                   <td className="w-[36px] px-1 py-1.5 align-middle"><span className={`${source.className} scale-[0.7] origin-top-left inline-block`}>{source.text}</span></td>
+                                                   <td className="w-[68px] px-1 py-1.5 align-middle text-[10px] text-muted-foreground font-mono">{format(new Date(t.transaction_date), 'dd/MM/yy')}</td>
+                                                   <td className="w-[90px] px-1 py-1.5 align-middle truncate" title={extractDocNo(t)}>
+                                                      <span className="text-[10px] font-mono font-medium">{extractDocNo(t)}</span>
                                                    </td>
-                                                   <td className="w-[80px] p-2 align-top text-right text-red-600 font-medium">{payment > 0 ? fmt(payment) : ""}</td>
-                                                   <td className="w-[80px] p-2 align-top text-right text-emerald-600 font-medium">{deposit > 0 ? fmt(deposit) : ""}</td>
+                                                   <td className="px-1 py-1.5 align-middle truncate" title={extractPayee(t.description)}>
+                                                      <span className="text-[11px] font-medium">{extractPayee(t.description)}</span>
+                                                   </td>
+                                                   <td className={`w-[90px] px-1 py-1.5 align-middle text-right font-mono font-medium ${isDeposit ? 'text-green-600' : 'text-red-600'}`}>
+                                                     {isEditing ? (
+                                                       <input
+                                                         type="number"
+                                                         step="0.01"
+                                                         value={editingAmount}
+                                                         onChange={(e) => { e.stopPropagation(); setEditingAmount(e.target.value); }}
+                                                         onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); handleInlineAmountSave(t.id, payment, deposit); } if (e.key === 'Escape') setEditingTxnId(null); }}
+                                                         onClick={(e) => e.stopPropagation()}
+                                                         onBlur={() => handleInlineAmountSave(t.id, payment, deposit)}
+                                                         autoFocus
+                                                         className="w-[80px] text-right text-xs border rounded px-1 py-0.5 bg-background"
+                                                       />
+                                                     ) : (
+                                                       <>{isDeposit ? '+' : '-'}{fmt(netAmount)}</>
+                                                     )}
+                                                   </td>
+                                                   <td className="w-[90px] px-1 py-1.5 align-middle truncate text-[10px] font-mono text-muted-foreground" title={t.cheque_number || t.reference || ''}>
+                                                      {t.cheque_number || t.reference || '—'}
+                                                   </td>
+                                                   <td className="w-[24px] px-0 py-1.5 align-middle text-center">
+                                                     {canEdit && !isEditing && (
+                                                       <button
+                                                         onClick={(e) => { e.stopPropagation(); setEditingTxnId(t.id); setEditingAmount(String(netAmount)); }}
+                                                         className="opacity-0 group-hover/row:opacity-100 transition-opacity text-muted-foreground hover:text-primary p-0.5"
+                                                         title="Edit amount"
+                                                       >
+                                                         <Pencil className="w-3 h-3" />
+                                                       </button>
+                                                     )}
+                                                   </td>
                                                 </tr>
                                              );
-                                          })}
+                                           })}
                                        </tbody>
                                     </table>
                                  )}
@@ -840,9 +1087,13 @@ const BankReconciliationWorksheet = () => {
 
             <div className="flex items-center justify-end gap-2 mt-3 pt-2">
                <Button variant="outline" size="sm" onClick={handleCancel}>Cancel</Button>
+               <Button variant="secondary" size="sm" onClick={handleManualSaveDraft} disabled={!hasClearedItems && !statementBalance}>
+                 <Save className="w-4 h-4 mr-1" />
+                 Save Draft
+               </Button>
                <Button size="sm" onClick={handleSave} disabled={isSaveDisabled || summary.difference !== 0} className={summary.difference === 0 ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
-                 <Save className="w-4 h-4 mr-2" />
-                 {saveReconciliation.isPending ? "Saving…" : summary.difference === 0 ? "Complete Reconcile" : "Save Draft"}
+                 <CheckCircle className="w-4 h-4 mr-1" />
+                 {saveReconciliation.isPending ? "Finalizing…" : "Complete Reconcile"}
                </Button>
             </div>
           </div>
@@ -932,6 +1183,55 @@ const BankReconciliationWorksheet = () => {
             <Button variant="destructive" onClick={handleClearStatement} disabled={isClearing}>
               <Trash2 className="w-4 h-4 mr-2" />
               {isClearing ? "Clearing..." : `Clear ${statementTxns.length} Entries`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ========================= QUICK-ADD MISSING ENTRY ========================= */}
+      <Dialog open={showQuickAdd} onOpenChange={setShowQuickAdd}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" /> Quick-Add Missing Entry
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={quickAddType} onValueChange={(v) => setQuickAddType(v as "payment" | "deposit")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="payment">Payment (Credit)</SelectItem>
+                  <SelectItem value="deposit">Deposit (Debit)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input type="date" value={quickAddDate} onChange={(e) => setQuickAddDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Amount</Label>
+              <Input type="number" step="0.01" value={quickAddAmount} onChange={(e) => setQuickAddAmount(e.target.value)} placeholder="0.00" />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input value={quickAddDesc} onChange={(e) => setQuickAddDesc(e.target.value)} placeholder="e.g. Bank charges - March" />
+            </div>
+            <div className="space-y-2">
+              <Label>Reference (optional)</Label>
+              <Input value={quickAddRef} onChange={(e) => setQuickAddRef(e.target.value)} placeholder="e.g. CHQ-001234" />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleQuickAdd}>
+              <Plus className="w-4 h-4 mr-1" /> Add Entry
             </Button>
           </DialogFooter>
         </DialogContent>

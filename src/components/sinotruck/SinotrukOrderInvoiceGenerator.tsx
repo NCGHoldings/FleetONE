@@ -243,7 +243,7 @@ export function SinotrukOrderInvoiceGenerator({ order, onRefresh }: SinotrukOrde
     const invoiceData: SinotrukOrderInvoiceData = {
       invoice_no: '', // Will be generated
       quotation_no: quotation.quotation_no || order.order_no,
-      invoice_date: new Date().toISOString().split('T')[0],
+      invoice_date: config.invoiceDate || new Date().toISOString().split('T')[0],
       
       customer_name: quotation.customer_name || '',
       company_name: quotation.company_name || '',

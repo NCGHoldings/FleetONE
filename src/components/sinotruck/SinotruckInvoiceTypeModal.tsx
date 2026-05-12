@@ -8,7 +8,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Building, Percent, AlertCircle, Receipt } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { FileText, Building, Percent, AlertCircle, Receipt, DollarSign, Users } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export interface SinotruckProformaInvoiceConfig {
@@ -18,6 +19,10 @@ export interface SinotruckProformaInvoiceConfig {
   financeCompanyName?: string;
   financeCompanyAddress?: string;
   proformaPurpose?: string;
+  amountMode?: 'percentage' | 'fixed';
+  declaredVehicleValue?: number;
+  customerCommitment?: number;
+  leasingCompanyAmount?: number;
   // Tax Invoice fields
   isTaxInvoice?: boolean;
   customerVatNumber?: string;
@@ -28,6 +33,7 @@ export interface SinotruckProformaInvoiceConfig {
   dateOfDelivery?: string;
   modeOfPayment?: string;
   additionalInformation?: string;
+  invoiceDate?: string;
 }
 
 interface SinotruckInvoiceTypeModalProps {
@@ -47,6 +53,8 @@ const FINANCE_PURPOSES = [
 ];
 
 const COMMON_PERCENTAGES = [60, 70, 80, 90];
+const COMMON_FIXED_INCREMENTS = [500000, 1000000, 2000000, 5000000];
+const COMMITMENT_PERCENTAGES = [20, 30, 40, 50];
 
 export function SinotruckInvoiceTypeModal({
   isOpen,
@@ -58,6 +66,11 @@ export function SinotruckInvoiceTypeModal({
 }: SinotruckInvoiceTypeModalProps) {
   const [invoiceCategory, setInvoiceCategory] = useState<'direct_invoice' | 'proforma_invoice' | 'tax_invoice'>(defaultInvoiceType);
   const [proformaPercentage, setProformaPercentage] = useState(70);
+  const [amountMode, setAmountMode] = useState<'percentage' | 'fixed'>('percentage');
+  const [fixedAmount, setFixedAmount] = useState(totalAmount);
+  const [commitmentMode, setCommitmentMode] = useState<'percentage' | 'fixed'>('percentage');
+  const [commitmentPercentage, setCommitmentPercentage] = useState(30);
+  const [commitmentFixedAmount, setCommitmentFixedAmount] = useState(0);
   const [financeCompanyName, setFinanceCompanyName] = useState('');
   const [financeCompanyAddress, setFinanceCompanyAddress] = useState('');
   const [proformaPurpose, setProformaPurpose] = useState('bank_leasing');
@@ -68,12 +81,25 @@ export function SinotruckInvoiceTypeModal({
   const [dateOfDelivery, setDateOfDelivery] = useState('');
   const [modeOfPayment, setModeOfPayment] = useState('');
   const [additionalInformation, setAdditionalInformation] = useState('');
+  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     setInvoiceCategory(defaultInvoiceType);
   }, [defaultInvoiceType, isOpen]);
 
-  const proformaAmount = Math.round((totalAmount * proformaPercentage) / 100);
+  useEffect(() => {
+    setFixedAmount(totalAmount);
+  }, [totalAmount, isOpen]);
+
+  const proformaAmount = amountMode === 'percentage' 
+    ? Math.round((totalAmount * proformaPercentage) / 100)
+    : fixedAmount;
+
+  const effectiveCustomerCommitment = commitmentMode === 'percentage'
+    ? Math.round(proformaAmount * commitmentPercentage / 100)
+    : commitmentFixedAmount;
+  const leasingCompanyAmount = proformaAmount - effectiveCustomerCommitment;
+
   const taxRate = 18;
   const baseAmount = totalAmount / (1 + taxRate / 100);
   const vatAmount = totalAmount - baseAmount;
@@ -81,12 +107,17 @@ export function SinotruckInvoiceTypeModal({
   const handleConfirm = () => {
     const config: SinotruckProformaInvoiceConfig = {
       invoiceCategory,
+      invoiceDate,
       ...(invoiceCategory === 'proforma_invoice' && {
-        proformaAmountPercentage: proformaPercentage,
+        amountMode,
+        proformaAmountPercentage: amountMode === 'percentage' ? proformaPercentage : Math.round((proformaAmount / totalAmount) * 100),
         proformaAmount,
         financeCompanyName: financeCompanyName || undefined,
         financeCompanyAddress: financeCompanyAddress || undefined,
-        proformaPurpose
+        proformaPurpose,
+        declaredVehicleValue: proformaAmount > totalAmount ? proformaAmount : undefined,
+        customerCommitment: effectiveCustomerCommitment > 0 ? effectiveCustomerCommitment : undefined,
+        leasingCompanyAmount,
       }),
       ...(invoiceCategory === 'tax_invoice' && {
         isTaxInvoice: true,
@@ -106,6 +137,11 @@ export function SinotruckInvoiceTypeModal({
   const handleClose = () => {
     setInvoiceCategory('direct_invoice');
     setProformaPercentage(70);
+    setAmountMode('percentage');
+    setFixedAmount(totalAmount);
+    setCommitmentMode('percentage');
+    setCommitmentPercentage(30);
+    setCommitmentFixedAmount(0);
     setFinanceCompanyName('');
     setFinanceCompanyAddress('');
     setProformaPurpose('bank_leasing');
@@ -115,6 +151,7 @@ export function SinotruckInvoiceTypeModal({
     setDateOfDelivery('');
     setModeOfPayment('');
     setAdditionalInformation('');
+    setInvoiceDate(new Date().toISOString().split('T')[0]);
     onClose();
   };
 
@@ -131,7 +168,7 @@ export function SinotruckInvoiceTypeModal({
         <div className="space-y-6 py-4">
           <RadioGroup
             value={invoiceCategory}
-            onValueChange={(value) => setInvoiceCategory(value as any)}
+            onValueChange={(value) => setInvoiceCategory(value as 'direct_invoice' | 'proforma_invoice' | 'tax_invoice')}
             className="space-y-3"
           >
             <div className="flex items-start space-x-3 p-4 border rounded-lg hover:border-primary transition-colors cursor-pointer">
@@ -149,7 +186,7 @@ export function SinotruckInvoiceTypeModal({
               <RadioGroupItem value="proforma_invoice" id="proforma" className="mt-1" />
               <div className="flex-1">
                 <Label htmlFor="proforma" className="font-semibold text-base cursor-pointer">Proforma Invoice</Label>
-                <p className="text-sm text-muted-foreground mt-1">For bank/finance company - partial amount for leasing purposes</p>
+                <p className="text-sm text-muted-foreground mt-1">For bank/finance company - flexible amount for leasing purposes</p>
               </div>
             </div>
 
@@ -162,6 +199,17 @@ export function SinotruckInvoiceTypeModal({
               </div>
             </div>
           </RadioGroup>
+
+          <div className="space-y-2 p-4 bg-muted/30 rounded-lg border">
+            <Label>Invoice Date</Label>
+            <Input
+              type="date"
+              value={invoiceDate}
+              onChange={(e) => setInvoiceDate(e.target.value)}
+              className="w-full sm:w-[200px]"
+            />
+            <p className="text-xs text-muted-foreground">Select a past date to backdate this invoice.</p>
+          </div>
 
           {/* Tax Invoice Fields */}
           {invoiceCategory === 'tax_invoice' && (
@@ -233,36 +281,235 @@ export function SinotruckInvoiceTypeModal({
             <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
               <Alert>
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>Proforma invoice will be generated with the specified percentage of total amount for financing purposes.</AlertDescription>
+                <AlertDescription>
+                  Proforma invoice for financing purposes. You can set the amount by percentage or enter a fixed amount (can exceed vehicle value).
+                </AlertDescription>
               </Alert>
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-2"><Percent className="h-4 w-4" />Invoice Amount Percentage</Label>
-                  <span className="text-lg font-bold text-primary">{proformaPercentage}%</span>
+              {/* Amount Mode Toggle */}
+              <div className="flex items-center justify-between p-3 bg-background rounded border">
+                <div className="flex items-center gap-2">
+                  <Percent className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm">Percentage</Label>
                 </div>
-                <Slider value={[proformaPercentage]} onValueChange={([value]) => setProformaPercentage(value)} min={10} max={100} step={5} className="w-full" />
-                <div className="flex gap-2 flex-wrap">
-                  {COMMON_PERCENTAGES.map((pct) => (
-                    <Button key={pct} type="button" variant={proformaPercentage === pct ? 'default' : 'outline'} size="sm" onClick={() => setProformaPercentage(pct)}>{pct}%</Button>
-                  ))}
+                <Switch
+                  checked={amountMode === 'fixed'}
+                  onCheckedChange={(checked) => setAmountMode(checked ? 'fixed' : 'percentage')}
+                />
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm">Fixed Amount</Label>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <div className="grid grid-cols-2 gap-4 p-3 bg-background rounded border">
-                  <div><p className="text-xs text-muted-foreground">Total Amount</p><p className="font-medium">LKR {totalAmount.toLocaleString()}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Proforma Amount</p><p className="font-bold text-primary">LKR {proformaAmount.toLocaleString()}</p></div>
+              </div>
+
+              {amountMode === 'percentage' ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2">
+                      <Percent className="h-4 w-4" />
+                      Invoice Amount Percentage
+                    </Label>
+                    <span className="text-lg font-bold text-primary">{proformaPercentage}%</span>
+                  </div>
+                  
+                  <Slider
+                    value={[proformaPercentage]}
+                    onValueChange={([value]) => setProformaPercentage(value)}
+                    min={10}
+                    max={150}
+                    step={5}
+                    className="w-full"
+                  />
+                  
+                  <div className="flex gap-2 flex-wrap">
+                    {COMMON_PERCENTAGES.map((pct) => (
+                      <Button
+                        key={pct}
+                        type="button"
+                        variant={proformaPercentage === pct ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setProformaPercentage(pct)}
+                      >
+                        {pct}%
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Proforma Invoice Amount (LKR)
+                    </Label>
+                    <Input
+                      type="number"
+                      value={fixedAmount}
+                      onChange={(e) => setFixedAmount(Number(e.target.value) || 0)}
+                      min={0}
+                      className="text-lg font-bold"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2 flex-wrap">
+                    {COMMON_FIXED_INCREMENTS.map((inc) => (
+                      <Button
+                        key={inc}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFixedAmount(totalAmount + inc)}
+                      >
+                        +{(inc / 1000000).toFixed(1)}M
+                      </Button>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFixedAmount(totalAmount)}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+
+                  {fixedAmount > totalAmount && (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-xs">
+                        Proforma amount exceeds actual vehicle value by LKR {(fixedAmount - totalAmount).toLocaleString()}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
+
+              {/* Customer Commitment & Amount Breakdown */}
+              <div className="space-y-3 p-3 bg-background rounded border">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="h-4 w-4 text-primary" />
+                  <Label className="font-semibold text-sm">Customer Commitment & Leasing Breakdown</Label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Declared Vehicle Value (Sub Total)</p>
+                    <p className="font-bold text-primary">LKR {proformaAmount.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Actual Vehicle Value</p>
+                    <p className="font-medium">LKR {totalAmount.toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3 space-y-3">
+                  {/* Commitment Mode Toggle */}
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Customer Commitment</Label>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className={commitmentMode === 'percentage' ? 'font-bold text-primary' : 'text-muted-foreground'}>%</span>
+                      <Switch
+                        checked={commitmentMode === 'fixed'}
+                        onCheckedChange={(checked) => {
+                          setCommitmentMode(checked ? 'fixed' : 'percentage');
+                          if (checked) {
+                            setCommitmentFixedAmount(Math.round(proformaAmount * commitmentPercentage / 100));
+                          }
+                        }}
+                      />
+                      <span className={commitmentMode === 'fixed' ? 'font-bold text-primary' : 'text-muted-foreground'}>Fixed</span>
+                    </div>
+                  </div>
+
+                  {commitmentMode === 'percentage' ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2 flex-wrap">
+                        {COMMITMENT_PERCENTAGES.map((pct) => (
+                          <Button
+                            key={pct}
+                            type="button"
+                            variant={commitmentPercentage === pct ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setCommitmentPercentage(pct)}
+                          >
+                            {pct}%
+                          </Button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Slider
+                          value={[commitmentPercentage]}
+                          onValueChange={([value]) => setCommitmentPercentage(value)}
+                          min={5}
+                          max={80}
+                          step={5}
+                          className="flex-1"
+                        />
+                        <span className="text-sm font-bold w-12 text-right">{commitmentPercentage}%</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Customer pays: LKR {effectiveCustomerCommitment.toLocaleString()}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Input
+                        type="number"
+                        value={commitmentFixedAmount}
+                        onChange={(e) => setCommitmentFixedAmount(Number(e.target.value) || 0)}
+                        min={0}
+                        max={proformaAmount}
+                        className="text-sm"
+                        placeholder="Enter fixed commitment amount"
+                      />
+                    </div>
+                  )}
+
+                  {/* Summary */}
+                  <div className="grid grid-cols-2 gap-3 p-2 bg-muted/50 rounded text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Customer Commitment</p>
+                      <p className="font-semibold text-destructive">LKR {effectiveCustomerCommitment.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">To Be Leased</p>
+                      <p className="font-bold text-primary">LKR {leasingCompanyAmount.toLocaleString()}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <Label className="flex items-center gap-2"><Building className="h-4 w-4" />Finance Company / Bank Details</Label>
+                <Label className="flex items-center gap-2">
+                  <Building className="h-4 w-4" />
+                  Finance Company / Bank Details
+                </Label>
+
                 <Select value={proformaPurpose} onValueChange={setProformaPurpose}>
-                  <SelectTrigger><SelectValue placeholder="Select purpose" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select purpose" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {FINANCE_PURPOSES.map((purpose) => (<SelectItem key={purpose.value} value={purpose.value}>{purpose.label}</SelectItem>))}
+                    {FINANCE_PURPOSES.map((purpose) => (
+                      <SelectItem key={purpose.value} value={purpose.value}>
+                        {purpose.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                <Input placeholder="Bank / Finance Company Name (optional)" value={financeCompanyName} onChange={(e) => setFinanceCompanyName(e.target.value)} />
-                <Textarea placeholder="Bank / Finance Company Address (optional)" value={financeCompanyAddress} onChange={(e) => setFinanceCompanyAddress(e.target.value)} rows={2} />
+
+                <Input
+                  placeholder="Bank / Finance Company Name (optional)"
+                  value={financeCompanyName}
+                  onChange={(e) => setFinanceCompanyName(e.target.value)}
+                />
+
+                <Textarea
+                  placeholder="Bank / Finance Company Address (optional)"
+                  value={financeCompanyAddress}
+                  onChange={(e) => setFinanceCompanyAddress(e.target.value)}
+                  rows={2}
+                />
               </div>
             </div>
           )}

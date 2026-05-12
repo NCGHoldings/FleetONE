@@ -3664,7 +3664,6 @@ export const useSaveBankReconciliation = () => {
           match_status: "matched",
           matched_at: new Date().toISOString(),
           company_id: effectiveCompanyId,
-          business_unit_code: businessUnitCode,
         }));
 
         const { error: itemsError } = await supabase
@@ -3825,6 +3824,10 @@ export const useSaveDraftReconciliation = () => {
             bank_account_id: data.bank_account_id,
             statement_date: data.statement_date,
             statement_no: data.statement_no,
+            statement_balance: data.statement_balance ? parseFloat(data.statement_balance) : 0,
+            book_balance: 0,
+            adjusted_book_balance: 0,
+            difference: 0,
             draft_statement_balance: data.statement_balance ? parseFloat(data.statement_balance) : null,
             reconciliation_date: new Date().toISOString().split('T')[0],
             status: "draft",
@@ -3853,7 +3856,6 @@ export const useSaveDraftReconciliation = () => {
           matched_at: new Date().toISOString(),
           matched_transaction_id: item.matched_transaction_id || null,
           company_id: effectiveCompanyId,
-          business_unit_code: businessUnitCode,
         }));
 
         const { error: itemsError } = await (supabase as any)
@@ -3869,7 +3871,11 @@ export const useSaveDraftReconciliation = () => {
       queryClient.invalidateQueries({ queryKey: ["draft-reconciliation"] });
     },
     onError: (error) => {
-      console.warn("Draft auto-save failed:", error.message);
+      console.error("Draft auto-save failed:", error.message);
+      // Surface persistent RLS or schema errors so users know drafts aren't saving
+      if (error.message?.includes("row-level security") || error.message?.includes("permission denied") || error.message?.includes("violates")) {
+        toast.error("Draft save blocked — check permissions. Contact admin if this persists.");
+      }
     },
   });
 };

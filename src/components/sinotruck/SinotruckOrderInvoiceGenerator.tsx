@@ -129,7 +129,7 @@ export function SinotruckOrderInvoiceGenerator({ order, onRefresh }: SinotruckOr
     const invoiceData: SinotruckOrderInvoiceData = {
       invoice_no: '',
       quotation_no: quotation.quotation_no || order.order_no,
-      invoice_date: new Date().toISOString().split('T')[0],
+      invoice_date: config.invoiceDate || new Date().toISOString().split('T')[0],
       
       customer_name: quotation.customer_name || '',
       company_name: quotation.company_name || '',
@@ -161,12 +161,17 @@ export function SinotruckOrderInvoiceGenerator({ order, onRefresh }: SinotruckOr
       finance_company_name: config.financeCompanyName,
       finance_company_address: config.financeCompanyAddress,
       proforma_purpose: config.proformaPurpose,
+      customer_commitment: config.customerCommitment,
+      leasing_amount: config.leasingCompanyAmount,
       // Tax invoice fields
       is_tax_invoice: config.isTaxInvoice,
       customer_vat_number: config.customerVatNumber,
       tax_rate: config.taxRate,
-      supplier_tin: config.supplierTin,
-      purchaser_tin: config.purchaserTin,
+      company_vat_number: '101116190 - 7000',
+      base_amount: config.isTaxInvoice ? order.total_amount / (1 + (config.taxRate || 18) / 100) : undefined,
+      vat_amount: config.isTaxInvoice ? order.total_amount - (order.total_amount / (1 + (config.taxRate || 18) / 100)) : undefined,
+      supplier_tin: config.supplierTin || '101116190 - 7000',
+      purchaser_tin: config.purchaserTin || config.customerVatNumber,
       place_of_supply: config.placeOfSupply,
       date_of_delivery: config.dateOfDelivery,
       mode_of_payment: config.modeOfPayment,

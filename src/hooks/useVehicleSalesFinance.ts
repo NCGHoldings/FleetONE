@@ -240,6 +240,7 @@ export async function createVehicleARInvoice({
   settings,
   customerCategoryId,
   invoiceNo,
+  invoiceDate,
   taxAmount,
   status,
 }: {
@@ -572,6 +573,7 @@ export async function postVehicleInvoiceToGL({
   isTaxInvoice,
   taxRate,
   invoiceNo,
+  invoiceDate,
   itemCategoryName,
 }: {
   module: VehicleModule;
