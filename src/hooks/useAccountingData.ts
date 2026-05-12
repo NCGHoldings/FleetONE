@@ -856,6 +856,43 @@ export const useLastReconciliation = (bankAccountId: string | null) => {
   });
 };
 
+// Fetch the active draft reconciliation for a bank account (for persistent matching)
+export const useDraftReconciliation = (bankAccountId: string | null) => {
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+
+  return useQuery({
+    queryKey: ["draft-reconciliation", bankAccountId, effectiveCompanyId],
+    queryFn: async () => {
+      if (!effectiveCompanyId || !bankAccountId) return null;
+
+      // 1. Fetch the draft header
+      const { data: draft, error: draftError } = await supabase
+        .from("bank_reconciliations")
+        .select("*")
+        .eq("bank_account_id", bankAccountId)
+        .eq("company_id", effectiveCompanyId)
+        .eq("status", "draft")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (draftError) throw draftError;
+      if (!draft) return null;
+
+      // 2. Fetch all items for this draft
+      const { data: items, error: itemsError } = await (supabase as any)
+        .from("bank_reconciliation_items")
+        .select("*")
+        .eq("reconciliation_id", draft.id);
+      if (itemsError) throw itemsError;
+
+      return { header: draft, items: items || [] };
+    },
+    enabled: !!bankAccountId && !!effectiveCompanyId,
+    staleTime: 0, // Always refetch when account changes
+  });
+};
+
 // ============ Fixed Assets ============
 export const useFixedAssets = () => {
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();

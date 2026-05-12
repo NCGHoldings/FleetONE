@@ -356,6 +356,7 @@ export async function postVehiclePaymentToGL({
   settings,
   effectiveCompanyId,
   customBankAccountId,
+  paymentDate,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -366,6 +367,7 @@ export async function postVehiclePaymentToGL({
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
   customBankAccountId?: string;
+  paymentDate?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
@@ -383,8 +385,23 @@ export async function postVehiclePaymentToGL({
       return null;
     }
 
-    const bankAccountId = customBankAccountId || settings.default_bank_account_id;
-    if (!bankAccountId) {
+    let finalBankAccountId = customBankAccountId || settings.default_bank_account_id;
+    
+    // If a custom bank account ID is provided, it might be a bank_accounts table ID.
+    // We need to resolve its corresponding chart_of_accounts ID (gl_account_id).
+    if (customBankAccountId) {
+      const { data: bankData } = await supabase
+        .from('bank_accounts')
+        .select('gl_account_id')
+        .eq('id', customBankAccountId)
+        .maybeSingle();
+        
+      if (bankData?.gl_account_id) {
+        finalBankAccountId = bankData.gl_account_id;
+      }
+    }
+
+    if (!finalBankAccountId) {
       console.error(`[${module.toUpperCase()} Finance] Missing bank account`);
       toast.error('Missing GL account configuration for bank');
       return null;
@@ -403,7 +420,7 @@ export async function postVehiclePaymentToGL({
       .insert({
         company_id: effectiveCompanyId,
         entry_number: entryNumber,
-        entry_date: new Date().toISOString().split('T')[0],
+        entry_date: paymentDate || new Date().toISOString().split('T')[0],
         description,
         reference: `${businessUnitCode}-${entryPrefix}-${orderNo}`,
         source_module: `${module}_sales`,
@@ -428,7 +445,7 @@ export async function postVehiclePaymentToGL({
     // DEBIT: Bank/Cash/Equity Account
     lines.push({
       journal_entry_id: journalEntry.id,
-      account_id: bankAccountId,
+      account_id: finalBankAccountId,
       description: `${businessUnitCode} ${methodDisplay} ${actionDisplay} - ${orderNo}`,
       debit: amount,
       credit: 0,

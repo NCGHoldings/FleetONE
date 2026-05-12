@@ -164,6 +164,9 @@ src/
 | 2026-04-28 | Nginx migrated: Docker proxy → static file serving from `FleetONE/dist/` | Antigravity |
 | 2026-04-28 | Staging vhost `staging.fleetone.ncg.lk` configured + SSL cert issued by Certbot ✅ | Antigravity |
 | 2026-04-28 | Production smoke test ✅ HTTP 200 + React root confirmed | Antigravity |
+| 2026-05-12 | `20260512043000_update_bus_standard_rates.sql` migration created — 27 bus-specific + model-based fallback rates | Antigravity |
+| 2026-05-12 | Odometer Quick-Adjust UI added to FuelAnalyticsSection — per-trip correction with distance recalc | Antigravity |
+| 2026-05-12 | PDF Report export added to FuelAnalyticsSection — landscape A4 with color-coded performance columns | Antigravity |
 
 ## 🔐 GITHUB SECRETS STATUS (2026-04-27)
 

@@ -1,5 +1,27 @@
 ## 2026-05-12
 
+### ✅ Fuel Analytics — Standard Rate Correction, Odometer Quick-Adjust & PDF Export
+
+**Problem:** All buses defaulted to an incorrect `8 km/L` standard rate, causing false performance signals. Odometer data entry errors (e.g. `135,814 km` in a single day) had no correction mechanism. No PDF export existed for fuel reports.
+
+**Migration Created:**
+- `supabase/migrations/20260512043000_update_bus_standard_rates.sql` — **[NEW]** Multi-stage migration:
+  - **Stage 1:** Bus-specific rates for 27 identified buses from the operational spreadsheet
+  - **Stage 2:** Model-based catch-all (C9→6, D7→7, C12 Pro→3.8, Leyland→3.5 km/L)
+  - Uses idempotent pattern: only updates buses with `expected_km_per_liter >= 8` or `NULL`
+
+**Files Modified:**
+- `src/components/trips-analytics/FuelAnalyticsSection.tsx`:
+  - **Odometer Quick-Adjust UI:** Added inline correction dialog with per-trip start/end meter inputs, live mileage preview, anomaly detection (>2,000 km/day flagged red), and atomic `daily_trips` update with distance recalculation
+  - **PDF Report Export:** Added `handleExportPDF()` using jsPDF + autoTable. Generates landscape A4 PDF with company header, date, color-coded columns (yellow=consumption, blue=standard rate, green/red=performance), anomaly flags (⚠), and page footers. Button: "PDF Report" next to date picker
+
+**Architecture Notes:**
+- Standard rates source: `buses.expected_km_per_liter` — shared by both Fleet Master Spreadsheet and Trips Analytics
+- Quick-adjust atomically updates `odometer_start`, `odometer_end`, and `distance_km` per trip, then triggers `onDataCorrected()` callback to refetch analytics
+- PDF uses same calculation logic as the on-screen table to ensure visual parity
+
+---
+
 ### ✅ Yutong Invoice Backdating & Finance Sync
 
 **Files Modified:**

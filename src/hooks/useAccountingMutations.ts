@@ -3591,26 +3591,68 @@ export const useSaveBankReconciliation = () => {
       const bankGLId = bankAcct?.gl_account_id;
       if (!bankGLId) throw new Error(`Bank account "${bankAcct?.account_name}" is not linked to a GL account. Configure this in Banking -> Bank Accounts.`);
 
-      // 1. Create the reconciliation header
-      const { data: recon, error: reconError } = await supabase
+      // 1. Check for existing draft and upgrade it, or create new
+      let recon: any;
+      const { data: existingDraft } = await supabase
         .from("bank_reconciliations")
-        .insert([{
-          bank_account_id: data.bank_account_id,
-          statement_date: data.statement_date,
-          statement_balance: data.statement_balance,
-          book_balance: data.book_balance,
-          adjusted_book_balance: data.adjusted_book_balance,
-          difference: data.difference,
-          reconciliation_date: new Date().toISOString().split('T')[0],
-          status: "completed",
-          notes: data.statement_no ? `Statement No: ${data.statement_no}` : null,
-          company_id: effectiveCompanyId,
-          business_unit_code: businessUnitCode,
-          reconciled_at: new Date().toISOString(),
-        }])
-        .select()
-        .single();
-      if (reconError) throw reconError;
+        .select("id")
+        .eq("bank_account_id", data.bank_account_id)
+        .eq("company_id", effectiveCompanyId)
+        .eq("status", "draft")
+        .limit(1)
+        .maybeSingle();
+
+      if (existingDraft) {
+        // Upgrade existing draft to completed
+        // First clear old draft items
+        await (supabase as any)
+          .from("bank_reconciliation_items")
+          .delete()
+          .eq("reconciliation_id", existingDraft.id);
+
+        const { data: updated, error: updateError } = await supabase
+          .from("bank_reconciliations")
+          .update({
+            statement_date: data.statement_date,
+            statement_balance: data.statement_balance,
+            book_balance: data.book_balance,
+            adjusted_book_balance: data.adjusted_book_balance,
+            difference: data.difference,
+            reconciliation_date: new Date().toISOString().split('T')[0],
+            status: "completed",
+            notes: data.statement_no ? `Statement No: ${data.statement_no}` : null,
+            business_unit_code: businessUnitCode,
+            reconciled_at: new Date().toISOString(),
+            draft_updated_at: null,
+          })
+          .eq("id", existingDraft.id)
+          .select()
+          .single();
+        if (updateError) throw updateError;
+        recon = updated;
+      } else {
+        // Create new reconciliation record
+        const { data: created, error: reconError } = await supabase
+          .from("bank_reconciliations")
+          .insert([{
+            bank_account_id: data.bank_account_id,
+            statement_date: data.statement_date,
+            statement_balance: data.statement_balance,
+            book_balance: data.book_balance,
+            adjusted_book_balance: data.adjusted_book_balance,
+            difference: data.difference,
+            reconciliation_date: new Date().toISOString().split('T')[0],
+            status: "completed",
+            notes: data.statement_no ? `Statement No: ${data.statement_no}` : null,
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode,
+            reconciled_at: new Date().toISOString(),
+          }])
+          .select()
+          .single();
+        if (reconError) throw reconError;
+        recon = created;
+      }
 
       // 2. Create reconciliation items for each cleared transaction
       if (data.cleared_transaction_ids.length > 0) {
@@ -3700,8 +3742,10 @@ export const useSaveBankReconciliation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-reconciliations"] });
       queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
       queryClient.invalidateQueries({ queryKey: ["last-reconciliation"] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["draft-reconciliation"] });
       toast.success("Reconciliation completed and saved");
     },
     onError: (error) => toast.error(`Failed to save reconciliation: ${error.message}`),
@@ -3726,6 +3770,144 @@ export const useMatchReconciliationItem = () => {
       toast.success("Item matched");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ Draft Reconciliation (Auto-Save) ============
+export const useSaveDraftReconciliation = () => {
+  const queryClient = useQueryClient();
+  const { getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+
+  return useMutation({
+    mutationFn: async (data: {
+      bank_account_id: string;
+      statement_date: string;
+      statement_no: string;
+      statement_balance: string;
+      cleared_items: Array<{
+        bank_transaction_id: string;
+        cleared_amount: number;
+        matched_transaction_id?: string;
+      }>;
+    }) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = getBusinessUnitCode();
+      if (!effectiveCompanyId) throw new Error("No company selected");
+
+      // 1. Find or create draft reconciliation
+      const { data: existingDraft } = await supabase
+        .from("bank_reconciliations")
+        .select("id")
+        .eq("bank_account_id", data.bank_account_id)
+        .eq("company_id", effectiveCompanyId)
+        .eq("status", "draft")
+        .limit(1)
+        .maybeSingle();
+
+      let draftId: string;
+
+      if (existingDraft) {
+        draftId = existingDraft.id;
+        // Update draft header with latest values
+        await supabase
+          .from("bank_reconciliations")
+          .update({
+            statement_date: data.statement_date,
+            statement_no: data.statement_no,
+            draft_statement_balance: data.statement_balance ? parseFloat(data.statement_balance) : null,
+            draft_updated_at: new Date().toISOString(),
+          })
+          .eq("id", draftId);
+      } else {
+        const { data: newDraft, error: createError } = await supabase
+          .from("bank_reconciliations")
+          .insert([{
+            bank_account_id: data.bank_account_id,
+            statement_date: data.statement_date,
+            statement_no: data.statement_no,
+            draft_statement_balance: data.statement_balance ? parseFloat(data.statement_balance) : null,
+            reconciliation_date: new Date().toISOString().split('T')[0],
+            status: "draft",
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode,
+            draft_updated_at: new Date().toISOString(),
+          }])
+          .select("id")
+          .single();
+        if (createError) throw createError;
+        draftId = newDraft.id;
+      }
+
+      // 2. Replace all items (delete + insert pattern for simplicity)
+      await (supabase as any)
+        .from("bank_reconciliation_items")
+        .delete()
+        .eq("reconciliation_id", draftId);
+
+      if (data.cleared_items.length > 0) {
+        const items = data.cleared_items.map((item) => ({
+          reconciliation_id: draftId,
+          bank_transaction_id: item.bank_transaction_id,
+          statement_amount: item.cleared_amount,
+          match_status: "matched",
+          matched_at: new Date().toISOString(),
+          matched_transaction_id: item.matched_transaction_id || null,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
+        }));
+
+        const { error: itemsError } = await (supabase as any)
+          .from("bank_reconciliation_items")
+          .insert(items);
+        if (itemsError) throw itemsError;
+      }
+
+      return draftId;
+    },
+    onSuccess: () => {
+      // Silent — no toast for auto-save
+      queryClient.invalidateQueries({ queryKey: ["draft-reconciliation"] });
+    },
+    onError: (error) => {
+      console.warn("Draft auto-save failed:", error.message);
+    },
+  });
+};
+
+export const useDeleteDraftReconciliation = () => {
+  const queryClient = useQueryClient();
+  const { getEffectiveCompanyId } = useCompany();
+
+  return useMutation({
+    mutationFn: async (bankAccountId: string) => {
+      const effectiveCompanyId = getEffectiveCompanyId();
+      if (!effectiveCompanyId) throw new Error("No company selected");
+
+      // Find draft
+      const { data: draft } = await supabase
+        .from("bank_reconciliations")
+        .select("id")
+        .eq("bank_account_id", bankAccountId)
+        .eq("company_id", effectiveCompanyId)
+        .eq("status", "draft")
+        .limit(1)
+        .maybeSingle();
+
+      if (draft) {
+        // Items cascade-delete via FK
+        await supabase
+          .from("bank_reconciliations")
+          .delete()
+          .eq("id", draft.id);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["draft-reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-reconciliations"] });
+    },
+    onError: (error) => {
+      console.warn("Failed to delete draft:", error.message);
+    },
   });
 };
 

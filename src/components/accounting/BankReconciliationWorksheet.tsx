@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,14 +7,15 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useBankAccounts, useBankTransactionsForRecon, useLastReconciliation } from "@/hooks/useAccountingData";
-import { useSaveBankReconciliation } from "@/hooks/useAccountingMutations";
-import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, ArrowRightLeft, Search, Sparkles, BookOpen, Maximize, Minimize, Trash2 } from "lucide-react";
+import { useBankAccounts, useBankTransactionsForRecon, useLastReconciliation, useDraftReconciliation } from "@/hooks/useAccountingData";
+import { useSaveBankReconciliation, useSaveDraftReconciliation, useDeleteDraftReconciliation } from "@/hooks/useAccountingMutations";
+import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, ArrowRightLeft, Search, Sparkles, BookOpen, Maximize, Minimize, Trash2, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import "./BankReconciliationWorksheet.css";
 import { BankStatementImportModal } from "./BankStatementImportModal";
+import { BankReconciliationReport } from "./BankReconciliationReport";
 
 // ---------- Types ----------
 type DisplayFilter = "all" | "not_cleared" | "cleared";
@@ -56,7 +57,10 @@ const BankReconciliationWorksheet = () => {
     toDate || undefined
   );
   const { data: lastRecon } = useLastReconciliation(selectedAccountId);
+  const { data: draftRecon } = useDraftReconciliation(selectedAccountId);
   const saveReconciliation = useSaveBankReconciliation();
+  const saveDraft = useSaveDraftReconciliation();
+  const deleteDraft = useDeleteDraftReconciliation();
 
   // --- UI State ---
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -69,6 +73,76 @@ const BankReconciliationWorksheet = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isHydratingRef = useRef(false);
+  const lastHydratedAccountRef = useRef<string | null>(null);
+
+  // --- Draft Hydration: restore cleared state from DB on account change ---
+  useEffect(() => {
+    if (!draftRecon || !selectedAccountId) return;
+    // Prevent re-hydration if we already hydrated this account
+    if (lastHydratedAccountRef.current === selectedAccountId) return;
+    lastHydratedAccountRef.current = selectedAccountId;
+
+    isHydratingRef.current = true;
+
+    // Restore header fields
+    if (draftRecon.header.statement_no) setStatementNo(draftRecon.header.statement_no);
+    if (draftRecon.header.draft_statement_balance != null) {
+      setStatementBalance(String(draftRecon.header.draft_statement_balance));
+    }
+    if (draftRecon.header.statement_date) setStatementDate(draftRecon.header.statement_date);
+
+    // Restore cleared items
+    if (draftRecon.items.length > 0) {
+      const restored: ClearedState = {};
+      draftRecon.items.forEach((item: any) => {
+        restored[item.bank_transaction_id] = {
+          cleared: true,
+          clearedAmount: item.statement_amount || 0,
+        };
+      });
+      setClearedState(restored);
+      toast.info(`Restored ${draftRecon.items.length} saved matches from your last session.`);
+    }
+
+    // Allow auto-save after a short delay to prevent immediate re-save
+    setTimeout(() => { isHydratingRef.current = false; }, 1000);
+  }, [draftRecon, selectedAccountId]);
+
+  // --- Debounced Auto-Save: persist cleared state to DB ---
+  useEffect(() => {
+    if (!selectedAccountId || isHydratingRef.current) return;
+
+    // Clear previous timer
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+
+    draftSaveTimerRef.current = setTimeout(() => {
+      const clearedItems = Object.entries(clearedState)
+        .filter(([, v]) => v.cleared)
+        .map(([id, v]) => ({
+          bank_transaction_id: id,
+          cleared_amount: v.clearedAmount,
+        }));
+
+      // Only save if there's actual state to persist (or we had items before)
+      if (clearedItems.length > 0 || draftRecon?.items?.length) {
+        saveDraft.mutate({
+          bank_account_id: selectedAccountId,
+          statement_date: statementDate,
+          statement_no: statementNo,
+          statement_balance: statementBalance,
+          cleared_items: clearedItems,
+        });
+      }
+    }, 800);
+
+    return () => {
+      if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clearedState, selectedAccountId, statementDate, statementNo, statementBalance]);
 
   // --- Clear imported statement handler ---
   const handleClearStatement = useCallback(async () => {
@@ -290,11 +364,16 @@ const BankReconciliationWorksheet = () => {
 
   // --- Handlers ---
   const handleAccountChange = useCallback((accountId: string) => {
+    // Reset hydration tracker so draft can be loaded for new account
+    lastHydratedAccountRef.current = null;
+    isHydratingRef.current = true;
     setSelectedAccountId(accountId);
     setClearedState({});
     setSuggestedMatches({});
     setStatementNo("");
     setStatementBalance("");
+    // Allow hydration after state clears
+    setTimeout(() => { isHydratingRef.current = false; }, 200);
   }, []);
 
   const toggleCleared = useCallback((txnId: string, payment: number, deposit: number) => {
@@ -394,11 +473,17 @@ const BankReconciliationWorksheet = () => {
     setStatementBalance("");
   }, [selectedAccountId, statementDate, statementNo, statementBalance, clearedState, summary, saveReconciliation, adjustments]);
 
-  const handleCancel = useCallback(() => {
+  const handleCancel = useCallback(async () => {
+    isHydratingRef.current = true;
     setClearedState({});
     setSuggestedMatches({});
-    toast.info("Cleared selections reset");
-  }, []);
+    // Delete the draft from DB so it doesn't come back on refresh
+    if (selectedAccountId) {
+      await deleteDraft.mutateAsync(selectedAccountId);
+    }
+    toast.info("Cleared selections reset and draft discarded");
+    setTimeout(() => { isHydratingRef.current = false; }, 500);
+  }, [selectedAccountId, deleteDraft]);
 
   const handleAddAdjustment = useCallback(() => {
     const amount = parseFloat(adjAmount);
@@ -509,12 +594,15 @@ const BankReconciliationWorksheet = () => {
                <Upload className="w-4 h-4 mr-1" /> Import Statement
              </Button>
              {statementTxns.length > 0 && (
-               <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950" onClick={() => setShowClearConfirm(true)}>
-                 <Trash2 className="w-4 h-4 mr-1" /> Clear Statement
+               <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700" onClick={() => setShowClearConfirm(true)}>
+                 <Trash2 className="w-4 h-4 mr-1" /> Clear
                </Button>
              )}
              <Button variant="secondary" size="sm" onClick={runAutoMatch} disabled={statementTxns.length === 0 || bookTxns.length === 0}>
                <Sparkles className="w-4 h-4 mr-1" /> Auto Match
+             </Button>
+             <Button variant="outline" size="sm" onClick={() => setShowReport(true)} disabled={Object.keys(clearedState).length === 0}>
+               <Printer className="w-4 h-4 mr-1" /> Report
              </Button>
              <Button variant="ghost" size="icon" className="w-8 h-8 ml-2 hover:bg-muted" onClick={() => setIsFullscreen(!isFullscreen)}>
                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
@@ -523,7 +611,6 @@ const BankReconciliationWorksheet = () => {
         </div>
       </CardHeader>
 
-      {/* ========================= MATCH TALLY BAR ========================= */}
       {selectedAccountId && (matchTally.selectedStatementVal !== 0 || matchTally.selectedBookVal !== 0) && (
          <div className="bg-primary/5 border-b border-primary/20 px-6 py-2 flex items-center justify-between text-sm flex-shrink-0 z-10">
             <div className="flex items-center gap-6">
@@ -849,6 +936,21 @@ const BankReconciliationWorksheet = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ========================= RECONCILIATION REPORT ========================= */}
+      <BankReconciliationReport
+        open={showReport}
+        onOpenChange={setShowReport}
+        bankAccount={selectedAccount}
+        statementDate={statementDate}
+        statementNo={statementNo}
+        statementBalance={parseFloat(statementBalance) || 0}
+        lastStatementBalance={lastStatementBalance}
+        clearedState={clearedState}
+        transactions={transactions}
+        adjustments={adjustments}
+        summary={summary}
+      />
     </Card>
   );
 };
