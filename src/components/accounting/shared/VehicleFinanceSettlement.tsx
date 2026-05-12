@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { format } from 'date-fns';
 import { reverseJournalEntry } from '@/hooks/useEditAccountingMutations';
 import { toast } from 'sonner';
-import { CheckCircle, Clock, DollarSign, Database, RefreshCw, FileText, ArrowRight, Undo2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { CheckCircle, Clock, DollarSign, Database, RefreshCw, FileText, ArrowRight, Undo2, AlertCircle, CheckCircle2, Plus } from 'lucide-react';
 import { GLBreakdownPreview } from './GLBreakdownPreview';
 import { 
   postVehiclePaymentToGL, 
@@ -80,19 +80,23 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
       setPayments(paymentData || []);
 
       // 3. Load AR Invoice if linked
+      let currentArInvoice = null;
       if (order.ar_invoice_id) {
         const { data: invoice, error: invoiceError } = await supabase
           .from('ar_invoices')
           .select('*')
           .eq('id', order.ar_invoice_id)
           .single();
-        if (!invoiceError) setArInvoice(invoice);
+        if (!invoiceError) {
+          setArInvoice(invoice);
+          currentArInvoice = invoice;
+        }
       }
 
       // 4. Load Live JEs based on payments and AR Invoice
       const jeIds = paymentData?.map(p => p.journal_entry_id).filter(Boolean) || [];
-      if (order.ar_invoice_id && arInvoice?.journal_entry_id) {
-        jeIds.push(arInvoice.journal_entry_id);
+      if (currentArInvoice?.journal_entry_id) {
+        jeIds.push(currentArInvoice.journal_entry_id);
       }
       
       if (jeIds.length > 0) {
@@ -517,7 +521,56 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
                   <div className="text-center py-8 text-muted-foreground bg-slate-50 rounded-lg">
                     <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p>No Master AR Invoice generated yet.</p>
-                    <p className="text-sm">Invoices are typically generated when the order is confirmed.</p>
+                    <p className="text-sm mb-4">You can manually generate and post the Master AR Invoice to the GL.</p>
+                    <Button 
+                      onClick={async () => {
+                        try {
+                          setIsSyncing('generate_ar');
+                          const settings = await fetchVehicleFinanceSettings(module, NCG_HOLDING_ID);
+                          if (!settings) throw new Error('Finance settings not configured.');
+
+                          const { createVehicleARInvoice, updateOrderFinanceLinks } = await import('@/hooks/useVehicleSalesFinance');
+                          
+                          const customerId = orderData?.finance_customer_id;
+                          if (!customerId) throw new Error('No finance customer linked to this order. Cannot post AR invoice.');
+
+                          const arResult = await createVehicleARInvoice({
+                            module,
+                            orderId: orderData.id,
+                            orderNo: orderData.order_no,
+                            customerId,
+                            totalAmount: orderData.total_amount || 0,
+                            advanceAmount: 0,
+                            companyId: NCG_HOLDING_ID,
+                            settings,
+                            status: 'unpaid', // NOT draft, so it auto-posts to GL
+                          });
+
+                          if (arResult) {
+                            await updateOrderFinanceLinks({
+                              module,
+                              orderId: orderData.id,
+                              arInvoiceId: arResult.invoiceId,
+                            });
+                            toast.success(`AR Invoice created and posted: ${arResult.invoiceNumber}`);
+                            loadFinanceData();
+                          }
+                        } catch (err: any) {
+                          toast.error(err.message || 'Failed to generate AR invoice');
+                        } finally {
+                          setIsSyncing(null);
+                        }
+                      }}
+                      disabled={isSyncing === 'generate_ar'}
+                      variant="default"
+                    >
+                      {isSyncing === 'generate_ar' ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4 mr-2" />
+                      )}
+                      Generate & Post Master AR Invoice
+                    </Button>
                   </div>
                 )}
               </CardContent>

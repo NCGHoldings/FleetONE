@@ -753,6 +753,12 @@ export const useBankTransactionsForRecon = (
       if (bankAccountId) {
         unreconciledQuery = unreconciledQuery.eq("bank_account_id", bankAccountId);
       }
+      if (fromDate) {
+        unreconciledQuery = unreconciledQuery.gte("transaction_date", fromDate);
+      }
+      if (toDate) {
+        unreconciledQuery = unreconciledQuery.lte("transaction_date", toDate);
+      }
 
       const { data: unreconciled, error: err1 } = await unreconciledQuery;
       if (err1) throw err1;

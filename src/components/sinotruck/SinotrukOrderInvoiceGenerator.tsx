@@ -68,7 +68,8 @@ export function SinotrukOrderInvoiceGenerator({ order, onRefresh }: SinotrukOrde
     orderData.chassis_number &&
     orderData.year_of_manufacture &&
     orderData.fuel_type &&
-    orderData.engine_capacity > 0 &&
+    orderData.engine_capacity !== undefined && 
+    orderData.engine_capacity !== null &&
     orderData.color_scheme
   );
 
