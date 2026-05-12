@@ -13,6 +13,8 @@ import { EnhancedYutongOrderDetailsModal } from './EnhancedYutongOrderDetailsMod
 import { YutongCreateOrderModal } from './YutongCreateOrderModal';
 import { YutongOrderCard } from './YutongOrderCard';
 import { YutongShipmentGroupManagement } from './YutongShipmentGroupManagement';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Trash2 } from 'lucide-react';
 
 const phaseLabels = {
   'order_confirmation': 'Order Confirmation',
@@ -50,7 +52,8 @@ export function YutongOrdersList() {
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [showShipments, setShowShipments] = useState(false);
-  const { getOrdersWithDetails, updateOrderPhase } = useYutongOrderManagement();
+  const { getOrdersWithDetails, updateOrderPhase, voidOrder } = useYutongOrderManagement();
+  const [orderToVoid, setOrderToVoid] = useState<YutongOrder | null>(null);
 
   const loadOrders = async () => {
     try {
@@ -231,6 +234,14 @@ export function YutongOrdersList() {
             >
               <CreditCard className="h-4 w-4" />
             </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-destructive hover:bg-destructive/10"
+              onClick={() => setOrderToVoid(order)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
             <Select
               value={order.current_phase}
               onValueChange={(value) => handlePhaseUpdate(order.id, value)}
@@ -347,6 +358,34 @@ export function YutongOrdersList() {
           }}
         />
       )}
+
+      <AlertDialog open={!!orderToVoid} onOpenChange={(open) => !open && setOrderToVoid(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will void the order
+              {orderToVoid && <strong> {orderToVoid.order_no}</strong>}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (orderToVoid) {
+                  const result = await voidOrder(orderToVoid.id);
+                  if (result.success) {
+                    loadOrders();
+                  }
+                }
+              }}
+            >
+              Void Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { JournalEntryForm } from "./JournalEntryForm";
 import { JournalEntryDetailDialog } from "./JournalEntryDetailDialog";
 import { useJournalEntries, useAllProfiles } from "@/hooks/useAccountingData";
-import { usePostJournalEntry, useRejectJournalEntry, useReverseJournalEntry, useDeleteJournalEntry } from "@/hooks/useAccountingMutations";
+import { usePostJournalEntry, useRejectJournalEntry, useReverseJournalEntry } from "@/hooks/useAccountingMutations";
 import { useCompany } from "@/contexts/CompanyContext";
 import { DateRangeFilter, type DateRange } from "@/components/ui/DateRangeFilter";
 import { Filter } from "lucide-react";
@@ -58,8 +58,6 @@ export const JournalEntriesView = () => {
   const postEntry = usePostJournalEntry();
   const rejectEntry = useRejectJournalEntry();
   const reverseEntry = useReverseJournalEntry();
-  const deleteEntry = useDeleteJournalEntry();
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [reverseConfirmEntry, setReverseConfirmEntry] = useState<any>(null);
 
   const getCreatorName = (userId: string | null) => {
@@ -262,15 +260,18 @@ export const JournalEntriesView = () => {
               </Button>
             </>
           )}
-          <Button 
-            size="sm" 
-            variant="outline" 
-            className="text-destructive hover:text-destructive"
-            onClick={() => setDeleteConfirmId(row.original.id)}
-            disabled={deleteEntry.isPending}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {row.original.status === "posted" && (
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="text-amber-600 hover:text-amber-700"
+              onClick={() => setReverseConfirmEntry(row.original)}
+              disabled={reverseEntry.isPending}
+              title="Reverse Entry"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -409,7 +410,6 @@ export const JournalEntriesView = () => {
         columns={columns}
         data={filteredEntries}
         enableColumnFilters
-        variant="professional"
       />
 
       {/* Entry Detail Dialog */}
@@ -435,33 +435,7 @@ export const JournalEntriesView = () => {
         }}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Journal Entry?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will reverse all COA balance impacts, delete all journal entry lines, and permanently remove this entry. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                if (deleteConfirmId) {
-                  deleteEntry.mutate(deleteConfirmId);
-                  setDeleteConfirmId(null);
-                }
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Reverse Confirmation Dialog */}
+      {/* GL Export Modal */}
       <AlertDialog open={!!reverseConfirmEntry} onOpenChange={(open) => !open && setReverseConfirmEntry(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -332,7 +332,6 @@ export const useYutongOrderManagement = () => {
               paymentMethod: paymentData.payment_method,
               settings,
               effectiveCompanyId: NCG_HOLDING_ID,
-              paymentDate: paymentData.payment_date,
             });
 
             if (glResult) {
@@ -356,6 +355,30 @@ export const useYutongOrderManagement = () => {
     }
   };
 
+  // Void an order instead of deleting
+  const voidOrder = async (orderId: string) => {
+    try {
+      setIsLoading(true);
+
+      // Update the order status to voided
+      const { error } = await supabase
+        .from('yutong_orders')
+        .update({ status: 'voided' })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      toast.success('Order voided successfully');
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error voiding order:', error);
+      toast.error('Failed to void order: ' + error.message);
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     isLoading,
     createOrderFromQuotation,
@@ -363,5 +386,6 @@ export const useYutongOrderManagement = () => {
     updateOrderPhase,
     getPaymentSchedules,
     recordCustomerPayment,
+    voidOrder,
   };
 };
