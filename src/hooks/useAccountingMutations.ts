@@ -591,7 +591,6 @@ export const useCreateARReceipt = () => {
         vehicle_type: receipt.vehicle_type || null,
         payee_employee_id: employeeIdResolved,
         vendor_id: vendorIdResolved,
-        is_direct_receipt: receipt.is_direct_receipt || false,
       };
 
       const { data, error } = await supabase
