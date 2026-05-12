@@ -9,19 +9,27 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requiredRoles = [] }: ProtectedRouteProps) {
-  const { user, loading, hasRole, isAuthenticated } = useAuth();
+  const { user, loading, hasRole, isAuthenticated, mfaLevel, hasMFAFactors } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      // Redirect to auth page with return URL
-      navigate("/auth", {
-        state: { from: location },
-        replace: true,
-      });
+    if (!loading) {
+      if (!isAuthenticated) {
+        // Redirect to auth page with return URL
+        navigate("/auth", {
+          state: { from: location },
+          replace: true,
+        });
+      } else if (hasMFAFactors && mfaLevel === 'aal1') {
+        // User has MFA enabled but hasn't verified second factor
+        navigate("/auth/verify-mfa", {
+          state: { from: location },
+          replace: true,
+        });
+      }
     }
-  }, [user, loading, navigate, location, isAuthenticated]);
+  }, [user, loading, navigate, location, isAuthenticated, mfaLevel, hasMFAFactors]);
 
   // Show loading spinner while checking authentication
   if (loading) {

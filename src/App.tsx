@@ -20,6 +20,7 @@ import "@/styles/professional-erp.css";
 
 // Pages
 import Auth from "./pages/Auth";
+import TwoFactorVerify from "./pages/TwoFactorVerify";
 import ResetPassword from "./pages/ResetPassword";
 import AcceptInvite from "./pages/AcceptInvite";
 import InstallApp from "./pages/InstallApp";
@@ -146,6 +147,7 @@ const App = () => (
                     <Routes>
                       {/* Public routes */}
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/verify-mfa" element={<TwoFactorVerify />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/accept-invite" element={<AcceptInvite />} />
             <Route path="/install" element={<InstallApp />} />

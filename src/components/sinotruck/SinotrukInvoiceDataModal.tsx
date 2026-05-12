@@ -41,7 +41,7 @@ export function SinotrukInvoiceDataModal({
     country_of_origin: existingData?.country_of_origin || 'CHINA',
     vehicle_condition: existingData?.vehicle_condition || 'BRAND NEW',
     fuel_type: existingData?.fuel_type || 'DIESEL',
-    engine_capacity: existingData?.engine_capacity || 0,
+    engine_capacity: existingData?.engine_capacity || '',
     color_scheme: existingData?.color_scheme || ''
   });
 
@@ -54,7 +54,7 @@ export function SinotrukInvoiceDataModal({
       country_of_origin: existingData?.country_of_origin || 'CHINA',
       vehicle_condition: existingData?.vehicle_condition || 'BRAND NEW',
       fuel_type: existingData?.fuel_type || 'DIESEL',
-      engine_capacity: existingData?.engine_capacity || 0,
+      engine_capacity: existingData?.engine_capacity || '',
       color_scheme: existingData?.color_scheme || ''
     });
   }, [existingData, isOpen]);
@@ -180,7 +180,7 @@ export function SinotrukInvoiceDataModal({
                 id="engine_capacity"
                 type="number"
                 value={formData.engine_capacity}
-                onChange={(e) => setFormData({ ...formData, engine_capacity: parseInt(e.target.value) || 0 })}
+                onChange={(e) => setFormData({ ...formData, engine_capacity: e.target.value ? parseInt(e.target.value) : '' })}
                 placeholder="e.g., 9500"
                 required
               />

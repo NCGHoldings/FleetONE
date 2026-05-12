@@ -18,24 +18,48 @@ const regions = [
 ];
 
 async function testRegions() {
+  const dbUrl = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL or SUPABASE_DB_URL must be provided in environment variables');
+  }
+
+  let failedCount = 0;
   for (const region of regions) {
     const host = `aws-0-${region}.pooler.supabase.com`;
-    const connectionString = `postgresql://postgres.wwjpdszkmtnzshbulkon:LlvTtsv8MYXJw0NT@${host}:5432/postgres`;
+    let connectionString;
+    try {
+      const parsed = new URL(dbUrl);
+      parsed.hostname = host;
+      parsed.port = '5432';
+      connectionString = parsed.toString();
+    } catch (err) {
+      throw new Error('Invalid DATABASE_URL provided');
+    }
     
     const client = new Client({ connectionString });
     try {
       await client.connect();
       console.log(`✅ SUCCESS on ${region}`);
-      await client.end();
       return;
     } catch (e) {
+      failedCount++;
       if (e.message.includes('Tenant or user not found')) {
         console.log(`❌ ${region}: Tenant not found`);
       } else {
         console.log(`❌ ${region}: ${e.message}`);
       }
+    } finally {
+      await client.end().catch(() => {});
     }
+  }
+
+  if (failedCount === regions.length) {
+    console.error('❌ All regions failed.');
+    process.exit(1);
   }
 }
 
-testRegions().catch(console.error);
+testRegions().catch(e => {
+  console.error(e);
+  process.exit(1);
+});
