@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { SinotrukOrder } from '@/hooks/useSinotrukOrderManagement';
 import { SinotruckPaymentTracking } from './SinotruckPaymentTracking';
-import { SinotruckOrderInvoiceGenerator } from './SinotruckOrderInvoiceGenerator';
+import { SinotrukOrderInvoiceGenerator } from './SinotrukOrderInvoiceGenerator';
 
 interface EnhancedSinotrukOrderDetailsModalProps {
     order: SinotrukOrder | null;
@@ -192,12 +192,12 @@ export function EnhancedSinotrukOrderDetailsModal({
                     </TabsContent>
 
                     <TabsContent value="documents" className="space-y-6">
-                        <SinotruckOrderInvoiceGenerator 
+                        <SinotrukOrderInvoiceGenerator 
                             order={{
                                 id: order.id,
                                 order_no: order.order_no,
                                 quotation_id: order.quotation_id,
-                                truck_model: order.truck_model,
+                                bus_model: order.truck_model,
                                 quantity: order.quantity,
                                 total_amount: order.total_amount || 0
                             }}

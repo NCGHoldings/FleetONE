@@ -587,7 +587,7 @@ export const DrillDownModal = ({
     if (!effectiveSourceModule || effectiveSourceModule === 'general') {
       if (reference.includes('-INV-') || reference.startsWith('INV-')) {
         effectiveSourceModule = 'ar_invoice';
-      } else if (reference.includes('-RCP-') || reference.startsWith('RCP-') || entryNumber.startsWith('SBS-PAY-')) {
+      } else if (reference.includes('-RCP-') || reference.startsWith('RCP-') || reference.includes('-RCT-') || entryNumber.startsWith('SBS-PAY-')) {
         effectiveSourceModule = 'ar_receipt';
       } else if (reference.includes('-PAY-') || reference.startsWith('PAY-')) {
         effectiveSourceModule = 'ap_payment';
@@ -595,6 +595,32 @@ export const DrillDownModal = ({
         effectiveSourceModule = 'ap_invoice';
       } else if (reference.includes('PC-') || reference.startsWith('PC-')) {
         effectiveSourceModule = 'petty_cash';
+      } else if (reference.includes('-CI-')) {
+        // Vehicle Customer Invoice references (e.g. NCGH-YT-CI-260102)
+        effectiveSourceModule = 'ar_invoice';
+      } else if (reference.includes('-ADV-') || reference.includes('-BAL-') || reference.includes('-REV-')) {
+        // Vehicle payment references (e.g. YUT-ADV-ORD123)
+        effectiveSourceModule = 'vehicle_payment_je';
+      }
+    }
+
+    // Normalize vehicle _sales source modules to their document type based on reference pattern
+    if (effectiveSourceModule?.endsWith('_sales')) {
+      // yutong_sales, sinotruck_sales, lightvehicle_sales
+      if (reference.includes('-CI-') || reference.includes('-INV-')) {
+        // Invoice-type JE → look up the AR invoice by its invoice_number
+        effectiveSourceModule = 'ar_invoice';
+      } else if (reference.includes('-RCT-') || reference.includes('-RCP-')) {
+        effectiveSourceModule = 'ar_receipt';
+      } else if (reference.includes('-ADV-APPLY-')) {
+        // Advance application JE — no source document, show journal voucher
+        effectiveSourceModule = 'vehicle_payment_je';
+      } else if (reference.includes('-ADV-') || reference.includes('-BAL-') || reference.includes('-REV-')) {
+        // Payment JE — no AR receipt, show journal voucher
+        effectiveSourceModule = 'vehicle_payment_je';
+      } else {
+        // Unknown vehicle sales ref — try AR invoice first
+        effectiveSourceModule = 'ar_invoice';
       }
     }
 
@@ -628,7 +654,7 @@ export const DrillDownModal = ({
       matchColumn = "voucher_number";
       docType = "petty_cash_voucher";
     } else {
-      // Fallback for general JEs
+      // Fallback for general JEs, vehicle payment JEs, etc.
       setPreviewDocType("journal_voucher");
       setPreviewDocData({ id: jeId, journal_entry_id: jeId, voucher_number: reference });
       setPreviewModalOpen(true);

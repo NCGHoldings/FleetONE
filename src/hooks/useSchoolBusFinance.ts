@@ -1098,6 +1098,7 @@ export function usePostPaymentToGL() {
       previousBalance,
       customArAccountId,
       customBankAccountId,
+      transactionDate,
       studentId,
     }: {
       paymentId: string;
@@ -1410,7 +1411,7 @@ export function usePostPaymentToGL() {
               .from("school_students")
               .update({
                 payment_status: 'paid',
-                last_payment_date: format(new Date(), "yyyy-MM-dd")
+                last_payment_date: transactionDate || format(new Date(), "yyyy-MM-dd")
               })
               .eq("id", studentId);
           }
@@ -1419,7 +1420,7 @@ export function usePostPaymentToGL() {
           if (physicalBankAccountId && amount > 0) {
             const { error: btErr } = await supabase.from("bank_transactions").insert([{
               bank_account_id: physicalBankAccountId,
-              transaction_date: format(new Date(), "yyyy-MM-dd"),
+              transaction_date: transactionDate || format(new Date(), "yyyy-MM-dd"),
               transaction_type: "receipt",
               description: `School Bus Payment from ${studentName} - ${receiptNumber}`,
               debit_amount: amount,
@@ -1540,6 +1541,7 @@ export function usePostGroupedPaymentToGL() {
       description,
       allocations,
       customBankAccountId,
+      transactionDate,
     }: {
       totalAmount: number;
       branchId: string;
@@ -1812,7 +1814,7 @@ export function usePostGroupedPaymentToGL() {
               .from("school_students")
               .update({
                 payment_status: 'paid',
-                last_payment_date: format(new Date(), "yyyy-MM-dd")
+                last_payment_date: transactionDate || format(new Date(), "yyyy-MM-dd")
               })
               .eq("id", alloc.studentId);
           }
@@ -1854,7 +1856,7 @@ export function usePostGroupedPaymentToGL() {
       if (physicalBankAccountId && totalAmount > 0) {
         const { error: btErr } = await supabase.from("bank_transactions").insert([{
           bank_account_id: physicalBankAccountId,
-          transaction_date: format(new Date(), "yyyy-MM-dd"),
+          transaction_date: transactionDate || format(new Date(), "yyyy-MM-dd"),
           transaction_type: "receipt",
           description: description || `Grouped School Bus Payment - ${referenceNo || ''}`,
           debit_amount: totalAmount,

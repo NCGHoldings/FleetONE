@@ -7,12 +7,13 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useBankAccounts, useBankTransactionsForRecon, useLastReconciliation, useDraftReconciliation } from "@/hooks/useAccountingData";
+import { useBankAccounts, useBankTransactionsForRecon, useLastReconciliation, useDraftReconciliation, useChartOfAccounts } from "@/hooks/useAccountingData";
 import { useSaveBankReconciliation, useSaveDraftReconciliation, useDeleteDraftReconciliation } from "@/hooks/useAccountingMutations";
-import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, ArrowRightLeft, Search, Sparkles, BookOpen, Maximize, Minimize, Trash2, Printer, Plus, Pencil } from "lucide-react";
+import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, ArrowRightLeft, Search, Sparkles, BookOpen, Maximize, Minimize, Trash2, Printer, Plus, Pencil, Zap, BarChart3, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 import "./BankReconciliationWorksheet.css";
 import { BankStatementImportModal } from "./BankStatementImportModal";
 import { BankReconciliationReport } from "./BankReconciliationReport";
@@ -76,8 +77,12 @@ const sourceLabel = (sourceType: string | null | undefined): { text: string; cla
 // ================ COMPONENT ================
 const BankReconciliationWorksheet = () => {
   const queryClient = useQueryClient();
+  const { getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
   // --- Data hooks ---
   const { data: bankAccounts = [], isLoading: acctLoading } = useBankAccounts();
+  const { data: chartOfAccounts = [] } = useChartOfAccounts();
+  const coaList = (chartOfAccounts || []) as Array<{ id: string; account_code: string; account_name: string; account_type: string; is_active: boolean }>;
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -112,6 +117,10 @@ const BankReconciliationWorksheet = () => {
   const [quickAddDate, setQuickAddDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [editingTxnId, setEditingTxnId] = useState<string | null>(null);
   const [editingAmount, setEditingAmount] = useState("");
+  const [showGapsPanel, setShowGapsPanel] = useState(false);
+  const [quickAddGLAccountId, setQuickAddGLAccountId] = useState<string>("");
+  const [quickAddGLSearch, setQuickAddGLSearch] = useState("");
+  const [suggestedGLAccount, setSuggestedGLAccount] = useState<{ id: string; code: string; name: string } | null>(null);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHydratingRef = useRef(false);
   const lastHydratedAccountRef = useRef<string | null>(null);
@@ -410,6 +419,88 @@ const BankReconciliationWorksheet = () => {
     };
   }, [bookTxns, clearedState, lastStatementBalance, targetBalance, adjustments]);
 
+  // --- Gap Detection: find unmatched items on each side ---
+  const gapAnalysis = useMemo(() => {
+    const usedBookIds = new Set<string>();
+    const usedStmtIds = new Set<string>();
+
+    // First pass: find exact matches (amount + date within 3 days)
+    statementTxns.forEach(st => {
+      if (clearedState[st.id]?.cleared || st.is_reconciled) { usedStmtIds.add(st.id); return; }
+      const stAmt = (st.debit_amount || 0) > 0 ? (st.debit_amount || 0) : (st.credit_amount || 0);
+      const stDate = new Date(st.transaction_date).getTime();
+
+      const match = bookTxns.find(bt => {
+        if (usedBookIds.has(bt.id) || clearedState[bt.id]?.cleared || bt.is_reconciled) return false;
+        const btAmt = (bt.debit_amount || 0) > 0 ? (bt.debit_amount || 0) : (bt.credit_amount || 0);
+        if (stAmt !== btAmt) return false;
+        const diffDays = Math.abs(new Date(bt.transaction_date).getTime() - stDate) / (1000 * 60 * 60 * 24);
+        return diffDays <= 5;
+      });
+
+      if (match) {
+        usedStmtIds.add(st.id);
+        usedBookIds.add(match.id);
+      }
+    });
+
+    const unmatchedStatement = statementTxns.filter(t => !usedStmtIds.has(t.id) && !clearedState[t.id]?.cleared && !t.is_reconciled);
+    const unmatchedBook = bookTxns.filter(t => !usedBookIds.has(t.id) && !clearedState[t.id]?.cleared && !t.is_reconciled);
+
+    const matchedCount = usedStmtIds.size;
+    const totalItems = statementTxns.length + bookTxns.length;
+    const matchedItems = matchedCount * 2; // both sides
+    const matchPct = totalItems > 0 ? Math.round((matchedItems / totalItems) * 100) : 0;
+
+    const unmatchedStmtTotal = unmatchedStatement.reduce((s, t) => s + ((t.debit_amount || 0) > 0 ? (t.debit_amount || 0) : (t.credit_amount || 0)), 0);
+    const unmatchedBookTotal = unmatchedBook.reduce((s, t) => s + ((t.debit_amount || 0) > 0 ? (t.debit_amount || 0) : (t.credit_amount || 0)), 0);
+
+    return { unmatchedStatement, unmatchedBook, matchedCount, matchPct, unmatchedStmtTotal, unmatchedBookTotal, totalItems };
+  }, [statementTxns, bookTxns, clearedState]);
+
+  // Pre-fill Quick Add from an unmatched statement item
+  const handleQuickAddFromStatement = useCallback(async (stmtTxn: any) => {
+    const deposit = stmtTxn.debit_amount || 0;
+    const payment = stmtTxn.credit_amount || 0;
+    setQuickAddType(deposit > 0 ? 'deposit' : 'payment');
+    setQuickAddAmount(String(deposit > 0 ? deposit : payment));
+    setQuickAddDesc(stmtTxn.description || extractPayee(stmtTxn.description) || '');
+    setQuickAddRef(stmtTxn.reference || stmtTxn.cheque_number || '');
+    setQuickAddDate(format(new Date(stmtTxn.transaction_date), 'yyyy-MM-dd'));
+    setQuickAddGLAccountId('');
+    setSuggestedGLAccount(null);
+
+    // Pattern lookup: find previously used GL account for similar descriptions
+    if (effectiveCompanyId && stmtTxn.description) {
+      try {
+        const descKey = (stmtTxn.description || '').substring(0, 30).replace(/[^a-zA-Z0-9 ]/g, '%');
+        const { data: patterns } = await (supabase as any)
+          .from('bank_reconciliation_patterns')
+          .select('gl_account_id, description_pattern, confidence_count')
+          .eq('company_id', effectiveCompanyId)
+          .ilike('description_pattern', `%${descKey.substring(0, 15)}%`)
+          .order('confidence_count', { ascending: false })
+          .limit(1);
+
+        if (patterns && patterns.length > 0 && patterns[0].gl_account_id) {
+          const matchedAccount = coaList.find(a => a.id === patterns[0].gl_account_id);
+          if (matchedAccount) {
+            setQuickAddGLAccountId(matchedAccount.id);
+            setSuggestedGLAccount({
+              id: matchedAccount.id,
+              code: matchedAccount.account_code,
+              name: matchedAccount.account_name
+            });
+          }
+        }
+      } catch {
+        // Pattern table may not exist yet — ignore
+      }
+    }
+
+    setShowQuickAdd(true);
+  }, [effectiveCompanyId, coaList]);
+
   // Derived Match Tally
   const matchTally = useMemo(() => {
     let selectedStatementVal = 0;
@@ -604,10 +695,52 @@ const BankReconciliationWorksheet = () => {
       if (error) throw error;
 
       toast.success(`Added ${quickAddType} of LKR ${fmt(amount)} to book records`);
+
+      // Save pattern for future auto-suggestions
+      if (quickAddGLAccountId && quickAddDesc.trim() && effectiveCompanyId) {
+        try {
+          const descPattern = quickAddDesc.trim().substring(0, 50);
+          const { data: existing } = await (supabase as any)
+            .from('bank_reconciliation_patterns')
+            .select('id, confidence_count')
+            .eq('company_id', effectiveCompanyId)
+            .eq('bank_account_id', selectedAccountId)
+            .eq('description_pattern', descPattern)
+            .eq('transaction_type', quickAddType)
+            .maybeSingle();
+
+          if (existing) {
+            await (supabase as any)
+              .from('bank_reconciliation_patterns')
+              .update({
+                gl_account_id: quickAddGLAccountId,
+                confidence_count: (existing.confidence_count || 1) + 1,
+                last_used_at: new Date().toISOString(),
+              })
+              .eq('id', existing.id);
+          } else {
+            await (supabase as any)
+              .from('bank_reconciliation_patterns')
+              .insert({
+                company_id: effectiveCompanyId,
+                bank_account_id: selectedAccountId,
+                description_pattern: descPattern,
+                reference_pattern: quickAddRef.trim() || null,
+                gl_account_id: quickAddGLAccountId,
+                transaction_type: quickAddType,
+              });
+          }
+        } catch {
+          // Pattern save is best-effort — don't block the main operation
+        }
+      }
+
       setShowQuickAdd(false);
       setQuickAddAmount("");
       setQuickAddDesc("");
       setQuickAddRef("");
+      setQuickAddGLAccountId("");
+      setSuggestedGLAccount(null);
       queryClient.invalidateQueries({ queryKey: ['bank-transactions-recon'] });
     } catch (err: any) {
       toast.error(`Failed to add entry: ${err.message}`);
@@ -803,6 +936,130 @@ const BankReconciliationWorksheet = () => {
                </Button>
             )}
          </div>
+      )}
+
+      {/* ========================= HEALTH DASHBOARD ========================= */}
+      {selectedAccountId && !txnLoading && (statementTxns.length > 0 || bookTxns.length > 0) && (
+        <div className="flex-shrink-0 z-10 border-b bg-gradient-to-r from-background to-muted/20 px-6 py-3">
+          <div className="flex items-center gap-6">
+            {/* Progress bar */}
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold flex items-center gap-1.5 text-muted-foreground uppercase tracking-wider">
+                  <BarChart3 className="w-3.5 h-3.5" /> Reconciliation Health
+                </span>
+                <span className={`text-xs font-bold ${gapAnalysis.matchPct >= 90 ? 'text-green-600' : gapAnalysis.matchPct >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                  {gapAnalysis.matchPct}% Matched
+                </span>
+              </div>
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${gapAnalysis.matchPct >= 90 ? 'bg-green-500' : gapAnalysis.matchPct >= 60 ? 'bg-amber-500' : 'bg-red-500'}`}
+                  style={{ width: `${gapAnalysis.matchPct}%` }}
+                />
+              </div>
+            </div>
+
+            {/* KPI chips */}
+            <div className="flex items-center gap-3 text-xs">
+              <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold">
+                <CheckCircle className="w-3 h-3" /> {gapAnalysis.matchedCount} Matched
+              </span>
+              {gapAnalysis.unmatchedStatement.length > 0 && (
+                <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-semibold">
+                  <AlertTriangle className="w-3 h-3" /> {gapAnalysis.unmatchedStatement.length} Missing from Book
+                </span>
+              )}
+              {gapAnalysis.unmatchedBook.length > 0 && (
+                <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-semibold">
+                  <AlertTriangle className="w-3 h-3" /> {gapAnalysis.unmatchedBook.length} Missing from Statement
+                </span>
+              )}
+            </div>
+
+            {/* Toggle gaps panel */}
+            {(gapAnalysis.unmatchedStatement.length > 0 || gapAnalysis.unmatchedBook.length > 0) && (
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowGapsPanel(!showGapsPanel)}>
+                {showGapsPanel ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
+                {showGapsPanel ? 'Hide' : 'View'} Gaps
+              </Button>
+            )}
+          </div>
+
+          {/* Expandable Gaps Panel */}
+          {showGapsPanel && (
+            <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-2 gap-4">
+              {/* Missing from Book */}
+              {gapAnalysis.unmatchedStatement.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-red-600 mb-1.5 flex items-center gap-1">
+                    <FileText className="w-3 h-3" /> Bank Statement Items — No Book Match ({gapAnalysis.unmatchedStatement.length})
+                  </h4>
+                  <div className="space-y-1 max-h-[140px] overflow-auto">
+                    {gapAnalysis.unmatchedStatement.map(t => {
+                      const amt = (t.debit_amount || 0) > 0 ? (t.debit_amount || 0) : (t.credit_amount || 0);
+                      const isDeposit = (t.debit_amount || 0) > 0;
+                      const ref = t.cheque_number || t.reference || '';
+                      return (
+                        <div key={t.id} className="flex items-center justify-between text-[11px] bg-red-50 dark:bg-red-900/10 rounded px-2 py-1.5 group">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className="font-mono text-muted-foreground w-[65px] flex-shrink-0">{format(new Date(t.transaction_date), 'dd/MM/yy')}</span>
+                            <span className="font-medium truncate max-w-[130px]" title={t.description || ''}>{extractPayee(t.description)}</span>
+                            {ref && <span className="font-mono text-[9px] text-muted-foreground bg-muted px-1 rounded truncate max-w-[80px]" title={ref}>{ref}</span>}
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className={`font-mono font-semibold ${isDeposit ? 'text-green-600' : 'text-red-600'}`}>
+                              {isDeposit ? '+' : '-'}{fmt(amt)}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 text-[10px] px-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-primary/10 hover:bg-primary/20 text-primary"
+                              onClick={() => handleQuickAddFromStatement(t)}
+                            >
+                              <Zap className="w-3 h-3 mr-0.5" /> Quick Add
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-1 font-mono">Total: LKR {fmt(gapAnalysis.unmatchedStmtTotal)}</div>
+                </div>
+              )}
+              {/* Missing from Statement */}
+              {gapAnalysis.unmatchedBook.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1.5 flex items-center gap-1">
+                    <BookOpen className="w-3 h-3" /> Book Items — No Statement Match ({gapAnalysis.unmatchedBook.length})
+                  </h4>
+                  <div className="space-y-1 max-h-[140px] overflow-auto">
+                    {gapAnalysis.unmatchedBook.map(t => {
+                      const amt = (t.debit_amount || 0) > 0 ? (t.debit_amount || 0) : (t.credit_amount || 0);
+                      const isDeposit = (t.debit_amount || 0) > 0;
+                      const ref = t.cheque_number || t.reference || '';
+                      const source = sourceLabel(t.source_type);
+                      return (
+                        <div key={t.id} className="flex items-center justify-between text-[11px] bg-amber-50 dark:bg-amber-900/10 rounded px-2 py-1.5">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className={`${source.className} scale-[0.65] origin-top-left inline-block flex-shrink-0`}>{source.text}</span>
+                            <span className="font-mono text-muted-foreground w-[65px] flex-shrink-0">{format(new Date(t.transaction_date), 'dd/MM/yy')}</span>
+                            <span className="font-medium truncate max-w-[110px]" title={t.description || ''}>{extractPayee(t.description)}</span>
+                            {ref && <span className="font-mono text-[9px] text-muted-foreground bg-muted px-1 rounded truncate max-w-[80px]" title={ref}>{ref}</span>}
+                          </div>
+                          <span className={`font-mono font-semibold flex-shrink-0 ${isDeposit ? 'text-green-600' : 'text-red-600'}`}>
+                            {isDeposit ? '+' : '-'}{fmt(amt)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-1 font-mono">Total: LKR {fmt(gapAnalysis.unmatchedBookTotal)}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ========================= SPLIT VIEW TABLES ========================= */}
@@ -1224,6 +1481,63 @@ const BankReconciliationWorksheet = () => {
             <div className="space-y-2">
               <Label>Reference (optional)</Label>
               <Input value={quickAddRef} onChange={(e) => setQuickAddRef(e.target.value)} placeholder="e.g. CHQ-001234" />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center justify-between">
+                <span>GL Account (optional)</span>
+                {suggestedGLAccount && (
+                  <span className="text-[10px] font-normal text-green-600 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> Auto-suggested from past pattern
+                  </span>
+                )}
+              </Label>
+              <div className="relative">
+                <Input
+                  value={quickAddGLSearch}
+                  onChange={(e) => setQuickAddGLSearch(e.target.value)}
+                  placeholder={quickAddGLAccountId ? coaList.find(a => a.id === quickAddGLAccountId)?.account_code + ' - ' + coaList.find(a => a.id === quickAddGLAccountId)?.account_name : 'Search GL account...'}
+                  className={quickAddGLAccountId ? 'border-green-300 bg-green-50/50 dark:bg-green-900/10' : ''}
+                />
+                {quickAddGLAccountId && (
+                  <button
+                    onClick={() => { setQuickAddGLAccountId(''); setQuickAddGLSearch(''); setSuggestedGLAccount(null); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              {quickAddGLSearch && !quickAddGLAccountId && (
+                <div className="max-h-[120px] overflow-auto border rounded bg-background shadow-md text-xs">
+                  {coaList
+                    .filter(a => a.is_active && (
+                      a.account_code.toLowerCase().includes(quickAddGLSearch.toLowerCase()) ||
+                      a.account_name.toLowerCase().includes(quickAddGLSearch.toLowerCase())
+                    ))
+                    .slice(0, 10)
+                    .map(a => (
+                      <button
+                        key={a.id}
+                        className="w-full text-left px-2 py-1.5 hover:bg-accent/50 flex items-center gap-2 border-b border-border/30 last:border-0"
+                        onClick={() => {
+                          setQuickAddGLAccountId(a.id);
+                          setQuickAddGLSearch('');
+                        }}
+                      >
+                        <span className="font-mono text-muted-foreground w-[60px]">{a.account_code}</span>
+                        <span className="font-medium truncate">{a.account_name}</span>
+                        <span className="ml-auto text-[9px] text-muted-foreground capitalize bg-muted px-1 rounded">{a.account_type}</span>
+                      </button>
+                    ))
+                  }
+                  {coaList.filter(a => a.is_active && (
+                    a.account_code.toLowerCase().includes(quickAddGLSearch.toLowerCase()) ||
+                    a.account_name.toLowerCase().includes(quickAddGLSearch.toLowerCase())
+                  )).length === 0 && (
+                    <div className="px-2 py-2 text-muted-foreground text-center">No accounts found</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

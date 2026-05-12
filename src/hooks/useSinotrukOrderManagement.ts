@@ -288,24 +288,31 @@ export const useSinotrukOrderManagement = () => {
                     const settings = await fetchVehicleFinanceSettings('sinotruck', NCG_HOLDING_ID);
                     
                     if (settings) {
-                        const description = `ADVANCE PAYMENT FOR SINOTRUK ORDER ${orderDetails.order_no} - ${orderDetails.sinotruck_quotations?.customer_name || 'CUSTOMER'}`;
+                        // Match Yutong pattern: determine advance vs balance via ar_invoice_id
+                        const isBalance = !!orderDetails.ar_invoice_id;
+                        const paymentType = isBalance ? 'balance' : 'advance';
+                        const customerName = orderDetails.sinotruck_quotations?.customer_name || 'Unknown';
                         
-                        await postVehiclePaymentToGL({
+                        const glResult = await postVehiclePaymentToGL({
                             module: 'sinotruck',
                             orderNo: orderDetails.order_no,
-                            customerName: orderDetails.sinotruck_quotations?.customer_name || 'CUSTOMER',
+                            customerName,
                             amount: paymentData.payment_amount,
-                            paymentType: 'advance',
+                            paymentType,
                             paymentMethod: paymentData.payment_method,
                             settings,
                             effectiveCompanyId: NCG_HOLDING_ID,
                             paymentDate: paymentData.payment_date,
                         });
+
+                        if (glResult) {
+                            console.log('[Sinotruk Finance] Payment successfully posted to GL:', glResult.entryNumber);
+                        }
                     }
                 }
             } catch (glError) {
-                console.error('Error posting Sinotruk payment to GL:', glError);
-                toast.error('Payment recorded but GL posting failed.');
+                console.warn('[Sinotruk Finance] Failed to auto-post payment to GL:', glError);
+                // Don't throw — payment recording should still succeed
             }
 
             toast.success('Customer payment recorded successfully');
@@ -387,6 +394,29 @@ export const useSinotrukOrderManagement = () => {
         }
     };
 
+    // Void an order instead of deleting (matches Yutong pattern)
+    const voidOrder = async (orderId: string) => {
+        try {
+            setIsLoading(true);
+
+            const { error } = await (supabase as any)
+                .from('sinotruck_orders')
+                .update({ status: 'voided' })
+                .eq('id', orderId);
+
+            if (error) throw error;
+
+            toast.success('Order voided successfully');
+            return { success: true };
+        } catch (error: any) {
+            console.error('Error voiding order:', error);
+            toast.error('Failed to void order: ' + error.message);
+            return { success: false, error };
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return {
         isLoading,
         createOrderFromQuotation,
@@ -396,5 +426,6 @@ export const useSinotrukOrderManagement = () => {
         recordCustomerPayment,
         verifyPayment,
         updateOrderFinancials,
+        voidOrder,
     };
 };

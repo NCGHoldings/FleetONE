@@ -659,3 +659,8 @@ export async function generateSinotruckOrderInvoicePDF(data: SinotruckOrderInvoi
 
   return pdf.output('blob');
 }
+
+// Re-export with alternate spelling (Sinotruk vs Sinotruck) for cross-module compatibility
+export type SinotrukOrderInvoiceData = SinotruckOrderInvoiceData;
+export const generateSinotrukOrderInvoiceHTML = generateSinotruckOrderInvoiceHTML;
+export const generateSinotrukOrderInvoicePDF = generateSinotruckOrderInvoicePDF;

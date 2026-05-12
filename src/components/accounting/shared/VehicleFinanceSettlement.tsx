@@ -80,23 +80,41 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
       setPayments(paymentData || []);
 
       // 3. Load AR Invoice if linked
-      let currentArInvoice = null;
+      let fetchedArInvoice: any = null;
       if (order.ar_invoice_id) {
         const { data: invoice, error: invoiceError } = await supabase
           .from('ar_invoices')
           .select('*')
           .eq('id', order.ar_invoice_id)
           .single();
-        if (!invoiceError) {
+        if (!invoiceError && invoice) {
+          fetchedArInvoice = invoice;
           setArInvoice(invoice);
-          currentArInvoice = invoice;
         }
       }
 
       // 4. Load Live JEs based on payments and AR Invoice
+      // Use the LOCAL fetchedArInvoice variable (not the stale React state)
       const jeIds = paymentData?.map(p => p.journal_entry_id).filter(Boolean) || [];
-      if (currentArInvoice?.journal_entry_id) {
-        jeIds.push(currentArInvoice.journal_entry_id);
+      if (fetchedArInvoice?.journal_entry_id) {
+        jeIds.push(fetchedArInvoice.journal_entry_id);
+      }
+
+      // 4b. Reference-based fallback: catch any JEs linked by order reference
+      // even if journal_entry_id wasn't persisted back to the AR invoice
+      if (order.order_no) {
+        const { data: refJEs } = await supabase
+          .from('journal_entries')
+          .select('id')
+          .eq('company_id', NCG_HOLDING_ID)
+          .ilike('reference', `%${order.order_no}%`)
+          .eq('status', 'posted');
+
+        if (refJEs) {
+          for (const je of refJEs) {
+            if (!jeIds.includes(je.id)) jeIds.push(je.id);
+          }
+        }
       }
       
       if (jeIds.length > 0) {

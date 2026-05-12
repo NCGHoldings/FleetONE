@@ -118,6 +118,133 @@ export const AccountsReceivableView = () => {
   }, []);
   // ──────────────────────────────────────────────────────────────────
 
+  // ── SELF-HEALING PATCH: Fix mismatched customer_id on Vehicle AR Invoices ──
+  // When createVehicleCustomer previously matched a customer from the wrong module
+  // (e.g. Light Vehicle "E R T PERERA" linked to Yutong orders), this patch
+  // auto-corrects the customer_id to match the actual quotation customer.
+  useEffect(() => {
+    const patchVehicleARCustomers = async () => {
+      try {
+        // Find all vehicle AR invoices (Yutong + Sinotruk)
+        const { data: vehicleARInvoices } = await supabase
+          .from('ar_invoices')
+          .select('id, invoice_number, customer_id, reference')
+          .or('invoice_number.ilike.NCGH-YT-%,invoice_number.ilike.NCGH-SNT-%');
+
+        if (!vehicleARInvoices || vehicleARInvoices.length === 0) return;
+
+        // Determine module type for each invoice
+        const modules = [
+          { prefix: 'NCGH-YT-', module: 'yutong', orderTable: 'yutong_orders', quotationJoin: 'yutong_quotations(customer_name, customer_phone, customer_email, customer_category_id)', buCode: 'YUT' },
+          { prefix: 'NCGH-SNT-', module: 'sinotruck', orderTable: 'sinotruck_orders', quotationJoin: 'sinotruck_quotations(customer_name, customer_phone, customer_email, customer_category_id)', buCode: 'SNT' },
+        ];
+
+        let fixedCount = 0;
+
+        for (const modInfo of modules) {
+          const modInvoices = vehicleARInvoices.filter(inv => inv.invoice_number?.startsWith(modInfo.prefix));
+          if (modInvoices.length === 0) continue;
+
+          // Find orders linked to these AR invoices
+          const arInvoiceIds = modInvoices.map(inv => inv.id);
+          const { data: orders } = await supabase
+            .from(modInfo.orderTable as any)
+            .select(`id, order_no, ar_invoice_id, finance_customer_id, ${modInfo.quotationJoin}`)
+            .in('ar_invoice_id', arInvoiceIds);
+
+          if (!orders) continue;
+
+          for (const order of orders) {
+            const quotation = (order as any)[`${modInfo.module}_quotations`];
+            const expectedName = quotation?.customer_name;
+            if (!expectedName) continue;
+
+            const arInv = modInvoices.find(inv => inv.id === (order as any).ar_invoice_id);
+            if (!arInv?.customer_id) continue;
+
+            // Check current customer name
+            const { data: currentCustomer } = await supabase
+              .from('customers')
+              .select('id, customer_name, business_unit_code')
+              .eq('id', arInv.customer_id)
+              .single();
+
+            if (!currentCustomer) continue;
+
+            // Compare names (case-insensitive)
+            if (currentCustomer.customer_name?.toLowerCase().trim() === expectedName.toLowerCase().trim()) continue;
+
+            // MISMATCH DETECTED — fix it
+            console.log(`[AR PATCH] Customer mismatch on ${arInv.invoice_number}: "${currentCustomer.customer_name}" should be "${expectedName}"`);
+
+            // Find or create the correct customer (module-scoped)
+            let correctCustomerId: string | null = null;
+
+            // Try module-scoped match first
+            const { data: scopedMatch } = await supabase
+              .from('customers')
+              .select('id')
+              .eq('company_id', 'a0000000-0000-0000-0000-000000000001')
+              .eq('business_unit_code', modInfo.buCode)
+              .ilike('customer_name', expectedName)
+              .limit(1)
+              .maybeSingle();
+
+            if (scopedMatch?.id) {
+              correctCustomerId = scopedMatch.id;
+            } else {
+              // Create new module-scoped customer
+              const customerCode = `${modInfo.buCode}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+              const { data: newCustomer } = await supabase
+                .from('customers')
+                .insert({
+                  company_id: 'a0000000-0000-0000-0000-000000000001',
+                  customer_code: customerCode,
+                  customer_name: expectedName,
+                  phone: quotation?.customer_phone || null,
+                  email: quotation?.customer_email || null,
+                  customer_type: 'individual',
+                  customer_category_id: quotation?.customer_category_id || null,
+                  business_unit_code: modInfo.buCode,
+                  is_active: true,
+                })
+                .select('id')
+                .single();
+
+              correctCustomerId = newCustomer?.id || null;
+            }
+
+            if (correctCustomerId) {
+              // Update AR Invoice customer_id
+              await supabase
+                .from('ar_invoices')
+                .update({ customer_id: correctCustomerId })
+                .eq('id', arInv.id);
+
+              // Update order's finance_customer_id
+              await supabase
+                .from(modInfo.orderTable as any)
+                .update({ finance_customer_id: correctCustomerId } as any)
+                .eq('id', (order as any).id);
+
+              console.log(`[AR PATCH] Fixed ${arInv.invoice_number}: customer_id updated to ${correctCustomerId} ("${expectedName}")`);
+              fixedCount++;
+            }
+          }
+        }
+
+        if (fixedCount > 0) {
+          console.log(`[AR PATCH] Fixed ${fixedCount} vehicle AR invoice(s) with wrong customer mapping.`);
+          window.location.reload();
+        }
+      } catch (err) {
+        console.error('[AR PATCH] Vehicle customer fix failed:', err);
+      }
+    };
+    patchVehicleARCustomers();
+  }, []);
+  // ──────────────────────────────────────────────────────────────────
+
   // Multi-field search filter
   const filteredInvoices = useMemo(() => {
     if (!invoices || !searchQuery.trim()) return invoices || [];
