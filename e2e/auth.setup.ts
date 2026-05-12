@@ -1,7 +1,7 @@
 import { test as setup, expect } from '@playwright/test';
 import path from 'path';
 
-const authFile = path.join(__dirname, '.auth/user.json');
+const authFile = path.join(process.cwd(), 'e2e', '.auth', 'user.json');
 
 setup('authenticate', async ({ page }) => {
   // Get credentials from environment variables
