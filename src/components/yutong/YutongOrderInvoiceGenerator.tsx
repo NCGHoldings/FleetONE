@@ -245,7 +245,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     const invoiceData: YutongOrderInvoiceData = {
       invoice_no: '', // Will be generated
       quotation_no: quotation.quotation_no || order.order_no,
-      invoice_date: new Date().toISOString().split('T')[0],
+      invoice_date: config.invoiceDate || new Date().toISOString().split('T')[0],
       
       customer_name: quotation.customer_name || '',
       company_name: quotation.company_name || '',
@@ -491,13 +491,18 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
                 {documents.map((doc) => {
                   const invoice = invoices.find(inv => inv.id === doc.invoice_record_id);
                   
+                  const isBackdated = invoice?.invoice_date && invoice?.created_at && invoice.invoice_date < invoice.created_at.split('T')[0];
+                  
                   return (
                     <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="flex-1">
                         <div className="flex items-center gap-3">
                           <FileText className="h-5 w-5 text-muted-foreground" />
                           <div>
-                            <p className="font-medium">{invoice?.invoice_no}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{invoice?.invoice_no}</p>
+                              {isBackdated && <Badge variant="outline" className="text-xs border-amber-500 text-amber-500 bg-amber-50 dark:bg-amber-950/20">Backdated to {invoice.invoice_date}</Badge>}
+                            </div>
                             <p className="text-sm text-muted-foreground">
                               {new Date(doc.created_at).toLocaleDateString()} • 
                               LKR {invoice?.invoice_amount?.toLocaleString()}

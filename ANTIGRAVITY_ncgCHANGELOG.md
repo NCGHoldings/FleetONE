@@ -1,10 +1,15 @@
-## 2026-05-10
+## 2026-05-12
 
-### ✅ Fixed "Staff" Role Fallback & Offline Caching (Network Hang Fix)
+### ✅ Yutong Invoice Backdating & Finance Sync
 
 **Files Modified:**
-- `src/hooks/useAuth.tsx` — Addressed the issue where all users defaulted to the "Staff" role during poor network conditions. Wrapped `fetchUserProfile`, `fetchMFAFactors`, and `fetchAAL` in 5-second `Promise.race` timeouts to prevent the `initializeUserData` `Promise.all` from hanging indefinitely. Implemented `localStorage` caching for user profiles and roles (`ncg_user_roles_cache`), so users retain their correct roles (e.g., Super Admin, Driver) and access even when the Supabase API is unreachable.
-- `src/hooks/usePagePermissions.ts` — Implemented a 5-second `Promise.race` timeout around the `supabase.from("user_page_permissions").select()` call to prevent `PageAccessGuard` from spinning indefinitely on "Verifying access...". Added `localStorage` caching (`ncg_permissions_cache_`) so users maintain their previously fetched module access rights during connection failures, gracefully degrading instead of completely locking them out.
+- `FleetONE-fresh/src/components/yutong/YutongInvoiceTypeModal.tsx` — Added an "Invoice Date" date picker to the generator modal, allowing users to select a backdated date for invoices.
+- `FleetONE-fresh/src/components/yutong/YutongOrderInvoiceGenerator.tsx` — Updated to consume the selected `invoiceDate`. Added a UI badge ("Backdated to [Date]") to visually flag backdated invoices in the list.
+- `src/hooks/useVehicleSalesFinance.ts` — Updated `createVehicleARInvoice` and `postVehicleInvoiceToGL` functions to accept and use the selected `invoiceDate`. This ensures AR invoices, due dates (calculated +30 days), and GL journal entries match the backdated date instead of `new Date()`.
+- `src/hooks/useYutongOrderInvoiceManagement.ts` — Plumbed `invoiceDate` through the `generateAndStoreDraftInvoice` and `approveInvoice` flows.
+
+**Architecture Notes:**
+- The actual physical PDF documents generated do not display a "backdated" mark, they naturally reflect the selected date as the official document date.
 
 ## 2026-05-06
 

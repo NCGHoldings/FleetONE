@@ -197,22 +197,6 @@ export async function createVehicleCustomer({
     // Create new customer with auto-generated code
     const customerCode = `${businessUnitCode}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-    // DEFAULT to External category if none provided
-    let effectiveCategoryId = customerCategoryId || null;
-    if (!effectiveCategoryId) {
-      const { data: externalCat } = await supabase
-        .from('customer_categories')
-        .select('id')
-        .eq('company_id', companyId)
-        .ilike('category_name', 'External')
-        .maybeSingle();
-      
-      if (externalCat) {
-        effectiveCategoryId = externalCat.id;
-        console.log(`[${module.toUpperCase()} Finance] Auto-assigned 'External' category to new customer`);
-      }
-    }
-
     const { data: newCustomer, error: insertError } = await supabase
       .from('customers')
       .insert({
@@ -222,7 +206,7 @@ export async function createVehicleCustomer({
         phone: customerPhone || null,
         email: customerEmail || null,
         customer_type: 'individual',
-        customer_category_id: effectiveCategoryId,
+        customer_category_id: customerCategoryId || null,
         business_unit_code: businessUnitCode,
         is_active: true,
       })
@@ -269,6 +253,7 @@ export async function createVehicleARInvoice({
   settings: VehicleFinanceSettings;
   customerCategoryId?: string;
   invoiceNo?: string;
+  invoiceDate?: string;
   taxAmount?: number;
   status?: string;
 }): Promise<{ invoiceId: string; invoiceNumber: string } | null> {
@@ -280,7 +265,8 @@ export async function createVehicleARInvoice({
     const timestamp = Date.now().toString(36).toUpperCase();
     const invoiceNumber = `${prefix}-${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}-${timestamp}`;
 
-    const dueDate = new Date();
+    const baseDate = invoiceDate ? new Date(invoiceDate) : new Date();
+    const dueDate = new Date(baseDate);
     dueDate.setDate(dueDate.getDate() + 30); // 30-day payment terms
 
     const arStatus = status || (advanceAmount >= totalAmount ? 'paid' : advanceAmount > 0 ? 'partial' : 'unpaid');
@@ -291,7 +277,7 @@ export async function createVehicleARInvoice({
         company_id: companyId,
         customer_id: customerId,
         invoice_number: invoiceNo || invoiceNumber,
-        invoice_date: new Date().toISOString().split('T')[0],
+        invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
         due_date: dueDate.toISOString().split('T')[0],
         total_amount: totalAmount,
         tax_amount: taxAmount || null,
@@ -322,7 +308,7 @@ export async function createVehicleARInvoice({
         const { postARInvoiceToGL } = await import('@/lib/gl-posting-utils');
         const glResult = await postARInvoiceToGL({
           invoiceNumber: invoice.invoice_number,
-          invoiceDate: new Date().toISOString().split('T')[0],
+          invoiceDate: invoiceDate || new Date().toISOString().split('T')[0],
           totalAmount: totalAmount,
           taxAmount: taxAmount && taxAmount > 0 ? taxAmount : undefined,
           tradeReceivableId: resolved.arAccountId,
@@ -357,6 +343,9 @@ export async function createVehicleARInvoice({
   }
 }
 
+/**
+ * Post a vehicle payment to GL (Journal Entry)
+ */
 export async function postVehiclePaymentToGL({
   module,
   orderNo,
@@ -367,9 +356,6 @@ export async function postVehiclePaymentToGL({
   settings,
   effectiveCompanyId,
   customBankAccountId,
-  customCreditAccountId,
-  customerId,
-  paymentDate,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -380,53 +366,24 @@ export async function postVehiclePaymentToGL({
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
   customBankAccountId?: string;
-  customCreditAccountId?: string;
-  customerId?: string;
-  paymentDate?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
 
     // Validate required accounts based on payment type
-    if (paymentType === 'advance' && !settings.customer_advance_account_id && !customCreditAccountId) {
+    if (paymentType === 'advance' && !settings.customer_advance_account_id) {
       console.error(`[${module.toUpperCase()} Finance] Missing customer advance account`);
       toast.error('Missing GL account configuration for customer advance');
       return null;
     }
 
-    if ((paymentType === 'balance' || paymentType === 'full') && !settings.sales_revenue_account_id && !customCreditAccountId) {
+    if ((paymentType === 'balance' || paymentType === 'full') && !settings.sales_revenue_account_id) {
       console.error(`[${module.toUpperCase()} Finance] Missing sales revenue account`);
       toast.error('Missing GL account configuration for sales revenue');
       return null;
     }
 
-    // Resolve accounts via Category resolution if customerId is provided
-    let tradeReceivableId = settings.trade_receivable_account_id;
-    let salesRevenueId = settings.sales_revenue_account_id;
-    let customerAdvanceId = settings.customer_advance_account_id;
-    let bankAccountId = customBankAccountId || settings.default_bank_account_id;
-
-    if (customerId) {
-      try {
-        const { resolveCustomerARAccounts } = await import('@/hooks/useCustomerCategories');
-        const resolved = await resolveCustomerARAccounts(customerId, effectiveCompanyId);
-        
-        if (resolved.arAccountId) tradeReceivableId = resolved.arAccountId;
-        if (resolved.revenueAccountId) salesRevenueId = resolved.revenueAccountId;
-        if (resolved.advanceAccountId) customerAdvanceId = resolved.advanceAccountId;
-        // Use resolved bank account ONLY IF customBankAccountId was not provided
-        if (!customBankAccountId && resolved.bankAccountId) {
-          bankAccountId = resolved.bankAccountId;
-        }
-        
-        console.log(`[${module.toUpperCase()} Finance] Payment GL resolution complete`, {
-          bankAccountId, tradeReceivableId, salesRevenueId, customerAdvanceId, source: resolved.source
-        });
-      } catch (err) {
-        console.warn(`[${module.toUpperCase()} Finance] Customer resolution failed for payment, using fallbacks`, err);
-      }
-    }
-
+    const bankAccountId = customBankAccountId || settings.default_bank_account_id;
     if (!bankAccountId) {
       console.error(`[${module.toUpperCase()} Finance] Missing bank account`);
       toast.error('Missing GL account configuration for bank');
@@ -446,7 +403,7 @@ export async function postVehiclePaymentToGL({
       .insert({
         company_id: effectiveCompanyId,
         entry_number: entryNumber,
-        entry_date: paymentDate || new Date().toISOString().split('T')[0],
+        entry_date: new Date().toISOString().split('T')[0],
         description,
         reference: `${businessUnitCode}-${entryPrefix}-${orderNo}`,
         source_module: `${module}_sales`,
@@ -480,32 +437,42 @@ export async function postVehiclePaymentToGL({
 
     // CREDIT: Based on payment type
     if (paymentType === 'advance') {
-      // CR Account: Priority 1. Custom Override, 2. Resolved Advance Account
+      // CR Customer Advance Receipt (Liability)
       lines.push({
         journal_entry_id: journalEntry.id,
-        account_id: customCreditAccountId || customerAdvanceId,
+        account_id: settings.customer_advance_account_id,
         description: `${businessUnitCode} Advance from ${customerName} - ${orderNo}`,
         debit: 0,
         credit: amount,
         company_id: effectiveCompanyId,
       });
     } else if (paymentType === 'balance') {
-      // CR Account: Priority 1. Custom Override, 2. Resolved Trade Receivable, 3. Resolved Revenue
-      const creditAccountId = customCreditAccountId || tradeReceivableId || salesRevenueId;
-      
-      lines.push({
-        journal_entry_id: journalEntry.id,
-        account_id: creditAccountId,
-        description: `${businessUnitCode} Balance payment from ${customerName} - ${orderNo}`,
-        debit: 0,
-        credit: amount,
-        company_id: effectiveCompanyId,
-      });
+      // CR Trade Receivable
+      if (settings.trade_receivable_account_id) {
+        lines.push({
+          journal_entry_id: journalEntry.id,
+          account_id: settings.trade_receivable_account_id,
+          description: `${businessUnitCode} Balance payment from ${customerName} - ${orderNo}`,
+          debit: 0,
+          credit: amount,
+          company_id: effectiveCompanyId,
+        });
+      } else {
+        // Fallback to revenue
+        lines.push({
+          journal_entry_id: journalEntry.id,
+          account_id: settings.sales_revenue_account_id,
+          description: `${businessUnitCode} Balance payment from ${customerName} - ${orderNo}`,
+          debit: 0,
+          credit: amount,
+          company_id: effectiveCompanyId,
+        });
+      }
     } else {
-      // Full payment: CR Account Priority 1. Custom Override, 2. Resolved Revenue
+      // Full payment: CR Revenue directly
       lines.push({
         journal_entry_id: journalEntry.id,
-        account_id: customCreditAccountId || salesRevenueId,
+        account_id: settings.sales_revenue_account_id,
         description: `${businessUnitCode} Full payment from ${customerName} - ${orderNo}`,
         debit: 0,
         credit: amount,
@@ -569,7 +536,7 @@ export async function resolveItemCategoryRevenueAccount(
 // Map module to default item category name
 const MODULE_CATEGORY_MAP: Record<VehicleModule, string> = {
   yutong: 'Yutong Sales',
-  sinotruck: 'Sinotruck Sales',
+  sinotruck: 'Sinotruk Sales',
   lightvehicle: 'Light Vehicle Sales',
 };
 
@@ -589,7 +556,6 @@ export async function postVehicleInvoiceToGL({
   taxRate,
   invoiceNo,
   itemCategoryName,
-  invoiceDate,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -601,8 +567,8 @@ export async function postVehicleInvoiceToGL({
   isTaxInvoice?: boolean;
   taxRate?: number;
   invoiceNo?: string;
-  itemCategoryName?: string;
   invoiceDate?: string;
+  itemCategoryName?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
@@ -644,7 +610,7 @@ export async function postVehicleInvoiceToGL({
     if (!tradeReceivableId || !salesRevenueId) {
       console.error(`[${module.toUpperCase()} Finance] Missing required accounts for invoice posting`);
       toast.error('Missing GL account configuration for invoice posting');
-      throw new Error(`Missing required GL accounts: ${!tradeReceivableId ? 'Trade Receivable ' : ''}${!salesRevenueId ? 'Sales Revenue' : ''}`);
+      return null;
     }
 
     const refLabel = invoiceNo || orderNo;
@@ -671,14 +637,15 @@ export async function postVehicleInvoiceToGL({
         total_debit: invoiceAmount,
         total_credit: invoiceAmount,
         business_unit_code: businessUnitCode,
-        posted_at: new Date().toISOString()
+        posted_at: new Date().toISOString(),
+        notes: invoiceNo ? `Invoice: ${invoiceNo}` : undefined,
       })
       .select('id, entry_number')
       .single();
 
     if (jeError) {
       console.error(`[${module.toUpperCase()} Finance] Invoice journal entry error:`, jeError);
-      throw new Error(`Failed to create GL entry: ${jeError.message}`);
+      return null;
     }
 
     // DR Trade Receivable (full amount)
@@ -730,15 +697,15 @@ export async function postVehicleInvoiceToGL({
 
     if (linesError) {
       await supabase.from('journal_entries').delete().eq('id', journalEntry.id);
-      throw new Error(`Failed to create GL entry lines: ${linesError.message}`);
+      return null;
     }
 
     await updateCOABalances(lines);
 
     return { journalEntryId: journalEntry.id, entryNumber: journalEntry.entry_number };
-  } catch (error: any) {
+  } catch (error) {
     console.error(`[${module.toUpperCase()} Finance] Exception posting invoice to GL:`, error);
-    throw error;
+    return null;
   }
 }
 
@@ -752,8 +719,6 @@ export async function applyAdvanceToReceivable({
   advanceAmount,
   settings,
   effectiveCompanyId,
-  customerId,
-  applicationDate,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -761,28 +726,11 @@ export async function applyAdvanceToReceivable({
   advanceAmount: number;
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
-  customerId?: string;
-  applicationDate?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
-    
-    // Resolve accounts via Category resolution if customerId is provided
-    let tradeReceivableId = settings.trade_receivable_account_id;
-    let customerAdvanceId = settings.customer_advance_account_id;
 
-    if (customerId) {
-      try {
-        const { resolveCustomerARAccounts } = await import('@/hooks/useCustomerCategories');
-        const resolved = await resolveCustomerARAccounts(customerId, effectiveCompanyId);
-        if (resolved.arAccountId) tradeReceivableId = resolved.arAccountId;
-        if (resolved.advanceAccountId) customerAdvanceId = resolved.advanceAccountId;
-      } catch (err) {
-        console.warn(`[${module.toUpperCase()} Finance] Customer resolution failed for advance application`, err);
-      }
-    }
-
-    if (!customerAdvanceId || !tradeReceivableId) {
+    if (!settings.customer_advance_account_id || !settings.trade_receivable_account_id) {
       console.error(`[${module.toUpperCase()} Finance] Missing accounts for advance application`);
       return null;
     }
@@ -795,7 +743,7 @@ export async function applyAdvanceToReceivable({
       .insert({
         company_id: effectiveCompanyId,
         entry_number: entryNumber,
-        entry_date: applicationDate || new Date().toISOString().split('T')[0],
+        entry_date: new Date().toISOString().split('T')[0],
         description,
         reference: `${businessUnitCode}-ADV-APPLY-${orderNo}`,
         source_module: `${module}_sales`,
@@ -814,7 +762,7 @@ export async function applyAdvanceToReceivable({
     const lines = [
       {
         journal_entry_id: journalEntry.id,
-        account_id: customerAdvanceId,
+        account_id: settings.customer_advance_account_id,
         description: `${businessUnitCode} Advance applied - ${customerName}`,
         debit: advanceAmount,
         credit: 0,
@@ -822,7 +770,7 @@ export async function applyAdvanceToReceivable({
       },
       {
         journal_entry_id: journalEntry.id,
-        account_id: tradeReceivableId,
+        account_id: settings.trade_receivable_account_id,
         description: `${businessUnitCode} Advance applied - ${customerName}`,
         debit: 0,
         credit: advanceAmount,
@@ -861,18 +809,16 @@ export async function createVehicleARReceipt({
   paymentDate,
   settings,
   effectiveCompanyId,
-  overrideGLAccountId,
 }: {
   module: VehicleModule;
   paymentId: string;
-  invoiceId: string;
+  invoiceId?: string;
   customerId: string;
   amount: number;
   paymentMethod: string;
   paymentDate: string;
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
-  overrideGLAccountId?: string;
 }): Promise<{ receiptId: string; receiptNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];

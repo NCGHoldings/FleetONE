@@ -33,6 +33,7 @@ export interface ProformaInvoiceConfig {
    dateOfDelivery?: string;
    modeOfPayment?: string;
    additionalInformation?: string;
+   invoiceDate?: string;
 }
 
 interface YutongInvoiceTypeModalProps {
@@ -82,6 +83,7 @@ export function YutongInvoiceTypeModal({
    const [dateOfDelivery, setDateOfDelivery] = useState('');
    const [modeOfPayment, setModeOfPayment] = useState('');
    const [additionalInformation, setAdditionalInformation] = useState('');
+   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     setInvoiceCategory(defaultInvoiceType);
@@ -108,6 +110,7 @@ export function YutongInvoiceTypeModal({
   const handleConfirm = () => {
     const config: ProformaInvoiceConfig = {
       invoiceCategory,
+      invoiceDate,
       ...(invoiceCategory === 'proforma_invoice' && {
         amountMode,
         proformaAmountPercentage: amountMode === 'percentage' ? proformaPercentage : Math.round((proformaAmount / totalAmount) * 100),
@@ -153,6 +156,7 @@ export function YutongInvoiceTypeModal({
      setDateOfDelivery('');
      setModeOfPayment('');
      setAdditionalInformation('');
+     setInvoiceDate(new Date().toISOString().split('T')[0]);
     onClose();
   };
 
@@ -214,6 +218,17 @@ export function YutongInvoiceTypeModal({
                </div>
              </div>
           </RadioGroup>
+
+          <div className="space-y-2 p-4 bg-muted/30 rounded-lg border">
+            <Label>Invoice Date</Label>
+            <Input
+              type="date"
+              value={invoiceDate}
+              onChange={(e) => setInvoiceDate(e.target.value)}
+              className="w-full sm:w-[200px]"
+            />
+            <p className="text-xs text-muted-foreground">Select a past date to backdate this invoice.</p>
+          </div>
 
            {/* Tax Invoice Options - Sri Lanka Government Format */}
            {invoiceCategory === 'tax_invoice' && (
