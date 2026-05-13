@@ -121,9 +121,9 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
           `business_unit_code.eq.${businessUnitCode}`,
           `entry_number.ilike.${businessUnitCode}-%`
         ];
-        // SBO has extra legacy prefixes
+        // SBO has extra legacy prefixes and alternate code 'SBS'
         if (businessUnitCode === "SBO") {
-          filterParts.push('entry_number.ilike.SBS-%', 'entry_number.ilike.FUEL-BLK-%', 'entry_number.ilike.EXP-BLK-%');
+          filterParts.push('business_unit_code.eq.SBS', 'entry_number.ilike.SBS-%', 'entry_number.ilike.FUEL-BLK-%', 'entry_number.ilike.EXP-BLK-%');
         }
         // Add legacy codes if the company short_code was changed
         const cName = selectedCompany?.name?.toLowerCase() || '';
@@ -154,7 +154,7 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
         } else if (cName.includes("sinotruck")) {
           query = query.or("entry_number.ilike.SNT-%,business_unit_code.eq.SNT");
         } else if (cName.includes("school bus")) {
-          query = query.or("entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%,business_unit_code.eq.SBO");
+          query = query.or("entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%,business_unit_code.eq.SBO,business_unit_code.eq.SBS");
         } else if (cName.includes("special hire")) {
           query = query.or("entry_number.ilike.SPH-%,business_unit_code.eq.SPH");
         } else if (cName.includes("light vehicle")) {
@@ -418,7 +418,7 @@ export const useARInvoices = (status?: "all" | "draft" | "sent" | "paid" | "part
       } else if (selectedCompany) {
         // Fallback for legacy setups
         const cName = selectedCompany.name.toLowerCase();
-        if (cName.includes("school bus")) query = query.or("invoice_number.ilike.SBS-%,business_unit_code.eq.SBO");
+        if (cName.includes("school bus")) query = query.or("invoice_number.ilike.SBS-%,business_unit_code.eq.SBO,business_unit_code.eq.SBS");
         else if (cName.includes("special hire")) query = query.or("invoice_number.ilike.SPH-%,business_unit_code.eq.SPH");
         else if (cName.includes("yutong")) query = query.or("invoice_number.ilike.YUT-%,business_unit_code.eq.YUT");
         else if (cName.includes("sinotruck")) query = query.or("invoice_number.ilike.SNT-%,business_unit_code.eq.SNT");
@@ -480,7 +480,7 @@ export const useAPInvoices = (status?: "all" | "draft" | "sent" | "paid" | "part
       } else if (selectedCompany) {
         // Fallback for legacy setups
         const cName = selectedCompany.name.toLowerCase();
-        if (cName.includes("school bus")) query = query.or("invoice_number.ilike.SBS-%,business_unit_code.eq.SBO");
+        if (cName.includes("school bus")) query = query.or("invoice_number.ilike.SBS-%,business_unit_code.eq.SBO,business_unit_code.eq.SBS");
         else if (cName.includes("special hire")) query = query.or("invoice_number.ilike.SPH-%,business_unit_code.eq.SPH");
         else if (cName.includes("yutong")) query = query.or("invoice_number.ilike.YUT-%,business_unit_code.eq.YUT");
         else if (cName.includes("sinotruck")) query = query.or("invoice_number.ilike.SNT-%,business_unit_code.eq.SNT");
@@ -538,7 +538,7 @@ export const useARReceipts = () => {
       } else if (selectedCompany) {
         // Fallback for legacy setups
         const cName = selectedCompany.name.toLowerCase();
-        if (cName.includes("school bus")) query = query.or("receipt_number.ilike.SBS-%,business_unit_code.eq.SBO");
+        if (cName.includes("school bus")) query = query.or("receipt_number.ilike.SBS-%,business_unit_code.eq.SBO,business_unit_code.eq.SBS");
         else if (cName.includes("special hire")) query = query.or("receipt_number.ilike.SPH-%,business_unit_code.eq.SPH");
         else if (cName.includes("yutong")) query = query.or("receipt_number.ilike.YUT-%,business_unit_code.eq.YUT");
         else if (cName.includes("sinotruck")) query = query.or("receipt_number.ilike.SNT-%,business_unit_code.eq.SNT");
@@ -2017,7 +2017,7 @@ export const useTrialBalanceData = (
       // modern entries (with business_unit_code) and legacy entries (with prefix only)
       if (autoBusinessUnitCode) {
         if (autoBusinessUnitCode === "SBO") {
-          jeQuery = jeQuery.or(`business_unit_code.eq.SBO,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%`);
+          jeQuery = jeQuery.or(`business_unit_code.eq.SBO,business_unit_code.eq.SBS,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%`);
         } else {
           jeQuery = jeQuery.or(`business_unit_code.eq.${autoBusinessUnitCode},entry_number.ilike.${autoBusinessUnitCode}-%`);
         }
@@ -2031,7 +2031,7 @@ export const useTrialBalanceData = (
         } else if (cName.includes("sinotruck")) {
           jeQuery = jeQuery.or("entry_number.ilike.SNT-%,business_unit_code.eq.SNT");
         } else if (cName.includes("school bus")) {
-          jeQuery = jeQuery.or("entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%,business_unit_code.eq.SBO");
+          jeQuery = jeQuery.or("entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%,business_unit_code.eq.SBO,business_unit_code.eq.SBS");
         } else if (cName.includes("special hire")) {
           jeQuery = jeQuery.or("entry_number.ilike.SPH-%,business_unit_code.eq.SPH");
         } else if (cName.includes("light vehicle")) {
@@ -2104,7 +2104,7 @@ export const useTrialBalanceData = (
       // Apply business unit filter with legacy entry_number prefix fallback
       if (autoBusinessUnitCode) {
         if (autoBusinessUnitCode === "SBO") {
-          jeQuery = jeQuery.or(`business_unit_code.eq.SBO,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%`);
+          jeQuery = jeQuery.or(`business_unit_code.eq.SBO,business_unit_code.eq.SBS,entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%`);
         } else {
           jeQuery = jeQuery.or(`business_unit_code.eq.${autoBusinessUnitCode},entry_number.ilike.${autoBusinessUnitCode}-%`);
         }
@@ -2118,7 +2118,7 @@ export const useTrialBalanceData = (
         } else if (cName.includes("sinotruck")) {
           jeQuery = jeQuery.or("entry_number.ilike.SNT-%,business_unit_code.eq.SNT");
         } else if (cName.includes("school bus")) {
-          jeQuery = jeQuery.or("entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%,business_unit_code.eq.SBO");
+          jeQuery = jeQuery.or("entry_number.ilike.SBS-%,entry_number.ilike.FUEL-BLK-%,entry_number.ilike.EXP-BLK-%,business_unit_code.eq.SBO,business_unit_code.eq.SBS");
         } else if (cName.includes("special hire")) {
           jeQuery = jeQuery.or("entry_number.ilike.SPH-%,business_unit_code.eq.SPH");
         } else if (cName.includes("light vehicle")) {

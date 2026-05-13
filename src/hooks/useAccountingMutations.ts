@@ -5507,6 +5507,29 @@ export const useUpdateAPInvoice = () => {
     }) => {
       const effectiveCompanyId = getEffectiveCompanyId();
       
+      // Fetch existing invoice to preserve paid_amount and correctly recalculate balance
+      const { data: existingInvoice } = await supabase
+        .from("ap_invoices")
+        .select("paid_amount, total_amount, status")
+        .eq("id", id)
+        .single();
+      
+      const existingPaidAmount = Number(existingInvoice?.paid_amount || 0);
+      const newTotalAmount = Number(data.total_amount || 0);
+      const newBalance = Math.max(0, newTotalAmount - existingPaidAmount);
+      
+      // Recalculate status based on actual paid vs total
+      let newStatus = existingInvoice?.status || 'unpaid';
+      if (newTotalAmount > 0) {
+        if (existingPaidAmount >= newTotalAmount) {
+          newStatus = 'paid';
+        } else if (existingPaidAmount > 0) {
+          newStatus = 'partial';
+        } else {
+          newStatus = 'unpaid';
+        }
+      }
+      
       const { error: headerError } = await supabase
         .from("ap_invoices")
         .update({
@@ -5516,9 +5539,11 @@ export const useUpdateAPInvoice = () => {
           invoice_date: data.invoice_date,
           due_date: data.due_date,
           subtotal: data.subtotal,
-          total_amount: data.total_amount,
+          total_amount: newTotalAmount,
           tax_amount: data.tax_amount,
           wht_amount: data.wht_amount,
+          balance: newBalance,
+          status: newStatus,
           notes: data.notes,
           route_id: data.route_id || null,
           bus_id: data.bus_id || null,
@@ -5586,6 +5611,29 @@ export const useUpdateARInvoice = () => {
     }) => {
       const effectiveCompanyId = getEffectiveCompanyId();
       
+      // Fetch existing invoice to preserve paid_amount and correctly recalculate balance
+      const { data: existingInvoice } = await supabase
+        .from("ar_invoices")
+        .select("paid_amount, total_amount, status")
+        .eq("id", id)
+        .single();
+      
+      const existingPaidAmount = Number(existingInvoice?.paid_amount || 0);
+      const newTotalAmount = Number(data.total_amount || 0);
+      const newBalance = Math.max(0, newTotalAmount - existingPaidAmount);
+      
+      // Recalculate status based on actual paid vs total
+      let newStatus = existingInvoice?.status || 'unpaid';
+      if (newTotalAmount > 0) {
+        if (existingPaidAmount >= newTotalAmount) {
+          newStatus = 'paid';
+        } else if (existingPaidAmount > 0) {
+          newStatus = 'partial';
+        } else {
+          newStatus = 'unpaid';
+        }
+      }
+      
       const { error: headerError } = await supabase
         .from("ar_invoices")
         .update({
@@ -5593,9 +5641,10 @@ export const useUpdateARInvoice = () => {
           invoice_number: data.invoice_number,
           invoice_date: data.invoice_date,
           due_date: data.due_date,
-          total_amount: data.total_amount,
+          total_amount: newTotalAmount,
           tax_amount: data.tax_amount,
-          balance: data.total_amount,
+          balance: newBalance,
+          status: newStatus,
           notes: data.notes,
           bus_id: data.bus_id || null,
           bus_no: data.bus_no || null,

@@ -1592,10 +1592,7 @@ export const generateSPHARInvoiceTemplate = (): string => `
   .sm .bl { font-weight: bold; color: #1e40af; }
   .sm .ba { font-weight: bold; color: #1e40af; font-size: 16px; text-align: right; }
   .nt { margin-top: 16px; padding: 10px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 13px; }
-  .sg { width: 100%; border-collapse: collapse; margin-top: 30px; font-size: 12px; }
-  .sg th { border: 1px solid #000; padding: 8px; text-align: center; background: #f3f4f6; }
-  .sg td { border: 1px solid #000; padding: 12px; vertical-align: top; }
-  .sgl { height: 40px; border-bottom: 1px solid #000; margin: 5px 0; }
+
   .ft { margin-top: 30px; text-align: center; font-size: 10px; color: #666; }
   @media print { body { background: #fff; } .pg { margin: 0; padding: 10px; max-width: 100%; } }
 </style>
@@ -1669,15 +1666,11 @@ export const generateSPHARInvoiceTemplate = (): string => `
     3. Cancellation charges apply if cancelled within 24 hours.<br>
     4. Prices are subject to fuel price fluctuations.
   </div>
-  <table class="sg">
-    <thead><tr><th>Prepared By</th><th>Checked By</th><th>Approved By</th></tr></thead>
-    <tbody><tr>
-      <td><strong>Name:</strong> {{prepared_by}}<br><strong>Signature:</strong><div class="sgl">{{prepared_by_signature}}</div><strong>Date:</strong> {{print_date}}</td>
-      <td><strong>Name:</strong> {{verified_by}}<br><strong>Signature:</strong><div class="sgl">{{verified_by_signature}}</div><strong>Date:</strong> .........................</td>
-      <td><strong>Name:</strong> {{approved_by}}<br><strong>Signature:</strong><div class="sgl">{{approved_by_signature}}</div><strong>Date:</strong> .........................</td>
-    </tr></tbody>
-  </table>
-  <div class="ft">Page 1 of 1<br>NCG Express Transport Management System</div>
+  <div class="ft">
+    This is a system-generated document. No signature is required.<br>
+    Page 1 of 1<br>
+    NCG Holding - Transport Management System
+  </div>
 </div>
 `;
 
@@ -1750,16 +1743,12 @@ export const generateSPHARReceiptTemplate = (): string => `
   <div class="rtrip">
     <strong>Notes:</strong> {{notes}}
   </div>
-  <div class="rnote">*Note: Please make sure to place the name, signature and date in the given space accordingly.</div>
-  <table class="rsg">
-    <thead><tr><th>Prepared By</th><th>Checked By</th><th>Approved By</th></tr></thead>
-    <tbody><tr>
-      <td><strong>Name:</strong> {{prepared_by}}<br><strong>Signature:</strong><div class="rsgl">{{prepared_by_signature}}</div><strong>Date:</strong> {{print_date}}</td>
-      <td><strong>Name:</strong> {{verified_by}}<br><strong>Signature:</strong><div class="rsgl">{{verified_by_signature}}</div><strong>Date:</strong> .........................</td>
-      <td><strong>Name:</strong> {{approved_by}}<br><strong>Signature:</strong><div class="rsgl">{{approved_by_signature}}</div><strong>Date:</strong> .........................</td>
-    </tr></tbody>
-  </table>
-  <div class="rft">Page 1 of 1<br>NCG Express Transport Management System</div>
+
+  <div class="rft">
+    This is a system-generated document. No signature is required.<br>
+    Page 1 of 1<br>
+    NCG Holding - Transport Management System
+  </div>
 </div>
 `;
 
@@ -2050,8 +2039,8 @@ export const generateSchoolReceiptTemplate = (): string => `
 
 // Export all templates as a map
 export const defaultTemplates: Record<string, () => string> = {
-  ar_invoice: generateARInvoiceTemplate,
-  ar_receipt: generateARReceiptTemplate,
+  ar_invoice: generateSPHARInvoiceTemplate,
+  ar_receipt: generateSPHARReceiptTemplate,
   ar_credit_note: generateARCreditNoteTemplate,
   ap_invoice: generateAPInvoiceTemplate,
   ap_payment_voucher: generateAPPaymentVoucherTemplate,

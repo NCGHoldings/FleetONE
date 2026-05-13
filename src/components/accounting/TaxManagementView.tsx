@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTaxCodes, useARInvoices, useAPInvoices } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { WHTDetailsSheet } from "./WHTDetailsSheet";
 
 export const TaxManagementView = () => {
   const { data: taxCodes, isLoading: taxCodesLoading } = useTaxCodes();
@@ -48,18 +49,21 @@ export const TaxManagementView = () => {
   );
 
   // WHT from AP payments
-  const whtTransactions = apInvoices?.filter(inv => (inv.wht_amount || 0) > 0).map(inv => ({
-    id: inv.id,
-    date: inv.invoice_date,
-    payment_number: inv.invoice_number,
-    vendor: inv.vendors?.vendor_name || "Unknown",
-    service_type: "Services",
-    gross_amount: inv.total_amount,
-    wht_rate: inv.wht_amount && inv.total_amount ? Math.round((inv.wht_amount / inv.total_amount) * 100) : 5,
-    wht_amount: inv.wht_amount || 0,
-    net_amount: inv.total_amount - (inv.wht_amount || 0),
-    status: inv.status === "paid" ? "Remitted" : "Withheld",
-  })) || [];
+  const whtTransactions = apInvoices?.filter(inv => (Number(inv.wht_amount) || 0) > 0).map(inv => {
+    const whtAmt = Number(inv.wht_amount) || 0;
+    return {
+      id: inv.id,
+      date: inv.invoice_date,
+      payment_number: inv.invoice_number,
+      vendor: inv.vendors?.vendor_name || "Unknown",
+      service_type: "Services",
+      gross_amount: inv.total_amount,
+      wht_rate: whtAmt && inv.total_amount ? Math.round((whtAmt / inv.total_amount) * 100) : 5,
+      wht_amount: whtAmt,
+      net_amount: inv.total_amount - whtAmt,
+      status: inv.status === "paid" ? "Remitted" : "Withheld",
+    };
+  }) || [];
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -294,24 +298,7 @@ export const TaxManagementView = () => {
         </TabsContent>
 
         <TabsContent value="wht">
-          <Card className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-2xl font-bold">Withholding Tax (WHT)</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Manage withholding tax on payments to vendors and contractors
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export WHT Certificates
-                </Button>
-              </div>
-            </div>
-
-            <DataTable enableColumnFilters columns={whtColumns} data={whtTransactions} searchKey="vendor" />
-          </Card>
+          <WHTDetailsSheet />
         </TabsContent>
 
         <TabsContent value="reports">

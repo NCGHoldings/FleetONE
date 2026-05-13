@@ -47,13 +47,17 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Loader2, Download, X, Filter, Bus, Route, Trash2, FileText, CheckCircle, Eye, ChevronDown, ChevronRight, Info, RefreshCw, ShieldCheck, Columns } from "lucide-react";
+import { Loader2, Download, X, Filter, Bus, Route, Trash2, FileText, CheckCircle, Eye, ChevronDown, ChevronRight, Info, RefreshCw, ShieldCheck, Columns, Lock, Unlock, Save, Edit3, GitBranch } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { reverseAndDeleteJournalEntry } from "@/lib/gl-posting-utils";
 import { useReconcileJournalLines } from "@/hooks/useAccountingMutations";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
+import { TransactionLineageDialog } from "./shared/TransactionLineageDialog";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface DrillDownModalProps {
   open: boolean;
@@ -92,12 +96,23 @@ export const DrillDownModal = ({
   const [breakdownExpanded, setBreakdownExpanded] = useState<Record<string, boolean>>({});
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [showRecalcConfirm, setShowRecalcConfirm] = useState(false);
+  const [isEditingOpeningBalance, setIsEditingOpeningBalance] = useState(false);
+  const [openingBalanceInput, setOpeningBalanceInput] = useState("");
+  const [isSavingOpeningBalance, setIsSavingOpeningBalance] = useState(false);
+  const [isTogglingLock, setIsTogglingLock] = useState(false);
 
   const [previewDocType, setPreviewDocType] = useState<string>("");
   const [previewDocData, setPreviewDocData] = useState<any>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
-  const defaultColumns = ["date", "entry_number", "account", "bu", "bus", "route", "reference", "description", "debit", "credit", "balance", "status"];
+  // Transaction Lineage Tracer states
+  const [lineageJeId, setLineageJeId] = useState<string | null>(null);
+  const [lineageEntryNumber, setLineageEntryNumber] = useState<string>("");
+  const [lineageAmount, setLineageAmount] = useState<number>(0);
+  const [lineageType, setLineageType] = useState<"debit" | "credit">("debit");
+  const [isLineageOpen, setIsLineageOpen] = useState(false);
+
+  const defaultColumns = ["date", "entry_number", "account", "bu", "bus", "route", "reference", "party_name", "description", "debit", "credit", "balance", "status"];
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem("drilldown-visible-columns");
@@ -245,7 +260,7 @@ export const DrillDownModal = ({
       if (resolvedAccountIds.length === 0) return [];
       const { data, error } = await supabase
         .from("chart_of_accounts")
-        .select("id, current_balance, account_type")
+        .select("id, current_balance, account_type, opening_balance, balance_locked")
         .in("id", resolvedAccountIds);
       if (error) throw error;
       return data;
@@ -271,7 +286,19 @@ export const DrillDownModal = ({
         const ref = entry.reference;
         const source = entry.source_module;
         
-        if (source === 'ar_invoice' || source === 'manual_ar' || ref.includes('-INV-') || ref.startsWith('INV-')) {
+        // Categorize into AR Invoice refs (includes all BU-specific invoice patterns)
+        const isARInvoiceSource = source === 'ar_invoice' || source === 'manual_ar' 
+          || source === 'yutong_sales' || source === 'sinotruck_sales' 
+          || source === 'light_vehicle_sales' || source === 'school_bus';
+        const isARInvoiceRef = ref.includes('-INV-') || ref.startsWith('INV-') 
+          || ref.includes('-CI-')   // Yutong/Sinotruck Customer Invoice (NCGH-YT-CI-xxxxx)
+          || ref.startsWith('SPH-AR-')  // Special Hire AR
+          || ref.startsWith('SBS-INV-') // School Bus Invoice
+          || ref.startsWith('NCGH-YT-') // Yutong
+          || ref.startsWith('NCGH-SNT-') // Sinotruck
+          || ref.startsWith('NCGH-LTV-'); // Light Vehicle
+
+        if (isARInvoiceSource || isARInvoiceRef) {
           arInvoiceRefs.add(ref);
         } else if (source === 'ap_invoice' || ref.includes('API-') || ref.startsWith('API-')) {
           apInvoiceRefs.add(ref);
@@ -282,45 +309,75 @@ export const DrillDownModal = ({
         }
       });
       
-      const balances: Record<string, { balance: number, type: 'invoice' | 'receipt', parentRef?: string }> = {};
+      const balances: Record<string, { balance: number, type: 'invoice' | 'receipt', parentRef?: string, partyName?: string }> = {};
       
-      // Fetch AR Invoices
+      // Fetch AR Invoices — include customer name
       if (arInvoiceRefs.size > 0) {
-        const { data } = await supabase.from('ar_invoices').select('invoice_number, balance').in('invoice_number', Array.from(arInvoiceRefs));
-        data?.forEach(inv => { balances[inv.invoice_number] = { balance: inv.balance, type: 'invoice' }; });
-      }
-      
-      // Fetch AP Invoices
-      if (apInvoiceRefs.size > 0) {
-        const { data } = await supabase.from('ap_invoices').select('invoice_number, balance').in('invoice_number', Array.from(apInvoiceRefs));
-        data?.forEach(inv => { balances[inv.invoice_number] = { balance: inv.balance, type: 'invoice' }; });
-      }
-      
-      // Fetch AR Receipts (to find parent invoice)
-      if (arReceiptRefs.size > 0) {
-        const { data: receipts } = await supabase.from('ar_receipts').select('id, receipt_number').in('receipt_number', Array.from(arReceiptRefs));
-        if (receipts && receipts.length > 0) {
-          const receiptMap = Object.fromEntries(receipts.map(r => [r.id, r.receipt_number]));
-          const { data: allocations } = await supabase.from('ar_receipt_allocations').select('receipt_id, ar_invoices(invoice_number)').in('receipt_id', receipts.map(r => r.id));
-          allocations?.forEach(alloc => { 
-            const receiptNumber = receiptMap[alloc.receipt_id];
-            if (receiptNumber && alloc.ar_invoices?.invoice_number) {
-              balances[receiptNumber] = { balance: 0, type: 'receipt', parentRef: alloc.ar_invoices.invoice_number }; 
+        const refsArray = Array.from(arInvoiceRefs);
+        // Primary: exact match on invoice_number
+        const { data } = await supabase.from('ar_invoices').select('invoice_number, balance, customers(customer_name)').in('invoice_number', refsArray);
+        data?.forEach((inv: any) => { balances[inv.invoice_number] = { balance: inv.balance, type: 'invoice', partyName: inv.customers?.customer_name || '' }; });
+        
+        // Secondary: for unmatched refs (e.g. short-form YT-CI-260101 vs full NCGH-YT-CI-260101), do ILIKE lookup
+        const matchedRefs = new Set(data?.map((inv: any) => inv.invoice_number) || []);
+        const unmatchedRefs = refsArray.filter(r => !matchedRefs.has(r));
+        if (unmatchedRefs.length > 0) {
+          // Build OR filter for ILIKE matching
+          const orFilter = unmatchedRefs.map(r => `invoice_number.ilike.%${r}%`).join(',');
+          const { data: fuzzyData } = await supabase.from('ar_invoices').select('invoice_number, balance, customers(customer_name)').or(orFilter);
+          fuzzyData?.forEach((inv: any) => {
+            // Map the result back to the original short ref that matched
+            const originalRef = unmatchedRefs.find(r => inv.invoice_number.includes(r));
+            if (originalRef && !balances[originalRef]) {
+              balances[originalRef] = { balance: inv.balance, type: 'invoice', partyName: inv.customers?.customer_name || '' };
             }
           });
         }
       }
       
-      // Fetch AP Payments (to find parent invoice)
+      // Fetch AP Invoices — include vendor name
+      if (apInvoiceRefs.size > 0) {
+        const { data } = await supabase.from('ap_invoices').select('invoice_number, balance, vendors(vendor_name)').in('invoice_number', Array.from(apInvoiceRefs));
+        data?.forEach((inv: any) => { balances[inv.invoice_number] = { balance: inv.balance, type: 'invoice', partyName: inv.vendors?.vendor_name || '' }; });
+      }
+      
+      // Fetch AR Receipts — include customer name + parent invoice
+      if (arReceiptRefs.size > 0) {
+        const { data: receipts } = await supabase.from('ar_receipts').select('id, receipt_number, customers(customer_name)').in('receipt_number', Array.from(arReceiptRefs));
+        if (receipts && receipts.length > 0) {
+          const receiptMap = Object.fromEntries(receipts.map((r: any) => [r.id, { number: r.receipt_number, partyName: r.customers?.customer_name || '' }]));
+          const { data: allocations } = await supabase.from('ar_receipt_allocations').select('receipt_id, ar_invoices(invoice_number)').in('receipt_id', receipts.map(r => r.id));
+          allocations?.forEach(alloc => { 
+            const info = receiptMap[alloc.receipt_id];
+            if (info && alloc.ar_invoices?.invoice_number) {
+              balances[info.number] = { balance: 0, type: 'receipt', parentRef: alloc.ar_invoices.invoice_number, partyName: info.partyName }; 
+            }
+          });
+          // Also add receipts without allocations
+          receipts.forEach((r: any) => {
+            if (!balances[r.receipt_number]) {
+              balances[r.receipt_number] = { balance: 0, type: 'receipt', partyName: r.customers?.customer_name || '' };
+            }
+          });
+        }
+      }
+      
+      // Fetch AP Payments — include vendor name + parent invoice
       if (apPaymentRefs.size > 0) {
-        const { data: payments } = await supabase.from('ap_payments').select('id, payment_number').in('payment_number', Array.from(apPaymentRefs));
+        const { data: payments } = await supabase.from('ap_payments').select('id, payment_number, vendors(vendor_name)').in('payment_number', Array.from(apPaymentRefs));
         if (payments && payments.length > 0) {
-          const paymentMap = Object.fromEntries(payments.map(p => [p.id, p.payment_number]));
+          const paymentMap = Object.fromEntries(payments.map((p: any) => [p.id, { number: p.payment_number, partyName: p.vendors?.vendor_name || '' }]));
           const { data: allocations } = await supabase.from('ap_payment_allocations').select('payment_id, ap_invoices(invoice_number)').in('payment_id', payments.map(p => p.id));
           allocations?.forEach(alloc => { 
-            const paymentNumber = paymentMap[alloc.payment_id];
-            if (paymentNumber && alloc.ap_invoices?.invoice_number) {
-              balances[paymentNumber] = { balance: 0, type: 'receipt', parentRef: alloc.ap_invoices.invoice_number }; 
+            const info = paymentMap[alloc.payment_id];
+            if (info && alloc.ap_invoices?.invoice_number) {
+              balances[info.number] = { balance: 0, type: 'receipt', parentRef: alloc.ap_invoices.invoice_number, partyName: info.partyName }; 
+            }
+          });
+          // Also add payments without allocations
+          payments.forEach((p: any) => {
+            if (!balances[p.payment_number]) {
+              balances[p.payment_number] = { balance: 0, type: 'receipt', partyName: p.vendors?.vendor_name || '' };
             }
           });
         }
@@ -362,21 +419,127 @@ export const DrillDownModal = ({
   // Both current_balance and fetchedNetMovement now use the SAME sign convention.
   const broughtForwardBalance = totalCurrentBalance - fetchedNetMovement;
 
+  // === Derived: Opening Balance & Lock Status ===
+  const totalOpeningBalance = useMemo(() => {
+    return accountsData?.reduce((sum, acc) => sum + (Number((acc as any).opening_balance) || 0), 0) || 0;
+  }, [accountsData]);
+
+  const isBalanceLocked = useMemo(() => {
+    return accountsData?.some((acc) => (acc as any).balance_locked === true) || false;
+  }, [accountsData]);
+
+  // === Save Opening Balance Handler ===
+  const handleSaveOpeningBalance = async () => {
+    if (resolvedAccountIds.length === 0) return;
+    const newOpeningBalance = parseFloat(openingBalanceInput);
+    if (isNaN(newOpeningBalance)) {
+      toast.error("Please enter a valid number");
+      return;
+    }
+    setIsSavingOpeningBalance(true);
+    try {
+      // For single account, set directly. For multiple, distribute proportionally (rare case)
+      for (const accountId of resolvedAccountIds) {
+        const perAccountBalance = resolvedAccountIds.length === 1
+          ? newOpeningBalance
+          : newOpeningBalance / resolvedAccountIds.length;
+
+        // Get current JE-based movement to recalculate current_balance
+        const allLines = await fetchAllRows(
+          supabase
+            .from("journal_entry_lines")
+            .select(`id, debit, credit, journal_entries!inner(status)`)
+            .eq("account_id", accountId)
+            .eq("journal_entries.status", "posted")
+        );
+        const { data: account } = await supabase
+          .from("chart_of_accounts")
+          .select("account_type")
+          .eq("id", accountId)
+          .single();
+
+        const totalDebit = allLines.reduce((s: number, l: any) => s + (Number(l.debit) || 0), 0);
+        const totalCredit = allLines.reduce((s: number, l: any) => s + (Number(l.credit) || 0), 0);
+        const acctIsDebitNormal = ["asset", "expense", "expenses"].includes((account?.account_type || "").toLowerCase());
+        const jeMovement = acctIsDebitNormal ? (totalDebit - totalCredit) : (totalCredit - totalDebit);
+
+        // current_balance = opening_balance + JE movements
+        const newCurrentBalance = perAccountBalance + jeMovement;
+
+        const { error } = await supabase
+          .from("chart_of_accounts")
+          .update({
+            opening_balance: perAccountBalance,
+            current_balance: newCurrentBalance,
+          })
+          .eq("id", accountId);
+
+        if (error) throw error;
+      }
+
+      toast.success(`Opening balance set to ${newOpeningBalance.toLocaleString()}`);
+      setIsEditingOpeningBalance(false);
+
+      // Invalidate caches
+      queryClient.invalidateQueries({ queryKey: ["account-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["drilldown-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bbf-breakdown"] });
+      queryClient.invalidateQueries({ queryKey: ["trial-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+    } catch (error) {
+      toast.error("Failed to save opening balance: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setIsSavingOpeningBalance(false);
+    }
+  };
+
+  // === Toggle Balance Lock Handler ===
+  const handleToggleBalanceLock = async () => {
+    if (resolvedAccountIds.length === 0) return;
+    setIsTogglingLock(true);
+    try {
+      const newLockState = !isBalanceLocked;
+      for (const accountId of resolvedAccountIds) {
+        const { error } = await supabase
+          .from("chart_of_accounts")
+          .update({ balance_locked: newLockState })
+          .eq("id", accountId);
+        if (error) throw error;
+      }
+      toast.success(newLockState ? "Balance locked — recalculation disabled" : "Balance unlocked — recalculation enabled");
+      queryClient.invalidateQueries({ queryKey: ["drilldown-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+    } catch (error) {
+      toast.error("Failed to toggle lock: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setIsTogglingLock(false);
+    }
+  };
+
   // === Recalculate Balance Handler ===
-  // Recalculates current_balance from ALL posted journal entry lines for this account
+  // Recalculates current_balance from opening_balance + ALL posted journal entry lines
   const handleRecalculateBalance = async () => {
     if (resolvedAccountIds.length === 0) return;
+
+    // Guard: check lock
+    if (isBalanceLocked) {
+      toast.error("Balance is locked. Unlock it first before recalculating.");
+      return;
+    }
+
     setIsRecalculating(true);
     try {
       for (const accountId of resolvedAccountIds) {
-        // 1. Get the account type and current_balance
+        // 1. Get the account type, current_balance, and opening_balance
         const { data: account } = await supabase
           .from("chart_of_accounts")
-          .select("id, account_type, current_balance")
+          .select("id, account_type, current_balance, opening_balance")
           .eq("id", accountId)
           .single();
 
         if (!account) continue;
+
+        const openingBal = Number((account as any).opening_balance) || 0;
 
         // 2. Fetch ALL posted JE lines for this account
         const allLines = await fetchAllRows(
@@ -391,12 +554,12 @@ export const DrillDownModal = ({
         const totalDebit = allLines.reduce((s: number, l: any) => s + (Number(l.debit) || 0), 0);
         const totalCredit = allLines.reduce((s: number, l: any) => s + (Number(l.credit) || 0), 0);
 
-        // 4. Calculate the correct current_balance based on account type
-        const isDebitNormal = ["asset", "expense", "expenses"].includes((account.account_type || "").toLowerCase());
-        // Note: chart_of_accounts has no opening_balance column; accounts start at 0
-        const correctBalance = isDebitNormal
+        // 4. Calculate the correct current_balance: opening_balance + JE movements
+        const acctIsDebitNormal = ["asset", "expense", "expenses"].includes((account.account_type || "").toLowerCase());
+        const jeMovement = acctIsDebitNormal
           ? (totalDebit - totalCredit)
           : (totalCredit - totalDebit);
+        const correctBalance = openingBal + jeMovement;
 
         // 5. Update the COA record
         const { error, data: updateData } = await supabase
@@ -409,16 +572,18 @@ export const DrillDownModal = ({
         
         console.log("RECALCULATION STATS:", {
           accountId,
+          openingBalance: openingBal,
           totalDebit,
           totalCredit,
+          jeMovement,
           correctBalance,
           oldBalance: account.current_balance,
-          isDebitNormal,
+          isDebitNormal: acctIsDebitNormal,
           accountType: account.account_type,
           updateData
         });
         
-        toast.success(`Recalculated: ${correctBalance.toLocaleString()} (Debits: ${totalDebit.toLocaleString()}, Credits: ${totalCredit.toLocaleString()}). Updated ${updateData?.length || 0} row(s).`);
+        toast.success(`Recalculated: ${correctBalance.toLocaleString()} (Opening: ${openingBal.toLocaleString()} + Movements: ${jeMovement.toLocaleString()}). Updated ${updateData?.length || 0} row(s).`);
       }
 
       // 6. Invalidate all related caches
@@ -445,15 +610,16 @@ export const DrillDownModal = ({
     queryFn: async () => {
       if (resolvedAccountIds.length === 0) return null;
 
-      // Get the COA current_balance for context (no opening_balance column exists)
+      // Get the COA current_balance and opening_balance for context
       const { data: coaData } = await supabase
         .from("chart_of_accounts")
-        .select("id, account_code, account_name, current_balance, account_type")
+        .select("id, account_code, account_name, current_balance, account_type, opening_balance, balance_locked")
         .in("id", resolvedAccountIds);
 
-      const coaOpeningBalance = 0; // chart_of_accounts has no opening_balance column
+      const coaOpeningBalance = coaData?.reduce((sum, a) => sum + (Number((a as any).opening_balance) || 0), 0) || 0;
       const coaCurrentBalance = coaData?.reduce((sum, a) => sum + (Number(a.current_balance) || 0), 0) || 0;
       const accountType = coaData?.[0]?.account_type || "unknown";
+      const balanceLocked = coaData?.some(a => (a as any).balance_locked === true) || false;
 
       // Fetch ALL journal entry lines for this account (no date filter)
       let query = supabase
@@ -740,6 +906,46 @@ export const DrillDownModal = ({
   const hasActiveFilters = businessUnitFilter !== "_all" || transactionType !== "all" ||
     busFilter !== "_all" || routeFilter !== "_all" || dateRange.from || dateRange.to;
 
+  /**
+   * Extracts Customer or Vendor name from journal entry description.
+   * Patterns: "AR Invoice: REF - CustomerName", "AP Invoice: REF - VendorName",
+   *           "AR Receipt: REF from CustomerName", "AP Payment: REF to VendorName",
+   *           "Advance Receipt: REF from CustomerName"
+   */
+  /**
+   * Resolves the Customer / Vendor name for a journal entry.
+   * Priority: 1) Looked-up party name from invoiceBalances (real DB join)
+   *           2) Regex extraction from JE description (fallback)
+   */
+  const resolvePartyName = (jeReference: string | null | undefined, jeDescription: string | null | undefined): string => {
+    // Priority 1: Real name from source document lookup
+    if (jeReference && invoiceBalances?.[jeReference]?.partyName) {
+      return invoiceBalances[jeReference].partyName;
+    }
+    // Priority 2: Regex extraction from description
+    return extractPartyNameFromDesc(jeDescription);
+  };
+
+  const extractPartyNameFromDesc = (jeDescription: string | null | undefined): string => {
+    if (!jeDescription) return '';
+    // Pattern 1: "AR Invoice: REF - CustomerName" or "AP Invoice: REF - VendorName"
+    const dashMatch = jeDescription.match(/^(?:AR Invoice|AP Invoice|Advance Applied|Credit Note)[^-]*-\s*(.+)$/i);
+    if (dashMatch) return dashMatch[1].trim();
+    // Pattern 2: "... from Name" (AR Receipt, Advance Receipt)
+    const fromMatch = jeDescription.match(/\bfrom\s+(.+)$/i);
+    if (fromMatch) return fromMatch[1].trim();
+    // Pattern 3: "... to Name" (AP Payment)
+    const toMatch = jeDescription.match(/\bto\s+(.+)$/i);
+    if (toMatch) return toMatch[1].trim();
+    // Pattern 4: "Sales Revenue — CustomerName" or "Revenue — CustomerName"
+    const emDashMatch = jeDescription.match(/(?:revenue|sales)\s*[—–-]\s*(.+)$/i);
+    if (emDashMatch) return emDashMatch[1].trim();
+    // Pattern 5: "YUT Sales revenue: CustomerName" (colon separator)
+    const colonMatch = jeDescription.match(/(?:sales|revenue|payment|receipt)[^:]*:\s*(.+)$/i);
+    if (colonMatch) return colonMatch[1].trim();
+    return '';
+  };
+
   const exportToCSV = () => {
     const dataToExport = selectedRows.size > 0
       ? transactionsWithBalance.filter((t) => selectedRows.has(t.id))
@@ -747,13 +953,14 @@ export const DrillDownModal = ({
 
     const isMultiAccount = resolvedAccountIds.length > 1;
     const headers = isMultiAccount
-      ? ["Date", "Entry #", "Account", "Business Unit", "Bus", "Route", "Reference", "Description", "Debit", "Credit", "Balance"]
-      : ["Date", "Entry #", "Business Unit", "Bus", "Route", "Reference", "Description", "Debit", "Credit", "Balance"];
+      ? ["Date", "Entry #", "Account", "Business Unit", "Bus", "Route", "Reference", "Customer / Vendor", "Description", "Debit", "Credit", "Balance"]
+      : ["Date", "Entry #", "Business Unit", "Bus", "Route", "Reference", "Customer / Vendor", "Description", "Debit", "Credit", "Balance"];
     const rows = dataToExport.map((t) => {
       const entry = t.journal_entries as any;
       const busInfo = t.buses as any;
       const routeInfo = t.routes as any;
       const accountInfo = t.chart_of_accounts as any;
+      const partyName = resolvePartyName(entry?.reference, entry?.description);
       const baseRow = [
         format(new Date(entry?.entry_date || t.created_at), "yyyy-MM-dd"),
         entry?.entry_number || "",
@@ -766,6 +973,7 @@ export const DrillDownModal = ({
         busInfo?.bus_no || "",
         routeInfo?.route_name || "",
         entry?.reference || "",
+        partyName.replace(/,/g, ";"),
         (t.description || entry?.description || "").replace(/,/g, ";"),
         String(t.debit || 0),
         String(t.credit || 0),
@@ -890,6 +1098,7 @@ export const DrillDownModal = ({
                 { id: "bus", label: "Bus" },
                 { id: "route", label: "Route" },
                 { id: "reference", label: "Reference" },
+                { id: "party_name", label: "Customer / Vendor" },
                 { id: "description", label: "Description" },
                 { id: "debit", label: "Debit" },
                 { id: "credit", label: "Credit" },
@@ -1002,6 +1211,7 @@ export const DrillDownModal = ({
                   {visibleColumns.includes("bus") && <TableHead>Bus</TableHead>}
                   {visibleColumns.includes("route") && <TableHead>Route</TableHead>}
                   {visibleColumns.includes("reference") && <TableHead>Reference</TableHead>}
+                  {visibleColumns.includes("party_name") && <TableHead>Customer / Vendor</TableHead>}
                   {visibleColumns.includes("description") && <TableHead>Description</TableHead>}
                   {visibleColumns.includes("debit") && <TableHead className="text-right">Debit</TableHead>}
                   {visibleColumns.includes("credit") && <TableHead className="text-right">Credit</TableHead>}
@@ -1083,6 +1293,18 @@ export const DrillDownModal = ({
                           </div>
                         </TableCell>
                       )}
+                      {visibleColumns.includes("party_name") && (
+                        <TableCell className="max-w-[160px] truncate text-xs" title={resolvePartyName(entry?.reference, entry?.description)}>
+                          {(() => {
+                            const name = resolvePartyName(entry?.reference, entry?.description);
+                            return name ? (
+                              <span className="font-medium text-foreground">{name}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            );
+                          })()}
+                        </TableCell>
+                      )}
                       {visibleColumns.includes("description") && (
                         <TableCell className="max-w-[150px] truncate" title={t.description || entry?.description}>
                           <span>{t.description || entry?.description}</span>
@@ -1145,21 +1367,47 @@ export const DrillDownModal = ({
                         </TableCell>
                       )}
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => setDeleteConfirmJEId(entry?.id)}
-                          title="Delete this journal entry"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-0.5">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-amber-500 hover:text-amber-600 hover:bg-amber-50"
+                                  onClick={() => {
+                                    setLineageJeId(entry?.id);
+                                    setLineageEntryNumber(entry?.entry_number || "");
+                                    setLineageAmount((t.debit || 0) > 0 ? t.debit : t.credit);
+                                    setLineageType((t.debit || 0) > 0 ? "debit" : "credit");
+                                    setIsLineageOpen(true);
+                                  }}
+                                  title="Trace transaction lineage"
+                                >
+                                  <GitBranch className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                Trace full audit flow
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteConfirmJEId(entry?.id)}
+                            title="Delete this journal entry"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
                 })}
                 <TableRow className="bg-muted/50 font-medium">
-                  <TableCell colSpan={visibleColumns.filter(c => ["date", "entry_number", "account", "bu", "bus", "route", "reference", "description", "debit", "credit"].includes(c) && (c !== "account" || resolvedAccountIds.length > 1)).length + 1} className="text-right py-3">
+                  <TableCell colSpan={visibleColumns.filter(c => ["date", "entry_number", "account", "bu", "bus", "route", "reference", "party_name", "description", "debit", "credit"].includes(c) && (c !== "account" || resolvedAccountIds.length > 1)).length + 1} className="text-right py-3">
                     <div className="flex items-center justify-end gap-2">
                       <span>Balance Brought Forward</span>
                       <TooltipProvider>
@@ -1542,6 +1790,16 @@ export const DrillDownModal = ({
         documentData={previewDocData}
       />
     )}
+
+    {/* Transaction Lineage Tracer */}
+    <TransactionLineageDialog
+      open={isLineageOpen}
+      onOpenChange={setIsLineageOpen}
+      journalEntryId={lineageJeId}
+      entryNumber={lineageEntryNumber}
+      amount={lineageAmount}
+      type={lineageType}
+    />
     </>
   );
 };

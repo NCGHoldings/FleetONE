@@ -792,6 +792,7 @@ export async function applyAdvanceToReceivable({
   advanceAmount,
   settings,
   effectiveCompanyId,
+  applicationDate,
 }: {
   module: VehicleModule;
   orderNo: string;
@@ -799,6 +800,8 @@ export async function applyAdvanceToReceivable({
   advanceAmount: number;
   settings: VehicleFinanceSettings;
   effectiveCompanyId: string;
+  /** Optional: use the invoice's backdated date instead of today */
+  applicationDate?: string;
 }): Promise<{ journalEntryId: string; entryNumber: string } | null> {
   try {
     const businessUnitCode = BUSINESS_UNIT_CODES[module];
@@ -816,7 +819,7 @@ export async function applyAdvanceToReceivable({
       .insert({
         company_id: effectiveCompanyId,
         entry_number: entryNumber,
-        entry_date: new Date().toISOString().split('T')[0],
+        entry_date: applicationDate || new Date().toISOString().split('T')[0],
         description,
         reference: `${businessUnitCode}-ADV-APPLY-${orderNo}`,
         source_module: `${module}_sales`,

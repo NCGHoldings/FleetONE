@@ -740,7 +740,7 @@ export async function recalculateCOABalances(
     // Get all accounts for the company
     let accountQuery = supabase
       .from("chart_of_accounts")
-      .select("id, account_code, account_name, current_balance, account_type")
+      .select("id, account_code, account_name, current_balance, account_type, opening_balance, balance_locked")
       .eq("company_id", companyId);
     
     // If filtering by BU, we might want to only look at accounts tagged for that BU
@@ -785,8 +785,9 @@ export async function recalculateCOABalances(
       const totalCredit = accountLines.reduce((sum, l) => sum + (l.credit || 0), 0);
 
       const isDebitNormal = ["asset", "expense"].includes(account.account_type);
-      // Calculate expected balance based on journal entries only (no opening balance column exists)
-      const calculatedBalance = isDebitNormal ? totalDebit - totalCredit : totalCredit - totalDebit;
+      const openingBalance = Number((account as any).opening_balance) || 0;
+      // Calculate expected balance: opening_balance + type-adjusted JE movements
+      const calculatedBalance = openingBalance + (isDebitNormal ? totalDebit - totalCredit : totalCredit - totalDebit);
 
       const difference = Math.abs((account.current_balance || 0) - calculatedBalance);
 
@@ -818,10 +819,23 @@ export async function recalculateCOABalances(
  */
 export async function fixBalanceDiscrepancies(
   discrepancies: Array<{ accountId: string; calculatedBalance: number }>
-): Promise<{ success: boolean; fixed: number; error?: string }> {
+): Promise<{ success: boolean; fixed: number; skippedLocked: number; error?: string }> {
   try {
     let fixed = 0;
+    let skippedLocked = 0;
     for (const d of discrepancies) {
+      // Check if account is locked before updating
+      const { data: account } = await supabase
+        .from("chart_of_accounts")
+        .select("balance_locked")
+        .eq("id", d.accountId)
+        .single();
+
+      if ((account as any)?.balance_locked) {
+        skippedLocked++;
+        continue;
+      }
+
       const { error } = await supabase
         .from("chart_of_accounts")
         .update({ current_balance: d.calculatedBalance })
@@ -829,11 +843,12 @@ export async function fixBalanceDiscrepancies(
 
       if (!error) fixed++;
     }
-    return { success: true, fixed };
+    return { success: true, fixed, skippedLocked };
   } catch (error) {
     return {
       success: false,
       fixed: 0,
+      skippedLocked: 0,
       error: error instanceof Error ? error.message : "Failed to fix discrepancies",
     };
   }

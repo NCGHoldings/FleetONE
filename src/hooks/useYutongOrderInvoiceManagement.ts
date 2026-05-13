@@ -951,6 +951,7 @@ export function useYutongOrderInvoiceManagement() {
             advanceAmount: totalPaid,
             settings,
             effectiveCompanyId: NCG_HOLDING_ID,
+            applicationDate: invoice.invoice_date,
           });
 
           if (advanceResult) {

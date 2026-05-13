@@ -423,12 +423,15 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{status_class}}'] = arInvStatus === 'paid' ? '' : arInvStatus === 'unpaid' ? 'pending' : 'rejected';
       placeholders['{{system_uuid}}'] = documentData?.id || '';
       placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
-      const arInvLogo = companyData?.logo_url || headerImageUrl || '';
+      const arInvLogo = companyData?.logo_url || headerImageUrl || `${window.location.origin}/ncg-holdings-logo.png`;
       if (arInvLogo) placeholders['{{company_logo}}'] = `<img src="${arInvLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
       placeholders['{{company_logo_url}}'] = arInvLogo;
       // Bus / Vehicle details (used by SPH invoice template)
       placeholders['{{bus_number}}'] = documentData?.bus_no || '';
       placeholders['{{bus_type}}'] = documentData?.bus_type || '';
+      // Description - first line item description or invoice notes
+      const firstLineDesc = (lineItems && lineItems.length > 0) ? (lineItems[0]?.description || '') : '';
+      placeholders['{{description}}'] = firstLineDesc || documentData?.notes || '';
       // Signature placeholders
       placeholders['{{prepared_by}}'] = documentData?.prepared_by || '';
       placeholders['{{prepared_by_signature}}'] = documentData?.prepared_by_signature 
@@ -470,7 +473,7 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{narration}}'] = documentData?.notes || '';
       placeholders['{{system_uuid}}'] = documentData?.id || '';
       placeholders['{{hash}}'] = documentData?.id ? documentData.id.substring(0, 8).toUpperCase() : '';
-      const arRcptLogo = companyData?.logo_url || headerImageUrl || '';
+      const arRcptLogo = companyData?.logo_url || headerImageUrl || `${window.location.origin}/ncg-holdings-logo.png`;
       if (arRcptLogo) placeholders['{{company_logo}}'] = `<img src="${arRcptLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
       placeholders['{{company_logo_url}}'] = arRcptLogo;
       // Signature placeholders

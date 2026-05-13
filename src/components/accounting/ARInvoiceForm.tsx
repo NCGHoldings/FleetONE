@@ -319,14 +319,14 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                           {...field} 
                           className="font-mono" 
                           readOnly
-                          placeholder="Auto-generated"
+                          placeholder={isEditing ? editingInvoice?.invoice_number : "Auto-generated on save"}
                         />
                          {isGenerating && (
                           <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
                         )}
                       </div>
                     </FormControl>
-                    <FormDescription className="text-xs">Auto-generated</FormDescription>
+                    <FormDescription className="text-xs">{isEditing ? "Read-only" : "Auto-generated on save"}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

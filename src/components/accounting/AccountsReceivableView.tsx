@@ -289,7 +289,7 @@ export const AccountsReceivableView = () => {
     return new Date(dueDate) < new Date();
   };
 
-  const canEdit = (status: string) => !["paid", "posted"].includes(status);
+  const canEdit = (status: string) => !["cancelled"].includes(status);
   const canDelete = (_status: string) => true; // Force delete enabled for testing
 
   const handleReceiveClick = (invoice: any) => {

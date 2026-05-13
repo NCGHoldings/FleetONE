@@ -364,6 +364,82 @@ export const TemplateInitializerButton = ({
           <Wand2 className="h-4 w-4 mr-2 text-blue-600" />
           Update SPH Templates Only (Safe)
         </Button>
+
+        {/* ALL Companies AR Invoice + Receipt Update — pushes the new clean template to every company */}
+        <Button 
+          variant="outline" 
+          className="bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 font-medium"
+          disabled={isInitializing} 
+          onClick={async () => {
+            setIsInitializing(true);
+            setProgress(0);
+            
+            // Target ar_invoice and ar_receipt for ALL companies
+            const arTypeCodes = ['ar_invoice', 'ar_receipt'];
+            const arTypes = templateTypes.filter(t => arTypeCodes.includes(t.type_code));
+            
+            if (arTypes.length === 0) {
+              toast.error("AR Invoice / AR Receipt template types not found.");
+              setIsInitializing(false);
+              return;
+            }
+            
+            let completed = 0;
+            const totalOps = companies.length * arTypes.length;
+            let updatedCount = 0;
+            let createdCount = 0;
+            
+            for (const company of companies) {
+              for (const templateType of arTypes) {
+                // Always use the new clean template (SPH-style) for all companies
+                const templateGenerator = sphTemplateOverrides[templateType.type_code] || defaultTemplates[templateType.type_code];
+                if (!templateGenerator) continue;
+                
+                const htmlContent = templateGenerator();
+                const templateName = templateDisplayNames[templateType.type_code] || templateType.type_name;
+                
+                const { data: existing } = await supabase
+                  .from('document_templates')
+                  .select('id')
+                  .eq('company_id', company.id)
+                  .eq('template_type_id', templateType.id)
+                  .single();
+                
+                if (existing) {
+                  await supabase.from('document_templates').update({ 
+                    html_content: htmlContent,
+                    template_name: templateName,
+                  }).eq('id', existing.id);
+                  updatedCount++;
+                } else {
+                  await supabase.from('document_templates').insert({
+                    company_id: company.id,
+                    template_type_id: templateType.id,
+                    template_name: templateName,
+                    template_code: `${company.short_code?.toLowerCase() || company.id.substring(0, 4)}_${templateType.type_code}`,
+                    html_content: htmlContent,
+                    css_styles: "",
+                    is_default: true,
+                    is_active: true,
+                    paper_size: "A4",
+                    orientation: "portrait",
+                    version: 1,
+                  });
+                  createdCount++;
+                }
+                completed++;
+                setProgress((completed / totalOps) * 100);
+              }
+            }
+            
+            setIsInitializing(false);
+            toast.success(`AR Templates updated for ALL companies! ${updatedCount} updated, ${createdCount} created.`);
+            onComplete?.();
+          }}
+        >
+          <Wand2 className="h-4 w-4 mr-2 text-orange-600" />
+          Update All AR Templates (Safe)
+        </Button>
       </div>
 
       {/* Progress Dialog */}

@@ -46,7 +46,10 @@ export const FinanceDocumentPreviewModal = ({
     }
 
     // Use SPH-specific template for SPH business unit (ar_invoice / ar_receipt)
-    const isSPH = businessUnitCode === 'SPH' || resolvedCompany?.short_code === 'SPH';
+    const isSPH = businessUnitCode === 'SPH' 
+      || resolvedCompany?.short_code === 'SPH' 
+      || company?.short_code === 'SPH'
+      || (documentData?.invoice_number || '').startsWith('SPH-');
     const defaultGenerator = (isSPH && sphTemplateOverrides[documentType]) || defaultTemplates[documentType];
     if (!defaultGenerator) {
       toast.error("No default layout available for this document type.");
@@ -341,7 +344,10 @@ export const FinanceDocumentPreviewModal = ({
   // Generate fallback HTML using default template
   const generateFallbackHtml = (docData: any): string => {
     // Use SPH-specific template when company is SPH (Special Hire business unit)
-    const isSPH = businessUnitCode === 'SPH' || resolvedCompany?.short_code === 'SPH';
+    const isSPH = businessUnitCode === 'SPH' 
+      || resolvedCompany?.short_code === 'SPH' 
+      || company?.short_code === 'SPH'
+      || (documentData?.invoice_number || '').startsWith('SPH-');
     const templateGenerator = (isSPH && sphTemplateOverrides[documentType]) || defaultTemplates[documentType];
     if (!templateGenerator) {
       return `

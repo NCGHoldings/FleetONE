@@ -9,8 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { format } from 'date-fns';
 import { reverseJournalEntry } from '@/hooks/useEditAccountingMutations';
 import { toast } from 'sonner';
-import { CheckCircle, Clock, DollarSign, Database, RefreshCw, FileText, ArrowRight, Undo2, AlertCircle, CheckCircle2, Plus } from 'lucide-react';
+import { CheckCircle, Clock, DollarSign, Database, RefreshCw, FileText, ArrowRight, Undo2, AlertCircle, CheckCircle2, Plus, CalendarDays } from 'lucide-react';
 import { GLBreakdownPreview } from './GLBreakdownPreview';
+import { TransactionDateAdjuster } from './TransactionDateAdjuster';
 import { 
   postVehiclePaymentToGL, 
   fetchVehicleFinanceSettings, 
@@ -43,6 +44,11 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
   const [reviewPayment, setReviewPayment] = useState<any>(null);
   const [isConfirmingSync, setIsConfirmingSync] = useState(false);
   const [manualOverrides, setManualOverrides] = useState<{ bankId: string | null; creditId: string | null }>({ bankId: null, creditId: null });
+
+  // Date Adjuster states
+  const [isDateAdjusterOpen, setIsDateAdjusterOpen] = useState(false);
+  const [adjusterArInvoice, setAdjusterArInvoice] = useState<any>(null);
+  const [adjusterJournalEntry, setAdjusterJournalEntry] = useState<any>(null);
 
   useEffect(() => {
     if (isOpen && orderId) {
@@ -290,6 +296,7 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
   const pendingAmount = payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.payment_amount, 0);
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -531,6 +538,19 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
                               Sync GL
                             </Button>
                           )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                            onClick={() => {
+                              setAdjusterArInvoice(arInvoice);
+                              setAdjusterJournalEntry(null);
+                              setIsDateAdjusterOpen(true);
+                            }}
+                          >
+                            <CalendarDays className="h-4 w-4 mr-1" />
+                            Adjust Date
+                          </Button>
                         </TableCell>
                       </TableRow>
                     </TableBody>
@@ -552,6 +572,26 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
                           const customerId = orderData?.finance_customer_id;
                           if (!customerId) throw new Error('No finance customer linked to this order. Cannot post AR invoice.');
 
+                          // Resolve the correct invoice date from the module's invoice records
+                          // This prevents backdated invoices from being posted with today's date
+                          let resolvedInvoiceDate: string | undefined;
+                          try {
+                            const invoiceTable = `${module}_invoice_records`;
+                            const { data: invoiceRecord } = await supabase
+                              .from(invoiceTable as any)
+                              .select('invoice_date, invoice_no')
+                              .eq('order_id', orderData.id)
+                              .order('created_at', { ascending: false })
+                              .limit(1)
+                              .maybeSingle();
+                            if (invoiceRecord?.invoice_date) {
+                              resolvedInvoiceDate = invoiceRecord.invoice_date;
+                              console.log(`[FinanceSettlement] Resolved invoice date from ${invoiceTable}: ${resolvedInvoiceDate}`);
+                            }
+                          } catch (e) {
+                            console.warn('[FinanceSettlement] Could not resolve invoice date from records, will default to today:', e);
+                          }
+
                           const arResult = await createVehicleARInvoice({
                             module,
                             orderId: orderData.id,
@@ -561,6 +601,7 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
                             advanceAmount: 0,
                             companyId: NCG_HOLDING_ID,
                             settings,
+                            invoiceDate: resolvedInvoiceDate,
                             status: 'unpaid', // NOT draft, so it auto-posts to GL
                           });
 
@@ -618,7 +659,22 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
                           </div>
                           <div className="text-right">
                             <div className="text-sm font-medium">{format(new Date(je.entry_date), 'MMM dd, yyyy')}</div>
-                            <Badge variant="outline" className="mt-1 bg-white">{je.status}</Badge>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className="bg-white">{je.status}</Badge>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-2 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                onClick={() => {
+                                  setAdjusterArInvoice(null);
+                                  setAdjusterJournalEntry(je);
+                                  setIsDateAdjusterOpen(true);
+                                }}
+                              >
+                                <CalendarDays className="h-3 w-3 mr-1" />
+                                Adjust
+                              </Button>
+                            </div>
                           </div>
                         </div>
                         <Table>
@@ -770,5 +826,19 @@ export function VehicleFinanceSettlement({ isOpen, onClose, orderId, module }: V
         </Dialog>
       </DialogContent>
     </Dialog>
+
+    {/* Transaction Date Adjuster */}
+    <TransactionDateAdjuster
+      isOpen={isDateAdjusterOpen}
+      onClose={() => {
+        setIsDateAdjusterOpen(false);
+        setAdjusterArInvoice(null);
+        setAdjusterJournalEntry(null);
+      }}
+      arInvoice={adjusterArInvoice}
+      journalEntry={adjusterJournalEntry}
+      onAdjusted={loadFinanceData}
+    />
+    </>
   );
 }
