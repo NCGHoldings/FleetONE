@@ -4794,6 +4794,8 @@ export const useUpdateBankAccount = () => {
       currency?: string;
       opening_balance?: number;
       gl_account_id?: string;
+      business_unit_code?: string | null;
+      shared_business_units?: string[];
       is_active?: boolean;
       is_default?: boolean;
       notes?: string;

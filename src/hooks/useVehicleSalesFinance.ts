@@ -158,8 +158,9 @@ export async function createVehicleCustomer({
       businessUnitCode,
     });
 
-    // Try to find existing customer by name — prioritize same module (business_unit_code)
+    // Try to find existing customer by name — STRICTLY module-scoped (business_unit_code)
     // to prevent cross-module collisions (e.g. a Light Vehicle "E R T PERERA" matching a Yutong order)
+    // ⚠️ NO GLOBAL FALLBACK — each module gets its own customer registry
     const { data: existingByNameScoped } = await supabase
       .from('customers')
       .select('id')
@@ -174,21 +175,8 @@ export async function createVehicleCustomer({
       return existingByNameScoped.id;
     }
 
-    // Fallback: try global name match (any module) — for shared customers
-    const { data: existingByName } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('company_id', companyId)
-      .ilike('customer_name', customerName)
-      .limit(1)
-      .maybeSingle();
-
-    if (existingByName?.id) {
-      console.log(`[${module.toUpperCase()} Finance] Found existing customer by name (global):`, existingByName.id);
-      return existingByName.id;
-    }
-
-    // Try by phone or email — also prioritize module-scoped first
+    // Try by phone or email — STRICTLY module-scoped only
+    // ⚠️ NO GLOBAL FALLBACK — prevents cross-module customer collisions via shared phone/email
     if (customerPhone || customerEmail) {
       let scopedQuery = supabase
         .from('customers')
@@ -208,26 +196,6 @@ export async function createVehicleCustomer({
       if (existingByContactScoped?.id) {
         console.log(`[${module.toUpperCase()} Finance] Found existing customer by contact (module-scoped):`, existingByContactScoped.id);
         return existingByContactScoped.id;
-      }
-
-      // Fallback: global contact match
-      let query = supabase
-        .from('customers')
-        .select('id')
-        .eq('company_id', companyId);
-
-      if (customerPhone) {
-        query = query.or(`phone.eq.${customerPhone}`);
-      }
-      if (customerEmail) {
-        query = query.or(`email.eq.${customerEmail}`);
-      }
-
-      const { data: existingByContact } = await query.limit(1).maybeSingle();
-
-      if (existingByContact?.id) {
-        console.log(`[${module.toUpperCase()} Finance] Found existing customer by contact (global):`, existingByContact.id);
-        return existingByContact.id;
       }
     }
 
@@ -348,6 +316,7 @@ export async function createVehicleARInvoice({
 
         // Tier 1: Item Category Resolution (highest priority for revenue)
         const effectiveCategoryName = MODULE_CATEGORY_MAP[module];
+        let arRevenueSource = 'global_settings';
         if (effectiveCategoryName) {
           const categoryRevenueId = await resolveItemCategoryRevenueAccount(
             effectiveCategoryName,
@@ -355,7 +324,10 @@ export async function createVehicleARInvoice({
           );
           if (categoryRevenueId) {
             salesRevenueId = categoryRevenueId;
-            console.log(`[${module.toUpperCase()} Finance] AR GL: Revenue resolved via item category: ${effectiveCategoryName}`);
+            arRevenueSource = `item_category:${effectiveCategoryName}`;
+            console.log(`[${module.toUpperCase()} Finance] AR GL: ✅ Tier 1 HIT — Revenue via item category: ${effectiveCategoryName} → ${categoryRevenueId}`);
+          } else {
+            console.warn(`[${module.toUpperCase()} Finance] AR GL: ⚠️ Tier 1 MISS — '${effectiveCategoryName}' not found for company '${companyId}'`);
           }
         }
 
@@ -364,7 +336,14 @@ export async function createVehicleARInvoice({
         const resolved = await resolveCustomerARAccounts(customerId, companyId);
         if (resolved.arAccountId) tradeReceivableId = resolved.arAccountId;
         // Only override revenue if item category didn't resolve it
-        if (!effectiveCategoryName && resolved.revenueAccountId) salesRevenueId = resolved.revenueAccountId;
+        if (!effectiveCategoryName && resolved.revenueAccountId) {
+          salesRevenueId = resolved.revenueAccountId;
+          arRevenueSource = `customer:${resolved.source}`;
+        }
+
+        if (arRevenueSource === 'global_settings') {
+          console.warn(`[${module.toUpperCase()} Finance] AR GL: ⚠️ REVENUE FALLBACK — Using global settings. Revenue=${salesRevenueId}`);
+        }
 
         if (tradeReceivableId && salesRevenueId && totalAmount > 0) {
         const { postARInvoiceToGL } = await import('@/lib/gl-posting-utils');
@@ -657,6 +636,9 @@ export async function postVehicleInvoiceToGL({
     // 1. Item Category → 2. Customer Category → 3. Customer Direct → 4. Global Settings
     let tradeReceivableId = settings.trade_receivable_account_id;
     let salesRevenueId = settings.sales_revenue_account_id;
+    let revenueSource = 'global_settings'; // Track which tier resolved the revenue account
+
+    console.log(`[${module.toUpperCase()} Finance] GL Resolution START — module=${module}, companyId=${effectiveCompanyId}, globalFallbackRevenue=${settings.sales_revenue_account_id}`);
 
     // Tier 1: Item Category Resolution (highest priority for revenue)
     const effectiveCategoryName = itemCategoryName || MODULE_CATEGORY_MAP[module];
@@ -667,7 +649,10 @@ export async function postVehicleInvoiceToGL({
       );
       if (categoryRevenueId) {
         salesRevenueId = categoryRevenueId;
-        console.log(`[${module.toUpperCase()} Finance] Revenue resolved via item category: ${effectiveCategoryName}`);
+        revenueSource = `item_category:${effectiveCategoryName}`;
+        console.log(`[${module.toUpperCase()} Finance] ✅ Tier 1 HIT — Revenue resolved via item category: ${effectiveCategoryName} → ${categoryRevenueId}`);
+      } else {
+        console.warn(`[${module.toUpperCase()} Finance] ⚠️ Tier 1 MISS — item_categories lookup for '${effectiveCategoryName}' + company '${effectiveCompanyId}' returned null`);
       }
     }
 
@@ -678,13 +663,21 @@ export async function postVehicleInvoiceToGL({
         const resolved = await resolveCustomerARAccounts(customerId, effectiveCompanyId);
         if (resolved.arAccountId) tradeReceivableId = resolved.arAccountId;
         // Only override revenue if item category didn't resolve it
-        if (!effectiveCategoryName && resolved.revenueAccountId) salesRevenueId = resolved.revenueAccountId;
+        if (!effectiveCategoryName && resolved.revenueAccountId) {
+          salesRevenueId = resolved.revenueAccountId;
+          revenueSource = `customer:${resolved.source}`;
+        }
         console.log(`[${module.toUpperCase()} Finance] GL resolution complete`, {
-          tradeReceivableId, salesRevenueId, source: resolved.source
+          tradeReceivableId, salesRevenueId, revenueSource, customerSource: resolved.source
         });
       } catch (err) {
         console.warn(`[${module.toUpperCase()} Finance] Customer resolution failed, using current fallback`, err);
       }
+    }
+
+    // Final guard: warn loudly if we're still on global fallback
+    if (revenueSource === 'global_settings') {
+      console.warn(`[${module.toUpperCase()} Finance] ⚠️ REVENUE FALLBACK — Using global settings.sales_revenue_account_id (${salesRevenueId}). This may be incorrect if the settings point to a different module's revenue account!`);
     }
 
     if (!tradeReceivableId || !salesRevenueId) {

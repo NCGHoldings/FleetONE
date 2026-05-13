@@ -126,31 +126,46 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
 
   const onSubmit = async (data: BankAccountFormData) => {
     try {
-      const payload = {
-        account_code: data.account_code,
-        account_name: data.account_name,
-        bank_name: data.bank_name || "",
-        account_number: data.account_number || "",
-        branch: data.branch,
-        account_type: data.account_type,
-        currency: data.currency || "LKR",
-        opening_balance: data.opening_balance || 0,
-        gl_account_id: data.gl_account_id,
-        business_unit_code: data.business_unit_code || businessUnitCode,
-        shared_business_units: data.shared_business_units || [],
-        is_active: data.is_active ?? true,
-        is_default: data.is_default ?? false,
-        notes: data.notes,
-        company_id: effectiveCompanyId,
-      };
-
       if (isEditing) {
-        await updateBankAccount.mutateAsync({ id: bankAccount.id, ...payload });
+        // On update: only send mutable fields. Never re-send account_code
+        // or company_id as they are part of unique constraints.
+        const updatePayload: Record<string, any> = {
+          id: bankAccount.id,
+          account_name: data.account_name,
+          bank_name: data.bank_name || "",
+          account_number: data.account_number || "",
+          branch: data.branch,
+          account_type: data.account_type,
+          currency: data.currency || "LKR",
+          opening_balance: data.opening_balance || 0,
+          gl_account_id: data.gl_account_id,
+          business_unit_code: data.business_unit_code || businessUnitCode,
+          shared_business_units: data.shared_business_units || [],
+          is_active: data.is_active ?? true,
+          is_default: data.is_default ?? false,
+          notes: data.notes,
+        };
+        await updateBankAccount.mutateAsync(updatePayload);
       } else {
+        // On create: send everything including account_code and company_id
         await createBankAccount.mutateAsync({
-          ...payload,
+          account_code: data.account_code,
+          account_name: data.account_name,
+          bank_name: data.bank_name || "",
+          account_number: data.account_number || "",
+          branch: data.branch,
+          account_type: data.account_type,
+          currency: data.currency || "LKR",
+          opening_balance: data.opening_balance || 0,
+          gl_account_id: data.gl_account_id,
+          business_unit_code: data.business_unit_code || businessUnitCode,
+          shared_business_units: data.shared_business_units || [],
+          is_active: data.is_active ?? true,
+          is_default: data.is_default ?? false,
+          notes: data.notes,
+          company_id: effectiveCompanyId,
           current_balance: data.opening_balance || 0,
-        });
+        } as any);
       }
       form.reset();
       onOpenChange(false);
@@ -180,7 +195,12 @@ export const BankAccountForm = ({ open, onOpenChange, bankAccount }: BankAccount
                 id="account_code" 
                 {...form.register("account_code")} 
                 placeholder="BANK-001"
+                disabled={isEditing}
+                className={isEditing ? "bg-muted cursor-not-allowed" : ""}
               />
+              {isEditing && (
+                <p className="text-[10px] text-muted-foreground">Account code cannot be changed after creation.</p>
+              )}
               {form.formState.errors.account_code && (
                 <p className="text-xs text-destructive">{form.formState.errors.account_code.message}</p>
               )}

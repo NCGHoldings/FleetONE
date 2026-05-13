@@ -216,18 +216,27 @@ export const AccountsReceivableView = () => {
 
             if (correctCustomerId) {
               // Update AR Invoice customer_id
-              await supabase
+              const { error: arUpdateErr } = await supabase
                 .from('ar_invoices')
                 .update({ customer_id: correctCustomerId })
                 .eq('id', arInv.id);
 
+              if (arUpdateErr) {
+                console.error(`[AR PATCH] Failed to update AR invoice ${arInv.invoice_number}:`, arUpdateErr);
+                continue;
+              }
+
               // Update order's finance_customer_id
-              await supabase
+              const { error: orderUpdateErr } = await supabase
                 .from(modInfo.orderTable as any)
                 .update({ finance_customer_id: correctCustomerId } as any)
                 .eq('id', (order as any).id);
 
-              console.log(`[AR PATCH] Fixed ${arInv.invoice_number}: customer_id updated to ${correctCustomerId} ("${expectedName}")`);
+              if (orderUpdateErr) {
+                console.error(`[AR PATCH] Failed to update order finance_customer_id:`, orderUpdateErr);
+              }
+
+              console.log(`[AR PATCH] ✅ Fixed ${arInv.invoice_number}: customer_id updated to ${correctCustomerId} ("${expectedName}")`);
               fixedCount++;
             }
           }

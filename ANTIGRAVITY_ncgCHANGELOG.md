@@ -1,3 +1,20 @@
+## 2026-05-13
+
+### ✅ Finance Modal Auto-Close & Double-Post Prevention
+
+**Problem:** "Confirm & Post to GL" modal dialogs in the Special Hire finance workflow lacked loading states and auto-close behavior, allowing users to click multiple times and potentially create duplicate journal entries.
+
+**Files Modified:**
+- `src/components/special-hire/FinanceApprovalPreviewModal.tsx` — Added `isPosting` loading state with disabled button + spinner during GL posting. Cancel button also disabled during posting. Prevents double-click duplicate GL entries.
+- `src/components/special-hire/FinanceApprovalModal.tsx` — Added `useEffect` hooks to reset internal `action` state when modal closes or loading completes. Prevents stale "Approving..." button labels on modal re-open. Also resets `notes` and `rejectionReason` on close for clean slate.
+
+**Architecture Notes:**
+- These are purely local React state management changes — no database, hook, or pipeline logic was modified.
+- Pattern follows established auto-close standard from `YutongPaymentTracking.tsx` and `VehicleFinanceSettlement.tsx`.
+- `FinanceApprovalPreviewModal.onConfirm` is now awaited as async, enabling the loading state to persist until the parent's GL posting resolves.
+
+---
+
 ## 2026-05-12
 
 ### ✅ Fuel Analytics — Standard Rate Correction, Odometer Quick-Adjust & PDF Export

@@ -249,27 +249,19 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
    .tax-totals-row.total-row .label {
      border-right-color: rgba(255,255,255,0.3);
    }
-   
-    .merged-cell {
-      vertical-align: middle !important;
-      text-align: center;
-      position: relative;
-    }
-    .merged-cell-content {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      width: 100%;
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      padding: 8px;
-      box-sizing: border-box;
-      font-weight: 700;
-    }
+     .merged-cell {
+       vertical-align: middle !important;
+       text-align: center;
+     }
+     .merged-cell-content {
+       display: flex;
+       align-items: center;
+       justify-content: center;
+       min-height: 100%;
+       padding: 8px;
+       box-sizing: border-box;
+       font-weight: 700;
+     }
 
   .invoice-container {
     width: 900px;
@@ -369,14 +361,16 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
     border-right: none;
   }
 
-  .invoice-body {
-    background: #e8f6ff;
-  }
+   .invoice-body {
+     background: #e8f6ff;
+   }
 
-  .invoice-body td {
-    border: 1px solid #0b2f66;
-    vertical-align: top;
-  }
+   .invoice-body td {
+     border: 1px solid #0b2f66;
+     vertical-align: top;
+     padding: 8px 12px;
+     font-size: 16px;
+   }
 
   .details-table {
     width: 100%;
@@ -410,13 +404,13 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
     text-transform: uppercase;
   }
 
-  .price, .qty, .total {
-    text-align: center;
-    font-size: 18px;
-    font-weight: 700;
-    background: #d6eefc;
-    padding: 14px;
-  }
+   .price, .qty, .total {
+     text-align: center;
+     font-size: 16px;
+     font-weight: 700;
+     background: #d6eefc;
+     padding: 10px 8px;
+   }
 
   /* Integrated Table Footer Styles */
   .totals-footer td {
@@ -1192,7 +1186,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
       
       console.log(`🎨 Rendering page ${i + 1}...`);
       const canvas = await html2canvas(page, {
-        scale: 1.5,
+        scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
@@ -1203,24 +1197,23 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
       
       console.log(`✅ Page ${i + 1} canvas rendered. Size:`, canvas.width, 'x', canvas.height);
 
-      // Use JPEG with higher quality for professional output
-      const imgData = canvas.toDataURL('image/jpeg', 0.85);
+      // Use PNG for crisp text and table borders (no JPEG compression artifacts)
+      const imgData = canvas.toDataURL('image/png');
       
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
       
-      // Calculate center position for proper alignment
-      const scaledWidth = imgWidth * ratio;
-      const scaledHeight = imgHeight * ratio;
-      const imgX = (pdfWidth - scaledWidth) / 2; // Center horizontally
-      const imgY = 0; // Start from top
+      // Scale to fill full PDF page width for consistent alignment with preview
+      const scaledWidth = pdfWidth;
+      const scaledHeight = (imgHeight / imgWidth) * pdfWidth;
+      const imgX = 0;
+      const imgY = 0;
       
       if (i > 0) {
         pdf.addPage();
       }
       
-      pdf.addImage(imgData, 'JPEG', imgX, imgY, scaledWidth, scaledHeight);
+      pdf.addImage(imgData, 'PNG', imgX, imgY, scaledWidth, scaledHeight);
       console.log(`📊 Page ${i + 1} added to PDF`);
     }
     

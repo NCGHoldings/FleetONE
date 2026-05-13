@@ -93,6 +93,23 @@ export const FinanceApprovalModal = ({
   // The hook validates settings before GL posting and shows a specific error toast.
   const isApproveBlocked = loading || action === 'reject';
 
+  // Reset internal action state when modal closes or loading finishes
+  // This prevents stale "Approving..." labels when the modal re-opens
+  useEffect(() => {
+    if (!isOpen) {
+      setAction(null);
+      setNotes('');
+      setRejectionReason('');
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!loading && action) {
+      // Reset action state once loading completes (parent finished processing)
+      setAction(null);
+    }
+  }, [loading]);
+
   useEffect(() => {
     if (settings && !isSettingsComplete) {
       setLocalSettings({

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -8,6 +8,7 @@ import { useSpecialHireFinanceSettings, useUpdateSpecialHireFinanceSettings } fr
 import { useChartOfAccounts } from '@/hooks/useAccountingData';
 import { Loader2, ArrowRight, CheckCircle2, AlertTriangle, Wand2, ArrowRightLeft } from 'lucide-react';
 import { toast } from 'sonner';
+
 
 interface FinanceApprovalPreviewModalProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export function FinanceApprovalPreviewModal({
   const updateSettings = useUpdateSpecialHireFinanceSettings();
 
   const [isConfiguring, setIsConfiguring] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
   const [localSettings, setLocalSettings] = useState<any>({
     revenue_external_account_id: '',
     trade_receivable_account_id: '',
@@ -282,9 +284,23 @@ export function FinanceApprovalPreviewModal({
             </Alert>
 
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={onClose}>Cancel</Button>
-              <Button onClick={onConfirm}>
-                Confirm & Post to GL <ArrowRight className="w-4 h-4 ml-2" />
+              <Button variant="outline" onClick={onClose} disabled={isPosting}>Cancel</Button>
+              <Button 
+                onClick={async () => {
+                  setIsPosting(true);
+                  try {
+                    await onConfirm();
+                  } finally {
+                    setIsPosting(false);
+                  }
+                }} 
+                disabled={isPosting}
+              >
+                {isPosting ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Posting...</>
+                ) : (
+                  <>Confirm & Post to GL <ArrowRight className="w-4 h-4 ml-2" /></>
+                )}
               </Button>
             </div>
           </div>

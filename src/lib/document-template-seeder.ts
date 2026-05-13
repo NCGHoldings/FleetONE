@@ -1615,7 +1615,7 @@ export const generateSPHARInvoiceTemplate = (): string => `
     <tr><td class="lb">Branch</td><td class="vl">SHS</td><td class="lb">Ref No</td><td class="vl">{{reference}}</td></tr>
     <tr><td class="lb">Contact Person</td><td class="vl">{{customer_name}}</td><td class="lb">Dates of Hire</td><td class="vl">{{due_date}}</td></tr>
     <tr><td class="lb">Contact Number</td><td class="vl">{{customer_phone}}</td><td class="lb">Quote No</td><td class="vl">{{reference}}</td></tr>
-    <tr><td class="lb">Address</td><td class="vl">{{customer_address}}</td><td class="lb">Bus Type</td><td class="vl"></td></tr>
+    <tr><td class="lb">Address</td><td class="vl">{{customer_address}}</td><td class="lb">Bus Type</td><td class="vl">{{bus_type}}</td></tr>
   </table>
 
   {{SECTION:1.0:Purpose:required}}
@@ -1638,7 +1638,7 @@ export const generateSPHARInvoiceTemplate = (): string => `
       <tr>
         <td>{{description}}</td>
         <td>{{notes}}</td>
-        <td>TBA</td>
+        <td>{{bus_number}}</td>
         <td><strong>{{total_amount}}</strong></td>
       </tr>
     </tbody>

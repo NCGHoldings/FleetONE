@@ -426,6 +426,9 @@ export const mapDocumentToPlaceholders = (
       const arInvLogo = companyData?.logo_url || headerImageUrl || '';
       if (arInvLogo) placeholders['{{company_logo}}'] = `<img src="${arInvLogo}" style="width:100%;height:100%;object-fit:contain;" alt="Company Logo" />`;
       placeholders['{{company_logo_url}}'] = arInvLogo;
+      // Bus / Vehicle details (used by SPH invoice template)
+      placeholders['{{bus_number}}'] = documentData?.bus_no || '';
+      placeholders['{{bus_type}}'] = documentData?.bus_type || '';
       // Signature placeholders
       placeholders['{{prepared_by}}'] = documentData?.prepared_by || '';
       placeholders['{{prepared_by_signature}}'] = documentData?.prepared_by_signature 

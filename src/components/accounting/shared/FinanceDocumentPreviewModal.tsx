@@ -310,15 +310,31 @@ export const FinanceDocumentPreviewModal = ({
   const resolvedCompany = companies?.find((c) => c.id === resolvedCompanyId);
   const company = useMemo(() => {
     if (!resolvedCompany) return undefined;
-    if (resolvedCompany.logo_url) return resolvedCompany;
-    // Inherit logo from parent company
-    if (resolvedCompany.parent_company_id && companies?.length) {
-      const parent = companies.find(c => c.id === resolvedCompany.parent_company_id);
+    let patched = { ...resolvedCompany };
+
+    // ── Runtime Guard: Sanitize legacy "Test" prefixed company names ──
+    // Ensures invoice headers show formal business names even if the DB
+    // migration (20260513110000_fix_sph_company_name) has not been applied yet.
+    const testNameMap: Record<string, string> = {
+      'test special hire': 'NCG Express (Pvt) Ltd — Special Hire',
+    };
+    const nameLower = (patched.name || '').toLowerCase().trim();
+    const companyNameLower = (patched.company_name || '').toLowerCase().trim();
+    if (testNameMap[nameLower]) {
+      patched = { ...patched, name: testNameMap[nameLower] };
+    }
+    if (testNameMap[companyNameLower]) {
+      patched = { ...patched, company_name: testNameMap[companyNameLower] };
+    }
+
+    // Inherit logo from parent company if sub-company has none
+    if (!patched.logo_url && patched.parent_company_id && companies?.length) {
+      const parent = companies.find(c => c.id === patched.parent_company_id);
       if (parent?.logo_url) {
-        return { ...resolvedCompany, logo_url: parent.logo_url };
+        patched = { ...patched, logo_url: parent.logo_url };
       }
     }
-    return resolvedCompany;
+    return patched;
   }, [resolvedCompany, companies]);
   const hasNoTemplate = !availableTemplates || availableTemplates.length === 0;
 

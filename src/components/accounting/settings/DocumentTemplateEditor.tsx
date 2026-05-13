@@ -13,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCreateDocumentTemplate, useUpdateDocumentTemplate, useUploadHeaderImage, HeaderMode } from "@/hooks/useDocumentTemplates";
 import { toast } from "sonner";
 import { parseHTMLDocumentTemplate } from "@/utils/htmlDocumentTemplateParser";
-import { ListChecks } from "lucide-react";
+import { ListChecks, Layout, Image, X, Upload, Info, Code, Eye, Copy } from "lucide-react";
 
 interface DocumentTemplateEditorProps {
   open: boolean;
