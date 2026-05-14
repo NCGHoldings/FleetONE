@@ -1,0 +1,75 @@
+name: Slack Bug Fixer
+
+on:
+  # Run automatically every hour
+  schedule:
+    - cron: "0 * * * *"
+
+  # Also allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no commits, no PRs, no Slack posts)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+# Only one run at a time — prevent overlapping git operations
+concurrency:
+  group: bug-fixer
+  cancel-in-progress: false
+
+jobs:
+  fix-bugs:
+    name: Fix open Slack bugs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: write       # push fix branches
+      pull-requests: write  # open PRs
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "FleetONE Bug Fixer"
+          git config user.email "bug-fixer@ncg.lk"
+
+      - name: Install project deps (for type context)
+        run: npm install --legacy-peer-deps
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: Run bug fixer
+        run: node scripts/bug-fixer.mjs
+        env:
+          SLACK_BOT_TOKEN:     ${{ secrets.SLACK_BOT_TOKEN }}
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN:        ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO:         ${{ github.repository }}
+          REPO_ROOT:           ${{ github.workspace }}
+          SLACK_CHANNEL_ID:    "C0B2XT7EN90"
+          BUG_BOT_USER_ID:     "U0B2ZP9PGM7"
+          DRY_RUN:             ${{ github.event.inputs.dry_run || 'false' }}
+          # Pass through Supabase env vars so type-checks work
+          VITE_SUPABASE_URL:              ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY:  ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+
+      - name: Summary
+        if: always()
+        run: echo "Bug fixer run completed. Check the job log for details."
