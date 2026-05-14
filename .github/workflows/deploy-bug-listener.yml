@@ -1,0 +1,56 @@
+name: Deploy Bug Listener
+
+on:
+  # Run once manually to install, or after changes to the listener script
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/bug-listener.mjs"
+      - "scripts/bug-listener.ecosystem.config.cjs"
+      - ".github/workflows/deploy-bug-listener.yml"
+
+jobs:
+  deploy:
+    name: Deploy bug listener to VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Deploy and restart via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:        ${{ secrets.VPS_HOST }}
+          username:    root
+          key:         ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /var/www/fleetone/FleetONE
+
+            # Pull latest code
+            git pull origin main
+
+            # Write secrets to env file (only updated when this workflow runs)
+            cat > /etc/fleetone-bug-listener.env <<EOF
+            SLACK_APP_TOKEN=${{ secrets.SLACK_APP_TOKEN }}
+            SLACK_BOT_TOKEN=${{ secrets.SLACK_BOT_TOKEN }}
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            GITHUB_REPO=NCGHoldings/FleetONE
+            REPO_ROOT=/var/www/fleetone/FleetONE
+            SLACK_CHANNEL_ID=C0B2XT7EN90
+            BUG_BOT_USER_ID=U0B2ZP9PGM7
+            EOF
+            chmod 600 /etc/fleetone-bug-listener.env
+
+            # Load secrets into current shell for pm2
+            export $(cat /etc/fleetone-bug-listener.env | xargs)
+
+            # Install/restart pm2 process
+            npm install -g pm2 --silent
+            pm2 start scripts/bug-listener.ecosystem.config.cjs \
+              --update-env \
+              -- \
+              || pm2 restart fleetone-bug-listener --update-env
+
+            pm2 save
+            pm2 status fleetone-bug-listener
