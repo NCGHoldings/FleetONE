@@ -35,10 +35,11 @@ jobs:
               echo "Pulling latest code…"
               cd $REPO_DIR
               git remote set-url origin "$REPO_URL"
-              git pull origin main
+              git fetch origin main
+              git reset --hard origin/main
             else
-              echo "Cloning repo…"
-              mkdir -p $REPO_DIR
+              echo "Cloning repo (removing any stale dir first)…"
+              rm -rf $REPO_DIR
               git clone "$REPO_URL" $REPO_DIR
               cd $REPO_DIR
             fi
