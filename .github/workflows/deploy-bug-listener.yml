@@ -59,22 +59,28 @@ jobs:
             # Load secrets into current shell for pm2
             set -a; source /etc/fleetone-bug-listener.env; set +a
 
-            # Ensure Node/npm in PATH (handles nvm and system installs)
-            export PATH="$PATH:/usr/local/bin:/usr/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -1)/bin"
-            NODE_BIN=$(which node 2>/dev/null || find /usr/local/bin /usr/bin $HOME/.nvm -name node -type f 2>/dev/null | head -1)
-            NPM_BIN=$(which npm 2>/dev/null || find /usr/local/bin /usr/bin $HOME/.nvm -name npm -type f 2>/dev/null | head -1)
-            echo "Node: $NODE_BIN  Npm: $NPM_BIN"
+            # Locate node/npm regardless of how they were installed
+            source ~/.bashrc 2>/dev/null || true
+            source ~/.profile 2>/dev/null || true
+            source ~/.nvm/nvm.sh 2>/dev/null || true
 
-            # Install pm2 + start/restart listener
-            $NPM_BIN install -g pm2 --silent
-            PM2_BIN=$(which pm2 2>/dev/null || find /usr/local/bin /usr/bin -name pm2 -type f 2>/dev/null | head -1)
+            # Fallback: scan common install paths
+            for p in /usr/local/bin /usr/bin /snap/bin $(ls -d /root/.nvm/versions/node/*/bin 2>/dev/null | sort -V | tail -1); do
+              [ -x "$p/node" ] && export PATH="$p:$PATH" && break
+            done
+
+            echo "Using node: $(which node) — $(node --version 2>/dev/null)"
+            echo "Using npm:  $(which npm)  — $(npm --version 2>/dev/null)"
+
+            # Install pm2 globally
+            npm install -g pm2
             cd $REPO_DIR
 
-            if $PM2_BIN describe fleetone-bug-listener > /dev/null 2>&1; then
-              $PM2_BIN restart fleetone-bug-listener --update-env
+            if pm2 describe fleetone-bug-listener > /dev/null 2>&1; then
+              pm2 restart fleetone-bug-listener --update-env
             else
-              $PM2_BIN start scripts/bug-listener.ecosystem.config.cjs --update-env
+              pm2 start scripts/bug-listener.ecosystem.config.cjs --update-env
             fi
 
-            $PM2_BIN save
-            $PM2_BIN status fleetone-bug-listener
+            pm2 save
+            pm2 status fleetone-bug-listener
