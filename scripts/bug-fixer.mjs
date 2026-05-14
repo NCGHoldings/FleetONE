@@ -20,7 +20,7 @@ import path from "path";
 
 // ── 1. Bootstrap deps ────────────────────────────────────────────────────────
 console.log("📦 Installing runtime deps…");
-execSync("npm install --no-save @slack/web-api @anthropic-ai/sdk", {
+execSync("npm install --no-save --legacy-peer-deps @slack/web-api @anthropic-ai/sdk", {
   stdio: "inherit",
   cwd: process.cwd(),
 });
