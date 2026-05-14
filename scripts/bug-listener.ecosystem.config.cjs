@@ -3,7 +3,7 @@ module.exports = {
     {
       name:         "fleetone-bug-listener",
       script:       "scripts/bug-listener.mjs",
-      cwd:          "/var/www/fleetone/FleetONE",
+      cwd:          "/var/www/fleetone/bug-listener",
       interpreter:  "node",
       restart_delay: 5000,   // wait 5s before restart on crash
       max_restarts:  20,
@@ -11,7 +11,7 @@ module.exports = {
       watch:         false,
       env: {
         NODE_ENV:          "production",
-        REPO_ROOT:         "/var/www/fleetone/FleetONE",
+        REPO_ROOT:         "/var/www/fleetone/bug-listener",
         GITHUB_REPO:       "NCGHoldings/FleetONE",
         SLACK_CHANNEL_ID:  "C0B2XT7EN90",
         BUG_BOT_USER_ID:   "U0B2ZP9PGM7",

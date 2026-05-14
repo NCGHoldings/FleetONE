@@ -23,34 +23,50 @@ jobs:
           host:        ${{ secrets.VPS_HOST }}
           username:    root
           key:         ${{ secrets.VPS_SSH_KEY }}
+          envs:        GH_PAT,SLACK_APP_TOKEN,SLACK_BOT_TOKEN,ANTHROPIC_API_KEY
           script: |
             set -e
-            cd /var/www/fleetone/FleetONE
 
-            # Pull latest code
-            git pull origin main
+            REPO_DIR=/var/www/fleetone/bug-listener
+            REPO_URL="https://x-access-token:$GH_PAT@github.com/NCGHoldings/FleetONE.git"
 
-            # Write secrets to env file (only updated when this workflow runs)
-            cat > /etc/fleetone-bug-listener.env <<EOF
-            SLACK_APP_TOKEN=${{ secrets.SLACK_APP_TOKEN }}
-            SLACK_BOT_TOKEN=${{ secrets.SLACK_BOT_TOKEN }}
-            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            # Clone repo if not present, otherwise pull latest
+            if [ -d "$REPO_DIR/.git" ]; then
+              echo "Pulling latest code…"
+              cd $REPO_DIR
+              git remote set-url origin "$REPO_URL"
+              git pull origin main
+            else
+              echo "Cloning repo…"
+              mkdir -p $REPO_DIR
+              git clone "$REPO_URL" $REPO_DIR
+              cd $REPO_DIR
+            fi
+
+            # Write secrets to env file
+            cat > /etc/fleetone-bug-listener.env << ENVEOF
+            SLACK_APP_TOKEN=$SLACK_APP_TOKEN
+            SLACK_BOT_TOKEN=$SLACK_BOT_TOKEN
+            ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
             GITHUB_REPO=NCGHoldings/FleetONE
-            REPO_ROOT=/var/www/fleetone/FleetONE
+            REPO_ROOT=$REPO_DIR
             SLACK_CHANNEL_ID=C0B2XT7EN90
             BUG_BOT_USER_ID=U0B2ZP9PGM7
-            EOF
+            ENVEOF
             chmod 600 /etc/fleetone-bug-listener.env
 
             # Load secrets into current shell for pm2
-            export $(cat /etc/fleetone-bug-listener.env | xargs)
+            set -a; source /etc/fleetone-bug-listener.env; set +a
 
-            # Install/restart pm2 process
+            # Install pm2 + start/restart listener
             npm install -g pm2 --silent
-            pm2 start scripts/bug-listener.ecosystem.config.cjs \
-              --update-env \
-              -- \
-              || pm2 restart fleetone-bug-listener --update-env
+            cd $REPO_DIR
+
+            if pm2 describe fleetone-bug-listener > /dev/null 2>&1; then
+              pm2 restart fleetone-bug-listener --update-env
+            else
+              pm2 start scripts/bug-listener.ecosystem.config.cjs --update-env
+            fi
 
             pm2 save
             pm2 status fleetone-bug-listener
