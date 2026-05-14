@@ -219,8 +219,22 @@ const AGENT_TOOLS = [
           description:
             "Specific manual test steps a reviewer MUST perform on staging before merging to production. Be precise — include UI paths, example data, and expected outcomes.",
         },
+        db_changes_required: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              description: { type: "string", description: "Plain-English explanation of what this SQL does and why it is needed" },
+              sql: { type: "string", description: "The exact SQL to run — must be safe to execute on the live Supabase project wwjpdszkmtnzshbulkon" },
+              risk: { type: "string", description: "What could go wrong if this SQL is run incorrectly or at the wrong time" },
+            },
+            required: ["description", "sql", "risk"],
+          },
+          description:
+            "SQL statements that MUST be applied to the database for this fix to work. Leave empty [] if no DB changes are needed. The agent must NEVER apply these automatically — they will be posted to Slack for a human to review and run manually.",
+        },
       },
-      required: ["summary", "files_changed", "risk_level", "affected_areas", "risk_details", "testing_checklist"],
+      required: ["summary", "files_changed", "risk_level", "affected_areas", "risk_details", "testing_checklist", "db_changes_required"],
     },
   },
 ];
@@ -233,10 +247,17 @@ function runTool(toolName, toolInput) {
   }
 
   if (toolName === "write_file") {
-    const abs = path.join(REPO_ROOT, toolInput.path);
+    const p = toolInput.path;
+    // Hard block: never write DB migrations or any SQL files
+    const blockedPaths = ["supabase/migrations", ".env", "supabase/functions", ".sql"];
+    const blocked = blockedPaths.find((b) => p.includes(b) || p.endsWith(b));
+    if (blocked) {
+      return `BLOCKED: Writing to '${p}' is not allowed. Database changes must be provided via db_changes_required in the done() call, not written as files.`;
+    }
+    const abs = path.join(REPO_ROOT, p);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, toolInput.content, "utf8");
-    return `Written: ${toolInput.path}`;
+    return `Written: ${p}`;
   }
 
   if (toolName === "bash") {
@@ -277,18 +298,24 @@ Critical rules:
 2. Never touch src/lib/gl-posting-utils.ts
 3. Never physically delete or modify posted journal entries
 4. If fixing something in the accounting module, be extra cautious — flag HIGH or CRITICAL risk
+5. 🚫 NEVER apply any database changes yourself — no running SQL, no Supabase migrations, no schema edits
+   - If the fix requires a DB change (new column, new RPC, RLS policy, index, etc.), write the SQL and put it in db_changes_required
+   - A human will review and run it manually via the Supabase SQL editor
+   - Do NOT create migration files in supabase/migrations/ — that would still be blocked but don't do it
 
 Your job:
 1. Investigate the bug, locate the root cause
-2. Fix it with minimal, targeted changes
-3. Think carefully about what else in the system imports or depends on the files you changed
-4. Call the \`done\` tool with a full risk assessment — be honest about what could break
+2. Fix it with code-only changes (TypeScript/React/config files only)
+3. If a DB change is also needed, document the exact SQL in db_changes_required — do NOT apply it
+4. Think carefully about what else in the system imports or depends on the files you changed
+5. Call the \`done\` tool with a full risk assessment — be honest about what could break
 
 When calling \`done\`, you MUST provide:
 - risk_level: how dangerous is this change on a live system (LOW/MEDIUM/HIGH/CRITICAL)
 - affected_areas: every feature/page/function that could be impacted
 - risk_details: what specifically could go wrong, and why it is or isn't safe
-- testing_checklist: exact steps a human reviewer must run on staging before merging`;
+- testing_checklist: exact steps a human reviewer must run on staging before merging
+- db_changes_required: [] if none needed, or array of {description, sql, risk} objects if DB changes are required`;
 
   const userMessage = `**Bug #${bug.id}** (${bug.severity})
 Title: ${bug.title}
@@ -505,6 +532,7 @@ async function main() {
       const riskLevel = agentResult.risk_level || "UNKNOWN";
       const riskEmoji = { LOW: "🟢", MEDIUM: "🟡", HIGH: "🔴", CRITICAL: "🚨" }[riskLevel] ?? "⚠️";
       const affectedSummary = (agentResult.affected_areas || []).join(", ") || "none identified";
+      const dbChanges = agentResult.db_changes_required || [];
 
       await postToThread(
         bug.ts,
@@ -516,8 +544,27 @@ async function main() {
         (["HIGH", "CRITICAL"].includes(riskLevel)
           ? `⛔ *${riskLevel} RISK — must be tested on staging before merging. See PR for full checklist.*\n\n`
           : "") +
+        (dbChanges.length > 0
+          ? `🗄️ *This fix also requires ${dbChanges.length} database change(s) — see next message.*\n\n`
+          : "") +
         `Please review the PR, test on staging, and merge. Then reply \`fixed\` in this thread.`
       );
+
+      // 7. If DB changes are needed, post them as a separate message so they're easy to copy
+      if (dbChanges.length > 0) {
+        for (let i = 0; i < dbChanges.length; i++) {
+          const change = dbChanges[i];
+          await postToThread(
+            bug.ts,
+            `🗄️ *Database change ${i + 1}/${dbChanges.length} required for Bug #${bug.id}*\n\n` +
+            `*What it does:* ${change.description}\n\n` +
+            `*⚠️ Risk if run incorrectly:* ${change.risk}\n\n` +
+            `*Run this SQL in the Supabase SQL editor (project \`wwjpdszkmtnzshbulkon\`) BEFORE or AFTER merging the PR (as noted above):*\n` +
+            `\`\`\`sql\n${change.sql}\n\`\`\`\n\n` +
+            `⛔ *Do NOT run this on the live DB without reviewing it first. This was generated automatically.*`
+          );
+        }
+      }
     } catch (err) {
       console.error(`  ❌ Error fixing bug #${bug.id}:`, err.message);
       await postToThread(
