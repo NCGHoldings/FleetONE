@@ -1,11 +1,9 @@
 name: Slack Bug Fixer
 
 on:
-  # Run automatically every hour
-  schedule:
-    - cron: "0 * * * *"
-
-  # Also allow manual trigger from GitHub Actions UI
+  # Triggered instantly by Supabase Edge Function (slack-bug-webhook)
+  # when ONE Bug Bot posts a new bug in #one-bug — no polling needed.
+  # Manual trigger still available from GitHub Actions UI.
   workflow_dispatch:
     inputs:
       dry_run:
