@@ -79,11 +79,8 @@ jobs:
             echo "pm2 path: $PM2  version: $($PM2 --version)"
             cd $REPO_DIR
 
-            if $PM2 describe fleetone-bug-listener > /dev/null 2>&1; then
-              $PM2 restart fleetone-bug-listener --update-env
-            else
-              $PM2 start scripts/bug-listener.ecosystem.config.cjs --update-env
-            fi
+            $PM2 delete fleetone-bug-listener 2>/dev/null || true
+            $PM2 start scripts/bug-listener.ecosystem.config.cjs
 
             $PM2 save
             $PM2 status fleetone-bug-listener
