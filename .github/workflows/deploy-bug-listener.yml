@@ -73,15 +73,17 @@ jobs:
             fi
             echo "node $(node --version)  npm $(npm --version)"
 
-            # Install pm2 globally
+            # Install pm2 globally and use explicit path to avoid stale system installs
             npm install -g pm2
+            PM2="$(npm prefix -g)/bin/pm2"
+            echo "pm2 path: $PM2  version: $($PM2 --version)"
             cd $REPO_DIR
 
-            if pm2 describe fleetone-bug-listener > /dev/null 2>&1; then
-              pm2 restart fleetone-bug-listener --update-env
+            if $PM2 describe fleetone-bug-listener > /dev/null 2>&1; then
+              $PM2 restart fleetone-bug-listener --update-env
             else
-              pm2 start scripts/bug-listener.ecosystem.config.cjs --update-env
+              $PM2 start scripts/bug-listener.ecosystem.config.cjs --update-env
             fi
 
-            pm2 save
-            pm2 status fleetone-bug-listener
+            $PM2 save
+            $PM2 status fleetone-bug-listener
