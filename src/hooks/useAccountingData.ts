@@ -379,7 +379,17 @@ export const useARInvoices = (status?: "all" | "draft" | "sent" | "paid" | "part
       if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ar_invoices")
-        .select("*, customers(customer_name)")
+        .select(`
+          *,
+          customers (customer_name, customer_code),
+          bus_categories (id, name, color),
+          school_ar_invoices (
+            id,
+            school_students (
+              id, student_name, bus_reg_no, route, school_location
+            )
+          )
+        `)
         .order("invoice_date", { ascending: false });
 
       if (effectiveCompanyId) {
@@ -445,7 +455,13 @@ export const useAPInvoices = (status?: "all" | "draft" | "sent" | "paid" | "part
       if (!effectiveCompanyId) return null;
       let query = supabase
         .from("ap_invoices")
-        .select("*, vendors(vendor_name)")
+        .select(`
+          *,
+          vendors (vendor_name, vendor_code),
+          routes (route_name, route_no),
+          buses (bus_no),
+          school_routes (route_name, route_code)
+        `)
         .order("invoice_date", { ascending: false });
 
       if (effectiveCompanyId) {
@@ -911,7 +927,7 @@ export const useFixedAssets = () => {
       if (!effectiveCompanyId) return null;
       let query = supabase
         .from("fixed_assets")
-        .select(`*, asset_types (type_name, asset_account_id, depreciation_account_id, accumulated_depr_account_id)`)
+        .select(`*, asset_categories (category_name, category_code, depreciation_method, depreciation_rate, useful_life_years, asset_account_id, accumulated_dep_account_id, depreciation_expense_account_id, gain_loss_disposal_account_id)`)
         .order("asset_code");
 
       if (effectiveCompanyId) {
@@ -1766,12 +1782,31 @@ export const usePeriodClosingChecklist = (periodId?: string) => {
       let journalQuery = supabase.from("journal_entries").select("id, status").eq("period_id", periodId).neq("status", "posted").eq("company_id", effectiveCompanyId);
       if (autoBusinessUnitCode) journalQuery = journalQuery.eq("business_unit_code", autoBusinessUnitCode);
 
-      // Unpaid AR Invoices
-      let arQuery = supabase.from("ar_invoices").select("id, status").eq("period_id", periodId).eq("status", "unpaid").eq("company_id", effectiveCompanyId);
+      // Fetch period date range to query AR/AP invoices (they don't have period_id)
+      const { data: period } = await supabase
+        .from("financial_periods")
+        .select("start_date, end_date")
+        .eq("id", periodId)
+        .single();
+
+      // Unpaid AR Invoices — filter by invoice_date within the period
+      let arQuery = supabase
+        .from("ar_invoices")
+        .select("id, status")
+        .eq("status", "unpaid")
+        .eq("company_id", effectiveCompanyId);
+      if (period?.start_date) arQuery = arQuery.gte("invoice_date", period.start_date);
+      if (period?.end_date) arQuery = arQuery.lte("invoice_date", period.end_date);
       if (autoBusinessUnitCode) arQuery = arQuery.eq("business_unit_code", autoBusinessUnitCode);
 
-      // Unpaid AP Invoices
-      let apQuery = supabase.from("ap_invoices").select("id, status").eq("period_id", periodId).eq("status", "unpaid").eq("company_id", effectiveCompanyId);
+      // Unpaid AP Invoices — filter by invoice_date within the period
+      let apQuery = supabase
+        .from("ap_invoices")
+        .select("id, status")
+        .eq("status", "unpaid")
+        .eq("company_id", effectiveCompanyId);
+      if (period?.start_date) apQuery = apQuery.gte("invoice_date", period.start_date);
+      if (period?.end_date) apQuery = apQuery.lte("invoice_date", period.end_date);
       if (autoBusinessUnitCode) apQuery = apQuery.eq("business_unit_code", autoBusinessUnitCode);
 
       // Pending Bank Reconciliations

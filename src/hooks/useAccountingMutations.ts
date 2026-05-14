@@ -1083,8 +1083,8 @@ export const useCreateAPInvoice = () => {
         .from("ap_invoices")
         .insert([{
           ...headerData,
-          paid_amount: invoice.wht_amount || 0,
-          balance: invoice.total_amount - (invoice.wht_amount || 0),
+          paid_amount: 0,
+          balance: invoice.total_amount,
           status: "unpaid",
           company_id: effectiveCompanyId,
           business_unit_code: businessUnitCode,
@@ -4646,7 +4646,7 @@ export const useImportBankStatement = () => {
 // ============ AP Credit Notes ============
 export const useCreateAPCreditNote = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (data: {
@@ -4658,6 +4658,7 @@ export const useCreateAPCreditNote = () => {
       original_invoice_id?: string;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
+      const effectiveCompanyId = getEffectiveCompanyId();
       
       const { data: result, error } = await supabase
         .from("ap_debit_notes")
@@ -4689,7 +4690,7 @@ export const useCreateAPCreditNote = () => {
 // ============ AR Debit Notes ============
 export const useCreateARDebitNote = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (data: {
@@ -4701,6 +4702,7 @@ export const useCreateARDebitNote = () => {
       original_invoice_id?: string;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
+      const effectiveCompanyId = getEffectiveCompanyId();
       
       const { data: result, error } = await supabase
         .from("ar_credit_notes")

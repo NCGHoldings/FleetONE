@@ -862,7 +862,25 @@ export async function fixBalanceDiscrepancies(
  */
 export async function reverseAndDeleteJournalEntry(journalEntryId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // 1. Fetch JE lines with account info
+    // HIGH-05: Guard — never physically delete a posted journal entry.
+    // Posted JEs must be reversed via a contra entry, not deleted.
+    const { data: je, error: jeErr } = await supabase
+      .from("journal_entries")
+      .select("id, status")
+      .eq("id", journalEntryId)
+      .single();
+
+    if (jeErr) throw jeErr;
+    if (!je) return { success: false, error: "Journal entry not found." };
+
+    if (je.status === "posted") {
+      return {
+        success: false,
+        error: "Cannot delete a posted journal entry. Use the Reverse action to create a contra entry instead.",
+      };
+    }
+
+    // 1. Fetch JE lines with account type (for balance reversal on draft entries)
     const { data: jeLines, error: linesErr } = await supabase
       .from("journal_entry_lines")
       .select("id, account_id, debit, credit")
@@ -870,13 +888,13 @@ export async function reverseAndDeleteJournalEntry(journalEntryId: string): Prom
 
     if (linesErr) throw linesErr;
 
-    // 2. Reverse each COA balance change
+    // 2. CRIT-02: Reverse each COA balance change using atomic delta RPC (no read-modify-write race).
+    // Only applies to draft entries that somehow had COA changes applied outside the normal trigger path.
     if (jeLines && jeLines.length > 0) {
       for (const line of jeLines) {
-        // Fetch current account to know normal type
         const { data: account, error: accErr } = await supabase
           .from("chart_of_accounts")
-          .select("id, current_balance, account_type")
+          .select("id, account_type")
           .eq("id", line.account_id)
           .single();
 
@@ -884,22 +902,16 @@ export async function reverseAndDeleteJournalEntry(journalEntryId: string): Prom
 
         const debitAmt = Number(line.debit) || 0;
         const creditAmt = Number(line.credit) || 0;
-
-        // Must match updateAccountBalance logic exactly:
-        // netAmount = debit - credit
-        // isDebitNormal → adjustment = +netAmount (so reversal = -netAmount)
-        // isCreditNormal → adjustment = -netAmount (so reversal = +netAmount)
         const isDebitNormal = ["asset", "expense"].includes(account.account_type || "");
         const netAmount = debitAmt - creditAmt;
-        // Reverse: negate the original adjustment
-        const balanceAdjustment = isDebitNormal ? -netAmount : netAmount;
+        // Reversal delta — negate the original adjustment
+        const delta = isDebitNormal ? -netAmount : netAmount;
 
-        const newBalance = Number(account.current_balance || 0) + balanceAdjustment;
-
-        await supabase
-          .from("chart_of_accounts")
-          .update({ current_balance: newBalance })
-          .eq("id", line.account_id);
+        // Use atomic RPC to avoid read-modify-write race condition
+        await supabase.rpc("adjust_coa_balance_atomic", {
+          p_account_id: line.account_id,
+          p_delta: delta,
+        });
       }
     }
 
