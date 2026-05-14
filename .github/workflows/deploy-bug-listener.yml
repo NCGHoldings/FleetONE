@@ -59,15 +59,22 @@ jobs:
             # Load secrets into current shell for pm2
             set -a; source /etc/fleetone-bug-listener.env; set +a
 
+            # Ensure Node/npm in PATH (handles nvm and system installs)
+            export PATH="$PATH:/usr/local/bin:/usr/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -1)/bin"
+            NODE_BIN=$(which node 2>/dev/null || find /usr/local/bin /usr/bin $HOME/.nvm -name node -type f 2>/dev/null | head -1)
+            NPM_BIN=$(which npm 2>/dev/null || find /usr/local/bin /usr/bin $HOME/.nvm -name npm -type f 2>/dev/null | head -1)
+            echo "Node: $NODE_BIN  Npm: $NPM_BIN"
+
             # Install pm2 + start/restart listener
-            npm install -g pm2 --silent
+            $NPM_BIN install -g pm2 --silent
+            PM2_BIN=$(which pm2 2>/dev/null || find /usr/local/bin /usr/bin -name pm2 -type f 2>/dev/null | head -1)
             cd $REPO_DIR
 
-            if pm2 describe fleetone-bug-listener > /dev/null 2>&1; then
-              pm2 restart fleetone-bug-listener --update-env
+            if $PM2_BIN describe fleetone-bug-listener > /dev/null 2>&1; then
+              $PM2_BIN restart fleetone-bug-listener --update-env
             else
-              pm2 start scripts/bug-listener.ecosystem.config.cjs --update-env
+              $PM2_BIN start scripts/bug-listener.ecosystem.config.cjs --update-env
             fi
 
-            pm2 save
-            pm2 status fleetone-bug-listener
+            $PM2_BIN save
+            $PM2_BIN status fleetone-bug-listener
