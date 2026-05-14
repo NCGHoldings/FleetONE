@@ -59,18 +59,15 @@ jobs:
             # Load secrets into current shell for pm2
             set -a; source /etc/fleetone-bug-listener.env; set +a
 
-            # Locate node/npm regardless of how they were installed
-            source ~/.bashrc 2>/dev/null || true
-            source ~/.profile 2>/dev/null || true
-            source ~/.nvm/nvm.sh 2>/dev/null || true
-
-            # Fallback: scan common install paths
-            for p in /usr/local/bin /usr/bin /snap/bin $(ls -d /root/.nvm/versions/node/*/bin 2>/dev/null | sort -V | tail -1); do
-              [ -x "$p/node" ] && export PATH="$p:$PATH" && break
-            done
-
-            echo "Using node: $(which node) — $(node --version 2>/dev/null)"
-            echo "Using npm:  $(which npm)  — $(npm --version 2>/dev/null)"
+            # Install Node.js 20 LTS if not present
+            if ! command -v node &>/dev/null; then
+              echo "Node.js not found — installing via NodeSource…"
+              apt-get update -qq
+              apt-get install -y -qq curl ca-certificates
+              curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+              apt-get install -y -qq nodejs
+            fi
+            echo "node $(node --version)  npm $(npm --version)"
 
             # Install pm2 globally
             npm install -g pm2
