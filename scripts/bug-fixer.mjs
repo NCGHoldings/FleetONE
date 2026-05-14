@@ -496,6 +496,12 @@ async function main() {
     console.log(`🔧 Fixing Bug #${bug.id} — ${bug.title}`);
 
     try {
+      // 0. Notify Slack immediately — bug is in the pipeline
+      await postToThread(
+        bug.ts,
+        `🤖 *Picked up Bug #${bug.id}*\n\nI'm analysing the codebase and working on a fix. I'll reply here once the PR is ready.`
+      );
+
       // 1. Create branch
       const branch = createBranch(bug.id);
 
