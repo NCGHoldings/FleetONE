@@ -196,8 +196,31 @@ const AGENT_TOOLS = [
           items: { type: "string" },
           description: "List of relative file paths that were modified",
         },
+        risk_level: {
+          type: "string",
+          enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+          description:
+            "Overall risk level of this change on the LIVE production system. HIGH = touches financial logic, auth, or cross-module state. CRITICAL = touches GL engine, RLS policies, or payment flows.",
+        },
+        affected_areas: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "List of features, pages, or functions that this change could affect or break — be specific (e.g. 'AR invoice creation', 'Yutong order PDF generation', 'Bank reconciliation page').",
+        },
+        risk_details: {
+          type: "string",
+          description:
+            "Detailed explanation of what could go wrong in production if this fix has a side-effect. Include which user roles, modules, or data flows are at risk. If LOW risk, still explain why it is safe.",
+        },
+        testing_checklist: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Specific manual test steps a reviewer MUST perform on staging before merging to production. Be precise — include UI paths, example data, and expected outcomes.",
+        },
       },
-      required: ["summary", "files_changed"],
+      required: ["summary", "files_changed", "risk_level", "affected_areas", "risk_details", "testing_checklist"],
     },
   },
 ];
@@ -237,19 +260,35 @@ function runTool(toolName, toolInput) {
 async function runFixAgent(bug) {
   console.log(`\n🤖 Running fix agent for Bug #${bug.id}…`);
 
-  const systemPrompt = `You are an expert TypeScript/React developer working on FleetONE — a fleet management SaaS built with React 18 + Vite + Supabase.
+  const systemPrompt = `You are an expert TypeScript/React developer working on FleetONE — a LIVE PRODUCTION fleet management SaaS used daily by real users. Built with React 18 + Vite + Supabase.
+
+⚠️  THIS IS A LIVE SYSTEM. Every change you make goes through code review before reaching production, but you must treat it as if it could affect real financial data, real user accounts, and real operations right now.
 
 Repository structure (key paths):
 - src/components/yutong/      — Yutong bus sales pipeline, order management, invoice generation
-- src/components/accounting/  — Finance ERP (AR/AP/GL)
+- src/components/accounting/  — Finance ERP (AR/AP/GL) — HIGH RISK area
 - src/components/fleet/       — Bus management
 - src/components/special-hire/— Special hire quotation/booking
 - src/hooks/                  — Data hooks (useAccountingData, useAccountingMutations, etc.)
-- src/lib/gl-posting-utils.ts — ⚠️ PROTECTED — do NOT modify
+- src/lib/gl-posting-utils.ts — ⚠️  PROTECTED — do NOT modify under any circumstances
 
-Your job: investigate the bug below, locate the root cause in the codebase, and fix it with minimal, targeted changes. Do not refactor unrelated code.
+Critical rules:
+1. Make the MINIMUM change needed to fix the bug — no refactoring, no "while I'm here" improvements
+2. Never touch src/lib/gl-posting-utils.ts
+3. Never physically delete or modify posted journal entries
+4. If fixing something in the accounting module, be extra cautious — flag HIGH or CRITICAL risk
 
-When you are done making all changes, call the \`done\` tool with a summary.`;
+Your job:
+1. Investigate the bug, locate the root cause
+2. Fix it with minimal, targeted changes
+3. Think carefully about what else in the system imports or depends on the files you changed
+4. Call the \`done\` tool with a full risk assessment — be honest about what could break
+
+When calling \`done\`, you MUST provide:
+- risk_level: how dangerous is this change on a live system (LOW/MEDIUM/HIGH/CRITICAL)
+- affected_areas: every feature/page/function that could be impacted
+- risk_details: what specifically could go wrong, and why it is or isn't safe
+- testing_checklist: exact steps a human reviewer must run on staging before merging`;
 
   const userMessage = `**Bug #${bug.id}** (${bug.severity})
 Title: ${bug.title}
@@ -295,6 +334,8 @@ Please investigate the codebase, find the root cause, and fix it.`;
         if (block.name === "done") {
           result = block.input;
           console.log(`  ✅ Agent done. Files changed: ${result.files_changed.join(", ")}`);
+          console.log(`  ⚠️  Risk level: ${result.risk_level}`);
+          console.log(`  📋 Affected areas: ${result.affected_areas?.join(", ")}`);
           break;
         }
 
@@ -316,25 +357,58 @@ Please investigate the codebase, find the root cause, and fix it.`;
 }
 
 // ── 8. Open PR via gh CLI ─────────────────────────────────────────────────────
+function riskBadge(level) {
+  return { LOW: "🟢 LOW", MEDIUM: "🟡 MEDIUM", HIGH: "🔴 HIGH", CRITICAL: "🚨 CRITICAL" }[level] ?? level;
+}
+
 function openPR(branch, bug, agentSummary) {
   const title = `fix: ${bug.title.slice(0, 72)}`;
-  const body = `## Bug #${bug.id}
-**Severity:** ${bug.severity}
-**Reporter reported:** ${bug.title}
 
-## What was fixed
-${agentSummary.summary}
+  const affectedList = (agentSummary.affected_areas || [])
+    .map((a) => `- ${a}`)
+    .join("\n");
 
-## Files changed
-${agentSummary.files_changed.map((f) => `- \`${f}\``).join("\n")}
+  const testingList = (agentSummary.testing_checklist || [])
+    .map((t) => `- [ ] ${t}`)
+    .join("\n");
 
-## Test plan
-- [ ] Reproduce the original steps from the bug report
-- [ ] Confirm the issue is resolved
-- [ ] Confirm no regression in adjacent functionality
+  const riskLevel = agentSummary.risk_level || "UNKNOWN";
+  const isHighRisk = ["HIGH", "CRITICAL"].includes(riskLevel);
+
+  const body = `## 🐛 Bug #${bug.id} — ${bug.title}
+**Original severity:** ${bug.severity} · **Slack thread:** \`#${bug.id}\`
 
 ---
-🤖 Auto-fixed by [FleetONE Bug Fixer](https://github.com/${GITHUB_REPO}/blob/main/.github/workflows/bug-fixer.yml) · Slack bug \`#${bug.id}\``;
+
+## ✅ What was fixed
+${agentSummary.summary}
+
+## 📁 Files changed
+${agentSummary.files_changed.map((f) => `- \`${f}\``).join("\n")}
+
+---
+
+## ${isHighRisk ? "🚨" : "⚠️"} Risk Assessment — ${riskBadge(riskLevel)}
+
+> **This is a LIVE production system.** Review this section carefully before merging.
+
+### Could affect
+${affectedList || "- No other areas identified"}
+
+### Risk details
+${agentSummary.risk_details || "Not provided."}
+
+${isHighRisk ? `> ⛔ **${riskLevel} RISK — Do NOT merge directly to main without testing on staging first.**\n` : ""}
+---
+
+## 🧪 Testing checklist (run on staging before merging)
+${testingList || "- [ ] Reproduce original bug steps and confirm resolved\n- [ ] Smoke test adjacent functionality"}
+- [ ] Deploy to staging and verify no console errors
+- [ ] Confirm no GL/financial data is affected (if applicable)
+
+---
+🤖 Auto-fixed by [FleetONE Bug Fixer](https://github.com/${GITHUB_REPO}/blob/main/.github/workflows/bug-fixer.yml) · Slack bug \`#${bug.id}\`
+⚠️ *This PR was generated automatically. A human must review, test on staging, and approve before merging.*`;
 
   if (DRY_RUN) {
     console.log(`[DRY RUN] Would create PR:\n  Title: ${title}\n  Branch: ${branch}`);
@@ -428,9 +502,21 @@ async function main() {
       console.log(`  ✅ PR created: ${prUrl}`);
 
       // 6. Post to Slack thread
+      const riskLevel = agentResult.risk_level || "UNKNOWN";
+      const riskEmoji = { LOW: "🟢", MEDIUM: "🟡", HIGH: "🔴", CRITICAL: "🚨" }[riskLevel] ?? "⚠️";
+      const affectedSummary = (agentResult.affected_areas || []).join(", ") || "none identified";
+
       await postToThread(
         bug.ts,
-        `🔧 *Auto-fix PR opened for Bug #${bug.id}*\n\n${prUrl}\n\n*What was changed:*\n${agentResult.summary}\n\nPlease review, test, and merge. Then reply \`fixed\` in this thread to close the bug.`
+        `🔧 *Auto-fix PR opened for Bug #${bug.id}*\n\n` +
+        `*PR:* ${prUrl}\n\n` +
+        `*What was changed:*\n${agentResult.summary}\n\n` +
+        `${riskEmoji} *Risk level: ${riskLevel}*\n` +
+        `*Could affect:* ${affectedSummary}\n\n` +
+        (["HIGH", "CRITICAL"].includes(riskLevel)
+          ? `⛔ *${riskLevel} RISK — must be tested on staging before merging. See PR for full checklist.*\n\n`
+          : "") +
+        `Please review the PR, test on staging, and merge. Then reply \`fixed\` in this thread.`
       );
     } catch (err) {
       console.error(`  ❌ Error fixing bug #${bug.id}:`, err.message);
