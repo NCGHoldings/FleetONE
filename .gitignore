@@ -28,6 +28,9 @@ dist-ssr
 .env
 .env.
 
+# Local AI/system memory — never commit (contains architecture secrets + internal notes)
+SYSTEM_MEMORY.local.md
+
 # WhatsApp session data (large Chrome binary cache)
 .wwebjs_auth/
 whatsapp-server/.wwebjs_auth/

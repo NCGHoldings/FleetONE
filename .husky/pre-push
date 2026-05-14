@@ -21,4 +21,9 @@ fi
 echo "✅ Type check passed"
 
 echo ""
+echo "📝 Updating SYSTEM_MEMORY.local.md..."
+node scripts/update-system-memory.cjs
+echo "✅ System memory updated"
+
+echo ""
 echo "🎉 All pre-push checks passed! Pushing..."
