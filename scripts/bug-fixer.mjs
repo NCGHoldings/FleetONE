@@ -19,22 +19,14 @@ import fs from "fs";
 import path from "path";
 
 // ── 1. Bootstrap deps ────────────────────────────────────────────────────────
-console.log("📦 Checking runtime deps…");
-function ensurePkg(pkg) {
-  try {
-    await import(pkg);
-  } catch {
-    console.log(`  installing ${pkg}`);
-    execSync(`npm install --no-save ${pkg}`, { stdio: "inherit" });
-  }
-}
-// Eager install (sync, so the dynamic imports below work)
+console.log("📦 Installing runtime deps…");
 execSync("npm install --no-save @slack/web-api @anthropic-ai/sdk", {
   stdio: "inherit",
+  cwd: process.cwd(),
 });
 
-const { WebClient } = await import("@slack/web-api");
-const { default: Anthropic } = await import("@anthropic-ai/sdk");
+const { WebClient } = (await import("@slack/web-api"));
+const { default: Anthropic } = (await import("@anthropic-ai/sdk"));
 
 // ── 2. Config ─────────────────────────────────────────────────────────────────
 const CHANNEL_ID = process.env.SLACK_CHANNEL_ID || "C0B2XT7EN90";
