@@ -286,19 +286,33 @@ export const DrillDownModal = ({
         const ref = entry.reference;
         const source = entry.source_module;
         
+        // ⚠️ CRITICAL: Exclude vehicle payment JE references (ADV/BAL/REV) from AR Invoice lookup.
+        // These are payment journal entries, NOT invoices. Including them causes fuzzy ILIKE
+        // to accidentally match wrong invoices and display incorrect customer names.
+        const isVehiclePaymentJE = ref.includes('-ADV-') || ref.includes('-BAL-') || ref.includes('-REV-')
+          || ref.includes('-ADV-APPLY-');
+
         // Categorize into AR Invoice refs (includes all BU-specific invoice patterns)
-        const isARInvoiceSource = source === 'ar_invoice' || source === 'manual_ar' 
-          || source === 'yutong_sales' || source === 'sinotruck_sales' 
-          || source === 'light_vehicle_sales' || source === 'school_bus';
-        const isARInvoiceRef = ref.includes('-INV-') || ref.startsWith('INV-') 
+        // Only match actual invoice references, not payment JE references
+        const isARInvoiceRef = !isVehiclePaymentJE && (
+          ref.includes('-INV-') || ref.startsWith('INV-') 
           || ref.includes('-CI-')   // Yutong/Sinotruck Customer Invoice (NCGH-YT-CI-xxxxx)
           || ref.startsWith('SPH-AR-')  // Special Hire AR
           || ref.startsWith('SBS-INV-') // School Bus Invoice
           || ref.startsWith('NCGH-YT-') // Yutong
           || ref.startsWith('NCGH-SNT-') // Sinotruck
-          || ref.startsWith('NCGH-LTV-'); // Light Vehicle
+          || ref.startsWith('NCGH-LTV-') // Light Vehicle
+        );
+        const isARInvoiceSource = !isVehiclePaymentJE && (
+          source === 'ar_invoice' || source === 'manual_ar' || source === 'school_bus'
+        );
+        // For vehicle _sales modules, only treat as AR invoice if the ref actually looks like an invoice
+        const isVehicleSalesInvoice = !isVehiclePaymentJE && (
+          (source === 'yutong_sales' || source === 'sinotruck_sales' || source === 'light_vehicle_sales')
+          && (ref.includes('-INV-') || ref.includes('-CI-'))
+        );
 
-        if (isARInvoiceSource || isARInvoiceRef) {
+        if (isARInvoiceSource || isARInvoiceRef || isVehicleSalesInvoice) {
           arInvoiceRefs.add(ref);
         } else if (source === 'ap_invoice' || ref.includes('API-') || ref.startsWith('API-')) {
           apInvoiceRefs.add(ref);
@@ -307,6 +321,8 @@ export const DrillDownModal = ({
         } else if (source === 'ap_payment' || source === 'advance_payment' || ref.includes('-PAY-') || ref.startsWith('PAY-')) {
           apPaymentRefs.add(ref);
         }
+        // Vehicle payment JEs (ADV/BAL/REV) intentionally NOT added to any lookup set.
+        // Their customer names will be resolved from the JE description via extractPartyNameFromDesc.
       });
       
       const balances: Record<string, { balance: number, type: 'invoice' | 'receipt', parentRef?: string, partyName?: string }> = {};
@@ -318,16 +334,25 @@ export const DrillDownModal = ({
         const { data } = await supabase.from('ar_invoices').select('invoice_number, balance, customers(customer_name)').in('invoice_number', refsArray);
         data?.forEach((inv: any) => { balances[inv.invoice_number] = { balance: inv.balance, type: 'invoice', partyName: inv.customers?.customer_name || '' }; });
         
-        // Secondary: for unmatched refs (e.g. short-form YT-CI-260101 vs full NCGH-YT-CI-260101), do ILIKE lookup
+        // Secondary: for unmatched refs that look like actual invoice numbers,
+        // do a scoped ILIKE lookup (e.g. short-form YT-CI-260101 vs full NCGH-YT-CI-260101)
         const matchedRefs = new Set(data?.map((inv: any) => inv.invoice_number) || []);
         const unmatchedRefs = refsArray.filter(r => !matchedRefs.has(r));
-        if (unmatchedRefs.length > 0) {
+        // Only attempt fuzzy matching for refs that look like actual invoice references
+        // (contain -CI- or -INV-). Skip generic refs to prevent cross-customer contamination.
+        const fuzzyEligibleRefs = unmatchedRefs.filter(r => 
+          r.includes('-CI-') || r.includes('-INV-') || r.startsWith('NCGH-')
+        );
+        if (fuzzyEligibleRefs.length > 0) {
           // Build OR filter for ILIKE matching
-          const orFilter = unmatchedRefs.map(r => `invoice_number.ilike.%${r}%`).join(',');
+          const orFilter = fuzzyEligibleRefs.map(r => `invoice_number.ilike.%${r}%`).join(',');
           const { data: fuzzyData } = await supabase.from('ar_invoices').select('invoice_number, balance, customers(customer_name)').or(orFilter);
           fuzzyData?.forEach((inv: any) => {
             // Map the result back to the original short ref that matched
-            const originalRef = unmatchedRefs.find(r => inv.invoice_number.includes(r));
+            // Check BOTH directions for substring containment
+            const originalRef = fuzzyEligibleRefs.find(r => 
+              inv.invoice_number.includes(r) || r.includes(inv.invoice_number)
+            );
             if (originalRef && !balances[originalRef]) {
               balances[originalRef] = { balance: inv.balance, type: 'invoice', partyName: inv.customers?.customer_name || '' };
             }
@@ -931,16 +956,32 @@ export const DrillDownModal = ({
     // Pattern 1: "AR Invoice: REF - CustomerName" or "AP Invoice: REF - VendorName"
     const dashMatch = jeDescription.match(/^(?:AR Invoice|AP Invoice|Advance Applied|Credit Note)[^-]*-\s*(.+)$/i);
     if (dashMatch) return dashMatch[1].trim();
-    // Pattern 2: "... from Name" (AR Receipt, Advance Receipt)
+    // Pattern 2: Vehicle finance descriptions — "BU TYPE (method) - OrderNo - CustomerName"
+    // e.g. "YUT ADVANCE (Cash) - ORD-123 - John Smith"
+    // e.g. "YUT BALANCE (Bank Transfer) - ORD-456 - E R T PERERA"
+    // e.g. "SNT INVOICE - NCGH-SNT-CI-260101 - Customer Ltd"
+    // The customer name is always the LAST segment after the last " - "
+    const vehicleDescMatch = jeDescription.match(/^(?:YUT|SNT|LTV|SBO)\s+(?:ADVANCE|BALANCE|FULL|INVOICE|ADV|BAL|REV)\b.*\s-\s(.+)$/i);
+    if (vehicleDescMatch) {
+      // Extract the last " - " segment (the customer name)
+      const parts = vehicleDescMatch[1].split(/\s-\s/);
+      return parts[parts.length - 1].trim();
+    }
+    // Pattern 3: Vehicle JE line descriptions — "BU Advance from CustomerName - OrderNo"
+    // e.g. "YUT Advance from John Smith - ORD-123"
+    // e.g. "YUT Balance payment from Customer Ltd - ORD-456"
+    const vehicleLineFromMatch = jeDescription.match(/^(?:YUT|SNT|LTV|SBO)\s+.*\bfrom\s+(.+?)\s+-\s+/i);
+    if (vehicleLineFromMatch) return vehicleLineFromMatch[1].trim();
+    // Pattern 4: "... from Name" (AR Receipt, Advance Receipt)
     const fromMatch = jeDescription.match(/\bfrom\s+(.+)$/i);
     if (fromMatch) return fromMatch[1].trim();
-    // Pattern 3: "... to Name" (AP Payment)
+    // Pattern 5: "... to Name" (AP Payment)
     const toMatch = jeDescription.match(/\bto\s+(.+)$/i);
     if (toMatch) return toMatch[1].trim();
-    // Pattern 4: "Sales Revenue — CustomerName" or "Revenue — CustomerName"
+    // Pattern 6: "Sales Revenue — CustomerName" or "Revenue — CustomerName"
     const emDashMatch = jeDescription.match(/(?:revenue|sales)\s*[—–-]\s*(.+)$/i);
     if (emDashMatch) return emDashMatch[1].trim();
-    // Pattern 5: "YUT Sales revenue: CustomerName" (colon separator)
+    // Pattern 7: "YUT Sales revenue: CustomerName" (colon separator)
     const colonMatch = jeDescription.match(/(?:sales|revenue|payment|receipt)[^:]*:\s*(.+)$/i);
     if (colonMatch) return colonMatch[1].trim();
     return '';

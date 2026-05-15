@@ -42,6 +42,7 @@ export interface VehicleRecord {
   is_matched: boolean;
   match_status: 'pending' | 'auto_matched' | 'manually_matched' | 'unmatched';
   raw_data: Record<string, any> | null;
+  service_checklist?: Record<string, any> | null;
   created_at: string;
   data_sheet?: VehicleDataSheet;
   order?: {
@@ -76,6 +77,28 @@ const COLUMN_PATTERNS: Record<string, string[]> = {
   vat: ['vat', 'tax'],
   total_amount: ['total amount', 'total', 'total_amount'],
   order_no: ['order', 'order no', 'order number', 'order no.', 'order_no'],
+  engine_capacity: ['engine capacity', 'capacity (cc)', 'cc'],
+  registration_no: ['registration no', 'reg no', 'reg number'],
+  'foc_carpet': ['carpet'],
+  'foc_carpet_installation': ['carpet(installation)', 'carpet installation', 'carpet install'],
+  'foc_tyre_rotation': ['tyre rotation', 'tire rotation'],
+  'foc_grease': ['grease'],
+  'foc_stickers': ['stickers', 'sticker'],
+  'foc_no_plate': ['no plate', 'number plate', 'license plate'],
+  'foc_addblue_cut': ['addblue cut', 'adblue cut'],
+  'foc_speed_limit': ['speed limit'],
+  'foc_wheel_alignment': ['wheel alignment', 'alignment'],
+  'foc_door_lock': ['door lock'],
+  'foc_dewax': ['dewax', 'body wash', 'dewax / body wash'],
+  'foc_steering_wheel': ['steering wheel', 'steering'],
+  'foc_sim_card': ['sim card', 'sim card installation', 'sim installation'],
+  'foc_checker_plate': ['checker plate'],
+  'foc_pdi': ['pdi', 'pre delivery inspection'],
+  'foc_shock_absorber': ['shock absorber', 'shock absober replace', 'shock absorber replace'],
+  'foc_1st_service': ['1st service', 'first service'],
+  'foc_2nd_service': ['2nd service', 'second service'],
+  'foc_3rd_service': ['3rd service', 'third service'],
+  'foc_other_services': ['other services', 'other'],
 };
 
 export function useYutongVehicleDataManagement() {
@@ -174,15 +197,71 @@ export function useYutongVehicleDataManagement() {
         fuel_type: record.fuel_type || 'DIESEL',
         engine_capacity: record.engine_capacity || null,
         raw_data: record.raw_data || null,
+        service_checklist: record.service_checklist || {},
         is_matched: false,
         match_status: 'pending' as const
       }));
 
-      const { error } = await supabase
-        .from('yutong_vehicle_records')
-        .insert(insertData);
+      // Deduplication: Find existing vehicles by chassis_no or engine_no
+      const chassisNos = insertData.map(d => d.chassis_no).filter(Boolean) as string[];
+      const engineNos = insertData.map(d => d.engine_no).filter(Boolean) as string[];
 
-      if (error) throw error;
+      let existingVehicles: any[] = [];
+      if (chassisNos.length > 0 || engineNos.length > 0) {
+        let query = supabase.from('yutong_vehicle_records').select('id, chassis_no, engine_no, raw_data, service_checklist');
+        if (chassisNos.length > 0 && engineNos.length > 0) {
+          query = query.or(`chassis_no.in.(${chassisNos.map(c => `"${c}"`).join(',')}),engine_no.in.(${engineNos.map(e => `"${e}"`).join(',')})`);
+        } else if (chassisNos.length > 0) {
+          query = query.in('chassis_no', chassisNos);
+        } else if (engineNos.length > 0) {
+          query = query.in('engine_no', engineNos);
+        }
+        
+        const { data: existingData, error: existingError } = await query;
+        if (!existingError && existingData) {
+          existingVehicles = existingData;
+        }
+      }
+
+      const toUpdate = [];
+      const toInsert = [];
+
+      for (const record of insertData) {
+        const existing = existingVehicles.find(ev => 
+          (record.chassis_no && ev.chassis_no === record.chassis_no) || 
+          (record.engine_no && ev.engine_no === record.engine_no)
+        );
+
+        if (existing) {
+          // Merge service checklist and raw data
+          toUpdate.push({
+            id: existing.id,
+            ...record,
+            raw_data: { ...(existing.raw_data || {}), ...(record.raw_data || {}) },
+            service_checklist: { ...(existing.service_checklist || {}), ...(record.service_checklist || {}) }
+          });
+        } else {
+          toInsert.push(record);
+        }
+      }
+
+      // Perform inserts
+      if (toInsert.length > 0) {
+        const { error: insertError } = await supabase
+          .from('yutong_vehicle_records')
+          .insert(toInsert);
+        if (insertError) throw insertError;
+      }
+
+      // Perform updates
+      if (toUpdate.length > 0) {
+        // Upsert approach: upsert requires all primary keys or a unique constraint.
+        // Since we have the ID, we can upsert.
+        const { error: updateError } = await supabase
+          .from('yutong_vehicle_records')
+          .upsert(toUpdate, { onConflict: 'id' });
+        if (updateError) throw updateError;
+      }
 
       // Update sheet status
       await supabase

@@ -376,6 +376,11 @@
   color: hsl(270 67% 35%);
 }
 
+.source-badge.source-je {
+  background: hsl(180 67% 40% / 0.12);
+  color: hsl(180 67% 28%);
+}
+
 .source-badge.source-stmt {
   background: hsl(142 76% 36% / 0.12);
   color: hsl(142 76% 26%);
@@ -384,4 +389,36 @@
 .source-badge.source-man {
   background: hsl(var(--muted));
   color: hsl(var(--muted-foreground));
+}
+
+.source-badge.source-rev {
+  background: hsl(280 60% 50% / 0.14);
+  color: hsl(280 60% 38%);
+}
+
+/* Reversal row highlight */
+.row-reversal {
+  background: hsl(280 50% 96%) !important;
+}
+
+.row-reversal:hover {
+  background: hsl(280 50% 93%) !important;
+}
+
+:is(.dark) .row-reversal {
+  background: hsl(280 40% 15% / 0.3) !important;
+}
+
+:is(.dark) .row-reversal:hover {
+  background: hsl(280 40% 15% / 0.45) !important;
+}
+
+:is(.dark) .source-badge.source-rev {
+  background: hsl(280 50% 30% / 0.3);
+  color: hsl(280 60% 72%);
+}
+
+.reversal-desc {
+  text-decoration: line-through;
+  opacity: 0.7;
 }

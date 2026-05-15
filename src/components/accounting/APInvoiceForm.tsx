@@ -36,9 +36,20 @@ const invoiceSchema = z.object({
   due_date: z.string().min(1, "Due date is required"),
   apply_wht: z.boolean().optional(),
   wht_rate: z.number().optional(),
+  wht_category: z.string().optional(),
   notes: z.string().optional(),
   business_unit_code: z.string().optional(),
 });
+
+const WHT_CATEGORIES = [
+  { value: 'rent', label: 'Rent' },
+  { value: 'service_fee', label: 'Service Fee' },
+  { value: 'vehicle_rent', label: 'Vehicle Rent' },
+  { value: 'interest', label: 'Interest' },
+  { value: 'commission', label: 'Commission' },
+  { value: 'other', label: 'Other' },
+  { value: 'non_liable', label: 'Non-Liable' },
+] as const;
 
 type InvoiceFormData = z.infer<typeof invoiceSchema>;
 
@@ -208,6 +219,7 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
       due_date: format(addDays(new Date(), 30), "yyyy-MM-dd"),
       apply_wht: false,
       wht_rate: 5,
+      wht_category: "",
       notes: "",
       business_unit_code: initialData?.formValues?.business_unit_code || businessUnitCode || "",
     },
@@ -225,6 +237,7 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
         wht_rate: editingInvoice.wht_amount && editingInvoice.subtotal
           ? Math.round((editingInvoice.wht_amount / editingInvoice.subtotal) * 100 * 100) / 100
           : 5,
+        wht_category: (editingInvoice as any).wht_category || "",
         notes: editingInvoice.notes || "",
         business_unit_code: editingInvoice.business_unit_code || "",
       });
@@ -272,6 +285,7 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
         due_date: format(addDays(new Date(), 30), "yyyy-MM-dd"),
         apply_wht: false,
         wht_rate: 5,
+        wht_category: "",
         notes: "",
         business_unit_code: businessUnitCode || "",
       });
@@ -883,27 +897,48 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
                   )}
                 />
                 {applyWht && (
-                  <FormField
-                    control={form.control}
-                    name="wht_rate"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center gap-2">
-                        <FormLabel className="!mt-0">Rate:</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8"
-                            min={0}
-                            max={100}
-                            step="0.5"
-                          />
-                        </FormControl>
-                        <span>%</span>
-                      </FormItem>
-                    )}
-                  />
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="wht_rate"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2">
+                          <FormLabel className="!mt-0">Rate:</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              className="w-20 h-8"
+                              min={0}
+                              max={100}
+                              step="0.5"
+                            />
+                          </FormControl>
+                          <span>%</span>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="wht_category"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2">
+                          <FormLabel className="!mt-0">Category:</FormLabel>
+                          <Select value={field.value || ""} onValueChange={field.onChange}>
+                            <SelectTrigger className="w-40 h-8">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {WHT_CATEGORIES.map(cat => (
+                                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                  </>
                 )}
               </div>
 
@@ -1150,6 +1185,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
               due_date: format(addDays(new Date(), 30), "yyyy-MM-dd"),
               apply_wht: false,
               wht_rate: 5,
+              wht_category: "",
               notes: "",
               business_unit_code: getBusinessUnitCode() || "",
             },
@@ -1252,6 +1288,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
               total_amount: data.grossTotal,
               tax_amount: data.totalTax,
               wht_amount: data.whtAmount,
+              wht_category: data.formValues.wht_category || undefined,
               notes: data.formValues.notes,
               route_id: data.routeId || undefined,
               bus_id: data.busId || undefined,
@@ -1279,6 +1316,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
             total_amount: data.grossTotal,
             tax_amount: data.totalTax,
             wht_amount: data.whtAmount,
+            wht_category: data.formValues.wht_category || undefined,
             notes: data.formValues.notes,
             route_id: data.routeId || undefined,
             bus_id: data.busId || undefined,

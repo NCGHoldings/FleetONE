@@ -10,11 +10,12 @@ import { cn } from '@/lib/utils';
 import { formatLKR } from '@/lib/accounting-utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { Check, ChevronsUpDown, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { FleetExcelImport } from './FleetExcelImport';
+import { Input } from '@/components/ui/input';
 
 interface FleetMasterSpreadsheetProps {
   initialDate?: Date;
@@ -40,12 +41,16 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
     roster,
     expandedRows, 
     availableRoutes,
+    routeLeaders,
     loading, 
     kpis, 
     updateField, 
     confirmAndCreateTrips, 
     addRosterEntry, 
+    deleteRosterEntry,
+    moveRosterEntry,
     bulkAddAllBuses, 
+    updateRouteLeaders,
     refetch 
   } = useFleetMasterSpreadsheet(selectedDate, editMode, dieselPrice);
   const [bulkAdding, setBulkAdding] = useState(false);
@@ -58,6 +63,26 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
   const [showImport, setShowImport] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [selectedRoutes, setSelectedRoutes] = useState<string[]>([]);
+  const [showBulkAssignLeader, setShowBulkAssignLeader] = useState(false);
+  const [bulkLeaderName, setBulkLeaderName] = useState('');
+
+  const handleToggleRoute = (routeLabel: string) => {
+    setSelectedRoutes(prev => 
+      prev.includes(routeLabel) 
+        ? prev.filter(r => r !== routeLabel)
+        : [...prev, routeLabel]
+    );
+  };
+
+  const handleBulkAssignLeader = async () => {
+    if (!bulkLeaderName.trim() || selectedRoutes.length === 0) return;
+    await updateRouteLeaders(selectedRoutes, bulkLeaderName.trim());
+    setShowBulkAssignLeader(false);
+    setSelectedRoutes([]);
+    setBulkLeaderName('');
+  };
 
   // Sync date when parent changes
   useEffect(() => {
@@ -96,6 +121,24 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
     setSelectedBusId('');
     setSelectedRouteId('');
     setSelectedRouteLabel('');
+  };
+
+  const handleAddBusToRoute = async (routeLabel: string) => {
+    const route = availableRoutes.find(r => r.route_name === routeLabel);
+    if (route) {
+      setSelectedRouteId(route.id);
+      setSelectedRouteLabel(route.route_name);
+    } else {
+      setSelectedRouteId('');
+      setSelectedRouteLabel(routeLabel === 'Unassigned Route' ? '' : routeLabel);
+    }
+    await loadAvailableBuses();
+  };
+
+  const handleDeleteRosterEntry = (id: string) => {
+    if (window.confirm("Are you sure you want to remove this bus from the roster?")) {
+      deleteRosterEntry(id);
+    }
   };
 
   const handleCreateTrips = async () => {
@@ -275,6 +318,12 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
             <Plus className="h-4 w-4 mr-1" /> Add Bus
           </Button>
 
+          {selectedRoutes.length > 0 && (
+            <Button variant="default" className="bg-blue-600 hover:bg-blue-700 text-white" size="sm" onClick={() => setShowBulkAssignLeader(true)}>
+              <Users className="h-4 w-4 mr-1" /> Assign Leader ({selectedRoutes.length})
+            </Button>
+          )}
+
           <Button variant="outline" size="sm" disabled={bulkAdding} onClick={async () => {
             setBulkAdding(true);
             await bulkAddAllBuses();
@@ -336,8 +385,45 @@ export function FleetMasterSpreadsheet({ initialDate }: FleetMasterSpreadsheetPr
           editMode={editMode}
           selectedDate={selectedDate}
           availableRoutes={availableRoutes}
+          routeLeaders={routeLeaders}
+          selectedRoutes={selectedRoutes}
+          onToggleRoute={handleToggleRoute}
+          onDelete={handleDeleteRosterEntry}
+          onMove={moveRosterEntry}
+          onAddBusToRoute={handleAddBusToRoute}
         />
       </div>
+
+      <Dialog open={showBulkAssignLeader} onOpenChange={setShowBulkAssignLeader}>
+        <DialogContent className="sm:max-w-[425px] z-[100]">
+          <DialogHeader>
+            <DialogTitle>Assign Route Leader</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="text-sm text-muted-foreground">
+              You are assigning a leader to {selectedRoutes.length} route(s):
+              <ul className="list-disc pl-5 mt-2 max-h-32 overflow-y-auto font-medium text-foreground">
+                {selectedRoutes.map(r => <li key={r}>{r}</li>)}
+              </ul>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Route Leader Name</label>
+              <Input 
+                value={bulkLeaderName} 
+                onChange={e => setBulkLeaderName(e.target.value)} 
+                placeholder="Type leader name..."
+                autoFocus
+              />
+            </div>
+            
+            <div className="flex justify-end pt-4 gap-2">
+              <Button variant="outline" onClick={() => setShowBulkAssignLeader(false)}>Cancel</Button>
+              <Button onClick={handleBulkAssignLeader} disabled={!bulkLeaderName.trim()}>Save Leader</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Bus Dialog */}
       <Dialog open={showAddBus} onOpenChange={setShowAddBus}>

@@ -9,13 +9,18 @@ import {
   Bus,
   FileText,
   Search,
-  Filter
+  Filter,
+  Eye,
+  Printer,
+  ExternalLink
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { BusDailyFolderModal } from './BusDailyFolderModal';
 
 interface SubmissionTrackingDashboardProps {
   selectedDate: Date;
@@ -26,6 +31,8 @@ export function SubmissionTrackingDashboard({ selectedDate }: SubmissionTracking
   const [busesData, setBusesData] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'missing' | 'sla_breach'>('all');
+  const [selectedBusForFolder, setSelectedBusForFolder] = useState<any | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchTrackingData();
@@ -167,222 +174,229 @@ export function SubmissionTrackingDashboard({ selectedDate }: SubmissionTracking
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card p-4 rounded-lg border shadow-sm">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search Bus Number..."
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+      {/* Mobile-friendly Filter Header */}
+      <div className="flex flex-col gap-3 bg-white p-3 rounded-xl border shadow-sm">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search Bus Number..."
+            className="pl-10 h-10 bg-slate-50 border-transparent focus:bg-white transition-colors rounded-lg"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
         
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex overflow-x-auto pb-1 gap-2 hide-scrollbar">
           <Button 
-            variant={filterMode === 'all' ? 'default' : 'outline'} 
+            variant={filterMode === 'all' ? 'default' : 'secondary'} 
             onClick={() => setFilterMode('all')}
             size="sm"
+            className={`rounded-full shrink-0 px-4 h-8 ${filterMode === 'all' ? 'shadow-sm' : 'bg-slate-100 text-slate-600'}`}
           >
             All Active
           </Button>
           <Button 
-            variant={filterMode === 'missing' ? 'default' : 'outline'} 
+            variant={filterMode === 'missing' ? 'default' : 'secondary'} 
             onClick={() => setFilterMode('missing')}
             size="sm"
-            className={filterMode === 'missing' ? 'bg-amber-600 hover:bg-amber-700' : ''}
+            className={`rounded-full shrink-0 px-4 h-8 ${filterMode === 'missing' ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600'}`}
           >
-            <AlertTriangle className="w-4 h-4 mr-1" /> Missing Data
+            <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Missing Data
           </Button>
           <Button 
-            variant={filterMode === 'sla_breach' ? 'default' : 'outline'} 
+            variant={filterMode === 'sla_breach' ? 'default' : 'secondary'} 
             onClick={() => setFilterMode('sla_breach')}
             size="sm"
-            className={filterMode === 'sla_breach' ? 'bg-red-600 hover:bg-red-700' : ''}
+            className={`rounded-full shrink-0 px-4 h-8 ${filterMode === 'sla_breach' ? 'bg-red-600 hover:bg-red-700 text-white shadow-sm' : 'bg-slate-100 text-slate-600'}`}
           >
-            <Clock className="w-4 h-4 mr-1" /> SLA Breach (&gt;4h)
+            <Clock className="w-3.5 h-3.5 mr-1.5" /> SLA Breach (&gt;4h)
           </Button>
         </div>
       </div>
 
-      <div className="bg-card rounded-lg border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
-              <tr>
-                <th className="px-4 py-3">Bus Number</th>
-                <th className="px-4 py-3 text-center">Submissions</th>
-                <th className="px-4 py-3">Trip-by-Trip Breakdown</th>
-                <th className="px-4 py-3 text-center">Daily Fuel / Exp</th>
-                <th className="px-4 py-3 text-center">Bank Deposit</th>
-                <th className="px-4 py-3">SLA Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {loading ? (
-                Array(5).fill(0).map((_, i) => (
-                  <tr key={i}>
-                    <td className="px-4 py-4"><Skeleton className="h-4 w-20" /></td>
-                    <td className="px-4 py-4"><Skeleton className="h-4 w-16 mx-auto" /></td>
-                    <td className="px-4 py-4"><Skeleton className="h-8 w-full" /></td>
-                    <td className="px-4 py-4"><Skeleton className="h-4 w-16 mx-auto" /></td>
-                    <td className="px-4 py-4"><Skeleton className="h-4 w-16 mx-auto" /></td>
-                    <td className="px-4 py-4"><Skeleton className="h-4 w-24" /></td>
-                  </tr>
-                ))
-              ) : displayData.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    No data found for the selected filters.
-                  </td>
-                </tr>
-              ) : (
-                displayData.map((bus, idx) => {
-                  const hasSubmissions = bus.submissions.length > 0;
-                  const allApplied = hasSubmissions && bus.submissions.every((s: any) => s.status === 'applied');
-                  
-                  let slaBadge = null;
-                  
-                  if (!hasSubmissions) {
-                    if (bus.latest_end_time) {
-                       const [hh, mm] = bus.latest_end_time.split(':').map(Number);
-                       const endTimeDate = new Date(selectedDate);
-                       endTimeDate.setHours(hh, mm, 0, 0);
-                       
-                       const hoursDiff = differenceInMinutes(now, endTimeDate) / 60;
-                       
-                       if (hoursDiff >= 4) {
-                         slaBadge = <Badge variant="destructive" className="animate-pulse flex w-fit"><Clock className="w-3 h-3 mr-1"/> SLA Breach (+{Math.floor(hoursDiff)}h)</Badge>;
-                       } else if (hoursDiff > 0) {
-                         slaBadge = <Badge variant="outline" className="border-amber-500 text-amber-600 flex w-fit"><Clock className="w-3 h-3 mr-1"/> Pending ({Math.floor(hoursDiff)}h)</Badge>;
-                       } else {
-                         slaBadge = <Badge variant="outline" className="text-slate-500 flex w-fit">In Transit</Badge>;
-                       }
-                    } else if (bus.trips.length > 0) {
-                       slaBadge = <Badge variant="outline" className="border-amber-300 text-amber-600 bg-amber-50 flex w-fit">Awaiting Sub</Badge>;
-                    } else {
-                       slaBadge = <Badge variant="outline" className="text-slate-400 flex w-fit">No Schedule</Badge>;
-                    }
-                  } else {
-                     slaBadge = <Badge className="bg-emerald-500 flex w-fit"><CheckCircle2 className="w-3 h-3 mr-1"/> Submitted</Badge>;
-                  }
+      <div className="grid gap-4">
+        {loading ? (
+          Array(3).fill(0).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border p-4 shadow-sm space-y-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <Skeleton className="h-6 w-24" />
+              </div>
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          ))
+        ) : displayData.length === 0 ? (
+          <div className="bg-white rounded-xl border p-8 text-center text-muted-foreground shadow-sm">
+            <Bus className="h-12 w-12 mx-auto mb-3 opacity-20" />
+            <p>No data found for the selected filters.</p>
+          </div>
+        ) : (
+          displayData.map((bus, idx) => {
+            const hasSubmissions = bus.submissions.length > 0;
+            const allApplied = hasSubmissions && bus.submissions.every((s: any) => s.status === 'applied');
+            
+            let slaBadge = null;
+            
+            if (!hasSubmissions) {
+              if (bus.latest_end_time) {
+                 const [hh, mm] = bus.latest_end_time.split(':').map(Number);
+                 const endTimeDate = new Date(selectedDate);
+                 endTimeDate.setHours(hh, mm, 0, 0);
+                 
+                 const hoursDiff = differenceInMinutes(now, endTimeDate) / 60;
+                 
+                 if (hoursDiff >= 4) {
+                   slaBadge = <Badge variant="destructive" className="animate-pulse border-none text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wide"><Clock className="w-3 h-3 mr-1"/> Breach (+{Math.floor(hoursDiff)}h)</Badge>;
+                 } else if (hoursDiff > 0) {
+                   slaBadge = <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-none text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wide"><Clock className="w-3 h-3 mr-1"/> Pending ({Math.floor(hoursDiff)}h)</Badge>;
+                 } else {
+                   slaBadge = <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-none text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wide">In Transit</Badge>;
+                 }
+              } else if (bus.trips.length > 0) {
+                 slaBadge = <Badge variant="secondary" className="bg-amber-50 text-amber-600 border-none text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wide">Awaiting Sub</Badge>;
+              } else {
+                 slaBadge = <Badge variant="secondary" className="bg-slate-50 text-slate-400 border-none text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wide">No Schedule</Badge>;
+              }
+            } else {
+               slaBadge = <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-none text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wide"><CheckCircle2 className="w-3 h-3 mr-1"/> Submitted</Badge>;
+            }
 
-                  const expOk = bus.total_expenses > 0 || hasSubmissions;
-                  const fuelOk = bus.has_fuel;
-                  
-                  let depositAmount = 0;
-                  let hasDeposit = false;
-                  bus.submissions.forEach((s: any) => {
-                    if (s.ocr_data?.bank_deposit?.actual_amount) {
-                      hasDeposit = true;
-                      depositAmount += parseFloat(s.ocr_data.bank_deposit.actual_amount);
-                    }
-                  });
+            const expOk = bus.total_expenses > 0 || hasSubmissions;
+            const fuelOk = bus.has_fuel;
+            
+            let depositAmount = 0;
+            let hasDeposit = false;
+            bus.submissions.forEach((s: any) => {
+              if (s.ocr_data?.bank_deposit?.actual_amount) {
+                hasDeposit = true;
+                depositAmount += parseFloat(s.ocr_data.bank_deposit.actual_amount);
+              }
+            });
 
-                  // Sort trips by trip_no to ensure they are sequential
-                  const sortedTrips = [...bus.trips].sort((a, b) => {
-                    const numA = parseInt(a.trip_no?.replace(/\D/g, '') || '0');
-                    const numB = parseInt(b.trip_no?.replace(/\D/g, '') || '0');
-                    return numA - numB;
-                  });
+            // Sort trips by trip_no to ensure they are sequential
+            const sortedTrips = [...bus.trips].sort((a, b) => {
+              const numA = parseInt(a.trip_no?.replace(/\D/g, '') || '0');
+              const numB = parseInt(b.trip_no?.replace(/\D/g, '') || '0');
+              return numA - numB;
+            });
 
-                  return (
-                    <tr key={idx} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-4 font-bold text-slate-700 dark:text-slate-300 align-top">
-                        <div className="flex flex-col gap-1">
-                          <span className="flex items-center gap-2">
-                            <Bus className="w-4 h-4 text-blue-500" />
-                            {bus.bus_no}
-                          </span>
-                          {bus.latest_end_time && (
-                            <span className="text-[10px] text-muted-foreground ml-6">
-                              Last End: {bus.latest_end_time.substring(0,5)}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-center align-top">
-                        {hasSubmissions ? (
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="font-bold text-emerald-600">{bus.submissions.length} Found</span>
-                            <span className="text-[10px] text-muted-foreground uppercase">{allApplied ? 'Applied' : 'Pending Review'}</span>
-                          </div>
-                        ) : (
-                          <span className="text-amber-500 font-medium text-xs">Missing</span>
-                        )}
-                      </td>
-                      
-                      {/* Trip Breakdown Column */}
-                      <td className="px-4 py-3 align-top min-w-[300px]">
-                        <div className="flex flex-wrap gap-2">
-                          {sortedTrips.length > 0 ? sortedTrips.map((trip: any, tIdx: number) => {
-                            const tripIncOk = trip.income > 0;
-                            const tripOdoOk = trip.odometer_start || trip.odometer_end;
-                            // Determine overall trip status for styling
-                            const isComplete = tripIncOk && tripOdoOk;
-                            const isPartial = (tripIncOk || tripOdoOk) && !isComplete;
-                            
-                            return (
-                              <div key={tIdx} className={`p-2 rounded border text-xs min-w-[110px] ${
-                                isComplete ? 'bg-emerald-50 border-emerald-200' :
-                                isPartial ? 'bg-amber-50 border-amber-200' :
-                                'bg-slate-50 border-slate-200'
-                              }`}>
-                                <div className="font-semibold text-slate-700 mb-1 border-b border-slate-200 pb-1 flex justify-between items-center">
-                                  <span>{trip.trip_no || `Trip ${tIdx+1}`}</span>
-                                  {isComplete && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
-                                </div>
-                                <div className="space-y-0.5">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground text-[10px] uppercase">Inc</span>
-                                    {tripIncOk ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <XCircle className="w-3 h-3 text-amber-500" />}
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground text-[10px] uppercase">Odo</span>
-                                    {tripOdoOk ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <XCircle className="w-3 h-3 text-amber-500" />}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          }) : (
-                            <span className="text-xs text-slate-400 italic">No trips scheduled</span>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-4 text-center align-top">
-                        <div className="flex flex-col items-center gap-1 text-xs font-medium">
-                          <span className={expOk ? "text-emerald-600" : "text-amber-500"}>
-                            Exp: {expOk ? <CheckCircle2 className="w-3 h-3 inline" /> : <XCircle className="w-3 h-3 inline" />}
-                          </span>
-                          <span className={fuelOk ? "text-emerald-600" : "text-slate-400"}>
-                            Fuel: {fuelOk ? <CheckCircle2 className="w-3 h-3 inline" /> : '-'}
-                          </span>
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-4 text-center align-top">
-                        {hasDeposit ? (
-                          <span className="font-bold text-purple-600">Rs. {depositAmount.toFixed(2)}</span>
-                        ) : (
-                          <span className="text-slate-400 text-xs">-</span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-4 align-top">
+            return (
+              <div key={idx} className="bg-white rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                {/* Card Header */}
+                <div className="p-4 border-b bg-slate-50 flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+                      <Bus className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                        <h3 className="font-bold text-lg text-slate-800 leading-none">{bus.bus_no}</h3>
                         {slaBadge}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                      </div>
+                      {bus.latest_end_time && (
+                        <p className="text-xs text-slate-500 font-medium">Last End: {bus.latest_end_time.substring(0,5)}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 bg-white shadow-sm border border-slate-100 rounded-full" onClick={() => setSelectedBusForFolder(bus)} title={`View ${bus.bus_no} folder`}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 bg-white shadow-sm border border-slate-100 rounded-full" onClick={() => {
+                      const printContent = `
+                        <html><head><title>${bus.bus_no} - Summary</title></head><body>
+                        <h1>🚌 ${bus.bus_no} — Summary</h1>
+                        <p>Total Trips: ${bus.trips.length}</p>
+                        </body></html>
+                      `;
+                      const w = window.open('', '_blank', 'width=700,height=600');
+                      if (w) { w.document.write(printContent); w.document.close(); setTimeout(() => { w.print(); }, 500); }
+                    }} title={`Print ${bus.bus_no} summary`}>
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Status Banner */}
+                <div className={`px-4 py-2 text-[11px] font-bold uppercase tracking-wider flex justify-between items-center ${hasSubmissions ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                  <span className="flex items-center gap-1.5">
+                    {hasSubmissions ? <FileText className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                    {hasSubmissions ? `${bus.submissions.length} Logs Found` : 'Logs Missing'}
+                  </span>
+                  <span>{hasSubmissions ? (allApplied ? 'Applied' : 'Pending Review') : 'Action Required'}</span>
+                </div>
+
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50/50">
+                   <div className="bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm flex items-center justify-between">
+                      <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Expenses</span>
+                      <span className={expOk ? "text-emerald-500" : "text-amber-500"}>{expOk ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}</span>
+                   </div>
+                   <div className="bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm flex items-center justify-between">
+                      <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Fuel Logs</span>
+                      <span className={fuelOk ? "text-emerald-500" : "text-slate-300"}>{fuelOk ? <CheckCircle2 className="h-4 w-4" /> : "-"}</span>
+                   </div>
+                   <div className="col-span-2 bg-white p-3 rounded-lg border border-slate-100 shadow-sm flex items-center justify-between">
+                      <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Bank Deposit</span>
+                      {hasDeposit ? (
+                        <span className="font-bold text-purple-600 text-sm">Rs. {depositAmount.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                      ) : (
+                        <span className="text-slate-400 text-[11px] font-semibold bg-slate-100 px-2 py-0.5 rounded uppercase">Not Recorded</span>
+                      )}
+                   </div>
+                </div>
+
+                {/* Trip Breakdown */}
+                <div className="p-3 border-t bg-white">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Trip Breakdown ({sortedTrips.length})</p>
+                  <div className="flex flex-wrap gap-2">
+                    {sortedTrips.length > 0 ? sortedTrips.map((trip: any, tIdx: number) => {
+                      const tripIncOk = trip.income > 0;
+                      const tripOdoOk = trip.odometer_start || trip.odometer_end;
+                      const isComplete = tripIncOk && tripOdoOk;
+                      const isPartial = (tripIncOk || tripOdoOk) && !isComplete;
+                      
+                      return (
+                        <div key={tIdx} className={`p-2 rounded-lg border shadow-sm text-xs min-w-[110px] flex-1 ${
+                          isComplete ? 'bg-emerald-50/50 border-emerald-100' :
+                          isPartial ? 'bg-amber-50/50 border-amber-100' :
+                          'bg-slate-50 border-slate-100'
+                        }`}>
+                          <div className="font-bold text-slate-700 mb-1 border-b border-slate-200/60 pb-1 flex justify-between items-center">
+                            <span>{trip.trip_no || `Trip ${tIdx+1}`}</span>
+                            {isComplete && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                          </div>
+                          <div className="space-y-1 mt-1.5">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-semibold text-[10px] uppercase">Inc</span>
+                              {tripIncOk ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-amber-500" />}
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 font-semibold text-[10px] uppercase">Odo</span>
+                              {tripOdoOk ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-amber-500" />}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }) : (
+                      <span className="text-xs text-slate-400 font-medium px-1">No trips scheduled for this date.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
+
+      <BusDailyFolderModal
+        open={!!selectedBusForFolder}
+        onOpenChange={(open) => !open && setSelectedBusForFolder(null)}
+        busData={selectedBusForFolder}
+        date={selectedDate}
+      />
     </div>
   );
 }

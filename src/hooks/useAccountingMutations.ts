@@ -102,7 +102,8 @@ export const usePostJournalEntry = () => {
           journal_entry_lines (
             account_id,
             debit,
-            credit
+            credit,
+            description
           )
         `)
         .eq("id", entryId)
@@ -110,14 +111,18 @@ export const usePostJournalEntry = () => {
       
       if (fetchError) throw fetchError;
       
+      // Fetch CoA details for all lines (needed for bank detection + balance update)
+      const accountIds = entry.journal_entry_lines.map((l: any) => l.account_id);
+      const { data: coaAccounts } = await supabase
+        .from("chart_of_accounts")
+        .select("id, account_code, account_name, account_type, current_balance")
+        .in("id", accountIds);
+
+      const coaMap = new Map((coaAccounts || []).map(a => [a.id, a]));
+
       for (const line of entry.journal_entry_lines) {
         const netAmount = (line.debit || 0) - (line.credit || 0);
-        
-        const { data: account } = await supabase
-          .from("chart_of_accounts")
-          .select("current_balance, account_type")
-          .eq("id", line.account_id)
-          .single();
+        const account = coaMap.get(line.account_id);
         
         if (account) {
           const isDebitNormal = ["asset", "expense"].includes(account.account_type);
@@ -145,6 +150,112 @@ export const usePostJournalEntry = () => {
         .eq("id", entryId);
       
       if (statusError) throw statusError;
+
+      // ═══════════════════════════════════════════════════════════════
+      // AUTO-CREATE BANK TRANSACTIONS for manual JEs touching bank accounts
+      // This ensures manual JEs appear in Bank Reconciliation and Lineage
+      // Two-pass lookup: first by gl_account_id, then fallback by account_name/code
+      // ═══════════════════════════════════════════════════════════════
+      try {
+        const bankLines = entry.journal_entry_lines.filter((line: any) => {
+          const coa = coaMap.get(line.account_id);
+          return coa?.account_code?.startsWith('1300');
+        });
+
+        if (bankLines.length > 0) {
+          // Pass 1: Find linked bank_accounts by gl_account_id (preferred)
+          const bankGLIds = bankLines.map((l: any) => l.account_id);
+          const { data: linkedBankAccounts } = await supabase
+            .from('bank_accounts')
+            .select('id, gl_account_id, current_balance, account_name')
+            .in('gl_account_id', bankGLIds);
+
+          // Pass 2: For unlinked lines, fallback by company + account_name/code match
+          const linkedGLIds = new Set((linkedBankAccounts || []).map((ba: any) => ba.gl_account_id));
+          const unlinkedLines = bankLines.filter((l: any) => !linkedGLIds.has(l.account_id));
+
+          let fallbackBankAccounts: any[] = [];
+          if (unlinkedLines.length > 0 && entry.company_id) {
+            const { data: companyBankAccounts } = await supabase
+              .from('bank_accounts')
+              .select('id, gl_account_id, current_balance, account_name, account_number')
+              .eq('company_id', entry.company_id);
+            fallbackBankAccounts = companyBankAccounts || [];
+          }
+
+          // Build a unified map: COA account_id → bank_account record
+          const bankAccountMap = new Map<string, any>();
+          // Populate from gl_account_id matches
+          for (const ba of (linkedBankAccounts || [])) {
+            bankAccountMap.set(ba.gl_account_id, ba);
+          }
+          // Populate fallback matches by account_name containing COA code
+          for (const line of unlinkedLines) {
+            const coa = coaMap.get(line.account_id);
+            if (!coa?.account_code) continue;
+            const matchedBA = fallbackBankAccounts.find((ba: any) => {
+              // Match if account_name contains the COA account_code (e.g. "13001012")
+              const nameMatch = ba.account_name?.includes(coa.account_code);
+              // Or match if account_number contains the code
+              const numMatch = ba.account_number?.includes(coa.account_code);
+              // Or match if account_name contains the COA account_name
+              const namePartMatch = coa.account_name && ba.account_name?.toLowerCase()?.includes(coa.account_name.toLowerCase().substring(0, 20));
+              return nameMatch || numMatch || namePartMatch;
+            });
+            if (matchedBA) {
+              bankAccountMap.set(line.account_id, matchedBA);
+              // Auto-heal: set gl_account_id for future lookups (fire-and-forget)
+              if (!matchedBA.gl_account_id) {
+                supabase
+                  .from('bank_accounts')
+                  .update({ gl_account_id: line.account_id })
+                  .eq('id', matchedBA.id)
+                  .then(() => console.log(`[PostJE] Auto-healed gl_account_id for bank account ${matchedBA.account_name}`));
+              }
+            }
+          }
+
+          if (bankAccountMap.size > 0) {
+            for (const bankLine of bankLines) {
+              const bankAccount = bankAccountMap.get(bankLine.account_id);
+              if (!bankAccount) continue;
+
+              const debitAmt = bankLine.debit || 0;
+              const creditAmt = bankLine.credit || 0;
+              const isDeposit = debitAmt > 0;
+              const lineDesc = bankLine.description || entry.description || '';
+
+              // Create bank_transaction with journal_entry_id backlink
+              await (supabase as any).from('bank_transactions').insert([{
+                bank_account_id: bankAccount.id,
+                transaction_date: entry.entry_date,
+                transaction_type: isDeposit ? 'deposit' : 'payment',
+                description: `${entry.entry_number} - ${lineDesc}`.substring(0, 255),
+                debit_amount: debitAmt,
+                credit_amount: creditAmt,
+                reference: entry.reference || entry.entry_number,
+                company_id: entry.company_id,
+                source_type: 'journal_entry',
+                source_id: entry.id,
+                journal_entry_id: entry.id,
+                is_reconciled: false,
+              }]);
+
+              // Update bank_accounts.current_balance
+              const balanceChange = debitAmt - creditAmt; // Positive = deposit, negative = payment
+              await supabase
+                .from('bank_accounts')
+                .update({ current_balance: (bankAccount.current_balance || 0) + balanceChange })
+                .eq('id', bankAccount.id);
+            }
+          } else {
+            console.warn(`[PostJE] No bank_accounts found for ${bankLines.length} bank GL lines. Check gl_account_id linkage.`);
+          }
+        }
+      } catch (bankErr) {
+        // Non-blocking: Bank transaction creation is best-effort
+        console.warn('[PostJE] Bank transaction auto-creation failed (non-fatal):', bankErr);
+      }
       
       return entry;
     },
@@ -152,6 +263,9 @@ export const usePostJournalEntry = () => {
       queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["accounting-summary", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
       toast.success("Journal entry posted successfully");
     },
     onError: (error) => {
@@ -2362,7 +2476,7 @@ export const useConsolidateAPPayments = () => {
 // ============ Bank Transactions ============
 export const useCreateBankTransaction = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (transaction: {
@@ -2375,7 +2489,6 @@ export const useCreateBankTransaction = () => {
       reference?: string;
       cheque_number?: string;
     }) => {
-      const { getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = getBusinessUnitCode();
       
@@ -2397,6 +2510,7 @@ export const useCreateBankTransaction = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions-recon"] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
       toast.success("Transaction recorded successfully");
     },

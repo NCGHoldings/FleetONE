@@ -15,6 +15,7 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { canvasToMultiPagePDF } from "@/lib/pdf-multi-page";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 interface FinanceDocumentPreviewModalProps {
   open: boolean;
@@ -305,6 +306,139 @@ export const FinanceDocumentPreviewModal = ({
     }
   }, [availableTemplates, selectedTemplateId, resolvedCompanyId]);
 
+  // ===== Bank Transfer Letter (virtual template for bank_transfer payments) =====
+  const isBankTransfer = documentType === 'ap_payment_voucher'
+    && (documentData?.payment_method || '').toLowerCase().replace(/[\s_-]/g, '') === 'banktransfer';
+  const BANK_TRANSFER_ID = '__bank_transfer_letter__';
+
+  const generateBankTransferLetterHtml = (): string => {
+    const doc = enrichedDocumentData || documentData;
+    const paymentDate = doc?.payment_date
+      ? format(new Date(doc.payment_date), 'do MMMM yyyy')
+      : format(new Date(), 'do MMMM yyyy');
+
+    // Company info
+    const companyName = company?.name || company?.company_name || 'NCG Holdings (Pvt) Ltd';
+
+    // Company's own bank account (source of funds)
+    // Try from bank_accounts join, or fallback
+    const companyBankName = doc?.bank_accounts?.bank_name || doc?.bank_name || '';
+    const companyAccountNo = doc?.bank_accounts?.account_number || doc?.account_number || '';
+
+    // Beneficiary info
+    const vba = doc?.vendor_bank_accounts;
+    const isCustomerPayee = doc?.payee_type === 'customer';
+    const isEmployeePayee = doc?.payee_type === 'employee';
+    const beneficiaryName = isCustomerPayee
+      ? (doc?.customers?.customer_name || '')
+      : isEmployeePayee
+        ? (doc?.employees?.staff_name || doc?.staff_registry?.staff_name || '')
+        : (vba?.account_holder_name || doc?.vendors?.vendor_name || '');
+    const beneficiaryBank = vba?.bank_name
+      ? `${vba.bank_name}${vba.bank_branch ? ' - ' + vba.bank_branch : ''}`
+      : (doc?.vendors?.bank_name || '');
+    const beneficiaryAccountNo = vba?.account_number || doc?.vendors?.bank_account || '';
+
+    const amount = doc?.amount || 0;
+    const formattedAmount = `Rs.${amount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    // Amount in words
+    const amountInWords = (() => {
+      const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+        'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+      const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+      const convertHundreds = (n: number): string => {
+        let result = '';
+        if (n >= 100) { result += ones[Math.floor(n / 100)] + ' Hundred '; n %= 100; }
+        if (n >= 20) { result += tens[Math.floor(n / 10)] + ' '; n %= 10; }
+        if (n > 0) result += ones[n] + ' ';
+        return result;
+      };
+      const rupees = Math.floor(amount);
+      const cents = Math.round((amount - rupees) * 100);
+      let result = '';
+      const million = Math.floor(rupees / 1000000);
+      const thousand = Math.floor((rupees % 1000000) / 1000);
+      const remainder = rupees % 1000;
+      if (million) result += convertHundreds(million) + 'Million ';
+      if (thousand) result += convertHundreds(thousand) + 'Thousand ';
+      if (remainder) result += convertHundreds(remainder);
+      result = result.trim() + ' Rupees';
+      if (cents > 0) result += ' and ' + convertHundreds(cents).trim() + ' Cents';
+      return result + ' only.';
+    })();
+
+    // Manager's bank (destination bank from beneficiary)
+    const managerBankName = vba?.bank_name || doc?.vendors?.bank_name || 'the Bank';
+
+    return `
+      <!DOCTYPE html>
+      <html><head><style>
+        @page { size: A4; margin: 25mm; }
+        body { font-family: 'Times New Roman', Times, serif; font-size: 13pt; line-height: 1.6; color: #000; margin: 0; padding: 40px 60px; }
+        .date { margin-bottom: 24px; }
+        .address { margin-bottom: 30px; }
+        .salutation { margin-bottom: 20px; }
+        .subject { font-weight: bold; text-decoration: underline; margin-bottom: 20px; font-size: 13pt; }
+        .body-text { margin-bottom: 18px; text-align: justify; }
+        table { border-collapse: collapse; width: 80%; margin: 20px 0; }
+        th, td { border: 1.5px solid #000; padding: 8px 12px; text-align: left; font-size: 12pt; }
+        th { font-weight: bold; background: #f9f9f9; }
+        .amount-words { margin: 20px 0; font-weight: bold; }
+        .closing { margin-top: 40px; }
+        .signature-block { margin-top: 80px; }
+        .signature-line { border-top: 1px dotted #000; width: 200px; padding-top: 4px; }
+        @media print {
+          body { padding: 0; }
+        }
+      </style></head><body>
+        <div class="date">${paymentDate}</div>
+        <div class="address">
+          The Manager,<br/>
+          ${managerBankName} PLC
+        </div>
+        <div class="salutation">Dear Sir/Madam,</div>
+        <div class="subject">
+          Fund Transfer from ${companyName} A/C No – ${companyAccountNo || '________________'}
+        </div>
+        <div class="body-text">
+          Please be kind enough to debit below mentioned amount from The ${companyName} account and credited to following bank account.
+        </div>
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Bank</th><th>Account No</th><th>Amount</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>${beneficiaryName}</td>
+              <td>${beneficiaryBank}</td>
+              <td>${beneficiaryAccountNo}</td>
+              <td>${formattedAmount}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="amount-words">
+          Total Amount In Word: ${amountInWords}
+        </div>
+        <div class="body-text">
+          You may debit the charges if any with the transaction to the same account.
+        </div>
+        <div class="body-text">
+          Expect you will do the needful with immediate effect and please accept our appreciation for the cooperation extended.
+        </div>
+        <div class="closing">
+          Yours Faithfully
+        </div>
+        <div class="signature-block">
+          <div class="signature-line">
+            Authorized Signatures<br/>
+            ${companyName}
+          </div>
+        </div>
+      </body></html>
+    `;
+  };
+
 
 
   const selectedTemplate = availableTemplates?.find((t) => t.id === selectedTemplateId);
@@ -449,6 +583,11 @@ export const FinanceDocumentPreviewModal = ({
       prepared_by_signature: signatures.prepared_by.dataUrl || enrichedDocumentData?.prepared_by_signature || '',
     };
 
+    // Use Bank Transfer Letter if that virtual template is selected
+    if (selectedTemplateId === BANK_TRANSFER_ID) {
+      return generateBankTransferLetterHtml();
+    }
+
     // Use selected template if available, otherwise use fallback
     if (selectedTemplate) {
       const placeholders = mapDocumentToPlaceholders(
@@ -580,13 +719,18 @@ export const FinanceDocumentPreviewModal = ({
                 <SelectValue placeholder="Select template" />
               </SelectTrigger>
               <SelectContent>
+                {isBankTransfer && (
+                  <SelectItem value={BANK_TRANSFER_ID}>
+                    📄 Bank Transfer Letter
+                  </SelectItem>
+                )}
                 {availableTemplates?.map((template) => (
                   <SelectItem key={template.id} value={template.id}>
                     {template.template_name}
                     {(template as any).is_default && " (Default)"}
                   </SelectItem>
                 ))}
-                {(!availableTemplates || availableTemplates.length === 0) && (
+                {(!availableTemplates || availableTemplates.length === 0) && !isBankTransfer && (
                   <SelectItem value="none" disabled>
                     No templates available
                   </SelectItem>

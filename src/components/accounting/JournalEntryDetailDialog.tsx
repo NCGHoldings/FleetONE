@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle, ArrowLeftRight, Eye, ExternalLink, FileText, Info, Check, ChevronsUpDown } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Eye, ExternalLink, FileText, Info, Check, ChevronsUpDown, Landmark } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -86,6 +86,7 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
   const [isFixingBank, setIsFixingBank] = useState(false);
   const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [isGeneratingBankTxn, setIsGeneratingBankTxn] = useState(false);
 
   const { data: bankAccounts } = useQuery({
     queryKey: ['bank-accounts-fix'],
@@ -182,6 +183,125 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
       toast.error(e.message || "Failed to fix bank account");
     } finally {
       setIsFixingBank(false);
+    }
+  };
+
+  // --- Detect orphaned bank GL lines (posted JE with 1300x accounts but no bank_transaction) ---
+  const bankLinesWithoutTxn = useQuery({
+    queryKey: ['je-bank-orphan-check', entry?.id, lines],
+    enabled: !!entry?.id && entry?.status === 'posted' && !!lines && lines.length > 0,
+    queryFn: async () => {
+      // Find lines touching bank GL accounts (1300x)
+      const bankLines = (lines || []).filter((l: any) => 
+        l.chart_of_accounts?.account_code?.startsWith('1300')
+      );
+      if (bankLines.length === 0) return { orphaned: false, bankLines: [] };
+
+      // Check if bank_transactions already exist for this JE
+      const { data: existingBT } = await supabase
+        .from('bank_transactions')
+        .select('id')
+        .or(`journal_entry_id.eq.${entry.id},source_id.eq.${entry.id}`);
+
+      if (existingBT && existingBT.length > 0) return { orphaned: false, bankLines: [] };
+
+      return { orphaned: true, bankLines };
+    },
+  });
+
+  const handleGenerateBankTransaction = async () => {
+    if (!entry || !lines) return;
+    setIsGeneratingBankTxn(true);
+    try {
+      const bankLines = (lines || []).filter((l: any) => 
+        l.chart_of_accounts?.account_code?.startsWith('1300')
+      );
+      if (bankLines.length === 0) throw new Error('No bank GL lines found');
+
+      // Two-pass lookup: gl_account_id first, then fallback by name/code
+      const bankGLIds = bankLines.map((l: any) => l.account_id);
+      const { data: linkedBA } = await supabase
+        .from('bank_accounts')
+        .select('id, gl_account_id, current_balance, account_name')
+        .in('gl_account_id', bankGLIds);
+
+      const linkedGLIds = new Set((linkedBA || []).map((ba: any) => ba.gl_account_id));
+      const unlinkedLines = bankLines.filter((l: any) => !linkedGLIds.has(l.account_id));
+
+      let fallbackBA: any[] = [];
+      if (unlinkedLines.length > 0 && entry.company_id) {
+        const { data: companyBA } = await supabase
+          .from('bank_accounts')
+          .select('id, gl_account_id, current_balance, account_name, account_number')
+          .eq('company_id', entry.company_id);
+        fallbackBA = companyBA || [];
+      }
+
+      // Build unified lookup map
+      const bankAccountMap = new Map<string, any>();
+      for (const ba of (linkedBA || [])) {
+        bankAccountMap.set(ba.gl_account_id, ba);
+      }
+      for (const line of unlinkedLines) {
+        const code = line.chart_of_accounts?.account_code;
+        const name = line.chart_of_accounts?.account_name;
+        if (!code) continue;
+        const matched = fallbackBA.find((ba: any) => {
+          const nameMatch = ba.account_name?.includes(code);
+          const numMatch = ba.account_number?.includes(code);
+          const namePartMatch = name && ba.account_name?.toLowerCase()?.includes(name.toLowerCase().substring(0, 20));
+          return nameMatch || numMatch || namePartMatch;
+        });
+        if (matched) {
+          bankAccountMap.set(line.account_id, matched);
+          // Auto-heal gl_account_id
+          if (!matched.gl_account_id) {
+            await supabase.from('bank_accounts')
+              .update({ gl_account_id: line.account_id })
+              .eq('id', matched.id);
+          }
+        }
+      }
+
+      if (bankAccountMap.size === 0) {
+        throw new Error('Could not find a matching bank_accounts record. Please ensure the bank account has gl_account_id linked to the COA entry.');
+      }
+
+      let created = 0;
+      for (const line of bankLines) {
+        const ba = bankAccountMap.get(line.account_id);
+        if (!ba) continue;
+        const debitAmt = line.debit || 0;
+        const creditAmt = line.credit || 0;
+        const isDeposit = debitAmt > 0;
+
+        const { error } = await (supabase as any).from('bank_transactions').insert([{
+          bank_account_id: ba.id,
+          transaction_date: entry.entry_date,
+          transaction_type: isDeposit ? 'deposit' : 'payment',
+          description: `${entry.entry_number} - ${line.description || entry.description || ''}`.substring(0, 255),
+          debit_amount: debitAmt,
+          credit_amount: creditAmt,
+          reference: entry.reference || entry.entry_number,
+          company_id: entry.company_id,
+          source_type: 'journal_entry',
+          source_id: entry.id,
+          journal_entry_id: entry.id,
+          is_reconciled: false,
+        }]);
+        if (error) throw error;
+        created++;
+      }
+
+      toast.success(`Created ${created} bank transaction(s) for ${entry.entry_number}. It will now appear in Bank Reconciliation.`);
+      // Invalidate queries to refresh Related Documents and bank recon
+      const { QueryClient } = await import('@tanstack/react-query');
+      window.location.reload();
+    } catch (err: any) {
+      console.error('[GenerateBankTxn]', err);
+      toast.error(`Failed: ${err.message}`);
+    } finally {
+      setIsGeneratingBankTxn(false);
     }
   };
 
@@ -436,6 +556,32 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
                 </Table>
               )}
             </div>
+
+            {/* Orphaned Bank GL Lines Warning */}
+            {bankLinesWithoutTxn.data?.orphaned && (
+              <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <Landmark className="h-5 w-5 text-amber-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                    Missing Bank Transaction
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                    This JE debits/credits a bank account (1300x) but no corresponding bank_transaction was created.
+                    It won't appear in Bank Reconciliation until fixed.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  onClick={handleGenerateBankTransaction}
+                  disabled={isGeneratingBankTxn}
+                >
+                  <Landmark className="h-4 w-4 mr-1" />
+                  {isGeneratingBankTxn ? 'Creating...' : 'Generate Bank Txn'}
+                </Button>
+              </div>
+            )}
 
             <Separator />
 

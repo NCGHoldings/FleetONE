@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useBankAccounts, useBankTransactionsForRecon, useLastReconciliation, useDraftReconciliation, useChartOfAccounts } from "@/hooks/useAccountingData";
 import { useSaveBankReconciliation, useSaveDraftReconciliation, useDeleteDraftReconciliation } from "@/hooks/useAccountingMutations";
-import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, ArrowRightLeft, Search, Sparkles, BookOpen, Maximize, Minimize, Trash2, Printer, Plus, Pencil, Zap, BarChart3, Eye, EyeOff } from "lucide-react";
+import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle, ArrowRightLeft, Search, Sparkles, BookOpen, Maximize, Minimize, Trash2, Printer, Plus, Pencil, Zap, BarChart3, Eye, EyeOff, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -68,6 +68,8 @@ const sourceLabel = (sourceType: string | null | undefined): { text: string; cla
     case "ar_receipt": return { text: "AR", className: "source-badge source-ar" };
     case "bank_fee": return { text: "FEE", className: "source-badge source-fee" };
     case "inter_bank_transfer": return { text: "IBT", className: "source-badge source-ibt" };
+    case "journal_entry": return { text: "JE", className: "source-badge source-je" };
+    case "reversal": return { text: "REV", className: "source-badge source-rev" };
     default: 
       if (sourceType?.startsWith('statement_import')) return { text: "STMT", className: "source-badge source-stmt" };
       return { text: "MAN", className: "source-badge source-man" };
@@ -121,6 +123,11 @@ const BankReconciliationWorksheet = () => {
   const [quickAddGLAccountId, setQuickAddGLAccountId] = useState<string>("");
   const [quickAddGLSearch, setQuickAddGLSearch] = useState("");
   const [suggestedGLAccount, setSuggestedGLAccount] = useState<{ id: string; code: string; name: string } | null>(null);
+  const [showReversalDialog, setShowReversalDialog] = useState(false);
+  const [reversalTarget, setReversalTarget] = useState<any>(null);
+  const [reversalReason, setReversalReason] = useState("");
+  const [reversalDate, setReversalDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [isReversing, setIsReversing] = useState(false);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHydratingRef = useRef(false);
   const lastHydratedAccountRef = useRef<string | null>(null);
@@ -687,6 +694,7 @@ const BankReconciliationWorksheet = () => {
         debit_amount: quickAddType === 'deposit' ? amount : 0,
         credit_amount: quickAddType === 'payment' ? amount : 0,
         is_reconciled: false,
+        company_id: effectiveCompanyId,
       };
 
       const { error } = await (supabase as any)
@@ -746,6 +754,154 @@ const BankReconciliationWorksheet = () => {
       toast.error(`Failed to add entry: ${err.message}`);
     }
   }, [selectedAccountId, quickAddAmount, quickAddDesc, quickAddRef, quickAddDate, quickAddType, queryClient]);
+
+  // --- Reverse Transaction ---
+  const handleReverseTransaction = useCallback(async () => {
+    if (!reversalTarget || !selectedAccountId) return;
+    if (!reversalReason.trim()) return toast.error("Please enter a reason for the reversal");
+
+    setIsReversing(true);
+    try {
+      const orig = reversalTarget;
+      const origDebit = orig.debit_amount || 0;
+      const origCredit = orig.credit_amount || 0;
+
+      // 1. Create offsetting bank_transaction with swapped debit/credit
+      const reversalInsert: any = {
+        bank_account_id: selectedAccountId,
+        transaction_date: reversalDate,
+        transaction_type: origDebit > 0 ? 'payment' : 'deposit', // opposite of original
+        description: `REVERSAL: ${orig.description || 'N/A'} — Reason: ${reversalReason.trim()}`,
+        debit_amount: origCredit,   // swap
+        credit_amount: origDebit,   // swap
+        reference: `REV-${orig.reference || orig.id?.substring(0, 8) || ''}`,
+        cheque_number: orig.cheque_number ? `REV-${orig.cheque_number}` : null,
+        source_type: 'reversal',
+        source_id: orig.id,
+        is_reconciled: false,
+        company_id: effectiveCompanyId,
+      };
+
+      const { data: reversalTxn, error: revError } = await (supabase as any)
+        .from('bank_transactions')
+        .insert([reversalInsert])
+        .select()
+        .single();
+      if (revError) throw revError;
+
+      // 2. Un-reconcile the original transaction if it was reconciled
+      if (orig.is_reconciled) {
+        await (supabase as any)
+          .from('bank_transactions')
+          .update({
+            is_reconciled: false,
+            reconciled_at: null,
+            reconciliation_id: null,
+          })
+          .eq('id', orig.id);
+      }
+
+      // 3. Auto-post reversing Journal Entry via GL
+      try {
+        // Fetch bank account's GL link
+        const { data: bankAcct } = await supabase
+          .from('bank_accounts')
+          .select('gl_account_id, account_name')
+          .eq('id', selectedAccountId)
+          .single();
+
+        const bankGLId = bankAcct?.gl_account_id;
+
+        if (bankGLId) {
+          // Determine the contra GL account from the original JE if possible
+          let contraGLId: string | null = null;
+
+          if (orig.journal_entry_id) {
+            // Fetch the original JE lines and find the non-bank line
+            const { data: jeLines } = await supabase
+              .from('journal_entry_lines')
+              .select('account_id, debit, credit')
+              .eq('journal_entry_id', orig.journal_entry_id);
+
+            if (jeLines && jeLines.length > 0) {
+              const contraLine = jeLines.find((l: any) => l.account_id !== bankGLId);
+              if (contraLine) contraGLId = contraLine.account_id;
+            }
+          }
+
+          // Fallback: use suspense/expense account from gl_settings
+          if (!contraGLId) {
+            const { data: glSettings } = await supabase
+              .from('gl_settings')
+              .select('expense_account_id')
+              .eq('company_id', effectiveCompanyId!)
+              .maybeSingle();
+            contraGLId = glSettings?.expense_account_id || null;
+          }
+
+          if (contraGLId) {
+            const { createAndPostJournalEntry } = await import('@/lib/gl-posting-utils');
+            const { getBusinessUnitCode } = await import('@/contexts/CompanyContext').then(m => {
+              // Use the already-available company context values
+              return { getBusinessUnitCode: () => null };
+            });
+
+            await createAndPostJournalEntry({
+              entry_date: reversalDate,
+              description: `Bank Reversal: ${orig.description || 'N/A'} — ${reversalReason.trim()}`,
+              reference: `REV-BANK-${orig.reference || orig.id?.substring(0, 8) || ''}`,
+              company_id: effectiveCompanyId!,
+              source_module: 'bank_reconciliation',
+              lines: [
+                {
+                  account_id: bankGLId,
+                  description: `Reversal of ${orig.description || 'bank transaction'}`,
+                  debit: origCredit,   // swap
+                  credit: origDebit,   // swap
+                },
+                {
+                  account_id: contraGLId,
+                  description: `Reversal of ${orig.description || 'bank transaction'}`,
+                  debit: origDebit,    // swap (opposite of bank line)
+                  credit: origCredit,  // swap
+                },
+              ],
+            });
+          } else {
+            console.warn('[BankReversal] No contra GL account found — skipping JE reversal');
+            toast.warning('Reversal created but no GL journal entry was posted (missing contra account).');
+          }
+        } else {
+          console.warn('[BankReversal] Bank account has no GL link — skipping JE');
+          toast.warning('Reversal created but no GL journal entry was posted (bank account not linked to GL).');
+        }
+      } catch (glErr: any) {
+        // GL posting is best-effort — don't block the bank reversal
+        console.warn('[BankReversal] GL reversal failed (non-fatal):', glErr);
+        toast.warning('Bank reversal created but GL journal entry failed: ' + (glErr?.message || 'Unknown'));
+      }
+
+      toast.success(`Reversal entry created for LKR ${fmt(origDebit > 0 ? origDebit : origCredit)}`);
+
+      // Reset dialog state
+      setShowReversalDialog(false);
+      setReversalTarget(null);
+      setReversalReason("");
+      setReversalDate(format(new Date(), "yyyy-MM-dd"));
+
+      // Invalidate caches
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-recon'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['chart-of-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-reconciliations'] });
+    } catch (err: any) {
+      toast.error(`Reversal failed: ${err.message}`);
+    } finally {
+      setIsReversing(false);
+    }
+  }, [reversalTarget, selectedAccountId, reversalReason, reversalDate, effectiveCompanyId, queryClient]);
 
   // --- Inline Edit Amount ---
   const handleInlineAmountSave = useCallback(async (txnId: string, originalPayment: number, originalDeposit: number) => {
@@ -1131,7 +1287,7 @@ const BankReconciliationWorksheet = () => {
                         <th className="p-1 text-left">Payee Name</th>
                         <th className="w-[90px] p-1 text-right">Amount</th>
                         <th className="w-[90px] p-1 text-left">Chq/Ref</th>
-                        <th className="w-[24px] p-1"></th>
+                        <th className="w-[48px] p-1"></th>
                       </tr>
                     </thead>
                   </table>
@@ -1216,9 +1372,11 @@ const BankReconciliationWorksheet = () => {
                                              const netAmount = deposit > 0 ? deposit : payment;
                                              const isDeposit = deposit > 0;
                                              const source = sourceLabel(t.source_type);
-                                             const rowClass = isCleared ? "bg-blue-50/50 dark:bg-blue-900/10" : isSuggested ? "bg-green-50/50 dark:bg-green-900/10 border-r-2 border-green-500" : "hover:bg-accent/50";
+                                             const isReversal = t.source_type === 'reversal';
+                                             const rowClass = isReversal ? "row-reversal" : isCleared ? "bg-blue-50/50 dark:bg-blue-900/10" : isSuggested ? "bg-green-50/50 dark:bg-green-900/10 border-r-2 border-green-500" : "hover:bg-accent/50";
                                              const isEditing = editingTxnId === t.id;
                                              const canEdit = !t.is_reconciled && (t.source_type === 'manual' || t.source_type === 'bank_fee');
+                                             const canReverse = !isReversal && t.source_type !== 'reversal';
                                              return (
                                                 <tr key={t.id} className={`border-b border-border/50 cursor-pointer transition-colors group/row ${rowClass}`} onClick={() => !t.is_reconciled && !isEditing && toggleCleared(t.id, payment, deposit)}>
                                                    <td className="w-[28px] px-1 py-1.5 align-middle text-center"><input type="checkbox" checked={isCleared} disabled={t.is_reconciled} onChange={() => {}} className="cursor-pointer" /></td>
@@ -1228,7 +1386,7 @@ const BankReconciliationWorksheet = () => {
                                                       <span className="text-[10px] font-mono font-medium">{extractDocNo(t)}</span>
                                                    </td>
                                                    <td className="px-1 py-1.5 align-middle truncate" title={extractPayee(t.description)}>
-                                                      <span className="text-[11px] font-medium">{extractPayee(t.description)}</span>
+                                                      <span className={`text-[11px] font-medium ${isReversal ? 'reversal-desc' : ''}`}>{extractPayee(t.description)}</span>
                                                    </td>
                                                    <td className={`w-[90px] px-1 py-1.5 align-middle text-right font-mono font-medium ${isDeposit ? 'text-green-600' : 'text-red-600'}`}>
                                                      {isEditing ? (
@@ -1250,16 +1408,27 @@ const BankReconciliationWorksheet = () => {
                                                    <td className="w-[90px] px-1 py-1.5 align-middle truncate text-[10px] font-mono text-muted-foreground" title={t.cheque_number || t.reference || ''}>
                                                       {t.cheque_number || t.reference || '—'}
                                                    </td>
-                                                   <td className="w-[24px] px-0 py-1.5 align-middle text-center">
-                                                     {canEdit && !isEditing && (
-                                                       <button
-                                                         onClick={(e) => { e.stopPropagation(); setEditingTxnId(t.id); setEditingAmount(String(netAmount)); }}
-                                                         className="opacity-0 group-hover/row:opacity-100 transition-opacity text-muted-foreground hover:text-primary p-0.5"
-                                                         title="Edit amount"
-                                                       >
-                                                         <Pencil className="w-3 h-3" />
-                                                       </button>
-                                                     )}
+                                                   <td className="w-[48px] px-0 py-1.5 align-middle text-center">
+                                                     <div className="flex items-center justify-center gap-0.5">
+                                                       {canEdit && !isEditing && (
+                                                         <button
+                                                           onClick={(e) => { e.stopPropagation(); setEditingTxnId(t.id); setEditingAmount(String(netAmount)); }}
+                                                           className="opacity-0 group-hover/row:opacity-100 transition-opacity text-muted-foreground hover:text-primary p-0.5"
+                                                           title="Edit amount"
+                                                         >
+                                                           <Pencil className="w-3 h-3" />
+                                                         </button>
+                                                       )}
+                                                       {canReverse && !isEditing && (
+                                                         <button
+                                                           onClick={(e) => { e.stopPropagation(); setReversalTarget(t); setReversalDate(format(new Date(), 'yyyy-MM-dd')); setShowReversalDialog(true); }}
+                                                           className="opacity-0 group-hover/row:opacity-100 transition-opacity text-muted-foreground hover:text-purple-600 p-0.5"
+                                                           title="Reverse this transaction"
+                                                         >
+                                                           <Undo2 className="w-3 h-3" />
+                                                         </button>
+                                                       )}
+                                                     </div>
                                                    </td>
                                                 </tr>
                                              );
@@ -1546,6 +1715,79 @@ const BankReconciliationWorksheet = () => {
             </DialogClose>
             <Button onClick={handleQuickAdd}>
               <Plus className="w-4 h-4 mr-1" /> Add Entry
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ========================= REVERSAL CONFIRMATION ========================= */}
+      <Dialog open={showReversalDialog} onOpenChange={(open) => { if (!open) { setShowReversalDialog(false); setReversalTarget(null); setReversalReason(''); } }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
+              <Undo2 className="w-5 h-5" /> Reverse Bank Transaction
+            </DialogTitle>
+          </DialogHeader>
+          {reversalTarget && (
+            <div className="space-y-4 py-4">
+              {/* Original Transaction Summary */}
+              <div className="bg-muted/50 border rounded-lg p-3 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Original Transaction</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                  <span className="text-muted-foreground">Date</span>
+                  <span className="font-mono font-medium">{format(new Date(reversalTarget.transaction_date), 'dd MMM yyyy')}</span>
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className={`font-mono font-bold ${(reversalTarget.debit_amount || 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {(reversalTarget.debit_amount || 0) > 0 ? '+' : '-'}LKR {fmt((reversalTarget.debit_amount || 0) > 0 ? reversalTarget.debit_amount : reversalTarget.credit_amount)}
+                  </span>
+                  <span className="text-muted-foreground">Payee</span>
+                  <span className="font-medium truncate">{extractPayee(reversalTarget.description)}</span>
+                  <span className="text-muted-foreground">Reference</span>
+                  <span className="font-mono text-xs">{reversalTarget.reference || reversalTarget.cheque_number || '—'}</span>
+                </div>
+              </div>
+
+              {/* Warning */}
+              <div className="flex items-start gap-2 text-sm bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-amber-800 dark:text-amber-300">
+                  This will create an <strong>offsetting entry</strong> that reverses the financial impact. A <strong>reversing Journal Entry</strong> will also be auto-posted to the General Ledger.
+                </p>
+              </div>
+
+              {/* Reversal Date */}
+              <div className="space-y-2">
+                <Label>Reversal Date</Label>
+                <Input
+                  type="date"
+                  value={reversalDate}
+                  onChange={(e) => setReversalDate(e.target.value)}
+                />
+              </div>
+
+              {/* Reason */}
+              <div className="space-y-2">
+                <Label>Reason for Reversal <span className="text-red-500">*</span></Label>
+                <Textarea
+                  value={reversalReason}
+                  onChange={(e) => setReversalReason(e.target.value)}
+                  placeholder="e.g. Duplicate entry, incorrect amount, wrong payee..."
+                  className="min-h-[80px]"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowReversalDialog(false); setReversalTarget(null); setReversalReason(''); }} disabled={isReversing}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReverseTransaction}
+              disabled={isReversing || !reversalReason.trim()}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              <Undo2 className="w-4 h-4 mr-1" />
+              {isReversing ? 'Reversing…' : 'Confirm Reversal'}
             </Button>
           </DialogFooter>
         </DialogContent>

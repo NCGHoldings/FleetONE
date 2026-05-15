@@ -26,6 +26,8 @@ export interface YutongOrder {
   actual_delivery_date?: string;
   status: string;
   progress_percentage: number;
+  engine_number?: string;
+  chassis_number?: string;
   notes?: string;
   total_paid: number;
   balance_due: number;

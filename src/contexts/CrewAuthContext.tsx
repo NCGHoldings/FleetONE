@@ -12,7 +12,8 @@ interface CrewMember {
 interface CrewAuthContextType {
   crewMember: CrewMember | null;
   isAuthenticated: boolean;
-  login: (nic: string, phone: string) => Promise<boolean>;
+  login: (nic: string) => Promise<boolean>;
+  register: (fullName: string, callingName: string, nic: string, phone: string) => Promise<{success: boolean, error?: string}>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -37,29 +38,60 @@ export const CrewAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setIsLoading(false);
   }, []);
 
-  const login = async (nic: string, phone: string): Promise<boolean> => {
+  const login = async (nic: string): Promise<boolean> => {
     try {
       const supabase = createAnonymousClient();
       
-      // Look up the staff member in the staff_registry
-      const { data, error } = await supabase
-        .from('staff_registry')
-        .select('id, staff_name, staff_type, nic_number, contact_number')
-        .eq('nic_number', nic.trim())
-        .eq('contact_number', phone.trim())
-        .eq('is_active', true)
-        .single();
+      // Look up the staff member using the secure RPC
+      const { data, error } = await supabase.rpc('login_crew_member', {
+        p_nic_number: nic.trim()
+      });
 
-      if (error || !data) {
+      if (error || !data || data.length === 0) {
+        console.error('Crew login error from RPC:', error || 'No data found');
         return false;
       }
 
-      setCrewMember(data);
-      localStorage.setItem('crew_session', JSON.stringify(data));
+      const crewData = data[0];
+      
+      if (crewData.is_active === false) {
+        console.error('Account is inactive');
+        return false;
+      }
+
+      setCrewMember(crewData);
+      localStorage.setItem('crew_session', JSON.stringify(crewData));
       return true;
     } catch (error) {
       console.error('Crew login error:', error);
       return false;
+    }
+  };
+
+  const register = async (fullName: string, callingName: string, nic: string, phone: string) => {
+    try {
+      const supabase = createAnonymousClient();
+      
+      const { data, error } = await supabase.rpc('register_crew_member', {
+        p_full_name: fullName,
+        p_calling_name: callingName,
+        p_nic_number: nic,
+        p_contact_number: phone,
+        p_pin_code: '0000' // Default PIN since it's no longer asked in UI
+      });
+
+      if (error) throw error;
+      
+      if (data && data.success) {
+        setCrewMember(data.data);
+        localStorage.setItem('crew_session', JSON.stringify(data.data));
+        return { success: true };
+      } else {
+        return { success: false, error: data?.error || 'Registration failed' };
+      }
+    } catch (error: any) {
+      console.error('Crew registration error:', error);
+      return { success: false, error: error.message };
     }
   };
 
@@ -70,7 +102,7 @@ export const CrewAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   return (
-    <CrewAuthContext.Provider value={{ crewMember, isAuthenticated: !!crewMember, login, logout, isLoading }}>
+    <CrewAuthContext.Provider value={{ crewMember, isAuthenticated: !!crewMember, login, register, logout, isLoading }}>
       {children}
     </CrewAuthContext.Provider>
   );

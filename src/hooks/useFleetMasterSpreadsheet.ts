@@ -54,6 +54,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
   const [roster, setRoster] = useState<FleetRosterRow[]>([]);
   const [expandedRows, setExpandedRows] = useState<ExpandedFleetRow[]>([]);
   const [availableRoutes, setAvailableRoutes] = useState<any[]>([]);
+  const [routeLeaders, setRouteLeaders] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   // Local per-trip overrides (stored here until "Create Trips" is clicked)
   // Key: "rosterId__seq" → { route_label?, route_id?, driver?, conductor?, turn_01_time?, turn_02_time? }
@@ -76,7 +77,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
 
       const { data: routesData } = await supabase
         .from("routes")
-        .select("id, route_no, route_name, distance_km")
+        .select("id, route_no, route_name, distance_km, route_leader")
         .eq("is_active", true);
       setAvailableRoutes(routesData || []);
       
@@ -84,6 +85,14 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
         acc[curr.id] = curr;
         return acc;
       }, {});
+
+      const leaderDict = (routesData || []).reduce((acc: Record<string, string | null>, curr: any) => {
+        if (curr.route_name) {
+          acc[curr.route_name] = curr.route_leader || null;
+        }
+        return acc;
+      }, {});
+      setRouteLeaders(leaderDict);
 
       const rosterRows: FleetRosterRow[] = (rosterData || []).map((r: any) => ({
         id: r.id,
@@ -636,14 +645,60 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
     }
   };
 
+  const mapBusType = (type: string | null) => {
+    if (!type) return 'Normal';
+    const t = type.toUpperCase();
+    if (t.includes('AC') || t.includes('A/C') || t.includes('LUXURY')) return 'A/C';
+    if (t.includes('VIKING')) return 'XL';
+    if (t.includes('CITY RIDER')) return 'Normal';
+    return 'Normal';
+  };
+
+  const mapPermitType = (serviceType: string | null) => {
+    if (!serviceType) return '-';
+    const t = serviceType.toUpperCase();
+    if (t.includes('SEMI')) return 'Semi';
+    if (t.includes('NORMAL')) return 'Normal';
+    if (t.includes('LUXURY')) return 'Normal'; // Or map to 'A/C' if you have an A/C permit option
+    return '-';
+  };
+
   const addRosterEntry = async (busId: string, routeId?: string, routeLabel?: string) => {
     try {
-      const { data: bus } = await supabase.from("buses").select("bus_no, route").eq("id", busId).single();
+      const existingBus = roster.find(r => r.bus_id === busId);
+      if (existingBus) {
+        const confirmed = window.confirm(
+          `Bus ${existingBus.bus_no} is already assigned to "${existingBus.route_label || 'another route'}".\n\nAre you sure you want to assign this bus to multiple routes simultaneously?`
+        );
+        if (!confirmed) return;
+      }
+
+      // 1. Fetch Bus Details
+      const { data: bus } = await supabase.from("buses").select("bus_no, route, type").eq("id", busId).single();
+      
+      // 2. Fetch Permit Details
+      const { data: permit } = await supabase.from("route_permits").select("service_type").eq("bus_id", busId).maybeSingle();
+
+      // 3. Fetch Target Details
+      let target = 0;
+      if (routeId) {
+        const { data: routeTarget } = await supabase.from("route_targets").select("revenue_target").eq("route_id", routeId).eq("is_active", true).maybeSingle();
+        target = routeTarget?.revenue_target || 0;
+      } else if (routeLabel) {
+        const { data: routeMatch } = await supabase.from("routes").select("id").eq("route_name", routeLabel).maybeSingle();
+        if (routeMatch?.id) {
+          const { data: routeTarget } = await supabase.from("route_targets").select("revenue_target").eq("route_id", routeMatch.id).eq("is_active", true).maybeSingle();
+          target = routeTarget?.revenue_target || 0;
+        }
+      }
       
       const { error } = await supabase.from("fleet_master_roster").insert({
         bus_id: busId,
         route_id: routeId || null,
         route_label: routeLabel || bus?.route || '',
+        bus_type: mapBusType(bus?.type),
+        permit_type: mapPermitType(permit?.service_type),
+        day_target: target,
         sort_order: roster.length + 1,
         is_active: true,
         trips_per_day: 1,
@@ -702,6 +757,47 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
     }
   };
 
+  const moveRosterEntry = async (rosterId: string, direction: 'up' | 'down') => {
+    try {
+      const rowToMove = roster.find(r => r.id === rosterId);
+      if (!rowToMove) return;
+
+      // Find all rows in the same section (route_label)
+      const groupKey = rowToMove.route_label || 'Unassigned Route';
+      const sectionRows = roster.filter(r => (r.route_label || 'Unassigned Route') === groupKey);
+      
+      const currentIndex = sectionRows.findIndex(r => r.id === rosterId);
+      
+      if (direction === 'up' && currentIndex > 0) {
+        const swapRow = sectionRows[currentIndex - 1];
+        await swapSortOrders(rowToMove, swapRow);
+      } else if (direction === 'down' && currentIndex < sectionRows.length - 1) {
+        const swapRow = sectionRows[currentIndex + 1];
+        await swapSortOrders(rowToMove, swapRow);
+      }
+    } catch (error: any) {
+      console.error("Error moving roster entry:", error);
+      toast({ title: "Error", description: "Failed to move row", variant: "destructive" });
+    }
+  };
+
+  const swapSortOrders = async (row1: FleetRosterRow, row2: FleetRosterRow) => {
+    const tempOrder = row1.sort_order;
+    // Update locally immediately for responsiveness
+    setRoster(prev => prev.map(r => {
+      if (r.id === row1.id) return { ...r, sort_order: row2.sort_order };
+      if (r.id === row2.id) return { ...r, sort_order: tempOrder };
+      return r;
+    }).sort((a, b) => a.sort_order - b.sort_order));
+
+    await Promise.all([
+      supabase.from("fleet_master_roster").update({ sort_order: row2.sort_order }).eq("id", row1.id),
+      supabase.from("fleet_master_roster").update({ sort_order: tempOrder }).eq("id", row2.id)
+    ]);
+    
+    await fetchRoster(true);
+  };
+
   // Compute KPIs
   // Only count first trip_sequence for bus-level KPIs
   const uniqueRows = expandedRows.filter(r => r.trip_sequence === 1);
@@ -714,17 +810,36 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
     totalFuelLiters: expandedRows.reduce((s, r) => s + r.fuel_liters, 0),
   };
 
+  const updateRouteLeaders = async (routeLabels: string[], leaderName: string) => {
+    try {
+      const { error } = await supabase
+        .from("routes")
+        .update({ route_leader: leaderName })
+        .in("route_name", routeLabels);
+        
+      if (error) throw error;
+      toast({ title: "Success", description: "Route leaders updated" });
+      await fetchRoster();
+    } catch (error: any) {
+      console.error("Error updating route leaders:", error);
+      toast({ title: "Error", description: error.message || "Failed to update route leaders", variant: "destructive" });
+    }
+  };
+
   return {
     roster,
     expandedRows,
     availableRoutes,
+    routeLeaders,
     loading,
     kpis,
     updateField,
     confirmAndCreateTrips,
     addRosterEntry,
     deleteRosterEntry,
+    moveRosterEntry,
     bulkAddAllBuses,
+    updateRouteLeaders,
     refetch: fetchRoster,
   };
 }

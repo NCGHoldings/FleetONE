@@ -130,6 +130,10 @@ export default function Complaints() {
     }
   };
 
+  // Helper: matches both 'feedback' (internal form) and 'good_feedback' (public form)
+  const isFeedbackType = (type: string | undefined) =>
+    type === 'feedback' || type === 'good_feedback';
+
   const getPriorityColor = (priority: string) => {
     switch (priority?.toLowerCase()) {
       case 'high': return 'bg-destructive text-destructive-foreground';
@@ -474,7 +478,7 @@ export default function Complaints() {
       header: "Type",
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          {row.getValue("type") === 'feedback' ? (
+          {isFeedbackType(row.getValue("type") as string) ? (
             <Badge className="bg-success text-success-foreground">
               <Smile className="h-3 w-3 mr-1" />
               Feedback
@@ -1018,7 +1022,7 @@ export default function Complaints() {
       <Dialog open={showManageDialog} onOpenChange={setShowManageDialog}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Manage {managingComplaint?.type === 'feedback' ? 'Feedback' : 'Complaint'} - {managingComplaint?.feedback_id}</DialogTitle>
+            <DialogTitle>Manage {isFeedbackType(managingComplaint?.type) ? 'Feedback' : 'Complaint'} - {managingComplaint?.feedback_id}</DialogTitle>
           </DialogHeader>
           <Tabs defaultValue="incident" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
@@ -1277,7 +1281,7 @@ export default function Complaints() {
               <div className="space-y-5">
                 {/* Title & Type */}
                 <div className="flex items-center gap-3">
-                  {selectedComplaint.type === 'feedback' ? (
+                  {isFeedbackType(selectedComplaint.type) ? (
                     <Badge className="bg-success text-success-foreground text-sm px-3 py-1">
                       <Smile className="h-4 w-4 mr-1" />
                       Good Feedback

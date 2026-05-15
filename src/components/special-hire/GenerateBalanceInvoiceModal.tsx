@@ -626,6 +626,69 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
                 toast.success(`Discount GL Entry: ${discountGLResult.entry_number}`);
               }
             }
+
+            // ===================================================================
+            // 4. RECONCILE ALL APPROVED PAYMENTS AGAINST AR INVOICE
+            // Fixes timing gap: payments approved before AR invoice existed
+            // are now aggregated and applied to ensure paid_amount is correct.
+            // This is idempotent — re-running produces the same correct result.
+            // ===================================================================
+            try {
+              // Re-fetch the arInvoiceId in case it was just created above
+              const { data: freshQuotation } = await supabase
+                .from('special_hire_quotations')
+                .select('ar_invoice_id')
+                .eq('id', quotationData.id)
+                .single();
+
+              const reconciledArId = freshQuotation?.ar_invoice_id;
+
+              if (reconciledArId) {
+                // Sum ALL approved payments (advance + balance) for this quotation
+                const { data: allApprovedPayments } = await supabase
+                  .from('special_hire_payments')
+                  .select('id, amount, payment_type')
+                  .eq('quotation_id', quotationData.id)
+                  .eq('status', 'approved');
+
+                const totalPaidFromPayments = (allApprovedPayments || []).reduce(
+                  (sum, p) => sum + (p.amount || 0), 0
+                );
+
+                const reconciledBalance = fullInvoiceAmount - totalPaidFromPayments;
+                const reconciledStatus = reconciledBalance <= 0
+                  ? 'paid'
+                  : (totalPaidFromPayments > 0 ? 'partial' : 'unpaid');
+
+                const { error: reconcileError } = await supabase
+                  .from('ar_invoices')
+                  .update({
+                    paid_amount: totalPaidFromPayments,
+                    balance: Math.max(0, reconciledBalance),
+                    status: reconciledStatus,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', reconciledArId);
+
+                if (reconcileError) {
+                  console.error('[SPH AR] ⚠️ Reconciliation update failed:', reconcileError);
+                } else {
+                  console.log('[SPH AR] ✅ AR Invoice reconciled — paid:', totalPaidFromPayments,
+                    'balance:', Math.max(0, reconciledBalance), 'status:', reconciledStatus);
+                }
+
+                // Also link any unlinked approved payments to the AR Invoice
+                for (const pmt of (allApprovedPayments || [])) {
+                  await supabase
+                    .from('special_hire_payments')
+                    .update({ ar_invoice_id: reconciledArId })
+                    .eq('id', pmt.id)
+                    .is('ar_invoice_id', null);
+                }
+              }
+            } catch (reconcileErr) {
+              console.warn('[SPH AR] ⚠️ Payment reconciliation failed (non-critical):', reconcileErr);
+            }
           } else {
             console.log('[SPH GL] Auto-post invoices disabled or settings not found');
           }

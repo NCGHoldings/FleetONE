@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -154,7 +154,8 @@ const App = () => (
             <Route path="/public/complaint" element={<PublicComplaint />} />
             <Route path="/public/special-hire" element={<PublicSpecialHire />} />
             <Route path="/public/receipt-upload" element={<PublicReceiptUpload />} />
-            <Route path="/public/conductor-upload" element={<PublicConductorUpload />} />
+            {/* Deprecated public route, redirect to secure portal */}
+            <Route path="/public/conductor-upload" element={<Navigate to="/public/crew-login" replace />} />
             <Route path="/customer-portal" element={<CustomerPortal />} />
             <Route path="/vendor-portal" element={<VendorPortal />} />
             <Route path="/public/yutong-report" element={<PublicYutongReport />} />

@@ -48,6 +48,42 @@ export interface UpstreamChain {
   vehicleModule: string | null;
 }
 
+// ─── Downstream Chain Types (Invoice → Receipts / Credit Notes) ──────────────
+
+export interface DownstreamReceipt {
+  receipt: any;
+  allocation: any;
+  journalEntry: any | null;
+}
+
+export interface DownstreamCreditNote {
+  creditNote: any;
+  journalEntry: any | null;
+}
+
+export interface BalanceTracker {
+  totalAmount: number;
+  paidAmount: number;
+  balance: number;
+  status: string;
+  receiptCount: number;
+  creditNoteCount: number;
+}
+
+export interface DownstreamChain {
+  receipts: DownstreamReceipt[];
+  creditNotes: DownstreamCreditNote[];
+  balanceTracker: BalanceTracker | null;
+  sphBooking: any | null;
+  bankTransactions: BankTransactionLink[];
+}
+
+export interface BankTransactionLink {
+  bankTransaction: any;
+  bankAccount: any | null;
+  isReconciled: boolean;
+}
+
 export interface LineageData {
   journalEntry: any;
   journalLines: any[];
@@ -55,6 +91,7 @@ export interface LineageData {
   sourceType: string;
   relatedJEs: any[];
   upstream: UpstreamChain;
+  downstream: DownstreamChain;
   nodes: LineageNode[];
   edges: LineageEdge[];
   mermaidCode: string;
@@ -67,6 +104,8 @@ export interface LineageData {
     accountsAffected: number;
     relatedCount: number;
     chainDepth: number;
+    paymentsCount: number;
+    balanceStatus: string;
   };
 }
 
@@ -342,6 +381,279 @@ async function fetchUpstreamChain(
   }
 }
 
+// ─── Downstream chain fetcher (Invoice → Receipts / Credit Notes) ────────────
+
+async function fetchDownstreamChain(
+  sourceDoc: any | null,
+  sourceType: string,
+): Promise<DownstreamChain> {
+  const empty: DownstreamChain = { receipts: [], creditNotes: [], balanceTracker: null, sphBooking: null, bankTransactions: [] };
+  if (!sourceDoc?.id) return empty;
+
+  try {
+    const receipts: DownstreamReceipt[] = [];
+    const creditNotes: DownstreamCreditNote[] = [];
+    let sphBooking: any = null;
+
+    // ── 1. AR Invoice → Receipts via allocations ──
+    if (sourceType === 'ar_invoice' || sourceType === 'manual_ar') {
+      const { data: allocations } = await supabase
+        .from('ar_receipt_allocations' as any)
+        .select('id, receipt_id, invoice_id, allocated_amount, write_off_amount')
+        .eq('invoice_id', sourceDoc.id)
+        .limit(20);
+
+      if (allocations?.length) {
+        for (const alloc of allocations) {
+          const { data: receipt } = await supabase
+            .from('ar_receipts')
+            .select('id, receipt_number, receipt_date, amount, payment_method, status, reference, journal_entry_id, notes')
+            .eq('id', alloc.receipt_id)
+            .maybeSingle();
+
+          let je: any = null;
+          if (receipt?.journal_entry_id) {
+            const { data: jeData } = await supabase
+              .from('journal_entries')
+              .select('id, entry_number, entry_date, description')
+              .eq('id', receipt.journal_entry_id)
+              .maybeSingle();
+            je = jeData;
+          }
+
+          if (receipt) {
+            receipts.push({ receipt, allocation: alloc, journalEntry: je });
+          }
+        }
+      }
+
+      // ── 2. AR Invoice → Credit Notes ──
+      const { data: cns } = await supabase
+        .from('ar_credit_notes' as any)
+        .select('id, credit_note_number, credit_date, amount, reason, status, invoice_id, journal_entry_id')
+        .eq('invoice_id', sourceDoc.id)
+        .limit(10);
+
+      if (cns?.length) {
+        for (const cn of cns) {
+          let je: any = null;
+          if (cn.journal_entry_id) {
+            const { data: jeData } = await supabase
+              .from('journal_entries')
+              .select('id, entry_number, entry_date, description')
+              .eq('id', cn.journal_entry_id)
+              .maybeSingle();
+            je = jeData;
+          }
+          creditNotes.push({ creditNote: cn, journalEntry: je });
+        }
+      }
+
+      // ── 3. SPH Booking link (if SPH invoice) ──
+      if (sourceDoc.invoice_number?.startsWith('SPH-')) {
+        try {
+          const { data: sphQuot } = await (supabase as any)
+            .from('special_hire_quotations')
+            .select('id, quotation_number, customer_name, route_from, route_to, hire_date, total_amount, status')
+            .eq('ar_invoice_id', sourceDoc.id)
+            .maybeSingle();
+          if (sphQuot) sphBooking = sphQuot;
+        } catch { /* non-fatal */ }
+      }
+    }
+
+    // ── 4. Balance Tracker ──
+    const balanceTracker: BalanceTracker | null = (sourceType === 'ar_invoice' || sourceType === 'manual_ar') ? {
+      totalAmount: sourceDoc.total_amount || 0,
+      paidAmount: sourceDoc.paid_amount || 0,
+      balance: sourceDoc.balance ?? (sourceDoc.total_amount - (sourceDoc.paid_amount || 0)),
+      status: sourceDoc.status || 'unknown',
+      receiptCount: receipts.length,
+      creditNoteCount: creditNotes.length,
+    } : null;
+
+    return { receipts, creditNotes, balanceTracker, sphBooking, bankTransactions: [] };
+  } catch (err) {
+    console.warn("Lineage: Downstream chain fetch error (non-fatal):", err);
+    return empty;
+  }
+}
+
+// ─── Reverse lookup: Receipt → Parent Invoice ────────────────────────────────
+
+async function reverseResolveInvoice(
+  sourceDoc: any | null,
+  sourceType: string,
+): Promise<{ parentInvoice: any | null; parentSourceType: string }> {
+  if (!sourceDoc?.id || sourceType !== 'ar_receipt') return { parentInvoice: null, parentSourceType: sourceType };
+
+  try {
+    const { data: allocations } = await supabase
+      .from('ar_receipt_allocations' as any)
+      .select('invoice_id')
+      .eq('receipt_id', sourceDoc.id)
+      .limit(1);
+
+    if (allocations?.[0]?.invoice_id) {
+      const { data: invoice } = await supabase
+        .from('ar_invoices')
+        .select('*')
+        .eq('id', allocations[0].invoice_id)
+        .maybeSingle();
+      if (invoice) return { parentInvoice: invoice, parentSourceType: 'ar_invoice' };
+    }
+  } catch { /* non-fatal */ }
+
+  return { parentInvoice: null, parentSourceType: sourceType };
+}
+
+// ─── Bank Transaction Links: JE → bank_transactions ─────────────────────────
+
+async function fetchBankTransactionLinks(
+  je: any,
+  jeLines: any[],
+): Promise<BankTransactionLink[]> {
+  try {
+    if (!jeLines?.length) return [];
+
+    // Detect which JE lines touch a bank account (CoA codes starting with 1300x)
+    const bankAccountCodes: string[] = [];
+    const bankLineAccountIds: string[] = [];
+    for (const line of jeLines) {
+      const coa = (line as any).chart_of_accounts;
+      if (coa?.account_code?.startsWith('1300')) {
+        bankAccountCodes.push(coa.account_code);
+        bankLineAccountIds.push(line.account_id);
+      }
+    }
+
+    if (bankAccountCodes.length === 0) return [];
+
+    // Find bank_accounts linked to these GL accounts
+    const { data: bankAccounts } = await supabase
+      .from('bank_accounts')
+      .select('id, account_name, bank_name, account_number, gl_account_id, current_balance')
+      .in('gl_account_id', bankLineAccountIds);
+
+    let bankTxns: any[] = [];
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Strategy 0 (PRIMARY): Direct journal_entry_id link
+    // This is the most reliable match — many bank_transactions store the
+    // journal_entry_id they were created from. Manual JEs and system JEs
+    // both use this FK.
+    // ═══════════════════════════════════════════════════════════════════
+    if (je.id) {
+      const { data: directLinks } = await supabase
+        .from('bank_transactions')
+        .select('*')
+        .eq('journal_entry_id', je.id)
+        .limit(10);
+      if (directLinks?.length) {
+        bankTxns.push(...directLinks);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Strategy 0b: Match by source_id (some modules store JE id as source)
+    // ═══════════════════════════════════════════════════════════════════
+    if (bankTxns.length === 0 && je.id) {
+      const { data: sourceLinks } = await supabase
+        .from('bank_transactions')
+        .select('*')
+        .eq('source_id', je.id)
+        .limit(10);
+      if (sourceLinks?.length) {
+        bankTxns.push(...sourceLinks);
+      }
+    }
+
+    // For heuristic strategies below, we need bank accounts
+    const bankAccountIds = bankAccounts?.map(ba => ba.id) || [];
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Strategy 1: Match by reference or entry_number in bank_transactions
+    // ═══════════════════════════════════════════════════════════════════
+    if (bankTxns.length === 0 && bankAccountIds.length > 0) {
+      const searchTerms = [je.reference, je.entry_number].filter(Boolean);
+      for (const term of searchTerms) {
+        if (!term) continue;
+        const { data } = await supabase
+          .from('bank_transactions')
+          .select('*')
+          .in('bank_account_id', bankAccountIds)
+          .or(`reference.ilike.%${term}%,description.ilike.%${term}%`)
+          .limit(5);
+        if (data?.length) {
+          bankTxns.push(...data);
+        }
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Strategy 2: Match by date + exact amount (last resort heuristic)
+    // ═══════════════════════════════════════════════════════════════════
+    if (bankTxns.length === 0 && je.entry_date && bankAccountIds.length > 0) {
+      for (const line of jeLines) {
+        const coa = (line as any).chart_of_accounts;
+        if (!coa?.account_code?.startsWith('1300')) continue;
+        const amount = line.debit || line.credit || 0;
+        if (amount <= 0) continue;
+        const matchingBA = bankAccounts?.find(ba => ba.gl_account_id === line.account_id);
+        if (!matchingBA) continue;
+
+        const { data } = await supabase
+          .from('bank_transactions')
+          .select('*')
+          .eq('bank_account_id', matchingBA.id)
+          .eq('transaction_date', je.entry_date)
+          .or(`debit_amount.eq.${amount},credit_amount.eq.${amount}`)
+          .limit(3);
+        if (data?.length) bankTxns.push(...data);
+      }
+    }
+
+    // Deduplicate
+    const seen = new Set<string>();
+    const uniqueTxns = bankTxns.filter(t => {
+      if (seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+
+    // Build result — enrich with bank account info
+    // For direct-link matches we may need to fetch the bank account details
+    // if the bankAccounts array doesn't cover all found transactions
+    const missingBAIds = uniqueTxns
+      .filter(bt => bt.bank_account_id && !bankAccounts?.find(a => a.id === bt.bank_account_id))
+      .map(bt => bt.bank_account_id);
+
+    let allBankAccounts = bankAccounts || [];
+    if (missingBAIds.length > 0) {
+      const uniqueMissing = [...new Set(missingBAIds)];
+      const { data: extraBAs } = await supabase
+        .from('bank_accounts')
+        .select('id, account_name, bank_name, account_number, gl_account_id, current_balance')
+        .in('id', uniqueMissing);
+      if (extraBAs?.length) {
+        allBankAccounts = [...allBankAccounts, ...extraBAs];
+      }
+    }
+
+    return uniqueTxns.map(bt => {
+      const ba = allBankAccounts.find(a => a.id === bt.bank_account_id) || null;
+      return {
+        bankTransaction: bt,
+        bankAccount: ba,
+        isReconciled: !!bt.is_reconciled,
+      };
+    });
+  } catch (err) {
+    console.warn('Lineage: Bank transaction link fetch error (non-fatal):', err);
+    return [];
+  }
+}
+
 // ─── Mermaid builder ─────────────────────────────────────────────────────────
 
 function buildMermaidCode(data: {
@@ -352,8 +664,9 @@ function buildMermaidCode(data: {
   sourceConfig: SourceTableConfig | null;
   relatedJEs: any[];
   upstream: UpstreamChain;
+  downstream: DownstreamChain;
 }): string {
-  const { je, lines, sourceDoc, sourceType, sourceConfig, relatedJEs, upstream } = data;
+  const { je, lines, sourceDoc, sourceType, sourceConfig, relatedJEs, upstream, downstream } = data;
 
   const parts: string[] = ["graph TD"];
 
@@ -366,6 +679,10 @@ function buildMermaidCode(data: {
   parts.push("  classDef creditLine fill:#dc2626,stroke:#f87171,stroke-width:2px,color:#fff,rx:8");
   parts.push("  classDef relatedJE fill:#d97706,stroke:#fbbf24,stroke-width:2px,color:#fff,rx:8");
   parts.push("  classDef payment fill:#0891b2,stroke:#22d3ee,stroke-width:2px,color:#fff,rx:8");
+  parts.push("  classDef receipt fill:#0e7490,stroke:#06b6d4,stroke-width:2px,color:#fff,rx:10");
+  parts.push("  classDef creditNote fill:#c2410c,stroke:#fb923c,stroke-width:2px,color:#fff,rx:10");
+  parts.push("  classDef balanceNode fill:#4338ca,stroke:#818cf8,stroke-width:2px,color:#fff,rx:10");
+  parts.push("  classDef sphBooking fill:#15803d,stroke:#4ade80,stroke-width:2px,color:#fff,rx:14");
   parts.push("");
 
   let hasUpstream = false;
@@ -515,6 +832,89 @@ function buildMermaidCode(data: {
     });
   }
 
+  // ── Downstream: AR Receipts ──
+  if (downstream.receipts.length > 0) {
+    parts.push("");
+    parts.push(`  subgraph SG_RCPT["💳 AR Receipts / Payments"]`);
+    downstream.receipts.forEach((dr, i) => {
+      const r = dr.receipt;
+      const method = (r.payment_method || '').replace(/_/g, ' ').toUpperCase();
+      parts.push(`    RCPT${i}["${mSafe(r.receipt_number || 'Receipt')}<br/>${method}<br/>${formatAmount(dr.allocation?.allocated_amount || r.amount || 0)}<br/>${r.receipt_date || ''}"]`);
+    });
+    parts.push(`  end`);
+    parts.push("");
+    downstream.receipts.forEach((dr, i) => {
+      parts.push(`  SRC -.-|"Allocated: ${formatAmount(dr.allocation?.allocated_amount || 0)}"| RCPT${i}`);
+      parts.push(`  class RCPT${i} receipt`);
+      if (dr.journalEntry) {
+        parts.push(`  RCPT${i} -.-|"Posted"| RCPT_JE${i}["${mSafe(dr.journalEntry.entry_number)}<br/>${dr.journalEntry.entry_date || ''}"]`);
+        parts.push(`  class RCPT_JE${i} journalEntry`);
+      }
+    });
+    parts.push("");
+  }
+
+  // ── Downstream: Credit Notes ──
+  if (downstream.creditNotes.length > 0) {
+    parts.push("");
+    parts.push(`  subgraph SG_CN["📝 Credit Notes"]`);
+    downstream.creditNotes.forEach((dc, i) => {
+      const cn = dc.creditNote;
+      parts.push(`    CN${i}["${mSafe(cn.credit_note_number || 'CN')}<br/>${formatAmount(cn.amount || 0)}<br/>${cn.credit_date || ''}<br/>Status: ${cn.status || 'N/A'}"]`);
+    });
+    parts.push(`  end`);
+    parts.push("");
+    downstream.creditNotes.forEach((dc, i) => {
+      parts.push(`  SRC -.-|"Credit Note"| CN${i}`);
+      parts.push(`  class CN${i} creditNote`);
+      if (dc.journalEntry) {
+        parts.push(`  CN${i} -.-|"Posted"| CN_JE${i}["${mSafe(dc.journalEntry.entry_number)}<br/>${dc.journalEntry.entry_date || ''}"]`);
+        parts.push(`  class CN_JE${i} journalEntry`);
+      }
+    });
+  }
+
+  // ── Downstream: SPH Booking ──
+  if (downstream.sphBooking) {
+    const spb = downstream.sphBooking;
+    parts.push("");
+    parts.push(`  SPH_BOOK["🚌 SPH Booking<br/>${mSafe(spb.quotation_number || 'Booking')}<br/>${mSafe(spb.route_from || '')} → ${mSafe(spb.route_to || '')}<br/>${formatAmount(spb.total_amount || 0)}"]`);
+    parts.push(`  SPH_BOOK -.-|"Linked"| SRC`);
+    parts.push(`  class SPH_BOOK sphBooking`);
+  }
+
+  // ── Downstream: Balance Tracker ──
+  if (downstream.balanceTracker) {
+    const bt = downstream.balanceTracker;
+    const pctPaid = bt.totalAmount > 0 ? Math.round((bt.paidAmount / bt.totalAmount) * 100) : 0;
+    const statusEmoji = bt.status === 'paid' ? '✅' : bt.status === 'partial' ? '⏳' : '🔴';
+    parts.push("");
+    parts.push(`  BAL["${statusEmoji} Balance Tracker<br/>Total: ${formatAmount(bt.totalAmount)}<br/>Paid: ${formatAmount(bt.paidAmount)} (${pctPaid}%%)<br/>Balance: ${formatAmount(bt.balance)}<br/>Status: ${bt.status.toUpperCase()}"]`);
+    parts.push(`  SRC -.-|"Tracking"| BAL`);
+    parts.push(`  class BAL balanceNode`);
+  }
+
+  // ── Downstream: Bank Transactions & Reconciliation ──
+  if (downstream.bankTransactions.length > 0) {
+    parts.push("");
+    parts.push(`  subgraph SG_BANK["🏦 Bank Transactions"]`);
+    downstream.bankTransactions.forEach((btl, i) => {
+      const bt = btl.bankTransaction;
+      const ba = btl.bankAccount;
+      const acctName = ba ? mSafe(ba.account_name || ba.bank_name || 'Bank') : 'Bank';
+      const amount = bt.debit_amount || bt.credit_amount || 0;
+      const txnType = (bt.transaction_type || 'txn').toUpperCase();
+      const reconStatus = btl.isReconciled ? '✅ Reconciled' : '⏳ Unreconciled';
+      parts.push(`    BANK${i}["${acctName}<br/>${txnType}: ${formatAmount(amount)}<br/>${bt.transaction_date || ''}<br/>${reconStatus}"]`);
+    });
+    parts.push(`  end`);
+    parts.push("");
+    downstream.bankTransactions.forEach((btl, i) => {
+      parts.push(`  JE -.-|"Bank Impact"| BANK${i}`);
+      parts.push(`  class BANK${i} ${btl.isReconciled ? 'receipt' : 'creditNote'}`);
+    });
+  }
+
   return parts.join("\n");
 }
 
@@ -597,50 +997,79 @@ export function useTransactionLineage(journalEntryId: string | null, enabled: bo
       const vehicleModule = detectVehicleModule(je.source_module, je.reference, je.business_unit_code);
       const upstream = await fetchUpstreamChain(sourceDoc, vehicleModule, je.reference);
 
-      // 6. Build Mermaid code
+      // 5b. Reverse lookup: if source is AR Receipt, trace back to the parent AR Invoice
+      let effectiveSourceDoc = sourceDoc;
+      let effectiveSourceType = detectedType;
+      let effectiveSourceConfig = sourceConfig;
+      if (detectedType === 'ar_receipt' && sourceDoc) {
+        const { parentInvoice, parentSourceType } = await reverseResolveInvoice(sourceDoc, detectedType);
+        if (parentInvoice) {
+          effectiveSourceDoc = parentInvoice;
+          effectiveSourceType = parentSourceType;
+          effectiveSourceConfig = SOURCE_TABLE_MAP[parentSourceType] || sourceConfig;
+        }
+      }
+
+      // 6. Downstream chain: Invoice → Receipts / Credit Notes / Balance
+      const downstream = await fetchDownstreamChain(effectiveSourceDoc, effectiveSourceType);
+
+      // 6b. Bank transaction links: detect bank CoA in JE lines → fetch bank_transactions
+      const bankTxnLinks = await fetchBankTransactionLinks(je, jeLines);
+      downstream.bankTransactions = bankTxnLinks;
+
+      // 7. Build Mermaid code
       const mermaidCode = buildMermaidCode({
         je,
         lines: jeLines,
-        sourceDoc,
-        sourceType: detectedType,
-        sourceConfig,
+        sourceDoc: effectiveSourceDoc || sourceDoc,
+        sourceType: effectiveSourceType,
+        sourceConfig: effectiveSourceConfig,
         relatedJEs,
         upstream,
+        downstream,
       });
 
-      // 7. Build summary
+      // 8. Build summary
       const totalDebit = jeLines.reduce((s, l) => s + (l.debit || 0), 0);
       const totalCredit = jeLines.reduce((s, l) => s + (l.credit || 0), 0);
       const uniqueAccounts = new Set(jeLines.map(l => l.account_id)).size;
 
       const partyName = upstream.quotation?.customer_name
         || upstream.order?.customer_name
+        || (effectiveSourceDoc ? (effectiveSourceDoc[effectiveSourceConfig?.partyField || ""] || "") : "")
         || (sourceDoc ? (sourceDoc[sourceConfig?.partyField || ""] || "") : "")
         || extractPartyFromDescription(je.description);
 
       let chainDepth = 1; // JE always
-      if (sourceDoc) chainDepth++;
+      if (sourceDoc || effectiveSourceDoc) chainDepth++;
       if (upstream.order) chainDepth++;
       if (upstream.quotation) chainDepth++;
+      if (downstream.receipts.length > 0) chainDepth++;
+      if (downstream.creditNotes.length > 0) chainDepth++;
+      if (downstream.balanceTracker) chainDepth++;
+      if (downstream.bankTransactions.length > 0) chainDepth++;
 
       const summary = {
-        sourceDocType: sourceConfig?.displayName || (detectedType === "manual" ? "Manual Entry" : detectedType),
-        sourceDocNumber: sourceDoc?.[sourceConfig?.numberField || ""] || je.reference || je.entry_number,
+        sourceDocType: effectiveSourceConfig?.displayName || sourceConfig?.displayName || (detectedType === "manual" ? "Manual Entry" : detectedType),
+        sourceDocNumber: effectiveSourceDoc?.[effectiveSourceConfig?.numberField || ""] || sourceDoc?.[sourceConfig?.numberField || ""] || je.reference || je.entry_number,
         partyName,
         totalDebit,
         totalCredit,
         accountsAffected: uniqueAccounts,
         relatedCount: relatedJEs.length,
         chainDepth,
+        paymentsCount: downstream.receipts.length,
+        balanceStatus: downstream.balanceTracker?.status || (detectedType === 'ar_receipt' ? 'receipt' : '—'),
       };
 
       return {
         journalEntry: je,
         journalLines: jeLines,
-        sourceDocument: sourceDoc,
-        sourceType: detectedType,
+        sourceDocument: effectiveSourceDoc || sourceDoc,
+        sourceType: effectiveSourceType,
         relatedJEs,
         upstream,
+        downstream,
         nodes: [],
         edges: [],
         mermaidCode,

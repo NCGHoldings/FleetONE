@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Network, Workflow, DatabaseZap, FileWarning, Briefcase, FileSignature, Receipt, GraduationCap, Truck, Bot } from "lucide-react";
+import { Network, Workflow, DatabaseZap, FileWarning, Briefcase, FileSignature, Receipt, GraduationCap, Truck, Bot, Bus } from "lucide-react";
 import { PipelineBlueprintViewer } from "./PipelineBlueprintViewer";
 import { BLUEPRINTS } from "./blueprint_data";
 
@@ -173,6 +173,7 @@ export const VerifyHubView = () => {
           {[
             { id: "queue", name: "Zero-Downtime Queue Architecture", icon: <DatabaseZap className="h-5 w-5 text-indigo-500" />, desc: "10,000+ Concurrent Transaction Engine", status: "Active Guard" },
             { id: "sph", name: "Special Hire AR Pipeline", icon: <Briefcase className="h-5 w-5 text-blue-500" />, desc: "Revenue to GL to Trade Receivables", status: "Active Guard" },
+            { id: "ncg_express", name: "NCG Express Full Flow", icon: <Bus className="h-5 w-5 text-teal-500" />, desc: "Operations ↔ Finance Interconnection", status: "Active Guard" },
             { id: "sbus", name: "School Bus AR Pipeline", icon: <GraduationCap className="h-5 w-5 text-amber-500" />, desc: "Mass Invoicing & Bank Reconciliation", status: "Active Guard" },
             { id: "yutong", name: "Yutong Operations Pipeline", icon: <Truck className="h-5 w-5 text-orange-500" />, desc: "Vehicle Sales & Purchasing Flow", status: "Active Guard" },
             { id: "pc", name: "Petty Cash Replenishment", icon: <Receipt className="h-5 w-5 text-emerald-500" />, desc: "Disbursements & AP Top-ups", status: "Active Guard" },

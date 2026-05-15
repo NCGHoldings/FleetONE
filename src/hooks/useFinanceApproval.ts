@@ -53,7 +53,7 @@ export const useFinanceApproval = () => {
     }
   };
 
-  const approvePayment = async (paymentId: string, notes?: string, signatures?: any, companyId?: string) => {
+  const approvePayment = async (paymentId: string, notes?: string, signatures?: any, companyId?: string, postingDate?: string) => {
     try {
       setIsLoading(true);
       console.log('[SPH Finance] ========== APPROVAL START ==========');
@@ -99,7 +99,7 @@ export const useFinanceApproval = () => {
       setIsLoading(false);
 
       // Fire background integration (non-blocking)
-      performBackgroundIntegration(paymentId, paymentData, signatures, companyId || NCG_HOLDING_ID).catch(err => {
+      performBackgroundIntegration(paymentId, paymentData, signatures, companyId || NCG_HOLDING_ID, postingDate).catch(err => {
         console.error('[SPH Finance] ❌ Background integration failed:', err);
         toast.warning('Payment approved but finance integration needs retry. Use "Retry AR Integration".');
       });
@@ -115,7 +115,7 @@ export const useFinanceApproval = () => {
   };
 
   // Background function for AR/GL integration + document regeneration
-  const performBackgroundIntegration = async (paymentId: string, paymentData: any, signatures?: any, companyId: string = NCG_HOLDING_ID) => {
+  const performBackgroundIntegration = async (paymentId: string, paymentData: any, signatures?: any, companyId: string = NCG_HOLDING_ID, postingDate?: string) => {
     let journalEntry: any = null;
     let arInvoiceId: string | null = paymentData.quotation.ar_invoice_id;
     let customerId: string | null = paymentData.quotation.finance_customer_id;
@@ -178,6 +178,7 @@ export const useFinanceApproval = () => {
         amount: paymentData.amount,
         settings,
         effectiveCompanyId: companyId,
+        postingDate,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Advance GL posted:', journalEntry.entry_number);
@@ -190,6 +191,7 @@ export const useFinanceApproval = () => {
         amount: paymentData.amount,
         settings,
         effectiveCompanyId: companyId,
+        postingDate,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Full payment GL posted:', journalEntry.entry_number);
@@ -202,6 +204,7 @@ export const useFinanceApproval = () => {
         balanceAmount: paymentData.amount,
         settings,
         effectiveCompanyId: companyId,
+        postingDate,
       });
       if (journalEntry) {
         console.log('[SPH Finance] ✅ Balance GL posted:', journalEntry.entry_number);

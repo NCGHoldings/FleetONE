@@ -84,12 +84,14 @@ export async function postAdvancePaymentToGLStandalone({
   amount,
   settings,
   effectiveCompanyId,
+  postingDate,
 }: {
   quotationNo: string;
   customerName: string;
   amount: number;
   settings: any;
   effectiveCompanyId: string;
+  postingDate?: string;
 }) {
   if (!settings?.default_bank_account_id || !settings?.customer_advance_account_id) {
     console.warn("GL accounts not configured for Special Hire advance payments");
@@ -97,13 +99,15 @@ export async function postAdvancePaymentToGLStandalone({
   }
 
   const entryNumber = `SPH-ADV-${quotationNo}-${Date.now().toString(36).toUpperCase()}`;
+  const effectiveDate = postingDate || format(new Date(), "yyyy-MM-dd");
+  const effectivePostedAt = postingDate ? new Date(postingDate + 'T00:00:00').toISOString() : new Date().toISOString();
 
   // Create journal entry
   const { data: journalEntry, error: jeError } = await supabase
     .from("journal_entries")
     .insert({
       entry_number: entryNumber,
-      entry_date: format(new Date(), "yyyy-MM-dd"),
+      entry_date: effectiveDate,
       description: `Advance payment received - ${customerName} - ${quotationNo}`,
       reference: quotationNo,
       total_debit: amount,
@@ -111,7 +115,7 @@ export async function postAdvancePaymentToGLStandalone({
       status: "posted",
       company_id: effectiveCompanyId,
       business_unit_code: "SPH",
-      posted_at: new Date().toISOString(),
+      posted_at: effectivePostedAt,
     })
     .select()
     .single();
@@ -158,12 +162,14 @@ export async function postFullPaymentToGLStandalone({
   amount,
   settings,
   effectiveCompanyId,
+  postingDate,
 }: {
   quotationNo: string;
   customerName: string;
   amount: number;
   settings: any;
   effectiveCompanyId: string;
+  postingDate?: string;
 }) {
   if (!settings?.default_bank_account_id || !settings?.customer_advance_account_id) {
     console.warn("GL accounts not configured for Special Hire full payments");
@@ -171,13 +177,15 @@ export async function postFullPaymentToGLStandalone({
   }
 
   const entryNumber = `SPH-FULL-${quotationNo}-${Date.now().toString(36).toUpperCase()}`;
+  const effectiveDate = postingDate || format(new Date(), "yyyy-MM-dd");
+  const effectivePostedAt = postingDate ? new Date(postingDate + 'T00:00:00').toISOString() : new Date().toISOString();
 
   // Create journal entry — same as advance: DR Bank / CR Customer Advance
   const { data: journalEntry, error: jeError } = await supabase
     .from("journal_entries")
     .insert({
       entry_number: entryNumber,
-      entry_date: format(new Date(), "yyyy-MM-dd"),
+      entry_date: effectiveDate,
       description: `Full payment received - ${customerName} - ${quotationNo}`,
       reference: quotationNo,
       total_debit: amount,
@@ -185,7 +193,7 @@ export async function postFullPaymentToGLStandalone({
       status: "posted",
       company_id: effectiveCompanyId,
       business_unit_code: "SPH",
-      posted_at: new Date().toISOString(),
+      posted_at: effectivePostedAt,
     })
     .select()
     .single();
@@ -231,6 +239,7 @@ export async function postBalancePaymentToGLStandalone({
   balanceAmount,
   settings,
   effectiveCompanyId,
+  postingDate,
 }: {
   quotationNo: string;
   invoiceNo?: string;
@@ -238,6 +247,7 @@ export async function postBalancePaymentToGLStandalone({
   balanceAmount: number;
   settings: any;
   effectiveCompanyId: string;
+  postingDate?: string;
 }) {
   if (!settings?.default_bank_account_id || !settings?.trade_receivable_account_id) {
     console.warn("GL accounts not configured for Special Hire balance payments");
@@ -245,13 +255,15 @@ export async function postBalancePaymentToGLStandalone({
   }
 
   const entryNumber = `SPH-BAL-${quotationNo}-${Date.now().toString(36).toUpperCase()}`;
+  const effectiveDate = postingDate || format(new Date(), "yyyy-MM-dd");
+  const effectivePostedAt = postingDate ? new Date(postingDate + 'T00:00:00').toISOString() : new Date().toISOString();
 
   // Create journal entry
   const { data: journalEntry, error: jeError } = await supabase
     .from("journal_entries")
     .insert({
       entry_number: entryNumber,
-      entry_date: format(new Date(), "yyyy-MM-dd"),
+      entry_date: effectiveDate,
       description: `Balance payment received - ${customerName} - ${quotationNo}`,
       reference: invoiceNo || quotationNo,
       total_debit: balanceAmount,
@@ -259,7 +271,7 @@ export async function postBalancePaymentToGLStandalone({
       status: "posted",
       company_id: effectiveCompanyId,
       business_unit_code: "SPH",
-      posted_at: new Date().toISOString(),
+      posted_at: effectivePostedAt,
     })
     .select()
     .single();

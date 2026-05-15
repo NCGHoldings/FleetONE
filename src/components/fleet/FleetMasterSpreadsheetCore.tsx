@@ -20,6 +20,12 @@ interface Props {
   editMode?: 'master' | 'daily';
   selectedDate?: Date;
   availableRoutes?: any[];
+  routeLeaders?: Record<string, string | null>;
+  selectedRoutes?: string[];
+  onToggleRoute?: (routeLabel: string) => void;
+  onDelete?: (rosterId: string) => void;
+  onMove?: (rosterId: string, direction: 'up' | 'down') => void;
+  onAddBusToRoute?: (routeLabel: string) => void;
 }
 
 const BUS_TYPE_OPTIONS = ['XL', 'Normal', 'Semi', 'A/C', 'Super Luxury'];
@@ -41,9 +47,10 @@ type SectionKey = typeof FLEET_SECTIONS[number]['key'];
 
 const MemoizedFleetRow = React.memo(({
   row, globalIndex, isSubRow, hasFuelData, rowBg,
-  frozenCol1Width, frozenCol2Width, visibleSections, editMode,
+  frozenCol1Width, frozenCol2Width, frozenCol3Width, visibleSections, editMode,
   renderRouteCell, renderDropdownCell, renderEditableCell, renderCrewCombobox, getPerformanceColor,
-  editingCell, openRouteComboboxFor, openCrewComboboxFor, BUS_TYPE_OPTIONS, PERMIT_TYPE_OPTIONS, REMARK_OPTIONS
+  editingCell, openRouteComboboxFor, openCrewComboboxFor, BUS_TYPE_OPTIONS, PERMIT_TYPE_OPTIONS, REMARK_OPTIONS,
+  onDelete, onMove
 }: any) => {
   return (
     <TableRow
@@ -58,10 +65,46 @@ const MemoizedFleetRow = React.memo(({
       </TableCell>
       {/* Frozen: Bus */}
       <TableCell
-        className={cn("text-sm font-semibold sticky z-10 py-2 min-h-[40px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]", rowBg)}
+        className={cn("text-sm font-semibold sticky z-10 py-2 min-h-[40px] border-r border-border/50", rowBg)}
         style={{ left: frozenCol1Width, width: frozenCol2Width, minWidth: frozenCol2Width }}
       >
         {isSubRow ? '' : row.bus_no}
+      </TableCell>
+      {/* Frozen: Actions */}
+      <TableCell
+        className={cn("text-sm sticky z-10 py-2 min-h-[40px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]", rowBg)}
+        style={{ left: frozenCol1Width + frozenCol2Width, width: frozenCol3Width, minWidth: frozenCol3Width }}
+      >
+        {!isSubRow && (
+          <div className="flex items-center gap-1 justify-center opacity-70 hover:opacity-100 transition-opacity">
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => onMove?.(row.id, 'up')}>
+                    <span className="text-xs">▲</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Move Up</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => onMove?.(row.id, 'down')}>
+                    <span className="text-xs">▼</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Move Down</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => onDelete?.(row.id)}>
+                    <span className="text-xs">✕</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete Bus</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
       </TableCell>
       {/* Route & Type */}
       {visibleSections.has('route_type') && (
@@ -156,7 +199,7 @@ const MemoizedFleetRow = React.memo(({
   return true;
 });
 
-export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode = 'master', selectedDate, availableRoutes = [] }: Props) {
+export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode = 'master', selectedDate, availableRoutes = [], routeLeaders = {}, selectedRoutes = [], onToggleRoute, onDelete, onMove, onAddBusToRoute }: Props) {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   
@@ -541,10 +584,10 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
     );
   }
 
-  // Group rows by section
+  // Group rows by section (Route)
   const sections = new Map<string, ExpandedFleetRow[]>();
   rows.forEach(row => {
-    const sec = row.section || 'OTHER';
+    const sec = row.route_label || 'Unassigned Route';
     if (!sections.has(sec)) sections.set(sec, []);
     sections.get(sec)!.push(row);
   });
@@ -554,13 +597,14 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
   // Frozen column dimensions
   const frozenCol1Width = 56; // No
   const frozenCol2Width = 100; // Bus
+  const frozenCol3Width = 100; // Actions
   const frozenHeaderBg = 'bg-blue-100 dark:bg-blue-950';
   const frozenBodyBg = 'bg-background';
   const frozenSubRowBg = 'bg-muted/30';
 
   // Group header colSpan calculations
   const groupHeaders: { key: SectionKey | 'identity'; label: string; colSpan: number; color: string }[] = [
-    { key: 'identity', label: 'Bus Info', colSpan: 2, color: 'bg-blue-600' },
+    { key: 'identity', label: 'Bus Info', colSpan: 3, color: 'bg-blue-600' },
   ];
   if (visibleSections.has('route_type')) groupHeaders.push({ key: 'route_type', label: 'Route & Type', colSpan: 4, color: 'bg-blue-500' });
   if (visibleSections.has('config')) groupHeaders.push({ key: 'config', label: 'Config', colSpan: 1, color: 'bg-blue-400' });
@@ -641,7 +685,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                     idx < groupHeaders.length - 1 && 'border-r',
                     isIdentity && 'sticky left-0 z-40'
                   )}
-                  style={isIdentity ? { width: frozenCol1Width + frozenCol2Width } : undefined}
+                  style={isIdentity ? { width: frozenCol1Width + frozenCol2Width + frozenCol3Width } : undefined}
                 >
                   {gh.label}
                 </TableHead>
@@ -663,6 +707,13 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
               style={{ left: frozenCol1Width, width: frozenCol2Width, minWidth: frozenCol2Width }}
             >
               Bus
+            </TableHead>
+            {/* Frozen: Actions */}
+            <TableHead
+              className={cn(frozenHeaderBg, "text-sm sticky z-40 py-3 text-center")}
+              style={{ left: frozenCol1Width + frozenCol2Width, width: frozenCol3Width, minWidth: frozenCol3Width }}
+            >
+              Actions
             </TableHead>
             {/* Route & Type */}
             {visibleSections.has('route_type') && (
@@ -725,8 +776,23 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
             <React.Fragment key={sectionName}>
               {/* Section header */}
               <TableRow>
-                <TableCell colSpan={TOTAL_COLUMNS} className="bg-blue-700 text-white font-bold text-sm py-2.5 px-4 sticky left-0">
-                  {sectionName}
+                <TableCell colSpan={TOTAL_COLUMNS + 1} className="bg-blue-700 text-white font-bold text-sm py-2.5 px-4 sticky left-0 z-30">
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded border-blue-400 bg-blue-800 text-blue-500 focus:ring-blue-500 cursor-pointer"
+                      checked={selectedRoutes?.includes(sectionName) || false}
+                      onChange={() => onToggleRoute?.(sectionName)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <span>{sectionName}</span>
+                    {routeLeaders?.[sectionName] && (
+                      <span className="bg-blue-800 text-blue-100 px-2 py-0.5 rounded text-xs ml-4 border border-blue-600 flex items-center gap-1.5 shadow-sm">
+                        <Users className="w-3 h-3 text-blue-300" />
+                        Leader: {routeLeaders[sectionName]}
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
               {sectionRows.map((row) => {
@@ -757,9 +823,23 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                     BUS_TYPE_OPTIONS={BUS_TYPE_OPTIONS}
                     PERMIT_TYPE_OPTIONS={PERMIT_TYPE_OPTIONS}
                     REMARK_OPTIONS={REMARK_OPTIONS}
+                    onDelete={onDelete}
+                    onMove={onMove}
                   />
                 );
               })}
+              {/* Add Bus to Route Row */}
+              <TableRow className="bg-blue-50/50 hover:bg-blue-50">
+                <TableCell colSpan={TOTAL_COLUMNS + 1} className="p-0 sticky left-0 z-10">
+                  <button
+                    className="w-full py-3 px-4 flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-100/50 transition-colors border-t border-b border-blue-100 border-dashed"
+                    onClick={() => onAddBusToRoute?.(sectionName)}
+                  >
+                    <span className="bg-blue-100 text-blue-700 rounded-full w-5 h-5 flex items-center justify-center text-lg leading-none pb-0.5">+</span>
+                    Add bus to {sectionName}
+                  </button>
+                </TableCell>
+              </TableRow>
             </React.Fragment>
           ))}
           {rows.length === 0 && (

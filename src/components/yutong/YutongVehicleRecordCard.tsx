@@ -1,16 +1,17 @@
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Car, Link2, Unlink, Palette, Hash, Settings } from 'lucide-react';
+import { Car, Link2, Unlink, Palette, Hash, Settings, List } from 'lucide-react';
 import { VehicleRecord } from '@/hooks/useYutongVehicleDataManagement';
 
 interface Props {
   vehicle: VehicleRecord;
   onMatch: () => void;
   onUnmatch: () => void;
+  onFoc?: () => void;
 }
 
-export function YutongVehicleRecordCard({ vehicle, onMatch, onUnmatch }: Props) {
+export function YutongVehicleRecordCard({ vehicle, onMatch, onUnmatch, onFoc }: Props) {
   const getMatchBadge = () => {
     if (vehicle.is_matched) {
       return <Badge className="bg-green-500">Matched</Badge>;
@@ -95,16 +96,22 @@ export function YutongVehicleRecordCard({ vehicle, onMatch, onUnmatch }: Props) 
         )}
 
         {/* Actions */}
-        <div className="pt-2 border-t">
+        <div className="pt-2 border-t grid grid-cols-2 gap-2">
           {!vehicle.is_matched ? (
             <Button variant="outline" size="sm" className="w-full" onClick={onMatch}>
               <Link2 className="h-4 w-4 mr-2" />
-              Match to Order
+              Match
             </Button>
           ) : (
             <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={onUnmatch}>
               <Unlink className="h-4 w-4 mr-2" />
               Unmatch
+            </Button>
+          )}
+          {onFoc && (
+            <Button variant="outline" size="sm" className="w-full" onClick={onFoc}>
+              <List className="h-4 w-4 mr-2" />
+              Checklist
             </Button>
           )}
         </div>

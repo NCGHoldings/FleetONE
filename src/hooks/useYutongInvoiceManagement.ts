@@ -279,8 +279,20 @@ export const useYutongInvoiceManagement = () => {
             if (arResult) {
               console.log('[Yutong Invoice] Created AR Invoice:', arResult.invoiceNumber);
               
-              // 4. Post to GL
-              if (settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
+              // 4. Post to GL — GUARD: Skip if AR invoice already has GL posted at creation time
+              // createVehicleARInvoice auto-posts GL when status != 'draft', so we must check first
+              let skipRevenueGL = false;
+              const { data: arCheck } = await supabase
+                .from('ar_invoices')
+                .select('journal_entry_id')
+                .eq('id', arResult.invoiceId)
+                .single();
+              if (arCheck?.journal_entry_id) {
+                console.log('[Yutong Invoice] AR Invoice already has GL posted (journal_entry_id exists), skipping redundant revenue GL.');
+                skipRevenueGL = true;
+              }
+
+              if (!skipRevenueGL && settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
                 const glResult = await postVehicleInvoiceToGL({
                   module: 'yutong',
                   orderNo: orderNo,
@@ -554,8 +566,20 @@ export const useYutongInvoiceManagement = () => {
           if (arResult) {
             console.log('[Yutong Sync] Created AR Invoice:', arResult.invoiceNumber);
             
-            // 4. Post to GL
-            if (settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
+            // 4. Post to GL — GUARD: Skip if AR invoice already has GL posted at creation time
+            // createVehicleARInvoice auto-posts GL when status != 'draft', so we must check first
+            let skipRevenueGL = false;
+            const { data: arCheck } = await supabase
+              .from('ar_invoices')
+              .select('journal_entry_id')
+              .eq('id', arResult.invoiceId)
+              .single();
+            if (arCheck?.journal_entry_id) {
+              console.log('[Yutong Sync] AR Invoice already has GL posted (journal_entry_id exists), skipping redundant revenue GL.');
+              skipRevenueGL = true;
+            }
+
+            if (!skipRevenueGL && settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
               const glResult = await postVehicleInvoiceToGL({
                 module: 'yutong',
                 orderNo: orderNo,

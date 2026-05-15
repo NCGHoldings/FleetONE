@@ -116,6 +116,38 @@ export function YutongOrdersList() {
       ),
     },
     {
+      accessorKey: "engine_number",
+      header: "Engine No",
+      cell: ({ row }) => {
+        const engineNo = (row.original as any).engine_number;
+        return (
+          <div className="font-mono text-xs">
+            {engineNo ? (
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">{engineNo}</span>
+            ) : (
+              <span className="text-muted-foreground italic">—</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "chassis_number",
+      header: "Chassis No",
+      cell: ({ row }) => {
+        const chassisNo = (row.original as any).chassis_number;
+        return (
+          <div className="font-mono text-xs">
+            {chassisNo ? (
+              <span className="text-blue-600 dark:text-blue-400 font-medium">{chassisNo}</span>
+            ) : (
+              <span className="text-muted-foreground italic">—</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       header: "Customer",
       cell: ({ row }) => {
         const quotation = (row.original as any).yutong_quotations;

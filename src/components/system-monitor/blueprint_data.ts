@@ -95,6 +95,161 @@ export const BLUEPRINTS: Record<string, { code: BlueprintGenerator, filename: st
     AR_INV -.->|Audits Missing| VH`;
     }
   },
+  ncg_express: {
+    filename: "ncg_express_full_flow.mermaid",
+    code: async (supabase: SupabaseClient, companyId: string) => {
+      // Fetch Special Hire settings
+      const { data: sphSettings } = await supabase
+        .from('special_hire_finance_settings')
+        .select('*')
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+      // Fetch Daily Trips / NCG Express settings
+      const { data: ncgSettings } = await supabase
+        .from('ncg_express_finance_settings')
+        .select('*')
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+      const { data: coa } = await supabase.from('chart_of_accounts').select('id, name');
+
+      const getGL = (id: string | null | undefined, fallback: string) => {
+        if (!id) return `Not Set - ${fallback}`;
+        const account = coa?.find(c => c.id === id);
+        return account ? account.name : `Unknown Account`;
+      };
+
+      // Special Hire GL accounts
+      const sphBank = getGL(sphSettings?.default_bank_account_id, "Bank");
+      const sphAdvLiab = getGL(sphSettings?.customer_advance_account_id, "Advances");
+      const sphTradeRec = getGL(sphSettings?.trade_receivable_account_id, "Trade Rec");
+      const sphRevenue = getGL(sphSettings?.revenue_external_account_id, "Revenue");
+
+      // Daily Trips GL accounts
+      const dtCash = getGL(ncgSettings?.cash_account_id, "Cash/Bank");
+      const dtTicketRev = getGL(ncgSettings?.ticket_revenue_account_id, "Ticket Revenue");
+      const dtFuel = getGL(ncgSettings?.fuel_expense_account_id, "Fuel Expense");
+      const dtRepair = getGL(ncgSettings?.repair_expense_account_id, "Repair Expense");
+      const dtExpCash = getGL(ncgSettings?.expense_cash_account_id, "Expense Cash");
+      const dtFuelCard = getGL(ncgSettings?.fuel_card_payable_account_id, "Fuel Card Payable");
+
+      return `graph TD
+    %% ===============================================================
+    %% NCG EXPRESS: FULL OPERATIONS + FINANCE INTERCONNECTION
+    %% Covers BOTH Special Hire and Daily Trips pipelines
+    %% ===============================================================
+
+    %% ─── DAILY TRIPS OPERATIONS ───
+    subgraph DT_OPS ["DAILY TRIPS - OPERATIONS"]
+        DA1["Driver Allocation<br/>Assign Bus + Crew per Route"] --> DA2["Import to Daily Trips<br/>ImportFromAllocationModal"]
+        DA2 --> DT1["Trip Entry<br/>Conductor submits via Quick Entry"]
+        DT1 --> DT2["Log Sheet Upload<br/>Attach scanned log sheet"]
+        DT2 --> DT3["Submission Monitor<br/>SLA Tracking per Bus"]
+        DT3 --> DT4{"Submission Complete?"}
+        DT4 -->|"Yes"| DT5["Approval Review<br/>SubmissionReviewModal"]
+        DT4 -->|"Missing"| DT6["Flag for Follow-up"]
+        DT5 -->|"Approved"| DT7["Trip Data Locked<br/>Posted to Ledger"]
+        DT5 -->|"Rejected"| DT8["Return for Correction"]
+    end
+
+    %% ─── DAILY TRIPS REVENUE GL ───
+    subgraph DT_REV ["DAILY TRIPS - REVENUE POSTING"]
+        DTR1["Bulk GL Posting<br/>BulkGLPostingDialog"] --> DTR2["JE: Trip Revenue"]
+        DTR2 -->|"Debit"| DTR_DR["DR: ${dtCash}"]
+        DTR2 -->|"Credit"| DTR_CR["CR: ${dtTicketRev}"]
+        DTR_DR --> DTR_COA["COA Updated"]
+        DTR_CR --> DTR_COA
+    end
+
+    %% ─── DAILY TRIPS EXPENSE GL ───
+    subgraph DT_EXP ["DAILY TRIPS - EXPENSE POSTING"]
+        DTE1["Daily Bus Expenses<br/>Fuel, Repairs, Tyres, etc."] --> DTE2["JE: Expense Recognition"]
+        DTE2 -->|"Debit"| DTE_DR1["DR: ${dtFuel}"]
+        DTE2 -->|"Debit"| DTE_DR2["DR: ${dtRepair}"]
+        DTE2 -->|"Debit"| DTE_DR3["DR: 18+ Expense Categories"]
+        DTE2 -->|"Credit"| DTE_CR1["CR: ${dtExpCash}"]
+        DTE2 -->|"Credit Fuel"| DTE_CR2["CR: ${dtFuelCard}"]
+    end
+
+    %% ─── DAILY TRIPS ANALYTICS ───
+    subgraph DT_PL ["PROFITABILITY ENGINE"]
+        PL1["Bus P and L Report<br/>Revenue minus Expenses per Bus"]
+        PL2["Route P and L Report<br/>Revenue minus Expenses per Route"]
+        PL3["Cashier Settlement<br/>Cash collected vs Expected"]
+        PL4["Bank Deposit<br/>Daily deposit reconciliation"]
+    end
+
+    %% ─── SPECIAL HIRE OPERATIONS ───
+    subgraph SPH_OPS ["SPECIAL HIRE - OPERATIONS"]
+        O1["Customer Inquiry<br/>Public Form / Manual"] --> O2["Create Quotation<br/>Cost Calculator"]
+        O2 --> O3{"Discount Applied?"}
+        O3 -->|"Yes"| O4["Manager Approval"]
+        O3 -->|"No"| O5["Send to Customer"]
+        O4 -->|"Approved"| O5
+        O5 --> O6{"Customer Accepts?"}
+        O6 -->|"Yes"| O7["Trip Confirmed"]
+        O6 -->|"No"| O_LOST["Lost"]
+        O7 --> O8["Assign Vehicle + Crew"]
+        O8 --> O9["Execute Trip"]
+        O9 --> O10["Trip Completed"]
+        O10 --> O11{"Adjustments?"}
+        O11 -->|"Yes"| O12["Extra KM / Hours"]
+        O11 -->|"No"| O13["Generate Final Invoice"]
+        O12 --> O13
+        O13 --> O14["Post to GL"]
+    end
+
+    %% ─── SPECIAL HIRE FINANCE ───
+    subgraph SPH_FIN ["SPECIAL HIRE - FINANCE"]
+        F1["Record Advance Payment"] --> F2["Finance Approval"]
+        F2 --> F3{"Approve?"}
+        F3 -->|"Yes"| F4["Post GL Entry"]
+        F3 -->|"No"| F5["Rejected"]
+        F4 --> F6["AR Receipt Created"]
+        F6 --> F7["Bank Transaction"]
+    end
+
+    %% ─── SPECIAL HIRE SETTLEMENT ───
+    subgraph SPH_SETTLE ["SPECIAL HIRE - SETTLEMENT"]
+        S1["Final Invoice"] --> S2["JE: Revenue Recognition"]
+        S2 -->|"Debit"| S2_DR["DR: ${sphTradeRec}"]
+        S2 -->|"Credit"| S2_CR["CR: ${sphRevenue}"]
+        S2 --> S3["JE: Advance Applied"]
+        S3 -->|"Debit"| S3_DR["DR: ${sphAdvLiab}"]
+        S3 -->|"Credit"| S3_CR["CR: ${sphTradeRec}"]
+        S3 --> S4["AR Invoice Balanced"]
+    end
+
+    %% ─── CROSS-BOUNDARY CONNECTIONS ───
+    DT7 -.->|"Revenue data"| DTR1
+    DT7 -.->|"Expense data"| DTE1
+    DTR_COA -.->|"Feeds"| PL1
+    DTR_COA -.->|"Feeds"| PL2
+    DTE1 -.->|"Feeds"| PL1
+    PL3 -.->|"Reconciles to"| PL4
+
+    O7 -.->|"Triggers advance"| F1
+    O14 -.->|"Posts GL"| S1
+    S4 -.->|"Status update"| VH
+
+    %% ─── SETTINGS SOURCES ───
+    NCG_SET[("ncg_express_finance_settings")]
+    SPH_SET[("special_hire_finance_settings")]
+    NCG_SET -.-> DTR2
+    NCG_SET -.-> DTE2
+    SPH_SET -.-> F4
+    SPH_SET -.-> S2
+
+    %% ─── VERIFY HUB ───
+    VH{"Verify Hub Monitoring"}
+    DTR2 -.-> VH
+    DTE2 -.-> VH
+    S2 -.-> VH
+    S3 -.-> VH
+    F4 -.-> VH`;
+    }
+  },
   iou: {
     filename: "iou_pipeline.mermaid",
     code: async (supabase: SupabaseClient, companyId: string) => {

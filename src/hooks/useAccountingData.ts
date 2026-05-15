@@ -744,6 +744,8 @@ export const useBankTransactions = (bankAccountId?: string) => {
 };
 
 // Reconciliation-specific hook: fetches ALL unreconciled + date-filtered reconciled transactions
+// Uses bank_account_id as primary scope (bank accounts are already company-filtered)
+// Includes legacy records with NULL company_id for backward compatibility
 export const useBankTransactionsForRecon = (
   bankAccountId?: string,
   fromDate?: string,
@@ -756,19 +758,21 @@ export const useBankTransactionsForRecon = (
     queryKey: ["bank-transactions-recon", bankAccountId, effectiveCompanyId, fromDate, toDate],
     queryFn: async () => {
       if (!effectiveCompanyId) return null;
-      // Fetch all unreconciled transactions (no limit)
+      if (!bankAccountId) return null;
+
+      // ═══════════════════════════════════════════════════════════════
+      // Fetch ALL unreconciled transactions for this bank account
+      // Uses OR filter: company_id matches OR company_id is null (legacy)
+      // The bank_account_id itself is already company-scoped
+      // ═══════════════════════════════════════════════════════════════
       let unreconciledQuery = supabase
         .from("bank_transactions")
         .select("*")
         .eq("is_reconciled", false)
+        .eq("bank_account_id", bankAccountId)
+        .or(`company_id.eq.${effectiveCompanyId},company_id.is.null`)
         .order("transaction_date", { ascending: false });
 
-      if (effectiveCompanyId) {
-        unreconciledQuery = unreconciledQuery.eq("company_id", effectiveCompanyId);
-      }
-      if (bankAccountId) {
-        unreconciledQuery = unreconciledQuery.eq("bank_account_id", bankAccountId);
-      }
       if (fromDate) {
         unreconciledQuery = unreconciledQuery.gte("transaction_date", fromDate);
       }
@@ -786,15 +790,11 @@ export const useBankTransactionsForRecon = (
           .from("bank_transactions")
           .select("*")
           .eq("is_reconciled", true)
+          .eq("bank_account_id", bankAccountId)
+          .or(`company_id.eq.${effectiveCompanyId},company_id.is.null`)
           .order("transaction_date", { ascending: false })
           .limit(500);
 
-        if (effectiveCompanyId) {
-          reconciledQuery = reconciledQuery.eq("company_id", effectiveCompanyId);
-        }
-        if (bankAccountId) {
-          reconciledQuery = reconciledQuery.eq("bank_account_id", bankAccountId);
-        }
         if (fromDate) {
           reconciledQuery = reconciledQuery.gte("transaction_date", fromDate);
         }

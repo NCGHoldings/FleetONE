@@ -4,10 +4,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Check, CheckCircle, Loader2, Send, Calculator, Trash2, Upload, CreditCard, Banknote, Camera, Route, Sun, Moon, Sparkles, Navigation, Bus, User, Receipt, ArrowLeft } from 'lucide-react';
+import { Calendar as CalendarIcon, User, Bus, Route, ArrowRight, ArrowLeft, Sun, Moon, CheckCircle, ChevronRight, Check, Plus, Minus, FileText, Banknote, Receipt, Navigation, PartyPopper, Sparkles, Loader2, Send, Calculator, Trash2, Upload, CreditCard, Camera } from "lucide-react";
 import { createAnonymousClient } from '@/integrations/supabase/public-client';
 import { GamificationBanner } from '@/components/trips/GamificationBanner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useCrewAuth } from '@/contexts/CrewAuthContext';
 
 type Language = 'en' | 'si' | 'ta';
 
@@ -274,6 +275,13 @@ const AutocompleteInput = ({
 
 export default function PublicConductorUpload() {
   const { toast } = useToast();
+  let crewMember: any = null;
+  try {
+    const auth = useCrewAuth();
+    crewMember = auth.crewMember;
+  } catch (e) {
+    // Failsafe if used outside of CrewAuthProvider
+  }
   
   // Persistent State Loaders
   const loadState = (key: string, defaultVal: any) => {
@@ -297,6 +305,8 @@ export default function PublicConductorUpload() {
   const [fuelPrice, setFuelPrice] = useState<number>(350);
   const [routeTarget, setRouteTarget] = useState<number>(0);
   const [fetchingMaster, setFetchingMaster] = useState(false);
+  const [activeRoutes, setActiveRoutes] = useState<any[]>([]);
+  const [selectedRouteTarget, setSelectedRouteTarget] = useState<any>(null);
   
   // Autocomplete Memory
   const [history, setHistory] = useState(() => loadState('history', { buses: [], drivers: [], conductors: [], routes: [] }));
@@ -331,6 +341,8 @@ export default function PublicConductorUpload() {
   }));
 
   const [completedTrips, setCompletedTrips] = useState<{tripNumber: number, total: number, time: string}[]>(() => loadState('completedTrips', []));
+  const [maxTrips, setMaxTrips] = useState(() => loadState('maxTrips', 4));
+  const [overrideRequested, setOverrideRequested] = useState(() => loadState('overrideRequested', false));
 
   // Auto-save Effect
   useEffect(() => {
@@ -340,8 +352,105 @@ export default function PublicConductorUpload() {
       localStorage.setItem('conductor_form_expenses', JSON.stringify(expenses));
       localStorage.setItem('conductor_form_fuelDetails', JSON.stringify(fuelDetails));
       localStorage.setItem('conductor_form_completedTrips', JSON.stringify(completedTrips));
+      localStorage.setItem('conductor_form_maxTrips', JSON.stringify(maxTrips));
+      localStorage.setItem('conductor_form_overrideRequested', JSON.stringify(overrideRequested));
     }
-  }, [formData, trip, expenses, fuelDetails, completedTrips, submitted]);
+  }, [formData, trip, expenses, fuelDetails, completedTrips, maxTrips, overrideRequested, submitted]);
+
+  // QR Code URL Parameter Parsing
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const busParam = params.get('bus');
+      if (busParam && !formData.busNumber) {
+        setFormData(prev => ({ ...prev, busNumber: busParam.toUpperCase() }));
+      }
+    } catch (e) {
+      console.log('Error parsing URL params', e);
+    }
+  }, []);
+
+  // Auto-fill Conductor Name from Authenticated Crew Session
+  useEffect(() => {
+    if (crewMember?.staff_name && formData.conductorName !== crewMember.staff_name) {
+      setFormData(prev => ({ ...prev, conductorName: crewMember.staff_name }));
+    }
+  }, [crewMember, formData.conductorName]);
+
+  // Bus Assignment Auto-Fill Logic (Debounced)
+  useEffect(() => {
+    const fetchAssignment = async () => {
+      const bus = formData.busNumber;
+      if (!bus || bus.length < 5) return;
+      
+      try {
+        const supabasePublic = createAnonymousClient();
+        // Get data for the specific date if selected, else default to today
+        const queryDate = formData.tripDate || new Date().toISOString().split('T')[0];
+        const { data, error } = await supabasePublic.rpc('get_public_bus_assignment', { p_bus_number: bus, p_date: queryDate });
+        
+        if (data && data.length > 0 && !error) {
+          const assignment = data[0];
+          
+          if (assignment.driver_name || assignment.conductor_name || assignment.route_name) {
+             setFormData(prev => ({ 
+               ...prev, 
+               routeName: assignment.route_name || prev.routeName,
+               driverName: assignment.driver_name || prev.driverName,
+               conductorName: assignment.conductor_name || prev.conductorName
+             }));
+             
+             const allocated = parseInt(assignment.total_allocated_trips) || 0;
+             // If the backend has allocated trips, use them. Otherwise fallback to 4.
+             if (allocated > 0) {
+                 setMaxTrips(allocated);
+             } else {
+                 setMaxTrips(4);
+             }
+             
+             toast({
+               title: "Assignment Loaded",
+               description: `Successfully fetched assignment. Allocated Trips: ${allocated > 0 ? allocated : 4}`,
+             });
+          }
+        }
+      } catch (e) {
+        console.log('Error fetching assignment', e);
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      fetchAssignment();
+    }, 600); // 600ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.busNumber, formData.tripDate]);
+
+  // Fetch official routes and targets
+  useEffect(() => {
+    const fetchRoutes = async () => {
+      try {
+        const supabasePublic = createAnonymousClient();
+        const { data, error } = await supabasePublic.rpc('get_public_route_targets');
+        if (data && !error) {
+          setActiveRoutes(data);
+        }
+      } catch (err) {
+        console.log("RPC fetch failed, will fallback to history.", err);
+      }
+    };
+    fetchRoutes();
+  }, []);
+
+  // Update selected route config when routeName changes
+  useEffect(() => {
+    if (formData.routeName && activeRoutes.length > 0) {
+      const match = activeRoutes.find(r => r.route_name === formData.routeName);
+      setSelectedRouteTarget(match || null);
+    } else {
+      setSelectedRouteTarget(null);
+    }
+  }, [formData.routeName, activeRoutes]);
 
   // Fetch interconnected fuel price
   useEffect(() => {
@@ -394,6 +503,18 @@ export default function PublicConductorUpload() {
     });
   };
 
+  const handleDeleteTrip = (tripNumber: number) => {
+    if (window.confirm(`Are you sure you want to delete Trip ${tripNumber}? You will need to re-enter it.`)) {
+      const newCompleted = completedTrips.filter(t => t.tripNumber !== tripNumber);
+      setCompletedTrips(newCompleted);
+      localStorage.setItem('conductor_form_completedTrips', JSON.stringify(newCompleted));
+      // Try to keep currentTripNumber sequential if we delete the latest one
+      if (tripNumber === currentTripNumber - 1) {
+        setCurrentTripNumber(tripNumber);
+      }
+    }
+  };
+
   const validateGlobalFields = () => {
     if (!formData.conductorName || !formData.driverName || !formData.busNumber || !formData.tripDate) {
       toast({
@@ -414,6 +535,57 @@ export default function PublicConductorUpload() {
     try {
       const supabasePublic = createAnonymousClient();
       
+      // -- DUPLICATE & 0 LKR SUBMISSION CHECK --
+      const { data: existingSubs } = await supabasePublic
+        .from('conductor_submissions')
+        .select('ocr_data, created_at')
+        .eq('bus_number', formData.busNumber)
+        .eq('trip_date', formData.tripDate)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (existingSubs && existingSubs.length > 0) {
+        let isDuplicate = false;
+        
+        for (const sub of existingSubs) {
+          const ocr = sub.ocr_data;
+          if (ocr?.submission_type !== submissionType) continue;
+
+          if (submissionType === 'trip_revenue') {
+             // Check if same exact total income, especially 0
+             if (ocr.total_income === specificData.total_income) {
+               isDuplicate = true; break;
+             }
+          } else if (submissionType === 'expenses') {
+             if (ocr.expenses?.total === specificData.expenses?.total) {
+               isDuplicate = true; break;
+             }
+          } else if (submissionType === 'fuel') {
+             if (ocr.fuel_details?.liters === specificData.fuel_details?.liters && ocr.fuel_details?.odometer === specificData.fuel_details?.odometer) {
+               isDuplicate = true; break;
+             }
+          }
+        }
+
+        if (isDuplicate) {
+          // Pause loading so the confirm dialog doesn't look weird
+          setLoading(false);
+          const isZero = (submissionType === 'trip_revenue' && specificData.total_income === 0) || 
+                         (submissionType === 'expenses' && specificData.expenses?.total === 0);
+          
+          const msg = isZero 
+            ? `⚠️ WARNING: You already submitted a 0 (Zero) amount for ${formData.busNumber} today.\n\nAre you sure you want to submit ANOTHER 0 amount?`
+            : `⚠️ WARNING: You already submitted the exact same values for ${formData.busNumber} today.\n\nAre you sure you want to submit a duplicate?`;
+            
+          const confirmed = window.confirm(msg);
+          if (!confirmed) {
+            return; // Abort submission
+          }
+          setLoading(true); // Resume loading if they confirmed
+        }
+      }
+      // -- END CHECK --
+
       const structuredData = {
         driver_name: formData.driverName,
         conductor_name: formData.conductorName,
@@ -422,6 +594,8 @@ export default function PublicConductorUpload() {
         trip_date: formData.tripDate,
         submission_type: submissionType, // Tells backoffice what this payload contains
         data_entry_method: 'hub_spoke_v3',
+        expected_targets: selectedRouteTarget || null,
+        calculated_commission: submissionType === 'trip_revenue' ? (selectedRouteTarget ? (calculateTripTotal(specificData?.trips?.[0]?.income) * (selectedRouteTarget.conductor_commission_percent / 100)) : 0) : 0,
         ...specificData
       };
 
@@ -478,6 +652,17 @@ export default function PublicConductorUpload() {
 
   const handleSubmitTrip = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // NEXT LEVEL VALIDATION: Block empty or unrealistically low trip submissions
+    if (totalIncome < 500) {
+      toast({
+        title: "Invalid Revenue Amount",
+        description: "Trip revenue cannot be less than Rs. 500. Please enter the correct collections before submitting.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     submitPartialPayload('trip_revenue', {
       trips: [{
         trip_number: currentTripNumber,
@@ -498,11 +683,22 @@ export default function PublicConductorUpload() {
 
   const handleSubmitFuel = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const liters = parseFloat(fuelDetails.liters) || 0;
+    if (liters <= 0) {
+      toast({
+        title: "Invalid Fuel Details",
+        description: "Please enter a valid amount of liters before submitting.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     submitPartialPayload('fuel', {
       fuel_details: {
         time: fuelDetails.time,
         odometer: fuelDetails.odometer,
-        liters: parseFloat(fuelDetails.liters) || null,
+        liters: liters,
         payment_method: fuelDetails.paymentMethod
       },
       // Automatically map fuel to expenses
@@ -514,6 +710,16 @@ export default function PublicConductorUpload() {
 
   const handleSubmitExpenses = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (totalExpenses <= 0) {
+      toast({
+        title: "Empty Expenses",
+        description: "Please enter at least one expense amount before submitting.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const formattedExpenses = Object.entries(expenses).reduce((acc: any, [key, val]) => {
       if (parseFloat(val) > 0) acc[key] = parseFloat(val);
       return acc;
@@ -536,25 +742,40 @@ export default function PublicConductorUpload() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-lg border-0">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
-              <Check className="h-8 w-8 text-emerald-600" />
-            </div>
-            <CardTitle className="text-2xl">{t.successTitle}</CardTitle>
-            <CardDescription>{t.successDesc}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-6 text-center">
-              <p className="text-sm text-emerald-800 mb-2 font-medium">{t.trackingCode}</p>
-              <p className="text-3xl font-bold font-mono text-emerald-600">{submissionCode}</p>
-            </div>
-            <Button onClick={resetForm} className="w-full h-12 text-lg" variant="outline">
-              {t.submitAnother}
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Animated Background Confetti/Sparkles effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-slate-900 to-blue-900">
+           <div className="absolute top-10 left-10 animate-bounce delay-100"><Sparkles className="w-12 h-12 text-yellow-400 opacity-50" /></div>
+           <div className="absolute top-20 right-20 animate-pulse delay-300"><Sparkles className="w-8 h-8 text-emerald-400 opacity-50" /></div>
+           <div className="absolute bottom-20 left-1/4 animate-bounce delay-500"><Sparkles className="w-10 h-10 text-blue-400 opacity-50" /></div>
+           <div className="absolute bottom-10 right-1/3 animate-pulse delay-700"><Sparkles className="w-16 h-16 text-purple-400 opacity-30" /></div>
+        </div>
+
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", bounce: 0.5 }}
+          className="relative z-10 w-full max-w-md"
+        >
+          <Card className="w-full shadow-2xl border-0 bg-white/95 backdrop-blur-sm rounded-[2rem]">
+            <CardHeader className="text-center pt-10">
+              <div className="mx-auto w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(16,185,129,0.3)]">
+                <PartyPopper className="h-12 w-12 text-emerald-600 animate-pulse" />
+              </div>
+              <CardTitle className="text-3xl font-black text-slate-800 tracking-tight">{t.successTitle}</CardTitle>
+              <CardDescription className="text-lg mt-2 text-slate-600 font-medium">{t.successDesc}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 pb-10">
+              <div className="rounded-2xl border-2 border-emerald-100 bg-emerald-50 p-8 text-center shadow-inner">
+                <p className="text-sm text-emerald-800 mb-3 font-bold tracking-widest uppercase">{t.trackingCode}</p>
+                <p className="text-4xl font-black font-mono text-emerald-600 tracking-wider">{submissionCode}</p>
+              </div>
+              <Button onClick={resetForm} className="w-full h-14 text-lg font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-xl transition-transform active:scale-95">
+                {t.submitAnother}
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     );
   }
@@ -665,7 +886,7 @@ export default function PublicConductorUpload() {
                           icon={<Route className="w-4 h-4 text-blue-500" />}
                         />
                       </div>
-                      <div className="space-y-2 col-span-2 sm:col-span-1">
+                      <div className={`space-y-2 col-span-2 sm:col-span-1 ${crewMember ? 'col-span-2' : ''}`}>
                         <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.driverName}</Label>
                         <AutocompleteInput 
                           value={formData.driverName} 
@@ -675,16 +896,19 @@ export default function PublicConductorUpload() {
                           icon={<User className="w-4 h-4" />}
                         />
                       </div>
-                      <div className="space-y-2 col-span-2 sm:col-span-1">
-                        <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.conductorName}</Label>
-                        <AutocompleteInput 
-                          value={formData.conductorName} 
-                          onChange={(v) => setFormData({ ...formData, conductorName: v })} 
-                          options={history.conductors || []} 
-                          placeholder="Conductor Name"
-                          icon={<User className="w-4 h-4 text-emerald-500" />}
-                        />
-                      </div>
+                      
+                      {!crewMember && (
+                        <div className="space-y-2 col-span-2 sm:col-span-1">
+                          <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.conductorName}</Label>
+                          <AutocompleteInput 
+                            value={formData.conductorName} 
+                            onChange={(v) => setFormData({ ...formData, conductorName: v })} 
+                            options={history.conductors || []} 
+                            placeholder="Conductor Name"
+                            icon={<User className="w-4 h-4 text-emerald-500" />}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -694,7 +918,7 @@ export default function PublicConductorUpload() {
                       <div className="flex items-center justify-between">
                         <h4 className="font-bold text-emerald-800 text-sm">Today's Submitted Trips</h4>
                         <div className="bg-white text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full text-xs font-bold">
-                          {completedTrips.length} {completedTrips.length === 1 ? 'Trip' : 'Trips'}
+                          {completedTrips.length} / {maxTrips} {completedTrips.length === 1 ? 'Trip' : 'Trips'}
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -704,26 +928,61 @@ export default function PublicConductorUpload() {
                             <div className="flex items-center gap-3">
                               <span className="text-xs text-slate-400">{ct.time}</span>
                               <span className="font-black text-emerald-700">Rs. {ct.total.toFixed(2)}</span>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-full" onClick={() => handleDeleteTrip(ct.tripNumber)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
                           </div>
                         ))}
                       </div>
+
+                      {completedTrips.length >= maxTrips && !overrideRequested && (
+                        <Button 
+                          variant="outline" 
+                          className="w-full mt-2 text-orange-600 border-orange-200 hover:bg-orange-50 text-xs font-bold"
+                          onClick={() => {
+                            if (window.confirm("Are you sure you ran an extra trip today? This will send an override request to your Group Leader.")) {
+                              setOverrideRequested(true);
+                              setMaxTrips(prev => prev + 1);
+                              toast({ title: "Override Requested", description: "You can now add an extra trip." });
+                            }
+                          }}
+                        >
+                          Request Extra Trip (Override)
+                        </Button>
+                      )}
+                      {overrideRequested && (
+                        <div className="text-center text-xs text-orange-600 font-bold bg-orange-100/50 rounded-lg p-2 mt-2 border border-orange-200">
+                          Override Active - Group Leader Notified
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* Hub Actions */}
                   <div className="space-y-3">
                     <button 
-                      onClick={() => { if (validateGlobalFields()) setCurrentStep('trip'); }}
-                      className="w-full bg-white p-5 rounded-[1.5rem] border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] flex items-center justify-between hover:border-emerald-200 hover:shadow-md transition-all group"
+                      onClick={() => { 
+                        if (!validateGlobalFields()) return; 
+                        if (completedTrips.length >= maxTrips) {
+                          toast({
+                            title: "Trip Limit Reached",
+                            description: `You have completed your allocated ${maxTrips} trips for today. Request an override if you ran extra.`,
+                            variant: "destructive"
+                          });
+                          return;
+                        }
+                        setCurrentStep('trip'); 
+                      }}
+                      className={`w-full bg-white p-5 rounded-[1.5rem] border shadow-[0_4px_20px_rgb(0,0,0,0.03)] flex items-center justify-between transition-all group ${completedTrips.length >= maxTrips ? 'opacity-50 cursor-not-allowed border-slate-100' : 'border-slate-100 hover:border-emerald-200 hover:shadow-md'}`}
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
                           <Bus className="w-6 h-6" />
                         </div>
                         <div className="text-left">
-                          <h4 className="font-bold text-lg text-slate-800">{lang === 'si' ? 'ගමන් ආදායම්' : t.income}</h4>
-                          <p className="text-xs text-slate-500 font-medium">Submit revenue trip by trip</p>
+                          <h4 className={`font-bold text-lg ${completedTrips.length >= maxTrips ? 'text-slate-400' : 'text-slate-800'}`}>{lang === 'si' ? 'ගමන් ආදායම්' : t.income}</h4>
+                          <p className="text-xs text-slate-500 font-medium">{completedTrips.length >= maxTrips ? 'Trip allocation completed' : 'Submit revenue trip by trip'}</p>
                         </div>
                       </div>
                       <Navigation className="w-5 h-5 text-slate-300 group-hover:text-emerald-500 transition-colors transform group-hover:translate-x-1" />
@@ -761,6 +1020,35 @@ export default function PublicConductorUpload() {
                       <Navigation className="w-5 h-5 text-slate-300 group-hover:text-rose-500 transition-colors transform group-hover:translate-x-1" />
                     </button>
 
+                  </div>
+
+                  {/* Start New Sheet Button */}
+                  <div className="flex justify-center pt-4 pb-4">
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => {
+                        if (window.confirm("Are you sure you want to start a new sheet? This will clear your current local data so you can enter a new bus or date.")) {
+                          localStorage.removeItem('conductor_form_global');
+                          localStorage.removeItem('conductor_form_current_trip');
+                          localStorage.removeItem('conductor_form_expenses');
+                          localStorage.removeItem('conductor_form_fuelDetails');
+                          localStorage.removeItem('conductor_form_completedTrips');
+                          localStorage.removeItem('conductor_form_maxTrips');
+                          localStorage.removeItem('conductor_form_overrideRequested');
+                          setFormData({ driverName: '', conductorName: crewMember?.staff_name || '', busNumber: '', routeName: '', tripDate: new Date().toISOString().split('T')[0] });
+                          setCompletedTrips([]);
+                          setExpenses({});
+                          setFuelDetails({ time: getCurrentTime(), odometer: '', liters: '', paymentMethod: 'cash' });
+                          setCurrentTripNumber(1);
+                          setMaxTrips(4);
+                          setOverrideRequested(false);
+                          toast({ title: "New Sheet Started", description: "You can now enter data for a new bus or date." });
+                        }
+                      }}
+                      className="text-slate-400 hover:text-slate-600 text-xs font-bold underline"
+                    >
+                      Refresh / Start New Data Sheet
+                    </Button>
                   </div>
                 </motion.div>
               )}
@@ -831,7 +1119,17 @@ export default function PublicConductorUpload() {
                         <span className="font-black text-emerald-600 text-lg">Rs. {totalIncome.toFixed(2)}</span>
                       </div>
 
-                      <Button type="submit" disabled={loading} className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md">
+                      {/* NEXT LEVEL: Live Commission Gamification */}
+                      {selectedRouteTarget && selectedRouteTarget.conductor_commission_percent > 0 && (
+                        <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex justify-between items-center shadow-inner">
+                          <span className="font-bold text-emerald-800 text-xs uppercase tracking-wider">Live Commission ({selectedRouteTarget.conductor_commission_percent}%)</span>
+                          <span className="font-black text-emerald-700 text-xl drop-shadow-sm">
+                            Rs. {(totalIncome * (selectedRouteTarget.conductor_commission_percent / 100)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} <span className="text-xl">💰</span>
+                          </span>
+                        </div>
+                      )}
+
+                      <Button type="submit" disabled={loading} className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md mt-2">
                         {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
                         {t.submitTrip}
                       </Button>
@@ -931,22 +1229,32 @@ export default function PublicConductorUpload() {
                     </div>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                      {EXPENSE_CATEGORIES.filter(c => c.primary || showAllExpenses).map((cat) => (
-                        <div key={cat.key} className="flex items-center justify-between py-1 border-b border-slate-50">
-                          <Label className="text-sm font-semibold text-slate-600 truncate mr-2">
-                            {lang === 'en' ? cat.en : lang === 'si' ? cat.si : cat.ta}
-                          </Label>
-                          <div className="relative w-28 shrink-0">
-                            <Input 
-                              type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
-                              className="h-8 text-right font-medium text-sm focus-visible:ring-rose-500 bg-rose-50/30 border-rose-100" 
-                              value={expenses[cat.key] || ''} 
-                              onChange={(e) => setExpenses({...expenses, [cat.key]: e.target.value})} 
-                              onFocus={(e) => e.target.select()}
-                            />
+                      {EXPENSE_CATEGORIES.filter(c => c.primary || showAllExpenses).map((cat) => {
+                        const val = parseFloat(expenses[cat.key]) || 0;
+                        // NEXT LEVEL: Expense Guardrails
+                        const isOverLimit = cat.key === 'food' && val > 1500;
+                        return (
+                          <div key={cat.key} className="flex flex-col py-1 border-b border-slate-50">
+                            <div className="flex items-center justify-between">
+                              <Label className={`text-sm font-semibold truncate mr-2 ${isOverLimit ? 'text-orange-600' : 'text-slate-600'}`}>
+                                {lang === 'en' ? cat.en : lang === 'si' ? cat.si : cat.ta}
+                              </Label>
+                              <div className="relative w-28 shrink-0">
+                                <Input 
+                                  type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
+                                  className={`h-8 text-right font-medium text-sm focus-visible:ring-rose-500 ${isOverLimit ? 'bg-orange-50 border-orange-300 text-orange-800' : 'bg-rose-50/30 border-rose-100'}`} 
+                                  value={expenses[cat.key] || ''} 
+                                  onChange={(e) => setExpenses({...expenses, [cat.key]: e.target.value})} 
+                                  onFocus={(e) => e.target.select()}
+                                />
+                              </div>
+                            </div>
+                            {isOverLimit && (
+                              <p className="text-[10px] text-orange-600 font-bold mt-1 text-right tracking-wide">⚠️ EXCEEDS ROUTE LIMIT (1,500)</p>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     <Button 

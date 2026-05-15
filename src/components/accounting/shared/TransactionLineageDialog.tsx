@@ -34,6 +34,7 @@ import {
   Package,
   Receipt,
   CreditCard,
+  Landmark,
   ChevronRight,
   Activity,
   Eye,
@@ -41,7 +42,7 @@ import {
   Printer,
 } from "lucide-react";
 import { useTransactionLineage, VEHICLE_STORAGE_BUCKETS } from "@/hooks/useTransactionLineage";
-import type { UpstreamDocument } from "@/hooks/useTransactionLineage";
+import type { UpstreamDocument, DownstreamReceipt, DownstreamCreditNote, BankTransactionLink } from "@/hooks/useTransactionLineage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -213,14 +214,15 @@ export const TransactionLineageDialog: React.FC<TransactionLineageDialogProps> =
     }
   }, [open, journalEntryId]);
 
-  // Auto-show chain panel when upstream data exists
   useEffect(() => {
-    if (lineage?.upstream?.order || lineage?.upstream?.quotation) {
+    if (lineage?.upstream?.order || lineage?.upstream?.quotation || lineage?.downstream?.receipts?.length || lineage?.downstream?.creditNotes?.length || lineage?.downstream?.balanceTracker || lineage?.downstream?.bankTransactions?.length) {
       setShowChainPanel(true);
     }
   }, [lineage]);
 
   const hasUpstream = !!(lineage?.upstream?.order || lineage?.upstream?.quotation);
+  const hasDownstream = !!(lineage?.downstream?.receipts?.length || lineage?.downstream?.creditNotes?.length || lineage?.downstream?.balanceTracker || lineage?.downstream?.bankTransactions?.length);
+  const hasChainData = hasUpstream || hasDownstream;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -255,7 +257,7 @@ export const TransactionLineageDialog: React.FC<TransactionLineageDialogProps> =
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {hasUpstream && (
+            {hasChainData && (
               <Button
                 variant="outline"
                 size="sm"
@@ -263,7 +265,7 @@ export const TransactionLineageDialog: React.FC<TransactionLineageDialogProps> =
                 onClick={() => setShowChainPanel(!showChainPanel)}
               >
                 <Activity className="h-3.5 w-3.5 mr-1.5" />
-                Audit Chain
+                Full Chain
                 <Badge className="ml-1.5 text-[10px] bg-violet-500/30 text-violet-200 border-0 px-1.5">
                   {lineage?.summary.chainDepth || 0}
                 </Badge>
@@ -418,12 +420,12 @@ export const TransactionLineageDialog: React.FC<TransactionLineageDialogProps> =
                   </div>
                 </div>
 
-                {/* ── Upstream Chain Panel (slide-in) ── */}
-                {showChainPanel && hasUpstream && (
-                  <div className="w-[320px] border-l border-slate-700 bg-[#1e293b] overflow-y-auto flex-shrink-0">
+                {/* ── Full Chain Panel (slide-in) ── */}
+                {showChainPanel && hasChainData && (
+                  <div className="w-[340px] border-l border-slate-700 bg-[#1e293b] overflow-y-auto flex-shrink-0">
                     <div className="px-4 py-3 border-b border-slate-700/50 flex items-center gap-2">
                       <Activity className="h-4 w-4 text-violet-400" />
-                      <span className="text-sm font-semibold text-white">Upstream Audit Chain</span>
+                      <span className="text-sm font-semibold text-white">Full Transaction Chain</span>
                     </div>
 
                     <div className="p-4 space-y-3">
@@ -603,6 +605,238 @@ export const TransactionLineageDialog: React.FC<TransactionLineageDialogProps> =
                             ))}
                           </div>
                         </div>
+                      )}
+
+                      {/* ═══ DOWNSTREAM: Balance Tracker ═══ */}
+                      {lineage.downstream?.balanceTracker && (
+                        <>
+                          <div className="flex justify-center mt-3">
+                            <ChevronRight className="h-4 w-4 text-slate-500 rotate-90" />
+                          </div>
+                          <div className="bg-[#0f172a] border border-indigo-500/20 rounded-lg overflow-hidden">
+                            <div className="px-3 py-2 bg-indigo-500/10 border-b border-indigo-500/20 flex items-center gap-2">
+                              <BookOpen className="h-3.5 w-3.5 text-indigo-400" />
+                              <span className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">
+                                Balance Tracker
+                              </span>
+                              <Badge className={`ml-auto text-[9px] px-1.5 py-0 ${
+                                lineage.downstream.balanceTracker.status === 'paid' 
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                  : lineage.downstream.balanceTracker.status === 'partial'
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                  : 'bg-red-500/20 text-red-300 border-red-500/30'
+                              }`} variant="outline">
+                                {lineage.downstream.balanceTracker.status.toUpperCase()}
+                              </Badge>
+                            </div>
+                            <div className="px-3 py-2.5 space-y-2">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-slate-500">Total</span>
+                                <span className="text-white font-semibold">LKR {lineage.downstream.balanceTracker.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-slate-500">Paid</span>
+                                <span className="text-emerald-300 font-semibold">LKR {lineage.downstream.balanceTracker.paidAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-slate-500">Balance</span>
+                                <span className={`font-semibold ${lineage.downstream.balanceTracker.balance <= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                                  LKR {lineage.downstream.balanceTracker.balance.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                                </span>
+                              </div>
+                              {/* Progress bar */}
+                              <div className="w-full bg-slate-700 rounded-full h-2 mt-1">
+                                <div
+                                  className={`h-2 rounded-full transition-all duration-500 ${
+                                    lineage.downstream.balanceTracker.status === 'paid' ? 'bg-emerald-500' : 'bg-indigo-500'
+                                  }`}
+                                  style={{ width: `${Math.min(100, lineage.downstream.balanceTracker.totalAmount > 0 ? (lineage.downstream.balanceTracker.paidAmount / lineage.downstream.balanceTracker.totalAmount) * 100 : 0)}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between text-[10px] text-slate-500 mt-0.5">
+                                <span>{lineage.downstream.balanceTracker.receiptCount} receipt(s)</span>
+                                <span>{lineage.downstream.balanceTracker.creditNoteCount} credit note(s)</span>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* ═══ DOWNSTREAM: AR Receipts / Payments ═══ */}
+                      {lineage.downstream?.receipts && lineage.downstream.receipts.length > 0 && (
+                        <>
+                          <div className="flex justify-center">
+                            <ChevronRight className="h-4 w-4 text-slate-500 rotate-90" />
+                          </div>
+                          <div className="bg-[#0f172a] border border-cyan-500/20 rounded-lg overflow-hidden">
+                            <div className="px-3 py-2 bg-cyan-500/10 border-b border-cyan-500/20 flex items-center gap-2">
+                              <CreditCard className="h-3.5 w-3.5 text-cyan-400" />
+                              <span className="text-xs font-semibold text-cyan-300 uppercase tracking-wider">
+                                AR Receipts ({lineage.downstream.receipts.length})
+                              </span>
+                            </div>
+                            <div className="divide-y divide-slate-700/50">
+                              {lineage.downstream.receipts.map((dr: DownstreamReceipt, i: number) => (
+                                <div key={i} className="px-3 py-2.5">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-cyan-300 font-mono">{dr.receipt.receipt_number}</span>
+                                    <span className="text-xs text-white font-semibold">
+                                      LKR {(dr.allocation?.allocated_amount || dr.receipt.amount || 0).toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between mt-1 text-[11px] text-slate-500">
+                                    <span className="capitalize">{(dr.receipt.payment_method || '—').replace(/_/g, ' ')}</span>
+                                    <span>{dr.receipt.receipt_date ? format(new Date(dr.receipt.receipt_date), "dd MMM yyyy") : '—'}</span>
+                                  </div>
+                                  {dr.journalEntry && (
+                                    <div className="mt-1.5 flex items-center gap-1 text-[10px] text-violet-400">
+                                      <GitBranch className="h-3 w-3" />
+                                      <span className="font-mono">{dr.journalEntry.entry_number}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* ═══ DOWNSTREAM: Credit Notes ═══ */}
+                      {lineage.downstream?.creditNotes && lineage.downstream.creditNotes.length > 0 && (
+                        <>
+                          <div className="flex justify-center">
+                            <ChevronRight className="h-4 w-4 text-slate-500 rotate-90" />
+                          </div>
+                          <div className="bg-[#0f172a] border border-orange-500/20 rounded-lg overflow-hidden">
+                            <div className="px-3 py-2 bg-orange-500/10 border-b border-orange-500/20 flex items-center gap-2">
+                              <FileText className="h-3.5 w-3.5 text-orange-400" />
+                              <span className="text-xs font-semibold text-orange-300 uppercase tracking-wider">
+                                Credit Notes ({lineage.downstream.creditNotes.length})
+                              </span>
+                            </div>
+                            <div className="divide-y divide-slate-700/50">
+                              {lineage.downstream.creditNotes.map((dc: DownstreamCreditNote, i: number) => (
+                                <div key={i} className="px-3 py-2.5">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-orange-300 font-mono">{dc.creditNote.credit_note_number}</span>
+                                    <span className="text-xs text-white font-semibold">
+                                      LKR {(dc.creditNote.amount || 0).toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between mt-1 text-[11px] text-slate-500">
+                                    <span className="truncate max-w-[150px]">{dc.creditNote.reason || '—'}</span>
+                                    <span>{dc.creditNote.credit_date ? format(new Date(dc.creditNote.credit_date), "dd MMM yyyy") : '—'}</span>
+                                  </div>
+                                  {dc.journalEntry && (
+                                    <div className="mt-1.5 flex items-center gap-1 text-[10px] text-violet-400">
+                                      <GitBranch className="h-3 w-3" />
+                                      <span className="font-mono">{dc.journalEntry.entry_number}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* ═══ DOWNSTREAM: SPH Booking ═══ */}
+                      {lineage.downstream?.sphBooking && (
+                        <>
+                          <div className="flex justify-center">
+                            <ChevronRight className="h-4 w-4 text-slate-500 rotate-90" />
+                          </div>
+                          <ChainCard
+                            icon={<Package className="h-4 w-4" />}
+                            title="SPH Booking"
+                            color="teal"
+                            fields={[
+                              { label: "Quotation", value: lineage.downstream.sphBooking.quotation_number },
+                              { label: "Customer", value: lineage.downstream.sphBooking.customer_name },
+                              { label: "Route", value: `${lineage.downstream.sphBooking.route_from || '—'} → ${lineage.downstream.sphBooking.route_to || '—'}` },
+                              { label: "Total", value: `LKR ${(lineage.downstream.sphBooking.total_amount || 0).toLocaleString()}` },
+                              { label: "Status", value: lineage.downstream.sphBooking.status, isBadge: true },
+                            ]}
+                          />
+                        </>
+                      )}
+
+                      {/* ═══ DOWNSTREAM: Bank Transactions & Reconciliation ═══ */}
+                      {lineage.downstream?.bankTransactions && lineage.downstream.bankTransactions.length > 0 && (
+                        <>
+                          <div className="flex justify-center">
+                            <ChevronRight className="h-4 w-4 text-slate-500 rotate-90" />
+                          </div>
+                          <div className="bg-[#0f172a] border border-sky-500/20 rounded-lg overflow-hidden">
+                            <div className="px-3 py-2 bg-sky-500/10 border-b border-sky-500/20 flex items-center gap-2">
+                              <Landmark className="h-3.5 w-3.5 text-sky-400" />
+                              <span className="text-xs font-semibold text-sky-300 uppercase tracking-wider">
+                                Bank Transactions ({lineage.downstream.bankTransactions.length})
+                              </span>
+                              {(() => {
+                                const reconCount = lineage.downstream.bankTransactions.filter((b: BankTransactionLink) => b.isReconciled).length;
+                                const total = lineage.downstream.bankTransactions.length;
+                                return (
+                                  <Badge
+                                    className={`ml-auto text-[9px] px-1.5 py-0 ${
+                                      reconCount === total
+                                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                        : reconCount > 0
+                                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                        : 'bg-red-500/20 text-red-300 border-red-500/30'
+                                    }`}
+                                    variant="outline"
+                                  >
+                                    {reconCount === total ? 'ALL RECONCILED' : reconCount > 0 ? `${reconCount}/${total} RECONCILED` : 'UNRECONCILED'}
+                                  </Badge>
+                                );
+                              })()}
+                            </div>
+                            <div className="divide-y divide-slate-700/50">
+                              {lineage.downstream.bankTransactions.map((btl: BankTransactionLink, i: number) => (
+                                <div key={i} className="px-3 py-2.5">
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5">
+                                      <Landmark className="h-3 w-3 text-sky-400/70" />
+                                      <span className="text-xs text-sky-300 font-medium truncate max-w-[140px]">
+                                        {btl.bankAccount?.account_name || btl.bankAccount?.bank_name || 'Bank Account'}
+                                      </span>
+                                    </div>
+                                    <Badge
+                                      className={`text-[9px] px-1.5 py-0 ${
+                                        btl.isReconciled
+                                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                          : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                      }`}
+                                      variant="outline"
+                                    >
+                                      {btl.isReconciled ? '✅ Reconciled' : '⏳ Pending'}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex justify-between mt-1 text-xs">
+                                    <span className="text-slate-400 capitalize">
+                                      {(btl.bankTransaction.transaction_type || 'transaction').replace(/_/g, ' ')}
+                                    </span>
+                                    <span className="text-white font-semibold">
+                                      LKR {((btl.bankTransaction.debit_amount || btl.bankTransaction.credit_amount || 0)).toLocaleString(undefined, {minimumFractionDigits: 2})}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between mt-1 text-[11px] text-slate-500">
+                                    <span className="truncate max-w-[160px]">{btl.bankTransaction.description || '—'}</span>
+                                    <span>
+                                      {btl.bankTransaction.transaction_date ? format(new Date(btl.bankTransaction.transaction_date), "dd MMM yyyy") : '—'}
+                                    </span>
+                                  </div>
+                                  {btl.bankAccount?.account_number && (
+                                    <div className="mt-1 text-[10px] text-slate-600 font-mono">
+                                      A/C: {btl.bankAccount.account_number}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>

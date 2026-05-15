@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/utils";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import XLSX from "xlsx-js-style";
 
 // ===== WHT Payment Type Mapping =====
 // Maps vendor categories to WHT payment types as per Sri Lanka IRD guidelines
@@ -40,18 +41,33 @@ const WHT_PAYMENT_TYPE_MAP: Record<string, string> = {
   "other": "Other",
 };
 
+// Maps wht_category DB values to display labels
+const WHT_CATEGORY_LABEL_MAP: Record<string, string> = {
+  "rent": "Rent",
+  "service_fee": "Service Fee",
+  "vehicle_rent": "Vehicle Rent",
+  "interest": "Interest",
+  "commission": "Commission",
+  "other": "Other",
+  "non_liable": "Non-Liable",
+};
+
 function resolvePaymentType(vendor: any, invoice: any): string {
-  // 1. Try vendor category name
+  // 1. Prefer explicit wht_category from the invoice (set via dropdown)
+  const cat = (invoice as any)?.wht_category;
+  if (cat && WHT_CATEGORY_LABEL_MAP[cat]) return WHT_CATEGORY_LABEL_MAP[cat];
+
+  // 2. Try vendor category name
   const catName = vendor?.vendor_categories?.category_name?.toLowerCase() || "";
   for (const [key, val] of Object.entries(WHT_PAYMENT_TYPE_MAP)) {
     if (catName.includes(key)) return val;
   }
-  // 2. Try invoice description / notes
+  // 3. Try invoice description / notes
   const desc = (invoice?.notes || invoice?.description || "").toLowerCase();
   for (const [key, val] of Object.entries(WHT_PAYMENT_TYPE_MAP)) {
     if (desc.includes(key)) return val;
   }
-  // 3. Fallback from WHT rate
+  // 4. Fallback from WHT rate
   if (vendor?.wht_rate === 5) return "Rent";
   if (vendor?.wht_rate === 2) return "Service Fee";
   if (vendor?.wht_rate === 10) return "Interest";
@@ -156,8 +172,10 @@ export const WHTDetailsSheet = () => {
           ? Math.round((whtAmt / inv.total_amount) * 100)
           : Number(inv.wht_rate) || vendor.wht_rate || 0;
 
-        // Liable = has actual WHT deducted, OR vendor is flagged as wht_applicable with a known rate
-        const isLiable = whtAmt > 0 || (vendor.wht_applicable && whtRate > 0);
+        // If wht_category is explicitly 'non_liable', force into Section B
+        const explicitNonLiable = (inv as any).wht_category === 'non_liable';
+        // Liable = has actual WHT deducted, OR vendor is flagged as wht_applicable with a known rate (but not if forced non-liable)
+        const isLiable = !explicitNonLiable && (whtAmt > 0 || (vendor.wht_applicable && whtRate > 0));
 
         return {
           serialNo: serial,
@@ -232,89 +250,138 @@ export const WHTDetailsSheet = () => {
     setTimeout(() => { w.print(); w.close(); }, 500);
   };
 
-  // ===== Excel Export Handler (IRD Template Format) =====
+  // ===== Excel Export Handler (Formatted .xlsx with IRD Template Styling) =====
   const handleExcelExport = () => {
-    const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-    const E = ''; // empty cell
-    const cols = 11; // S/N, Type, Name, Address, TIN, Description, Amount, WHT%, WHT Deducted, Net, Notes
-    const emptyRow = new Array(cols).fill(E).join(',');
-    const rows: string[] = [];
+    // Style definitions matching IRD WHT template
+    const border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } } as const;
+    const titleStyle = { font: { bold: true, sz: 14 } };
+    const labelStyle = { font: { bold: true, sz: 11 } };
+    const valueStyle = { font: { sz: 11 } };
+    const sectionStyle = { font: { bold: true, sz: 12, underline: true } };
+    const hdrStyle = { font: { bold: true, sz: 10, color: { rgb: '000000' } }, fill: { fgColor: { rgb: 'FFFF00' } }, border, alignment: { horizontal: 'center', wrapText: true } } as any;
+    const catStyle = { font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: 'F2F2F2' } }, border } as any;
+    const cellStr = (v: string) => ({ v, t: 's' as const, s: { font: { sz: 10 }, border } });
+    const cellNum = (v: number) => ({ v, t: 'n' as const, s: { font: { sz: 10 }, border, numFmt: '#,##0.00', alignment: { horizontal: 'right' } } });
+    const cellPct = (v: number) => ({ v, t: 'n' as const, s: { font: { sz: 10 }, border, alignment: { horizontal: 'center' } } });
+    const totalStr = (v: string) => ({ v, t: 's' as const, s: { font: { bold: true, sz: 10 }, border, alignment: { horizontal: 'right' } } });
+    const totalNum = (v: number) => ({ v, t: 'n' as const, s: { font: { bold: true, sz: 10 }, border, numFmt: '#,##0.00', alignment: { horizontal: 'right' } } });
+    const grandStr = (v: string) => ({ v, t: 's' as const, s: { font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1F4E79' } }, border, alignment: { horizontal: 'right' } } });
+    const grandNum = (v: number) => ({ v, t: 'n' as const, s: { font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1F4E79' } }, border, numFmt: '#,##0.00', alignment: { horizontal: 'right' } } });
+    const empty = { v: '', t: 's' as const, s: { border } };
 
-    // === HEADER BLOCK ===
-    rows.push(`"WHT Details Sheet"`);
-    rows.push(emptyRow);
-    rows.push(`"Company Name:",${esc(companyName)}`);
-    rows.push(`"TIN Number:",${esc(selectedCompany?.tax_id || selectedCompany?.registration_number || '—')}`);
-    rows.push(`"Month:",${esc(periodLabel)}`);
-    rows.push(emptyRow);
+    const data: any[][] = [];
+    const COLS = 11;
+    const emptyRow = () => new Array(COLS).fill(null);
+
+    // === HEADER ===
+    data.push([{ v: 'WHT Details Sheet', s: titleStyle }, ...new Array(COLS - 1).fill(null)]);
+    data.push(emptyRow());
+    data.push([{ v: 'Company Name:', s: labelStyle }, { v: companyName, s: valueStyle }, ...new Array(COLS - 2).fill(null)]);
+    data.push([{ v: 'TIN Number:', s: labelStyle }, { v: (selectedCompany as any)?.tax_id || (selectedCompany as any)?.registration_number || '—', s: valueStyle }, ...new Array(COLS - 2).fill(null)]);
+    data.push([{ v: 'Month:', s: labelStyle }, { v: periodLabel, s: valueStyle }, ...new Array(COLS - 2).fill(null)]);
+    data.push(emptyRow());
 
     // === SECTION A: LIABLE LIST ===
-    rows.push(`"Liable List"`);
-    rows.push(emptyRow);
-    // Column Headers
-    rows.push(['Serial No','Type of Payment',"Withholdee's Name","Withholdee's Address","Withholdee's TIN/NIC",'Description','Total Amount Paid (Rs.)','Rate of WHT (%)','Amount of WHT Deducted (Rs.)','Net Amount','Special notes'].map(h => esc(h)).join(','));
+    data.push([{ v: 'Liable List', s: sectionStyle }, ...new Array(COLS - 1).fill(null)]);
+    data.push(emptyRow());
+    // Column headers (yellow background)
+    data.push(
+      ['Serial No', 'Type of Payment', "Withholdee's Name", "Withholdee's Address", "Withholdee's TIN/NIC",
+       'Description', 'Total Amount Paid (Rs.)', 'Rate of WHT (%)', 'Amount of WHT Deducted (Rs.)', 'Net Amount', 'Special notes'
+      ].map(h => ({ v: h, t: 's' as const, s: hdrStyle }))
+    );
 
-    // Grouped by payment type (matching IRD template)
+    // Grouped by payment type
     Object.entries(groupedLiable).forEach(([paymentType, items]) => {
-      // Category header row
-      rows.push(`${esc(paymentType)}`);
-      // Line items with sequential numbering within category
+      // Category header row (grey background)
+      const catRow = new Array(COLS).fill(null);
+      catRow[0] = { v: paymentType, t: 's' as const, s: catStyle };
+      for (let i = 1; i < COLS; i++) catRow[i] = { v: '', t: 's' as const, s: { fill: { fgColor: { rgb: 'F2F2F2' } }, border } };
+      data.push(catRow);
+
+      // Line items
       items.forEach((item, idx) => {
-        rows.push([
-          idx + 1,
-          item.paymentType,
-          item.withholdee_name,
-          item.withholdee_address,
-          item.withholdee_tin_nic,
-          item.description,
-          item.total_amount_paid.toFixed(2),
-          item.wht_rate,
-          item.wht_amount.toFixed(2),
-          item.net_amount.toFixed(2),
-          item.special_notes
-        ].map(v => esc(v)).join(','));
+        data.push([
+          cellStr(String(idx + 1)),
+          cellStr(item.paymentType),
+          cellStr(item.withholdee_name),
+          cellStr(item.withholdee_address),
+          cellStr(item.withholdee_tin_nic),
+          cellStr(item.description),
+          cellNum(item.total_amount_paid),
+          cellPct(item.wht_rate),
+          cellNum(item.wht_amount),
+          cellNum(item.net_amount),
+          cellStr(item.special_notes),
+        ]);
       });
-      // Empty row (template has blank rows for manual entries)
-      rows.push(emptyRow);
-      // Category sub-total
+      // Empty row for manual entries
+      data.push(new Array(COLS).fill(empty));
+
+      // Sub-total
       const subtotalPaid = items.reduce((s, i) => s + i.total_amount_paid, 0);
       const subtotalWHT = items.reduce((s, i) => s + i.wht_amount, 0);
       const subtotalNet = items.reduce((s, i) => s + i.net_amount, 0);
-      rows.push([E, E, E, E, E, 'Total', subtotalPaid.toFixed(2), E, subtotalWHT.toFixed(2), subtotalNet.toFixed(2), E].join(','));
-      rows.push(emptyRow);
+      data.push([empty, empty, empty, empty, empty, totalStr('Total'), totalNum(subtotalPaid), empty, totalNum(subtotalWHT), totalNum(subtotalNet), empty]);
+      data.push(emptyRow());
     });
 
-    // Grand Total
-    rows.push([E, E, E, E, E, '"Grand Total"', grandTotalPaid.toFixed(2), E, grandTotalWHT.toFixed(2), grandTotalNet.toFixed(2), E].join(','));
-    rows.push(emptyRow);
-    rows.push(emptyRow);
+    // Grand Total (dark blue background, white text)
+    data.push([
+      { v: '', s: { fill: { fgColor: { rgb: '1F4E79' } }, border } },
+      { v: '', s: { fill: { fgColor: { rgb: '1F4E79' } }, border } },
+      { v: '', s: { fill: { fgColor: { rgb: '1F4E79' } }, border } },
+      { v: '', s: { fill: { fgColor: { rgb: '1F4E79' } }, border } },
+      { v: '', s: { fill: { fgColor: { rgb: '1F4E79' } }, border } },
+      grandStr('Grand Total'),
+      grandNum(grandTotalPaid),
+      { v: '', s: { fill: { fgColor: { rgb: '1F4E79' } }, border } },
+      grandNum(grandTotalWHT),
+      grandNum(grandTotalNet),
+      { v: '', s: { fill: { fgColor: { rgb: '1F4E79' } }, border } },
+    ]);
+    data.push(emptyRow());
+    data.push(emptyRow());
 
     // === SECTION B: NON-LIABLE LIST ===
-    rows.push(`"Non-Liable List"`);
-    rows.push(emptyRow);
-    rows.push(['Serial No','Type of Payment','Name','Description','Total Amount Paid (Rs.)','Invoice #'].map(h => esc(h)).join(','));
+    data.push([{ v: 'Non-Liable List', s: sectionStyle }, ...new Array(5).fill(null)]);
+    data.push(new Array(6).fill(null));
+    data.push(
+      ['Serial No', 'Type of Payment', 'Name', 'Description', 'Total Amount Paid (Rs.)', 'Invoice #'
+      ].map(h => ({ v: h, t: 's' as const, s: hdrStyle }))
+    );
     nonLiableItems.forEach((item, idx) => {
-      rows.push([
-        idx + 1,
-        item.paymentType,
-        item.withholdee_name,
-        item.description,
-        item.total_amount_paid.toFixed(2),
-        item.invoice_number
-      ].map(v => esc(v)).join(','));
+      data.push([
+        cellStr(String(idx + 1)),
+        cellStr(item.paymentType),
+        cellStr(item.withholdee_name),
+        cellStr(item.description),
+        cellNum(item.total_amount_paid),
+        cellStr(item.invoice_number),
+      ]);
     });
-    rows.push(emptyRow);
-    rows.push([E, E, '"Total Non-Liable"', E, nonLiableTotalAmount.toFixed(2), E].join(','));
+    // Non-liable total
+    data.push([empty, empty, totalStr('Total Non-Liable'), empty, totalNum(nonLiableTotalAmount), empty]);
 
-    // Build final CSV
-    const csv = '\uFEFF' + rows.join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `WHT_Details_${format(start, 'yyyy-MM')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    // Build workbook
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    // Column widths
+    ws['!cols'] = [
+      { wch: 8 },  // Serial No
+      { wch: 16 }, // Type of Payment
+      { wch: 24 }, // Name
+      { wch: 28 }, // Address
+      { wch: 16 }, // TIN
+      { wch: 22 }, // Description
+      { wch: 20 }, // Amount Paid
+      { wch: 12 }, // WHT %
+      { wch: 22 }, // WHT Deducted
+      { wch: 18 }, // Net Amount
+      { wch: 16 }, // Notes
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `WHT_Details_${format(start, 'yyyy-MM')}`);
+    XLSX.writeFile(wb, `WHT_Details_${format(start, 'yyyy-MM')}.xlsx`);
   };
 
   // ===== Format number for display =====

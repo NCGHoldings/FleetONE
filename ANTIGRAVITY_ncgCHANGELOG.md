@@ -1,4 +1,42 @@
+## 2026-05-14
+
+### ✅ Critical GL Double-Posting Fix — Yutong Invoice Idempotency Guard
+
+**Problem:** `useYutongInvoiceManagement.ts` called both `createVehicleARInvoice()` (which auto-posts GL when status ≠ 'draft') and `postVehicleInvoiceToGL()` unconditionally, creating **two identical revenue recognition journal entries** per invoice approval/sync. This inflated the Sales Revenue (41101001) ledger by 2x for affected Yutong invoices.
+
+**Root Cause:** The quotation-based Yutong invoice hook (`useYutongInvoiceManagement.ts`) lacked the `skipRevenueGL` guard that was already present in the order-based hook (`useYutongOrderInvoiceManagement.ts`) and the Sinotruk hook.
+
+**Files Modified:**
+- `src/hooks/useYutongInvoiceManagement.ts` — Added `journal_entry_id` check guard to both `approveInvoice` and `syncInvoiceToFinanceHub` methods. After `createVehicleARInvoice` returns, the code now queries `ar_invoices.journal_entry_id` — if it already exists (set by the auto-GL-post inside `createVehicleARInvoice`), the subsequent `postVehicleInvoiceToGL` call is skipped entirely. Matches the idempotency pattern in `useYutongOrderInvoiceManagement.ts` and `useSinotrukOrderInvoiceManagement.ts`.
+
+**Architecture Notes:**
+- All vehicle sales GL posting now follows the same idempotency contract: `createVehicleARInvoice` is the **single source of truth** for revenue recognition GL. `postVehicleInvoiceToGL` is only called as a fallback when the AR invoice was created without auto-posting (e.g., draft status).
+- **Database cleanup may be required** for historically double-posted invoices: look for duplicate JEs sharing the same `reference` field containing the same invoice number.
+
+---
+
 ## 2026-05-13
+
+### ✅ Bank Reconciliation — Transaction Visibility & Lineage Stabilization
+
+**Problem:** Manual Journal Entries (JEs) and Quick-Add bank transactions were missing from the Bank Reconciliation "System Records (Book)" panel. Root cause was a strict `company_id` filter in the reconciliation hook that excluded legacy records with NULL `company_id`, plus the Quick Add workflow failing to inject `company_id` into new records.
+
+**Files Modified:**
+- `src/hooks/useAccountingData.ts` — Refactored `useBankTransactionsForRecon` to use an OR filter (`company_id.eq.X,company_id.is.null`) instead of strict equality. Ensures legacy records without `company_id` appear in the reconciliation view. Made `bank_account_id` a required filter (was optional).
+- `src/components/accounting/BankReconciliationWorksheet.tsx` — Fixed `handleQuickAdd` to include `company_id: effectiveCompanyId` in the bank_transaction insert payload.
+- `src/hooks/useAccountingMutations.ts` — Fixed Rules of Hooks violation in `useCreateBankTransaction`: removed inner `useCompany()` call from `mutationFn` (not a React component). Moved `getBusinessUnitCode` destructuring to outer scope. Added `bank-transactions-recon` query invalidation on success.
+
+**Migration Created:**
+- `supabase/migrations/20260513170000_backfill_bank_transactions_company_id.sql` — Backfill: inherits `company_id` from parent `bank_accounts`, sets `source_type='manual'` for NULL entries, links `journal_entry_id` for JE-sourced transactions.
+
+**Backfill Script:**
+- `backfill_bank_company_id.ts` — Standalone script (`npx tsx backfill_bank_company_id.ts`) for runtime backfill via Supabase JS client.
+
+**Architecture Notes:**
+- Bank Reconciliation now uses `bank_account_id` as primary scope (bank accounts are already company-owned), with `company_id` as a secondary inclusive filter
+- Pattern: `OR(company_id = X, company_id IS NULL)` ensures backward compatibility for legacy data
+
+---
 
 ### ✅ Finance Modal Auto-Close & Double-Post Prevention
 

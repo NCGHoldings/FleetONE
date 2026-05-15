@@ -31,7 +31,29 @@ const FIELD_OPTIONS = [
   { value: 'invoice_amount', label: 'Invoice Amount' },
   { value: 'vat', label: 'VAT' },
   { value: 'total_amount', label: 'Total Amount' },
+  { value: 'engine_capacity', label: 'Engine Capacity' },
+  { value: 'registration_no', label: 'Registration No' },
   { value: 'order_no', label: 'Order No (stored in raw data)' },
+  { value: 'foc_carpet', label: 'FOC: Carpet' },
+  { value: 'foc_carpet_installation', label: 'FOC: Carpet (Installation)' },
+  { value: 'foc_tyre_rotation', label: 'FOC: Tyre Rotation' },
+  { value: 'foc_grease', label: 'FOC: Grease' },
+  { value: 'foc_stickers', label: 'FOC: Stickers' },
+  { value: 'foc_no_plate', label: 'FOC: No Plate' },
+  { value: 'foc_addblue_cut', label: 'FOC: AddBlue Cut' },
+  { value: 'foc_speed_limit', label: 'FOC: Speed Limit' },
+  { value: 'foc_wheel_alignment', label: 'FOC: Wheel Alignment' },
+  { value: 'foc_door_lock', label: 'FOC: Door Lock' },
+  { value: 'foc_dewax', label: 'FOC: Dewax / Body Wash' },
+  { value: 'foc_steering_wheel', label: 'FOC: Steering Wheel' },
+  { value: 'foc_sim_card', label: 'FOC: Sim Card Installation' },
+  { value: 'foc_checker_plate', label: 'FOC: Checker Plate' },
+  { value: 'foc_pdi', label: 'FOC: PDI' },
+  { value: 'foc_shock_absorber', label: 'FOC: Shock Absorber Replace' },
+  { value: 'foc_1st_service', label: 'FOC: 1st Service' },
+  { value: 'foc_2nd_service', label: 'FOC: 2nd Service' },
+  { value: 'foc_3rd_service', label: 'FOC: 3rd Service' },
+  { value: 'foc_other_services', label: 'FOC: Other Services' },
   { value: 'skip', label: '-- Skip Column --' },
 ];
 
@@ -280,7 +302,7 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
       const vehicleRecords = allData
         .filter((_, idx) => !headerRowIndices.has(idx))
         .map(row => {
-          const record: any = { raw_data: {} };
+          const record: any = { raw_data: {}, service_checklist: {} };
           headers.forEach((header, idx) => {
             const mapping = columnMappings[idx];
             const value = row ? row[idx] : null;
@@ -288,11 +310,15 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
             
             if (mapping?.mappedTo && value !== null && value !== undefined) {
               const mappedTo = mapping.mappedTo;
-              if (['order_no', 'address', 'status', 'invoice_amount', 'vat', 'total_amount'].includes(mappedTo)) {
+              if (mappedTo.startsWith('foc_')) {
+                // Remove 'foc_' prefix for cleaner keys in the JSONB object
+                const cleanKey = mappedTo.replace('foc_', '');
+                record.service_checklist[cleanKey] = String(value).trim();
+              } else if (['order_no', 'address', 'status', 'invoice_amount', 'vat', 'total_amount', 'registration_no'].includes(mappedTo)) {
                 // Store non-schema fields directly in raw_data with underscore prefix
                 record.raw_data[`_${mappedTo}`] = String(value).trim();
-              } else if (mappedTo === 'year_of_manufacture') {
-                record[mappedTo] = parseInt(String(value)) || null;
+              } else if (mappedTo === 'year_of_manufacture' || mappedTo === 'engine_capacity') {
+                record[mappedTo] = parseInt(String(value).replace(/[^0-9]/g, '')) || null;
               } else {
                 record[mappedTo] = String(value).trim();
               }

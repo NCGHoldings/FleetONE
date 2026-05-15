@@ -139,6 +139,24 @@ export function LightVehicleOrdersList() {
                       <p className="text-sm text-muted-foreground">
                         {order.vehicle_name} {order.brand && `(${order.brand})`} x {order.quantity}
                       </p>
+                      <div className="flex gap-3 mt-1">
+                        <span className="text-xs font-mono">
+                          <span className="text-muted-foreground">ENG:</span>{' '}
+                          {(order as any).engine_number ? (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">{(order as any).engine_number}</span>
+                          ) : (
+                            <span className="text-muted-foreground italic">—</span>
+                          )}
+                        </span>
+                        <span className="text-xs font-mono">
+                          <span className="text-muted-foreground">CHS:</span>{' '}
+                          {(order as any).chassis_number ? (
+                            <span className="text-blue-600 dark:text-blue-400 font-medium">{(order as any).chassis_number}</span>
+                          ) : (
+                            <span className="text-muted-foreground italic">—</span>
+                          )}
+                        </span>
+                      </div>
                     </div>
                     <div className="text-right space-y-1">
                       <p className="font-bold">Rs {order.total_amount.toLocaleString()}</p>

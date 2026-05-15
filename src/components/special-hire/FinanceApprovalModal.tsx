@@ -7,7 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CheckCircle, XCircle, Clock, ExternalLink, FileText, Download, Eye, PenTool, User, Calendar, AlertTriangle, Wand2, Loader2, Database } from 'lucide-react';
+import { Calendar as CalendarUI } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CheckCircle, XCircle, Clock, ExternalLink, FileText, Download, Eye, PenTool, User, Calendar, CalendarIcon, AlertTriangle, Wand2, Loader2, Database } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useDocumentManagement } from '@/hooks/useDocumentManagement';
 import { useSignatureManagement } from '@/hooks/useSignatureManagement';
@@ -23,7 +26,7 @@ import { toast } from 'sonner';
 interface FinanceApprovalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onApprove: (notes?: string, signatures?: any) => void;
+  onApprove: (notes?: string, signatures?: any, postingDate?: string) => void;
   onReject: (reason: string) => void;
   paymentData: {
     id: string;
@@ -57,6 +60,7 @@ export const FinanceApprovalModal = ({
   const [notes, setNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [action, setAction] = useState<'approve' | 'reject' | null>(null);
+  const [postingDate, setPostingDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [documents, setDocuments] = useState<any[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
@@ -257,7 +261,7 @@ export const FinanceApprovalModal = ({
         finalSignatures[type] = sig;
       }
     });
-    onApprove(notes || undefined, finalSignatures);
+    onApprove(notes || undefined, finalSignatures, postingDate);
   };
 
   const handleReject = () => {
@@ -779,6 +783,36 @@ export const FinanceApprovalModal = ({
         {!isSyncMode && (
           <div className="space-y-4">
             <Label className="text-base font-medium">Finance Review</Label>
+
+            {/* GL Posting Date (Back-Date Option) */}
+            <div className="space-y-2">
+              <Label>GL Posting Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !postingDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {postingDate ? format(new Date(postingDate), "PPP") : <span>Pick a posting date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarUI
+                    mode="single"
+                    selected={new Date(postingDate)}
+                    onSelect={(date) => date && setPostingDate(format(date, 'yyyy-MM-dd'))}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-muted-foreground">
+                Default is today. Select an earlier date to back-date the GL entry for period-end adjustments.
+              </p>
+            </div>
             
             <div className="space-y-2">
               <Label htmlFor="notes">Approval Notes (Optional)</Label>
