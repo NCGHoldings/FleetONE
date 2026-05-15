@@ -59,7 +59,12 @@ const translations = {
     successTitle: "Submission Received!",
     successDesc: "Your details have been successfully submitted.",
     trackingCode: "Your tracking code:",
-    submitAnother: "Back to Hub"
+    submitAnother: "Back to Hub",
+    bannerReady: "Ready for the road? 🚌",
+    bannerKeepUp: "Keep it up! 💪",
+    bannerDone: "Incredible work! 🎉",
+    bannerRemaining: "You have {remaining} more trip(s) to go today. Let's make it a great one!",
+    bannerCompleted: "You've completed all your scheduled trips today. Drive safe!"
   },
   si: {
     title: "ගමන් විස්තර ඉදිරිපත් කිරීම",
@@ -107,7 +112,12 @@ const translations = {
     successTitle: "සාර්ථකයි!",
     successDesc: "ඔබගේ විස්තර සාර්ථකව ඉදිරිපත් කරන ලදී.",
     trackingCode: "ඔබේ ලුහුබැඳීමේ කේතය:",
-    submitAnother: "ප්‍රධාන මෙනුවට"
+    submitAnother: "ප්‍රධාන මෙනුවට",
+    bannerReady: "රෝද කැරකෙන තරමටයි ජීවිතේ දුවන්නේ! 🚌",
+    bannerKeepUp: "කට්ට කාගෙන ඉස්සරහටම යමු! 💪",
+    bannerDone: "අද දවසේ වැඩ ඉවරයි, සුපිරියි! 🎉",
+    bannerRemaining: "අද දිනට තවත් ගමන් {remaining} ක්. පරිස්සමින් ගිහින් එන්න!",
+    bannerCompleted: "අදට නියමිත ගමන් සියල්ල අවසන්. පරිස්සමින් ගෙදර යන්න."
   },
   ta: {
     title: "பயண விவரங்கள்",
@@ -155,7 +165,12 @@ const translations = {
     successTitle: "வெற்றி!",
     successDesc: "உங்கள் விவரங்கள் வெற்றிகரமாக சமர்ப்பிக்கப்பட்டன.",
     trackingCode: "உங்கள் கண்காணிப்பு குறியீடு:",
-    submitAnother: "பிரதான மெனுவிற்கு"
+    submitAnother: "பிரதான மெனுவிற்கு",
+    bannerReady: "பயணத்திற்கு தயாரா? 🚌",
+    bannerKeepUp: "தொடர்ந்து முன்னேறுங்கள்! 💪",
+    bannerDone: "சிறப்பான பணி! இலக்கு முடிந்தது! 🎉",
+    bannerRemaining: "இன்று இன்னும் {remaining} பயணங்கள் உள்ளன. பாதுகாப்பான பயணம்!",
+    bannerCompleted: "இன்றைய பயணங்கள் முடிவடைந்தன. பத்திரமாக செல்லுங்கள்!"
   }
 };
 
@@ -325,10 +340,16 @@ export default function PublicConductorUpload() {
     const completed = loadState('completedTrips', []);
     return completed.length > 0 ? Math.max(...completed.map((t: any) => t.tripNumber)) + 1 : 1;
   });
-  const [trip, setTrip] = useState<Trip>(() => loadState('current_trip', {
-    id: '1', startOdo: '', endOdo: '',
-    income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' }
-  }));
+  const [trip, setTrip] = useState<Trip>(() => {
+    const saved = loadState('current_trip', null);
+    if (saved) return saved;
+    const completed = loadState('completedTrips', []);
+    const lastCompleted = completed.length > 0 ? completed[completed.length - 1] : null;
+    return {
+      id: '1', startOdo: lastCompleted?.endOdometer || '', endOdo: '',
+      income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' }
+    };
+  });
 
   // Expenses State
   const [expenses, setExpenses] = useState<Record<string, string>>(() => loadState('expenses', {}));
@@ -340,7 +361,7 @@ export default function PublicConductorUpload() {
     time: getCurrentTime(), odometer: '', liters: '', paymentMethod: 'cash'
   }));
 
-  const [completedTrips, setCompletedTrips] = useState<{tripNumber: number, total: number, time: string}[]>(() => loadState('completedTrips', []));
+  const [completedTrips, setCompletedTrips] = useState<{tripNumber: number, total: number, time: string, endOdometer?: string}[]>(() => loadState('completedTrips', []));
   const [maxTrips, setMaxTrips] = useState(() => loadState('maxTrips', 4));
   const [overrideRequested, setOverrideRequested] = useState(() => loadState('overrideRequested', false));
 
@@ -628,14 +649,15 @@ export default function PublicConductorUpload() {
         const newCompleted = [...completedTrips, { 
           tripNumber: currentTripNumber, 
           total: calculateTripTotal(specificData?.trips?.[0]?.income), 
-          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) 
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          endOdometer: trip.endOdo
         }];
         setCompletedTrips(newCompleted);
         localStorage.setItem('conductor_form_completedTrips', JSON.stringify(newCompleted));
 
         localStorage.removeItem('conductor_form_current_trip');
         setCurrentTripNumber(prev => prev + 1); // Increment trip number for next time
-        setTrip({ id: Date.now().toString(), startOdo: '', endOdo: '', income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' } });
+        setTrip({ id: Date.now().toString(), startOdo: trip.endOdo, endOdo: '', income: { callBooking: '', agentBooking: '', busCollection: '', luggage: '', miscIncome: '' } });
       } else if (submissionType === 'fuel') {
         localStorage.removeItem('conductor_form_fuelDetails');
       } else if (submissionType === 'expenses') {
@@ -653,6 +675,24 @@ export default function PublicConductorUpload() {
   const handleSubmitTrip = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!trip.startOdo || !trip.endOdo) {
+      toast({
+        title: "Missing Odometers",
+        description: "Please enter both Start and End odometers for this trip.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (parseFloat(trip.endOdo) <= parseFloat(trip.startOdo)) {
+      toast({
+        title: "Invalid Odometers",
+        description: "End odometer must be greater than Start odometer.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // NEXT LEVEL VALIDATION: Block empty or unrealistically low trip submissions
     if (totalIncome < 500) {
       toast({
@@ -886,7 +926,7 @@ export default function PublicConductorUpload() {
                           icon={<Route className="w-4 h-4 text-blue-500" />}
                         />
                       </div>
-                      <div className={`space-y-2 col-span-2 sm:col-span-1 ${crewMember ? 'col-span-2' : ''}`}>
+                      <div className="space-y-2 col-span-2 sm:col-span-1">
                         <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.driverName}</Label>
                         <AutocompleteInput 
                           value={formData.driverName} 
@@ -897,18 +937,16 @@ export default function PublicConductorUpload() {
                         />
                       </div>
                       
-                      {!crewMember && (
-                        <div className="space-y-2 col-span-2 sm:col-span-1">
-                          <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.conductorName}</Label>
-                          <AutocompleteInput 
-                            value={formData.conductorName} 
-                            onChange={(v) => setFormData({ ...formData, conductorName: v })} 
-                            options={history.conductors || []} 
-                            placeholder="Conductor Name"
-                            icon={<User className="w-4 h-4 text-emerald-500" />}
-                          />
-                        </div>
-                      )}
+                      <div className="space-y-2 col-span-2 sm:col-span-1">
+                        <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.conductorName}</Label>
+                        <AutocompleteInput 
+                          value={formData.conductorName} 
+                          onChange={(v) => setFormData({ ...formData, conductorName: v })} 
+                          options={history.conductors || []} 
+                          placeholder="Conductor Name"
+                          icon={<User className="w-4 h-4 text-emerald-500" />}
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1061,6 +1099,28 @@ export default function PublicConductorUpload() {
                   exit={{ opacity: 0, x: 20 }}
                   className="space-y-6 pt-4 px-4 sm:px-5"
                 >
+                  {/* Gamification / Guidance Message */}
+                  <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl p-4 text-white shadow-md relative overflow-hidden">
+                    <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+                    <div className="relative z-10 flex items-center justify-between">
+                      <div>
+                        <h3 className="font-bold text-lg mb-1">
+                          {completedTrips.length === 0 ? t.bannerReady : 
+                           completedTrips.length >= maxTrips ? t.bannerDone : 
+                           t.bannerKeepUp}
+                        </h3>
+                        <p className="text-emerald-50 text-sm font-medium">
+                          {completedTrips.length >= maxTrips 
+                            ? t.bannerCompleted 
+                            : t.bannerRemaining.replace('{remaining}', (maxTrips - completedTrips.length).toString())}
+                        </p>
+                      </div>
+                      <div className="bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm text-center">
+                        <span className="block text-2xl font-black leading-none">{completedTrips.length}/{maxTrips}</span>
+                      </div>
+                    </div>
+                  </div>
+
                   <form onSubmit={handleSubmitTrip} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="p-4 bg-emerald-50/50 border-b border-slate-100 flex justify-between items-center">
                       <div className="flex items-center gap-2">
@@ -1073,50 +1133,145 @@ export default function PublicConductorUpload() {
                       {/* Odometer */}
                       <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
                         <div className="space-y-1">
-                          <Label className="text-xs font-bold text-slate-500">{t.startOdo}</Label>
+                          <Label className="text-xs font-bold text-slate-700">{t.startOdo} <span className="text-red-500">*</span></Label>
                           <Input 
                             type="number" inputMode="decimal" placeholder="0" 
                             value={trip.startOdo} onChange={(e) => setTrip({...trip, startOdo: e.target.value})} 
-                            className="h-8 text-sm" 
+                            className={`h-8 text-sm ${currentTripNumber > 1 ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : !trip.startOdo ? 'border-red-300 bg-red-50 focus-visible:ring-red-500' : ''}`} 
+                            required
+                            readOnly={currentTripNumber > 1}
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs font-bold text-slate-500">{t.endOdo}</Label>
+                          <Label className="text-xs font-bold text-slate-700">{t.endOdo} <span className="text-red-500">*</span></Label>
                           <Input 
                             type="number" inputMode="decimal" placeholder="0" 
                             value={trip.endOdo} onChange={(e) => setTrip({...trip, endOdo: e.target.value})} 
-                            className="h-8 text-sm" 
+                            className={`h-8 text-sm ${!trip.endOdo ? 'border-red-300 bg-red-50 focus-visible:ring-red-500' : ''}`} 
+                            required
                           />
                         </div>
                       </div>
 
                       {/* Income Fields */}
-                      <div className="space-y-2">
-                        {[
-                          { key: 'callBooking', label: t.callBooking },
-                          { key: 'agentBooking', label: t.agentBooking },
-                          { key: 'busCollection', label: t.busCollection },
-                          { key: 'luggage', label: t.luggage },
-                          { key: 'miscIncome', label: t.miscIncome },
-                        ].map(inc => (
-                          <div key={inc.key} className="flex items-center justify-between py-1 border-b border-slate-50 last:border-0">
-                            <Label className="text-sm font-semibold text-slate-600">{inc.label}</Label>
-                            <div className="relative w-32">
-                              <Input 
-                                type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
-                                className="h-9 text-right font-medium focus-visible:ring-emerald-500" 
-                                value={trip.income?.[inc.key as keyof typeof trip.income] || ''} 
-                                onChange={(e) => updateTripIncome(inc.key, e.target.value)} 
-                                onFocus={(e) => e.target.select()}
-                              />
+                      <div className="space-y-5">
+                        {/* Passenger Collections - Creative Design */}
+                        <div className="space-y-2 bg-gradient-to-br from-amber-50 to-orange-50/50 rounded-xl p-4 border border-amber-200 shadow-sm relative overflow-hidden">
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200/20 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+                          <div className="relative z-10">
+                            <div className="flex flex-col items-start mb-3 pb-3 border-b border-amber-200/60">
+                              <div className="flex justify-between items-center w-full">
+                                <h4 className="text-3xl font-black bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent pb-1" 
+                                    style={{ 
+                                      fontFamily: lang === 'si' ? "'Abhaya Libre', serif" : lang === 'ta' ? "'Kavivanar', cursive" : "'Caveat', cursive", 
+                                      letterSpacing: lang === 'en' ? '0.5px' : 'normal',
+                                      lineHeight: '1.2'
+                                    }}>
+                                  {lang === 'si' ? 'මගී ප්‍රවේශපත්‍ර ආදායම' : lang === 'ta' ? 'பயணிகள் பயணச்சீட்டு வருமானம்' : 'Passenger Ticket Income'}
+                                </h4>
+                                <span className="text-sm font-bold bg-gradient-to-r from-amber-500 to-orange-500 px-2.5 py-1 rounded-md text-white shadow-sm whitespace-nowrap ml-2">
+                                  Rs. {((parseFloat(trip.income?.busCollection) || 0) + (parseFloat(trip.income?.callBooking) || 0) + (parseFloat(trip.income?.agentBooking) || 0)).toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-1">
+                              {[
+                                { key: 'busCollection', labelSi: 'බස් රථයේ එකතු කිරීම', labelTa: 'பஸ் சேகரிப்பு', labelEn: 'Bus Collection' },
+                                { key: 'callBooking', labelSi: 'දුරකථන වෙන්කිරීම්', labelTa: 'தொலைபேசி முன்பதிவு', labelEn: 'Call Booking' },
+                                { key: 'agentBooking', labelSi: 'නියෝජිත වෙන්කිරීම්', labelTa: 'முகவர் முன்பதிவு', labelEn: 'Agent Booking' },
+                              ].map(inc => (
+                                <div key={inc.key} className="flex items-center justify-between py-2 border-b border-amber-100/50 last:border-0">
+                                  <div className="flex flex-col">
+                                    <Label className="text-[20px] font-bold text-amber-900" 
+                                           style={{ fontFamily: lang === 'si' ? "'Abhaya Libre', serif" : lang === 'ta' ? "'Kavivanar', cursive" : "'Caveat', cursive" }}>
+                                      {lang === 'si' ? inc.labelSi : lang === 'ta' ? inc.labelTa : inc.labelEn}
+                                    </Label>
+                                    {lang !== 'en' && <span className="text-[10px] font-semibold text-amber-600/70 uppercase tracking-wider">{inc.labelEn}</span>}
+                                  </div>
+                                  <div className="relative w-32">
+                                    <Input 
+                                      type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
+                                      className="h-10 text-right font-bold text-amber-950 bg-white/80 focus-visible:ring-amber-500 border-amber-200 shadow-sm" 
+                                      value={trip.income?.[inc.key as keyof typeof trip.income] || ''} 
+                                      onChange={(e) => updateTripIncome(inc.key, e.target.value)} 
+                                      onFocus={(e) => e.target.select()}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
-                        ))}
+                        </div>
+
+                        {/* Other Income (Separated) - Creative Design */}
+                        <div className="space-y-2 bg-gradient-to-br from-fuchsia-50 to-purple-50/50 rounded-xl p-4 border border-fuchsia-200 shadow-sm relative overflow-hidden">
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-200/20 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+                          <div className="relative z-10">
+                            <div className="flex flex-col items-start mb-3 pb-3 border-b border-fuchsia-200/60">
+                              <div className="flex justify-between items-center w-full">
+                                <h4 className="text-3xl font-black bg-gradient-to-r from-fuchsia-600 to-purple-500 bg-clip-text text-transparent pb-1"
+                                    style={{ 
+                                      fontFamily: lang === 'si' ? "'Abhaya Libre', serif" : lang === 'ta' ? "'Kavivanar', cursive" : "'Caveat', cursive", 
+                                      letterSpacing: lang === 'en' ? '0.5px' : 'normal',
+                                      lineHeight: '1.2'
+                                    }}>
+                                  {lang === 'si' ? 'වෙනත් ආදායම්' : lang === 'ta' ? 'பிற வருமானங்கள்' : 'Other Income'}
+                                </h4>
+                                <span className="text-sm font-bold bg-gradient-to-r from-fuchsia-500 to-purple-500 px-2.5 py-1 rounded-md text-white shadow-sm whitespace-nowrap ml-2">
+                                  Rs. {((parseFloat(trip.income?.luggage) || 0) + (parseFloat(trip.income?.miscIncome) || 0)).toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              {[
+                                { key: 'luggage', labelSi: 'ගමන් මලු ආදායම', labelTa: 'சாமான்கள் வருமானம்', labelEn: 'Luggage Income' },
+                                { key: 'miscIncome', labelSi: 'විවිධ ආදායම්', labelTa: 'இதர வருமானம்', labelEn: 'Miscellaneous Income' },
+                              ].map(inc => (
+                                <div key={inc.key} className="flex items-center justify-between py-2 border-b border-fuchsia-100/50 last:border-0">
+                                  <div className="flex flex-col">
+                                    <Label className="text-[20px] font-bold text-fuchsia-900"
+                                           style={{ fontFamily: lang === 'si' ? "'Abhaya Libre', serif" : lang === 'ta' ? "'Kavivanar', cursive" : "'Caveat', cursive" }}>
+                                      {lang === 'si' ? inc.labelSi : lang === 'ta' ? inc.labelTa : inc.labelEn}
+                                    </Label>
+                                    {lang !== 'en' && <span className="text-[10px] font-semibold text-fuchsia-600/70 uppercase tracking-wider">{inc.labelEn}</span>}
+                                  </div>
+                                  <div className="relative w-32">
+                                    <Input 
+                                      type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
+                                      className="h-10 text-right font-bold text-fuchsia-950 bg-white/80 focus-visible:ring-fuchsia-500 border-fuchsia-200 shadow-sm" 
+                                      value={trip.income?.[inc.key as keyof typeof trip.income] || ''} 
+                                      onChange={(e) => updateTripIncome(inc.key, e.target.value)} 
+                                      onFocus={(e) => e.target.select()}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-[10px] text-fuchsia-500/80 leading-tight pt-2 font-medium">
+                              * Income from luggage and miscellaneous items are tracked separately.
+                            </p>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
-                        <span className="font-bold text-slate-600 text-sm">Trip Subtotal</span>
-                        <span className="font-black text-emerald-600 text-lg">Rs. {totalIncome.toFixed(2)}</span>
+                      <div className="pt-4 mt-2 border-t border-slate-200">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-semibold text-slate-500 uppercase">Total Passenger Revenue</span>
+                          <span className="text-sm font-bold text-slate-700">Rs. {((parseFloat(trip.income?.busCollection) || 0) + (parseFloat(trip.income?.callBooking) || 0) + (parseFloat(trip.income?.agentBooking) || 0)).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-xs font-semibold text-indigo-500 uppercase">Total Other Income</span>
+                          <span className="text-sm font-bold text-indigo-700">Rs. {((parseFloat(trip.income?.luggage) || 0) + (parseFloat(trip.income?.miscIncome) || 0)).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-end pt-3 border-t border-slate-100">
+                          <div className="space-y-1">
+                            <span className="block font-black text-slate-800 text-sm">Grand Total</span>
+                            <span className="block text-[10px] uppercase font-bold tracking-wider text-slate-400">Passenger + Other Income</span>
+                          </div>
+                          <span className="font-black text-emerald-600 text-2xl tracking-tight">Rs. {totalIncome.toFixed(2)}</span>
+                        </div>
                       </div>
 
                       {/* NEXT LEVEL: Live Commission Gamification */}

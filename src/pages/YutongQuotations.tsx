@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus, FileText, Calculator, Truck, ShoppingCart, DollarSign, Package, Shield, Cog, FileCheck, MapPin, Wrench, Users, Bus, BarChart3, UserPlus, FileSpreadsheet, History, Upload, Table2 } from 'lucide-react';
+import { Plus, FileText, Calculator, ShoppingCart, DollarSign, Package, Shield, Cog, FileCheck, MapPin, Wrench, Users, Bus, BarChart3, UserPlus, FileSpreadsheet, History, Upload, Table2 } from 'lucide-react';
 import { YutongQuotationsList } from "@/components/yutong/YutongQuotationsList";
 import { YutongQuotationForm } from "@/components/yutong/YutongQuotationFormUpdated";
 import { YutongBusModelsAdmin } from "@/components/yutong/YutongBusModelsAdmin";
@@ -32,7 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 interface DashboardStats {
   totalQuotations: number;
   pendingQuotations: number;
-  confirmedSales: number;
+  totalOrders: number;
   totalValue: number;
 }
 
@@ -59,29 +59,38 @@ export default function YutongQuotations() {
   const [stats, setStats] = useState<DashboardStats>({
     totalQuotations: 0,
     pendingQuotations: 0,
-    confirmedSales: 0,
+    totalOrders: 0,
     totalValue: 0
   });
   const { toast } = useToast();
 
   const loadStats = async () => {
     try {
-      const { data: quotations, error } = await supabase
+      // Fetch quotation stats
+      const { data: quotations, error: qError } = await supabase
         .from('yutong_quotations')
         .select('status, total_price');
 
-      if (error) throw error;
+      if (qError) throw qError;
 
-      const total = quotations?.length || 0;
+      // Fetch order stats (these are the actual confirmed orders shown in Orders tab)
+      const { data: orders, error: oError } = await supabase
+        .from('yutong_orders')
+        .select('total_amount, status')
+        .neq('status', 'voided');
+
+      if (oError) throw oError;
+
+      const totalQuotations = quotations?.length || 0;
       const pending = quotations?.filter(q => ['draft', 'sent'].includes(q.status)).length || 0;
-      const confirmed = quotations?.filter(q => q.status === 'confirmed').length || 0;
-      const value = quotations?.reduce((sum, q) => sum + (q.total_price || 0), 0) || 0;
+      const totalOrders = orders?.length || 0;
+      const totalOrderValue = orders?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
 
       setStats({
-        totalQuotations: total,
+        totalQuotations,
         pendingQuotations: pending,
-        confirmedSales: confirmed,
-        totalValue: value
+        totalOrders,
+        totalValue: totalOrderValue
       });
     } catch (error: any) {
       console.error('Error loading stats:', error);
@@ -174,11 +183,11 @@ export default function YutongQuotations() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Confirmed Sales</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.confirmedSales}</div>
+            <div className="text-2xl font-bold text-green-600">{stats.totalOrders}</div>
           </CardContent>
         </Card>
 

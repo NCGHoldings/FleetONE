@@ -13,24 +13,6 @@ interface SubmissionMatrixDashboardProps {
   selectedMonth: Date;
 }
 
-import { Users } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-const getLeaderColor = (leader: string | undefined | null) => {
-  if (!leader || leader === 'Unassigned') return { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' };
-  const colors = [
-    { bg: 'bg-blue-100 dark:bg-blue-900', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800' },
-    { bg: 'bg-emerald-100 dark:bg-emerald-900', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800' },
-    { bg: 'bg-purple-100 dark:bg-purple-900', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800' },
-    { bg: 'bg-amber-100 dark:bg-amber-900', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800' },
-    { bg: 'bg-rose-100 dark:bg-rose-900', text: 'text-rose-700 dark:text-rose-300', border: 'border-rose-200 dark:border-rose-800' },
-    { bg: 'bg-cyan-100 dark:bg-cyan-900', text: 'text-cyan-700 dark:text-cyan-300', border: 'border-cyan-200 dark:border-cyan-800' },
-  ];
-  let hash = 0;
-  for (let i = 0; i < leader.length; i++) hash = leader.charCodeAt(i) + ((hash << 5) - hash);
-  return colors[Math.abs(hash) % colors.length];
-};
-
 export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [tripsData, setTripsData] = useState<any[]>([]);
@@ -39,8 +21,6 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
   const [selectedFolderDate, setSelectedFolderDate] = useState<Date>(new Date());
   const [expandedCell, setExpandedCell] = useState<{bus_no: string, day: number} | null>(null);
   const [selectedDetailDay, setSelectedDetailDay] = useState<number | null>(null);
-  const [pilotBuses, setPilotBuses] = useState<Set<string>>(new Set());
-  const [fallbackLeaders, setFallbackLeaders] = useState<Map<string, string>>(new Map());
 
   const daysInMonth = getDaysInMonth(selectedMonth);
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -63,7 +43,7 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
         .select(`
           id, bus_id, trip_no, income, total_expenses, trip_date, route_label,
           buses:bus_id(bus_no),
-          routes:route_id(route_name, route_leader)
+          routes:route_id(route_name)
         `)
         .gte('trip_date', startDateStr)
         .lte('trip_date', endDateStr);
@@ -77,33 +57,8 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
         .gte('trip_date', startDateStr)
         .lte('trip_date', endDateStr);
 
-      // 3. Fetch pilot project buses
-      const { data: activeBuses } = await supabase
-        .from('buses')
-        .select('bus_no')
-        .eq('is_app_active', true);
-
-      // 4. Fetch fleet master roster to get fallback leaders for buses without trips
-      const { data: roster } = await supabase
-        .from('fleet_master_roster')
-        .select(`
-          bus_id,
-          buses:bus_id(bus_no),
-          routes:route_id(route_leader)
-        `)
-        .eq('is_active', true);
-
       setTripsData(trips || []);
       setSubmissionsData(submissions || []);
-      setPilotBuses(new Set((activeBuses || []).map(b => b.bus_no)));
-      
-      const rosterLeaders = new Map<string, string>();
-      (roster || []).forEach(r => {
-        if (r.buses?.bus_no && r.routes?.route_leader) {
-          rosterLeaders.set(r.buses.bus_no, r.routes.route_leader);
-        }
-      });
-      setFallbackLeaders(rosterLeaders);
     } catch (e: any) {
       console.error(e);
     } finally {
@@ -115,7 +70,6 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
   const fleetMatrix = useMemo(() => {
     const grouped = new Map<string, { 
       bus_no: string; 
-      team_leader: string;
       dates: Map<number, { 
         trips: any[]; 
         submissions: any[]; 
@@ -123,26 +77,17 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
       }> 
     }>();
 
-    // To track the most frequent leader for a bus
-    const busLeaderCounts = new Map<string, Map<string, number>>();
-
     // Map trips
     tripsData.forEach(t => {
       const busNo = t.buses?.bus_no;
-      if (!busNo || !t.trip_date || !pilotBuses.has(busNo)) return;
+      if (!busNo || !t.trip_date) return;
       
       const date = parseISO(t.trip_date);
       const day = date.getDate();
 
       if (!grouped.has(busNo)) {
-        grouped.set(busNo, { bus_no: busNo, team_leader: 'Unassigned', dates: new Map() });
+        grouped.set(busNo, { bus_no: busNo, dates: new Map() });
       }
-
-      // Track leader
-      const leader = t.routes?.route_leader || 'Unassigned';
-      if (!busLeaderCounts.has(busNo)) busLeaderCounts.set(busNo, new Map());
-      const lMap = busLeaderCounts.get(busNo)!;
-      lMap.set(leader, (lMap.get(leader) || 0) + 1);
 
       const bus = grouped.get(busNo)!;
       if (!bus.dates.has(day)) {
@@ -154,7 +99,7 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
     // Map submissions
     submissionsData.forEach(sub => {
       const busNo = sub.bus_number;
-      if (!busNo || !sub.trip_date || !pilotBuses.has(busNo)) return;
+      if (!busNo || !sub.trip_date) return;
       
       const date = parseISO(sub.trip_date);
       const day = date.getDate();
@@ -185,43 +130,11 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
           }
         }
       });
-
-      // Assign the most frequent leader
-      if (busLeaderCounts.has(bus.bus_no)) {
-        const lMap = busLeaderCounts.get(bus.bus_no)!;
-        let maxCount = -1;
-        let bestLeader = 'Unassigned';
-        lMap.forEach((count, leader) => {
-          if (count > maxCount) {
-            maxCount = count;
-            bestLeader = leader;
-          }
-        });
-        bus.team_leader = bestLeader;
-      } else if (fallbackLeaders.has(bus.bus_no)) {
-        bus.team_leader = fallbackLeaders.get(bus.bus_no)!;
-      }
     });
 
     // Sort by bus number
     return Array.from(grouped.values()).sort((a, b) => a.bus_no.localeCompare(b.bus_no));
-  }, [tripsData, submissionsData, days, pilotBuses, fallbackLeaders]);
-
-  const groupedByLeader = useMemo(() => {
-    const map = new Map<string, typeof fleetMatrix>();
-    fleetMatrix.forEach(b => {
-      const leader = b.team_leader;
-      if (!map.has(leader)) map.set(leader, []);
-      map.get(leader)!.push(b);
-    });
-
-    // Sort so "Unassigned" is at the bottom, otherwise alphabetical by leader
-    return Array.from(map.entries()).sort(([leaderA], [leaderB]) => {
-      if (leaderA === 'Unassigned') return 1;
-      if (leaderB === 'Unassigned') return -1;
-      return leaderA.localeCompare(leaderB);
-    });
-  }, [fleetMatrix]);
+  }, [tripsData, submissionsData, days]);
 
   // Calculate daily totals (Missing vs Complete)
   const dailyTotals = useMemo(() => {
@@ -346,182 +259,158 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
                     </div>
                  </div>
 
-                 {/* Detail Rows - Grouped by Team Leader */}
+                 {/* Detail Rows */}
                  {buses.length === 0 ? (
-                    <div className="p-12 text-center text-slate-500 font-medium">No scheduled trips or submissions for this date.</div>
-                  ) : (() => {
-                     // Step 1: Group buses by Team Leader → Route
-                     const leaderGroups = new Map<string, Map<string, typeof buses>>();
-                     
-                     buses.forEach(bus => {
-                       const leader = bus.team_leader || 'Unassigned';
-                       const dayData = bus.dates.get(selectedDetailDay)!;
-                       const routeName = Array.from(new Set(dayData.trips.map(t => t.routes?.route_name || t.route_label).filter(Boolean))).join(', ') || 'Unassigned Route';
-                       
-                       if (!leaderGroups.has(leader)) leaderGroups.set(leader, new Map());
-                       const rg = leaderGroups.get(leader)!;
-                       if (!rg.has(routeName)) rg.set(routeName, []);
-                       rg.get(routeName)!.push(bus);
-                     });
+                   <div className="p-12 text-center text-slate-500 font-medium">No scheduled trips or submissions for this date.</div>
+                 ) : (() => {
+                    // Group buses by route
+                    const groupedBuses = buses.reduce((acc, bus) => {
+                      const dayData = bus.dates.get(selectedDetailDay)!;
+                      const routeNames = Array.from(new Set(dayData.trips.map(t => t.routes?.route_name || t.route_label).filter(Boolean))).join(', ') || 'Unassigned / Unknown Route';
+                      if (!acc[routeNames]) acc[routeNames] = [];
+                      acc[routeNames].push(bus);
+                      return acc;
+                    }, {} as Record<string, typeof buses>);
 
-                     // Step 2: Sort leaders (Unassigned last)
-                     const sortedLeaders = Array.from(leaderGroups.entries()).sort(([a], [b]) => {
-                       if (a === 'Unassigned') return 1;
-                       if (b === 'Unassigned') return -1;
-                       return a.localeCompare(b);
-                     });
+                    // Sort routes alphabetically, putting Unassigned last
+                    const sortedRoutes = Object.keys(groupedBuses).sort((a, b) => {
+                      if (a === 'Unassigned / Unknown Route') return 1;
+                      if (b === 'Unassigned / Unknown Route') return -1;
+                      return a.localeCompare(b);
+                    });
 
-                     return sortedLeaders.map(([leaderName, routeGroups]) => {
-                       const leaderColor = getLeaderColor(leaderName);
-                       const totalBuses = Array.from(routeGroups.values()).reduce((sum, arr) => sum + arr.length, 0);
-                       
-                       return (
-                       <div key={leaderName} className="flex flex-col">
-                         {/* Team Leader Section Header */}
-                         <div className={cn("border-b border-t-2 w-full", leaderColor.border)}>
-                           <div className={cn("px-4 py-2.5 font-bold text-sm uppercase tracking-wide flex items-center gap-3", leaderColor.bg, leaderColor.text)}>
-                             <Users className="w-4 h-4" />
-                             {leaderName === 'Unassigned' ? 'Unassigned Routes' : `Team Leader: ${leaderName}`}
-                             <Badge variant="secondary" className={cn("text-[10px] h-5 border font-bold", leaderColor.bg, leaderColor.text, leaderColor.border)}>
-                               {totalBuses} Buses
-                             </Badge>
-                           </div>
-                         </div>
+                    return sortedRoutes.map((routeName) => (
+                      <div key={routeName} className="flex flex-col">
+                        {/* Route Header Row */}
+                        <div className="bg-blue-50/80 border-b border-t border-blue-100 shadow-sm sticky left-0 z-10 w-full">
+                          <div className="px-4 py-2 font-bold text-xs text-blue-900 uppercase tracking-widest flex items-center gap-2">
+                            <div className="w-1.5 h-4 bg-blue-500 rounded-full"></div>
+                            {routeName}
+                            <Badge variant="secondary" className="ml-2 text-[9px] h-4 bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-200">
+                              {groupedBuses[routeName].length} Buses
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {/* Buses in this Route */}
+                        {groupedBuses[routeName].map((bus, idx) => {
+                          const dayData = bus.dates.get(selectedDetailDay)!;
+                          const hasSubmissions = dayData.submissions.length > 0;
+                          
+                          let expOk = false;
+                          let fuelOk = false;
+                          let depositAmount = 0;
+                          let hasDeposit = false;
+                          let totalExp = 0;
 
-                         {/* Routes under this leader */}
-                         {Array.from(routeGroups.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([routeName, routeBuses]) => (
-                           <div key={routeName} className="flex flex-col">
-                             {/* Route Sub-Header */}
-                             <div className="bg-slate-50/80 border-b border-slate-200 sticky left-0 z-10 w-full">
-                               <div className="px-6 py-1.5 font-semibold text-[10px] text-slate-600 uppercase tracking-widest flex items-center gap-2">
-                                 <div className={cn("w-1 h-3 rounded-full", leaderColor.bg)}></div>
-                                 {routeName}
-                                 <span className="text-slate-400 font-normal">({routeBuses.length})</span>
-                               </div>
-                             </div>
-                         
-                             {/* Buses in this Route */}
-                             {routeBuses.map((bus, idx) => {
-                               const dayData = bus.dates.get(selectedDetailDay)!;
-                               const hasSubmissions = dayData.submissions.length > 0;
-                           
-                               let expOk = false;
-                               let fuelOk = false;
-                               let depositAmount = 0;
-                               let hasDeposit = false;
-                               let totalExp = 0;
+                          dayData.trips.forEach(t => totalExp += (t.total_expenses || 0));
+                          dayData.submissions.forEach((s: any) => {
+                            if (s.ocr_data?.bank_deposit?.actual_amount) {
+                              hasDeposit = true;
+                              depositAmount += parseFloat(s.ocr_data.bank_deposit.actual_amount);
+                            }
+                            if (s.ocr_data?.expenses?.total) {
+                              totalExp += parseFloat(s.ocr_data.expenses.total);
+                            }
+                            if (s.ocr_data?.fuel_details?.liters) {
+                              fuelOk = true;
+                            }
+                          });
+                          expOk = totalExp > 0 || hasSubmissions;
 
-                               dayData.trips.forEach(t => totalExp += (t.total_expenses || 0));
-                               dayData.submissions.forEach((s: any) => {
-                                 if (s.ocr_data?.bank_deposit?.actual_amount) {
-                                   hasDeposit = true;
-                                   depositAmount += parseFloat(s.ocr_data.bank_deposit.actual_amount);
-                                 }
-                                 if (s.ocr_data?.expenses?.total) {
-                                   totalExp += parseFloat(s.ocr_data.expenses.total);
-                                 }
-                                 if (s.ocr_data?.fuel_details?.liters) {
-                                   fuelOk = true;
-                                 }
-                               });
-                               expOk = totalExp > 0 || hasSubmissions;
+                          const sortedTrips = [...dayData.trips].sort((a, b) => {
+                            const numA = parseInt(a.trip_no?.replace(/\D/g, '') || '0');
+                            const numB = parseInt(b.trip_no?.replace(/\D/g, '') || '0');
+                            return numA - numB;
+                          });
 
-                               const sortedTrips = [...dayData.trips].sort((a, b) => {
-                                 const numA = parseInt(a.trip_no?.replace(/\D/g, '') || '0');
-                                 const numB = parseInt(b.trip_no?.replace(/\D/g, '') || '0');
-                                 return numA - numB;
-                               });
-
-                               return (
-                                 <div key={bus.bus_no} className={`flex border-b hover:bg-slate-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
-                                    <div className="w-32 min-w-32 p-2 sticky left-0 z-10 border-r flex flex-col justify-center bg-inherit shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                                      <div className="flex items-center gap-2">
-                                        <Bus className="h-4 w-4 text-blue-500 shrink-0" />
-                                        <div className="text-sm font-bold text-slate-700 truncate">{bus.bus_no}</div>
-                                      </div>
-                                    </div>
-
-                                   {Array.from({ length: maxTrips }).map((_, i) => {
-                                       const trip = sortedTrips[i];
-                                       if (!trip) {
-                                         return (
-                                           <div key={i} className="w-16 min-w-16 p-3 border-r flex items-center justify-center bg-slate-50/30">
-                                             <div className="w-5 h-5 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200 shadow-sm">
-                                               <Minus className="w-3 h-3" />
-                                             </div>
-                                           </div>
-                                         );
-                                       }
-                                       const tripIncOk = trip.income > 0;
-                                       const tripOdoOk = trip.odometer_start || trip.odometer_end;
-                                       const isComplete = tripIncOk && tripOdoOk;
-                                       return (
-                                         <div key={i} className="w-16 min-w-16 p-3 border-r flex items-center justify-center">
-                                           {isComplete ? (
-                                             <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-sm">
-                                               <Check className="w-3 h-3" />
-                                             </div>
-                                           ) : (
-                                             <div className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center border border-rose-200 shadow-sm">
-                                               <X className="w-3 h-3" />
-                                             </div>
-                                           )}
-                                         </div>
-                                       );
-                                    })}
-
-                                   <div className="w-20 min-w-20 p-3 border-r flex items-center justify-center">
-                                       {fuelOk ? (
-                                         <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-sm">
-                                           <Check className="w-3 h-3" />
-                                         </div>
-                                       ) : (
-                                         <div className="w-5 h-5 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200 shadow-sm">
-                                           <Minus className="w-3 h-3" />
-                                         </div>
-                                       )}
-                                    </div>
-                                   <div className="w-20 min-w-20 p-3 border-r flex items-center justify-center">
-                                       {expOk ? (
-                                         <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-sm">
-                                           <Check className="w-3 h-3" />
-                                         </div>
-                                       ) : (
-                                         <div className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center border border-rose-200 shadow-sm">
-                                           <X className="w-3 h-3" />
-                                         </div>
-                                       )}
-                                    </div>
-                                   <div className="w-32 min-w-32 p-3 border-r flex items-center justify-center">
-                                       {hasDeposit ? (
-                                         <span className="font-bold text-purple-600 text-sm">Rs. {depositAmount.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
-                                       ) : (
-                                         <span className="text-slate-400 text-[10px] font-semibold bg-slate-100 px-2 py-0.5 rounded uppercase">Not Recorded</span>
-                                       )}
-                                    </div>
-                                   <div className="w-24 min-w-24 p-3 flex items-center justify-center">
-                                        <button onClick={() => {
-                                            setSelectedBusForFolder({
-                                                bus_no: bus.bus_no,
-                                                trips: dayData.trips,
-                                                submissions: dayData.submissions,
-                                                total_income: dayData.trips.reduce((acc: number, t: any) => acc + (t.income || 0), 0),
-                                                total_expenses: dayData.trips.reduce((acc: number, t: any) => acc + (t.total_expenses || 0), 0),
-                                                trip_date: format(date, 'yyyy-MM-dd')
-                                            });
-                                            setSelectedFolderDate(date);
-                                        }} className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-blue-600 hover:text-blue-800 bg-white border shadow-sm px-2 py-1 rounded hover:bg-slate-50 transition-colors">
-                                          <FolderOpen className="h-3 w-3" /> View
-                                        </button>
-                                    </div>
+                          return (
+                            <div key={bus.bus_no} className={`flex border-b hover:bg-slate-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
+                               <div className="w-32 min-w-32 p-2 sticky left-0 z-10 border-r flex flex-col justify-center bg-inherit shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                                 <div className="flex items-center gap-2">
+                                   <Bus className="h-4 w-4 text-blue-500 shrink-0" />
+                                   <div className="text-sm font-bold text-slate-700 truncate">{bus.bus_no}</div>
                                  </div>
-                               );
-                             })}
-                           </div>
-                         ))}
-                       </div>
-                     );
-                     });
+                               </div>
+
+                               {Array.from({ length: maxTrips }).map((_, i) => {
+                                  const trip = sortedTrips[i];
+                                  if (!trip) {
+                                    return (
+                                      <div key={i} className="w-16 min-w-16 p-3 border-r flex items-center justify-center bg-slate-50/30">
+                                        <div className="w-5 h-5 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200 shadow-sm">
+                                          <Minus className="w-3 h-3" />
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  const tripIncOk = trip.income > 0;
+                                  const tripOdoOk = trip.odometer_start || trip.odometer_end;
+                                  const isComplete = tripIncOk && tripOdoOk;
+                                  return (
+                                    <div key={i} className="w-16 min-w-16 p-3 border-r flex items-center justify-center">
+                                      {isComplete ? (
+                                        <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-sm">
+                                          <Check className="w-3 h-3" />
+                                        </div>
+                                      ) : (
+                                        <div className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center border border-rose-200 shadow-sm">
+                                          <X className="w-3 h-3" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                               })}
+
+                               <div className="w-20 min-w-20 p-3 border-r flex items-center justify-center">
+                                  {fuelOk ? (
+                                    <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-sm">
+                                      <Check className="w-3 h-3" />
+                                    </div>
+                                  ) : (
+                                    <div className="w-5 h-5 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200 shadow-sm">
+                                      <Minus className="w-3 h-3" />
+                                    </div>
+                                  )}
+                               </div>
+                               <div className="w-20 min-w-20 p-3 border-r flex items-center justify-center">
+                                  {expOk ? (
+                                    <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-sm">
+                                      <Check className="w-3 h-3" />
+                                    </div>
+                                  ) : (
+                                    <div className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center border border-rose-200 shadow-sm">
+                                      <X className="w-3 h-3" />
+                                    </div>
+                                  )}
+                               </div>
+                               <div className="w-32 min-w-32 p-3 border-r flex items-center justify-center">
+                                  {hasDeposit ? (
+                                    <span className="font-bold text-purple-600 text-sm">Rs. {depositAmount.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                                  ) : (
+                                    <span className="text-slate-400 text-[10px] font-semibold bg-slate-100 px-2 py-0.5 rounded uppercase">Not Recorded</span>
+                                  )}
+                               </div>
+                               <div className="w-24 min-w-24 p-3 flex items-center justify-center">
+                                   <button onClick={() => {
+                                       setSelectedBusForFolder({
+                                           bus_no: bus.bus_no,
+                                           trips: dayData.trips,
+                                           submissions: dayData.submissions,
+                                           total_income: dayData.trips.reduce((acc, t) => acc + (t.income || 0), 0),
+                                           total_expenses: dayData.trips.reduce((acc, t) => acc + (t.total_expenses || 0), 0),
+                                           trip_date: format(date, 'yyyy-MM-dd')
+                                       });
+                                       setSelectedFolderDate(date);
+                                   }} className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-blue-600 hover:text-blue-800 bg-white border shadow-sm px-2 py-1 rounded hover:bg-slate-50 transition-colors">
+                                     <FolderOpen className="h-3 w-3" /> View
+                                   </button>
+                               </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ));
                  })()}
                </div>
                <ScrollBar orientation="horizontal" />
@@ -590,29 +479,12 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
                 })}
               </div>
 
-              {/* Bus Rows Grouped By Leader */}
-              {groupedByLeader.map(([leader, buses]) => {
-                const leaderColor = getLeaderColor(leader);
-                
-                return (
-                  <div key={leader} className="flex flex-col">
-                    {/* Leader Section Header */}
-                    <div className={cn("sticky left-0 z-20 flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider border-b border-t mt-1", leaderColor.bg, leaderColor.text, leaderColor.border)}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-3.5 bg-current rounded-full opacity-70"></div>
-                        {leader === 'Unassigned' ? 'Unassigned Routes' : `Team Leader: ${leader}`}
-                      </div>
-                      <Badge variant="secondary" className={cn("ml-2 text-[9px] h-4 border", leaderColor.bg, leaderColor.text, leaderColor.border)}>
-                        {buses.length} Buses
-                      </Badge>
-                    </div>
-
-                    {/* Buses under this leader */}
-                    {buses.map((bus, idx) => {
-                      const isExpanded = expandedCell?.bus_no === bus.bus_no;
-                      const expandedDay = isExpanded ? expandedCell.day : null;
-                      const expandedData = isExpanded && expandedDay ? bus.dates.get(expandedDay) : null;
-                      const expandedDate = expandedDay ? new Date(monthStart.getFullYear(), monthStart.getMonth(), expandedDay) : null;
+              {/* Bus Rows */}
+              {fleetMatrix.map((bus, idx) => {
+                const isExpanded = expandedCell?.bus_no === bus.bus_no;
+                const expandedDay = isExpanded ? expandedCell.day : null;
+                const expandedData = isExpanded && expandedDay ? bus.dates.get(expandedDay) : null;
+                const expandedDate = expandedDay ? new Date(monthStart.getFullYear(), monthStart.getMonth(), expandedDay) : null;
 
                 return (
                   <div 
@@ -830,9 +702,6 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
                   </div>
                 );
               })}
-            </div>
-          );
-        })}
 
               {/* Summary Row */}
               <div className="flex border-t-2 bg-slate-100 font-medium text-slate-600">

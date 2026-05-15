@@ -153,18 +153,39 @@ export function ExpenseMappingGrid({ importData }: Props) {
     const { data: bData } = await supabase.from("buses").select("id, bus_no");
     if (bData) setVehicles(bData);
     
-    // Fetch recent Special Hire quotations with customer details
-    const { data: qData, error } = await supabase
-      .from("special_hire_quotations")
-      .select("id, quotation_no, pickup_datetime, drop_datetime, customer_name")
-      .order("created_at", { ascending: false })
-      .limit(500);
+    // Fetch ALL Special Hire quotations (paginated to bypass PostgREST 1000-row default)
+    // Each record is ~200 bytes, so even 5000 records = ~1MB — well within limits
+    let allQuotations: typeof quotations = [];
+    let page = 0;
+    const PAGE_SIZE = 1000;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
       
-    if (error) {
-      console.error("Failed to load quotations:", error);
+      const { data: qData, error } = await supabase
+        .from("special_hire_quotations")
+        .select("id, quotation_no, pickup_datetime, drop_datetime, customer_name")
+        .order("created_at", { ascending: false })
+        .range(from, to);
+        
+      if (error) {
+        console.error("Failed to load quotations page:", error);
+        break;
+      }
+      
+      if (qData && qData.length > 0) {
+        allQuotations = [...allQuotations, ...qData];
+        hasMore = qData.length === PAGE_SIZE; // More pages if we hit the limit
+        page++;
+      } else {
+        hasMore = false;
+      }
     }
-      
-    if (qData) setQuotations(qData as any);
+    
+    console.log(`[MasterExpenses] Loaded ${allQuotations.length} quotations for mapping`);
+    setQuotations(allQuotations as any);
   };
 
   const runAutoSuggest = async () => {

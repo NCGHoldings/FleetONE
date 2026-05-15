@@ -1,5 +1,7 @@
 -- Migration: Update login_crew_member to handle NULL is_active and use ILIKE for NIC
 
+DROP FUNCTION IF EXISTS public.login_crew_member(TEXT);
+
 CREATE OR REPLACE FUNCTION public.login_crew_member(p_nic_number TEXT)
 RETURNS TABLE (
     id UUID,

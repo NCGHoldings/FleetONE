@@ -1,3 +1,22 @@
+## 2026-05-15
+
+### ✅ Master Expenses — Quotation Mapping Visibility Fix
+
+**Problem:** Quotation numbers (e.g., QUO-2026-1842) were not appearing in the "Quotation Mapping" dropdown on the Master Data Pipeline page. The system had 3035+ quotations but the fetch was limited to the 500 most recent, causing older quotations to be invisible and unmappable.
+
+**Root Cause:** `fetchMappingDictionaries()` in `ExpenseMappingGrid.tsx` used `.limit(500)` which excluded quotations beyond the newest 500 records.
+
+**Files Modified:**
+- `src/components/accounting/expenses/ExpenseMappingGrid.tsx` — Replaced `.limit(500)` with paginated fetch loop (1000 records per page) that loads ALL quotations. Each record is ~200 bytes, so even 5000 records = ~1MB — well within browser limits.
+- `src/components/accounting/expenses/SearchableSelect.tsx` — **Rewritten** to handle large datasets efficiently. Added `maxDisplayed` prop (default: 100) that limits initial DOM rendering, with client-side pre-filtering via `shouldFilter={false}` + manual search. When user types a search query, it filters the full options array. Shows "Showing X of Y — type to search all" note when truncated.
+
+**Architecture Notes:**
+- The `SearchableSelect` now uses `shouldFilter={false}` on the `Command` component and implements its own pre-filtering logic, avoiding cmdk's default behavior of rendering all items in the DOM
+- Quotation search is now instant and covers the entire dataset regardless of size
+- The `PopoverContent` width increased from 220px to 280px to better display quotation labels with customer names and date ranges
+
+---
+
 ## 2026-05-14
 
 ### ✅ Critical GL Double-Posting Fix — Yutong Invoice Idempotency Guard

@@ -742,35 +742,30 @@ export const mapDocumentToPlaceholders = (
       const paymentDateFormatted = formatDate(documentData?.payment_date);
       placeholders['{{date_value}}'] = isCheque && documentData?.cheque_date ? formatDate(documentData?.cheque_date) : paymentDateFormatted;
       
-      if (!isCheque) {
-        const hasBeneficiaryBank = vendorBankAccount?.bank_name || payeeBankName || vendorBankAccount?.account_number || payeeBankAccount;
-        
-        if (!hasBeneficiaryBank && (payeeType === 'direct' || documentData?.is_direct_payment || documentData?.is_advance)) {
-          // Hide beneficiary details for internal float transfers or direct payments without bank info
-          placeholders['{{beneficiary_bank_details}}'] = '';
-        } else {
-          placeholders['{{beneficiary_bank_details}}'] = `
-          <h4 style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">BENEFICIARY BANK DETAILS</h4>
-          <table style="width: 100%; border-collapse: collapse; border: 2px solid black; margin-bottom: 20px; font-weight: bold;">
-            <tr>
-              <td style="border: 1px solid black; padding: 5px; width: 25%;">BANK NAME</td>
-              <td style="border: 1px solid black; padding: 5px; width: 75%;">${vendorBankAccount?.bank_name || payeeBankName}</td>
-            </tr>
-            <tr>
-              <td style="border: 1px solid black; padding: 5px;">BRANCH</td>
-              <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.bank_branch || payeeBankBranch}</td>
-            </tr>
-            <tr>
-              <td style="border: 1px solid black; padding: 5px;">PAYEE NAME</td>
-              <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.account_holder_name || payeeName}</td>
-            </tr>
-            <tr>
-              <td style="border: 1px solid black; padding: 5px;">ACCOUNT NO.</td>
-              <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.account_number || payeeBankAccount}</td>
-            </tr>
-          </table>
-          `;
-        }
+      const isCash = ['cash', 'petty_cash'].includes((payMethod || '').toLowerCase());
+      
+      if (!isCheque && !isCash) {
+        placeholders['{{beneficiary_bank_details}}'] = `
+        <h4 style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">BENEFICIARY BANK DETAILS</h4>
+        <table style="width: 100%; border-collapse: collapse; border: 2px solid black; margin-bottom: 20px; font-weight: bold;">
+          <tr>
+            <td style="border: 1px solid black; padding: 5px; width: 25%;">BANK NAME</td>
+            <td style="border: 1px solid black; padding: 5px; width: 75%;">${vendorBankAccount?.bank_name || payeeBankName || ''}</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid black; padding: 5px;">BRANCH</td>
+            <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.bank_branch || payeeBankBranch || ''}</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid black; padding: 5px;">PAYEE NAME</td>
+            <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.account_holder_name || payeeName || ''}</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid black; padding: 5px;">ACCOUNT NO.</td>
+            <td style="border: 1px solid black; padding: 5px;">${vendorBankAccount?.account_number || payeeBankAccount || ''}</td>
+          </tr>
+        </table>
+        `;
       } else {
         placeholders['{{beneficiary_bank_details}}'] = '';
       }

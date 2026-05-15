@@ -47,10 +47,10 @@ type SectionKey = typeof FLEET_SECTIONS[number]['key'];
 
 const MemoizedFleetRow = React.memo(({
   row, globalIndex, isSubRow, hasFuelData, rowBg,
-  frozenCol1Width, frozenCol2Width, frozenCol3Width, visibleSections, editMode,
+  frozenCol1Width, frozenColAppWidth, frozenCol2Width, frozenCol3Width, visibleSections, editMode,
   renderRouteCell, renderDropdownCell, renderEditableCell, renderCrewCombobox, getPerformanceColor,
   editingCell, openRouteComboboxFor, openCrewComboboxFor, BUS_TYPE_OPTIONS, PERMIT_TYPE_OPTIONS, REMARK_OPTIONS,
-  onDelete, onMove
+  onDelete, onMove, onUpdate
 }: any) => {
   return (
     <TableRow
@@ -63,17 +63,31 @@ const MemoizedFleetRow = React.memo(({
       >
         {isSubRow ? '' : globalIndex}
       </TableCell>
+      {/* Frozen: App Active */}
+      <TableCell
+        className={cn("text-sm text-center sticky z-10 py-2 min-h-[40px]", rowBg)}
+        style={{ left: frozenCol1Width, width: frozenColAppWidth, minWidth: frozenColAppWidth }}
+      >
+        {isSubRow ? '' : (
+          <input
+            type="checkbox"
+            className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+            checked={row.is_app_active || false}
+            onChange={() => onUpdate?.(row.id, 'is_app_active', !row.is_app_active, row.trip_sequence)}
+          />
+        )}
+      </TableCell>
       {/* Frozen: Bus */}
       <TableCell
         className={cn("text-sm font-semibold sticky z-10 py-2 min-h-[40px] border-r border-border/50", rowBg)}
-        style={{ left: frozenCol1Width, width: frozenCol2Width, minWidth: frozenCol2Width }}
+        style={{ left: frozenCol1Width + frozenColAppWidth, width: frozenCol2Width, minWidth: frozenCol2Width }}
       >
         {isSubRow ? '' : row.bus_no}
       </TableCell>
       {/* Frozen: Actions */}
       <TableCell
         className={cn("text-sm sticky z-10 py-2 min-h-[40px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]", rowBg)}
-        style={{ left: frozenCol1Width + frozenCol2Width, width: frozenCol3Width, minWidth: frozenCol3Width }}
+        style={{ left: frozenCol1Width + frozenColAppWidth + frozenCol2Width, width: frozenCol3Width, minWidth: frozenCol3Width }}
       >
         {!isSubRow && (
           <div className="flex items-center gap-1 justify-center opacity-70 hover:opacity-100 transition-opacity">
@@ -596,6 +610,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
 
   // Frozen column dimensions
   const frozenCol1Width = 56; // No
+  const frozenColAppWidth = 44; // App
   const frozenCol2Width = 100; // Bus
   const frozenCol3Width = 100; // Actions
   const frozenHeaderBg = 'bg-blue-100 dark:bg-blue-950';
@@ -604,7 +619,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
 
   // Group header colSpan calculations
   const groupHeaders: { key: SectionKey | 'identity'; label: string; colSpan: number; color: string }[] = [
-    { key: 'identity', label: 'Bus Info', colSpan: 3, color: 'bg-blue-600' },
+    { key: 'identity', label: 'Bus Info', colSpan: 4, color: 'bg-blue-600' },
   ];
   if (visibleSections.has('route_type')) groupHeaders.push({ key: 'route_type', label: 'Route & Type', colSpan: 4, color: 'bg-blue-500' });
   if (visibleSections.has('config')) groupHeaders.push({ key: 'config', label: 'Config', colSpan: 1, color: 'bg-blue-400' });
@@ -685,7 +700,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                     idx < groupHeaders.length - 1 && 'border-r',
                     isIdentity && 'sticky left-0 z-40'
                   )}
-                  style={isIdentity ? { width: frozenCol1Width + frozenCol2Width + frozenCol3Width } : undefined}
+                  style={isIdentity ? { width: frozenCol1Width + frozenColAppWidth + frozenCol2Width + frozenCol3Width } : undefined}
                 >
                   {gh.label}
                 </TableHead>
@@ -701,17 +716,24 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
             >
               No
             </TableHead>
+            {/* Frozen: App */}
+            <TableHead
+              className={cn(frozenHeaderBg, "text-sm sticky z-40 py-3 text-center")}
+              style={{ left: frozenCol1Width, width: frozenColAppWidth, minWidth: frozenColAppWidth }}
+            >
+              App
+            </TableHead>
             {/* Frozen: Bus */}
             <TableHead
-              className={cn(frozenHeaderBg, "text-sm sticky z-40 py-3 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]")}
-              style={{ left: frozenCol1Width, width: frozenCol2Width, minWidth: frozenCol2Width }}
+              className={cn(frozenHeaderBg, "text-sm sticky z-40 py-3")}
+              style={{ left: frozenCol1Width + frozenColAppWidth, width: frozenCol2Width, minWidth: frozenCol2Width }}
             >
               Bus
             </TableHead>
             {/* Frozen: Actions */}
             <TableHead
-              className={cn(frozenHeaderBg, "text-sm sticky z-40 py-3 text-center")}
-              style={{ left: frozenCol1Width + frozenCol2Width, width: frozenCol3Width, minWidth: frozenCol3Width }}
+              className={cn(frozenHeaderBg, "text-sm sticky z-40 py-3 text-center shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]")}
+              style={{ left: frozenCol1Width + frozenColAppWidth + frozenCol2Width, width: frozenCol3Width, minWidth: frozenCol3Width }}
             >
               Actions
             </TableHead>
@@ -772,7 +794,16 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
           </TableRow>
         </TableHeader>
         <TableBody>
-          {Array.from(sections.entries()).map(([sectionName, sectionRows]) => (
+          {Array.from(sections.entries()).sort(([routeA], [routeB]) => {
+            const leaderA = routeLeaders?.[routeA] || 'Unassigned';
+            const leaderB = routeLeaders?.[routeB] || 'Unassigned';
+            if (leaderA !== leaderB) {
+              if (leaderA === 'Unassigned') return 1;
+              if (leaderB === 'Unassigned') return -1;
+              return leaderA.localeCompare(leaderB);
+            }
+            return routeA.localeCompare(routeB);
+          }).map(([sectionName, sectionRows]) => (
             <React.Fragment key={sectionName}>
               {/* Section header */}
               <TableRow>
@@ -785,13 +816,10 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                       onChange={() => onToggleRoute?.(sectionName)}
                       onClick={(e) => e.stopPropagation()}
                     />
-                    <span>{sectionName}</span>
-                    {routeLeaders?.[sectionName] && (
-                      <span className="bg-blue-800 text-blue-100 px-2 py-0.5 rounded text-xs ml-4 border border-blue-600 flex items-center gap-1.5 shadow-sm">
-                        <Users className="w-3 h-3 text-blue-300" />
-                        Leader: {routeLeaders[sectionName]}
-                      </span>
-                    )}
+                    <span>
+                      {routeLeaders?.[sectionName] ? `[Team Leader: ${routeLeaders[sectionName]}] ` : ''}
+                      {sectionName}
+                    </span>
                   </div>
                 </TableCell>
               </TableRow>
@@ -809,7 +837,9 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                     hasFuelData={hasFuelData}
                     rowBg={rowBg}
                     frozenCol1Width={frozenCol1Width}
+                    frozenColAppWidth={frozenColAppWidth}
                     frozenCol2Width={frozenCol2Width}
+                    frozenCol3Width={frozenCol3Width}
                     visibleSections={visibleSections}
                     editMode={editMode}
                     renderRouteCell={renderRouteCell}
@@ -825,6 +855,7 @@ export function FleetMasterSpreadsheetCore({ rows, loading, onUpdate, editMode =
                     REMARK_OPTIONS={REMARK_OPTIONS}
                     onDelete={onDelete}
                     onMove={onMove}
+                    onUpdate={onUpdate}
                   />
                 );
               })}

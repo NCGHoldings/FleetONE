@@ -25,6 +25,7 @@ export interface FleetRosterRow {
   is_active: boolean;
   turn_01_time: string | null;
   turn_02_time: string | null;
+  is_app_active: boolean;
 }
 
 export interface ExpandedFleetRow extends FleetRosterRow {
@@ -69,7 +70,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
       // Fetch roster with bus info including model and expected_km_per_liter
       const { data: rosterData, error: rosterError } = await supabase
         .from("fleet_master_roster")
-        .select(`*, buses!inner(bus_no, model, expected_km_per_liter)`)
+        .select(`*, buses!inner(bus_no, model, expected_km_per_liter, is_app_active)`)
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
 
@@ -86,12 +87,12 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
         return acc;
       }, {});
 
-      const leaderDict = (routesData || []).reduce((acc: Record<string, string | null>, curr: any) => {
-        if (curr.route_name) {
-          acc[curr.route_name] = curr.route_leader || null;
+      const leaderDict: Record<string, string | null> = {};
+      (rosterData || []).forEach((r: any) => {
+        if (r.route_label && r.route_id) {
+          leaderDict[r.route_label] = routeDict[r.route_id]?.route_leader || null;
         }
-        return acc;
-      }, {});
+      });
       setRouteLeaders(leaderDict);
 
       const rosterRows: FleetRosterRow[] = (rosterData || []).map((r: any) => ({
@@ -115,6 +116,7 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
         is_active: r.is_active,
         turn_01_time: r.turn_01_time,
         turn_02_time: r.turn_02_time,
+        is_app_active: r.buses?.is_app_active || false,
       }));
 
       setRoster(rosterRows);
@@ -269,6 +271,26 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
 
   const updateField = async (rosterId: string, field: string, value: any, tripSequence?: number) => {
     try {
+      if (field === 'is_app_active') {
+        const row = expandedRows.find(r => r.id === rosterId);
+        if (!row?.bus_no) return;
+        
+        const { error } = await supabase
+          .from("buses")
+          .update({ is_app_active: value })
+          .eq("bus_no", row.bus_no);
+
+        if (error) throw error;
+
+        setExpandedRows(prev => prev.map(r =>
+          r.bus_no === row.bus_no ? { ...r, is_app_active: value } : r
+        ));
+        
+        setRoster(prev => prev.map(r => 
+          r.bus_no === row.bus_no ? { ...r, is_app_active: value } : r
+        ));
+        return;
+      }
       // Handle per-trip route updates: field format is "route_label__trip:<trip_id>"
       const tripRouteMatch = field.match(/^route_label__trip:(.+)$/);
       if (tripRouteMatch) {
@@ -812,10 +834,19 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
 
   const updateRouteLeaders = async (routeLabels: string[], leaderName: string) => {
     try {
+      const targetRouteIds = new Set<string>();
+      roster.forEach(r => {
+        if (r.route_label && routeLabels.includes(r.route_label) && r.route_id) {
+          targetRouteIds.add(r.route_id);
+        }
+      });
+
+      if (targetRouteIds.size === 0) return;
+
       const { error } = await supabase
         .from("routes")
         .update({ route_leader: leaderName })
-        .in("route_name", routeLabels);
+        .in("id", Array.from(targetRouteIds));
         
       if (error) throw error;
       toast({ title: "Success", description: "Route leaders updated" });
