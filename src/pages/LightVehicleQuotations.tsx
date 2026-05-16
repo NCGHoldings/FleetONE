@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus, FileText, Calculator, Truck, ShoppingCart, DollarSign, Package, Cog, Users, Car, UserPlus, FileSpreadsheet } from 'lucide-react';
+import { Plus, FileText, Calculator, Truck, ShoppingCart, DollarSign, Package, Cog, Users, Car, UserPlus, FileSpreadsheet, Receipt } from 'lucide-react';
 import { LightVehicleQuotationsList } from "@/components/lightvehicle/LightVehicleQuotationsList";
 import { LightVehicleQuotationForm } from "@/components/lightvehicle/LightVehicleQuotationForm";
 import { LightVehicleModelsAdmin } from "@/components/lightvehicle/LightVehicleModelsAdmin";
@@ -14,6 +14,8 @@ import { LightVehicleFinanceDashboard } from "@/components/lightvehicle/LightVeh
 import { LightVehicleResponsiblePersonsAdmin } from "@/components/lightvehicle/LightVehicleResponsiblePersonsAdmin";
 import { LightVehicleReferralManagement } from "@/components/lightvehicle/LightVehicleReferralManagement";
 import { LightVehicleVehicleDataManagement } from "@/components/lightvehicle/LightVehicleVehicleDataManagement";
+import { LightVehicleRentalsList } from "@/components/lightvehicle/LightVehicleRentalsList";
+import { LightVehicleRentalForm } from "@/components/lightvehicle/LightVehicleRentalForm";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,6 +30,7 @@ export default function LightVehicleQuotations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
+  const [showRentalForm, setShowRentalForm] = useState(false);
   const activeTab = searchParams.get('tab') || 'quotations';
   const [stats, setStats] = useState<DashboardStats>({
     totalQuotations: 0,
@@ -141,7 +144,7 @@ export default function LightVehicleQuotations() {
 
       {/* Main Content - Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 lg:grid-cols-9">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 lg:grid-cols-10">
           <TabsTrigger value="quotations" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Quotations</span>
@@ -153,6 +156,10 @@ export default function LightVehicleQuotations() {
           <TabsTrigger value="finance" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
             <span className="hidden sm:inline">Finance</span>
+          </TabsTrigger>
+          <TabsTrigger value="rentals" className="flex items-center gap-2">
+            <Receipt className="h-4 w-4" />
+            <span className="hidden sm:inline">Rentals</span>
           </TabsTrigger>
           <TabsTrigger value="referral" className="flex items-center gap-2">
             <UserPlus className="h-4 w-4" />
@@ -192,6 +199,10 @@ export default function LightVehicleQuotations() {
           <LightVehicleFinanceDashboard />
         </TabsContent>
 
+        <TabsContent value="rentals" className="space-y-4">
+          <LightVehicleRentalsList onNewRental={() => setShowRentalForm(true)} />
+        </TabsContent>
+
         <TabsContent value="referral" className="space-y-4">
           <LightVehicleReferralManagement />
         </TabsContent>
@@ -224,6 +235,21 @@ export default function LightVehicleQuotations() {
           onCancel={handleFormCancel}
         />
       )}
+
+      {showRentalForm && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <LightVehicleRentalForm
+              onCancel={() => setShowRentalForm(false)}
+              onSuccess={() => {
+                setShowRentalForm(false);
+                // You could trigger a refresh here if needed
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

@@ -6,14 +6,22 @@ import { useCrewAuth } from '@/contexts/CrewAuthContext';
 export default function CrewAppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isLoading } = useCrewAuth();
+  const { crewMember, isLoading } = useCrewAuth();
+
+  React.useEffect(() => {
+    if (crewMember?.staff_type === 'driver' && (location.pathname === '/public/crew' || location.pathname === '/public/crew/upload')) {
+      navigate('/public/crew/driver-upload', { replace: true });
+    }
+  }, [crewMember, location.pathname, navigate]);
 
   if (isLoading) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">Loading...</div>;
   }
 
+  const isDriver = crewMember?.staff_type === 'driver';
+
   const tabs = [
-    { name: 'Upload', path: '/public/crew/upload', icon: Home },
+    { name: 'Upload', path: isDriver ? '/public/crew/driver-upload' : '/public/crew/upload', icon: Home },
     { name: 'Performance', path: '/public/crew/performance', icon: TrendingUp },
     { name: 'Finance', path: '/public/crew/finance', icon: Banknote },
     { name: 'Profile', path: '/public/crew/profile', icon: User },
@@ -32,7 +40,7 @@ export default function CrewAppLayout() {
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = location.pathname === tab.path || 
-                             (tab.path === '/public/crew/upload' && location.pathname === '/public/crew');
+                             ((tab.path === '/public/crew/upload' || tab.path === '/public/crew/driver-upload') && location.pathname === '/public/crew');
             return (
               <button
                 key={tab.name}

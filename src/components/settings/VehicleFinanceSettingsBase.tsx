@@ -87,6 +87,9 @@ export function VehicleFinanceSettingsBase({
 
       if (accountsError) throw accountsError;
       setAccounts(accountsData || []);
+      
+      // Temporary debug log to inspect all loaded accounts
+      console.log('DEBUG: Loaded Chart of Accounts:', accountsData?.map(a => `${a.account_code} - ${a.account_name} (${a.account_type})`));
 
       // Load existing settings
       const existingSettings = await fetchVehicleFinanceSettings(module, NCG_HOLDING_ID);
@@ -147,7 +150,22 @@ export function VehicleFinanceSettingsBase({
   };
 
   const getAccountsByType = (types: string[]) => {
-    return accounts.filter(a => types.includes(a.account_type));
+    if (types.includes('all')) return accounts;
+    
+    return accounts.filter(a => {
+      if (!a.account_type) {
+        // If an account has no type, we still want it to be selectable if 'all' isn't used?
+        // Let's include it if we are being generous, or keep it strict. 
+        // We'll allow it if 'liability' was requested just in case it's a generic unassigned account.
+        return types.some(t => t === 'liability');
+      }
+      const accType = a.account_type.toLowerCase();
+      // Match partial root words to handle pluralizations (e.g., liability vs liabilities, asset vs assets)
+      return types.some(t => {
+        const root = t.toLowerCase().replace(/y$/, 'i').replace(/s$/, '');
+        return accType.includes(root) || accType.includes(t.toLowerCase());
+      });
+    });
   };
 
   const isRequiredField = (field: keyof VehicleFinanceSettings): boolean => {
@@ -302,7 +320,7 @@ export function VehicleFinanceSettingsBase({
               {renderAccountSelect(
                 'VAT Output Account',
                 'vat_output_account_id',
-                ['liability'],
+                ['all'],
                 'Select VAT output account'
               )}
               {renderAccountSelect(

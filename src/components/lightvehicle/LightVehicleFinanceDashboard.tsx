@@ -9,6 +9,8 @@ interface FinanceStats {
   totalReceived: number;
   totalPending: number;
   overduePayments: number;
+  mrr: number;
+  unpaidRent: number;
 }
 
 export function LightVehicleFinanceDashboard() {
@@ -16,7 +18,9 @@ export function LightVehicleFinanceDashboard() {
     totalRevenue: 0,
     totalReceived: 0,
     totalPending: 0,
-    overduePayments: 0
+    overduePayments: 0,
+    mrr: 0,
+    unpaidRent: 0
   });
   const [loading, setLoading] = useState(true);
 
@@ -32,11 +36,31 @@ export function LightVehicleFinanceDashboard() {
         const totalReceived = orders.reduce((sum, o) => sum + (o.total_paid || 0), 0);
         const totalPending = orders.reduce((sum, o) => sum + (o.balance_due || 0), 0);
 
+        // Get rental stats
+        const { data: rentals } = await supabase
+          .from('lightvehicle_rentals')
+          .select('monthly_rent_amount')
+          .eq('status', 'active');
+          
+        const mrr = rentals ? rentals.reduce((sum, r) => sum + (Number(r.monthly_rent_amount) || 0), 0) : 0;
+
+        // Get unpaid rent invoices
+        const { data: rentInvoices } = await supabase
+          .from('ar_invoices')
+          .select('balance')
+          .eq('source_module', 'lightvehicle_rentals')
+          .neq('status', 'paid')
+          .neq('status', 'void');
+          
+        const unpaidRent = rentInvoices ? rentInvoices.reduce((sum, i) => sum + (Number(i.balance) || 0), 0) : 0;
+
         setStats({
           totalRevenue,
           totalReceived,
           totalPending,
-          overduePayments: 0 // Can be calculated based on due dates
+          overduePayments: 0, // Can be calculated based on due dates
+          mrr,
+          unpaidRent
         });
       }
     } catch (error) {
@@ -106,6 +130,28 @@ export function LightVehicleFinanceDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">LKR {stats.overduePayments.toLocaleString()}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Monthly Recurring Rev.</CardTitle>
+            <TrendingUp className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">LKR {stats.mrr.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">From active rentals</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unpaid Rent</CardTitle>
+            <AlertCircle className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">LKR {stats.unpaidRent.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">Pending rent invoices</p>
           </CardContent>
         </Card>
       </div>

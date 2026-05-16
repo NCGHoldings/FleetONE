@@ -239,6 +239,26 @@ export function useYutongOrderInvoiceManagement() {
             .eq('id', orderId)
             .single();
           
+          if (settings && !orderDetails?.finance_customer_id && orderDetails?.yutong_quotations?.customer_name) {
+            console.log('[Yutong] Resolving finance customer prior to draft AR creation...');
+            const { createVehicleCustomer } = await import('@/hooks/useVehicleSalesFinance');
+            const newCustomerId = await createVehicleCustomer({
+              module: 'yutong',
+              companyId: NCG_HOLDING_ID,
+              customerName: orderDetails.yutong_quotations.customer_name,
+              customerPhone: orderDetails.yutong_quotations.customer_phone || undefined,
+              customerEmail: orderDetails.yutong_quotations.customer_email || undefined,
+              customerCategoryId: orderDetails.yutong_quotations.customer_category_id || undefined,
+            });
+            if (newCustomerId) {
+              await supabase
+                .from('yutong_orders')
+                .update({ finance_customer_id: newCustomerId })
+                .eq('id', orderId);
+              orderDetails.finance_customer_id = newCustomerId;
+            }
+          }
+          
           if (settings && orderDetails?.finance_customer_id) {
             // ✅ Duplicate AR prevention — only one AR invoice per order
             if (orderDetails?.ar_invoice_id) {
@@ -439,12 +459,16 @@ export function useYutongOrderInvoiceManagement() {
           // Check if AR Invoice already exists (duplicate prevention)
           let arInvoiceId = orderDetails?.ar_invoice_id;
           
-          // Both Customer Invoice and Tax Invoice are real sales — both get VAT split JE
+          // Tax Invoices get VAT split JE. Regular Customer Invoices do not unless explicitly specified.
           const isTax = invoiceData.invoice_category === 'tax_invoice' || 
-                        invoiceData.invoice_category === 'direct_invoice' ||
-                        invoiceData.is_tax_invoice || 
+                        invoiceData.is_tax_invoice === true || 
                         (invoiceData.tax_rate && invoiceData.tax_rate > 0) || 
                         (invoiceData.vat_amount && invoiceData.vat_amount > 0);
+          
+          if (isTax && !settings.vat_output_account_id) {
+            throw new Error("VAT Output Account is not configured in Yutong Finance Settings. Please configure it before approving a Tax Invoice.");
+          }
+          
           const taxRateVal = invoiceData.tax_rate || 18;
           const taxAmt = isTax ? (invoiceData.vat_amount || invoiceAmount - invoiceAmount / (1 + taxRateVal / 100)) : undefined;
           
@@ -851,9 +875,15 @@ export function useYutongOrderInvoiceManagement() {
 
       const invoiceData = (docData?.invoice_data || {}) as any;
       const isTax = invoiceCategory === 'tax_invoice' ||
-                    invoiceCategory === 'direct_invoice' ||
-                    invoiceData.is_tax_invoice ||
-                    (invoiceData.tax_rate && invoiceData.tax_rate > 0);
+                    invoiceData.is_tax_invoice === true ||
+                    (invoiceData.tax_rate && invoiceData.tax_rate > 0) ||
+                    (invoiceData.vat_amount && invoiceData.vat_amount > 0);
+                    
+      if (isTax && !settings.vat_output_account_id) {
+        toast.error("VAT Output Account is not configured in Yutong Finance Settings.");
+        return { success: false, error: new Error("VAT Output Account missing") };
+      }
+                    
       const taxRateVal = invoiceData.tax_rate || 18;
       const taxAmt = isTax ? (invoiceData.vat_amount || invoiceAmount - invoiceAmount / (1 + taxRateVal / 100)) : undefined;
 

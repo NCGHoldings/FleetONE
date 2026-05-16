@@ -1,0 +1,16 @@
+--- ANTIGRAVITY_ncgCHANGELOG.md
++++ ANTIGRAVITY_ncgCHANGELOG.md
+@@ -1,4 +1,14 @@
++## 2026-05-16
++
++### ✅ Yutong Finance Sync UX & AR Auto-Creation Fix
++
++**Problem:** Users were confused when creating Tax Invoices because the "Sync" button was missing and Master AR was not automatically created. The Master AR creation failed silently because the `finance_customer_id` had not been established yet. The Sync button was missing because the invoice remained in `draft` status instead of `approved`.
++
++**Files Modified:**
++- `src/hooks/useYutongOrderInvoiceManagement.ts` — Added `createVehicleCustomer` logic inside `generateAndStoreDraftInvoice` so that a `finance_customer_id` is guaranteed to exist. This allows the system to successfully auto-create the draft Master AR invoice immediately at generation time, instead of failing silently.
++- `src/components/yutong/YutongOrderInvoiceGenerator.tsx` — Added an inline `Approve` button (with a green styling) directly on the main invoice row for any invoice in `draft` status. This fixes the UX gap where the Approve button was previously hidden inside the "View" modal, causing users to mistakenly believe the invoice generation had failed or skipped finance integration.
++
+ ## 2026-05-15
+ 
+ ### ✅ School Bus Master Expenses Pipeline

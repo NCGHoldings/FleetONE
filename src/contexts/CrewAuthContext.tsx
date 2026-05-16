@@ -13,7 +13,7 @@ interface CrewAuthContextType {
   crewMember: CrewMember | null;
   isAuthenticated: boolean;
   login: (nic: string) => Promise<boolean>;
-  register: (fullName: string, callingName: string, nic: string, phone: string) => Promise<{success: boolean, error?: string}>;
+  register: (fullName: string, callingName: string, nic: string, phone: string, staffType: string, salaryType: string, employmentType: string, assignedBus: string) => Promise<{success: boolean, error?: string}>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -68,7 +68,7 @@ export const CrewAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const register = async (fullName: string, callingName: string, nic: string, phone: string) => {
+  const register = async (fullName: string, callingName: string, nic: string, phone: string, staffType: string, salaryType: string, employmentType: string, assignedBus: string) => {
     try {
       const supabase = createAnonymousClient();
       
@@ -77,7 +77,11 @@ export const CrewAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         p_calling_name: callingName,
         p_nic_number: nic,
         p_contact_number: phone,
-        p_pin_code: '0000' // Default PIN since it's no longer asked in UI
+        p_pin_code: '0000', // Default PIN since it's no longer asked in UI
+        p_staff_type: staffType,
+        p_salary_type: salaryType,
+        p_employment_type: employmentType,
+        p_assigned_bus: assignedBus || null
       });
 
       if (error) throw error;

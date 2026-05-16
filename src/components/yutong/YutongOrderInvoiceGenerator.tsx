@@ -10,6 +10,7 @@ import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceMa
 import { YutongInvoiceDataModal } from './YutongInvoiceDataModal';
 import { YutongOrderInvoiceViewModal } from './YutongOrderInvoiceViewModal';
 import { YutongInvoiceTypeModal, ProformaInvoiceConfig } from './YutongInvoiceTypeModal';
+import { JournalEntryDetailDialog } from '../accounting/JournalEntryDetailDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +46,8 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
   const [showInvoiceViewModal, setShowInvoiceViewModal] = useState(false);
   const [showInvoiceTypeModal, setShowInvoiceTypeModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
+  const [selectedJournalEntry, setSelectedJournalEntry] = useState<any>(null);
+  const [showGLDialog, setShowGLDialog] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [quotation, setQuotation] = useState<any>(null);
@@ -61,7 +64,8 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     generateAndStoreDraftInvoice,
     getInvoicesByOrder,
     getInvoiceDocuments,
-    syncInvoiceToFinanceHub
+    syncInvoiceToFinanceHub,
+    approveInvoice
   } = useYutongOrderInvoiceManagement();
 
   const vehicleDetailsComplete = !!(
@@ -368,6 +372,81 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     }
   };
 
+  const handleViewGL = async (doc: any) => {
+    try {
+      const invoice = invoices.find(inv => inv.id === doc.invoice_record_id);
+      if (!invoice) return;
+
+      const { data: orderData } = await supabase
+        .from('yutong_orders')
+        .select('ar_invoice_id')
+        .eq('id', invoice.order_id)
+        .single();
+
+      if (!orderData?.ar_invoice_id) {
+        toast.error("No AR Invoice found for this order yet.");
+        return;
+      }
+
+      const { data: arInvoice } = await supabase
+        .from('ar_invoices')
+        .select('journal_entry_id')
+        .eq('id', orderData.ar_invoice_id)
+        .single();
+
+      if (!arInvoice?.journal_entry_id) {
+        toast.error("No Journal Entry posted for this AR Invoice.");
+        return;
+      }
+
+      const { data: je } = await supabase
+        .from('journal_entries')
+        .select('*')
+        .eq('id', arInvoice.journal_entry_id)
+        .single();
+
+      if (je) {
+        setSelectedJournalEntry(je);
+        setShowGLDialog(true);
+      }
+    } catch (error) {
+      console.error("Error viewing GL:", error);
+      toast.error("Failed to load GL entries");
+    }
+  };
+
+  const handleResetInvoice = async (doc: any) => {
+    try {
+      toast.loading("Resetting invoice...", { id: "reset" });
+      const invoice = invoices.find(inv => inv.id === doc.invoice_record_id);
+      if (!invoice) return;
+
+      const { data: orderData } = await supabase
+        .from('yutong_orders')
+        .select('ar_invoice_id')
+        .eq('id', invoice.order_id)
+        .single();
+
+      if (orderData?.ar_invoice_id) {
+        const { data: ar } = await supabase.from('ar_invoices').select('journal_entry_id').eq('id', orderData.ar_invoice_id).single();
+        if (ar?.journal_entry_id) {
+          await supabase.from('journal_entries').delete().eq('id', ar.journal_entry_id);
+        }
+        await supabase.from('ar_invoices').update({ journal_entry_id: null, status: 'draft' }).eq('id', orderData.ar_invoice_id);
+      }
+
+      await supabase.from('yutong_invoice_records').update({ status: 'draft', approved_by: null }).eq('id', invoice.id);
+      await supabase.from('yutong_invoice_documents').update({ document_status: 'draft' }).eq('invoice_record_id', invoice.id);
+      
+      toast.success("Invoice reset to draft.", { id: "reset" });
+      loadData();
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      console.error("Error resetting invoice:", error);
+      toast.error("Failed to reset invoice", { id: "reset" });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     if (status === 'approved') {
       return <Badge className="bg-success">{status}</Badge>;
@@ -516,22 +595,77 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
                         {getStatusBadge(doc.document_status)}
                         
                         <div className="flex gap-2">
-                          {doc.document_status === 'approved' && invoice && invoice.invoice_category !== 'proforma_invoice' && (
+                          {doc.document_status === 'draft' && (
                             <Button
                               size="sm"
-                              variant="secondary"
-                              onClick={(e) => {
-                                console.log('BUTTON ONCLICK FIRED for invoice:', invoice.id);
+                              className="bg-success hover:bg-success/90 text-success-foreground"
+                              onClick={async (e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-                                handleSyncToFinance(invoice.id);
+                                toast.info('Approving invoice...');
+                                const result = await approveInvoice(doc.invoice_record_id, doc.id);
+                                if (result.success) {
+                                  toast.success('Invoice approved successfully!');
+                                  loadData();
+                                  if (onRefresh) onRefresh();
+                                }
                               }}
                               disabled={isLoading}
-                              title="Sync to Finance Hub"
+                              title="Approve Invoice"
                             >
-                              <RefreshCw className="h-4 w-4 mr-1" />
-                              Sync
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Approve
                             </Button>
+                          )}
+                          {doc.document_status === 'approved' && invoice && invoice.invoice_category !== 'proforma_invoice' && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  handleSyncToFinance(invoice.id);
+                                }}
+                                disabled={isLoading}
+                                title="Sync to Finance Hub"
+                              >
+                                <RefreshCw className="h-4 w-4 mr-1" />
+                                Sync
+                              </Button>
+                              
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  handleViewGL(doc);
+                                }}
+                                disabled={isLoading}
+                                title="View Journal Entry Details"
+                              >
+                                <FileText className="h-4 w-4 mr-1" />
+                                View GL
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-red-200 text-red-700 hover:bg-red-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  handleResetInvoice(doc);
+                                }}
+                                disabled={isLoading}
+                                title="Reset to Draft (Dev Fix)"
+                              >
+                                <AlertCircle className="h-4 w-4 mr-1" />
+                                Reset
+                              </Button>
+                            </>
                           )}
                           <Button
                             size="sm"
@@ -597,6 +731,17 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
           onRefresh={() => {
             loadData();
             if (onRefresh) onRefresh();
+          }}
+        />
+      )}
+
+      {selectedJournalEntry && (
+        <JournalEntryDetailDialog
+          entry={selectedJournalEntry}
+          open={showGLDialog}
+          onOpenChange={(isOpen) => {
+            setShowGLDialog(isOpen);
+            if (!isOpen) setSelectedJournalEntry(null);
           }}
         />
       )}

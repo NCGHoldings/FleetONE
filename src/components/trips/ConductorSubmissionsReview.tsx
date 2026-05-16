@@ -13,6 +13,7 @@ import { SubmissionReviewModal } from './SubmissionReviewModal';
 import { ConductorPortalQuickActions } from './ConductorPortalQuickActions';
 import { BusDailyFolderModal } from './BusDailyFolderModal';
 import { SubmissionMatrixDashboard } from './SubmissionMatrixDashboard';
+import { BusCrewMasterTab } from './BusCrewMasterTab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMemo } from 'react';
 
@@ -28,6 +29,7 @@ interface ConductorSubmission {
   status: string;
   created_at: string;
   reviewed_at?: string;
+  applied_to_trip_id?: string;
 }
 
 export const ConductorSubmissionsReview = () => {
@@ -136,7 +138,7 @@ export const ConductorSubmissionsReview = () => {
                 total_income: 0,
                 total_expenses: 0,
                 total_fuel_liters: 0,
-                total_trips_reported: 0,
+                trip_numbers: new Set(),
                 routes: new Set(),
             };
         }
@@ -155,9 +157,9 @@ export const ConductorSubmissionsReview = () => {
            groups[key].total_fuel_liters += parseFloat(ocr.fuel_details.liters);
         }
         if (ocr.trips && Array.isArray(ocr.trips)) {
-           groups[key].total_trips_reported += ocr.trips.length;
-        } else if (ocr.submission_type === 'trip_revenue') {
-           groups[key].total_trips_reported += 1;
+           ocr.trips.forEach((t: any) => groups[key].trip_numbers.add(t.trip_number || 1));
+        } else if (ocr.submission_type === 'trip_revenue' || ocr.submission_type === 'trip_odometer') {
+           groups[key].trip_numbers.add(ocr.trip_number || 1);
         }
     });
     
@@ -301,9 +303,9 @@ export const ConductorSubmissionsReview = () => {
         <div className="flex flex-col gap-3 mb-4">
           <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border shadow-sm w-full">
             <span className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-blue-600" /> Filter {activeTab === 'master_sheet' ? 'Month' : 'Date'}:
+              <Clock className="w-4 h-4 text-blue-600" /> Filter {activeTab === 'master_sheet' || activeTab === 'crew_profiles' ? 'Month' : 'Date'}:
             </span>
-            {activeTab === 'master_sheet' ? (
+            {activeTab === 'master_sheet' || activeTab === 'crew_profiles' ? (
               <Input 
                 type="month" 
                 value={selectedMonth} 
@@ -320,9 +322,12 @@ export const ConductorSubmissionsReview = () => {
             )}
           </div>
 
-          <TabsList className="grid w-full grid-cols-2 h-12 p-1 bg-slate-100 rounded-xl">
+          <TabsList className="grid w-full grid-cols-3 h-12 p-1 bg-slate-100 rounded-xl">
             <TabsTrigger value="master_sheet" className="flex gap-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
               <BarChart2 className="w-4 h-4" /> <span className="hidden sm:inline">Fleet</span> Master
+            </TabsTrigger>
+            <TabsTrigger value="crew_profiles" className="flex gap-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Bus className="w-4 h-4" /> <span className="hidden sm:inline">Staff</span> Profiles
             </TabsTrigger>
             <TabsTrigger value="approvals" className="flex gap-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
               <CheckSquare className="w-4 h-4" /> Approvals {pendingCount > 0 && <Badge variant="destructive" className="ml-1 h-5 px-1.5 flex items-center justify-center text-[10px] rounded-full">{pendingCount}</Badge>}
@@ -339,7 +344,12 @@ export const ConductorSubmissionsReview = () => {
            </Card>
         </TabsContent>
 
-        {/* 2. PENDING APPROVALS TAB */}
+        {/* 2. STAFF PROFILE COLLECTION TAB */}
+        <TabsContent value="crew_profiles" className="mt-0">
+           <BusCrewMasterTab />
+        </TabsContent>
+
+        {/* 3. PENDING APPROVALS TAB */}
         <TabsContent value="approvals" className="mt-0 space-y-4">
           {/* Filters and Search - Mobile friendly stack */}
           <div className="flex flex-col gap-3 bg-white p-3 rounded-xl border shadow-sm">
@@ -438,7 +448,7 @@ export const ConductorSubmissionsReview = () => {
                       <div className="flex items-center gap-2 mt-1 col-span-2 text-xs text-slate-600 font-medium bg-white p-2 rounded border shadow-sm">
                         <span className="flex-1">📝 {group.submissions.length} Logs</span>
                         <span className="text-slate-300">|</span>
-                        <span className="flex-1 text-center">🚌 {group.total_trips_reported} Trips</span>
+                        <span className="flex-1 text-center">🚌 {group.trip_numbers.size} Trips</span>
                         <span className="text-slate-300">|</span>
                         <span className="flex-1 text-right">⛽ {group.total_fuel_liters || 0}L</span>
                       </div>
@@ -460,9 +470,16 @@ export const ConductorSubmissionsReview = () => {
                                 {format(new Date(submission.created_at), 'h:mm a')}
                               </span>
                             </div>
-                            <Badge variant={getStatusColor(submission.status)} className="text-[10px] px-2 py-0.5 rounded-full capitalize">
-                              {submission.status}
-                            </Badge>
+                            <div className="flex flex-col items-end gap-1">
+                              <Badge variant={getStatusColor(submission.status)} className="text-[10px] px-2 py-0.5 rounded-full capitalize">
+                                {submission.status}
+                              </Badge>
+                              {submission.applied_to_trip_id && (
+                                <Badge variant="outline" className="text-[9px] bg-indigo-50 text-indigo-700 border-indigo-200">
+                                  Linked to Fleet Sheet
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                           
                           <div className="bg-slate-50 rounded-lg p-2 text-xs flex justify-between items-center border border-slate-100">

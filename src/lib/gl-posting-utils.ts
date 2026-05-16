@@ -25,6 +25,7 @@ export interface JournalEntryLine {
   description: string;
   debit: number;
   credit: number;
+  cost_center_id?: string;
 }
 
 export interface CreateJournalEntryParams {
@@ -138,6 +139,7 @@ export async function createAndPostJournalEntry(
       credit: line.credit,
       company_id: params.company_id,
       business_unit_code: params.business_unit_code,
+      cost_center_id: line.cost_center_id || null,
     }));
 
     const { error: linesError } = await supabase
@@ -435,7 +437,7 @@ export async function postAPInvoiceToGL(params: {
   companyId: string;
   businessUnitCode?: string;
   vendorName?: string;
-  expenseLines?: Array<{ accountId: string; amount: number; taxAmount?: number; description?: string }>;
+  expenseLines?: Array<{ accountId: string; amount: number; taxAmount?: number; description?: string; costCenterId?: string }>;
   sourceModule?: string;
   costAllocations?: Array<{ unit_code: string; amount: number }>;
 }): Promise<{ success: boolean; journalEntryId?: string; error?: string }> {
@@ -467,6 +469,7 @@ export async function postAPInvoiceToGL(params: {
               description: `${line.description || 'Expense'} [${alloc.unit_code}]`,
               debit: allocAmount,
               credit: 0,
+              cost_center_id: line.costCenterId,
             });
             lineBusinessUnits.push(alloc.unit_code);
           }
@@ -489,29 +492,33 @@ export async function postAPInvoiceToGL(params: {
   } else {
     // Standard mode (no cost allocations)
     if (params.expenseLines && params.expenseLines.length > 0) {
-      const grouped = new Map<string, { netAmount: number; description: string }>();
+      const grouped = new Map<string, { accountId: string; netAmount: number; description: string; costCenterId?: string }>();
       for (const line of params.expenseLines) {
         const lineTax = line.taxAmount || 0;
         const lineNet = line.amount - lineTax;
         totalTaxAmount += lineTax;
 
-        const existing = grouped.get(line.accountId);
+        const groupKey = `${line.accountId}_${line.costCenterId || 'none'}`;
+        const existing = grouped.get(groupKey);
         if (existing) {
           existing.netAmount += lineNet;
         } else {
-          grouped.set(line.accountId, {
+          grouped.set(groupKey, {
+            accountId: line.accountId,
             netAmount: lineNet,
             description: line.description || `Expense/Purchase - ${params.invoiceNumber}`,
+            costCenterId: line.costCenterId,
           });
         }
       }
-      for (const [accountId, data] of grouped) {
+      for (const [_, data] of grouped) {
         if (data.netAmount > 0) {
           debitLines.push({
-            account_id: accountId,
+            account_id: data.accountId,
             description: data.description,
             debit: Math.round(data.netAmount * 100) / 100,
             credit: 0,
+            cost_center_id: data.costCenterId,
           });
           lineBusinessUnits.push(params.businessUnitCode || '');
         }
@@ -615,6 +622,7 @@ export async function postAPInvoiceToGL(params: {
         credit: line.credit,
         company_id: params.companyId,
         business_unit_code: lineBusinessUnits[idx] || params.businessUnitCode,
+        cost_center_id: line.cost_center_id || null,
       }));
 
       const { error: linesError } = await supabase.from("journal_entry_lines").insert(jeLines);

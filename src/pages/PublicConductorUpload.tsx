@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar as CalendarIcon, User, Bus, Route, ArrowRight, ArrowLeft, Sun, Moon, CheckCircle, ChevronRight, Check, Plus, Minus, FileText, Banknote, Receipt, Navigation, PartyPopper, Sparkles, Loader2, Send, Calculator, Trash2, Upload, CreditCard, Camera } from "lucide-react";
+import { Calendar as CalendarIcon, User, Bus, Route, ArrowRight, ArrowLeft, Sun, Moon, CheckCircle, ChevronRight, Check, Plus, Minus, FileText, Banknote, Receipt, Navigation, PartyPopper, Sparkles, Loader2, Send, Calculator, Trash2, Upload, CreditCard, Camera, Lock, X } from "lucide-react";
 import { createAnonymousClient } from '@/integrations/supabase/public-client';
 import { GamificationBanner } from '@/components/trips/GamificationBanner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -60,7 +60,14 @@ const translations = {
     successDesc: "Your details have been successfully submitted.",
     trackingCode: "Your tracking code:",
     submitAnother: "Back to Hub",
-    bannerReady: "Ready for the road? 🚌",
+    bannerReady: [
+      "Ready for the road? 🚌",
+      "Even if the road is long, with big dreams the journey is not tiring.",
+      "The steering wheel is in your hands - the responsibility of a thousand lives is in your heart.",
+      "The rhythm of the road is at your feet - the trust of passengers is in your hands.",
+      "A watchful eye - a safe destination.",
+      "Let's prioritize responsibility over speed."
+    ],
     bannerKeepUp: "Keep it up! 💪",
     bannerDone: "Incredible work! 🎉",
     bannerRemaining: "You have {remaining} more trip(s) to go today. Let's make it a great one!",
@@ -113,7 +120,14 @@ const translations = {
     successDesc: "ඔබගේ විස්තර සාර්ථකව ඉදිරිපත් කරන ලදී.",
     trackingCode: "ඔබේ ලුහුබැඳීමේ කේතය:",
     submitAnother: "ප්‍රධාන මෙනුවට",
-    bannerReady: "රෝද කැරකෙන තරමටයි ජීවිතේ දුවන්නේ! 🚌",
+    bannerReady: [
+      "රෝද කැරකෙන තරමටයි ජීවිතේ දුවන්නේ! 🚌",
+      "පාර දිග වුණත්, හීන ලොකු නම් ගමන මහන්සි නැත",
+      "සුක්කානම ඔබේ අතේ - ජීවිත දහසක වගකීම ඔබේ හිතේ.",
+      "පාරේ රිද්මය ඔබේ දෙපයේ - මගීන්ගේ විශ්වාසය ඔබේ දෑතේ.",
+      "සුපරීක්ෂාකාරී දෑසක් - සුරක්ෂිත ගමනාන්තයක්.",
+      "වේගයට වඩා - වගකීමට මුල්තැන දෙමු."
+    ],
     bannerKeepUp: "කට්ට කාගෙන ඉස්සරහටම යමු! 💪",
     bannerDone: "අද දවසේ වැඩ ඉවරයි, සුපිරියි! 🎉",
     bannerRemaining: "අද දිනට තවත් ගමන් {remaining} ක්. පරිස්සමින් ගිහින් එන්න!",
@@ -166,7 +180,14 @@ const translations = {
     successDesc: "உங்கள் விவரங்கள் வெற்றிகரமாக சமர்ப்பிக்கப்பட்டன.",
     trackingCode: "உங்கள் கண்காணிப்பு குறியீடு:",
     submitAnother: "பிரதான மெனுவிற்கு",
-    bannerReady: "பயணத்திற்கு தயாரா? 🚌",
+    bannerReady: [
+      "பயணத்திற்கு தயாரா? 🚌",
+      "பாதை நீளமாக இருந்தாலும், பெரிய கனவுகளுடன் பயணம் சோர்வடையாது.",
+      "திசைமாற்றி உங்கள் கைகளில் - ஆயிரம் உயிர்களின் பொறுப்பு உங்கள் இதயத்தில்.",
+      "பாதையின் தாளம் உங்கள் காலடியில் - பயணிகளின் நம்பிக்கை உங்கள் கைகளில்.",
+      "கவனமான கண்கள் - பாதுகாப்பான இலக்கு.",
+      "வேகத்தை விட பொறுப்புக்கு முன்னுரிமை கொடுப்போம்."
+    ],
     bannerKeepUp: "தொடர்ந்து முன்னேறுங்கள்! 💪",
     bannerDone: "சிறப்பான பணி! இலக்கு முடிந்தது! 🎉",
     bannerRemaining: "இன்று இன்னும் {remaining} பயணங்கள் உள்ளன. பாதுகாப்பான பயணம்!",
@@ -219,7 +240,8 @@ const AutocompleteInput = ({
   placeholder, 
   uppercase = false,
   autoFormat,
-  icon
+  icon,
+  disabled = false
 }: { 
   value: string; 
   onChange: (v: string) => void; 
@@ -228,6 +250,7 @@ const AutocompleteInput = ({
   uppercase?: boolean;
   autoFormat?: 'bus';
   icon?: React.ReactNode;
+  disabled?: boolean;
 }) => {
   const [show, setShow] = useState(false);
   
@@ -265,7 +288,8 @@ const AutocompleteInput = ({
         onBlur={() => setTimeout(() => setShow(false), 200)}
         placeholder={placeholder}
         required
-        className={`bg-slate-50 border-slate-200 focus-visible:ring-blue-500 transition-all ${icon ? 'pl-9' : ''}`}
+        disabled={disabled}
+        className={`bg-slate-50 border-slate-200 focus-visible:ring-blue-500 transition-all ${icon ? 'pl-9' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       />
       {show && filtered.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 shadow-xl rounded-md max-h-48 overflow-y-auto">
@@ -310,6 +334,14 @@ export default function PublicConductorUpload() {
   const t = translations[lang];
 
   const [loading, setLoading] = useState(false);
+  const [quoteIndex, setQuoteIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setQuoteIndex(prev => (prev + 1) % 6);
+    }, 5000); // Change quote every 5 seconds
+    return () => clearInterval(interval);
+  }, []);
   const [submitted, setSubmitted] = useState(false);
   const [submissionCode, setSubmissionCode] = useState('');
   
@@ -391,38 +423,84 @@ export default function PublicConductorUpload() {
     }
   }, []);
 
-  // Auto-fill Conductor Name from Authenticated Crew Session
+  // Auto-fill from Authenticated Crew Session (name + bus)
   useEffect(() => {
-    if (crewMember?.staff_name && formData.conductorName !== crewMember.staff_name) {
-      setFormData(prev => ({ ...prev, conductorName: crewMember.staff_name }));
+    if (crewMember) {
+      const updates: any = {};
+      if (crewMember.staff_name && formData.conductorName !== crewMember.staff_name) {
+        updates.conductorName = crewMember.staff_name;
+      }
+      if (crewMember.assigned_bus && !formData.busNumber) {
+        let bus = crewMember.assigned_bus.replace(/[\s-]/g, '').toUpperCase();
+        const match = bus.match(/^([A-Z0-9]+?)(\d{4})$/);
+        if (match) bus = `${match[1]}-${match[2]}`;
+        updates.busNumber = bus;
+      }
+      if (Object.keys(updates).length > 0) {
+        setFormData(prev => ({ ...prev, ...updates }));
+      }
     }
-  }, [crewMember, formData.conductorName]);
+  }, [crewMember]);
+
+  // Track last fetched bus with a ref to avoid stale closures
+  const lastFetchedBusRef = React.useRef('');
+  const [fetchingAssignment, setFetchingAssignment] = useState(false);
+  const [routeAutoFilled, setRouteAutoFilled] = useState(false);
+  const [routeConfirmed, setRouteConfirmed] = useState(false);
+  const [scheduledTripId, setScheduledTripId] = useState<string | null>(null);
 
   // Bus Assignment Auto-Fill Logic (Debounced)
   useEffect(() => {
+    const bus = formData.busNumber;
+    if (!bus || bus.length < 7) {
+      setFetchingAssignment(false);
+      return;
+    }
+    const fetchKey = `${bus}_${formData.tripDate}`;
+    if (fetchKey === lastFetchedBusRef.current) return;
+    
+    // Show loading immediately
+    setFetchingAssignment(true);
+
     const fetchAssignment = async () => {
-      const bus = formData.busNumber;
-      if (!bus || bus.length < 5) return;
-      
       try {
         const supabasePublic = createAnonymousClient();
-        // Get data for the specific date if selected, else default to today
         const queryDate = formData.tripDate || new Date().toISOString().split('T')[0];
         const { data, error } = await supabasePublic.rpc('get_public_bus_assignment', { p_bus_number: bus, p_date: queryDate });
+        
+        lastFetchedBusRef.current = fetchKey;
         
         if (data && data.length > 0 && !error) {
           const assignment = data[0];
           
-          if (assignment.driver_name || assignment.conductor_name || assignment.route_name) {
+          const hasRoute = assignment.route_name && assignment.route_name.trim().length > 0;
+          const hasDriver = assignment.driver_name && assignment.driver_name.trim().length > 0;
+          const hasConductor = assignment.conductor_name && assignment.conductor_name.trim().length > 0;
+          
+          if (hasDriver || hasConductor || hasRoute) {
              setFormData(prev => ({ 
                ...prev, 
-               routeName: assignment.route_name || prev.routeName,
-               driverName: assignment.driver_name || prev.driverName,
-               conductorName: assignment.conductor_name || prev.conductorName
+               routeName: hasRoute ? assignment.route_name : prev.routeName,
+               driverName: hasDriver ? assignment.driver_name : prev.driverName,
+               conductorName: hasConductor ? assignment.conductor_name : prev.conductorName
              }));
              
+             // Lock route if auto-filled, require confirmation
+             if (hasRoute) {
+               setRouteAutoFilled(true);
+               setRouteConfirmed(false);
+             } else {
+               setRouteAutoFilled(false);
+               setRouteConfirmed(false);
+             }
+             
+             if (assignment.daily_trip_id) {
+               setScheduledTripId(assignment.daily_trip_id);
+             } else {
+               setScheduledTripId(null);
+             }
+             
              const allocated = parseInt(assignment.total_allocated_trips) || 0;
-             // If the backend has allocated trips, use them. Otherwise fallback to 4.
              if (allocated > 0) {
                  setMaxTrips(allocated);
              } else {
@@ -431,18 +509,22 @@ export default function PublicConductorUpload() {
              
              toast({
                title: "Assignment Loaded",
-               description: `Successfully fetched assignment. Allocated Trips: ${allocated > 0 ? allocated : 4}`,
+               description: `Route: ${hasRoute ? assignment.route_name : 'N/A'} | Trips: ${allocated > 0 ? allocated : 4}`,
              });
+          } else {
+            setRouteAutoFilled(false);
           }
         }
       } catch (e) {
-        console.log('Error fetching assignment', e);
+        console.log('[BUS-ASSIGN] Error:', e);
+      } finally {
+        setFetchingAssignment(false);
       }
     };
 
     const timeoutId = setTimeout(() => {
       fetchAssignment();
-    }, 600); // 600ms debounce
+    }, 400);
 
     return () => clearTimeout(timeoutId);
   }, [formData.busNumber, formData.tripDate]);
@@ -545,6 +627,14 @@ export default function PublicConductorUpload() {
       });
       return false;
     }
+    if (routeAutoFilled && !routeConfirmed) {
+      toast({
+        title: "Confirm Route",
+        description: "Please confirm or change the suggested route before proceeding.",
+        variant: "destructive"
+      });
+      return false;
+    }
     return true;
   };
 
@@ -635,7 +725,8 @@ export default function PublicConductorUpload() {
           image_url: 'manual_data_entry_no_image', 
           ocr_data: structuredData,
           status: 'pending',
-          submission_code: '' 
+          submission_code: '',
+          applied_to_trip_id: scheduledTripId
         });
 
       if (insertError) throw insertError;
@@ -674,24 +765,6 @@ export default function PublicConductorUpload() {
 
   const handleSubmitTrip = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!trip.startOdo || !trip.endOdo) {
-      toast({
-        title: "Missing Odometers",
-        description: "Please enter both Start and End odometers for this trip.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    if (parseFloat(trip.endOdo) <= parseFloat(trip.startOdo)) {
-      toast({
-        title: "Invalid Odometers",
-        description: "End odometer must be greater than Start odometer.",
-        variant: "destructive"
-      });
-      return;
-    }
 
     // NEXT LEVEL VALIDATION: Block empty or unrealistically low trip submissions
     if (totalIncome < 500) {
@@ -706,8 +779,6 @@ export default function PublicConductorUpload() {
     submitPartialPayload('trip_revenue', {
       trips: [{
         trip_number: currentTripNumber,
-        start_odometer: parseFloat(trip.startOdo) || null,
-        end_odometer: parseFloat(trip.endOdo) || null,
         income: {
           call_booking: parseFloat(trip.income.callBooking) || 0,
           agent_booking: parseFloat(trip.income.agentBooking) || 0,
@@ -902,29 +973,98 @@ export default function PublicConductorUpload() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.tripDate}</Label>
-                        <Input type="date" value={formData.tripDate} onChange={(e) => setFormData({ ...formData, tripDate: e.target.value })} required className="bg-slate-50 border-slate-200 focus-visible:ring-blue-500 transition-all" />
+                        <Input 
+                          type="date" 
+                          value={formData.tripDate} 
+                          onChange={(e) => setFormData({ ...formData, tripDate: e.target.value })} 
+                          required 
+                          disabled={fetchingAssignment}
+                          className={`bg-slate-50 border-slate-200 focus-visible:ring-blue-500 transition-all ${fetchingAssignment ? 'opacity-50' : ''}`} 
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.busNumber}</Label>
                         <AutocompleteInput 
                           value={formData.busNumber} 
-                          onChange={(v) => setFormData({ ...formData, busNumber: v })} 
+                          onChange={(v) => {
+                            // Clear route when bus number changes so RPC can fetch the correct one
+                            setFormData(prev => ({ ...prev, busNumber: v, routeName: v !== prev.busNumber ? '' : prev.routeName }));
+                            lastFetchedBusRef.current = ''; // Reset so RPC re-fetches for new bus
+                            setRouteAutoFilled(false); // Unlock route for new bus
+                            setRouteConfirmed(false);
+                          }} 
                           options={history.buses || []} 
-                          placeholder="NA-1234" 
+                          placeholder="ND-1234" 
                           uppercase={true} 
                           autoFormat="bus"
                           icon={<Bus className="w-4 h-4" />}
+                          disabled={fetchingAssignment}
                         />
                       </div>
-                      <div className="space-y-2 col-span-2">
-                        <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.routeName}</Label>
-                        <AutocompleteInput 
-                          value={formData.routeName} 
-                          onChange={(v) => setFormData({ ...formData, routeName: v })} 
-                          options={history.routes || []} 
-                          placeholder={lang === 'si' ? 'කොළඹ - මහනුවර' : 'Colombo - Kandy'}
-                          icon={<Route className="w-4 h-4 text-blue-500" />}
-                        />
+                      <div className="space-y-2 col-span-2 relative">
+                        <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-2">
+                          {t.routeName}
+                          {fetchingAssignment ? (
+                            <span className="flex items-center gap-1 text-blue-500 animate-pulse">
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              <span className="text-[9px] font-semibold tracking-wider">LOADING...</span>
+                            </span>
+                          ) : routeAutoFilled && !routeConfirmed ? (
+                            <span className="flex items-center gap-1 text-amber-600">
+                              <span className="text-[9px] font-semibold tracking-wider">CONFIRM ROUTE</span>
+                            </span>
+                          ) : routeAutoFilled && routeConfirmed ? (
+                            <span className="flex items-center gap-1 text-emerald-500">
+                              <Lock className="w-3 h-3" />
+                              <span className="text-[9px] font-semibold tracking-wider">SYSTEM ASSIGNED</span>
+                            </span>
+                          ) : null}
+                        </Label>
+                        {routeAutoFilled && !routeConfirmed ? (
+                          <div className="flex flex-col gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg shadow-sm">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                              <Route className="w-4 h-4 text-amber-600 shrink-0" />
+                              {formData.routeName}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Button 
+                                type="button"
+                                size="sm" 
+                                onClick={() => setRouteConfirmed(true)} 
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 flex-1"
+                              >
+                                <Check className="w-4 h-4 mr-1" /> Confirm
+                              </Button>
+                              <Button 
+                                type="button"
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => { 
+                                  setRouteAutoFilled(false); 
+                                  setRouteConfirmed(false);
+                                  setFormData(p => ({...p, routeName: ''})); 
+                                }} 
+                                className="h-8 flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                              >
+                                <X className="w-4 h-4 mr-1" /> Change
+                              </Button>
+                            </div>
+                          </div>
+                        ) : routeAutoFilled && routeConfirmed ? (
+                          <div className="flex items-center gap-2 h-10 px-3 bg-emerald-50 border border-emerald-200 rounded-md text-sm font-semibold text-emerald-800">
+                            <Route className="w-4 h-4 text-emerald-500 shrink-0" />
+                            {formData.routeName}
+                            <CheckCircle className="w-4 h-4 text-emerald-500 ml-auto shrink-0" />
+                          </div>
+                        ) : (
+                          <AutocompleteInput 
+                            value={formData.routeName} 
+                            onChange={(v) => setFormData({ ...formData, routeName: v })} 
+                            options={history.routes || []} 
+                            placeholder={lang === 'si' ? 'කොළඹ - මහනුවර' : 'Colombo - Kandy'}
+                            icon={<Route className="w-4 h-4 text-blue-500" />}
+                          />
+                        )}
                       </div>
                       <div className="space-y-2 col-span-2 sm:col-span-1">
                         <Label className="text-xs font-bold text-slate-600 uppercase tracking-wide">{t.driverName}</Label>
@@ -998,7 +1138,16 @@ export default function PublicConductorUpload() {
                   )}
 
                   {/* Hub Actions */}
-                  <div className="space-y-3">
+                  {fetchingAssignment && (
+                    <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm animate-pulse">
+                      <Loader2 className="w-5 h-5 text-blue-500 animate-spin shrink-0" />
+                      <div>
+                        <p className="text-sm font-bold text-blue-700">Syncing route data...</p>
+                        <p className="text-[10px] text-blue-500">Please wait — loading your bus assignment details</p>
+                      </div>
+                    </div>
+                  )}
+                  <div className={`space-y-3 ${fetchingAssignment ? 'opacity-40 pointer-events-none' : ''}`}>
                     <button 
                       onClick={() => { 
                         if (!validateGlobalFields()) return; 
@@ -1105,7 +1254,7 @@ export default function PublicConductorUpload() {
                     <div className="relative z-10 flex items-center justify-between">
                       <div>
                         <h3 className="font-bold text-lg mb-1">
-                          {completedTrips.length === 0 ? t.bannerReady : 
+                          {completedTrips.length === 0 ? t.bannerReady[quoteIndex] : 
                            completedTrips.length >= maxTrips ? t.bannerDone : 
                            t.bannerKeepUp}
                         </h3>
@@ -1130,29 +1279,6 @@ export default function PublicConductorUpload() {
                     </div>
                     
                     <div className="p-4 space-y-4">
-                      {/* Odometer */}
-                      <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <div className="space-y-1">
-                          <Label className="text-xs font-bold text-slate-700">{t.startOdo} <span className="text-red-500">*</span></Label>
-                          <Input 
-                            type="number" inputMode="decimal" placeholder="0" 
-                            value={trip.startOdo} onChange={(e) => setTrip({...trip, startOdo: e.target.value})} 
-                            className={`h-8 text-sm ${currentTripNumber > 1 ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : !trip.startOdo ? 'border-red-300 bg-red-50 focus-visible:ring-red-500' : ''}`} 
-                            required
-                            readOnly={currentTripNumber > 1}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs font-bold text-slate-700">{t.endOdo} <span className="text-red-500">*</span></Label>
-                          <Input 
-                            type="number" inputMode="decimal" placeholder="0" 
-                            value={trip.endOdo} onChange={(e) => setTrip({...trip, endOdo: e.target.value})} 
-                            className={`h-8 text-sm ${!trip.endOdo ? 'border-red-300 bg-red-50 focus-visible:ring-red-500' : ''}`} 
-                            required
-                          />
-                        </div>
-                      </div>
-
                       {/* Income Fields */}
                       <div className="space-y-5">
                         {/* Passenger Collections - Creative Design */}

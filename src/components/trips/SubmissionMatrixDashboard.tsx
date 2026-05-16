@@ -88,19 +88,37 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
         .from('fleet_master_roster')
         .select(`
           bus_id,
+          route_label,
           buses:bus_id(bus_no),
           routes:route_id(route_leader)
         `)
+        .eq('is_active', true);
+
+      const { data: allRoutes } = await supabase
+        .from('routes')
+        .select('route_name, route_leader')
         .eq('is_active', true);
 
       setTripsData(trips || []);
       setSubmissionsData(submissions || []);
       setPilotBuses(new Set((activeBuses || []).map(b => b.bus_no)));
       
+      const routeLeaderByName = new Map<string, string>();
+      (allRoutes || []).forEach(rt => {
+        if (rt.route_name && rt.route_leader) {
+          routeLeaderByName.set(rt.route_name, rt.route_leader);
+        }
+      });
+
       const rosterLeaders = new Map<string, string>();
       (roster || []).forEach(r => {
-        if (r.buses?.bus_no && r.routes?.route_leader) {
-          rosterLeaders.set(r.buses.bus_no, r.routes.route_leader);
+        const busNo = r.buses?.bus_no;
+        if (busNo) {
+          if (r.routes?.route_leader) {
+            rosterLeaders.set(busNo, r.routes.route_leader);
+          } else if (r.route_label && routeLeaderByName.has(r.route_label)) {
+            rosterLeaders.set(busNo, routeLeaderByName.get(r.route_label)!);
+          }
         }
       });
       setFallbackLeaders(rosterLeaders);
@@ -186,21 +204,26 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
         }
       });
 
-      // Assign the most frequent leader
+      // Assign the most frequent leader from trips, but fallback to roster if Unassigned
+      let bestLeader = 'Unassigned';
       if (busLeaderCounts.has(bus.bus_no)) {
         const lMap = busLeaderCounts.get(bus.bus_no)!;
         let maxCount = -1;
-        let bestLeader = 'Unassigned';
         lMap.forEach((count, leader) => {
           if (count > maxCount) {
             maxCount = count;
             bestLeader = leader;
           }
         });
-        bus.team_leader = bestLeader;
-      } else if (fallbackLeaders.has(bus.bus_no)) {
-        bus.team_leader = fallbackLeaders.get(bus.bus_no)!;
       }
+      
+      // If historical trips yielded no leader (e.g. assigned later), or bus had no trips at all,
+      // fallback to the actively mapped leader from the roster.
+      if (bestLeader === 'Unassigned' && fallbackLeaders.has(bus.bus_no)) {
+        bestLeader = fallbackLeaders.get(bus.bus_no)!;
+      }
+      
+      bus.team_leader = bestLeader;
     });
 
     // Sort by bus number
@@ -299,6 +322,27 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
   if (selectedDetailDay !== null && activeDetailDayData) {
     const { buses, maxTrips, date } = activeDetailDayData;
     
+    // Step 1: Group buses by Team Leader → Route
+    const leaderGroups = new Map<string, Map<string, typeof buses>>();
+    
+    buses.forEach(bus => {
+      const leader = bus.team_leader || 'Unassigned';
+      const dayData = bus.dates.get(selectedDetailDay)!;
+      const routeName = Array.from(new Set(dayData.trips.map(t => t.routes?.route_name || t.route_label).filter(Boolean))).join(', ') || 'Unassigned Route';
+      
+      if (!leaderGroups.has(leader)) leaderGroups.set(leader, new Map());
+      const rg = leaderGroups.get(leader)!;
+      if (!rg.has(routeName)) rg.set(routeName, []);
+      rg.get(routeName)!.push(bus);
+    });
+
+    // Step 2: Sort leaders (Unassigned last)
+    const sortedLeaders = Array.from(leaderGroups.entries()).sort(([a], [b]) => {
+      if (a === 'Unassigned') return 1;
+      if (b === 'Unassigned') return -1;
+      return a.localeCompare(b);
+    });
+    
     return (
       <TooltipProvider>
         <Card className="shadow-sm border-slate-200">
@@ -319,112 +363,92 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
               <span className="flex items-center gap-1"><X className="w-3.5 h-3.5 text-rose-500" /> Missing</span>
             </div>
           </CardHeader>
-          <CardContent className="p-0">
-             <ScrollArea className="w-full">
-               <div className="min-w-max pb-4">
-                 {/* Detail Header */}
-                 <div className="flex border-b bg-slate-50">
-                    <div className="w-32 min-w-32 p-3 font-semibold text-sm text-slate-700 sticky left-0 z-20 bg-slate-50 border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                      Bus Number
-                    </div>
-                    {Array.from({ length: maxTrips }).map((_, i) => (
-                      <div key={i} className="w-16 min-w-16 p-3 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500 border-r bg-slate-50/80">
-                        Trip {i + 1}
+          <CardContent className="p-0 flex flex-col xl:flex-row divide-y xl:divide-y-0 xl:divide-x">
+             <div className="flex-1 min-w-0">
+               <ScrollArea className="w-full">
+                 <div className="min-w-max pb-4">
+                   {/* Detail Header */}
+                   <div className="flex border-b bg-slate-50">
+                      <div className="w-32 min-w-32 p-3 font-semibold text-sm text-slate-700 sticky left-0 z-20 bg-slate-50 border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                        Bus Number
                       </div>
-                    ))}
-                    <div className="w-20 min-w-20 p-3 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500 border-r bg-slate-50/80">
-                      Fuel
-                    </div>
-                    <div className="w-20 min-w-20 p-3 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500 border-r bg-slate-50/80">
-                      Expenses
-                    </div>
-                    <div className="w-32 min-w-32 p-3 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500 border-r bg-slate-50/80">
-                      Bank Deposit
-                    </div>
-                    <div className="w-24 min-w-24 p-3 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500 bg-slate-50/80">
-                      Action
-                    </div>
-                 </div>
+                      {Array.from({ length: maxTrips }).map((_, i) => (
+                        <div key={i} className="w-16 min-w-16 p-3 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500 border-r bg-slate-50/80">
+                          Trip {i + 1}
+                        </div>
+                      ))}
+                      <div className="w-20 min-w-20 p-3 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500 border-r bg-slate-50/80">
+                        Fuel
+                      </div>
+                      <div className="w-20 min-w-20 p-3 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500 border-r bg-slate-50/80">
+                        Expenses
+                      </div>
+                      <div className="w-32 min-w-32 p-3 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500 border-r bg-slate-50/80">
+                        Bank Deposit
+                      </div>
+                      <div className="w-24 min-w-24 p-3 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500 bg-slate-50/80">
+                        Action
+                      </div>
+                   </div>
 
-                 {/* Detail Rows - Grouped by Team Leader */}
-                 {buses.length === 0 ? (
-                    <div className="p-12 text-center text-slate-500 font-medium">No scheduled trips or submissions for this date.</div>
-                  ) : (() => {
-                     // Step 1: Group buses by Team Leader → Route
-                     const leaderGroups = new Map<string, Map<string, typeof buses>>();
-                     
-                     buses.forEach(bus => {
-                       const leader = bus.team_leader || 'Unassigned';
-                       const dayData = bus.dates.get(selectedDetailDay)!;
-                       const routeName = Array.from(new Set(dayData.trips.map(t => t.routes?.route_name || t.route_label).filter(Boolean))).join(', ') || 'Unassigned Route';
-                       
-                       if (!leaderGroups.has(leader)) leaderGroups.set(leader, new Map());
-                       const rg = leaderGroups.get(leader)!;
-                       if (!rg.has(routeName)) rg.set(routeName, []);
-                       rg.get(routeName)!.push(bus);
-                     });
-
-                     // Step 2: Sort leaders (Unassigned last)
-                     const sortedLeaders = Array.from(leaderGroups.entries()).sort(([a], [b]) => {
-                       if (a === 'Unassigned') return 1;
-                       if (b === 'Unassigned') return -1;
-                       return a.localeCompare(b);
-                     });
-
-                     return sortedLeaders.map(([leaderName, routeGroups]) => {
-                       const leaderColor = getLeaderColor(leaderName);
-                       const totalBuses = Array.from(routeGroups.values()).reduce((sum, arr) => sum + arr.length, 0);
-                       
-                       return (
-                       <div key={leaderName} className="flex flex-col">
-                         {/* Team Leader Section Header */}
-                         <div className={cn("border-b border-t-2 w-full", leaderColor.border)}>
-                           <div className={cn("px-4 py-2.5 font-bold text-sm uppercase tracking-wide flex items-center gap-3", leaderColor.bg, leaderColor.text)}>
-                             <Users className="w-4 h-4" />
-                             {leaderName === 'Unassigned' ? 'Unassigned Routes' : `Team Leader: ${leaderName}`}
-                             <Badge variant="secondary" className={cn("text-[10px] h-5 border font-bold", leaderColor.bg, leaderColor.text, leaderColor.border)}>
-                               {totalBuses} Buses
-                             </Badge>
-                           </div>
-                         </div>
-
-                         {/* Routes under this leader */}
-                         {Array.from(routeGroups.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([routeName, routeBuses]) => (
-                           <div key={routeName} className="flex flex-col">
-                             {/* Route Sub-Header */}
-                             <div className="bg-slate-50/80 border-b border-slate-200 sticky left-0 z-10 w-full">
-                               <div className="px-6 py-1.5 font-semibold text-[10px] text-slate-600 uppercase tracking-widest flex items-center gap-2">
-                                 <div className={cn("w-1 h-3 rounded-full", leaderColor.bg)}></div>
-                                 {routeName}
-                                 <span className="text-slate-400 font-normal">({routeBuses.length})</span>
-                               </div>
-                             </div>
+                   {/* Detail Rows - Grouped by Team Leader */}
+                   {buses.length === 0 ? (
+                      <div className="p-12 text-center text-slate-500 font-medium">No scheduled trips or submissions for this date.</div>
+                    ) : (
+                       sortedLeaders.map(([leaderName, routeGroups]) => {
+                         const leaderColor = getLeaderColor(leaderName);
+                         const totalBuses = Array.from(routeGroups.values()).reduce((sum, arr) => sum + arr.length, 0);
                          
-                             {/* Buses in this Route */}
-                             {routeBuses.map((bus, idx) => {
-                               const dayData = bus.dates.get(selectedDetailDay)!;
-                               const hasSubmissions = dayData.submissions.length > 0;
-                           
-                               let expOk = false;
-                               let fuelOk = false;
-                               let depositAmount = 0;
-                               let hasDeposit = false;
-                               let totalExp = 0;
+                         return (
+                         <div key={leaderName} className="flex flex-col">
+                           {/* Team Leader Section Header */}
+                           <div className={cn("border-b border-t-2 w-full", leaderColor.border)}>
+                             <div className={cn("px-4 py-2.5 font-bold text-sm uppercase tracking-wide flex items-center gap-3", leaderColor.bg, leaderColor.text)}>
+                               <Users className="w-4 h-4" />
+                               {leaderName === 'Unassigned' ? 'Unassigned Routes' : `Team Leader: ${leaderName}`}
+                               <Badge variant="secondary" className={cn("text-[10px] h-5 border font-bold", leaderColor.bg, leaderColor.text, leaderColor.border)}>
+                                 {totalBuses} Buses
+                               </Badge>
+                             </div>
+                           </div>
 
-                               dayData.trips.forEach(t => totalExp += (t.total_expenses || 0));
-                               dayData.submissions.forEach((s: any) => {
-                                 if (s.ocr_data?.bank_deposit?.actual_amount) {
-                                   hasDeposit = true;
-                                   depositAmount += parseFloat(s.ocr_data.bank_deposit.actual_amount);
-                                 }
-                                 if (s.ocr_data?.expenses?.total) {
-                                   totalExp += parseFloat(s.ocr_data.expenses.total);
-                                 }
-                                 if (s.ocr_data?.fuel_details?.liters) {
-                                   fuelOk = true;
-                                 }
-                               });
-                               expOk = totalExp > 0 || hasSubmissions;
+                           {/* Routes under this leader */}
+                           {Array.from(routeGroups.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([routeName, routeBuses]) => (
+                             <div key={routeName} className="flex flex-col">
+                               {/* Route Sub-Header */}
+                               <div className="bg-slate-50/80 border-b border-slate-200 sticky left-0 z-10 w-full">
+                                 <div className="px-6 py-1.5 font-semibold text-[10px] text-slate-600 uppercase tracking-widest flex items-center gap-2">
+                                   <div className={cn("w-1 h-3 rounded-full", leaderColor.bg)}></div>
+                                   {routeName}
+                                   <span className="text-slate-400 font-normal">({routeBuses.length})</span>
+                                 </div>
+                               </div>
+                           
+                               {/* Buses in this Route */}
+                               {routeBuses.map((bus, idx) => {
+                                 const dayData = bus.dates.get(selectedDetailDay)!;
+                                 const hasSubmissions = dayData.submissions.length > 0;
+                             
+                                 let expOk = false;
+                                 let fuelOk = false;
+                                 let depositAmount = 0;
+                                 let hasDeposit = false;
+                                 let totalExp = 0;
+
+                                 dayData.trips.forEach(t => totalExp += (t.total_expenses || 0));
+                                 dayData.submissions.forEach((s: any) => {
+                                   if (s.ocr_data?.bank_deposit?.actual_amount) {
+                                     hasDeposit = true;
+                                     depositAmount += parseFloat(s.ocr_data.bank_deposit.actual_amount);
+                                   }
+                                   if (s.ocr_data?.expenses?.total) {
+                                     totalExp += parseFloat(s.ocr_data.expenses.total);
+                                   }
+                                   if (s.ocr_data?.fuel_details?.liters) {
+                                     fuelOk = true;
+                                   }
+                                 });
+                                 expOk = totalExp > 0 || hasSubmissions;
 
                                const sortedTrips = [...dayData.trips].sort((a, b) => {
                                  const numA = parseInt(a.trip_no?.replace(/\D/g, '') || '0');
@@ -521,11 +545,67 @@ export function SubmissionMatrixDashboard({ selectedMonth }: SubmissionMatrixDas
                          ))}
                        </div>
                      );
-                     });
-                 })()}
+                   })
+                 )}
                </div>
                <ScrollBar orientation="horizontal" />
              </ScrollArea>
+           </div>
+           
+           {/* Right Pane (Team Leader Summary) */}
+           <div className="w-full xl:w-[320px] shrink-0 bg-slate-50/50 p-4 border-t xl:border-t-0">
+             <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
+               <Users className="w-4 h-4 text-slate-500" />
+               Team Leader Summary
+             </h3>
+             <div className="space-y-4">
+               {sortedLeaders.length === 0 ? (
+                  <p className="text-sm text-slate-500 italic">No data</p>
+               ) : (
+                 sortedLeaders.map(([leaderName, routeGroups]) => {
+                   const leaderColor = getLeaderColor(leaderName);
+                   const allLeaderBuses = Array.from(routeGroups.values()).flat();
+                   const totalBuses = allLeaderBuses.length;
+                   
+                   // Count how many buses have AT LEAST one successful submission recorded today
+                   const submittedBuses = allLeaderBuses.filter(b => {
+                      const dayData = b.dates.get(selectedDetailDay)!;
+                      return dayData.submissions.length > 0;
+                   }).length;
+                   
+                   const pendingBuses = totalBuses - submittedBuses;
+                   const progress = totalBuses > 0 ? Math.round((submittedBuses / totalBuses) * 100) : 0;
+
+                   return (
+                     <div key={leaderName} className={cn("p-3 rounded-lg border bg-white shadow-sm", leaderColor.border)}>
+                       <div className="flex justify-between items-center mb-2">
+                         <span className={cn("font-bold text-sm", leaderColor.text)}>
+                           {leaderName === 'Unassigned' ? 'Unassigned' : leaderName}
+                         </span>
+                         <Badge variant="secondary" className="text-[10px] bg-slate-100">{totalBuses} Buses</Badge>
+                       </div>
+                       
+                       {/* Progress Bar */}
+                       <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mb-3">
+                         <div className={cn("h-full transition-all duration-500", leaderColor.bg)} style={{ width: `${progress}%` }} />
+                       </div>
+
+                       <div className="flex justify-between text-[11px] font-bold uppercase tracking-wider">
+                         <div className="flex items-center gap-1.5 text-emerald-600">
+                           <Check className="w-3.5 h-3.5" />
+                           {submittedBuses} Done
+                         </div>
+                         <div className="flex items-center gap-1.5 text-rose-500">
+                           <Clock className="w-3.5 h-3.5" />
+                           {pendingBuses} Pending
+                         </div>
+                       </div>
+                     </div>
+                   );
+                 })
+               )}
+             </div>
+           </div>
           </CardContent>
         </Card>
 

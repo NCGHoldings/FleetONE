@@ -17,7 +17,7 @@ import { useCreateARInvoice, useUpdateARInvoice } from "@/hooks/useAccountingMut
 import { useGenerateNumber } from "@/hooks/useNumbering";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2, Receipt, MapPin, AlignLeft, FileText, Bus } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { SearchableAccountSelector } from "./shared/SearchableAccountSelector";
 import { SearchableCustomerSelector } from "./shared/SearchableCustomerSelector";
@@ -298,160 +298,170 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit AR Invoice" : "Create AR Invoice"}</DialogTitle>
+      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto bg-slate-50/95 backdrop-blur border-slate-200 shadow-2xl">
+        <DialogHeader className="pb-2 border-b border-slate-200/60 mb-2 flex flex-row items-center justify-between pr-8">
+          <DialogTitle className="text-xl font-semibold text-slate-800 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-blue-600" />
+            {isEditing ? "Edit AR Invoice" : "Create AR Invoice"}
+          </DialogTitle>
+          <span className={`px-2.5 py-0.5 rounded-full text-[11px] uppercase tracking-wider font-bold ${isEditing ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-100 text-blue-800 border border-blue-200'}`}>
+            {isEditing ? "Editing" : "New Draft"}
+          </span>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Header Fields */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <FormField
-                control={form.control}
-                name="invoice_number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Invoice #</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input 
-                          {...field} 
-                          className="font-mono" 
-                          readOnly
-                          placeholder={isEditing ? editingInvoice?.invoice_number : "Auto-generated on save"}
-                        />
-                         {isGenerating && (
-                          <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
-                        )}
-                      </div>
-                    </FormControl>
-                    <FormDescription className="text-xs">{isEditing ? "Read-only" : "Auto-generated on save"}</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="customer_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Customer</FormLabel>
-                    <SearchableCustomerSelector
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      showQuickAdd={true}
-                    />
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="invoice_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Invoice Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="due_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Due Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {isParentView && (
+            
+            {/* Header Fields - Organized in a modern card */}
+            <div className="bg-white p-5 rounded-xl border border-slate-200/60 shadow-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
                 <FormField
                   control={form.control}
-                  name="business_unit_code"
+                  name="customer_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Business Unit</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Unit" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="HQ">HQ / Central</SelectItem>
-                          {BUSINESS_UNITS.map(bu => (
-                            <SelectItem key={bu.code} value={bu.code}>{bu.code} — {bu.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel className="text-slate-600 font-medium">Customer</FormLabel>
+                      <SearchableCustomerSelector
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        showQuickAdd={true}
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              )}
+
+                <FormField
+                  control={form.control}
+                  name="invoice_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-slate-600 font-medium">Invoice #</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input 
+                            {...field} 
+                            className="font-mono bg-slate-50" 
+                            readOnly
+                            placeholder={isEditing ? editingInvoice?.invoice_number : "Auto-generated on save"}
+                          />
+                           {isGenerating && (
+                            <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="invoice_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-slate-600 font-medium">Invoice Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} className="bg-white" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="due_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-slate-600 font-medium">Due Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} className="bg-white" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {isParentView && (
+                  <FormField
+                    control={form.control}
+                    name="business_unit_code"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2 md:col-span-4 mt-2">
+                        <FormLabel className="text-slate-600 font-medium">Business Unit</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="w-full md:w-1/4">
+                              <SelectValue placeholder="Select Unit" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="HQ">HQ / Central</SelectItem>
+                            {BUSINESS_UNITS.map(bu => (
+                              <SelectItem key={bu.code} value={bu.code}>{bu.code} — {bu.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
             </div>
 
-            {/* Bus Selection */}
-            <div className="border rounded-lg p-4 bg-muted/30">
-              <h3 className="font-semibold text-sm mb-3">Bus Details (Optional)</h3>
+            {/* Bus Selection - Encapsulated */}
+            <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100/60 shadow-sm transition-all duration-200 hover:shadow-md hover:bg-blue-50/60">
+              <h3 className="font-medium text-blue-900 text-sm mb-3 flex items-center gap-2">
+                <Bus className="w-4 h-4 text-blue-700" />
+                Fleet Details (Optional Context)
+              </h3>
               <BusSelector value={busData} onChange={setBusData} />
             </div>
 
-            {/* Invoice Lines */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-semibold">Invoice Lines</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addLine}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Line
-                </Button>
+            {/* Invoice Lines - Sleek Table */}
+            <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-slate-500" />
+                  Invoice Lines
+                </h3>
               </div>
-
-              <div className="border rounded-lg overflow-x-auto">
-                <table className="w-full min-w-[900px] table-fixed">
+              
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[950px] table-fixed text-sm">
                   <colgroup>
-                    <col style={{ width: 150 }} />
+                    <col style={{ width: 160 }} />
                     <col />
-                    <col style={{ width: 90 }} />
-                    <col style={{ width: 150 }} />
-                    <col style={{ width: 110 }} />
+                    <col style={{ width: 80 }} />
+                    <col style={{ width: 140 }} />
+                    <col style={{ width: 120 }} />
                     <col style={{ width: 180 }} />
-                    <col style={{ width: 130 }} />
-                    <col style={{ width: 40 }} />
+                    <col style={{ width: 140 }} />
+                    <col style={{ width: 50 }} />
                   </colgroup>
-                  <thead className="bg-muted">
+                  <thead className="bg-white border-b border-slate-200">
                     <tr>
-                      <th className="px-3 py-2 text-left text-sm font-medium">Item Category</th>
-                      <th className="px-3 py-2 text-left text-sm font-medium">Description</th>
-                      <th className="px-3 py-2 text-center text-sm font-medium">Qty</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium">Unit Price</th>
-                      <th className="px-3 py-2 text-center text-sm font-medium">Tax Code</th>
-                      <th className="px-3 py-2 text-left text-sm font-medium">Revenue Account</th>
-                      <th className="px-3 py-2 text-right text-sm font-medium">Line Total</th>
-                      <th className="px-3 py-2"></th>
+                      <th className="px-4 py-3 text-left font-medium text-slate-500">Item Category</th>
+                      <th className="px-4 py-3 text-left font-medium text-slate-500">Description</th>
+                      <th className="px-4 py-3 text-center font-medium text-slate-500">Qty</th>
+                      <th className="px-4 py-3 text-right font-medium text-slate-500">Unit Price</th>
+                      <th className="px-4 py-3 text-center font-medium text-slate-500">Tax</th>
+                      <th className="px-4 py-3 text-left font-medium text-slate-500">Revenue Account</th>
+                      <th className="px-4 py-3 text-right font-medium text-slate-500">Line Total</th>
+                      <th className="px-4 py-3"></th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100">
                     {lines.map((line) => (
-                      <tr key={line.id} className="border-t">
-                        <td className="px-3 py-2">
+                      <tr key={line.id} className="hover:bg-blue-50/40 transition-colors group">
+                        <td className="px-4 py-3">
                           <Select
                             value={line.item_category_id || "_none"}
                             onValueChange={(val) => handleCategoryChange(line.id, val)}
                           >
-                            <SelectTrigger className="h-9 text-sm">
+                            <SelectTrigger className="h-9 bg-white">
                               <SelectValue placeholder="Select category" />
                             </SelectTrigger>
                             <SelectContent>
@@ -464,13 +474,13 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                             </SelectContent>
                           </Select>
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3">
                           <Textarea
                             value={line.description}
                             onChange={(e) => updateLine(line.id, "description", e.target.value)}
-                            placeholder="Item description"
+                            placeholder="Detailed description..."
                             rows={1}
-                            className="min-h-[36px] text-sm resize-none"
+                            className="min-h-[36px] resize-none bg-white border-slate-200 focus:border-blue-300 transition-colors"
                             onInput={(e) => {
                               const target = e.target as HTMLTextAreaElement;
                               target.style.height = 'auto';
@@ -478,29 +488,29 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                             }}
                           />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3">
                           <Input
                             type="number"
                             value={line.quantity}
                             onChange={(e) => updateLine(line.id, "quantity", parseFloat(e.target.value) || 0)}
-                            className="h-9 text-center"
+                            className="h-9 text-center bg-white"
                             min={1}
                           />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3">
                           <CurrencyInput
                             value={line.unit_price}
                             onValueChange={(val) => updateLine(line.id, "unit_price", val)}
-                            placeholder="0"
+                            placeholder="0.00"
                             compact
                           />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3">
                           <Select
                             value={line.tax_code || "_none"}
                             onValueChange={(val) => handleTaxCodeChange(line.id, val === "_none" ? "" : val)}
                           >
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger className="h-9 bg-white">
                               <SelectValue placeholder="None" />
                             </SelectTrigger>
                             <SelectContent>
@@ -513,27 +523,28 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                             </SelectContent>
                           </Select>
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3">
                           <SearchableAccountSelector
                             value={line.account_id || ""}
                             onValueChange={(val) => updateLine(line.id, "account_id", val)}
                             placeholder="Auto from category"
                             accountTypes={["revenue", "income", "equity"]}
-                            className="h-9 text-sm"
+                            className="h-9 bg-white"
                           />
                         </td>
-                        <td className="px-3 py-2 text-right font-medium">
+                        <td className="px-4 py-3 text-right font-medium text-slate-800">
                           <CurrencyDisplay amount={line.line_total} />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3 text-center">
                           <Button
                             type="button"
                             variant="ghost"
-                            size="sm"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
                             onClick={() => removeLine(line.id)}
                             disabled={lines.length === 1}
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </td>
                       </tr>
@@ -541,60 +552,83 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                   </tbody>
                 </table>
               </div>
+              <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+                <Button type="button" variant="ghost" size="sm" onClick={addLine} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Line Item
+                </Button>
+              </div>
+            </div>
 
-              {/* Totals */}
-              <div className="flex justify-end">
-                <div className="w-64 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal:</span>
-                    <span className="font-medium"><CurrencyDisplay amount={subtotal} /></span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tax:</span>
-                    <span className="font-medium"><CurrencyDisplay amount={totalTax} /></span>
-                  </div>
-                  <div className="flex justify-between border-t pt-2">
-                    <span className="font-semibold">Total:</span>
-                    <span className="font-bold text-lg"><CurrencyDisplay amount={grandTotal} /></span>
+            {/* Bottom Split Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              
+              {/* Left side - Notes & Address */}
+              <div className="col-span-1 lg:col-span-7 space-y-4">
+                <div className="bg-white p-4 rounded-xl border border-slate-200/60 shadow-sm">
+                  <FormField
+                    control={form.control}
+                    name="billing_address"
+                    render={({ field }) => (
+                      <FormItem className="mb-4">
+                        <FormLabel className="text-slate-600 font-medium flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400" /> Billing Address (Override)
+                        </FormLabel>
+                        <FormControl>
+                          <Textarea {...field} placeholder="Leave blank to use default customer address..." rows={2} className="resize-none bg-slate-50 focus-visible:ring-blue-500" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-slate-600 font-medium flex items-center gap-1.5">
+                          <AlignLeft className="w-3.5 h-3.5 text-slate-400" /> Internal Notes & Remarks
+                        </FormLabel>
+                        <FormControl>
+                          <Textarea {...field} placeholder="Optional notes for internal reference..." rows={3} className="resize-none bg-slate-50 focus-visible:ring-blue-500" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Right side - Totals Card */}
+              <div className="col-span-1 lg:col-span-5">
+                <div className="bg-blue-50/60 border border-blue-200/60 rounded-xl p-5 shadow-sm">
+                  <h3 className="font-semibold text-blue-900 mb-4 border-b border-blue-200/60 pb-2">Invoice Totals</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span>Subtotal</span>
+                      <span className="font-medium text-slate-800"><CurrencyDisplay amount={subtotal} /></span>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span>Tax Amount</span>
+                      <span className="font-medium text-slate-800"><CurrencyDisplay amount={totalTax} /></span>
+                    </div>
+                    <div className="pt-3 mt-3 border-t border-blue-200/60 flex justify-between items-center">
+                      <span className="font-semibold text-slate-900 text-base">Total Amount</span>
+                      <span className="font-bold text-xl text-blue-700 tracking-tight"><CurrencyDisplay amount={grandTotal} /></span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <FormField
-              control={form.control}
-              name="billing_address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Billing Address</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} placeholder="Enter specific billing address for this invoice..." rows={3} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} placeholder="Additional notes..." rows={2} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            {/* Fixed Footer Actions */}
+            <div className="flex justify-end gap-3 pt-6 border-t border-slate-200/60 mt-4">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="bg-white">
                 Cancel
               </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? (isEditing ? "Updating..." : "Creating...") : (isEditing ? "Update Invoice" : "Create Invoice")}
+              <Button type="submit" disabled={isPending} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm px-6">
+                {isPending ? (isEditing ? "Updating..." : "Creating...") : (isEditing ? "Update Invoice" : "Create & Send Invoice")}
               </Button>
             </div>
           </form>

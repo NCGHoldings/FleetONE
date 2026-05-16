@@ -12,6 +12,7 @@ export const ConductorPortalQuickActions = () => {
   const { toast } = useToast();
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [instructionsOpen, setInstructionsOpen] = useState(false);
+  const [isPortalExpanded, setIsPortalExpanded] = useState(false);
   const uploadUrl = `${window.location.origin}/public/conductor-upload`;
 
   const copyToClipboard = (text: string, label: string) => {
@@ -93,89 +94,100 @@ export const ConductorPortalQuickActions = () => {
   return (
     <>
       <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <QrCode className="h-5 w-5" />
-            Conductor Upload Portal
-          </CardTitle>
-          <CardDescription>
-            Share this link or QR code with conductors to submit trip sheets
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Mini QR Code Preview */}
-          <div className="flex items-start gap-4 p-4 bg-background rounded-lg border">
-            <div className="flex-shrink-0 p-2 bg-white rounded-lg">
-              <QRCodeSVG value={uploadUrl} size={80} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium mb-1">Upload URL</p>
-              <p className="text-xs text-muted-foreground break-all mb-3">{uploadUrl}</p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => copyToClipboard(uploadUrl, "Upload link")}
-                >
-                  <Copy className="mr-2 h-3 w-3" />
-                  Copy Link
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => window.open(uploadUrl, '_blank')}
-                >
-                  <ExternalLink className="mr-2 h-3 w-3" />
-                  Open
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setQrModalOpen(true)}
-                >
-                  <QrCode className="mr-2 h-3 w-3" />
-                  Full QR
-                </Button>
+        <Collapsible open={isPortalExpanded} onOpenChange={setIsPortalExpanded}>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-slate-50/50 transition-colors">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <QrCode className="h-5 w-5" />
+                    Conductor Upload Portal
+                  </CardTitle>
+                  <CardDescription>
+                    Share this link or QR code with conductors to submit trip sheets
+                  </CardDescription>
+                </div>
+                <ChevronDown className={`h-5 w-5 text-slate-400 transition-transform ${isPortalExpanded ? 'rotate-180' : ''}`} />
               </div>
-            </div>
-          </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
+              {/* Mini QR Code Preview */}
+              <div className="flex items-start gap-4 p-4 bg-background rounded-lg border">
+                <div className="flex-shrink-0 p-2 bg-white rounded-lg">
+                  <QRCodeSVG value={uploadUrl} size={80} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium mb-1">Upload URL</p>
+                  <p className="text-xs text-muted-foreground break-all mb-3">{uploadUrl}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(uploadUrl, "Upload link")}
+                    >
+                      <Copy className="mr-2 h-3 w-3" />
+                      Copy Link
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(uploadUrl, '_blank')}
+                    >
+                      <ExternalLink className="mr-2 h-3 w-3" />
+                      Open
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setQrModalOpen(true)}
+                    >
+                      <QrCode className="mr-2 h-3 w-3" />
+                      Full QR
+                    </Button>
+                  </div>
+                </div>
+              </div>
 
-          {/* Share Actions */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Share via:</p>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={shareViaWhatsApp}>
-                <MessageSquare className="mr-2 h-4 w-4" />
-                WhatsApp
-              </Button>
-              <Button size="sm" variant="outline" onClick={shareViaEmail}>
-                <Mail className="mr-2 h-4 w-4" />
-                Email
-              </Button>
-            </div>
-          </div>
+              {/* Share Actions */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Share via:</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={shareViaWhatsApp}>
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    WhatsApp
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={shareViaEmail}>
+                    <Mail className="mr-2 h-4 w-4" />
+                    Email
+                  </Button>
+                </div>
+              </div>
 
-          {/* Instructions */}
-          <Collapsible open={instructionsOpen} onOpenChange={setInstructionsOpen}>
-            <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium hover:text-primary">
-              <ChevronDown className={`h-4 w-4 transition-transform ${instructionsOpen ? 'rotate-180' : ''}`} />
-              Instructions for Conductors
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2 text-sm text-muted-foreground space-y-2">
-              <ol className="list-decimal list-inside space-y-1">
-                <li>Open the upload link or scan the QR code</li>
-                <li>Enter your name and phone number</li>
-                <li>Enter the bus number</li>
-                <li>Take clear photos of your trip sheet (both sides if needed)</li>
-                <li>Upload the images (up to 5 images)</li>
-                <li>Click Submit and save your submission code</li>
-              </ol>
-              <p className="text-xs mt-2 italic">
-                Submissions will be processed and reviewed by our team. You'll be notified once reviewed.
-              </p>
-            </CollapsibleContent>
-          </Collapsible>
-        </CardContent>
+              {/* Instructions */}
+              <Collapsible open={instructionsOpen} onOpenChange={setInstructionsOpen}>
+                <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium hover:text-primary">
+                  <ChevronDown className={`h-4 w-4 transition-transform ${instructionsOpen ? 'rotate-180' : ''}`} />
+                  Instructions for Conductors
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2 text-sm text-muted-foreground space-y-2">
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>Open the upload link or scan the QR code</li>
+                    <li>Enter your name and phone number</li>
+                    <li>Enter the bus number</li>
+                    <li>Take clear photos of your trip sheet (both sides if needed)</li>
+                    <li>Upload the images (up to 5 images)</li>
+                    <li>Click Submit and save your submission code</li>
+                  </ol>
+                  <p className="text-xs mt-2 italic">
+                    Submissions will be processed and reviewed by our team. You'll be notified once reviewed.
+                  </p>
+                </CollapsibleContent>
+              </Collapsible>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
       </Card>
 
       {/* Full QR Code Modal */}

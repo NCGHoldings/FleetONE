@@ -136,7 +136,7 @@ export function MasterExpenseUploader({ onSuccess }: Props) {
     }
   };
 
-  const sectors = ["Special Hire", "Yutong", "Sinotruck", "Light Vehicle", "NCG Holding", "NCG Express"];
+  const sectors = ["School Bus", "Special Hire", "Yutong", "Sinotruck", "Light Vehicle", "NCG Holding", "NCG Express"];
 
   if (showMapper && pendingFile) {
     return (

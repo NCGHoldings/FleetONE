@@ -60,6 +60,7 @@ import PublicComplaint from "./pages/PublicComplaint";
 import PublicSpecialHire from "./pages/PublicSpecialHire";
 import PublicReceiptUpload from "./pages/PublicReceiptUpload";
 import PublicConductorUpload from "./pages/PublicConductorUpload";
+import PublicDriverUpload from "./pages/PublicDriverUpload";
 import { ConductorSubmissionsReview } from "./components/trips/ConductorSubmissionsReview";
 import { LateEntryApprovalInterface } from "./components/trips/LateEntryApprovalInterface";
 import CrewLogin from "./pages/CrewLogin";
@@ -161,6 +162,8 @@ const App = () => (
             <Route path="/public/yutong-report" element={<PublicYutongReport />} />
             <Route path="/public/yutong-spreadsheet" element={<PublicYutongSpreadsheet />} />
             
+            {/* Admin/Master Data Routes */}
+            
             {/* Crew App Routes */}
             <Route path="/public/crew-login" element={
               <CrewAuthProvider>
@@ -174,6 +177,7 @@ const App = () => (
             }>
               <Route index element={<PublicConductorUpload />} />
               <Route path="upload" element={<PublicConductorUpload />} />
+              <Route path="driver-upload" element={<PublicDriverUpload />} />
               <Route path="performance" element={<CrewPerformance />} />
               <Route path="finance" element={<CrewFinance />} />
               <Route path="history" element={<CrewHistory />} />

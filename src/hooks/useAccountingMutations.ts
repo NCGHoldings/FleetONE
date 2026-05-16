@@ -1182,6 +1182,7 @@ export const useCreateAPInvoice = () => {
         tax_code?: string;
         line_total: number;
         account_id?: string;
+        cost_center_id?: string;
       }>;
       cost_allocations?: Array<{ unit_code: string; amount: number }>;
     }) => {
@@ -1269,6 +1270,7 @@ export const useCreateAPInvoice = () => {
             amount: line.line_total || 0,
             taxAmount: line.tax_amount || 0,
             description: `${line.description || 'Expense'} - ${invoice.invoice_number}`,
+            costCenterId: line.cost_center_id,
           }));
 
           const glResult = await postAPInvoiceToGL({

@@ -86,12 +86,17 @@ export const SubmissionReviewModal = ({
 
       if (bus) {
         busFound = true;
-        const { data: trip } = await supabase
+        let tripQuery = supabase
           .from('daily_trips')
-          .select('id, income, distance_km, total_expenses')
-          .eq('bus_id', bus.id)
-          .eq('trip_date', tripDate)
-          .maybeSingle();
+          .select('id, income, distance_km, total_expenses');
+          
+        if (submission?.applied_to_trip_id && tripDate === submission?.trip_date) {
+            tripQuery = tripQuery.eq('id', submission.applied_to_trip_id);
+        } else {
+            tripQuery = tripQuery.eq('bus_id', bus.id).eq('trip_date', tripDate);
+        }
+        
+        const { data: trip } = await tripQuery.maybeSingle();
         
         if (trip) {
           setExistingTripId(trip.id);
@@ -209,12 +214,17 @@ export const SubmissionReviewModal = ({
         const isPrimaryDate = date === editedData.trip_date;
         
         // Find existing trip for this specific date FULLY to merge properly
-        const { data: existingTrip } = await supabase
+        let tripQuery = supabase
           .from('daily_trips')
-          .select('*')
-          .eq('bus_id', bus.id)
-          .eq('trip_date', date)
-          .maybeSingle();
+          .select('*');
+          
+        if (submission.applied_to_trip_id && isPrimaryDate) {
+          tripQuery = tripQuery.eq('id', submission.applied_to_trip_id);
+        } else {
+          tripQuery = tripQuery.eq('bus_id', bus.id).eq('trip_date', date);
+        }
+        
+        const { data: existingTrip } = await tripQuery.maybeSingle();
 
         const tripPayload: any = {
           bus_id: bus.id,

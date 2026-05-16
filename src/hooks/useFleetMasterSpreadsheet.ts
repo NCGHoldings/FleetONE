@@ -88,9 +88,23 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
       }, {});
 
       const leaderDict: Record<string, string | null> = {};
+      
+      const routeByName = (routesData || []).reduce((acc: any, curr: any) => {
+        acc[curr.route_name] = curr;
+        return acc;
+      }, {});
+
       (rosterData || []).forEach((r: any) => {
-        if (r.route_label && r.route_id) {
-          leaderDict[r.route_label] = routeDict[r.route_id]?.route_leader || null;
+        if (r.route_label) {
+          if (r.route_id && routeDict[r.route_id]?.route_leader) {
+            leaderDict[r.route_label] = routeDict[r.route_id].route_leader;
+          } else if (routeByName[r.route_label]?.route_leader) {
+            leaderDict[r.route_label] = routeByName[r.route_label].route_leader;
+          } else {
+             if (leaderDict[r.route_label] === undefined) {
+               leaderDict[r.route_label] = null;
+             }
+          }
         }
       });
       setRouteLeaders(leaderDict);
@@ -835,20 +849,61 @@ export function useFleetMasterSpreadsheet(selectedDate: Date, editMode: EditMode
   const updateRouteLeaders = async (routeLabels: string[], leaderName: string) => {
     try {
       const targetRouteIds = new Set<string>();
-      roster.forEach(r => {
-        if (r.route_label && routeLabels.includes(r.route_label) && r.route_id) {
-          targetRouteIds.add(r.route_id);
-        }
-      });
-
-      if (targetRouteIds.size === 0) return;
-
-      const { error } = await supabase
-        .from("routes")
-        .update({ route_leader: leaderName })
-        .in("id", Array.from(targetRouteIds));
+      
+      for (const label of routeLabels) {
+        // Find existing route by ID if linked in roster
+        let routeId = roster.find(r => r.route_label === label && r.route_id)?.route_id;
         
-      if (error) throw error;
+        // Fallback: match by name in availableRoutes
+        if (!routeId) {
+           const match = availableRoutes.find(r => r.route_name === label);
+           if (match) routeId = match.id;
+        }
+
+        // If STILL no routeId, create the route!
+        if (!routeId) {
+           const generatedRouteNo = `RTE-${Math.floor(Math.random() * 10000)}`;
+           const parts = label.split('-');
+           const startLoc = parts[0]?.trim() || 'Unknown';
+           const endLoc = parts[1]?.trim() || 'Unknown';
+
+           const { data: newRoute, error: insertError } = await supabase
+             .from("routes")
+             .insert({ 
+                route_name: label, 
+                route_no: generatedRouteNo,
+                start_location: startLoc,
+                end_location: endLoc,
+                distance_km: 0,
+                route_leader: leaderName, 
+                is_active: true 
+             })
+             .select()
+             .single();
+           if (insertError) throw insertError;
+           routeId = newRoute.id;
+
+           // Also back-update roster entries for this label so they link to the newly created route_id
+           await supabase
+             .from("fleet_master_roster")
+             .update({ route_id: routeId })
+             .eq("route_label", label);
+        }
+
+        if (routeId) {
+          targetRouteIds.add(routeId);
+        }
+      }
+
+      if (targetRouteIds.size > 0) {
+        const { error } = await supabase
+          .from("routes")
+          .update({ route_leader: leaderName })
+          .in("id", Array.from(targetRouteIds));
+          
+        if (error) throw error;
+      }
+      
       toast({ title: "Success", description: "Route leaders updated" });
       await fetchRoster();
     } catch (error: any) {

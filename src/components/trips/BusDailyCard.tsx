@@ -41,8 +41,8 @@ export function BusDailyCard({ summary, onRefresh }: BusDailyCardProps) {
   };
 
   // Divide expenses equally by number of trips
-  const allocatedExpense = summary.total_expenses / summary.trip_count;
-  const expensePercentage = 100 / summary.trip_count;
+  const allocatedExpense = summary.trip_count > 0 ? summary.total_expenses / summary.trip_count : 0;
+  const expensePercentage = summary.trip_count > 0 ? 100 / summary.trip_count : 0;
   
   const allocatedExpenses = summary.trips.map(trip => ({
     ...trip,

@@ -11,7 +11,7 @@ import { format } from "date-fns";
 import { SearchableSelect } from "@/components/accounting/expenses/SearchableSelect";
 import { toast } from "sonner";
 import { useChartOfAccounts } from "@/hooks/useAccountingData";
-import { useCreateJournalEntry, usePostJournalEntry } from "@/hooks/useAccountingMutations";
+import { useCreateJournalEntry, usePostJournalEntry, useCreateAPInvoice, useCreateAPPayment } from "@/hooks/useAccountingMutations";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useVendors, useCustomers } from "@/hooks/useAccountingData";
@@ -38,6 +38,8 @@ export function ExpenseMappingGrid({ importData }: Props) {
   // Accounting mapping hooks
   const { data: accounts } = useChartOfAccounts();
   const createJournal = useCreateJournalEntry();
+  const createAPInvoice = useCreateAPInvoice();
+  const createAPPayment = useCreateAPPayment();
   const postJournal = usePostJournalEntry();
   const { selectedCompanyId, currentCompany } = useCompany();
   
@@ -280,16 +282,70 @@ export function ExpenseMappingGrid({ importData }: Props) {
     let crAccountId: string | undefined;
     let description = "";
 
-    if (category === "AP_Invoice") {
+    // Smart Routing: If a vendor is mapped, force AP Invoice flow (unless explicitly an AP Payment)
+    const isAPInvoiceFlow = category === "AP_Invoice" || (record.mapped_vendor_id && category !== "AP_Payment");
+
+    if (isAPInvoiceFlow) {
       drAccountId = record.mapped_expense_account_id || undefined;
-      crAccountId = record.mapped_payment_account_id || undefined; // AP Account selected in payment mode column
       description = `AP Invoice: ${record.vendor_name || record.raw_data["Vendor"] || "Unknown"} - ${record.document_number || "Import"}`;
+      
+      if (!drAccountId || !record.mapped_vendor_id) {
+        throw new Error(`Missing Expense Account or Vendor for AP Invoice`);
+      }
+
+      const invoiceNumber = record.document_number || `INV-${record.id.substring(0, 8).toUpperCase()}`;
+
+      await createAPInvoice.mutateAsync({
+        invoice_number: invoiceNumber,
+        vendor_id: record.mapped_vendor_id,
+        invoice_date: record.expense_date || new Date().toISOString().split('T')[0],
+        due_date: record.expense_date || new Date().toISOString().split('T')[0],
+        total_amount: record.amount,
+        notes: description,
+        lines: [
+          {
+            description: description,
+            quantity: 1,
+            unit_price: record.amount,
+            line_total: record.amount,
+            account_id: drAccountId,
+            cost_center_id: record.mapped_vehicle_id || undefined
+          }
+        ]
+      });
+
+      // We still need to mark the record as confirmed. There is no gl_journal_id for AP Invoices at this step.
+      await updateRecordInDb(record.id, { 
+        is_confirmed: true
+      });
+
+      return "AP-INVOICE";
     } else if (category === "AP_Payment") {
-      drAccountId = record.mapped_expense_account_id || undefined; // AP Account selected in expense column
       crAccountId = record.mapped_payment_account_id || undefined; // Bank/Cash selected in payment column
       description = `AP Payment: ${record.vendor_name || record.raw_data["Vendor"] || "Unknown"} - ${record.document_number || "Import"}`;
+      
+      if (!crAccountId || !record.mapped_vendor_id) {
+        throw new Error(`Missing Bank/Cash Account or Vendor for AP Payment`);
+      }
+
+      await createAPPayment.mutateAsync({
+        payment_number: record.document_number || `PMT-${record.id.substring(0, 8).toUpperCase()}`,
+        vendor_id: record.mapped_vendor_id,
+        payment_date: record.expense_date || new Date().toISOString().split('T')[0],
+        amount: record.amount,
+        payment_method: "bank_transfer",
+        bank_account_id: crAccountId,
+        notes: description,
+        is_direct_payment: true
+      });
+
+      await updateRecordInDb(record.id, { 
+        is_confirmed: true
+      });
+
+      return "AP-PAYMENT";
     } else {
-      // Default Expense flow
+      // Default Expense flow (Journal Entry)
       drAccountId = record.mapped_expense_account_id || undefined;
       crAccountId = record.mapped_payment_account_id || undefined;
       description = `Expense Import: ${importData.expense_type} - ${record.raw_data["TRIP ID"] || record.raw_data["TRNX_ID"] || "Generic"}`;
@@ -312,13 +368,15 @@ export function ExpenseMappingGrid({ importData }: Props) {
           account_id: drAccountId,
           debit_amount: record.amount,
           credit_amount: 0,
-          description: description
+          description: description,
+          cost_center_id: record.mapped_vehicle_id || undefined
         },
         {
           account_id: crAccountId,
           debit_amount: 0,
           credit_amount: record.amount,
-          description: description
+          description: description,
+          cost_center_id: record.mapped_vehicle_id || undefined
         }
       ]
     });
@@ -352,9 +410,10 @@ export function ExpenseMappingGrid({ importData }: Props) {
   // Bulk Operations
   const [bulkVendorId, setBulkVendorId] = useState<string>("");
   const [bulkCustomerId, setBulkCustomerId] = useState<string>("");
+  const [bulkVehicleId, setBulkVehicleId] = useState<string>("");
 
   const handleApplyBulkMapping = async () => {
-    if (!bulkExpenseAccountId && !bulkPaymentAccountId && !bulkVendorId && !bulkCustomerId) return;
+    if (!bulkExpenseAccountId && !bulkPaymentAccountId && !bulkVendorId && !bulkCustomerId && !bulkVehicleId) return;
     
     let successCount = 0;
     try {
@@ -363,6 +422,7 @@ export function ExpenseMappingGrid({ importData }: Props) {
       if (bulkPaymentAccountId) updates.mapped_payment_account_id = bulkPaymentAccountId;
       if (bulkVendorId) updates.mapped_vendor_id = bulkVendorId;
       if (bulkCustomerId) updates.mapped_customer_id = bulkCustomerId;
+      if (bulkVehicleId) updates.mapped_vehicle_id = bulkVehicleId;
 
       const targetRecords = records.filter(r => selectedIds.has(r.id) && !r.is_confirmed);
       
@@ -492,6 +552,7 @@ export function ExpenseMappingGrid({ importData }: Props) {
   }
 
   const isSpecialHire = importData.sector === "Special Hire";
+  const isSchoolBus = importData.sector === "School Bus";
   const unconfirmedCount = records.filter(r => !r.is_confirmed).length;
   const processableFiltered = filteredRecords.filter(r => !r.is_confirmed);
 
@@ -515,28 +576,17 @@ export function ExpenseMappingGrid({ importData }: Props) {
         
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
-            isSpecialHire ? (
-              <Button 
-                onClick={handleBulkConfirm} 
-                disabled={isBulkProcessing}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                <CheckSquare className="h-4 w-4 mr-2" />
-                Bulk Confirm ({selectedIds.size})
-              </Button>
-            ) : (
-              <Button 
-                onClick={handleBulkPostToGL} 
-                disabled={isBulkProcessing || createJournal.isPending || postJournal.isPending}
-                className="bg-primary hover:bg-primary/90"
-              >
-                <CheckSquare className="h-4 w-4 mr-2" />
-                Bulk Post to GL ({selectedIds.size})
-              </Button>
-            )
+            <Button 
+              onClick={handleBulkPostToGL} 
+              disabled={isBulkProcessing || createJournal.isPending || postJournal.isPending}
+              className="bg-primary hover:bg-primary/90"
+            >
+              <CheckSquare className="h-4 w-4 mr-2" />
+              Bulk Post to GL ({selectedIds.size})
+            </Button>
           )}
 
-          {isSpecialHire && (
+          {(isSpecialHire || isSchoolBus) && (
              <Button 
                variant="secondary" 
                onClick={runAutoSuggest} 
@@ -566,7 +616,20 @@ export function ExpenseMappingGrid({ importData }: Props) {
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto bg-blue-50/50 p-2 rounded-md border border-blue-100">
               <span className="text-xs font-medium text-blue-800 whitespace-nowrap pl-2">Bulk Map ({selectedIds.size}):</span>
               
-              {(importData.import_category === "AP_Invoice" || importData.import_category === "AP_Payment") && (
+              {(isSchoolBus || isSpecialHire) && (
+                <div className="w-[180px]">
+                  <SearchableSelect
+                    options={vehicleOptions}
+                    value={bulkVehicleId || "none"}
+                    onValueChange={(val) => setBulkVehicleId(val === "none" ? "" : val)}
+                    placeholder="Map Vehicle..."
+                    searchPlaceholder="Search bus number..."
+                    triggerClassName="h-8 text-xs bg-white"
+                  />
+                </div>
+              )}
+              
+              {(importData.import_category === "AP_Invoice" || importData.import_category === "AP_Payment" || isSpecialHire || isSchoolBus) && (
                 <div className="w-[180px]">
                   <SearchableSelect
                     options={vendorOptions}
@@ -604,7 +667,7 @@ export function ExpenseMappingGrid({ importData }: Props) {
                 variant="default"
                 className="h-8 text-xs bg-blue-600 hover:bg-blue-700"
                 onClick={handleApplyBulkMapping}
-                disabled={!bulkExpenseAccountId && !bulkPaymentAccountId && !bulkVendorId && !bulkCustomerId}
+                disabled={!bulkExpenseAccountId && !bulkPaymentAccountId && !bulkVendorId && !bulkCustomerId && !bulkVehicleId}
               >
                 Apply
               </Button>
@@ -626,26 +689,22 @@ export function ExpenseMappingGrid({ importData }: Props) {
               <TableHead>Amount (Rs)</TableHead>
               <TableHead>Raw Detail</TableHead>
               
-              {isSpecialHire ? (
-                <>
-                  <TableHead className="w-[200px]">Vehicle Mapping</TableHead>
-                  <TableHead className="w-[200px]">Quotation Mapping</TableHead>
-                  <TableHead className="w-[100px] text-right">Action</TableHead>
-                </>
-              ) : (
-                <>
-                  {(importData.import_category === "AP_Invoice" || importData.import_category === "AP_Payment") && (
-                    <TableHead className="w-[180px]">Vendor</TableHead>
-                  )}
-                  <TableHead className="w-[180px]">
-                    {importData.import_category === "AP_Payment" ? "AP Account" : "Expense Account"}
-                  </TableHead>
-                  <TableHead className="w-[180px]">
-                    {importData.import_category === "AP_Invoice" ? "AP Account" : "Payment Mode"}
-                  </TableHead>
-                  <TableHead className="w-[120px] text-right">Action</TableHead>
-                </>
+              {(isSchoolBus || isSpecialHire) && (
+                <TableHead className="w-[180px]">Vehicle Mapping</TableHead>
               )}
+              {isSpecialHire && (
+                <TableHead className="w-[180px]">Quotation Mapping</TableHead>
+              )}
+              {(importData.import_category === "AP_Invoice" || importData.import_category === "AP_Payment" || isSpecialHire || isSchoolBus) && (
+                <TableHead className="w-[180px]">Vendor</TableHead>
+              )}
+              <TableHead className="w-[180px]">
+                {importData.import_category === "AP_Payment" ? "AP Account" : "Expense Account"}
+              </TableHead>
+              <TableHead className="w-[180px]">
+                {importData.import_category === "AP_Invoice" ? "AP Account" : "Payment Mode"}
+              </TableHead>
+              <TableHead className="w-[120px] text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -684,104 +743,84 @@ export function ExpenseMappingGrid({ importData }: Props) {
                     </span>
                   </TableCell>
                   
-                  {isSpecialHire ? (
-                    <>
-                      <TableCell>
-                         <SearchableSelect
-                           options={vehicleOptions}
-                           value={r.mapped_vehicle_id || "none"}
-                           onValueChange={(val) => handleManualMapping(r.id, "mapped_vehicle_id", val === "none" ? null : val)}
-                           disabled={r.is_confirmed}
-                           placeholder="Map Vehicle..."
-                           searchPlaceholder="Search bus number..."
-                           emptyLabel="None"
-                         />
-                      </TableCell>
-                      <TableCell>
-                         <SearchableSelect
-                           options={quotationOptions}
-                           value={r.mapped_quotation_id || "none"}
-                           onValueChange={(val) => handleManualMapping(r.id, "mapped_quotation_id", val === "none" ? null : val)}
-                           disabled={r.is_confirmed}
-                           placeholder="Map Quotation..."
-                           searchPlaceholder="Search quotation no..."
-                           emptyLabel="None"
-                         />
-                      </TableCell>
-                      <TableCell className="text-right">
-                         {r.is_confirmed ? (
-                           <Badge variant="outline" className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">
-                             <CheckCircle2 className="h-3 w-3 mr-1" /> Confirmed
-                           </Badge>
-                         ) : (
-                           <Button 
-                             size="sm" 
-                             variant="outline"
-                             className="h-8 text-xs"
-                             onClick={() => handleConfirmRecord(r)}
-                             disabled={!r.mapped_quotation_id || !r.mapped_vehicle_id || isBulkProcessing}
-                           >
-                             Confirm
-                           </Button>
-                         )}
-                      </TableCell>
-                    </>
-                  ) : (
-                    <>
-                      {(importData.import_category === "AP_Invoice" || importData.import_category === "AP_Payment") && (
-                        <TableCell>
-                           <SearchableSelect
-                             options={vendorOptions}
-                             value={r.mapped_vendor_id || "none"}
-                             onValueChange={(val) => handleManualMapping(r.id, "mapped_vendor_id", val === "none" ? null : val)}
-                             disabled={r.is_confirmed}
-                             placeholder="Select Vendor..."
-                             searchPlaceholder="Search vendors..."
-                             emptyLabel="None"
-                           />
-                        </TableCell>
-                      )}
-                      <TableCell>
-                         <SearchableSelect
-                           options={importData.import_category === "AP_Payment" ? apAccounts : expenseOptions}
-                           value={r.mapped_expense_account_id || "none"}
-                           onValueChange={(val) => handleManualMapping(r.id, "mapped_expense_account_id", val === "none" ? null : val)}
-                           disabled={r.is_confirmed || createJournal.isPending || postJournal.isPending}
-                           placeholder="Select Account..."
-                           searchPlaceholder="Search account..."
-                           emptyLabel="None"
-                         />
-                      </TableCell>
-                      <TableCell>
-                         <SearchableSelect
-                           options={importData.import_category === "AP_Invoice" ? apAccounts : paymentOptions}
-                           value={r.mapped_payment_account_id || "none"}
-                           onValueChange={(val) => handleManualMapping(r.id, "mapped_payment_account_id", val === "none" ? null : val)}
-                           disabled={r.is_confirmed || createJournal.isPending || postJournal.isPending}
-                           placeholder="Select Account..."
-                           searchPlaceholder="Search account..."
-                           emptyLabel="None"
-                         />
-                      </TableCell>
-                      <TableCell className="text-right">
-                         {r.is_confirmed ? (
-                           <Badge variant="outline" className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200" title={`Posted: GL Journal ${r.gl_journal_id}`}>
-                             <CheckCircle2 className="h-3 w-3 mr-1" /> Posted
-                           </Badge>
-                         ) : (
-                           <Button 
-                             size="sm" 
-                             variant="default"
-                             className="h-8 text-xs bg-primary hover:bg-primary/90"
-                             onClick={() => handlePostToGL(r)}
-                             disabled={!r.mapped_expense_account_id || !r.mapped_payment_account_id || createJournal.isPending || postJournal.isPending || isBulkProcessing}
-                           >
-                             Post to GL
-                           </Button>
-                         )}
-                      </TableCell>
-                    </>
+                  {(isSchoolBus || isSpecialHire) && (
+                    <TableCell>
+                       <SearchableSelect
+                         options={vehicleOptions}
+                         value={r.mapped_vehicle_id || "none"}
+                         onValueChange={(val) => handleManualMapping(r.id, "mapped_vehicle_id", val === "none" ? null : val)}
+                         disabled={r.is_confirmed}
+                         placeholder="Map Vehicle..."
+                         searchPlaceholder="Search bus number..."
+                         emptyLabel="None"
+                       />
+                    </TableCell>
                   )}
+                  {isSpecialHire && (
+                    <TableCell>
+                       <SearchableSelect
+                         options={quotationOptions}
+                         value={r.mapped_quotation_id || "none"}
+                         onValueChange={(val) => handleManualMapping(r.id, "mapped_quotation_id", val === "none" ? null : val)}
+                         disabled={r.is_confirmed}
+                         placeholder="Map Quotation..."
+                         searchPlaceholder="Search quotation no..."
+                         emptyLabel="None"
+                       />
+                    </TableCell>
+                  )}
+                  {(importData.import_category === "AP_Invoice" || importData.import_category === "AP_Payment" || isSpecialHire || isSchoolBus) && (
+                    <TableCell>
+                       <SearchableSelect
+                         options={vendorOptions}
+                         value={r.mapped_vendor_id || "none"}
+                         onValueChange={(val) => handleManualMapping(r.id, "mapped_vendor_id", val === "none" ? null : val)}
+                         disabled={r.is_confirmed}
+                         placeholder="Select Vendor..."
+                         searchPlaceholder="Search vendors..."
+                         emptyLabel="None"
+                       />
+                    </TableCell>
+                  )}
+                  <TableCell>
+                     <SearchableSelect
+                       options={importData.import_category === "AP_Payment" ? apAccounts : expenseOptions}
+                       value={r.mapped_expense_account_id || "none"}
+                       onValueChange={(val) => handleManualMapping(r.id, "mapped_expense_account_id", val === "none" ? null : val)}
+                       disabled={r.is_confirmed || createJournal.isPending || postJournal.isPending}
+                       placeholder="Select Account..."
+                       searchPlaceholder="Search account..."
+                       emptyLabel="None"
+                     />
+                  </TableCell>
+                  <TableCell>
+                     <SearchableSelect
+                       options={importData.import_category === "AP_Invoice" ? apAccounts : paymentOptions}
+                       value={r.mapped_payment_account_id || "none"}
+                       onValueChange={(val) => handleManualMapping(r.id, "mapped_payment_account_id", val === "none" ? null : val)}
+                       disabled={r.is_confirmed || createJournal.isPending || postJournal.isPending}
+                       placeholder="Select Account..."
+                       searchPlaceholder="Search account..."
+                       emptyLabel="None"
+                     />
+                  </TableCell>
+                  <TableCell className="text-right">
+                     {r.is_confirmed ? (
+                       <Badge variant="outline" className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200" title={`Posted: ${r.gl_journal_id || 'AP Module'}`}>
+                         <CheckCircle2 className="h-3 w-3 mr-1" /> Posted
+                       </Badge>
+                     ) : (
+                       <Button 
+                         size="sm" 
+                         variant="outline"
+                         className="h-8 text-xs bg-primary/10 hover:bg-primary/20 text-primary border-primary/20"
+                         onClick={() => handlePostToGL(r)}
+                         disabled={createJournal.isPending || postJournal.isPending || !r.mapped_expense_account_id || (!r.mapped_payment_account_id && !r.mapped_vendor_id)}
+                       >
+                         Post
+                       </Button>
+                     )}
+                  </TableCell>
                 </TableRow>
               );
             })}

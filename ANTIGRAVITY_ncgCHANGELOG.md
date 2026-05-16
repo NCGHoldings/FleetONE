@@ -1,4 +1,39 @@
+## 2026-05-16
+
+### ✅ Yutong Finance Sync UX & AR Auto-Creation Fix
+
+**Problem:** Users were confused when creating Tax Invoices because the "Sync" button was missing and Master AR was not automatically created. The Master AR creation failed silently because the `finance_customer_id` had not been established yet. The Sync button was missing because the invoice remained in `draft` status instead of `approved`.
+
+**Files Modified:**
+- `src/hooks/useYutongOrderInvoiceManagement.ts` — Added `createVehicleCustomer` logic inside `generateAndStoreDraftInvoice` so that a `finance_customer_id` is guaranteed to exist. This allows the system to successfully auto-create the draft Master AR invoice immediately at generation time, instead of failing silently.
+- `src/components/yutong/YutongOrderInvoiceGenerator.tsx` — Added an inline `Approve` button (with a green styling) directly on the main invoice row for any invoice in `draft` status. This fixes the UX gap where the Approve button was previously hidden inside the "View" modal, causing users to mistakenly believe the invoice generation had failed or skipped finance integration.
+
 ## 2026-05-15
+
+### ✅ School Bus Master Expenses Pipeline
+
+**Problem:** The School Bus operations needed to be brought into the Master Data Pipeline for bulk uploading financial data, but required "full flexibility" (i.e. hybrid mapping to both Vehicles and GL Accounts simultaneously).
+
+**Files Modified:**
+- `src/components/accounting/expenses/MasterExpenseUploader.tsx` — Added "School Bus" to the supported sectors list for smart data mapping.
+- `src/components/accounting/expenses/ExpenseMappingGrid.tsx` — Enabled a hybrid mapping grid for the School Bus sector. It now displays both the `Vehicle Mapping` column (for operational analytics tracking) and the `Expense Account / Payment Mode` columns (for direct GL posting). Modified `postSingleToGL` to include `cost_center_id: mapped_vehicle_id` in the generated journal entry lines, ensuring vehicle data propagates to the ledger.
+
+**Architecture Notes:**
+- "School Bus" expenses are now fully integrated into the Master Data Pipeline and post directly to the GL while retaining analytical linkages to specific vehicles via the `cost_center_id` on the journal entry lines.
+
+### ✅ Team Leader Operational Matrix & Submission Dashboard Overhaul
+
+**Problem:** Operational oversight was grouped strictly by route, making it difficult to track daily fleet assignments, coverage, and conductor submissions by Team Leader. "Unassigned" buses were not surfaced effectively.
+ 
+**Root Cause:** The grouping logic in both the Fleet Master Spreadsheet and the Conductor Submission Matrix only aggregated buses based on their route labels.
+ 
+**Files Modified:**
+- `src/components/fleet/FleetMasterSpreadsheetCore.tsx` — Restructured the Fleet Sheet table sections to group rows by Team Leader. Added a blue section header displaying `[Team Leader: Name]` prepended to the route name to provide immediate visual identification for the supervisor.
+- `src/components/trips/SubmissionMatrixDashboard.tsx` — Refactored the `Daily Detail View` to utilize a `Map`-based clustering strategy. Buses are now first grouped by `Team Leader`, then by Route. Added color-coded Team Leader header banners (incorporating `getLeaderColor` tokens) to cleanly separate daily operations accountability.
+ 
+**Architecture Notes:**
+- "Unassigned" buses are intentionally clustered at the end of the detail matrix with a dedicated visual header to enforce operational oversight and 100% assignment compliance.
+- The `fleetMatrix` logic now correctly reflects real-time leader changes from `useFleetMasterSpreadsheet.ts` without requiring a hard refresh.
 
 ### ✅ Master Expenses — Quotation Mapping Visibility Fix
 
@@ -14,6 +49,17 @@
 - The `SearchableSelect` now uses `shouldFilter={false}` on the `Command` component and implements its own pre-filtering logic, avoiding cmdk's default behavior of rendering all items in the DOM
 - Quotation search is now instant and covers the entire dataset regardless of size
 - The `PopoverContent` width increased from 220px to 280px to better display quotation labels with customer names and date ranges
+
+### ✅ Payment Vouchers — Beneficiary Bank Details Consistency
+
+**Problem:** The "BENEFICIARY BANK DETAILS" table was appearing on "Online" payment vouchers but was completely missing from "Bank Transfer" vouchers.
+
+**Root Cause:** The template generator in `document-template-utils.ts` had restrictive logic that hid the bank details table for direct payments or float transfers if explicit bank details were missing, leading to inconsistent voucher layouts for identical payment methods.
+
+**Files Modified:**
+- `src/lib/document-template-utils.ts` — Updated the `beneficiary_bank_details` placeholder logic to **always** render the bank details table for any payment method that is NOT `Cheque`, `Cash`, or `Petty Cash` (e.g., Bank Transfer, Online). This ensures visual consistency across all digital payment methods and provides a fillable area even if bank details aren't digitally captured.
+
+---
 
 ---
 

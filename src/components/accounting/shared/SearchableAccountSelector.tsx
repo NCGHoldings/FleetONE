@@ -45,9 +45,11 @@ export const SearchableAccountSelector = ({
     );
     
     if (accountTypes && accountTypes.length > 0) {
-      result = result.filter((acc) =>
-        accountTypes.includes(acc.account_type || "")
-      );
+      result = result.filter((acc) => {
+        if (!acc.account_type) return false;
+        const accType = acc.account_type.toLowerCase();
+        return accountTypes.some(t => accType.includes(t.toLowerCase()));
+      });
     }
     
     return result;

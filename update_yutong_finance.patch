@@ -1,0 +1,30 @@
+--- src/hooks/useYutongOrderInvoiceManagement.ts
++++ src/hooks/useYutongOrderInvoiceManagement.ts
+@@ -239,6 +239,26 @@
+             .eq('id', orderId)
+             .single();
+           
++          // Automatically create finance customer if missing so we can create the draft AR
++          if (settings && !orderDetails?.finance_customer_id && orderDetails?.yutong_quotations?.customer_name) {
++            console.log('[Yutong] Resolving finance customer prior to draft AR creation...');
++            const { createVehicleCustomer } = await import('@/hooks/useVehicleSalesFinance');
++            const newCustomerId = await createVehicleCustomer({
++              module: 'yutong',
++              companyId: NCG_HOLDING_ID,
++              customerName: orderDetails.yutong_quotations.customer_name,
++              customerPhone: orderDetails.yutong_quotations.customer_phone || undefined,
++              customerEmail: orderDetails.yutong_quotations.customer_email || undefined,
++              customerCategoryId: orderDetails.yutong_quotations.customer_category_id || undefined,
++            });
++            if (newCustomerId) {
++              await supabase
++                .from('yutong_orders')
++                .update({ finance_customer_id: newCustomerId })
++                .eq('id', orderId);
++              orderDetails.finance_customer_id = newCustomerId;
++            }
++          }
++          
+           if (settings && orderDetails?.finance_customer_id) {
+             // ✅ Duplicate AR prevention — only one AR invoice per order
+             if (orderDetails?.ar_invoice_id) {

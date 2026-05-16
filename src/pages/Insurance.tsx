@@ -9,13 +9,20 @@ import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ColumnDef } from "@tanstack/react-table";
-import { Shield, Plus, AlertTriangle, CheckCircle, Calendar, FileText, Clock, Car } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Shield, Plus, AlertTriangle, CheckCircle, Calendar, FileText, Clock, Car, RefreshCw, MoreHorizontal, Settings } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { DocumentUpload } from "@/components/documents/DocumentUpload";
 import { AccidentInsurance } from "@/components/accident/AccidentInsurance";
+import { InsuranceFinanceSettings } from "@/components/insurance/InsuranceFinanceSettings";
 import { useInsuranceFinanceSettings, usePostInsurancePremiumToGL } from "@/hooks/useInsuranceFinance";
 
 interface InsuranceRecord {
@@ -50,6 +57,8 @@ export default function Insurance() {
   const [drivers, setDrivers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [unsyncedBuses, setUnsyncedBuses] = useState<any[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const { data: financeSettings } = useInsuranceFinanceSettings();
   const postInsuranceToGL = usePostInsurancePremiumToGL();
@@ -95,7 +104,7 @@ export default function Insurance() {
     try {
       const { data, error } = await supabase
         .from('buses')
-        .select('id, bus_no, registration_number')
+        .select('id, bus_no, registration_number, insurance_expiry, insurance_company')
         .eq('status', 'active')
         .order('bus_no');
 
@@ -129,6 +138,43 @@ export default function Insurance() {
     fetchDrivers();
   }, []);
 
+  useEffect(() => {
+    // Calculate unsynced buses from the loaded fleet data
+    const existingBusIds = new Set(insuranceRecords.map(r => r.bus_id));
+    const unsynced = buses.filter(b => b.insurance_expiry && !existingBusIds.has(b.id));
+    setUnsyncedBuses(unsynced);
+  }, [buses, insuranceRecords]);
+
+  const handleSyncFleetData = async () => {
+    if (!isAdmin) return;
+    setIsSyncing(true);
+    try {
+      const recordsToInsert = unsyncedBuses.map(bus => ({
+        policy_number: `AUTO-${bus.bus_no}-${Date.now().toString().slice(-6)}`,
+        bus_id: bus.id,
+        insurance_company: bus.insurance_company || 'Fleet Master Sync',
+        policy_type: 'comprehensive',
+        premium_amount: 0,
+        coverage_amount: 0,
+        expiry_date: bus.insurance_expiry,
+        status: getExpiryStatus(bus.insurance_expiry),
+        issue_date: new Date().toISOString().split('T')[0],
+      }));
+
+      const { error } = await supabase.from('insurance_records').insert(recordsToInsert);
+      
+      if (error) throw error;
+
+      toast.success(`Successfully synced ${unsyncedBuses.length} policies from Fleet Master`);
+      fetchInsuranceRecords();
+    } catch (error: any) {
+      console.error('Error syncing:', error);
+      toast.error(error.message || 'Failed to sync fleet data');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!isAdmin) {
       toast.error('Access denied');
@@ -147,6 +193,21 @@ export default function Insurance() {
         .single();
 
       if (error) throw error;
+
+      // Sync back to buses master data
+      if (formData.bus_id && formData.expiry_date) {
+         try {
+           await supabase
+             .from('buses')
+             .update({ 
+               insurance_expiry: formData.expiry_date,
+               insurance_company: formData.insurance_company
+             })
+             .eq('id', formData.bus_id);
+         } catch (syncError) {
+           console.error('Error syncing to bus master:', syncError);
+         }
+      }
 
       // Auto-post to GL if setting is enabled
       if (financeSettings?.auto_post_premium && newRecord?.premium_amount > 0) {
@@ -206,6 +267,24 @@ export default function Insurance() {
       agent_email: '',
       driver_id: ''
     });
+  };
+
+  const handleRenewPolicy = (record: InsuranceRecord) => {
+    setFormData({
+      bus_id: record.bus_id,
+      policy_number: '', 
+      insurance_company: record.insurance_company || '',
+      policy_type: record.policy_type || 'comprehensive',
+      issue_date: '',
+      expiry_date: '',
+      premium_amount: '',
+      coverage_amount: record.coverage_amount?.toString() || '',
+      agent_name: record.agent_name || '',
+      agent_phone: record.agent_phone || '',
+      agent_email: record.agent_email || '',
+      driver_id: record.driver_id || ''
+    });
+    setIsDialogOpen(true);
   };
 
   const getExpiryStatus = (expiryDate: string) => {
@@ -383,27 +462,50 @@ export default function Insurance() {
       },
     },
     {
-      id: "documents",
-      header: "Documents",
-      cell: ({ row }) => (
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button size="sm" variant="outline">
-              <FileText className="h-4 w-4 mr-2" />
-              Docs
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Insurance Documents - Policy #{row.original.policy_number}</DialogTitle>
-            </DialogHeader>
-            <DocumentUpload 
-              linkedTable="insurance_records" 
-              linkedRowId={row.original.id}
-            />
-          </DialogContent>
-        </Dialog>
-      ),
+      id: "actions",
+      cell: ({ row }) => {
+        const record = row.original;
+        const status = getExpiryStatus(record.expiry_date);
+        
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {(status === 'expired' || status === 'expiring-soon') && isAdmin && (
+                <DropdownMenuItem 
+                  onClick={() => handleRenewPolicy(record)}
+                  className="text-primary font-medium cursor-pointer gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Renew Policy
+                </DropdownMenuItem>
+              )}
+              <Dialog>
+                <DialogTrigger asChild>
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer gap-2">
+                    <FileText className="h-4 w-4" />
+                    View Documents
+                  </DropdownMenuItem>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Insurance Documents - Policy #{record.policy_number}</DialogTitle>
+                  </DialogHeader>
+                  <DocumentUpload 
+                    linkedTable="insurance_records" 
+                    linkedRowId={record.id}
+                  />
+                </DialogContent>
+              </Dialog>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     },
   ];
 
@@ -433,17 +535,29 @@ export default function Insurance() {
           </div>
           
           {isAdmin && (
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
+            <div className="flex gap-3">
+              {unsyncedBuses.length > 0 && (
                 <Button 
-                  onClick={resetForm}
+                  onClick={handleSyncFleetData}
+                  disabled={isSyncing}
                   className="bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300 animate-scale-in"
-                  style={{ animationDelay: '0.2s' }}
+                  style={{ animationDelay: '0.1s' }}
                 >
-                  <Plus className="h-4 w-4 mr-2 animate-pulse-subtle" />
-                  Add Insurance Policy
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                  Sync {unsyncedBuses.length} from Fleet Data
                 </Button>
-              </DialogTrigger>
+              )}
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    onClick={resetForm}
+                    className="bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300 animate-scale-in"
+                    style={{ animationDelay: '0.2s' }}
+                  >
+                    <Plus className="h-4 w-4 mr-2 animate-pulse-subtle" />
+                    Add Insurance Policy
+                  </Button>
+                </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Add Insurance Policy</DialogTitle>
@@ -596,6 +710,7 @@ export default function Insurance() {
               </div>
             </DialogContent>
             </Dialog>
+            </div>
           )}
         </div>
         
@@ -658,7 +773,7 @@ export default function Insurance() {
 
       {/* Tabbed Interface for Insurance Management */}
       <Tabs defaultValue="policies" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <TabsTrigger value="policies" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
             Insurance Policies
@@ -667,6 +782,12 @@ export default function Insurance() {
             <Car className="h-4 w-4" />
             Accident Insurance
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="finance" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Finance Settings
+            </TabsTrigger>
+          )}
         </TabsList>
         
         <TabsContent value="policies" className="space-y-4">
@@ -686,6 +807,12 @@ export default function Insurance() {
         <TabsContent value="accidents" className="space-y-4">
           <AccidentInsurance />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="finance" className="space-y-4">
+            <InsuranceFinanceSettings />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

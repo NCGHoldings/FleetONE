@@ -27,7 +27,8 @@ import { CashierSettlementDashboard } from "@/components/ncg-express/CashierSett
 import { BankDepositDashboard } from "@/components/ncg-express/BankDepositDashboard";
 import { FleetMasterSpreadsheet } from "@/components/fleet/FleetMasterSpreadsheet";
 import { LogSheetUploadModal } from "@/components/trips/LogSheetUploadModal";
-import { SubmissionTrackingDashboard } from "@/components/trips/SubmissionTrackingDashboard";
+import { SubmissionMatrixDashboard } from "@/components/trips/SubmissionMatrixDashboard";
+import { ConductorSubmissionsReview } from "@/components/trips/ConductorSubmissionsReview";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 
@@ -426,57 +427,7 @@ export default function DailyTrips() {
         </div>
       ) : mainTab === "submission-monitor" ? (
         <div className="container mx-auto p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-            <div>
-              <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                <Clock className="w-5 h-5 text-blue-500" />
-                Submission Tracking & SLA Monitor
-              </h2>
-              <p className="text-sm text-muted-foreground">Monitor real-time data completeness and identify delayed trip submissions.</p>
-            </div>
-            
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setSelectedDate(subDays(selectedDate, 1))}
-                title="Previous Day"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-[200px] justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(selectedDate, "PPP")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => date && setSelectedDate(date)}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setSelectedDate(addDays(selectedDate, 1))}
-                title="Next Day"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <SubmissionTrackingDashboard selectedDate={selectedDate} />
+          <ConductorSubmissionsReview />
         </div>
       ) : mainTab === "cash-settlement" ? (
         <div className="container mx-auto p-4">

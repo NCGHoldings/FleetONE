@@ -246,8 +246,20 @@ export function useDailyBusGroupedTrips(
         });
       }
 
+      // Fetch all active buses
+      const { data: activeBuses } = await supabase
+        .from('buses')
+        .select('id, bus_no')
+        .eq('is_active', true);
+
       // Group trips by bus_id (and date if range query)
       const groupedByBus = new Map<string, any[]>();
+      const busNoMap = new Map<string, string>();
+
+      (activeBuses || []).forEach(bus => {
+        groupedByBus.set(bus.id, []);
+        busNoMap.set(bus.id, bus.bus_no);
+      });
       
       (tripsData || []).forEach((trip: any) => {
         const busId = trip.bus_id;
@@ -256,6 +268,9 @@ export function useDailyBusGroupedTrips(
         
         if (!groupedByBus.has(busId)) {
           groupedByBus.set(busId, []);
+        }
+        if (trip.buses?.bus_no) {
+          busNoMap.set(busId, trip.buses.bus_no);
         }
         
         // Parse notes to get driver/conductor info - use safe parsing to prevent crashes
@@ -358,7 +373,7 @@ export function useDailyBusGroupedTrips(
       const summaries: BusDailySummary[] = [];
       
       groupedByBus.forEach((trips, busId) => {
-        const busNo = (tripsData || []).find((t: any) => t.bus_id === busId)?.buses?.bus_no || 'Unknown';
+        const busNo = busNoMap.get(busId) || 'Unknown';
         const expense = expenseMap.get(busId);
         
         const totalRevenue = trips.reduce((sum, t) => sum + (t.income || 0), 0);
