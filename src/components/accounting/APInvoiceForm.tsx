@@ -39,6 +39,7 @@ const invoiceSchema = z.object({
   wht_category: z.string().optional(),
   notes: z.string().optional(),
   business_unit_code: z.string().optional(),
+  agent_reference: z.string().optional(),
 });
 
 const WHT_CATEGORIES = [
@@ -222,6 +223,7 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
       wht_category: "",
       notes: "",
       business_unit_code: initialData?.formValues?.business_unit_code || businessUnitCode || "",
+      agent_reference: initialData?.formValues?.agent_reference || "",
     },
   });
 
@@ -240,6 +242,7 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
         wht_category: (editingInvoice as any).wht_category || "",
         notes: editingInvoice.notes || "",
         business_unit_code: editingInvoice.business_unit_code || "",
+        agent_reference: editingInvoice.agent_reference || "",
       });
       setSelectedRouteId(editingInvoice.route_id || "");
       setSelectedBusId(editingInvoice.bus_id || "");
@@ -288,6 +291,7 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
         wht_category: "",
         notes: "",
         business_unit_code: businessUnitCode || "",
+        agent_reference: "",
       });
       // Reset invoice lines to a single empty line
       setLines([{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }]);
@@ -497,7 +501,7 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
     <div className={cn("space-y-6", !isActive && "hidden")}>
         <Form {...form}>
           <form className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
               <FormField
                 control={form.control}
                 name="invoice_number"
@@ -536,6 +540,24 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
                       value={field.value}
                       onValueChange={handleVendorChange}
                       showQuickAdd={true}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="agent_reference"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sub-Vendor / Agent</FormLabel>
+                    <SearchableVendorSelector
+                      value={field.value || ""}
+                      onValueChange={field.onChange}
+                      placeholder="Select agent..."
+                      showQuickAdd={true}
+                      valueType="name"
                     />
                     <FormMessage />
                   </FormItem>
@@ -1081,6 +1103,8 @@ const SingleAPInvoiceForm = forwardRef(({ initialData, editingInvoice, isActive,
               )}
             />
 
+
+
             {!isEditing && (
               <div className="border rounded-lg p-4 space-y-4">
                 <div className="flex items-center justify-between">
@@ -1188,6 +1212,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
               wht_category: "",
               notes: "",
               business_unit_code: getBusinessUnitCode() || "",
+              agent_reference: "",
             },
             lines: [{ id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 }],
             allocations: [],
@@ -1295,6 +1320,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
               school_route_id: data.schoolRouteId || undefined,
               company_id: effectiveCompanyId,
               business_unit_code: data.formValues.business_unit_code || businessUnitCode,
+              agent_reference: data.formValues.agent_reference,
             },
             lines: lineData,
           });
@@ -1323,6 +1349,7 @@ export const APInvoiceForm = ({ open, onOpenChange, editingInvoice }: APInvoiceF
             school_route_id: data.schoolRouteId || undefined,
             company_id: effectiveCompanyId,
             business_unit_code: data.formValues.business_unit_code || businessUnitCode,
+            agent_reference: data.formValues.agent_reference,
             lines: lineData,
             cost_allocations: validAllocations.length > 0 ? validAllocations : undefined,
           });

@@ -10,9 +10,10 @@ import { CustomerForm } from "../CustomerForm";
 
 interface SearchableCustomerSelectorProps {
   value: string;
-  onValueChange: (customerId: string) => void;
+  onValueChange: (val: string) => void;
   placeholder?: string;
   showQuickAdd?: boolean;
+  valueType?: "id" | "name";
 }
 
 export const SearchableCustomerSelector = ({
@@ -20,6 +21,7 @@ export const SearchableCustomerSelector = ({
   onValueChange,
   placeholder = "Select customer",
   showQuickAdd = true,
+  valueType = "id",
 }: SearchableCustomerSelectorProps) => {
   const { data: customers } = useCustomers();
   const [search, setSearch] = useState("");
@@ -59,7 +61,7 @@ export const SearchableCustomerSelector = ({
               </div>
 
               {filteredCustomers.map((customer: any) => (
-                <SelectItem key={customer.id} value={customer.id}>
+                <SelectItem key={customer.id} value={valueType === "name" ? customer.customer_name : customer.id}>
                   <div className="flex items-center gap-2 w-full pr-2">
                     <span className="font-mono text-[11px] text-muted-foreground">{customer.customer_code}</span>
                     <span className="truncate flex-1">{customer.customer_name}</span>

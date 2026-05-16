@@ -1,27 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCrewAuth } from '@/contexts/CrewAuthContext';
-import { Wallet, Banknote, History, PiggyBank, Receipt, CreditCard } from 'lucide-react';
+import { Wallet, Banknote, History, PiggyBank, Receipt, CreditCard, Loader2 } from 'lucide-react';
+import { createAnonymousClient } from '@/integrations/supabase/public-client';
 
 import CrewLogin from './CrewLogin';
 
 export default function CrewFinance() {
   const { crewMember, isAuthenticated } = useCrewAuth();
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!crewMember?.id) return;
+    
+    const fetchDashboard = async () => {
+      try {
+        const supabase = createAnonymousClient();
+        const { data, error } = await supabase.rpc('get_crew_dashboard_data', { p_staff_id: crewMember.id });
+        if (!error && data) {
+          setDashboardData(data);
+        }
+      } catch (err) {
+        console.error("Error fetching crew dashboard:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, [crewMember?.id]);
 
   if (!isAuthenticated) {
     return <CrewLogin />;
   }
 
-  // Mock Data
-  const currentSalary = 32000; // Base + Commission
-  const advancedTaken = 5000;
-  const loanBalance = 12000;
-  
-  const transactions = [
-    { type: 'Advance', amount: 5000, date: '2026-05-01', status: 'Approved' },
-    { type: 'Loan Deduction', amount: 2000, date: '2026-04-30', status: 'Deducted' },
-    { type: 'Salary Paid', amount: 45000, date: '2026-04-28', status: 'Paid' },
-  ];
+  const currentSalary = dashboardData?.current_salary || 0;
+  const advancedTaken = dashboardData?.advances || 0;
+  const loanBalance = dashboardData?.loan_balance || 0;
+  const transactions = dashboardData?.recent_transactions || [];
 
   return (
     <div className="p-4 space-y-6 pb-24">

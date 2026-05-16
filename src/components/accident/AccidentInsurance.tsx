@@ -16,6 +16,7 @@ import { format, parseISO } from "date-fns";
 import { AccidentDetailsModal } from "@/components/accident/AccidentDetailsModal";
 import { AccidentImportModal } from "@/components/accident/AccidentImportModal";
 import { AddAccidentModal } from "@/components/accident/AddAccidentModal";
+import { EmergencyAccidentReportModal } from "@/components/accident/EmergencyAccidentReportModal";
 import { EnhancedSearch } from "@/components/ui/enhanced-search";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -71,6 +72,7 @@ export function AccidentInsurance() {
   const [viewMode, setViewMode] = useState<"table" | "bus-cards">("table");
   const [selectedBusNumber, setSelectedBusNumber] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
 
   const isAdmin = hasRole('super_admin') || hasRole('admin') || hasRole('supervisor');
 
@@ -583,7 +585,13 @@ export function AccidentInsurance() {
           </div>
           
           {/* Action Buttons */}
-          <div className="flex gap-3 mt-6">
+          <div className="flex flex-wrap gap-3 mt-6">
+            <Button 
+              className="bg-red-600 hover:bg-red-700 text-white font-bold shadow-lg animate-pulse-subtle border-white/20 border"
+              onClick={() => setIsEmergencyModalOpen(true)}
+            >
+              🚨 Emergency Report
+            </Button>
             {isAdmin && (
               <>
                 <Button 
@@ -903,6 +911,12 @@ export function AccidentInsurance() {
       <AddAccidentModal
         open={isAddModalOpen}
         onOpenChange={setIsAddModalOpen}
+        onSuccess={fetchAccidents}
+      />
+
+      <EmergencyAccidentReportModal 
+        open={isEmergencyModalOpen}
+        onOpenChange={setIsEmergencyModalOpen}
         onSuccess={fetchAccidents}
       />
     </div>

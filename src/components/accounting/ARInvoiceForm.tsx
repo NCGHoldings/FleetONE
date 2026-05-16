@@ -31,6 +31,7 @@ const invoiceSchema = z.object({
   billing_address: z.string().optional(),
   notes: z.string().optional(),
   business_unit_code: z.string().optional(),
+  agent_reference: z.string().optional(),
 });
 
 type InvoiceFormData = z.infer<typeof invoiceSchema>;
@@ -117,6 +118,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
       billing_address: "",
       notes: "",
       business_unit_code: editingInvoice?.business_unit_code || defaultBusinessUnit || "HQ",
+      agent_reference: editingInvoice?.agent_reference || "",
     },
   });
 
@@ -132,6 +134,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
         billing_address: editingInvoice.billing_address || "",
         notes: editingInvoice.notes || "",
         business_unit_code: editingInvoice.business_unit_code || "",
+        agent_reference: editingInvoice.agent_reference || "",
       });
 
       // Pre-fill bus data
@@ -266,6 +269,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
             tax_amount: totalTax,
             notes: data.billing_address ? `${data.billing_address ? `Billing: ${data.billing_address}\n` : ''}${data.notes || ''}`.trim() : data.notes,
             business_unit_code: data.business_unit_code,
+            agent_reference: data.agent_reference,
             ...busFields,
           },
           lines: lineData,
@@ -281,6 +285,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
           tax_amount: totalTax,
           notes: data.billing_address ? `${data.billing_address ? `Billing: ${data.billing_address}\n` : ''}${data.notes || ''}`.trim() : data.notes,
           business_unit_code: data.business_unit_code || defaultBusinessUnit,
+          agent_reference: data.agent_reference,
           ...busFields,
           lines: lineData,
         });
@@ -314,7 +319,7 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
             
             {/* Header Fields - Organized in a modern card */}
             <div className="bg-white p-5 rounded-xl border border-slate-200/60 shadow-sm">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-4">
                 <FormField
                   control={form.control}
                   name="customer_id"
@@ -325,6 +330,24 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                         value={field.value}
                         onValueChange={field.onChange}
                         showQuickAdd={true}
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="agent_reference"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-slate-600 font-medium">Sub-Customer / Agent</FormLabel>
+                      <SearchableCustomerSelector
+                        value={field.value || ""}
+                        onValueChange={field.onChange}
+                        placeholder="Select agent..."
+                        showQuickAdd={true}
+                        valueType="name"
                       />
                       <FormMessage />
                     </FormItem>
@@ -597,6 +620,8 @@ export const ARInvoiceForm = ({ open, onOpenChange, editingInvoice }: ARInvoiceF
                       </FormItem>
                     )}
                   />
+
+
                 </div>
               </div>
 

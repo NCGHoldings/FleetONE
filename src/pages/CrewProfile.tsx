@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,9 +17,34 @@ export default function CrewProfile() {
   const [leaveReason, setLeaveReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!crewMember?.id) return;
+    
+    const fetchDashboard = async () => {
+      try {
+        const supabase = createAnonymousClient();
+        const { data, error } = await supabase.rpc('get_crew_dashboard_data', { p_staff_id: crewMember.id });
+        if (!error && data) {
+          setDashboardData(data);
+        }
+      } catch (err) {
+        console.error("Error fetching crew dashboard:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, [crewMember?.id]);
+
   if (!isAuthenticated) {
     return <CrewLogin />;
   }
+
+  const estCommission = dashboardData?.estimated_commission || 0;
+  const targetsHit = dashboardData?.targets_hit || 0;
 
   const handleLeaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,14 +103,14 @@ export default function CrewProfile() {
           <CardContent className="p-4 flex flex-col items-center text-center">
             <Wallet className="w-6 h-6 mb-2 text-emerald-100" />
             <p className="text-xs text-emerald-100 font-medium">Est. Commission</p>
-            <p className="text-lg font-bold">Rs. 12,500</p>
+            <p className="text-lg font-bold">Rs. {estCommission.toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-amber-500 to-amber-600 border-0 text-white shadow-md">
           <CardContent className="p-4 flex flex-col items-center text-center">
             <Medal className="w-6 h-6 mb-2 text-amber-100" />
             <p className="text-xs text-amber-100 font-medium">Targets Hit</p>
-            <p className="text-lg font-bold">14 This Month</p>
+            <p className="text-lg font-bold">{targetsHit} This Month</p>
           </CardContent>
         </Card>
       </div>

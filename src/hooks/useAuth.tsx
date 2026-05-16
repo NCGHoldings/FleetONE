@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // 5-second timeout to fail fast if Supabase is unreachable
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Auth fetch timeout")), 5000);
+        setTimeout(() => reject(new Error("Auth fetch timeout")), 30000);
       });
 
       // 2. Fetch fresh profile
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchMFAFactors = async () => {
     try {
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("MFA fetch timeout")), 5000));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("MFA fetch timeout")), 30000));
       const mfaPromise = supabase.auth.mfa.listFactors();
       const response = await Promise.race([mfaPromise, timeoutPromise]) as any;
       const { data, error } = response;
@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchAAL = async () => {
     try {
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AAL fetch timeout")), 5000));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AAL fetch timeout")), 30000));
       const aalPromise = supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       const response = await Promise.race([aalPromise, timeoutPromise]) as any;
       const { data, error } = response;

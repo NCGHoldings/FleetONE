@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { CustomerForm } from "./CustomerForm";
+import { SearchableCustomerSelector } from "./shared/SearchableCustomerSelector";
 import { useCompany } from "@/contexts/CompanyContext";
 
 const receiptSchema = z.object({
@@ -105,6 +106,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
 
   const [allocations, setAllocations] = useState<InvoiceAllocation[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(preselectedCustomerId || "");
+  const [selectedSubCustomer, setSelectedSubCustomer] = useState("");
   const [selectedPartyType, setSelectedPartyType] = useState<"customer" | "vendor" | "employee">("customer");
   const [isAdvance, setIsAdvance] = useState(isAdvanceMode);
   const [globalWriteOffAccountId, setGlobalWriteOffAccountId] = useState("");
@@ -286,7 +288,8 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
     if (selectedCustomerId && !isAdvance) {
       if (selectedPartyType === "customer" && allInvoices) {
         const customerInvoices = allInvoices.filter(
-          (inv) => inv.customer_id === selectedCustomerId && (inv.balance || 0) > 0
+          (inv) => inv.customer_id === selectedCustomerId && (inv.balance || 0) > 0 &&
+          (!selectedSubCustomer || inv.agent_reference === selectedSubCustomer)
         );
         setAllocations(
           customerInvoices.map((inv) => ({
@@ -651,6 +654,25 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdv
                   </FormItem>
                 )}
               />
+
+              {selectedPartyType === "customer" && (
+                <FormField
+                  control={form.control}
+                  name="customer_id" // using customer_id just to satisfy FormField
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>Filter by Sub-Customer / Agent</FormLabel>
+                      <SearchableCustomerSelector
+                        value={selectedSubCustomer}
+                        onValueChange={setSelectedSubCustomer}
+                        placeholder="All Invoices"
+                        showQuickAdd={false}
+                        valueType="name"
+                      />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}

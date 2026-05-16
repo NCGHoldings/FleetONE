@@ -53,7 +53,7 @@ export function SearchableFinanceAccountSelector({
 
   // Filter out accounts with empty ids
   const filteredAccounts = useMemo(() => {
-    return accounts.filter(
+    return (accounts || []).filter(
       (account) => account.id && account.id.trim() !== ""
     );
   }, [accounts]);

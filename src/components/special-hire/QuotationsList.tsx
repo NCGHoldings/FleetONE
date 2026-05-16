@@ -146,7 +146,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
   const loadQuotations = async () => {
     try {
       const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Quotations load timeout')), 5000)
+        setTimeout(() => reject(new Error('Quotations load timeout')), 30000)
       );
 
       const fetchPromise = (async () => {

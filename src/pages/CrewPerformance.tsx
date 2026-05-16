@@ -1,29 +1,45 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useCrewAuth } from '@/contexts/CrewAuthContext';
-import { TrendingUp, Medal, Target, Award, Calendar } from 'lucide-react';
+import { TrendingUp, Medal, Target, Award, Calendar, Loader2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { createAnonymousClient } from '@/integrations/supabase/public-client';
 
 import CrewLogin from './CrewLogin';
 
 export default function CrewPerformance() {
   const { crewMember, isAuthenticated } = useCrewAuth();
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!crewMember?.id) return;
+    
+    const fetchDashboard = async () => {
+      try {
+        const supabase = createAnonymousClient();
+        const { data, error } = await supabase.rpc('get_crew_dashboard_data', { p_staff_id: crewMember.id });
+        if (!error && data) {
+          setDashboardData(data);
+        }
+      } catch (err) {
+        console.error("Error fetching crew dashboard:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, [crewMember?.id]);
 
   if (!isAuthenticated) {
     return <CrewLogin />;
   }
 
-  // Mock Performance Data
-  const monthlyTarget = 150000;
-  const currentRevenue = 125000;
-  const progressPercent = (currentRevenue / monthlyTarget) * 100;
-
-  const pastTrips = [
-    { date: '2026-05-02', route: 'Makumbura - Badulla', revenue: 45000, targetHit: true },
-    { date: '2026-05-01', route: 'Panadura - Kandy', revenue: 38000, targetHit: true },
-    { date: '2026-04-30', route: 'Colombo - Nuwara Eliya', revenue: 42000, targetHit: true },
-    { date: '2026-04-28', route: 'Makumbura - Badulla', revenue: 28000, targetHit: false },
-  ];
+  const monthlyTarget = dashboardData?.monthly_target || 150000;
+  const currentRevenue = dashboardData?.current_revenue || 0;
+  const progressPercent = monthlyTarget > 0 ? Math.min((currentRevenue / monthlyTarget) * 100, 100) : 0;
+  const pastTrips = dashboardData?.recent_performance || [];
+  const targetsHit = dashboardData?.targets_hit || 0;
 
   return (
     <div className="p-4 space-y-6 pb-24">
@@ -63,7 +79,7 @@ export default function CrewPerformance() {
             </div>
             <div>
               <p className="text-xs text-slate-500 font-medium">Targets Hit</p>
-              <p className="text-xl font-bold text-slate-800">14 Trips</p>
+              <p className="text-xl font-bold text-slate-800">{targetsHit} Trips</p>
             </div>
           </CardContent>
         </Card>

@@ -1,11 +1,17 @@
+import { readFileSync } from 'fs';
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
 
-const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
+const envContent = readFileSync('.env', 'utf8');
+const envVars = {};
+envContent.split('\n').forEach(line => {
+  const match = line.match(/^([^=]+)="(.*)"$/);
+  if (match) envVars[match[1]] = match[2];
+});
 
-async function check() {
-  const { data, error } = await supabase.from('daily_trips').select('id, route_label, route_id').limit(10);
-  console.log('Daily Trips:', data);
+const supabase = createClient(envVars.VITE_SUPABASE_URL, envVars.VITE_SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false } });
+
+async function run() {
+  const { data, error } = await supabase.from('ar_invoices').select('*').limit(0);
+  console.log('Error:', error);
 }
-check();
+run();

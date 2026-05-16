@@ -123,6 +123,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const initialParsed = parsePayee(preselectedVendorId || "");
   const [payeeType, setPayeeType] = useState<"vendor" | "customer">(initialParsed.type);
   const [payeeId, setPayeeId] = useState<string>(initialParsed.id);
+  const [selectedSubVendor, setSelectedSubVendor] = useState("");
   const [selectedBankAccountId, setSelectedBankAccountId] = useState("");
   const [isAdvance, setIsAdvance] = useState(isAdvanceMode);
   const [isDirectPayment, setIsDirectPayment] = useState(false);
@@ -254,7 +255,8 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   useEffect(() => {
     if (payeeType === "vendor" && payeeId && allInvoices && !isAdvance && !isDirectPayment) {
       const vendorInvoices = allInvoices.filter(
-        (inv) => inv.vendor_id === payeeId && (inv.balance || 0) > 0 && inv.approval_status === "approved"
+        (inv) => inv.vendor_id === payeeId && (inv.balance || 0) > 0 && inv.approval_status === "approved" &&
+        (!selectedSubVendor || inv.agent_reference === selectedSubVendor)
       );
       setAllocations(
         vendorInvoices.map((inv) => ({
@@ -642,6 +644,25 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
                   </FormItem>
                 )}
               />
+
+              {payeeType === "vendor" && (
+                <FormField
+                  control={form.control}
+                  name="vendor_id" // using vendor_id just to satisfy FormField, but we control the value manually
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>Filter by Sub-Vendor / Agent</FormLabel>
+                      <SearchableVendorSelector
+                        value={selectedSubVendor}
+                        onValueChange={setSelectedSubVendor}
+                        placeholder="All Invoices"
+                        showQuickAdd={false}
+                        valueType="name"
+                      />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {/* Vendor Bank Account Selector */}
               {selectedVendorId && vendorBankAccounts && vendorBankAccounts.length > 0 && (

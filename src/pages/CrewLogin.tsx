@@ -301,25 +301,6 @@ export default function CrewLogin() {
                         />
                       </div>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 font-bold text-xs flex flex-col gap-0.5">
-                        <span className="text-sm">Assigned Bus <span className="text-red-500">*</span></span>
-                        <span className="text-[10px] text-slate-400 font-medium tracking-wide">පවරා ඇති බස් රථය / ஒதுக்கப்பட்ட பேருந்து</span>
-                      </Label>
-                      <div className="relative group">
-                        <Bus className="absolute left-3.5 top-3 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                        <Input 
-                          placeholder="e.g. ND-3456" 
-                          value={regAssignedBus}
-                          onChange={(e) => setRegAssignedBus(formatBusNumber(e.target.value))}
-                          className="h-10 pl-10 bg-white/50 hover:bg-white border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm font-bold tracking-wider uppercase transition-all rounded-xl text-sm"
-                          required
-                        />
-                      </div>
-                      <p className="text-[10px] text-slate-400 font-medium">Format: XX-1234 / ආකෘතිය: XX-1234 / வடிவம்: XX-1234</p>
-                    </div>
-
                     <div className="grid grid-cols-2 gap-4 pt-1">
                       <div className="space-y-2 col-span-2 sm:col-span-1">
                         <Label className="text-slate-700 font-bold text-xs flex flex-col gap-0.5">
@@ -349,11 +330,12 @@ export default function CrewLogin() {
                           <SelectContent className="rounded-xl shadow-xl">
                             <SelectItem value="permanent" className="rounded-lg cursor-pointer">Permanent</SelectItem>
                             <SelectItem value="casual" className="rounded-lg cursor-pointer">Casual</SelectItem>
+                            <SelectItem value="temporary" className="rounded-lg cursor-pointer">Temporary</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       
-                      {regEmploymentType === 'casual' && (
+                      {(regEmploymentType === 'casual' || regEmploymentType === 'temporary') && (
                         <div className="space-y-2 col-span-2">
                           <Label className="text-slate-700 font-bold text-sm">Salary Basis <span className="text-red-500">*</span></Label>
                           <Select value={regSalaryType} onValueChange={setRegSalaryType}>
@@ -367,6 +349,24 @@ export default function CrewLogin() {
                           </Select>
                         </div>
                       )}
+                    </div>
+
+                    <div className="space-y-2 mt-2">
+                      <Label className="text-slate-700 font-bold text-xs flex flex-col gap-0.5">
+                        <span className="text-sm">Assigned Bus {regEmploymentType !== 'temporary' && <span className="text-red-500">*</span>}</span>
+                        <span className="text-[10px] text-slate-400 font-medium tracking-wide">පවරා ඇති බස් රථය / ஒதுக்கப்பட்ட பேருந்து</span>
+                      </Label>
+                      <div className="relative group">
+                        <Bus className="absolute left-3.5 top-3 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                        <Input 
+                          placeholder={regEmploymentType === 'temporary' ? "e.g. ND-3456 (Optional)" : "e.g. ND-3456"} 
+                          value={regAssignedBus}
+                          onChange={(e) => setRegAssignedBus(formatBusNumber(e.target.value))}
+                          className="h-10 pl-10 bg-white/50 hover:bg-white border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm font-bold tracking-wider uppercase transition-all rounded-xl text-sm"
+                          required={regEmploymentType !== 'temporary'}
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-medium">Format: XX-1234 / ආකෘතිය: XX-1234 / வடிவம்: XX-1234</p>
                     </div>
 
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="pt-3">

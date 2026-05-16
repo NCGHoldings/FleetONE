@@ -10,12 +10,13 @@ import { VendorForm } from "../VendorForm";
 
 interface SearchableVendorSelectorProps {
   value: string;
-  onValueChange: (vendorId: string) => void;
+  onValueChange: (val: string) => void;
   placeholder?: string;
   showQuickAdd?: boolean;
   /** Also include customers in the dropdown for cross-entity payments */
   includeCustomers?: boolean;
   customers?: any[];
+  valueType?: "id" | "name";
 }
 
 export const SearchableVendorSelector = ({
@@ -25,6 +26,7 @@ export const SearchableVendorSelector = ({
   showQuickAdd = true,
   includeCustomers = false,
   customers = [],
+  valueType = "id",
 }: SearchableVendorSelectorProps) => {
   const { data: vendors } = useVendors();
   const [search, setSearch] = useState("");
@@ -79,7 +81,7 @@ export const SearchableVendorSelector = ({
                 </div>
               )}
               {filteredVendors.map((vendor: any) => (
-                <SelectItem key={vendor.id} value={vendor.id}>
+                <SelectItem key={vendor.id} value={valueType === "name" ? vendor.vendor_name : vendor.id}>
                   <div className="flex items-center gap-2 w-full pr-2">
                     <span className="font-mono text-[11px] text-muted-foreground">{vendor.vendor_code}</span>
                     <span className="truncate">{vendor.vendor_name}</span>
@@ -99,7 +101,7 @@ export const SearchableVendorSelector = ({
                     <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Customers</span>
                   </div>
                   {filteredCustomers.map((customer: any) => (
-                    <SelectItem key={`cust-${customer.id}`} value={`customer:${customer.id}`}>
+                    <SelectItem key={`cust-${customer.id}`} value={valueType === "name" ? customer.customer_name : `customer:${customer.id}`}>
                       <div className="flex items-center gap-2 w-full pr-2">
                         <Badge variant="outline" className="text-[9px] px-1 py-0 bg-blue-500/10 text-blue-400 border-blue-500/30">
                           Customer
