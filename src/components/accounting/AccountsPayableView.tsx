@@ -144,6 +144,14 @@ export const AccountsPayableView = () => {
       ),
     },
     {
+      accessorKey: "agent_reference",
+      header: "Agent/Ref",
+      cell: ({ row }: any) => {
+        const ref = row.original.agent_reference;
+        return ref ? <span className="font-mono text-xs">{ref}</span> : <span className="text-xs text-muted-foreground">—</span>;
+      },
+    },
+    {
       accessorKey: "vendor_bill_number",
       header: "Vendor Bill #",
       cell: ({ row }: any) => {

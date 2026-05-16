@@ -477,6 +477,7 @@ export const useCreateARInvoice = () => {
       bus_type?: string;
       bus_category_id?: string;
       bus_sub_category_id?: string;
+      agent_reference?: string;
       lines?: Array<{
         description: string;
         quantity: number;
@@ -492,7 +493,7 @@ export const useCreateARInvoice = () => {
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = getBusinessUnitCode();
       
-      const { lines, bus_id, bus_no, bus_type, bus_category_id, bus_sub_category_id, ...headerData } = invoice;
+      const { lines, bus_id, bus_no, bus_type, bus_category_id, bus_sub_category_id, agent_reference, ...headerData } = invoice;
       
       const { data, error } = await supabase
         .from("ar_invoices")
@@ -507,6 +508,7 @@ export const useCreateARInvoice = () => {
           bus_type: bus_type || null,
           bus_category_id: bus_category_id || null,
           bus_sub_category_id: bus_sub_category_id || null,
+          agent_reference: agent_reference || null,
         }])
         .select()
         .single();
@@ -1174,6 +1176,7 @@ export const useCreateAPInvoice = () => {
       route_id?: string;
       bus_id?: string;
       school_route_id?: string;
+      agent_reference?: string;
       lines?: Array<{
         description: string;
         quantity: number;
@@ -5612,6 +5615,7 @@ export const useUpdateAPInvoice = () => {
         route_id?: string;
         bus_id?: string;
         school_route_id?: string;
+        agent_reference?: string;
       };
       lines: Array<{
         description: string;
@@ -5717,6 +5721,7 @@ export const useUpdateARInvoice = () => {
         bus_type?: string;
         bus_category_id?: string;
         bus_sub_category_id?: string;
+        agent_reference?: string;
       };
       lines: Array<{
         description: string;
