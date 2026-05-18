@@ -76,28 +76,13 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          echo "🗄️ Starting database dump via Pooler..."
+          echo "🗄️ Starting database dump (Direct Connection)..."
           
-          # Use Node to ensure the URL uses Port 5432 (Session Mode)
-          DB_URL=$(node -e '
-            try {
-              const url = new URL(process.env.DATABASE_URL);
-              // Force port 5432 if it is a Supabase pooler host
-              if (url.hostname.includes("pooler.supabase.com")) {
-                url.port = "5432";
-                // Ensure the username contains the project ref for pooler connections
-                if (url.username === "postgres") {
-                  url.username = "postgres.wwjpdszkmtnzshbulkon";
-                }
-              }
-              console.log(url.toString());
-            } catch (e) {
-              console.error("Invalid DATABASE_URL");
-              process.exit(1);
-            }
-          ')
+          if [[ "$DATABASE_URL" == *"pooler.supabase.com"* ]]; then
+            echo "⚠️ WARNING: You are using a pooler connection. It is highly recommended to use the Direct Connection (port 5432 on db.wwjpdszkmtnzshbulkon.supabase.co) for backups to avoid dropped connections during pg_dump."
+          fi
           
-          pg_dump "$DB_URL" -Fc -Z 9 -f supabase-backup.dump
+          pg_dump "$DATABASE_URL" -Fc -Z 9 -f supabase-backup.dump
           
           DUMP_SIZE=$(du -sh supabase-backup.dump | cut -f1)
           echo "✅ Dump complete. Size: $DUMP_SIZE"
