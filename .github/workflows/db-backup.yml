@@ -85,6 +85,10 @@ jobs:
               // Force port 5432 if it is a Supabase pooler host
               if (url.hostname.includes("pooler.supabase.com")) {
                 url.port = "5432";
+                // Ensure the username contains the project ref for pooler connections
+                if (url.username === "postgres") {
+                  url.username = "postgres.wwjpdszkmtnzshbulkon";
+                }
               }
               console.log(url.toString());
             } catch (e) {
